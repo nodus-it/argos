@@ -13,7 +13,8 @@ Issues und Aufgaben nach v1. Sortiert nach Größe und Risiko. Einige sind manue
 
 ## Iteration 2: PR-Workflow
 
-- [ ] **Phase `pr`**: nach `push` einen GitHub-PR erstellen mit Konzept als PR-Body. Vorbedingung: push war erfolgreich. Nutzt `gh` CLI oder GitHub-REST direkt.
+- [x] **Basis-PR**: `push`-Phase erstellt automatisch einen GitHub PR via `gh pr create` (title=commit subject, body=commit body). PR-URL wird geloggt und im result-JSON als `pr_url` zurückgegeben. *(in v1 umgesetzt)*
+- [ ] **Phase `pr` (erweitert)**: PR-Body aus `concept.md` befüllen, Labels setzen, Reviewers zuweisen.
 - [ ] **Phase `respond`**: PR-Feedback erkennen und einarbeiten. Worker pollt PR-Comments seit letztem Lauf, klassifiziert sie via Claude-Sub-Phase (`revise|clarify|ignore`), führt entsprechend Aktionen aus.
 - [ ] **Phase `analyze`** als optionaler Pre-Concept-Schritt: nur Repo-Inspektion, kein LLM. Output: Repo-Map als Datei, die in concept als Input genutzt werden kann.
 - [ ] **Phase `revise`**: gezielter Edit ohne kompletten Reset, wenn die Änderung lokal und klein ist.
