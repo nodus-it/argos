@@ -209,6 +209,12 @@ phase_implement_run() {
         --max-turns "$max_turns" \
         < "$user_prompt_path" \
         | tee "$stream_log" \
+        | tee >(jq -rj '
+            if .type == "assistant" then
+                (.message.content[]? | select(.type == "text") | .text // "")
+            elif .type == "result" then "\n"
+            else empty end
+          ' 2>/dev/null >&2) \
         | jq -c 'select(.type == "result")' \
         > "$result_json"
     local claude_exit=${PIPESTATUS[0]}

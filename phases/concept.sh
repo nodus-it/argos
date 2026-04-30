@@ -64,6 +64,8 @@ _concept_initial_clone() {
     if ! git fetch --quiet --depth=1 origin "$BASE_BRANCH" 2>>/workspace/.agent/logs/clone.err; then
         echo "concept: git fetch failed (siehe logs/clone.err)" >&2
         git remote set-url origin "$REPO_URL"
+        # .git entfernen damit der naechste Aufruf einen sauberen Retry machen kann
+        rm -rf /workspace/.git
         return 1
     fi
     git checkout -B "$feature_branch" "origin/$BASE_BRANCH"
