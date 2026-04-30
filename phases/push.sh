@@ -48,7 +48,7 @@ _push_has_changes() {
     return 1
 }
 
-# _push_create_github_pr: Erstellt einen GitHub Pull Request via gh CLI.
+# _push_create_github_pr: Erstellt einen GitHub Pull Request via GitHub REST API.
 # Args: $1=feature_branch, $2=title, $3=body (optional)
 # Output: PR-URL auf stdout, leer wenn nicht GitHub oder fehlgeschlagen.
 _push_create_github_pr() {
@@ -58,26 +58,56 @@ _push_create_github_pr() {
 
     [[ "$REPO_URL" == *"github.com"* ]] || return 0
 
+    local owner_repo
+    owner_repo="$(printf '%s' "$REPO_URL" | sed 's|https://github.com/||; s|\.git$||')"
+    [[ -n "$owner_repo" ]] || return 0
+
     local pr_log="/workspace/.agent/logs/gh-pr.${ITERATION}.log"
-    local pr_url
+    local tmp_resp
+    tmp_resp="$(mktemp)"
+
     set +x
-    if ! pr_url="$(
-        GITHUB_TOKEN="$REPO_TOKEN" \
-        gh pr create \
-            --title "$title" \
-            --body "$body" \
-            --base "$BASE_BRANCH" \
-            --head "$feature_branch" \
-            2>"$pr_log"
-    )"; then
-        if grep -q "already exists" "$pr_log" 2>/dev/null; then
-            pr_url="$(GITHUB_TOKEN="$REPO_TOKEN" gh pr view "$feature_branch" \
-                --json url --jq '.url' 2>/dev/null || true)"
-            [[ -n "$pr_url" ]] && { printf '%s' "$pr_url"; return 0; }
-        fi
-        log_warn "push: PR-Erstellung fehlgeschlagen (siehe logs/gh-pr.${ITERATION}.log)"
-        return 0
-    fi
+    local http_code
+    http_code="$(curl -s \
+        -o "$tmp_resp" \
+        -w '%{http_code}' \
+        -X POST \
+        -H "Authorization: Bearer $REPO_TOKEN" \
+        -H "Accept: application/vnd.github+json" \
+        -H "X-GitHub-Api-Version: 2022-11-28" \
+        "https://api.github.com/repos/$owner_repo/pulls" \
+        -d "$(jq -n \
+            --arg title "$title" \
+            --arg body  "$body" \
+            --arg base  "$BASE_BRANCH" \
+            --arg head  "$feature_branch" \
+            '{title:$title,body:$body,base:$base,head:$head}')" \
+        2>"$pr_log")"
+
+    local pr_url=""
+    case "$http_code" in
+        201)
+            pr_url="$(jq -r '.html_url' "$tmp_resp")"
+            ;;
+        422)
+            # PR existiert bereits — vorhandenen PR per List-API suchen
+            local owner="${owner_repo%%/*}"
+            pr_url="$(curl -s \
+                -H "Authorization: Bearer $REPO_TOKEN" \
+                -H "Accept: application/vnd.github+json" \
+                -H "X-GitHub-Api-Version: 2022-11-28" \
+                "https://api.github.com/repos/$owner_repo/pulls?head=${owner}:${feature_branch}&state=open" \
+                2>>"$pr_log" \
+                | jq -r '.[0].html_url // empty')"
+            [[ -z "$pr_url" ]] && log_warn "push: PR existiert bereits, URL nicht ermittelbar"
+            ;;
+        *)
+            cat "$tmp_resp" >> "$pr_log"
+            log_warn "push: PR-Erstellung fehlgeschlagen (HTTP $http_code, siehe logs/gh-pr.${ITERATION}.log)"
+            ;;
+    esac
+
+    rm -f "$tmp_resp"
     printf '%s' "$pr_url"
 }
 
