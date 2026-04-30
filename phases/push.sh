@@ -165,8 +165,12 @@ phase_push_run() {
     }
     local cm_result_log="/workspace/.agent/logs/commit-message.result.${ITERATION}.json"
     if ! phase_commit_message_run > "$cm_result_log"; then
-        echo "push: commit-message Sub-Phase fehlgeschlagen" >&2
-        return 1
+        log_warn "push: commit-message fehlgeschlagen — verwende Fallback-Message"
+        local _fc
+        _fc="$(git -C /workspace status --porcelain | wc -l | tr -d ' ')"
+        printf 'chore: apply implementation changes (%s files)\n' "$_fc" \
+            > "/workspace/.agent/logs/commit-message.${ITERATION}.subject"
+        : > "/workspace/.agent/logs/commit-message.${ITERATION}.body"
     fi
 
     local subject_file="/workspace/.agent/logs/commit-message.${ITERATION}.subject"

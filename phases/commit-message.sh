@@ -124,7 +124,7 @@ phase_commit_message_run() {
             --append-system-prompt "$sysprompt_content" \
             --output-format json \
             --json-schema "$schema_content" \
-            --max-turns 3 \
+            --max-turns 8 \
             --permission-mode bypassPermissions \
             < "$user_prompt_path" \
             > "$output_json"; then

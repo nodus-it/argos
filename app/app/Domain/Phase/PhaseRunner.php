@@ -15,9 +15,110 @@ class PhaseRunner
         private readonly CredentialStore $credentials,
     ) {}
 
+    public function getPhaseLogPath(string $taskName, string $phase): string
+    {
+        $configDir = config('argos.config_dir');
+        return "{$configDir}/tasks/{$taskName}/{$phase}.bg.log";
+    }
+
+    /**
+     * Start a phase in the background. Returns immediately; phase runs detached.
+     */
+    public function startBackground(Task $task, string $phase, array $flags = []): void
+    {
+        $repoRoot = config('argos.repo_root');
+        $cmd = $this->buildCommand($task, $phase, $flags);
+        $logPath = $this->getPhaseLogPath($task->name, $phase);
+
+        $logDir = dirname($logPath);
+        if (!is_dir($logDir)) {
+            mkdir($logDir, 0755, true);
+        }
+
+        // Truncate old log so watch always starts from the beginning
+        file_put_contents($logPath, '');
+
+        $shellParts = array_map('escapeshellarg', $cmd);
+        $shellCmd = 'cd ' . escapeshellarg($repoRoot)
+            . ' && nohup ' . implode(' ', $shellParts)
+            . ' >> ' . escapeshellarg($logPath) . ' 2>&1 &';
+
+        PhaseRun::create([
+            'task_id'   => $task->id,
+            'phase'     => $phase,
+            'iteration' => $task->phaseRuns()->where('phase', $phase)->count() + 1,
+            'status'    => 'running',
+            'started_at' => now(),
+        ]);
+
+        $task->update([
+            'current_phase'  => $phase,
+            'current_status' => 'running',
+        ]);
+
+        shell_exec($shellCmd);
+    }
+
+    /**
+     * Run a phase in the foreground, yielding output chunks as a generator.
+     */
     public function run(Task $task, string $phase, array $flags = []): \Generator
     {
         $repoRoot = config('argos.repo_root');
+        $cmd = $this->buildCommand($task, $phase, $flags);
+
+        $process = new Process($cmd, $repoRoot);
+        $process->setTimeout(null);
+        $process->setIdleTimeout(null);
+
+        $phaseRun = PhaseRun::create([
+            'task_id'    => $task->id,
+            'phase'      => $phase,
+            'iteration'  => $task->phaseRuns()->where('phase', $phase)->count() + 1,
+            'status'     => 'running',
+            'started_at' => now(),
+        ]);
+
+        $chunks = [];
+        $process->start(function (string $type, string $chunk) use (&$chunks): void {
+            $chunks[] = $chunk;
+        });
+
+        while ($process->isRunning()) {
+            while ($chunks !== []) {
+                yield array_shift($chunks);
+            }
+            usleep(50_000);
+        }
+
+        foreach ($chunks as $chunk) {
+            yield $chunk;
+        }
+
+        $exitCode = $process->getExitCode() ?? 1;
+
+        $status = match ($exitCode) {
+            0 => 'completed',
+            4 => 'quality_gate_failed',
+            5 => 'no_changes',
+            default => 'failed',
+        };
+
+        $phaseRun->update([
+            'status'      => $status,
+            'finished_at' => now(),
+            'exit_code'   => $exitCode,
+        ]);
+
+        $task->update([
+            'current_phase'  => $phase,
+            'current_status' => $status,
+        ]);
+    }
+
+    private function buildCommand(Task $task, string $phase, array $flags = []): array
+    {
+        $repoRoot  = config('argos.repo_root');
         $configDir = config('argos.config_dir');
 
         $profile = $task->repoProfile;
@@ -50,7 +151,7 @@ class PhaseRunner
             $cmd[] = "{$descriptionPath}:/run/agent/description.md:ro";
         }
 
-        $cmd = array_merge($cmd, [
+        return array_merge($cmd, [
             '-e', "PHASE={$phase}",
             '-e', "TASK_ID={$task->name}",
             '-e', "REPO_URL={$profile->url}",
@@ -62,56 +163,6 @@ class PhaseRunner
             'worker',
             $phase,
             $task->name,
-        ]);
-
-        $process = new Process($cmd, $repoRoot);
-        $process->setTimeout(null);
-        $process->setIdleTimeout(null);
-
-        $phaseRun = PhaseRun::create([
-            'task_id' => $task->id,
-            'phase' => $phase,
-            'iteration' => $task->phaseRuns()->where('phase', $phase)->count() + 1,
-            'status' => 'running',
-            'started_at' => now(),
-        ]);
-
-        // Collect chunks via iterator so we can yield them
-        $chunks = [];
-        $process->start(function (string $type, string $chunk) use (&$chunks): void {
-            $chunks[] = $chunk;
-        });
-
-        while ($process->isRunning()) {
-            while ($chunks !== []) {
-                yield array_shift($chunks);
-            }
-            usleep(50_000);
-        }
-
-        // Drain any remaining chunks after process exits
-        foreach ($chunks as $chunk) {
-            yield $chunk;
-        }
-
-        $exitCode = $process->getExitCode() ?? 1;
-
-        $status = match ($exitCode) {
-            0 => 'completed',
-            4 => 'quality_gate_failed',
-            5 => 'no_changes',
-            default => 'failed',
-        };
-
-        $phaseRun->update([
-            'status' => $status,
-            'finished_at' => now(),
-            'exit_code' => $exitCode,
-        ]);
-
-        $task->update([
-            'current_phase' => $phase,
-            'current_status' => $status,
         ]);
     }
 }
