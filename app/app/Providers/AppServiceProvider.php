@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Console\Commands\ArgosCommand;
+use App\Console\Commands\ArgosInitCommand;
 use App\Domain\Credentials\CredentialStore;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\ServiceProvider;
@@ -19,6 +21,11 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->commands([
+            ArgosCommand::class,
+            ArgosInitCommand::class,
+        ]);
+
         $this->configureDatabase();
     }
 

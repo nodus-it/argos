@@ -40,4 +40,27 @@ class StateReader
 
         return $state['phases'][$phase]['status'] ?? null;
     }
+
+    public function readNotes(string $taskName): ?string
+    {
+        $process = new Process(
+            ['docker', 'run', '--rm',
+                '-v', "task_ws_{$taskName}:/workspace:ro",
+                '--entrypoint', 'sh',
+                'agent-worker:latest',
+                '-c', 'cat /workspace/.agent/concept.notes.md',
+            ],
+        );
+
+        $process->setTimeout(10);
+        $process->run();
+
+        if (!$process->isSuccessful()) {
+            return null;
+        }
+
+        $output = $process->getOutput();
+
+        return $output !== '' ? $output : null;
+    }
 }
