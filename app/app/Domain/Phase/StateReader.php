@@ -41,6 +41,44 @@ class StateReader
         return $state['phases'][$phase]['current_status'] ?? null;
     }
 
+    public function readConcept(string $taskName): ?string
+    {
+        $process = new Process([
+            'docker', 'run', '--rm',
+            '-v', "task_ws_{$taskName}:/workspace:ro",
+            'alpine',
+            'cat', '/workspace/.agent/concept.md',
+        ]);
+
+        $process->setTimeout(10);
+        $process->run();
+
+        if (!$process->isSuccessful()) {
+            return null;
+        }
+
+        $output = $process->getOutput();
+
+        return $output !== '' ? $output : null;
+    }
+
+    public function writeNotes(string $taskName, string $content): bool
+    {
+        $process = new Process([
+            'docker', 'run', '--rm',
+            '-v', "task_ws_{$taskName}:/workspace",
+            'alpine',
+            'sh', '-c',
+            'mkdir -p /workspace/.agent && printf "%s" "$NOTE_CONTENT" > /workspace/.agent/concept.notes.md',
+        ]);
+
+        $process->setEnv(['NOTE_CONTENT' => $content]);
+        $process->setTimeout(10);
+        $process->run();
+
+        return $process->isSuccessful();
+    }
+
     public function readNotes(string $taskName): ?string
     {
         $process = new Process([
@@ -105,11 +143,32 @@ class StateReader
                 ]);
         }
 
+        $updates = [];
+
         if ($lastPhase !== null && $lastStatus !== null) {
-            $task->update([
-                'current_phase'  => $lastPhase,
-                'current_status' => $lastStatus,
-            ]);
+            $updates['current_phase']  = $lastPhase;
+            $updates['current_status'] = $lastStatus;
+        }
+
+        $featureBranch = $state['repo']['feature_branch'] ?? null;
+        if ($featureBranch !== null && $featureBranch !== $task->feature_branch) {
+            $updates['feature_branch'] = $featureBranch;
+        }
+
+        // pr_url kommt aus dem letzten push-Iterations-Result
+        $pushIterations = $state['phases']['push']['iterations'] ?? [];
+        foreach (array_reverse($pushIterations) as $iter) {
+            $prUrl = $iter['pr_url'] ?? null;
+            if ($prUrl !== null && $prUrl !== '') {
+                if ($prUrl !== $task->pr_url) {
+                    $updates['pr_url'] = $prUrl;
+                }
+                break;
+            }
+        }
+
+        if ($updates !== []) {
+            $task->update($updates);
         }
     }
 }

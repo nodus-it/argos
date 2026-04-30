@@ -8,6 +8,7 @@ use App\Domain\Phase\PhaseRunner;
 use App\Filament\Admin\Resources\TaskResource\Pages\CreateTask;
 use App\Filament\Admin\Resources\TaskResource\Pages\ListTasks;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTask;
+use App\Filament\Admin\Resources\TaskResource\Pages\ViewTaskConcept;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTaskLogs;
 use App\Filament\Admin\Resources\TaskResource\RelationManagers\PhaseRunsRelationManager;
 use App\Models\RepoProfile;
@@ -127,10 +128,11 @@ class TaskResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index'  => ListTasks::route('/'),
-            'create' => CreateTask::route('/create'),
-            'view'   => ViewTask::route('/{record}'),
-            'logs'   => ViewTaskLogs::route('/{record}/logs'),
+            'index'   => ListTasks::route('/'),
+            'create'  => CreateTask::route('/create'),
+            'view'    => ViewTask::route('/{record}'),
+            'concept' => ViewTaskConcept::route('/{record}/concept'),
+            'logs'    => ViewTaskLogs::route('/{record}/logs'),
         ];
     }
 

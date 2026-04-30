@@ -32,6 +32,11 @@ class ViewTask extends ViewRecord
     {
         return [
             $this->phaseAction('concept', 'Concept', 'heroicon-o-light-bulb'),
+            Action::make('viewConcept')
+                ->label('Konzept')
+                ->icon('heroicon-o-document-text')
+                ->color('gray')
+                ->url(TaskResource::getUrl('concept', ['record' => $this->getRecord()])),
             $this->phaseAction('implement', 'Implement', 'heroicon-o-code-bracket'),
             $this->phaseAction('push', 'Push', 'heroicon-o-arrow-up-tray'),
             Action::make('logs')
