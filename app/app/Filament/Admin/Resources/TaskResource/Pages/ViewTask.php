@@ -34,7 +34,11 @@ class ViewTask extends ViewRecord
             $this->phaseAction('concept', 'Concept', 'heroicon-o-light-bulb'),
             $this->phaseAction('implement', 'Implement', 'heroicon-o-code-bracket'),
             $this->phaseAction('push', 'Push', 'heroicon-o-arrow-up-tray'),
-            $this->logsAction(),
+            Action::make('logs')
+                ->label('Logs')
+                ->icon('heroicon-o-command-line')
+                ->color('gray')
+                ->url(TaskResource::getUrl('logs', ['record' => $this->getRecord()])),
             Action::make('refresh')
                 ->label('Aktualisieren')
                 ->icon('heroicon-o-arrow-path')
@@ -105,8 +109,5 @@ class ViewTask extends ViewRecord
             });
     }
 
-    private function logsAction(): Action
-    {
-        return TaskResource::makeLogsAction();
-    }
+
 }
