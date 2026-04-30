@@ -21,6 +21,22 @@ class PhaseRunner
         return "{$configDir}/tasks/{$taskName}/{$phase}.bg.log";
     }
 
+    public function writeFeedbackToVolume(string $taskName, string $feedback): void
+    {
+        $process = new Process([
+            'docker', 'run', '--rm',
+            '-v', "task_ws_{$taskName}:/workspace",
+            '-e', 'FEEDBACK',
+            'alpine',
+            'sh', '-c',
+            'mkdir -p /workspace/.agent && printf "%s" "$FEEDBACK" > /workspace/.agent/respond.feedback.md',
+        ]);
+
+        $process->setEnv(['FEEDBACK' => $feedback]);
+        $process->setTimeout(10);
+        $process->mustRun();
+    }
+
     /**
      * Start a phase in the background. Returns immediately; phase runs detached.
      */

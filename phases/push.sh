@@ -256,10 +256,22 @@ phase_push_run() {
     local commit_sha
     commit_sha="$(git -C /workspace rev-parse HEAD)"
 
+    # PR-Body: concept.md voranstellen wenn vorhanden
+    local pr_body="$body"
+    if [[ -f /workspace/.agent/concept.md ]]; then
+        local concept_content
+        concept_content="$(cat /workspace/.agent/concept.md)"
+        if [[ -n "$body" ]]; then
+            pr_body="$(printf '%s\n\n---\n\n%s' "$concept_content" "$body")"
+        else
+            pr_body="$concept_content"
+        fi
+    fi
+
     # PR/MR erstellen oder URL aus Push-Output lesen
     local pr_url=""
     case "$platform" in
-        github) pr_url="$(_push_pr_github "$feature_branch" "$subject" "$body")" ;;
+        github) pr_url="$(_push_pr_github "$feature_branch" "$subject" "$pr_body")" ;;
         gitlab) pr_url="$(_push_pr_gitlab "$push_log")" ;;
     esac
     if [[ -n "$pr_url" ]]; then

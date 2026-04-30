@@ -10,6 +10,7 @@ use App\Filament\Admin\Resources\TaskResource\Pages\ListTasks;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTask;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTaskConcept;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTaskLogs;
+use App\Filament\Admin\Resources\TaskResource\Pages\ViewTaskRespond;
 use App\Filament\Admin\Resources\TaskResource\RelationManagers\PhaseRunsRelationManager;
 use App\Models\RepoProfile;
 use App\Models\Task;
@@ -131,8 +132,9 @@ class TaskResource extends Resource
             'index'   => ListTasks::route('/'),
             'create'  => CreateTask::route('/create'),
             'view'    => ViewTask::route('/{record}'),
-            'concept' => ViewTaskConcept::route('/{record}/concept'),
-            'logs'    => ViewTaskLogs::route('/{record}/logs'),
+            'concept'  => ViewTaskConcept::route('/{record}/concept'),
+            'logs'     => ViewTaskLogs::route('/{record}/logs'),
+            'respond'  => ViewTaskRespond::route('/{record}/respond'),
         ];
     }
 

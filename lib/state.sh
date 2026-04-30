@@ -53,7 +53,8 @@ state_init() {
                 concept:    $empty,
                 implement:  $empty,
                 diff:       $empty,
-                push:       $empty
+                push:       $empty,
+                respond:    $empty
             }
         }' > "${STATE_FILE}.tmp"
     mv "${STATE_FILE}.tmp" "$STATE_FILE"

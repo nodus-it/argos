@@ -39,6 +39,11 @@ class ViewTask extends ViewRecord
                 ->url(TaskResource::getUrl('concept', ['record' => $this->getRecord()])),
             $this->phaseAction('implement', 'Implement', 'heroicon-o-code-bracket'),
             $this->phaseAction('push', 'Push', 'heroicon-o-arrow-up-tray'),
+            Action::make('respond')
+                ->label('Respond')
+                ->icon('heroicon-o-chat-bubble-left-right')
+                ->color('gray')
+                ->url(TaskResource::getUrl('respond', ['record' => $this->getRecord()])),
             Action::make('logs')
                 ->label('Logs')
                 ->icon('heroicon-o-command-line')

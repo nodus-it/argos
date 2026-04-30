@@ -14,8 +14,8 @@
 # shellcheck disable=SC2034
 # (Konstanten werden vom Caller gelesen.)
 
-PHASE_NAMES=(concept implement diff push commit-message)
-PHASE_ORDER_IN_LIFECYCLE=(concept implement diff push)
+PHASE_NAMES=(concept implement diff push respond commit-message)
+PHASE_ORDER_IN_LIFECYCLE=(concept implement diff push respond)
 
 PHASES_DIR="${PHASES_DIR:-/usr/local/share/agent/phases}"
 

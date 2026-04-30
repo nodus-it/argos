@@ -111,7 +111,7 @@ class StateReader
             return;
         }
 
-        $phaseOrder = ['concept', 'implement', 'diff', 'push'];
+        $phaseOrder = ['concept', 'implement', 'diff', 'push', 'respond'];
         $lastPhase  = null;
         $lastStatus = null;
 
