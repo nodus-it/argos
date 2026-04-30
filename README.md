@@ -11,6 +11,7 @@ Vier Phasen pro Task: **`concept`** (Plan formulieren) → **`implement`** (Code
 - Docker & Docker Compose v2
 - `claude` CLI ([Anthropic Claude Code](https://docs.claude.com/en/docs/claude-code/cli-reference))
 - `git`, `bash`
+- `jq` (JSON-Verarbeitung der Phase-Flags) — `sudo apt-get install -y jq` auf Debian/Ubuntu/WSL
 
 ```bash
 # 1. Claude Code installieren und Subscription-Token erzeugen

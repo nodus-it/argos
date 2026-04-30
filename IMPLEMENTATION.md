@@ -25,14 +25,14 @@ Dieses Dokument enthält alle konkreten Entscheidungen, die zum Bau von v1 nöti
 claude -p \
   --append-system-prompt "$(cat /workspace/.agent/runtime/concept.system.merged.md)" \
   --output-format json \
-  --max-turns 5 \
+  --max-turns 15 \
   --permission-mode bypassPermissions \
   < /workspace/.agent/runtime/concept.user-prompt.md
 ```
 
 - `--append-system-prompt`: erwartet den merged System-Prompt als String-Argument (Claude Code 2.1.x hat keinen `-file`-Suffix mehr; die Phase-Skripte lesen die merged-Datei via `"$(cat …)"` ein)
 - `--output-format json`: liefert ein einzelnes Envelope `{result, session_id, total_cost_usd, ...}`. `result` enthält den Free-Form-Text der letzten Assistant-Message
-- `max-turns 5`: Claude darf File-Tools nutzen (Repo-Struktur lesen) bevor Output erscheint
+- `max-turns 15`: Claude darf File-Tools nutzen (Repo-Struktur lesen) bevor Output erscheint; 15 reicht für typische Repos (5 war in der Praxis zu knapp)
 - `bypassPermissions`: Container ist die Sandbox, keine Approval-Prompts
 - stdin: User-Prompt-File mit Aufgabe + ggf. vorheriges Konzept + Notes
 

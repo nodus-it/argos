@@ -117,6 +117,20 @@ _agent_run_volume_cmd() {
 cmd_init() {
     local update_only="${ARG_FLAG_UPDATE_TOKEN:-}"
 
+    # Prüfe Host-Abhängigkeit: jq wird für die Flag-Verarbeitung jeder Phase benötigt.
+    if ! command -v jq &>/dev/null; then
+        printf '[WARN] jq ist nicht installiert — wird für Phase-Flags benötigt.\n'
+        printf '       Auf Debian/Ubuntu/WSL: sudo apt-get install -y jq\n'
+        printf 'Jetzt installieren? [y/N] '
+        local jq_ans
+        IFS= read -r jq_ans || jq_ans="n"
+        if [[ "$jq_ans" =~ ^[YyJj]$ ]]; then
+            sudo apt-get install -y jq || die "$EXIT_GENERAL" "jq-Installation fehlgeschlagen — bitte manuell installieren"
+        else
+            printf '[WARN] Fortfahren ohne jq — Phasen-Flags (z.B. --fresh) werden nicht übergeben.\n'
+        fi
+    fi
+
     if [[ "$update_only" != "true" ]]; then
         log_info "init: baue worker-Image (kann ein paar Minuten dauern)"
         (cd "$AGENT_REPO_ROOT" && docker compose build worker)

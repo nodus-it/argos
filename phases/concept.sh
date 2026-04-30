@@ -189,11 +189,11 @@ phase_concept_run() {
     local sysprompt_content
     sysprompt_content="$(cat "$sysprompt")"
 
-    log_info "concept: rufe claude (max-turns 5) auf — output nach $output_json"
+    log_info "concept: rufe claude (max-turns 15) auf — output nach $output_json"
     if ! claude -p \
             --append-system-prompt "$sysprompt_content" \
             --output-format json \
-            --max-turns 5 \
+            --max-turns 15 \
             --permission-mode bypassPermissions \
             < "$user_prompt_path" \
             > "$output_json"; then
