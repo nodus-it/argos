@@ -2,7 +2,7 @@
 
     {{-- Phase Selector --}}
     <div class="flex items-center gap-2 flex-wrap">
-        @foreach(['concept' => ['icon' => '💡', 'label' => 'Concept'], 'implement' => ['icon' => '⚙️', 'label' => 'Implement'], 'push' => ['icon' => '🚀', 'label' => 'Push']] as $p => $meta)
+        @foreach(['concept' => 'Concept', 'implement' => 'Implement', 'push' => 'Push'] as $p => $label)
             @php
                 $isActive   = $phase === $p;
                 $hasLog     = file_exists(config('argos.config_dir') . '/tasks/' . $task->name . '/' . $p . '.bg.log');
@@ -17,8 +17,7 @@
                     'opacity-40' => !$hasLog && !$isActive,
                 ])
             >
-                <span>{{ $meta['icon'] }}</span>
-                <span>{{ $meta['label'] }}</span>
+                <span>{{ $label }}</span>
                 @if($isThisRunning)
                     <span class="flex h-2 w-2 relative">
                         <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
@@ -66,22 +65,21 @@
         @scroll="autoScroll = ($refs.terminal.scrollHeight - $refs.terminal.scrollTop - $refs.terminal.clientHeight) < 40"
     >
         {{-- Title Bar --}}
-        <div class="flex items-center gap-3 px-4 py-3 bg-slate-900 border-b border-slate-800">
-            <div class="flex gap-1.5">
-                <span class="h-3 w-3 rounded-full bg-red-500/80"></span>
-                <span class="h-3 w-3 rounded-full bg-amber-500/80"></span>
-                <span class="h-3 w-3 rounded-full bg-emerald-500/80"></span>
-            </div>
-            <span class="flex-1 text-center text-xs text-slate-500 font-mono">
-                argos worker — {{ $phase }} · {{ $task->name }}
+        <div class="flex items-center justify-between px-4 py-2.5 bg-slate-900 border-b border-slate-800">
+            <span class="text-xs text-slate-500 font-mono">
+                argos · {{ $task->name }} · {{ $phase }}
             </span>
-            <div class="w-12 flex justify-end">
-                @if($isRunning)
-                    <span class="text-xs text-amber-400 font-mono">●</span>
-                @else
-                    <span class="text-xs text-slate-600 font-mono">■</span>
-                @endif
-            </div>
+            @if($isRunning)
+                <span class="inline-flex items-center gap-1.5 text-xs text-amber-400 font-mono">
+                    <span class="flex h-2 w-2 relative">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                    </span>
+                    live
+                </span>
+            @else
+                <span class="text-xs text-slate-600 font-mono">idle</span>
+            @endif
         </div>
 
         {{-- Log Content --}}

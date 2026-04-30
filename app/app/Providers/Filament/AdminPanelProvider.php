@@ -7,6 +7,9 @@ namespace App\Providers\Filament;
 use App\Filament\Admin\Widgets\StatsOverviewWidget;
 use App\Http\Middleware\AutoLoginMiddleware;
 use Filament\Http\Middleware\AuthenticateSession;
+use Filament\View\PanelsRenderHook;
+use Illuminate\Foundation\Vite;
+use Illuminate\Support\HtmlString;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Pages\Dashboard;
@@ -52,6 +55,10 @@ class AdminPanelProvider extends PanelProvider
                 DispatchServingFilamentEvent::class,
                 AutoLoginMiddleware::class,
             ])
-            ->authMiddleware([]);
+            ->authMiddleware([])
+            ->renderHook(
+                PanelsRenderHook::HEAD_END,
+                fn (): HtmlString => new HtmlString(app(Vite::class)(['resources/css/app.css']))
+            );
     }
 }
