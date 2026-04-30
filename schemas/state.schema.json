@@ -1,0 +1,77 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Worker Task State",
+  "type": "object",
+  "required": ["task_id", "schema_version", "created_at", "updated_at", "repo", "phases"],
+  "properties": {
+    "task_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*[a-z0-9]$",
+      "maxLength": 40
+    },
+    "schema_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "repo": {
+      "type": "object",
+      "required": ["url", "base_branch"],
+      "properties": {
+        "url": {"type": "string", "format": "uri"},
+        "base_branch": {"type": "string"},
+        "feature_branch": {"type": ["string", "null"]}
+      }
+    },
+    "phases": {
+      "type": "object",
+      "required": ["concept", "implement", "diff", "push"],
+      "properties": {
+        "concept": {"$ref": "#/definitions/phaseState"},
+        "implement": {"$ref": "#/definitions/phaseState"},
+        "diff": {"$ref": "#/definitions/phaseState"},
+        "push": {"$ref": "#/definitions/phaseState"}
+      }
+    }
+  },
+  "definitions": {
+    "phaseState": {
+      "type": "object",
+      "required": ["iterations", "current_status"],
+      "properties": {
+        "iterations": {
+          "type": "array",
+          "items": {"$ref": "#/definitions/phaseIteration"}
+        },
+        "current_status": {
+          "type": "string",
+          "enum": ["pending", "running", "completed", "quality_gate_failed", "failed", "no_changes"]
+        }
+      }
+    },
+    "phaseIteration": {
+      "type": "object",
+      "required": ["n", "started_at", "status"],
+      "properties": {
+        "n": {"type": "integer", "minimum": 1},
+        "started_at": {"type": "string", "format": "date-time"},
+        "finished_at": {"type": ["string", "null"], "format": "date-time"},
+        "status": {
+          "type": "string",
+          "enum": ["running", "completed", "quality_gate_failed", "failed", "no_changes"]
+        },
+        "exit_code": {"type": ["integer", "null"]},
+        "flags": {"type": "object"},
+        "failed_gate": {"type": ["string", "null"]},
+        "error_message": {"type": ["string", "null"]}
+      }
+    }
+  }
+}

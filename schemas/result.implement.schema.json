@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Implement Phase Result",
+  "type": "object",
+  "required": ["phase", "task_id", "iteration", "status", "started_at", "finished_at", "exit_code", "quality_gates"],
+  "properties": {
+    "phase": {"const": "implement"},
+    "task_id": {"type": "string"},
+    "iteration": {"type": "integer", "minimum": 1},
+    "status": {
+      "type": "string",
+      "enum": ["completed", "quality_gate_failed", "failed", "no_changes"]
+    },
+    "started_at": {"type": "string", "format": "date-time"},
+    "finished_at": {"type": "string", "format": "date-time"},
+    "duration_ms": {"type": "integer"},
+    "exit_code": {"type": "integer"},
+    "changed_files": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "quality_gates": {
+      "type": "object",
+      "properties": {
+        "pint": {"enum": ["pass", "fail", "skip"]},
+        "pest": {"enum": ["pass", "fail", "skip"]},
+        "phpunit": {"enum": ["pass", "fail", "skip"]},
+        "phpstan": {"enum": ["pass", "advisory_fail", "skip"]}
+      }
+    },
+    "failed_gate": {"type": ["string", "null"]},
+    "claude_session_id": {"type": ["string", "null"]},
+    "claude_total_cost_usd": {"type": ["number", "null"]},
+    "error_message": {"type": ["string", "null"]}
+  }
+}

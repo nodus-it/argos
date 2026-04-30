@@ -1,0 +1,17 @@
+{
+  "type": "object",
+  "properties": {
+    "subject": {
+      "type": "string",
+      "minLength": 10,
+      "maxLength": 72,
+      "description": "Conventional Commits style subject line"
+    },
+    "body": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional body explaining what and why"
+    }
+  },
+  "required": ["subject", "body"]
+}

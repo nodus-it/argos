@@ -1,0 +1,23 @@
+# OS / Editor
+.DS_Store
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Logs
+*.log
+logs/
+
+# Local env / secrets
+.env
+.env.local
+*.local
+
+# Local tmp
+/tmp/
+tmp/
+
+# Test artifacts
+coverage/
+.bats-tmp/

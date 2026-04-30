@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Push Phase Result",
+  "type": "object",
+  "required": ["phase", "task_id", "iteration", "status", "started_at", "finished_at", "exit_code"],
+  "properties": {
+    "phase": {"const": "push"},
+    "task_id": {"type": "string"},
+    "iteration": {"type": "integer", "minimum": 1},
+    "status": {
+      "type": "string",
+      "enum": ["completed", "failed", "no_changes"]
+    },
+    "started_at": {"type": "string", "format": "date-time"},
+    "finished_at": {"type": "string", "format": "date-time"},
+    "duration_ms": {"type": "integer"},
+    "exit_code": {"type": "integer"},
+    "branch": {"type": ["string", "null"]},
+    "commit_sha": {"type": ["string", "null"]},
+    "remote_url": {"type": ["string", "null"]},
+    "commit_subject": {"type": ["string", "null"]},
+    "error_message": {"type": ["string", "null"]}
+  }
+}
