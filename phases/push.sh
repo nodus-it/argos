@@ -48,15 +48,22 @@ _push_has_changes() {
     return 1
 }
 
-# _push_create_github_pr: Erstellt einen GitHub Pull Request via GitHub REST API.
+# _push_detect_platform: Gibt "github", "gitlab" oder "" zurueck.
+_push_detect_platform() {
+    case "$REPO_URL" in
+        *github.com*) printf 'github' ;;
+        *gitlab*)     printf 'gitlab' ;;
+        *)            printf '' ;;
+    esac
+}
+
+# _push_pr_github: Erstellt einen GitHub Pull Request via REST API.
 # Args: $1=feature_branch, $2=title, $3=body (optional)
-# Output: PR-URL auf stdout, leer wenn nicht GitHub oder fehlgeschlagen.
-_push_create_github_pr() {
+# Output: PR-URL auf stdout, leer bei Fehler.
+_push_pr_github() {
     local feature_branch="$1"
     local title="$2"
     local body="${3:-}"
-
-    [[ "$REPO_URL" == *"github.com"* ]] || return 0
 
     local owner_repo
     owner_repo="$(printf '%s' "$REPO_URL" | sed 's|https://github.com/||; s|\.git$||')"
@@ -109,6 +116,15 @@ _push_create_github_pr() {
 
     rm -f "$tmp_resp"
     printf '%s' "$pr_url"
+}
+
+# _push_pr_gitlab: Extrahiert die MR-URL aus dem git-push-Output (GitLab
+# schreibt die URL ins Push-Remote-Output wenn -o merge_request.create gesetzt).
+# Args: $1=push_log
+# Output: MR-URL auf stdout, leer wenn nicht gefunden.
+_push_pr_gitlab() {
+    local push_log="$1"
+    grep -oE 'https://[^[:space:]]*/merge_requests/[0-9]+' "$push_log" | head -1
 }
 
 phase_push_run() {
@@ -181,6 +197,22 @@ phase_push_run() {
         fi
     fi
 
+    # Platform erkennen und Push-Optionen fuer GitLab vorbereiten
+    local platform
+    platform="$(_push_detect_platform)"
+
+    local push_opts=()
+    if [[ "$platform" == "gitlab" ]]; then
+        push_opts+=(
+            -o merge_request.create
+            -o "merge_request.target=$BASE_BRANCH"
+            -o "merge_request.title=$subject"
+        )
+        if [[ -n "$body" && "$body" != $'\n' ]]; then
+            push_opts+=(-o "merge_request.description=$body")
+        fi
+    fi
+
     # Push mit Token in der URL (defensiv: nicht loggen)
     set +x
     local auth_url
@@ -194,7 +226,7 @@ phase_push_run() {
     fi
 
     local push_log="/workspace/.agent/logs/git-push.${ITERATION}.log"
-    if ! git -C /workspace push -u origin "$feature_branch" > "$push_log" 2>&1; then
+    if ! git -C /workspace push -u origin "$feature_branch" "${push_opts[@]}" > "$push_log" 2>&1; then
         # URL ohne Token wiederherstellen vor return
         git -C /workspace remote set-url origin "$REPO_URL"
         local push_exit=1
@@ -220,11 +252,14 @@ phase_push_run() {
     local commit_sha
     commit_sha="$(git -C /workspace rev-parse HEAD)"
 
-    # GitHub PR erstellen
+    # PR/MR erstellen oder URL aus Push-Output lesen
     local pr_url=""
-    pr_url="$(_push_create_github_pr "$feature_branch" "$subject" "$body")"
+    case "$platform" in
+        github) pr_url="$(_push_pr_github "$feature_branch" "$subject" "$body")" ;;
+        gitlab) pr_url="$(_push_pr_gitlab "$push_log")" ;;
+    esac
     if [[ -n "$pr_url" ]]; then
-        log_info "push: PR erstellt — $pr_url"
+        log_info "push: PR/MR erstellt — $pr_url"
     fi
 
     finished_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
