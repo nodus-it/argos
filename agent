@@ -432,7 +432,60 @@ cmd_status() {
         return
     fi
     _agent_require_known_task
-    _agent_run_volume_cmd "$ARG_TASK_ID" 'jq . /workspace/.agent/state.json 2>/dev/null || echo "(noch keine state.json — concept zuerst)"'
+
+    local state_json
+    state_json="$(_agent_run_volume_cmd "$ARG_TASK_ID" \
+        'jq -c . /workspace/.agent/state.json 2>/dev/null')" || true
+
+    if [[ -z "$state_json" ]]; then
+        printf 'Task:   %s\n' "$ARG_TASK_ID"
+        printf 'Status: (noch keine state.json — erst concept ausfuehren)\n'
+        return 0
+    fi
+
+    local repo_url base_branch feature_branch created_at
+    repo_url="$(jq -r '.repo.url // "?"' <<< "$state_json")"
+    base_branch="$(jq -r '.repo.base_branch // "?"' <<< "$state_json")"
+    feature_branch="$(jq -r '.repo.feature_branch // "-"' <<< "$state_json")"
+    created_at="$(jq -r '.created_at // "?"' <<< "$state_json")"
+
+    printf '\033[1mTask:          %s\033[0m\n' "$ARG_TASK_ID"
+    printf 'Repo:          %s\n' "$repo_url"
+    printf 'Base-Branch:   %s\n' "$base_branch"
+    printf 'Feature-Branch:%s\n' "$feature_branch"
+    printf 'Erstellt:      %s\n' "$created_at"
+    printf '\n'
+
+    local status_icon
+    for phase in concept implement diff push; do
+        local current_status iter_count
+        current_status="$(jq -r --arg p "$phase" '.phases[$p].current_status // "pending"' <<< "$state_json")"
+        iter_count="$(jq -r --arg p "$phase" '(.phases[$p].iterations // []) | length' <<< "$state_json")"
+
+        case "$current_status" in
+            completed)           status_icon='✓' ;;
+            running)             status_icon='⟳' ;;
+            failed)              status_icon='✗' ;;
+            quality_gate_failed) status_icon='✗' ;;
+            no_changes)          status_icon='—' ;;
+            *)                   status_icon='·' ;;
+        esac
+
+        printf '  %s %-12s  %s' "$status_icon" "$phase" "$current_status"
+        if [[ "$iter_count" -gt 0 ]]; then
+            printf '  (%s Iteration(en))' "$iter_count"
+        fi
+        printf '\n'
+
+        # Iterationen ausgeben wenn vorhanden
+        if [[ "$iter_count" -gt 0 ]]; then
+            local iter_list
+            iter_list="$(jq -r --arg p "$phase" \
+                '.phases[$p].iterations[] | "     #\(.n)  \(.status)  \(.started_at[0:16] // "?")  \(if .finished_at then .finished_at[0:16] else "-" end)\(if .failed_gate then "  gate:\(.failed_gate)" else "" end)\(if .error_message then "  err:\(.error_message[0:60])" else "" end)"' \
+                <<< "$state_json" 2>/dev/null)"
+            [[ -n "$iter_list" ]] && printf '%s\n' "$iter_list"
+        fi
+    done
 }
 
 # cmd_abort_silent: Loescht Volume + Host-State ohne Frage. Helper fuer push --auto-cleanup.

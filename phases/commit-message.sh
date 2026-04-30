@@ -135,7 +135,14 @@ phase_commit_message_run() {
     local is_error
     is_error="$(jq -r '.is_error // false' "$output_json" 2>/dev/null || echo true)"
     if [[ "$is_error" != "false" ]]; then
-        echo "commit-message: claude returned is_error=true" >&2
+        local err_msg
+        err_msg="$(jq -r '.result // "(no result field)"' "$output_json" 2>/dev/null)"
+        echo "commit-message: claude returned is_error=true: $err_msg" >&2
+        if echo "$err_msg" | grep -qiE "invalid api key|authentication|oauth|unauthorized|401|token.*expired|invalid_api_key"; then
+            echo "  → Claude-OAuth-Token ungültig oder abgelaufen." >&2
+            echo "    Token erneuern: claude setup-token" >&2
+            echo "    Dann: ./agent init --update-token" >&2
+        fi
         return 3
     fi
 
