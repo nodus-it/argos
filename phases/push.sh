@@ -48,6 +48,39 @@ _push_has_changes() {
     return 1
 }
 
+# _push_create_github_pr: Erstellt einen GitHub Pull Request via gh CLI.
+# Args: $1=feature_branch, $2=title, $3=body (optional)
+# Output: PR-URL auf stdout, leer wenn nicht GitHub oder fehlgeschlagen.
+_push_create_github_pr() {
+    local feature_branch="$1"
+    local title="$2"
+    local body="${3:-}"
+
+    [[ "$REPO_URL" == *"github.com"* ]] || return 0
+
+    local pr_log="/workspace/.agent/logs/gh-pr.${ITERATION}.log"
+    local pr_url
+    set +x
+    if ! pr_url="$(
+        GITHUB_TOKEN="$REPO_TOKEN" \
+        gh pr create \
+            --title "$title" \
+            --body "$body" \
+            --base "$BASE_BRANCH" \
+            --head "$feature_branch" \
+            2>"$pr_log"
+    )"; then
+        if grep -q "already exists" "$pr_log" 2>/dev/null; then
+            pr_url="$(GITHUB_TOKEN="$REPO_TOKEN" gh pr view "$feature_branch" \
+                --json url --jq '.url' 2>/dev/null || true)"
+            [[ -n "$pr_url" ]] && { printf '%s' "$pr_url"; return 0; }
+        fi
+        log_warn "push: PR-Erstellung fehlgeschlagen (siehe logs/gh-pr.${ITERATION}.log)"
+        return 0
+    fi
+    printf '%s' "$pr_url"
+}
+
 phase_push_run() {
     cd /workspace 2>/dev/null || {
         echo "push: /workspace not mounted" >&2
@@ -157,6 +190,13 @@ phase_push_run() {
     local commit_sha
     commit_sha="$(git -C /workspace rev-parse HEAD)"
 
+    # GitHub PR erstellen
+    local pr_url=""
+    pr_url="$(_push_create_github_pr "$feature_branch" "$subject" "$body")"
+    if [[ -n "$pr_url" ]]; then
+        log_info "push: PR erstellt — $pr_url"
+    fi
+
     finished_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
     finished_epoch=$(date -u +%s)
     local duration_ms=$(( (finished_epoch - started_epoch) * 1000 ))
@@ -173,7 +213,8 @@ phase_push_run() {
         branch "$feature_branch" \
         commit_sha "$commit_sha" \
         remote_url "$REPO_URL" \
-        commit_subject "$subject"
+        commit_subject "$subject" \
+        pr_url "$pr_url"
 
     return 0
 }

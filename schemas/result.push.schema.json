@@ -19,6 +19,7 @@
     "commit_sha": {"type": ["string", "null"]},
     "remote_url": {"type": ["string", "null"]},
     "commit_subject": {"type": ["string", "null"]},
+    "pr_url": {"type": ["string", "null"]},
     "error_message": {"type": ["string", "null"]}
   }
 }
