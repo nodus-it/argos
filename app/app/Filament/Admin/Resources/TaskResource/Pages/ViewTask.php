@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Admin\Resources\TaskResource\Pages;
 
 use App\Domain\Phase\PhaseRunner;
+use App\Domain\Phase\StateReader;
 use App\Filament\Admin\Resources\TaskResource;
 use App\Models\Task;
 use Filament\Actions\Action;
@@ -17,12 +18,35 @@ class ViewTask extends ViewRecord
 {
     protected static string $resource = TaskResource::class;
 
+    public function mount(int|string $record): void
+    {
+        parent::mount($record);
+
+        /** @var Task $task */
+        $task = $this->getRecord();
+        app(StateReader::class)->syncToDb($task);
+        $task->refresh();
+    }
+
     protected function getHeaderActions(): array
     {
         return [
             $this->phaseAction('concept', 'Concept', 'heroicon-o-light-bulb'),
             $this->phaseAction('implement', 'Implement', 'heroicon-o-code-bracket'),
             $this->phaseAction('push', 'Push', 'heroicon-o-arrow-up-tray'),
+            $this->logsAction(),
+            Action::make('refresh')
+                ->label('Aktualisieren')
+                ->icon('heroicon-o-arrow-path')
+                ->color('gray')
+                ->action(function (): void {
+                    /** @var Task $task */
+                    $task = $this->getRecord();
+                    app(StateReader::class)->syncToDb($task);
+                    $task->refresh();
+                    Notification::make()->title('Status aktualisiert')->success()->send();
+                    $this->redirect($this->getUrl());
+                }),
         ];
     }
 
@@ -69,14 +93,20 @@ class ViewTask extends ViewRecord
             ->label($label)
             ->icon($icon)
             ->action(function () use ($phase, $label): void {
-                /** @var Task $record */
-                $record = $this->getRecord();
-                if ($record->phaseRuns()->where('status', 'running')->exists()) {
+                /** @var Task $task */
+                $task = $this->getRecord();
+                if ($task->phaseRuns()->where('status', 'running')->exists()) {
                     Notification::make()->title('Phase läuft bereits')->warning()->send();
                     return;
                 }
-                app(PhaseRunner::class)->startBackground($record, $phase);
+                app(PhaseRunner::class)->startBackground($task, $phase);
                 Notification::make()->title("{$label} gestartet")->success()->send();
+                $this->redirect($this->getUrl());
             });
+    }
+
+    private function logsAction(): Action
+    {
+        return TaskResource::makeLogsAction();
     }
 }

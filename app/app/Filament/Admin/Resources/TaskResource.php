@@ -11,16 +11,16 @@ use App\Filament\Admin\Resources\TaskResource\Pages\ViewTask;
 use App\Filament\Admin\Resources\TaskResource\RelationManagers\PhaseRunsRelationManager;
 use App\Models\RepoProfile;
 use App\Models\Task;
+use Filament\Actions\Action;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\ViewAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
-use Filament\Actions\ViewAction;
-use Filament\Actions\Action;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 
@@ -65,6 +65,7 @@ class TaskResource extends Resource
     {
         return $table
             ->defaultSort('created_at', 'desc')
+            ->poll('5s')
             ->columns([
                 TextColumn::make('name')
                     ->searchable()
@@ -102,6 +103,7 @@ class TaskResource extends Resource
                 self::phaseAction('concept', 'Concept', 'heroicon-o-light-bulb'),
                 self::phaseAction('implement', 'Implement', 'heroicon-o-code-bracket'),
                 self::phaseAction('push', 'Push', 'heroicon-o-arrow-up-tray'),
+                self::makeLogsAction(),
             ])
             ->bulkActions([
                 BulkActionGroup::make([
@@ -124,6 +126,51 @@ class TaskResource extends Resource
             'create' => CreateTask::route('/create'),
             'view'   => ViewTask::route('/{record}'),
         ];
+    }
+
+    public static function makeLogsAction(): Action
+    {
+        return Action::make('logs')
+            ->label('Logs')
+            ->icon('heroicon-o-document-text')
+            ->color('gray')
+            ->fillForm(fn (Task $record): array => [
+                'log' => self::readBgLog($record->name, $record->current_phase),
+            ])
+            ->form([
+                Textarea::make('log')
+                    ->label('Ausgabe')
+                    ->rows(20)
+                    ->readOnly()
+                    ->extraAttributes(['style' => 'font-family: monospace; font-size: 0.75rem; white-space: pre;']),
+            ])
+            ->modalHeading(fn (Task $record): string => "Logs: {$record->name} / " . ($record->current_phase ?? '—'))
+            ->modalSubmitAction(false)
+            ->modalCancelActionLabel('Schließen');
+    }
+
+    private static function readBgLog(string $taskName, ?string $phase): string
+    {
+        if ($phase === null) {
+            return '(noch keine Phase gestartet)';
+        }
+
+        $configDir = config('argos.config_dir');
+        $logPath = "{$configDir}/tasks/{$taskName}/{$phase}.bg.log";
+
+        if (!file_exists($logPath)) {
+            return "(kein Log unter {$logPath})";
+        }
+
+        $content = file_get_contents($logPath) ?: '';
+
+        $lines = explode("\n", $content);
+        if (count($lines) > 200) {
+            $lines = array_slice($lines, -200);
+            array_unshift($lines, '... (abgeschnitten — letzte 200 Zeilen)');
+        }
+
+        return implode("\n", $lines);
     }
 
     private static function phaseAction(string $phase, string $label, string $icon): Action
