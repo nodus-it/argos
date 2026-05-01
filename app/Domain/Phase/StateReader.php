@@ -15,7 +15,7 @@ class StateReader
      */
     public function read(string $taskName): ?array
     {
-        $process = new Process([
+        $process = $this->newProcess([
             'docker', 'run', '--rm',
             '-v', 'task_ws_'.Task::slugifyName($taskName).':/workspace:ro',
             'alpine',
@@ -43,7 +43,7 @@ class StateReader
 
     public function readConcept(string $taskName): ?string
     {
-        $process = new Process([
+        $process = $this->newProcess([
             'docker', 'run', '--rm',
             '-v', 'task_ws_'.Task::slugifyName($taskName).':/workspace:ro',
             'alpine',
@@ -64,7 +64,7 @@ class StateReader
 
     public function writeNotes(string $taskName, string $content): bool
     {
-        $process = new Process([
+        $process = $this->newProcess([
             'docker', 'run', '--rm',
             '-v', 'task_ws_'.Task::slugifyName($taskName).':/workspace',
             'alpine',
@@ -81,7 +81,7 @@ class StateReader
 
     public function readNotes(string $taskName): ?string
     {
-        $process = new Process([
+        $process = $this->newProcess([
             'docker', 'run', '--rm',
             '-v', 'task_ws_'.Task::slugifyName($taskName).':/workspace:ro',
             'alpine',
@@ -98,6 +98,11 @@ class StateReader
         $output = $process->getOutput();
 
         return $output !== '' ? $output : null;
+    }
+
+    protected function newProcess(array $cmd): Process
+    {
+        return new Process($cmd);
     }
 
     /**

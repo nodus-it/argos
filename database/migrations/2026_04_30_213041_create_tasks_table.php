@@ -17,8 +17,8 @@ return new class extends Migration
             $table->text('description');
             $table->string('feature_branch')->nullable();
             $table->string('pr_url')->nullable();
-            $table->enum('current_phase', ['concept', 'implement', 'diff', 'push'])->nullable();
-            $table->enum('current_status', ['pending', 'running', 'completed', 'failed'])->nullable();
+            $table->enum('current_phase', ['concept', 'implement', 'diff', 'push', 'respond'])->nullable();
+            $table->enum('current_status', ['pending', 'running', 'completed', 'failed', 'quality_gate_failed', 'no_changes'])->nullable();
             $table->timestamps();
 
             $table->foreign('repo_profile_id')->references('id')->on('repo_profiles')->nullOnDelete();

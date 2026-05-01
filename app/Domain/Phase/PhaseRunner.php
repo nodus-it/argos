@@ -24,7 +24,7 @@ class PhaseRunner
 
     public function writeFeedbackToVolume(string $taskName, string $feedback): void
     {
-        $process = new Process([
+        $process = $this->newProcess([
             'docker', 'run', '--rm',
             '-v', 'task_ws_'.Task::slugifyName($taskName).':/workspace',
             '-e', 'FEEDBACK',
@@ -71,7 +71,7 @@ class PhaseRunner
         $logHandle = fopen($logPath, 'a');
         $stdout = '';
 
-        $process = new Process($cmd);
+        $process = $this->newProcess($cmd);
         $process->setTimeout(null);
         $process->setIdleTimeout(null);
 
@@ -130,7 +130,7 @@ class PhaseRunner
         $logHandle = fopen($logPath, 'a');
         $stdout = '';
 
-        $process = new Process($cmd);
+        $process = $this->newProcess($cmd);
         $process->setTimeout(null);
         $process->setIdleTimeout(null);
 
@@ -152,6 +152,11 @@ class PhaseRunner
             'current_phase' => $phase,
             'current_status' => $status,
         ]);
+    }
+
+    protected function newProcess(array $cmd): Process
+    {
+        return new Process($cmd);
     }
 
     private function exitCodeToStatus(int $exitCode): string
