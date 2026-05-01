@@ -17,7 +17,7 @@ class RunPhaseJob implements ShouldQueue
     public int $timeout = 3600;
 
     public function __construct(
-        public readonly int $taskId,
+        public readonly string $taskId,
         public readonly string $phase,
         public readonly array $flags = [],
     ) {}
