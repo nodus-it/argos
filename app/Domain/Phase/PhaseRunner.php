@@ -235,7 +235,8 @@ class PhaseRunner
             );
         }
 
-        $workerImage = config('argos.worker_image', 'ghcr.io/nodus-it/argos-worker:latest');
+        $workerImage = $profile->worker_image
+            ?: config('argos.worker_image', 'ghcr.io/nodus-it/argos-worker:latest');
         $phaseFlags = $flags !== [] ? json_encode($flags) : '{}';
 
         return [
