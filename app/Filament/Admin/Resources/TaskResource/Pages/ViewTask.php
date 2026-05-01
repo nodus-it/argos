@@ -19,8 +19,8 @@ class ViewTask extends ViewRecord
 {
     protected static string $resource = TaskResource::class;
 
-    /** @var array<int, array{text: string, class: string}> */
-    public array $diffLines = [];
+    /** @var array<int, array{from_path: string, to_path: string, is_new: bool, is_deleted: bool, additions: int, deletions: int, hunks: array<int, mixed>}> */
+    public array $diffFiles = [];
 
     public string $diffStat = '';
 
@@ -29,6 +29,10 @@ class ViewTask extends ViewRecord
     public string $notes = '';
 
     public bool $editingNotes = false;
+
+    public string $implementNotes = '';
+
+    public bool $editingImplementNotes = false;
 
     /** @var array<string, array<int, array{text: string, class: string}>> keyed by "phase.iteration" */
     public array $loadedLogIterations = [];
@@ -44,6 +48,7 @@ class ViewTask extends ViewRecord
         $task->refresh();
 
         $this->notes = $task->concept_notes ?? '';
+        $this->implementNotes = $task->implement_notes ?? '';
     }
 
     public function startEditingNotes(): void
@@ -69,6 +74,29 @@ class ViewTask extends ViewRecord
         $this->editingNotes = false;
     }
 
+    public function startEditingImplementNotes(): void
+    {
+        $this->editingImplementNotes = true;
+    }
+
+    public function saveImplementNotes(): void
+    {
+        /** @var Task $task */
+        $task = $this->getRecord();
+        $task->update(['implement_notes' => $this->implementNotes ?: null]);
+
+        $this->editingImplementNotes = false;
+        Notification::make()->title('Feedback gespeichert')->success()->send();
+    }
+
+    public function cancelEditingImplementNotes(): void
+    {
+        /** @var Task $task */
+        $task = $this->getRecord();
+        $this->implementNotes = $task->fresh()->implement_notes ?? '';
+        $this->editingImplementNotes = false;
+    }
+
     public function poll(): void
     {
         /** @var Task $task */
@@ -80,6 +108,7 @@ class ViewTask extends ViewRecord
             $reader->syncToDb($task);
             $task->refresh();
             $this->notes = $task->concept_notes ?? '';
+            $this->implementNotes = $task->implement_notes ?? '';
         }
     }
 
@@ -113,7 +142,7 @@ class ViewTask extends ViewRecord
         ]);
         $diffProcess->setTimeout(15);
         $diffProcess->run();
-        $this->diffLines = $this->parseDiffLines($diffProcess->getOutput());
+        $this->diffFiles = $this->parseDiffStructured($diffProcess->getOutput());
         $this->diffLoaded = true;
     }
 
@@ -139,6 +168,8 @@ class ViewTask extends ViewRecord
         $currentConceptIter = ($phaseRuns['concept'] ?? collect())->last()?->iteration;
         $currentImplementIter = ($phaseRuns['implement'] ?? collect())->last()?->iteration;
 
+        $lastImplementRun = ($phaseRuns['implement'] ?? collect())->last();
+
         return [
             'phaseRuns' => $phaseRuns,
             'conceptHtml' => $task->concept_md ? Str::markdown($task->concept_md) : null,
@@ -147,6 +178,15 @@ class ViewTask extends ViewRecord
             'pushLog' => $this->parseLogLines($this->readLogFile('push')),
             'notesHistory' => $reader->readNotesHistory($task),
             'conceptHistory' => $reader->readConceptHistory($task, $currentConceptIter),
+            'implementSummaryNontechnicalHtml' => $task->implement_summary_nontechnical
+                ? Str::markdown($task->implement_summary_nontechnical)
+                : null,
+            'implementSummaryTechnicalHtml' => $task->implement_summary_technical
+                ? Str::markdown($task->implement_summary_technical)
+                : null,
+            'implementHistory' => $reader->readImplementHistory($task, $currentImplementIter),
+            'implementNotesHistory' => $reader->readImplementNotesHistory($task),
+            'implementQualityGates' => $lastImplementRun?->result_json['quality_gates'] ?? null,
             'conceptLogIterations' => array_values(array_filter(
                 $reader->listLogIterations($task, 'concept'),
                 fn (int $i) => $i !== $currentConceptIter
@@ -317,29 +357,123 @@ class ViewTask extends ViewRecord
         return $result;
     }
 
-    /** @return array<int, array{text: string, class: string}> */
-    private function parseDiffLines(string $content): array
+    /**
+     * Parse a unified diff into a structured representation for GitHub-style rendering.
+     *
+     * @return array<int, array{from_path: string, to_path: string, is_new: bool, is_deleted: bool, additions: int, deletions: int, hunks: list<array{header: string, context_hint: string, lines: list<array{type: string, old_num: int|null, new_num: int|null, text: string}>}>}>
+     */
+    private function parseDiffStructured(string $content): array
     {
-        if ($content === '') {
+        if (trim($content) === '') {
             return [];
         }
 
-        $result = [];
+        $files = [];
+        $currentFile = null;
+        $currentHunk = null;
+        $oldLine = 0;
+        $newLine = 0;
+
         foreach (explode("\n", $content) as $raw) {
             $line = (string) preg_replace('/\033\[[0-9;]*[mGKHFABCDJsu]/', '', $raw);
-            $class = match (true) {
-                str_starts_with($line, '+++'), str_starts_with($line, '---') => 'text-slate-400 font-semibold',
-                str_starts_with($line, '@@') => 'text-sky-400',
-                str_starts_with($line, 'diff '), str_starts_with($line, 'index '),
-                str_starts_with($line, 'new file'), str_starts_with($line, 'deleted ') => 'text-slate-500',
-                str_starts_with($line, '+') => 'text-emerald-400',
-                str_starts_with($line, '-') => 'text-red-400',
-                $line === '' => 'text-slate-700',
-                default => 'text-slate-300',
-            };
-            $result[] = ['text' => $line, 'class' => $class];
+
+            if (str_starts_with($line, 'diff --git ')) {
+                if ($currentFile !== null) {
+                    if ($currentHunk !== null) {
+                        $currentFile['hunks'][] = $currentHunk;
+                        $currentHunk = null;
+                    }
+                    $files[] = $currentFile;
+                }
+                preg_match('/^diff --git a\/(.+) b\/(.+)$/', $line, $m);
+                $currentFile = [
+                    'from_path' => $m[1] ?? '',
+                    'to_path' => $m[2] ?? '',
+                    'is_new' => false,
+                    'is_deleted' => false,
+                    'additions' => 0,
+                    'deletions' => 0,
+                    'hunks' => [],
+                ];
+
+                continue;
+            }
+
+            if ($currentFile === null) {
+                continue;
+            }
+
+            if (str_starts_with($line, 'new file')) {
+                $currentFile['is_new'] = true;
+
+                continue;
+            }
+
+            if (str_starts_with($line, 'deleted file')) {
+                $currentFile['is_deleted'] = true;
+
+                continue;
+            }
+
+            if (str_starts_with($line, '--- ') || str_starts_with($line, '+++ ') || str_starts_with($line, 'index ')) {
+                continue;
+            }
+
+            if (str_starts_with($line, '@@')) {
+                if ($currentHunk !== null) {
+                    $currentFile['hunks'][] = $currentHunk;
+                }
+                preg_match('/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@(.*)$/', $line, $m);
+                $oldLine = isset($m[1]) ? (int) $m[1] : 1;
+                $newLine = isset($m[2]) ? (int) $m[2] : 1;
+                $currentHunk = [
+                    'header' => $line,
+                    'context_hint' => trim($m[3] ?? ''),
+                    'lines' => [],
+                ];
+
+                continue;
+            }
+
+            if ($currentHunk === null) {
+                continue;
+            }
+
+            $firstChar = $line !== '' ? $line[0] : ' ';
+
+            if ($firstChar === '+') {
+                $currentHunk['lines'][] = [
+                    'type' => 'add',
+                    'old_num' => null,
+                    'new_num' => $newLine++,
+                    'text' => substr($line, 1),
+                ];
+                $currentFile['additions']++;
+            } elseif ($firstChar === '-') {
+                $currentHunk['lines'][] = [
+                    'type' => 'del',
+                    'old_num' => $oldLine++,
+                    'new_num' => null,
+                    'text' => substr($line, 1),
+                ];
+                $currentFile['deletions']++;
+            } else {
+                $currentHunk['lines'][] = [
+                    'type' => 'context',
+                    'old_num' => $oldLine++,
+                    'new_num' => $newLine++,
+                    'text' => substr($line, 1),
+                ];
+            }
         }
 
-        return $result;
+        if ($currentHunk !== null && $currentFile !== null) {
+            $currentFile['hunks'][] = $currentHunk;
+        }
+        if ($currentFile !== null) {
+            $files[] = $currentFile;
+        }
+
+        return $files;
     }
 }

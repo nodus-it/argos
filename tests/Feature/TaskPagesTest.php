@@ -39,6 +39,8 @@ class TaskPagesTest extends TestCase
             $mock->shouldReceive('syncToDb')->andReturn(null);
             $mock->shouldReceive('readNotesHistory')->andReturn([]);
             $mock->shouldReceive('readConceptHistory')->andReturn([]);
+            $mock->shouldReceive('readImplementHistory')->andReturn([]);
+            $mock->shouldReceive('readImplementNotesHistory')->andReturn([]);
             $mock->shouldReceive('listLogIterations')->andReturn([]);
         });
     }

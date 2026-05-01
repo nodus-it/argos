@@ -29,6 +29,9 @@ class PhaseRun extends Model
         'concept_md',
         'concept_notes',
         'stream_log',
+        'implement_summary_nontechnical',
+        'implement_summary_technical',
+        'implement_notes',
     ];
 
     protected function casts(): array

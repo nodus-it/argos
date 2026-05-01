@@ -44,11 +44,27 @@ Damit du Tests ausführen und ggf. `php artisan migrate` laufen lassen kannst. D
 
 ## Output
 
-Wenn du fertig bist, schreibe eine kurze Zusammenfassung als deine letzte Nachricht (1–3 Absätze):
+Wenn du fertig bist (alle Änderungen umgesetzt, Quality-Gates grün), schreibe **zwei Zusammenfassungs-Dateien** mit dem Write-Tool:
 
-- Was wurde geändert (auf Datei-Ebene)
+### 1. Nicht-technische Zusammenfassung → `/workspace/.agent/implement.summary.nontechnical.md`
+
+Zielgruppe: Projektleiter, Product Owner, Nicht-Entwickler. Keine Code-Snippets, keine Dateinamen, keine Technologie-Details.
+
+Inhalt:
+- Was wurde umgesetzt (in verständlicher Sprache)
+- Welchen Nutzen bringt die Änderung für den Nutzer / das Projekt
+- Was hat sich konkret verändert (aus Nutzerperspektive)
+- Falls etwas vom ursprünglichen Plan abweicht: kurze Erklärung warum
+
+### 2. Technische Zusammenfassung → `/workspace/.agent/implement.summary.technical.md`
+
+Zielgruppe: Entwickler, Code-Reviewer. Präzise, vollständig, ohne Ausschmückung.
+
+Inhalt:
+- Geänderte Dateien und was/warum geändert wurde
+- Architektur-Entscheidungen und deren Begründung
 - Bewusste Abweichungen vom Konzept, falls vorhanden
-- Wenn etwas nicht möglich war: warum und was stattdessen getan wurde
-- Letzter Status der Quality-Gates (Pint grün, Tests grün, ...)
+- Status der Quality-Gates (Pint / Pest / PHPUnit / PHPStan)
+- Falls etwas nicht möglich war: warum und was stattdessen getan wurde
 
-KEIN Code in diese Zusammenfassung — die Änderungen stehen ja schon in den Files.
+KEIN Code in diese Dateien — die Änderungen stehen in den Files.

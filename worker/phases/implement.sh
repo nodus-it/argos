@@ -78,12 +78,21 @@ _implement_setup_toolchain() {
 # _implement_build_user_prompt: Erzeugt User-Prompt fuer Claude-Implement-Session.
 _implement_build_user_prompt() {
     local concept_file=/workspace/.agent/concept.md
+    local notes_file=/workspace/.agent/implement.notes.md
     {
         printf '# Implement-Phase\n\n'
         printf 'Du befindest dich im Workspace `/workspace`. Setze das folgende Konzept um.\n\n'
         printf '## Konzept\n\n'
         cat "$concept_file"
-        printf '\n\n## Quality-Gates\n\n'
+        printf '\n'
+
+        if [[ -f "$notes_file" && -s "$notes_file" ]]; then
+            printf '\n## Anmerkungen des Users (implement.notes.md)\n\n'
+            cat "$notes_file"
+            printf '\n'
+        fi
+
+        printf '\n## Quality-Gates\n\n'
         printf 'Wie im System-Prompt beschrieben: Pint und Tests selbst laufen lassen, '
         printf 'iterieren bis gruen. KEIN git commit, KEIN git push — uebernehmen die '
         printf 'nachfolgenden Phasen.\n'
@@ -229,6 +238,10 @@ phase_implement_run() {
     if (( claude_exit != 0 )); then
         log_warn "implement: claude exited with code $claude_exit"
     fi
+
+    # Notes nach dem Claude-Aufruf entfernen — wurden vor dem Lauf per writeImplementNotesToVolume
+    # aus der DB in die Datei geschrieben und sind jetzt nicht mehr benoetigt.
+    rm -f /workspace/.agent/implement.notes.md
 
     if [[ ! -s "$result_json" ]]; then
         echo "implement: stream-json lieferte kein result-Event" >&2

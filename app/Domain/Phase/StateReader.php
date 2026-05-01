@@ -108,6 +108,49 @@ class StateReader
     }
 
     /**
+     * Read implement summary version history from phase_runs (newest first, excluding current).
+     *
+     * @return array<int, array{timestamp: string, nontechnical: string|null, technical: string|null}>
+     */
+    public function readImplementHistory(Task $task, ?int $currentIteration = null): array
+    {
+        return $task->phaseRuns()
+            ->where('phase', 'implement')
+            ->where(function ($q): void {
+                $q->whereNotNull('implement_summary_nontechnical')
+                    ->orWhereNotNull('implement_summary_technical');
+            })
+            ->when($currentIteration !== null, fn ($q) => $q->where('iteration', '!=', $currentIteration))
+            ->orderBy('iteration', 'desc')
+            ->get()
+            ->map(fn (PhaseRun $run) => [
+                'timestamp' => $run->finished_at?->format('d.m.Y H:i') ?? '—',
+                'nontechnical' => $run->implement_summary_nontechnical,
+                'technical' => $run->implement_summary_technical,
+            ])
+            ->all();
+    }
+
+    /**
+     * Read implement notes history from implement phase_runs (newest first).
+     *
+     * @return array<int, array{timestamp: string, content: string}>
+     */
+    public function readImplementNotesHistory(Task $task): array
+    {
+        return $task->phaseRuns()
+            ->where('phase', 'implement')
+            ->whereNotNull('implement_notes')
+            ->orderBy('iteration', 'desc')
+            ->get()
+            ->map(fn (PhaseRun $run) => [
+                'timestamp' => "Iteration {$run->iteration} · ".($run->finished_at?->format('d.m.Y H:i') ?? '—'),
+                'content' => $run->implement_notes,
+            ])
+            ->all();
+    }
+
+    /**
      * List phase run iterations that have a stream log stored, descending.
      *
      * @return list<int>

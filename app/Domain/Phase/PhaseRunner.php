@@ -48,6 +48,31 @@ class PhaseRunner
     }
 
     /**
+     * Before an implement phase: write task.implement_notes to implement.notes.md in the volume.
+     * Returns the notes value that was written (for post-phase storage).
+     */
+    public function writeImplementNotesToVolume(Task $task): ?string
+    {
+        $notes = $task->implement_notes;
+        if ($notes === null || $notes === '') {
+            return null;
+        }
+
+        $process = $this->newProcess([
+            'docker', 'run', '--rm', '-i',
+            '-v', $task->volumeName().':/workspace',
+            'alpine',
+            'sh', '-c',
+            'mkdir -p /workspace/.agent && cat > /workspace/.agent/implement.notes.md',
+        ]);
+        $process->setInput($notes);
+        $process->setTimeout(10);
+        $process->run();
+
+        return $notes;
+    }
+
+    /**
      * After a phase completes: read generated content from the volume and store in the DB.
      * Docker is called here (background job), never on page load.
      */
@@ -83,6 +108,32 @@ class PhaseRunner
             if ($streamLog !== null) {
                 $phaseRun->update(['stream_log' => $streamLog]);
             }
+        }
+
+        if ($phase === 'implement') {
+            $nontechnical = $this->readFileFromVolume(
+                $task->volumeName(),
+                '/workspace/.agent/implement.summary.nontechnical.md'
+            );
+            $technical = $this->readFileFromVolume(
+                $task->volumeName(),
+                '/workspace/.agent/implement.summary.technical.md'
+            );
+
+            $phaseRun->update([
+                'implement_summary_nontechnical' => $nontechnical,
+                'implement_summary_technical' => $technical,
+                'implement_notes' => $notesBeforeRun,
+            ]);
+
+            $taskUpdate = ['implement_notes' => null];
+            if ($nontechnical !== null) {
+                $taskUpdate['implement_summary_nontechnical'] = $nontechnical;
+            }
+            if ($technical !== null) {
+                $taskUpdate['implement_summary_technical'] = $technical;
+            }
+            $task->update($taskUpdate);
         }
 
         if ($phase === 'push') {
@@ -143,7 +194,11 @@ class PhaseRunner
      */
     public function runLive(Task $task, string $phase, callable $output, array $flags = []): int
     {
-        $notesBeforeRun = $phase === 'concept' ? $this->writeNotesToVolume($task) : null;
+        $notesBeforeRun = match ($phase) {
+            'concept' => $this->writeNotesToVolume($task),
+            'implement' => $this->writeImplementNotesToVolume($task),
+            default => null,
+        };
 
         $cmd = $this->buildCommand($task, $phase, $flags);
         $logPath = $this->getPhaseLogPath($task->name, $phase);
@@ -207,7 +262,11 @@ class PhaseRunner
      */
     public function runBlocking(Task $task, string $phase, array $flags = []): void
     {
-        $notesBeforeRun = $phase === 'concept' ? $this->writeNotesToVolume($task) : null;
+        $notesBeforeRun = match ($phase) {
+            'concept' => $this->writeNotesToVolume($task),
+            'implement' => $this->writeImplementNotesToVolume($task),
+            default => null,
+        };
 
         $cmd = $this->buildCommand($task, $phase, $flags);
         $logPath = $this->getPhaseLogPath($task->name, $phase);
