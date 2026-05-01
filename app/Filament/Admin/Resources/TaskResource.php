@@ -22,8 +22,10 @@ use Filament\Actions\ViewAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -57,10 +59,17 @@ class TaskResource extends Resource
             Select::make('repo_profile_id')
                 ->label('Projekt')
                 ->options(RepoProfile::all()->pluck('name', 'id'))
-                ->required(),
+                ->required()
+                ->live(),
 
             Textarea::make('description')
                 ->rows(8)
+                ->columnSpanFull(),
+
+            Toggle::make('auto_concept')
+                ->label('Concept direkt starten')
+                ->helperText('Startet die Concept-Phase sofort nach dem Anlegen.')
+                ->default(fn (Get $get): bool => RepoProfile::find($get('repo_profile_id'))?->auto_concept ?? false)
                 ->columnSpanFull(),
         ]);
     }

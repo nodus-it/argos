@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\TaskResource\Pages;
 
+use App\Enums\WorkflowStatus;
 use App\Filament\Admin\Resources\TaskResource;
+use App\Jobs\RunPhaseJob;
 use App\Models\Task;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Database\Eloquent\Model;
@@ -19,9 +21,12 @@ class CreateTask extends CreateRecord
         /** @var Task $record */
         $record = parent::handleRecordCreation($data);
 
-        $volumeName = "task_ws_{$record->name}";
-        $process = Process::fromShellCommandline("docker volume create {$volumeName}");
-        $process->run();
+        Process::fromShellCommandline('docker volume create '.escapeshellarg("task_ws_{$record->name}"))->run();
+
+        if ($record->auto_concept) {
+            $record->update(['workflow_status' => WorkflowStatus::ConceptRunning]);
+            RunPhaseJob::dispatch($record->id, 'concept');
+        }
 
         return $record;
     }
