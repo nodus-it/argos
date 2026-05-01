@@ -6,18 +6,12 @@ namespace App\Filament\Admin\Pages;
 
 use App\Models\RepoProfile;
 use Filament\Actions\Action;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Concerns\InteractsWithForms;
-use Filament\Forms\Contracts\HasForms;
-use Filament\Forms\Form;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Illuminate\Validation\Rule;
 
-class Onboarding extends Page implements HasForms
+class Onboarding extends Page
 {
-    use InteractsWithForms;
-
     protected string $view = 'filament.admin.pages.onboarding';
 
     public static function getNavigationIcon(): string
@@ -49,62 +43,40 @@ class Onboarding extends Page implements HasForms
 
     public string $workerImage = '';
 
-    /** @var array<string, mixed> */
-    public array $projectData = [];
+    public string $name = '';
+
+    public string $url = '';
+
+    public string $token = '';
+
+    public string $platform = '';
+
+    public string $default_branch = 'main';
 
     public function mount(): void
     {
         $this->claudeTokenSet = (bool) config('argos.claude_token');
         $this->workerImage = config('argos.worker_image', '');
-        $this->form->fill();
-    }
-
-    public function form(Form $form): Form
-    {
-        return $form
-            ->statePath('projectData')
-            ->schema([
-                TextInput::make('name')
-                    ->label('Projektname')
-                    ->required()
-                    ->maxLength(255),
-
-                TextInput::make('url')
-                    ->label('Repo-URL')
-                    ->required()
-                    ->url()
-                    ->maxLength(500),
-
-                TextInput::make('token')
-                    ->label('Personal Access Token')
-                    ->password()
-                    ->revealable()
-                    ->maxLength(500),
-
-                Select::make('platform')
-                    ->options([
-                        'github' => 'GitHub',
-                        'gitlab' => 'GitLab',
-                    ])
-                    ->required(),
-
-                TextInput::make('default_branch')
-                    ->label('Default Branch')
-                    ->required()
-                    ->default('main')
-                    ->maxLength(255),
-            ]);
-    }
-
-    protected function getFormActions(): array
-    {
-        return [];
     }
 
     public function createProject(): void
     {
-        $data = $this->form->getState();
-        RepoProfile::create($data);
+        $this->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'url' => ['required', 'url', 'max:500'],
+            'token' => ['nullable', 'string', 'max:500'],
+            'platform' => ['required', Rule::in(['github', 'gitlab'])],
+            'default_branch' => ['required', 'string', 'max:255'],
+        ]);
+
+        RepoProfile::create([
+            'name' => $this->name,
+            'url' => $this->url,
+            'token' => $this->token ?: null,
+            'platform' => $this->platform,
+            'default_branch' => $this->default_branch,
+        ]);
+
         Notification::make()->title('Projekt angelegt — Argos ist bereit!')->success()->send();
         $this->redirect(route('filament.admin.resources.tasks.index'));
     }
