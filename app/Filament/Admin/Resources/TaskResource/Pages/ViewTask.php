@@ -14,6 +14,7 @@ use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Schemas\Schema;
+use Symfony\Component\Process\Process;
 
 class ViewTask extends ViewRecord
 {
@@ -55,6 +56,37 @@ class ViewTask extends ViewRecord
                 ->icon('heroicon-o-command-line')
                 ->color('gray')
                 ->url(TaskResource::getUrl('logs', ['record' => $this->getRecord()])),
+            Action::make('markCompleted')
+                ->label('Abschließen')
+                ->icon('heroicon-o-check-circle')
+                ->color('success')
+                ->requiresConfirmation()
+                ->modalDescription('Task als abgeschlossen markieren? Der Workflow-Status wird auf "Abgeschlossen" gesetzt.')
+                ->action(function (): void {
+                    /** @var Task $task */
+                    $task = $this->getRecord();
+                    $task->update(['workflow_status' => WorkflowStatus::Completed]);
+                    Notification::make()->title('Task abgeschlossen')->success()->send();
+                    $this->redirect($this->getUrl());
+                })
+                ->visible(fn (): bool => $this->getRecord()->workflow_status !== WorkflowStatus::Completed),
+
+            Action::make('deleteVolume')
+                ->label('Workspace löschen')
+                ->icon('heroicon-o-trash')
+                ->color('danger')
+                ->requiresConfirmation()
+                ->modalDescription('Den Docker-Volume für diesen Task löschen? Diese Aktion ist nicht rückgängig zu machen.')
+                ->action(function (): void {
+                    /** @var Task $task */
+                    $task = $this->getRecord();
+                    Process::fromShellCommandline(
+                        'docker volume rm '.escapeshellarg("task_ws_{$task->name}")
+                    )->run();
+                    Notification::make()->title('Workspace gelöscht')->success()->send();
+                })
+                ->visible(fn (): bool => $this->getRecord()->workflow_status === WorkflowStatus::Completed),
+
             Action::make('refresh')
                 ->label('Aktualisieren')
                 ->icon('heroicon-o-arrow-path')
