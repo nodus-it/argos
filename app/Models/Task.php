@@ -35,6 +35,16 @@ class Task extends Model
         ];
     }
 
+    public function volumeName(): string
+    {
+        return 'task_ws_'.self::slugifyName($this->name);
+    }
+
+    public static function slugifyName(string $name): string
+    {
+        return preg_replace('/[^a-zA-Z0-9_.-]/', '_', $name) ?? $name;
+    }
+
     public function repoProfile(): BelongsTo
     {
         return $this->belongsTo(RepoProfile::class);

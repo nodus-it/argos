@@ -81,7 +81,7 @@ class ViewTask extends ViewRecord
                     /** @var Task $task */
                     $task = $this->getRecord();
                     Process::fromShellCommandline(
-                        'docker volume rm '.escapeshellarg("task_ws_{$task->name}")
+                        'docker volume rm '.escapeshellarg($task->volumeName())
                     )->run();
                     Notification::make()->title('Workspace gelöscht')->success()->send();
                 })

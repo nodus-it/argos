@@ -49,14 +49,14 @@ class ArgosCommand extends Command
 
             $options = [];
             foreach ($tasks as $task) {
-                $phase  = $task->current_phase ?? '—';
+                $phase = $task->current_phase ?? '—';
                 $status = $task->current_status ?? '·';
-                $icon   = $status === 'running' ? '⟳' : ($status === 'completed' ? '✓' : '·');
+                $icon = $status === 'running' ? '⟳' : ($status === 'completed' ? '✓' : '·');
                 $options["task:{$task->name}"] = "{$icon} {$task->name}  {$phase}  {$status}";
             }
-            $options['---new']     = '+ Neuer Task';
+            $options['---new'] = '+ Neuer Task';
             $options['---refresh'] = '↺ Aktualisieren';
-            $options['---quit']    = '✕ Beenden';
+            $options['---quit'] = '✕ Beenden';
 
             $choice = select('Aktion', $options);
 
@@ -84,6 +84,7 @@ class ArgosCommand extends Command
 
             if ($task === null) {
                 error("Task '{$taskName}' nicht gefunden.");
+
                 return;
             }
 
@@ -102,17 +103,17 @@ class ArgosCommand extends Command
             $options = [];
 
             if ($runningRun !== null) {
-                $options['watch']   = "⟳ Ausgabe beobachten ({$runningRun->phase})";
+                $options['watch'] = "⟳ Ausgabe beobachten ({$runningRun->phase})";
                 $options['refresh'] = '↺ Status aktualisieren';
             }
 
-            $options['concept']   = '● Concept generieren';
+            $options['concept'] = '● Concept generieren';
             $options['implement'] = '● Implement starten';
-            $options['view']      = '📄 Konzept anschauen + Feedback';
-            $options['diff']      = '● Diff anzeigen';
-            $options['push']      = '● Push + PR';
-            $options['logs']      = '📋 Logs anzeigen';
-            $options['back']      = '← Zurück';
+            $options['view'] = '📄 Konzept anschauen + Feedback';
+            $options['diff'] = '● Diff anzeigen';
+            $options['push'] = '● Push + PR';
+            $options['logs'] = '📋 Logs anzeigen';
+            $options['back'] = '← Zurück';
 
             $choice = select('Aktion', $options);
 
@@ -121,15 +122,15 @@ class ArgosCommand extends Command
             }
 
             match ($choice) {
-                'watch'     => $this->watchPhase($task, $runningRun->phase),
-                'refresh'   => null,
-                'concept'   => $this->startPhaseBackground($task, 'concept'),
+                'watch' => $this->watchPhase($task, $runningRun->phase),
+                'refresh' => null,
+                'concept' => $this->startPhaseBackground($task, 'concept'),
                 'implement' => $this->startPhaseBackground($task, 'implement'),
-                'view'      => $this->showConceptAndFeedback($task),
-                'diff'      => $this->showDiff($task),
-                'push'      => $this->startPhaseBackground($task, 'push'),
-                'logs'      => $this->showLogs($task),
-                default     => null,
+                'view' => $this->showConceptAndFeedback($task),
+                'diff' => $this->showDiff($task),
+                'push' => $this->startPhaseBackground($task, 'push'),
+                'logs' => $this->showLogs($task),
+                default => null,
             };
         }
     }
@@ -140,6 +141,7 @@ class ArgosCommand extends Command
         if ($running) {
             warning('Eine Phase läuft bereits. Bitte erst beobachten oder warten bis sie abgeschlossen ist.');
             sleep(2);
+
             return;
         }
 
@@ -162,13 +164,14 @@ class ArgosCommand extends Command
 
         $logPath = $this->phaseRunner->getPhaseLogPath($task->name, $phase);
 
-        if (!is_file($logPath)) {
+        if (! is_file($logPath)) {
             warning("Log-Datei nicht gefunden: {$logPath}");
             sleep(2);
+
             return;
         }
 
-        $offset      = 0;
+        $offset = 0;
         $finalStatus = 'unknown';
 
         while (true) {
@@ -180,7 +183,7 @@ class ArgosCommand extends Command
             }
 
             // Check state.json every 2 seconds for completion
-            $state       = $this->stateReader->read($task->name);
+            $state = $this->stateReader->read($task->name);
             $phaseStatus = $state['phases'][$phase]['current_status'] ?? 'running';
 
             if ($phaseStatus !== 'running') {
@@ -206,14 +209,14 @@ class ArgosCommand extends Command
     private function showLogs(Task $task): void
     {
         $configDir = config('argos.config_dir');
-        $phases    = ['concept', 'implement', 'push', 'commit-message'];
+        $phases = ['concept', 'implement', 'push', 'commit-message'];
 
         // Nur Phasen anbieten für die ein Background-Log existiert
         $options = [];
         foreach ($phases as $phase) {
             $path = $this->phaseRunner->getPhaseLogPath($task->name, $phase);
             if (is_file($path) && filesize($path) > 0) {
-                $options[$phase] = $phase . '  (' . $this->formatBytes(filesize($path)) . ')';
+                $options[$phase] = $phase.'  ('.$this->formatBytes(filesize($path)).')';
             }
         }
 
@@ -235,6 +238,7 @@ class ArgosCommand extends Command
 
         if ($choice === 'volume') {
             $this->showVolumeLogs($task);
+
             return;
         }
 
@@ -252,7 +256,7 @@ class ArgosCommand extends Command
         // Verfügbare Log-Dateien im Volume auflisten
         $listProcess = new Process([
             'docker', 'run', '--rm',
-            '-v', "task_ws_{$task->name}:/workspace:ro",
+            '-v', $task->volumeName().':/workspace:ro',
             'alpine',
             'sh', '-c', 'ls -lh /workspace/.agent/logs/ 2>/dev/null | tail -30',
         ]);
@@ -272,7 +276,7 @@ class ArgosCommand extends Command
 
         $catProcess = new Process([
             'docker', 'run', '--rm',
-            '-v', "task_ws_{$task->name}:/workspace:ro",
+            '-v', $task->volumeName().':/workspace:ro',
             'alpine',
             'cat', "/workspace/.agent/logs/{$filename}",
         ]);
@@ -291,7 +295,8 @@ class ArgosCommand extends Command
         if ($bytes < 1024) {
             return "{$bytes} B";
         }
-        return round($bytes / 1024, 1) . ' KB';
+
+        return round($bytes / 1024, 1).' KB';
     }
 
     private function showDiff(Task $task): void
@@ -305,7 +310,7 @@ class ArgosCommand extends Command
         // Show committed changes vs origin AND uncommitted working-tree changes
         $process = new Process([
             'docker', 'run', '--rm',
-            '-v', "task_ws_{$task->name}:/workspace:ro",
+            '-v', $task->volumeName().':/workspace:ro',
             '--entrypoint', 'sh',
             'agent-worker:latest',
             '-c', implode(' && ', [
@@ -337,7 +342,7 @@ class ArgosCommand extends Command
         // Read concept.md from volume
         $process = new Process([
             'docker', 'run', '--rm',
-            '-v', "task_ws_{$task->name}:/workspace:ro",
+            '-v', $task->volumeName().':/workspace:ro',
             'alpine',
             'cat', '/workspace/.agent/concept.md',
         ]);
@@ -375,7 +380,7 @@ class ArgosCommand extends Command
         $writeProcess = new Process([
             'docker', 'run', '--rm',
             '-i',
-            '-v', "task_ws_{$task->name}:/workspace",
+            '-v', $task->volumeName().':/workspace',
             'alpine',
             'sh', '-c', 'mkdir -p /workspace/.agent && cat > /workspace/.agent/concept.notes.md',
         ]);
@@ -404,8 +409,8 @@ class ArgosCommand extends Command
         if ($profiles->isEmpty()) {
             $profile = $this->createRepoProfile();
         } else {
-            $options               = $profiles->pluck('name', 'id')->toArray();
-            $options['---new']     = '+ Neues Profil anlegen';
+            $options = $profiles->pluck('name', 'id')->toArray();
+            $options['---new'] = '+ Neues Profil anlegen';
 
             $selected = select('Repo-Profil', $options);
 
@@ -416,6 +421,7 @@ class ArgosCommand extends Command
 
         if ($profile === null) {
             error('Kein Repo-Profil ausgewählt.');
+
             return;
         }
 
@@ -431,12 +437,12 @@ class ArgosCommand extends Command
         $description = textarea('Task-Beschreibung (Markdown)', rows: 10);
 
         $task = $taskService->create([
-            'name'            => $name,
+            'name' => $name,
             'repo_profile_id' => $profile->id,
-            'description'     => $description,
+            'description' => $description,
         ]);
 
-        Process::fromShellCommandline("docker volume create task_ws_{$name}")->run();
+        Process::fromShellCommandline('docker volume create '.Task::slugifyName($name))->run();
 
         $this->line('');
         info("Task '{$name}' angelegt.");
@@ -453,24 +459,24 @@ class ArgosCommand extends Command
         info('Neues Repo-Profil');
         $this->line('');
 
-        $name     = text('Profil-Name (z.B. nodus-it/test)');
-        $url      = text('Repo-URL (https://...)');
-        $token    = password('Token (ghp_... oder GitLab PAT)');
-        $branch   = text('Default Branch', default: 'main');
+        $name = text('Profil-Name (z.B. nodus-it/test)');
+        $url = text('Repo-URL (https://...)');
+        $token = password('Token (ghp_... oder GitLab PAT)');
+        $branch = text('Default Branch', default: 'main');
         $platform = select('Platform', ['github' => 'GitHub', 'gitlab' => 'GitLab']);
 
         return RepoProfile::create([
-            'name'           => $name,
-            'url'            => $url,
-            'token'          => $token,
+            'name' => $name,
+            'url' => $url,
+            'token' => $token,
             'default_branch' => $branch,
-            'platform'       => $platform,
+            'platform' => $platform,
         ]);
     }
 
     private function renderHeader(): void
     {
-        $db   = config('database.default') === 'mariadb' ? '⬡ MariaDB' : '◌ SQLite';
+        $db = config('database.default') === 'mariadb' ? '⬡ MariaDB' : '◌ SQLite';
         $time = now()->format('H:i');
         $this->line("┌─ ARGOS ──────────────────────── {$db}  {$time} ─┐");
     }
@@ -479,6 +485,7 @@ class ArgosCommand extends Command
     {
         if ($tasks->isEmpty()) {
             $this->line('  (Keine Tasks vorhanden)');
+
             return;
         }
 
@@ -486,17 +493,17 @@ class ArgosCommand extends Command
             '  %-30s %-12s %-22s %-20s',
             'Name', 'Phase', 'Status', 'Repo-Profil',
         ));
-        $this->line('  ' . str_repeat('─', 86));
+        $this->line('  '.str_repeat('─', 86));
 
         foreach ($tasks as $task) {
             $status = $task->current_status ?? '·';
-            $icon   = match ($status) {
-                'running'            => '⟳',
-                'completed'          => '✓',
-                'failed'             => '✗',
+            $icon = match ($status) {
+                'running' => '⟳',
+                'completed' => '✓',
+                'failed' => '✗',
                 'quality_gate_failed' => '!',
-                'no_changes'         => '=',
-                default              => '·',
+                'no_changes' => '=',
+                default => '·',
             };
             $this->line(sprintf(
                 '  %-30s %-12s %-22s %-20s',
@@ -510,11 +517,11 @@ class ArgosCommand extends Command
 
     private function renderTaskDetail(Task $task): void
     {
-        $this->line('┌─ Task: ' . $task->name . ' ' . str_repeat('─', max(0, 50 - strlen($task->name))) . '┐');
-        $this->line('│  Repo-Profil : ' . ($task->repoProfile?->name ?? '—'));
-        $this->line('│  Branch      : ' . ($task->feature_branch ?? '—'));
-        $this->line('│  PR-URL      : ' . ($task->pr_url ?? '—'));
-        $this->line('└' . str_repeat('─', 60) . '┘');
+        $this->line('┌─ Task: '.$task->name.' '.str_repeat('─', max(0, 50 - strlen($task->name))).'┐');
+        $this->line('│  Repo-Profil : '.($task->repoProfile?->name ?? '—'));
+        $this->line('│  Branch      : '.($task->feature_branch ?? '—'));
+        $this->line('│  PR-URL      : '.($task->pr_url ?? '—'));
+        $this->line('└'.str_repeat('─', 60).'┘');
 
         $runs = $task->phaseRuns()
             ->orderByDesc('started_at')
@@ -523,6 +530,7 @@ class ArgosCommand extends Command
 
         if ($runs->isEmpty()) {
             $this->line('  (Noch keine Phase-Runs)');
+
             return;
         }
 
@@ -531,10 +539,10 @@ class ArgosCommand extends Command
             '  %-12s %-6s %-22s %-10s %-20s',
             'Phase', 'Iter.', 'Status', 'Kosten', 'Gestartet',
         ));
-        $this->line('  ' . str_repeat('─', 72));
+        $this->line('  '.str_repeat('─', 72));
 
         foreach ($runs as $run) {
-            $cost = $run->cost_usd !== null ? '$' . number_format((float) $run->cost_usd, 4) : '—';
+            $cost = $run->cost_usd !== null ? '$'.number_format((float) $run->cost_usd, 4) : '—';
             $this->line(sprintf(
                 '  %-12s %-6s %-22s %-10s %-20s',
                 $run->phase,

@@ -17,7 +17,7 @@ class StateReader
     {
         $process = new Process([
             'docker', 'run', '--rm',
-            '-v', "task_ws_{$taskName}:/workspace:ro",
+            '-v', 'task_ws_'.Task::slugifyName($taskName).':/workspace:ro',
             'alpine',
             'cat', '/workspace/.agent/state.json',
         ]);
@@ -25,7 +25,7 @@ class StateReader
         $process->setTimeout(10);
         $process->run();
 
-        if (!$process->isSuccessful()) {
+        if (! $process->isSuccessful()) {
             return null;
         }
 
@@ -45,7 +45,7 @@ class StateReader
     {
         $process = new Process([
             'docker', 'run', '--rm',
-            '-v', "task_ws_{$taskName}:/workspace:ro",
+            '-v', 'task_ws_'.Task::slugifyName($taskName).':/workspace:ro',
             'alpine',
             'cat', '/workspace/.agent/concept.md',
         ]);
@@ -53,7 +53,7 @@ class StateReader
         $process->setTimeout(10);
         $process->run();
 
-        if (!$process->isSuccessful()) {
+        if (! $process->isSuccessful()) {
             return null;
         }
 
@@ -66,7 +66,7 @@ class StateReader
     {
         $process = new Process([
             'docker', 'run', '--rm',
-            '-v', "task_ws_{$taskName}:/workspace",
+            '-v', 'task_ws_'.Task::slugifyName($taskName).':/workspace',
             'alpine',
             'sh', '-c',
             'mkdir -p /workspace/.agent && printf "%s" "$NOTE_CONTENT" > /workspace/.agent/concept.notes.md',
@@ -83,7 +83,7 @@ class StateReader
     {
         $process = new Process([
             'docker', 'run', '--rm',
-            '-v', "task_ws_{$taskName}:/workspace:ro",
+            '-v', 'task_ws_'.Task::slugifyName($taskName).':/workspace:ro',
             'alpine',
             'cat', '/workspace/.agent/concept.notes.md',
         ]);
@@ -91,7 +91,7 @@ class StateReader
         $process->setTimeout(10);
         $process->run();
 
-        if (!$process->isSuccessful()) {
+        if (! $process->isSuccessful()) {
             return null;
         }
 
@@ -112,7 +112,7 @@ class StateReader
         }
 
         $phaseOrder = ['concept', 'implement', 'diff', 'push', 'respond'];
-        $lastPhase  = null;
+        $lastPhase = null;
         $lastStatus = null;
 
         foreach ($phaseOrder as $phase) {
@@ -126,7 +126,7 @@ class StateReader
                 continue;
             }
 
-            $lastPhase  = $phase;
+            $lastPhase = $phase;
             $lastStatus = $stateStatus;
 
             if ($stateStatus === 'running') {
@@ -138,7 +138,7 @@ class StateReader
                 ->where('phase', $phase)
                 ->where('status', 'running')
                 ->update([
-                    'status'      => $stateStatus,
+                    'status' => $stateStatus,
                     'finished_at' => now(),
                 ]);
         }
@@ -146,7 +146,7 @@ class StateReader
         $updates = [];
 
         if ($lastPhase !== null && $lastStatus !== null) {
-            $updates['current_phase']  = $lastPhase;
+            $updates['current_phase'] = $lastPhase;
             $updates['current_status'] = $lastStatus;
         }
 

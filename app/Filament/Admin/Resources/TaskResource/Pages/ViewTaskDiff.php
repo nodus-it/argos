@@ -21,8 +21,10 @@ class ViewTaskDiff extends Page
     /** @var array<int, array{text: string, class: string}> */
     public array $lines = [];
 
-    public string $stat   = '';
-    public bool $isEmpty  = true;
+    public string $stat = '';
+
+    public bool $isEmpty = true;
+
     public string $updatedAt = '';
 
     public function mount(string $record): void
@@ -68,19 +70,19 @@ class ViewTaskDiff extends Page
 
     private function loadDiff(): void
     {
-        $branch    = $this->task->repoProfile?->default_branch ?? 'main';
-        $image     = config('argos.worker_image');
-        $taskName  = $this->task->name;
+        $branch = $this->task->repoProfile?->default_branch ?? 'main';
+        $image = config('argos.worker_image');
+        $taskName = $this->task->name;
 
         $statProcess = new Process([
             'docker', 'run', '--rm',
-            '-v', "task_ws_{$taskName}:/workspace:ro",
+            '-v', 'task_ws_'.Task::slugifyName($taskName).':/workspace:ro',
             '--entrypoint', 'sh',
             $image,
             '-c',
             "git -C /workspace diff --stat origin/{$branch}...HEAD 2>/dev/null; "
-            . "echo ''; "
-            . "git -C /workspace status --short 2>/dev/null",
+            ."echo ''; "
+            .'git -C /workspace status --short 2>/dev/null',
         ]);
         $statProcess->setTimeout(15);
         $statProcess->run();
@@ -88,7 +90,7 @@ class ViewTaskDiff extends Page
 
         $diffProcess = new Process([
             'docker', 'run', '--rm',
-            '-v', "task_ws_{$taskName}:/workspace:ro",
+            '-v', 'task_ws_'.Task::slugifyName($taskName).':/workspace:ro',
             '--entrypoint', 'sh',
             $image,
             '-c',
@@ -97,9 +99,9 @@ class ViewTaskDiff extends Page
         $diffProcess->setTimeout(15);
         $diffProcess->run();
 
-        $raw          = $diffProcess->getOutput();
+        $raw = $diffProcess->getOutput();
         $this->isEmpty = trim($raw) === '';
-        $this->lines   = $this->parseLines($raw);
+        $this->lines = $this->parseLines($raw);
         $this->updatedAt = now()->format('H:i:s');
     }
 
@@ -116,16 +118,16 @@ class ViewTaskDiff extends Page
 
             $class = match (true) {
                 str_starts_with($line, '+++'),
-                str_starts_with($line, '---')    => 'text-slate-400 font-semibold',
-                str_starts_with($line, '@@')      => 'text-sky-400',
+                str_starts_with($line, '---') => 'text-slate-400 font-semibold',
+                str_starts_with($line, '@@') => 'text-sky-400',
                 str_starts_with($line, 'diff '),
                 str_starts_with($line, 'index '),
                 str_starts_with($line, 'new file'),
                 str_starts_with($line, 'deleted ') => 'text-slate-500',
-                str_starts_with($line, '+')        => 'text-emerald-400',
-                str_starts_with($line, '-')        => 'text-red-400',
-                $line === ''                        => 'text-slate-700',
-                default                            => 'text-slate-300',
+                str_starts_with($line, '+') => 'text-emerald-400',
+                str_starts_with($line, '-') => 'text-red-400',
+                $line === '' => 'text-slate-700',
+                default => 'text-slate-300',
             };
 
             $result[] = ['text' => $line, 'class' => $class];

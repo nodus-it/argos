@@ -26,7 +26,7 @@ class PhaseRunner
     {
         $process = new Process([
             'docker', 'run', '--rm',
-            '-v', "task_ws_{$taskName}:/workspace",
+            '-v', 'task_ws_'.Task::slugifyName($taskName).':/workspace',
             '-e', 'FEEDBACK',
             'alpine',
             'sh', '-c',
@@ -241,7 +241,7 @@ class PhaseRunner
 
         return [
             'docker', 'run', '--rm',
-            '-v', "task_ws_{$task->name}:/workspace",
+            '-v', $task->volumeName().':/workspace',
             '-v', 'composer_cache:/home/agent/.composer/cache',
             '-v', 'npm_cache:/home/agent/.npm',
             '--memory', env('ARGOS_MEM_LIMIT', '4g'),

@@ -21,7 +21,7 @@ class CreateTask extends CreateRecord
         /** @var Task $record */
         $record = parent::handleRecordCreation($data);
 
-        Process::fromShellCommandline('docker volume create '.escapeshellarg("task_ws_{$record->name}"))->run();
+        Process::fromShellCommandline('docker volume create '.escapeshellarg($record->volumeName()))->run();
 
         if ($record->auto_concept) {
             $record->update(['workflow_status' => WorkflowStatus::ConceptRunning]);
