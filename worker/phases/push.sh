@@ -276,6 +276,7 @@ phase_push_run() {
     esac
     if [[ -n "$pr_url" ]]; then
         log_info "push: PR/MR erstellt — $pr_url"
+        state_set_pr_url "$pr_url"
     fi
 
     finished_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"

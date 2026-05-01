@@ -160,16 +160,10 @@ class StateReader
             $updates['feature_branch'] = $featureBranch;
         }
 
-        // pr_url kommt aus dem letzten push-Iterations-Result
-        $pushIterations = $state['phases']['push']['iterations'] ?? [];
-        foreach (array_reverse($pushIterations) as $iter) {
-            $prUrl = $iter['pr_url'] ?? null;
-            if ($prUrl !== null && $prUrl !== '') {
-                if ($prUrl !== $task->pr_url) {
-                    $updates['pr_url'] = $prUrl;
-                }
-                break;
-            }
+        // pr_url kommt aus repo.pr_url (gesetzt von push.sh via state_set_pr_url)
+        $prUrl = $state['repo']['pr_url'] ?? null;
+        if ($prUrl !== null && $prUrl !== '' && $prUrl !== $task->pr_url) {
+            $updates['pr_url'] = $prUrl;
         }
 
         if ($updates !== []) {

@@ -206,18 +206,12 @@ class StateReaderTest extends TestCase
         $this->assertSame('feature/my-task', $task->fresh()->feature_branch);
     }
 
-    public function test_sync_to_db_extracts_pr_url_from_push_iterations(): void
+    public function test_sync_to_db_extracts_pr_url_from_repo_state(): void
     {
         $task = Task::factory()->create(['pr_url' => null]);
         $state = [
-            'phases' => [
-                'push' => [
-                    'current_status' => 'completed',
-                    'iterations' => [
-                        ['pr_url' => 'https://github.com/org/repo/pull/42'],
-                    ],
-                ],
-            ],
+            'phases' => ['push' => ['current_status' => 'completed', 'iterations' => []]],
+            'repo' => ['pr_url' => 'https://github.com/org/repo/pull/42'],
         ];
         $reader = $this->partialMock(StateReader::class, function (MockInterface $mock) use ($state): void {
             $mock->shouldReceive('read')->andReturn($state);
@@ -228,19 +222,12 @@ class StateReaderTest extends TestCase
         $this->assertSame('https://github.com/org/repo/pull/42', $task->fresh()->pr_url);
     }
 
-    public function test_sync_to_db_picks_last_push_iteration_with_pr_url(): void
+    public function test_sync_to_db_does_not_overwrite_existing_pr_url(): void
     {
-        $task = Task::factory()->create(['pr_url' => null]);
+        $task = Task::factory()->create(['pr_url' => 'https://github.com/org/repo/pull/1']);
         $state = [
-            'phases' => [
-                'push' => [
-                    'current_status' => 'completed',
-                    'iterations' => [
-                        ['pr_url' => 'https://github.com/org/repo/pull/1'],
-                        ['pr_url' => 'https://github.com/org/repo/pull/2'],
-                    ],
-                ],
-            ],
+            'phases' => [],
+            'repo' => ['pr_url' => 'https://github.com/org/repo/pull/1'],
         ];
         $reader = $this->partialMock(StateReader::class, function (MockInterface $mock) use ($state): void {
             $mock->shouldReceive('read')->andReturn($state);
@@ -248,7 +235,8 @@ class StateReaderTest extends TestCase
 
         $reader->syncToDb($task);
 
-        $this->assertSame('https://github.com/org/repo/pull/2', $task->fresh()->pr_url);
+        // Same URL → no update needed, still the original
+        $this->assertSame('https://github.com/org/repo/pull/1', $task->fresh()->pr_url);
     }
 
     public function test_sync_to_db_skips_pending_phases(): void

@@ -103,6 +103,19 @@ state_get_feature_branch() {
     jq -r '.repo.feature_branch // ""' "$STATE_FILE"
 }
 
+# state_set_pr_url: Setzt repo.pr_url nach erfolgreichem push/MR.
+# Args: $1=pr_url
+# Returns: 0 bei Erfolg.
+state_set_pr_url() {
+    local pr_url="$1"
+    local now
+    now="$(_state_now)"
+    jq --arg u "$pr_url" --arg now "$now" \
+        '.repo.pr_url = $u | .updated_at = $now' \
+        "$STATE_FILE" > "${STATE_FILE}.tmp"
+    mv "${STATE_FILE}.tmp" "$STATE_FILE"
+}
+
 # state_add_iteration: Fügt eine neue Iteration zur Phase hinzu.
 # Args: $1=phase, $2=flags_json (z.B. '{"fresh":false}'), $3=optional started_at
 # Output: Iterationsnummer (n) auf stdout.

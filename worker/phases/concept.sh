@@ -43,9 +43,10 @@ _concept_initial_clone() {
     local auth_url
     auth_url="$(git_auth_inject_token "$REPO_URL" "$REPO_TOKEN")"
 
-    local now_epoch feature_branch
+    local now_epoch feature_branch slug
     now_epoch="$(date -u +%s)"
-    feature_branch="ai/${TASK_ID}-${now_epoch}"
+    slug="$(printf '%s' "${TASK_ID}" | tr ' /' '-' | tr -cd 'a-zA-Z0-9._-')"
+    feature_branch="ai/${slug}-${now_epoch}"
 
     # `git clone` weigert sich, in ein nicht-leeres /workspace zu clonen
     # (`/workspace/.agent/` existiert schon). Stattdessen: init + fetch + checkout.
@@ -68,7 +69,12 @@ _concept_initial_clone() {
         rm -rf /workspace/.git
         return 1
     fi
-    git checkout -B "$feature_branch" "origin/$BASE_BRANCH"
+    if ! git checkout -B "$feature_branch" "origin/$BASE_BRANCH" 2>>/workspace/.agent/logs/clone.err; then
+        echo "concept: git checkout failed (siehe logs/clone.err)" >&2
+        git remote set-url origin "$REPO_URL"
+        rm -rf /workspace/.git
+        return 1
+    fi
     # Originellen URL ohne Token zurueckschreiben damit credentials nicht
     # im Workspace persistieren.
     git remote set-url origin "$REPO_URL"
