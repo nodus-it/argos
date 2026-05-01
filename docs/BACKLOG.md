@@ -16,11 +16,11 @@ Der Prototyp war CLI-first mit Bash-Steuerung. Das Zielbild ist Web First mit PH
 
 ## Nächste Features
 
-- [ ] **State-Sync nach Phase**: PHP liest `state.json` aus Volume nach Container-Exit, schreibt in DB.
-- [ ] **Phase `diff` in Web-UI**: strukturierte Diff-Ansicht in Filament statt nur stdout.
+- [x] **State-Sync nach Phase**: PHP liest `state.json` nach Container-Exit, schreibt feature_branch/pr_url/Status in DB. *(Mai 2026)*
+- [x] **Phase `diff` in Web-UI**: strukturierte Diff-Ansicht in Filament mit git diff + stat, color-coded. *(Mai 2026)*
 - [ ] **Cost-Tracking**: `total_cost_usd` aus Claude-Result-JSONs in DB summieren, in Task-Detailseite anzeigen.
 - [ ] **Worker-Image-Varianten**: `argos-worker-node`, `argos-worker-python` — pro Task konfigurierbar welches Worker-Image genutzt wird.
-- [ ] **DB-Sidecar optional**: MariaDB als Compose-Profile wenn Boost-Projekte produktive DB brauchen.
+- [x] **DB-Sidecar optional**: MariaDB als Compose-Profile (`--profile db`), auto-detection bleibt aktiv. *(Mai 2026)*
 
 ## Mittelfristig
 
