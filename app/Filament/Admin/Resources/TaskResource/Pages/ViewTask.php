@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\TaskResource\Pages;
 
-use App\Domain\Phase\PhaseRunner;
 use App\Domain\Phase\StateReader;
 use App\Filament\Admin\Resources\TaskResource;
+use App\Jobs\RunPhaseJob;
 use App\Models\Task;
 use Filament\Actions\Action;
 use Filament\Infolists\Components\TextEntry;
@@ -113,7 +113,7 @@ class ViewTask extends ViewRecord
                     Notification::make()->title('Phase läuft bereits')->warning()->send();
                     return;
                 }
-                app(PhaseRunner::class)->startBackground($task, $phase);
+                RunPhaseJob::dispatch($task->id, $phase);
                 Notification::make()->title("{$label} gestartet")->success()->send();
                 $this->redirect($this->getUrl());
             });

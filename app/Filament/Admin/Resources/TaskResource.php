@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources;
 
-use App\Domain\Phase\PhaseRunner;
 use App\Filament\Admin\Resources\TaskResource\Pages\CreateTask;
+use App\Jobs\RunPhaseJob;
 use App\Filament\Admin\Resources\TaskResource\Pages\ListTasks;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTask;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTaskConcept;
@@ -148,7 +148,7 @@ class TaskResource extends Resource
                     Notification::make()->title('Phase läuft bereits')->warning()->send();
                     return;
                 }
-                app(PhaseRunner::class)->startBackground($record, $phase);
+                RunPhaseJob::dispatch($record->id, $phase);
                 Notification::make()->title("{$label} gestartet")->success()->send();
             });
     }

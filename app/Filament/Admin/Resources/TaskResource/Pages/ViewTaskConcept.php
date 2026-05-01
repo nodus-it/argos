@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\TaskResource\Pages;
 
-use App\Domain\Phase\PhaseRunner;
 use App\Domain\Phase\StateReader;
+use App\Jobs\RunPhaseJob;
 use App\Filament\Admin\Resources\TaskResource;
 use App\Models\Task;
 use Filament\Actions\Action;
@@ -53,7 +53,7 @@ class ViewTaskConcept extends Page
                         Notification::make()->title('Phase läuft bereits')->warning()->send();
                         return;
                     }
-                    app(PhaseRunner::class)->startBackground($this->task, 'concept');
+                    RunPhaseJob::dispatch($this->task->id, 'concept');
                     Notification::make()->title('Concept gestartet')->success()->send();
                     $this->redirect(TaskResource::getUrl('logs', ['record' => $this->task]));
                 }),

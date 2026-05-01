@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Console\Commands\ArgosCommand;
-use App\Console\Commands\ArgosInitCommand;
 use App\Domain\Credentials\CredentialStore;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\ServiceProvider;
@@ -23,7 +22,6 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->commands([
             ArgosCommand::class,
-            ArgosInitCommand::class,
         ]);
 
         $this->configureDatabase();
@@ -31,35 +29,15 @@ class AppServiceProvider extends ServiceProvider
 
     private function configureDatabase(): void
     {
-        $store = $this->app->make(CredentialStore::class);
-        $dbConfig = $store->getDbConfig();
-
-        if ($dbConfig !== null) {
-            // Apply db.env values to the mariadb connection config dynamically
-            $map = [
-                'ARGOS_DB_HOST' => 'host',
-                'ARGOS_DB_PORT' => 'port',
-                'ARGOS_DB_DATABASE' => 'database',
-                'ARGOS_DB_USERNAME' => 'username',
-                'ARGOS_DB_PASSWORD' => 'password',
-            ];
-
-            foreach ($map as $envKey => $configKey) {
-                if (isset($dbConfig[$envKey])) {
-                    config(["database.connections.mariadb.{$configKey}" => $dbConfig[$envKey]]);
-                }
-            }
-        }
-
         if ($this->canConnectToMariadb()) {
             config(['database.default' => 'mariadb']);
             return;
         }
 
-        $sqlitePath = config('argos.config_dir') . '/argos.db';
+        $sqlitePath = env('DB_DATABASE', config('argos.config_dir') . '/argos.db');
         config([
-            'database.default' => 'sqlite',
-            'database.connections.sqlite.database' => $sqlitePath,
+            'database.default'                        => 'sqlite',
+            'database.connections.sqlite.database'    => $sqlitePath,
         ]);
 
         $this->ensureSqliteExists($sqlitePath);
@@ -68,7 +46,7 @@ class AppServiceProvider extends ServiceProvider
 
     private function canConnectToMariadb(): bool
     {
-        $c = config('database.connections.mariadb');
+        $c   = config('database.connections.mariadb');
         $dsn = "mysql:host={$c['host']};port={$c['port']};dbname={$c['database']};charset=utf8mb4";
 
         try {
@@ -87,11 +65,11 @@ class AppServiceProvider extends ServiceProvider
     {
         $dir = dirname($path);
 
-        if (!is_dir($dir)) {
+        if (! is_dir($dir)) {
             mkdir($dir, 0700, true);
         }
 
-        if (!is_file($path)) {
+        if (! is_file($path)) {
             touch($path);
         }
     }

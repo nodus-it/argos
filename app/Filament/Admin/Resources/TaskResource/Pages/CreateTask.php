@@ -19,16 +19,6 @@ class CreateTask extends CreateRecord
         /** @var Task $record */
         $record = parent::handleRecordCreation($data);
 
-        $configDir = config('argos.config_dir');
-        $descriptionDir = "{$configDir}/tasks/{$record->name}";
-
-        if (!is_dir($descriptionDir)) {
-            mkdir($descriptionDir, 0755, true);
-        }
-
-        $descriptionPath = "{$descriptionDir}/description.md";
-        file_put_contents($descriptionPath, $data['description'] ?? '');
-
         $volumeName = "task_ws_{$record->name}";
         $process = Process::fromShellCommandline("docker volume create {$volumeName}");
         $process->run();

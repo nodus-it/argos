@@ -39,11 +39,12 @@ class PhaseRunner
     }
 
     /**
-     * Start a phase in the background. Returns immediately; phase runs detached.
+     * Run a phase synchronously, streaming output to a log file.
+     * Intended to be called from a queue job.
      */
-    public function startBackground(Task $task, string $phase, array $flags = []): void
+    public function runBlocking(Task $task, string $phase, array $flags = []): void
     {
-        $cmd = $this->buildCommand($task, $phase, $flags);
+        $cmd     = $this->buildCommand($task, $phase, $flags);
         $logPath = $this->getPhaseLogPath($task->name, $phase);
 
         $logDir = dirname($logPath);
@@ -53,60 +54,30 @@ class PhaseRunner
 
         file_put_contents($logPath, '');
 
-        $shellParts = array_map('escapeshellarg', $cmd);
-        $shellCmd = 'nohup '.implode(' ', $shellParts)
-            .' >> '.escapeshellarg($logPath).' 2>&1 &';
-
-        PhaseRun::create([
-            'task_id' => $task->id,
-            'phase' => $phase,
-            'iteration' => $task->phaseRuns()->where('phase', $phase)->count() + 1,
-            'status' => 'running',
+        $phaseRun = PhaseRun::create([
+            'task_id'    => $task->id,
+            'phase'      => $phase,
+            'iteration'  => $task->phaseRuns()->where('phase', $phase)->count() + 1,
+            'status'     => 'running',
             'started_at' => now(),
         ]);
 
         $task->update([
-            'current_phase' => $phase,
+            'current_phase'  => $phase,
             'current_status' => 'running',
         ]);
 
-        shell_exec($shellCmd);
-    }
-
-    /**
-     * Run a phase in the foreground, yielding output chunks as a generator.
-     */
-    public function run(Task $task, string $phase, array $flags = []): \Generator
-    {
-        $cmd = $this->buildCommand($task, $phase, $flags);
+        $logHandle = fopen($logPath, 'a');
 
         $process = new Process($cmd);
         $process->setTimeout(null);
         $process->setIdleTimeout(null);
 
-        $phaseRun = PhaseRun::create([
-            'task_id' => $task->id,
-            'phase' => $phase,
-            'iteration' => $task->phaseRuns()->where('phase', $phase)->count() + 1,
-            'status' => 'running',
-            'started_at' => now(),
-        ]);
-
-        $chunks = [];
-        $process->start(function (string $type, string $chunk) use (&$chunks): void {
-            $chunks[] = $chunk;
+        $process->run(function (string $type, string $chunk) use ($logHandle): void {
+            fwrite($logHandle, $chunk);
         });
 
-        while ($process->isRunning()) {
-            while ($chunks !== []) {
-                yield array_shift($chunks);
-            }
-            usleep(50_000);
-        }
-
-        foreach ($chunks as $chunk) {
-            yield $chunk;
-        }
+        fclose($logHandle);
 
         $exitCode = $process->getExitCode() ?? 1;
 
@@ -118,13 +89,13 @@ class PhaseRunner
         };
 
         $phaseRun->update([
-            'status' => $status,
+            'status'      => $status,
             'finished_at' => now(),
-            'exit_code' => $exitCode,
+            'exit_code'   => $exitCode,
         ]);
 
         $task->update([
-            'current_phase' => $phase,
+            'current_phase'  => $phase,
             'current_status' => $status,
         ]);
     }
@@ -149,7 +120,7 @@ class PhaseRunner
         }
 
         $workerImage = config('argos.worker_image', 'ghcr.io/nodus-it/argos-worker:latest');
-        $phaseFlags = $flags !== [] ? json_encode($flags) : '{}';
+        $phaseFlags  = $flags !== [] ? json_encode($flags) : '{}';
 
         return [
             'docker', 'run', '--rm',

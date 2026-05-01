@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\TaskResource\Pages;
 
-use App\Domain\Phase\PhaseRunner;
 use App\Filament\Admin\Resources\TaskResource;
+use App\Jobs\RunPhaseJob;
 use App\Models\Task;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
@@ -64,10 +64,8 @@ class ViewTaskRespond extends Page
             return;
         }
 
-        $runner = app(PhaseRunner::class);
-
         try {
-            $runner->writeFeedbackToVolume($this->task->name, $feedback);
+            app(\App\Domain\Phase\PhaseRunner::class)->writeFeedbackToVolume($this->task->name, $feedback);
         } catch (\Throwable $e) {
             Notification::make()
                 ->title('Fehler beim Schreiben des Feedbacks')
@@ -77,7 +75,7 @@ class ViewTaskRespond extends Page
             return;
         }
 
-        $runner->startBackground($this->task, 'respond');
+        RunPhaseJob::dispatch($this->task->id, 'respond');
 
         Notification::make()->title('Respond gestartet')->success()->send();
 

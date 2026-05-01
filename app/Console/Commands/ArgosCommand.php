@@ -7,6 +7,7 @@ namespace App\Console\Commands;
 use App\Domain\Phase\PhaseRunner;
 use App\Domain\Phase\StateReader;
 use App\Domain\Task\TaskService;
+use App\Jobs\RunPhaseJob;
 use App\Models\RepoProfile;
 use App\Models\Task;
 use Illuminate\Console\Command;
@@ -143,8 +144,8 @@ class ArgosCommand extends Command
         }
 
         try {
-            $this->phaseRunner->startBackground($task, $phase);
-            info("Phase '{$phase}' wurde im Hintergrund gestartet. ⟳");
+            RunPhaseJob::dispatch($task->id, $phase);
+            info("Phase '{$phase}' wurde in die Queue eingereiht. ⟳");
         } catch (\RuntimeException $e) {
             error($e->getMessage());
         }
@@ -434,15 +435,6 @@ class ArgosCommand extends Command
             'repo_profile_id' => $profile->id,
             'description'     => $description,
         ]);
-
-        $configDir = config('argos.config_dir');
-        $taskDir   = "{$configDir}/tasks/{$name}";
-
-        if (!is_dir($taskDir)) {
-            mkdir($taskDir, 0755, true);
-        }
-
-        file_put_contents("{$taskDir}/description.md", $description);
 
         Process::fromShellCommandline("docker volume create task_ws_{$name}")->run();
 
