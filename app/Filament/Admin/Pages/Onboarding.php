@@ -84,6 +84,11 @@ class Onboarding extends Page
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('createProject')
+                ->label('Projekt anlegen')
+                ->icon('heroicon-o-rocket-launch')
+                ->action(fn () => $this->createProject()),
+
             Action::make('skip')
                 ->label('Überspringen')
                 ->color('gray')

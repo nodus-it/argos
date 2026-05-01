@@ -44,7 +44,7 @@
                     Verbinde Argos mit einem Git-Repository. Weitere Projekte kannst du danach unter <strong>Konfiguration → Projekte</strong> anlegen.
                 </p>
 
-                <form wire:submit="createProject" class="space-y-4">
+                <form wire:submit.prevent class="space-y-4">
 
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Projektname <span class="text-red-500">*</span></label>
@@ -83,16 +83,6 @@
                         <input wire:model="default_branch" type="text" placeholder="main"
                             class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" />
                         @error('default_branch') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
-                    </div>
-
-                    <div class="flex justify-end pt-2">
-                        <button type="submit" wire:loading.attr="disabled"
-                            class="inline-flex items-center gap-2 rounded-lg bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium px-5 py-2.5 transition-colors">
-                            <span wire:loading.remove wire:target="createProject"><x-heroicon-o-rocket-launch class="h-4 w-4" /></span>
-                            <span wire:loading wire:target="createProject"><x-heroicon-o-arrow-path class="h-4 w-4 animate-spin" /></span>
-                            <span wire:loading.remove wire:target="createProject">Projekt anlegen & loslegen</span>
-                            <span wire:loading wire:target="createProject">Wird angelegt…</span>
-                        </button>
                     </div>
 
                 </form>
