@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Console\Commands\AgentConceptCommand;
+use App\Console\Commands\AgentDiffCommand;
+use App\Console\Commands\AgentImplementCommand;
+use App\Console\Commands\AgentPushCommand;
 use App\Console\Commands\ArgosCommand;
 use App\Domain\Credentials\CredentialStore;
 use Illuminate\Support\Facades\Artisan;
@@ -22,6 +26,10 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->commands([
             ArgosCommand::class,
+            AgentConceptCommand::class,
+            AgentImplementCommand::class,
+            AgentDiffCommand::class,
+            AgentPushCommand::class,
         ]);
 
         $this->configureDatabase();

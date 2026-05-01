@@ -39,6 +39,72 @@ class PhaseRunner
     }
 
     /**
+     * Run a phase synchronously, streaming output to a log file AND a callback.
+     * Intended for Artisan commands where live terminal output is needed.
+     * Returns the process exit code.
+     */
+    public function runLive(Task $task, string $phase, callable $output, array $flags = []): int
+    {
+        $cmd     = $this->buildCommand($task, $phase, $flags);
+        $logPath = $this->getPhaseLogPath($task->name, $phase);
+
+        $logDir = dirname($logPath);
+        if (! is_dir($logDir)) {
+            mkdir($logDir, 0755, true);
+        }
+
+        file_put_contents($logPath, '');
+
+        $phaseRun = PhaseRun::create([
+            'task_id'    => $task->id,
+            'phase'      => $phase,
+            'iteration'  => $task->phaseRuns()->where('phase', $phase)->count() + 1,
+            'status'     => 'running',
+            'started_at' => now(),
+        ]);
+
+        $task->update([
+            'current_phase'  => $phase,
+            'current_status' => 'running',
+        ]);
+
+        $logHandle = fopen($logPath, 'a');
+
+        $process = new Process($cmd);
+        $process->setTimeout(null);
+        $process->setIdleTimeout(null);
+
+        $process->run(function (string $type, string $chunk) use ($logHandle, $output): void {
+            fwrite($logHandle, $chunk);
+            $output($chunk);
+        });
+
+        fclose($logHandle);
+
+        $exitCode = $process->getExitCode() ?? 1;
+
+        $status = match ($exitCode) {
+            0 => 'completed',
+            4 => 'quality_gate_failed',
+            5 => 'no_changes',
+            default => 'failed',
+        };
+
+        $phaseRun->update([
+            'status'      => $status,
+            'finished_at' => now(),
+            'exit_code'   => $exitCode,
+        ]);
+
+        $task->update([
+            'current_phase'  => $phase,
+            'current_status' => $status,
+        ]);
+
+        return $exitCode;
+    }
+
+    /**
      * Run a phase synchronously, streaming output to a log file.
      * Intended to be called from a queue job.
      */
