@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Filament\Admin\Resources;
 
 use App\Filament\Admin\Resources\TaskResource\Pages\CreateTask;
-use App\Jobs\RunPhaseJob;
 use App\Filament\Admin\Resources\TaskResource\Pages\ListTasks;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTask;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTaskConcept;
@@ -13,6 +12,7 @@ use App\Filament\Admin\Resources\TaskResource\Pages\ViewTaskDiff;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTaskLogs;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTaskRespond;
 use App\Filament\Admin\Resources\TaskResource\RelationManagers\PhaseRunsRelationManager;
+use App\Jobs\RunPhaseJob;
 use App\Models\RepoProfile;
 use App\Models\Task;
 use Filament\Actions\Action;
@@ -55,7 +55,7 @@ class TaskResource extends Resource
                 ->maxLength(255),
 
             Select::make('repo_profile_id')
-                ->label('Repo-Profil')
+                ->label('Projekt')
                 ->options(RepoProfile::all()->pluck('name', 'id'))
                 ->required(),
 
@@ -76,7 +76,7 @@ class TaskResource extends Resource
                     ->sortable(),
 
                 TextColumn::make('repoProfile.name')
-                    ->label('Repo')
+                    ->label('Projekt')
                     ->sortable(),
 
                 TextColumn::make('current_phase')
@@ -87,12 +87,12 @@ class TaskResource extends Resource
                     ->label('Status')
                     ->badge()
                     ->color(fn (?string $state): string => match ($state) {
-                        'running'             => 'warning',
-                        'completed'           => 'success',
-                        'failed'              => 'danger',
+                        'running' => 'warning',
+                        'completed' => 'success',
+                        'failed' => 'danger',
                         'quality_gate_failed' => 'danger',
-                        'no_changes'          => 'info',
-                        default               => 'gray',
+                        'no_changes' => 'info',
+                        default => 'gray',
                     })
                     ->placeholder('—'),
 
@@ -130,13 +130,13 @@ class TaskResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index'   => ListTasks::route('/'),
-            'create'  => CreateTask::route('/create'),
-            'view'    => ViewTask::route('/{record}'),
-            'concept'  => ViewTaskConcept::route('/{record}/concept'),
-            'diff'     => ViewTaskDiff::route('/{record}/diff'),
-            'logs'     => ViewTaskLogs::route('/{record}/logs'),
-            'respond'  => ViewTaskRespond::route('/{record}/respond'),
+            'index' => ListTasks::route('/'),
+            'create' => CreateTask::route('/create'),
+            'view' => ViewTask::route('/{record}'),
+            'concept' => ViewTaskConcept::route('/{record}/concept'),
+            'diff' => ViewTaskDiff::route('/{record}/diff'),
+            'logs' => ViewTaskLogs::route('/{record}/logs'),
+            'respond' => ViewTaskRespond::route('/{record}/respond'),
         ];
     }
 
@@ -148,6 +148,7 @@ class TaskResource extends Resource
             ->action(function (Task $record) use ($phase, $label): void {
                 if ($record->phaseRuns()->where('status', 'running')->exists()) {
                     Notification::make()->title('Phase läuft bereits')->warning()->send();
+
                     return;
                 }
                 RunPhaseJob::dispatch($record->id, $phase);

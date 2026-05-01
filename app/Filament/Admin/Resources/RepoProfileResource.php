@@ -8,14 +8,15 @@ use App\Filament\Admin\Resources\RepoProfileResource\Pages\CreateRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\EditRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\ListRepoProfiles;
 use App\Models\RepoProfile;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\EditAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
-use Filament\Actions\DeleteAction;
-use Filament\Actions\EditAction;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 
@@ -25,7 +26,7 @@ class RepoProfileResource extends Resource
 
     public static function getNavigationIcon(): string
     {
-        return 'heroicon-o-server';
+        return 'heroicon-o-folder-open';
     }
 
     public static function getNavigationGroup(): ?string
@@ -35,7 +36,17 @@ class RepoProfileResource extends Resource
 
     public static function getNavigationLabel(): string
     {
-        return 'Repo-Profile';
+        return 'Projekte';
+    }
+
+    public static function getModelLabel(): string
+    {
+        return 'Projekt';
+    }
+
+    public static function getPluralModelLabel(): string
+    {
+        return 'Projekte';
     }
 
     public static function form(Schema $schema): Schema
@@ -69,6 +80,20 @@ class RepoProfileResource extends Resource
                 ->required()
                 ->default('main')
                 ->maxLength(255),
+
+            TextInput::make('worker_image')
+                ->label('Worker-Image')
+                ->placeholder('ghcr.io/nodus-it/argos-worker:latest')
+                ->helperText('Leer lassen für globalen Standard aus ARGOS_WORKER_IMAGE.')
+                ->maxLength(255),
+
+            Toggle::make('auto_concept')
+                ->label('Concept automatisch starten')
+                ->helperText('Startet die Concept-Phase direkt nach dem Anlegen eines Tasks.'),
+
+            Toggle::make('auto_pr')
+                ->label('PR automatisch erstellen')
+                ->helperText('Startet die Push-Phase automatisch nach erfolgreicher Implementierung.'),
         ]);
     }
 
@@ -85,7 +110,7 @@ class RepoProfileResource extends Resource
                     ->color(fn (string $state): string => match ($state) {
                         'github' => 'gray',
                         'gitlab' => 'warning',
-                        default  => 'gray',
+                        default => 'gray',
                     }),
 
                 TextColumn::make('default_branch')
@@ -114,9 +139,9 @@ class RepoProfileResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index'  => ListRepoProfiles::route('/'),
+            'index' => ListRepoProfiles::route('/'),
             'create' => CreateRepoProfile::route('/create'),
-            'edit'   => EditRepoProfile::route('/{record}/edit'),
+            'edit' => EditRepoProfile::route('/{record}/edit'),
         ];
     }
 }

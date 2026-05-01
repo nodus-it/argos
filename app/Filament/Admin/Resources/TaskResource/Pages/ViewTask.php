@@ -76,7 +76,7 @@ class ViewTask extends ViewRecord
                 ->label('Name'),
 
             TextEntry::make('repoProfile.name')
-                ->label('Repo-Profil'),
+                ->label('Projekt'),
 
             TextEntry::make('current_phase')
                 ->label('Aktuelle Phase')
@@ -86,12 +86,12 @@ class ViewTask extends ViewRecord
                 ->label('Status')
                 ->badge()
                 ->color(fn (?string $state): string => match ($state) {
-                    'running'             => 'warning',
-                    'completed'           => 'success',
-                    'failed'              => 'danger',
+                    'running' => 'warning',
+                    'completed' => 'success',
+                    'failed' => 'danger',
                     'quality_gate_failed' => 'danger',
-                    'no_changes'          => 'info',
-                    default               => 'gray',
+                    'no_changes' => 'info',
+                    default => 'gray',
                 }),
 
             TextEntry::make('feature_branch')
@@ -116,6 +116,7 @@ class ViewTask extends ViewRecord
                 $task = $this->getRecord();
                 if ($task->phaseRuns()->where('status', 'running')->exists()) {
                     Notification::make()->title('Phase läuft bereits')->warning()->send();
+
                     return;
                 }
                 RunPhaseJob::dispatch($task->id, $phase);
@@ -123,6 +124,4 @@ class ViewTask extends ViewRecord
                 $this->redirect($this->getUrl());
             });
     }
-
-
 }
