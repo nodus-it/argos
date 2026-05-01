@@ -2,16 +2,16 @@
 
 ## Was hier passiert
 
-Du baust den **Claude Worker v1** — ein dockerisiertes Tool, das Dev-Tasks isoliert und phasenweise ausführt. Lies `WORKER-CONCEPT.md` für das Big Picture.
+Du baust den **Claude Worker v1** — ein dockerisiertes Tool, das Dev-Tasks isoliert und phasenweise ausführt. Lies `docs/WORKER-CONCEPT.md` für das Big Picture.
 
 ## Wo was steht (Quellen der Wahrheit)
 
 | Frage | Datei |
 | --- | --- |
-| Was bauen wir und wofür? | `WORKER-CONCEPT.md` |
-| Wie genau implementieren? | `IMPLEMENTATION.md` |
-| Wann ist v1 fertig? | `V1-DONE.md` |
-| Was kommt danach? | `BACKLOG.md` |
+| Was bauen wir und wofür? | `docs/WORKER-CONCEPT.md` |
+| Wie genau implementieren? | `docs/IMPLEMENTATION.md` |
+| Wann ist v1 fertig? | `docs/V1-DONE.md` |
+| Was kommt danach? | `docs/BACKLOG.md` |
 | System-Prompts für die Claude-Sessions im Worker | `worker/prompts/*.system.md` |
 | Schemas für State und Outputs | `worker/schemas/*.schema.json` |
 
@@ -54,7 +54,7 @@ CI führt `shellcheck` über `agent`, `worker/lib/`, `worker/phases/`, `worker/d
 ### Dokumentation
 
 - Jede neue Funktion in `worker/lib/` braucht einen Docstring.
-- Bei Architektur-relevanten Änderungen: `WORKER-CONCEPT.md` oder `IMPLEMENTATION.md` mit aktualisieren.
+- Bei Architektur-relevanten Änderungen: `docs/WORKER-CONCEPT.md` oder `docs/IMPLEMENTATION.md` mit aktualisieren.
 - Beispiel-Walkthrough in `docs/EXAMPLE.md` mit jedem neuen Feature aktuell halten.
 
 ### Tests

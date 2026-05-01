@@ -1,21 +1,20 @@
-# Claude Worker — v1
+# Argos Worker
 
-Dockerisierter Worker, der eine einzelne Dev-Aufgabe phasenweise und isoliert vom Host ausführt, gesteuert über ein Bash-CLI.
+Dockerisierter Worker, der eine einzelne Dev-Aufgabe phasenweise und isoliert vom Host ausführt. Steuerung über die Web-UI (Laravel/Filament) oder das `./agent`-CLI.
 
 ## Mission
 
-Das Tool nimmt entgegen: Git-Remote + Repo-Token + Base-Branch + Aufgaben-Beschreibung. Es führt vier Phasen durch — `concept`, `implement`, `diff`, `push` — wobei zwischen den Phasen menschliche Approval-Gates möglich sind. Phasen sind wiederholbar (Default inkrementell, `--fresh` setzt zurück). Ergebnis: ein Feature-Branch ist auf der Remote.
+Das Tool nimmt entgegen: Git-Remote + Repo-Token + Base-Branch + Aufgaben-Beschreibung. Es führt fünf Phasen durch — `concept`, `implement`, `diff`, `push`, `respond` — wobei zwischen den Phasen menschliche Approval-Gates möglich sind. Phasen sind wiederholbar. Ergebnis: ein Feature-Branch mit PR ist auf der Remote, Review-Feedback wird in weiteren Iterationen eingearbeitet.
 
-Keine Orchestrierung, keine DB, keine UI. Manuelle Bedienung über `./agent <command>`.
+## Aktueller Umfang
 
-## Was diese Iteration nicht tut
-
-- Keine Task-Quellen abfragen (Issues, Tickets) — Aufgaben werden manuell angelegt
-- Keine PR-Erstellung — nur Branch-Push, PR macht der Mensch
-- Kein Feedback-Loop am PR
-- Keine Datenbank, keine UI
+- Task-Steuerung über Web-UI (`/admin/tasks`) und `./agent`-CLI
+- PR-Erstellung via GitHub REST API nach Push, concept.md als PR-Body
+- Review-Feedback über die UI in den Branch einarbeiten (respond-Phase)
+- SQLite-basierte Datenbank für Task- und Phasen-State in der Web-UI
+- Kein automatisches Abfragen von Issues/Tickets — Aufgaben werden manuell angelegt
 - Keine Multi-Repo-Tasks
-- Kein DB-Sidecar — Projekte mit DB-Anforderungen wechseln im Worker auf SQLite (siehe „Boost-Strategie")
+- Kein DB-Sidecar — Projekte mit DB-Anforderungen wechseln im Worker auf SQLite (Boost-Strategie)
 
 ## Sicherheits-Modell
 
@@ -29,33 +28,39 @@ Keine Orchestrierung, keine DB, keine UI. Manuelle Bedienung über `./agent <com
 ## Komponenten-Übersicht
 
 ```
-agent/                              # Repo-Root
+argos/                              # Repo-Root (= Laravel-Projekt-Root)
 ├── agent                           # Haupt-CLI (Bash)
-├── docker/
-│   ├── Dockerfile                  # Worker-Image (multi-stage)
-│   └── worker-entrypoint.sh        # Phase-Dispatcher im Container
+├── app/, config/, resources/, ...  # Laravel Web-UI (Filament)
+├── artisan, composer.json, ...     # Laravel-Standard-Dateien
 ├── docker-compose.yml
-├── lib/                            # Bash-Library
-│   ├── tasks.sh
-│   ├── credentials.sh
-│   ├── docker.sh
-│   ├── state.sh
-│   ├── lock.sh
-│   ├── logging.sh
-│   └── result.sh
-├── phases/                         # Phase-Skripte
-│   ├── registry.sh
-│   ├── concept.sh
-│   ├── implement.sh
-│   ├── diff.sh
-│   ├── push.sh
-│   └── commit-message.sh
-├── prompts/                        # System-Prompt-Templates
-│   ├── concept.system.md
-│   ├── implement.system.md
-│   ├── commit-message.system.md
-│   └── user.global.system.md       # User-globale Konventionen
-├── schemas/                        # JSON-Schemas
+├── worker/                         # Docker-Worker (Bash)
+│   ├── docker/
+│   │   ├── Dockerfile              # Worker-Image (multi-stage)
+│   │   └── worker-entrypoint.sh    # Phase-Dispatcher im Container
+│   ├── lib/                        # Bash-Library
+│   │   ├── tasks.sh
+│   │   ├── credentials.sh
+│   │   ├── docker.sh
+│   │   ├── state.sh
+│   │   ├── lock.sh
+│   │   ├── logging.sh
+│   │   └── result.sh
+│   ├── phases/                     # Phase-Skripte
+│   │   ├── registry.sh
+│   │   ├── concept.sh
+│   │   ├── implement.sh
+│   │   ├── diff.sh
+│   │   ├── push.sh
+│   │   ├── respond.sh
+│   │   └── commit-message.sh
+│   ├── prompts/                    # System-Prompt-Templates
+│   │   ├── concept.system.md
+│   │   ├── implement.system.md
+│   │   ├── respond.system.md
+│   │   ├── commit-message.system.md
+│   │   └── user.global.system.md   # User-globale Konventionen
+│   ├── schemas/                    # JSON-Schemas
+│   └── tests/                      # Bash/Bats-Tests
 └── tests/, docs/, .github/workflows/
 ```
 
@@ -140,19 +145,19 @@ Nach erfolgreichem Push fragt das CLI: „Workspace löschen? [y/N]". Bei `y` wi
 
 ## Wiederholbarkeit & State-Tracking
 
-Im Workspace-Volume liegt unter `/workspace/.agent/state.json` ein Status-File mit allen Iterationen pro Phase, ihren Statuses, Timestamps. Schema in `schemas/state.schema.json`.
+Im Workspace-Volume liegt unter `/workspace/.agent/state.json` ein Status-File mit allen Iterationen pro Phase, ihren Statuses, Timestamps. Schema in `worker/schemas/state.schema.json`.
 
 `agent status <task-id>` liest dieses File und zeigt es schön formatiert. `agent status` (ohne Argument) listet alle Tasks.
 
 ## Phase-Erweiterbarkeit
 
-Phasen sind nicht hartcodiert in der CLI, sondern als einzelne Skripte unter `phases/<name>.sh` definiert. Jede Phase liefert:
+Phasen sind nicht hartcodiert in der CLI, sondern als einzelne Skripte unter `worker/phases/<name>.sh` definiert. Jede Phase liefert:
 
 - Eine Funktion `phase_<name>_run` — der eigentliche Code
 - Eine Funktion `phase_<name>_preconditions` — gibt 0 zurück wenn OK, sonst Exit-Code + Fehlermeldung auf stderr
 - Eine Funktion `phase_<name>_help` — kurze Beschreibung für `agent help <phase>`
 
-Die `phases/registry.sh` listet alle aktiven Phasen in Reihenfolge. Neue Phase hinzufügen = neues Skript + Eintrag in Registry. Vorhandene Phase ändern = nur das eine Skript.
+Die `worker/phases/registry.sh` listet alle aktiven Phasen in Reihenfolge. Neue Phase hinzufügen = neues Skript + Eintrag in Registry. Vorhandene Phase ändern = nur das eine Skript.
 
 Beispiele für spätere Phasen:
 - `analyze` — pre-concept Repo-Inspektion
@@ -232,7 +237,7 @@ Jede Phase produziert:
    - `logs/<phase>.<n>.log`, `logs/entrypoint.<n>.log`
    - `state.json`
 
-2. **Result-JSON auf stdout** (eine Zeile, am Ende der Phase, Schema in `schemas/`). CLI pretty-printed das automatisch; mit `--json`-Flag kommt rohes JSON.
+2. **Result-JSON auf stdout** (eine Zeile, am Ende der Phase, Schema in `worker/schemas/`). CLI pretty-printed das automatisch; mit `--json`-Flag kommt rohes JSON.
 
 3. **Exit-Code:**
    - `0` — Phase erfolgreich

@@ -86,7 +86,7 @@ direkt, fallback auf `.result | fromjson` (falls Claude die JSON-Antwort
 ins `result`-Feld als String legt). Beim End-to-End-Test wird der reale
 Pfad sichtbar; danach Spec endgültig aktualisieren.
 
-Schema in `schemas/commit-message.schema.json`:
+Schema in `worker/schemas/commit-message.schema.json`:
 ```json
 {
   "type": "object",
@@ -114,7 +114,7 @@ Keine `--allowedTools`-Beschränkung. Claude hat im Container vollen Zugriff auf
 
 ### 2.1 Schema
 
-Datei: `/workspace/.agent/state.json`. Schema in `schemas/state.schema.json`.
+Datei: `/workspace/.agent/state.json`. Schema in `worker/schemas/state.schema.json`.
 
 Beispielstand:
 ```json
@@ -170,7 +170,7 @@ Beispielstand:
 
 ### 2.3 Atomare Writes
 
-`lib/state.sh` schreibt nie direkt, sondern:
+`worker/lib/state.sh` schreibt nie direkt, sondern:
 1. `state.json` lesen, in Bash-Variable parsen via `jq`
 2. Modifikation in Variable
 3. Schreibe in `state.json.tmp`
@@ -221,7 +221,7 @@ Bei Konflikt mit existierendem Remote-Branch: git push schlägt fehl, Phase exit
 4. Lock acquiren (siehe Abschnitt 6)
    - bei Lock-Konflikt: Exit 6
 
-5. Phase-Skript laden via phases/registry.sh
+5. Phase-Skript laden via worker/phases/registry.sh
 
 6. Vorbedingungen prüfen:
    - phase_<name>_preconditions aufrufen
@@ -249,7 +249,7 @@ Spezialfall `phase shell`: kein State-Update, einfach `bash -i` mit cd nach `/wo
 
 ## 5. Phase-Konventionen
 
-Jede Phase liefert in `phases/<name>.sh`:
+Jede Phase liefert in `worker/phases/<name>.sh`:
 
 ```bash
 #!/usr/bin/env bash
@@ -280,13 +280,13 @@ phase_concept_run() {
 }
 ```
 
-`phases/registry.sh` enthält:
+`worker/phases/registry.sh` enthält:
 
 ```bash
 PHASE_NAMES=(concept implement diff push commit-message)
 PHASE_ORDER_IN_LIFECYCLE=(concept implement diff push)
 
-# Jede Phase muss als Datei phases/<name>.sh existieren.
+# Jede Phase muss als Datei worker/phases/<name>.sh existieren.
 # Sub-Phasen wie commit-message sind in PHASE_NAMES aber nicht in
 # PHASE_ORDER_IN_LIFECYCLE — sie werden von anderen Phasen aufgerufen.
 ```
@@ -302,7 +302,7 @@ Inhalt (JSON):
 {"pid": 12345, "phase": "implement", "started_at": "2026-04-30T10:00:00Z"}
 ```
 
-`lib/lock.sh`:
+`worker/lib/lock.sh`:
 
 ```bash
 lock_acquire() {
@@ -333,7 +333,7 @@ Stale-Lock-Detection: wenn der Lock älter als 4 Stunden ist (Container-Restart 
 
 Jede Phase emittiert auf stdout (letzte Zeile) ein Result-JSON. Schema-Validierung in den Tests.
 
-Allgemeines Schema (siehe `schemas/result.<phase>.schema.json`):
+Allgemeines Schema (siehe `worker/schemas/result.<phase>.schema.json`):
 
 ```json
 {
@@ -367,7 +367,7 @@ Phase-spezifisch:
 
 ### 8.1 Argument-Parsing
 
-Eigenes `lib/parse_args.sh` mit POSIX-Bash-Konstrukten, kein externes Tool.
+Eigenes `worker/lib/parse_args.sh` mit POSIX-Bash-Konstrukten, kein externes Tool.
 
 Pattern:
 ```bash
@@ -383,11 +383,11 @@ parse_args "$@"
 ### 8.2 Help-System
 
 `./agent help` und `./agent help <command>` zeigen lesbare Hilfe.
-Help-Texte stehen pro Command in einer Funktion `help_<command>()` in `lib/help.sh`.
+Help-Texte stehen pro Command in einer Funktion `help_<command>()` in `worker/lib/help.sh`.
 
 ### 8.3 Error-Handling
 
-`lib/error.sh` mit Funktionen wie:
+`worker/lib/error.sh` mit Funktionen wie:
 ```bash
 die() {
     local code="$1"; shift
@@ -405,7 +405,7 @@ Konsistente Exit-Codes wie in Phase-Skripten.
 
 ### 8.4 docker-compose-Wrapper
 
-`lib/docker.sh::docker_run_phase()`:
+`worker/lib/docker.sh::docker_run_phase()`:
 ```bash
 # Argumente: phase, task_id
 # - Lädt credentials.env aus ~/.agent/tasks/<task-id>/
@@ -430,7 +430,7 @@ anzulegen, bevor das Volume drüber gemountet wird — Resultat: der `agent`-Use
 
 ### 8.5 Volume-Management
 
-`lib/tasks.sh::task_create_volume()`:
+`worker/lib/tasks.sh::task_create_volume()`:
 ```bash
 # Erstellt Volume task_ws_<task-id>
 docker volume create "task_ws_$1" >/dev/null
@@ -461,23 +461,23 @@ docker volume inspect "task_ws_$1" >/dev/null 2>&1
 # (default: beide)
 
 # Bats:
-docker run --rm -v "$PWD:/code" -w /code bats/bats:latest tests/bats/
+docker run --rm -v "$PWD:/code" -w /code bats/bats:latest worker/tests/bats/
 
 # Integration:
-bash tests/integration/run-all.sh
+bash worker/tests/integration/run-all.sh
 ```
 
 ### 9.2 Bats-Tests
 
-In `tests/bats/`. Jeder File testet eine Lib-Datei. Beispiel:
+In `worker/tests/bats/`. Jeder File testet eine Lib-Datei. Beispiel:
 
 ```bash
-# tests/bats/test_state.bats
+# worker/tests/bats/test_state.bats
 
 setup() {
     export TEST_DIR=$(mktemp -d)
     export STATE_FILE="$TEST_DIR/state.json"
-    source lib/state.sh
+    source worker/lib/state.sh
 }
 
 teardown() {
@@ -502,9 +502,9 @@ teardown() {
 
 ### 9.3 Integration-Tests
 
-In `tests/integration/`. Nutzen einen lokalen Bare-Git-Repo als „Remote" (`fixtures/fake-remote-repo/`) und ein Mock-Claude-Binary das deterministischen Output zurückgibt.
+In `worker/tests/integration/`. Nutzen einen lokalen Bare-Git-Repo als „Remote" (`fixtures/fake-remote-repo/`) und ein Mock-Claude-Binary das deterministischen Output zurückgibt.
 
-Mock-Claude (`tests/integration/fixtures/mock-claude/claude`):
+Mock-Claude (`worker/tests/integration/fixtures/mock-claude/claude`):
 ```bash
 #!/usr/bin/env bash
 # Reagiert auf bestimmte Prompts mit vordefinierten Outputs.
@@ -530,7 +530,7 @@ In Tests wird das Image *für den Test* gebaut mit `--build-arg CLAUDE_BIN=/test
 - Trigger: push to main, alle PRs
 - Steps:
   - Checkout
-  - Bash-Lint via `shellcheck` über `lib/`, `phases/`, `agent`, `docker/worker-entrypoint.sh`
+  - Bash-Lint via `shellcheck` über `worker/lib/`, `worker/phases/`, `agent`, `docker/worker-entrypoint.sh`
   - Bats-Tests
   - Integration-Tests
 - Kein Echtsystem-Test (kein Claude-Token in CI)
@@ -550,7 +550,7 @@ Ein Phase-Skript baut den finalen System-Prompt aus mehreren Layern zusammen:
 (CLAUDE.md im Repo wird von Claude Code automatisch zusätzlich geladen — das müssen wir nicht zusammenführen.)
 ```
 
-Die Merge-Logik in `lib/prompts.sh::build_system_prompt()`:
+Die Merge-Logik in `worker/lib/prompts.sh::build_system_prompt()`:
 
 ```bash
 build_system_prompt() {

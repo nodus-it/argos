@@ -82,7 +82,7 @@ Volume gehört einem anderen User als dem `agent` (uid 1000). Tritt nur bei sehr
 
 ### `state.json` ist nach Container-Crash invalide
 
-Sollte durch atomic-write (lib/state.sh nutzt `.tmp + mv`) nicht passieren. Falls doch:
+Sollte durch atomic-write (worker/lib/state.sh nutzt `.tmp + mv`) nicht passieren. Falls doch:
 
 ```bash
 ./agent shell <task-id>
@@ -120,14 +120,14 @@ Erwartet — apt + PHP-Extensions + Node 20 + Claude Code via npm summieren sich
 
 ### Bats-Tests scheitern mit "command not found: jq"
 
-Lokales Bats-Image hat kein jq. Wir nutzen `tests/Dockerfile.bats` (bats + jq + check-jsonschema) — das wird automatisch gebaut. Falls das fehlt: `bash tests/run-bats.sh` baut es.
+Lokales Bats-Image hat kein jq. Wir nutzen `worker/tests/Dockerfile.bats` (bats + jq + check-jsonschema) — das wird automatisch gebaut. Falls das fehlt: `bash worker/tests/run-bats.sh` baut es.
 
 ### Integration-Test scheitert mit `git clone failed`
 
-`tests/integration/fixtures/fake-remote-repo/setup.sh` legt das Bare-Repo an. Wenn das Skript schief geht, prüfen:
+`worker/tests/integration/fixtures/fake-remote-repo/setup.sh` legt das Bare-Repo an. Wenn das Skript schief geht, prüfen:
 
 ```bash
-ls -la tests/integration/fixtures/fake-remote-repo/fake-remote.git/
+ls -la worker/tests/integration/fixtures/fake-remote-repo/fake-remote.git/
 ```
 
-Sollte HEAD, branches/, refs/ enthalten. Falls nicht: `bash tests/integration/fixtures/fake-remote-repo/setup.sh` manuell.
+Sollte HEAD, branches/, refs/ enthalten. Falls nicht: `bash worker/tests/integration/fixtures/fake-remote-repo/setup.sh` manuell.
