@@ -1,17 +1,18 @@
 # EXTENDING — neue Phase oder Lib-Funktion hinzufügen
 
-## Eine neue Phase anlegen
+Eine neue Phase braucht beide Seiten: Bash (Worker-Ausführung) und PHP (Steuerung, CLI).
 
-Beispiel: Phase `analyze` — pre-concept Repo-Inspektion (siehe BACKLOG, Iteration 2).
+## Beispiel: Phase `analyze`
 
-### 1. Phase-Skript
+Pre-Concept Repo-Inspektion ohne LLM (siehe BACKLOG).
+
+### 1. Bash — Phase-Skript
 
 `worker/phases/analyze.sh`:
 
 ```bash
 #!/usr/bin/env bash
-# phases/analyze.sh — Pre-Concept Repo-Inspektion (kein LLM).
-# shellcheck shell=bash
+# Wird gesourced vom worker-entrypoint, nicht direkt ausgeführt.
 
 phase_analyze_help() {
     echo "Analyze-Phase: Repo-Map ohne Claude erzeugen."
@@ -29,7 +30,6 @@ phase_analyze_run() {
     local started_at finished_at
     started_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
-    # Hier Logik...
     find . -name '*.php' | head -50 > /workspace/.agent/repo-map.txt
 
     finished_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
@@ -45,71 +45,73 @@ phase_analyze_run() {
 }
 ```
 
-### 2. Registry erweitern
+### 2. Bash — Registry erweitern
 
 `worker/phases/registry.sh`:
 
 ```bash
-PHASE_NAMES=(concept implement diff push commit-message analyze)
+PHASE_NAMES=(concept implement diff push commit-message respond analyze)
 PHASE_ORDER_IN_LIFECYCLE=(analyze concept implement diff push)
 ```
 
 ### 3. Result-Schema
 
-`worker/schemas/result.analyze.schema.json` — Pflicht-Felder analog zu den anderen Result-Schemas. Schema validieren via Bats-Test in `worker/tests/bats/test_result_schemas.bats` ergänzen.
+`worker/schemas/result.analyze.schema.json` anlegen, Pflicht-Felder analog zu den anderen Result-Schemas. Bats-Test in `worker/tests/bats/test_result_schemas.bats` ergänzen.
 
-### 4. CLI-Subcommand
+### 4. State-Schema
 
-`agent` braucht einen Eintrag in `main()`:
+Wenn die Phase in `state.json.phases.*` auftaucht: `worker/schemas/state.schema.json` und `worker/lib/state.sh::state_init` erweitern. **`schema_version` hochzählen.**
 
-```bash
-analyze)
-    cmd_phase "$ARG_COMMAND"
-    ;;
+### 5. PHP — Queue-Job
+
+`RunPhaseJob` deckt automatisch alle Phasen ab — kein neuer Job-Typ nötig. Nur der Phase-Name `'analyze'` wird übergeben.
+
+### 6. PHP — Artisan-Command
+
+`app/Console/Commands/AgentAnalyze.php`:
+
+```php
+class AgentAnalyze extends Command
+{
+    protected $signature = 'agent:analyze {task}';
+
+    public function handle(PhaseRunner $runner): void
+    {
+        $task = Task::where('name', $this->argument('task'))->firstOrFail();
+        $runner->run($task, 'analyze');
+    }
+}
 ```
 
-Plus optional `cmd_phase` für phase-spezifische Flag-Handhabung erweitern, plus `worker/lib/help.sh::help_show` und `help_analyze`.
+### 7. Web-UI — Action-Button
 
-### 5. Worker-Entrypoint
+In `TaskResource` (oder `ViewTask`) einen neuen Action-Button `analyze` hinzufügen, der `RunPhaseJob::dispatch($task->id, 'analyze')` auslöst.
 
-In `docker/worker-entrypoint.sh::main()` die case-Liste der bekannten Phasen erweitern:
+### 8. Tests
 
-```bash
-concept|implement|diff|push|commit-message|analyze)
-    ...
-```
-
-`_ep_validate_env` ggf. um phase-spezifische Env-Anforderungen erweitern.
-
-### 6. Bats-Test (optional)
-
-Hilfsfunktionen in `worker/phases/analyze.sh` als eigene Funktionen `_analyze_*` — testbar via Bats wenn man sie sourced (mit Mock-Env).
-
-### 7. Integration-Test ergänzen
-
-`worker/tests/integration/test_phase_lifecycle.sh` um einen `agent analyze`-Aufruf erweitern, falls Teil des Default-Lifecycle. Sonst eigener Test `tests/integration/test_phase_analyze.sh`.
-
-### 8. State-Schema
-
-`worker/schemas/state.schema.json` listet aktuell nur die vier Default-Phasen. Wenn die neue Phase Lifecycle-relevant ist (= taucht in `state.json.phases.*` auf), Schema und `worker/lib/state.sh::state_init` erweitern. **`schema_version` hochzählen** und Migrations-Logik bedenken — siehe CLAUDE.md.
+- Bash-Unit: `worker/tests/bats/test_phase_analyze.bats` (Hilfsfunktionen als `_analyze_*` aus dem Phase-Skript heraus testbar via source)
+- Integration: `worker/tests/integration/test_phase_lifecycle.sh` um `agent analyze`-Aufruf erweitern, oder eigener Test
+- PHP: Feature-Test für den Artisan-Command
 
 ### 9. Dokumentation
 
-`WORKER-CONCEPT.md` und `IMPLEMENTATION.md` aktualisieren. `docs/EXAMPLE.md` erweitern.
+`docs/WORKER-CONCEPT.md` (Phasen-Abschnitt) und `docs/IMPLEMENTATION.md` (Sections 5 + 7) aktualisieren.
 
-## Eine neue Lib-Funktion
+---
 
-1. Funktion in der passenden `worker/lib/<modul>.sh` mit Docstring oben (siehe CLAUDE.md "Bash-Stil")
+## Eine neue Lib-Funktion (Bash)
+
+1. Funktion in `worker/lib/<modul>.sh` mit Docstring
 2. Bats-Test in `worker/tests/bats/test_<modul>.bats`
-3. shellcheck (`bash worker/tests/run-tests.sh --shellcheck`) muss clean sein (severity warning)
-4. Wenn von außerhalb nutzbar: in den relevanten Phase-Skripten oder im `agent`-CLI sourcen
+3. `shellcheck --severity=warning` muss clean sein
+4. In Phase-Skripten oder Entrypoint sourcen wo nötig
 
 ## Konventionen-Erinnerung
 
-- `set -euo pipefail; IFS=$'\n\t'` in Top-Level-Skripten — nicht in lib-Files (die werden gesourced).
+- `set -euo pipefail; IFS=$'\n\t'` in Top-Level-Skripten — nicht in lib-Files (werden gesourced).
 - `[[ ... ]]` statt `[ ... ]`, `(( ... ))` für Arithmetik.
 - `local` für alle Variablen in Funktionen.
-- Tokens niemals loggen, niemals via `echo` ausgeben — `set +x` falls debug-trace aktiv.
-- `state_*`-Operationen sind atomic via `.tmp + mv` — neue State-Mutationen müssen das Pattern halten.
+- Tokens niemals loggen — `set +x` falls debug-trace aktiv.
+- State-Mutationen atomic via `.tmp + mv` (wie in `worker/lib/state.sh`).
 
 Mehr Details: [`CLAUDE.md`](../CLAUDE.md).

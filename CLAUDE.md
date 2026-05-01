@@ -2,16 +2,15 @@
 
 ## Was hier passiert
 
-Du baust den **Claude Worker v1** — ein dockerisiertes Tool, das Dev-Tasks isoliert und phasenweise ausführt. Lies `docs/WORKER-CONCEPT.md` für das Big Picture.
+Du baust **Argos** — einen Web-First Dev-Agent mit zwei Docker-Images (Manager + Worker). Lies `docs/WORKER-CONCEPT.md` für das Big Picture und das Sicherheitsmodell.
 
 ## Wo was steht (Quellen der Wahrheit)
 
 | Frage | Datei |
 | --- | --- |
-| Was bauen wir und wofür? | `docs/WORKER-CONCEPT.md` |
+| Was bauen wir, Architektur, Sicherheitsmodell? | `docs/WORKER-CONCEPT.md` |
 | Wie genau implementieren? | `docs/IMPLEMENTATION.md` |
-| Wann ist v1 fertig? | `docs/V1-DONE.md` |
-| Was kommt danach? | `docs/BACKLOG.md` |
+| Was kommt als nächstes? | `docs/BACKLOG.md` |
 | System-Prompts für die Claude-Sessions im Worker | `worker/prompts/*.system.md` |
 | Schemas für State und Outputs | `worker/schemas/*.schema.json` |
 
@@ -80,37 +79,39 @@ CI führt `shellcheck` über `agent`, `worker/lib/`, `worker/phases/`, `worker/d
 
 ## Was du NICHT tust ohne Rücksprache
 
-- Architektur-Entscheidungen aus den Spec-Dokumenten umkehren
+- Architektur-Entscheidungen aus den Spec-Dokumenten umkehren — insbesondere: kein AI im Manager-Container, Worker ohne Docker-Socket
 - Neue Top-Level-Dependencies (Bash-Tools die nicht in `bookworm` Standard sind, ohne explizite Rechtfertigung)
 - Neue Volumes oder Services in `docker-compose.yml`
 - Neue Phasen einführen oder bestehende grundlegend ändern (Phase-Erweiterung über `phases/` ist OK, aber concept→implement→diff→push als Default-Flow ist gesetzt)
-- Auth-Flow ändern (Claude-OAuth-Token-Pfad, Repo-Token in env)
+- Auth-Flow ändern (Tokens kommen als Env-Vars aus der DB in den Worker — nie aus Dateien)
 - Branch-Naming-Schema ändern
 - An den State-Schema-Versionen vorbei eine neue Struktur einführen — wenn die Struktur sich ändert, `schema_version` hochzählen und Migrations-Logik bedenken
 
 ## Wenn du fertig bist mit einem Schritt
 
 1. `shellcheck` über alle geänderten Bash-Files
-2. `bash worker/tests/run-bats.sh` falls vorhanden
-3. Commit nach Conventional-Commits-Style
-4. Falls eine Annahme aus der Spec sich beim Bauen als falsch erwiesen hat: betroffenes Spec-Dokument anpassen *im selben Commit oder im Folge-Commit*
+2. `bash worker/tests/run-bats.sh` falls Bash-Änderungen
+3. `php artisan test` für PHP-Änderungen
+4. Commit nach Conventional-Commits-Style
+5. Falls eine Annahme aus der Spec sich beim Bauen als falsch erwiesen hat: betroffenes Spec-Dokument anpassen *im selben Commit oder im Folge-Commit*
 
 ## Häufige Befehle
 
 ```bash
-# Image bauen
-docker compose build worker
+# Worker-Image bauen
+docker build -t argos-worker:latest worker/
 
-# Tests laufen lassen
+# Bash-Tests laufen lassen
 ./worker/tests/run-tests.sh
 
-# Manuelle Smoke-Tests gegen Test-Repo
-./agent task new smoke-test
-# (mit Test-Repo-URL und Test-Token)
-./agent concept smoke-test
-./agent implement smoke-test
-./agent diff smoke-test
-./agent push smoke-test
+# PHP-Tests
+php artisan test
+
+# Lokale Entwicklung (Web-UI)
+php artisan serve
+
+# CLI (im laufenden Manager-Container)
+docker exec -it argos php artisan agent:concept task-001
 ```
 
 ## Rückfragen sind willkommen

@@ -1,80 +1,95 @@
-# Argos Worker
+# Argos — Architektur & Konzept
 
-Dockerisierter Worker, der eine einzelne Dev-Aufgabe phasenweise und isoliert vom Host ausführt. Steuerung über die Web-UI (Laravel/Filament) oder das `./agent`-CLI.
+Argos ist ein Web-First Dev-Agent. Er nimmt Aufgaben entgegen, arbeitet sie phasenweise in isolierten Worker-Containern ab und erstellt Pull Requests. Gesteuert wird alles über die Laravel/Filament-Web-UI oder per Artisan-CLI via `docker exec`.
 
 ## Mission
 
-Das Tool nimmt entgegen: Git-Remote + Repo-Token + Base-Branch + Aufgaben-Beschreibung. Es führt fünf Phasen durch — `concept`, `implement`, `diff`, `push`, `respond` — wobei zwischen den Phasen menschliche Approval-Gates möglich sind. Phasen sind wiederholbar. Ergebnis: ein Feature-Branch mit PR ist auf der Remote, Review-Feedback wird in weiteren Iterationen eingearbeitet.
+Git-Remote + Repo-Token + Base-Branch + Aufgaben-Beschreibung rein, Feature-Branch mit PR raus. Fünf Phasen — `concept`, `implement`, `diff`, `push`, `respond` — mit optionalen menschlichen Approval-Gates dazwischen. Phasen sind wiederholbar. Review-Feedback wird in weiteren Iterationen eingearbeitet.
 
-## Aktueller Umfang
+## Zielarchitektur: Zwei Images, ein User-Container
 
-- Task-Steuerung über Web-UI (`/admin/tasks`) und `./agent`-CLI
-- PR-Erstellung via GitHub REST API nach Push, concept.md als PR-Body
-- Review-Feedback über die UI in den Branch einarbeiten (respond-Phase)
-- SQLite-basierte Datenbank für Task- und Phasen-State in der Web-UI
-- Kein automatisches Abfragen von Issues/Tickets — Aufgaben werden manuell angelegt
-- Keine Multi-Repo-Tasks
-- Kein DB-Sidecar — Projekte mit DB-Anforderungen wechseln im Worker auf SQLite (Boost-Strategie)
+Der Nutzer startet **einen einzigen Container** (`argos-manager`). Alles läuft darin: Web-UI, Datenbank, Queue-Worker. Wenn eine Phase ausgeführt wird, spawnt der Manager einen kurzlebigen Worker-Container — der Nutzer sieht das nicht.
+
+```
+Host
+├── Docker Socket (/var/run/docker.sock)  ← in Manager gemountet
+├── argos-data Volume (/data)              ← SQLite-DB + persistenter State
+│
+└── argos-manager Container (langlebig)
+    ├── Laravel + Filament (Web-UI, Port 80)
+    ├── Queue-Worker (database-Treiber, kein Redis)
+    ├── Docker CLI (nur Client)           ← kein Daemon, nur Socket-Zugriff
+    └── KEINE KI                          ← bewusst: Socket + AI = Isolation gebrochen
+        │
+        │ docker run --rm (pro Phase)
+        ▼
+    argos-worker Container (kurzlebig, pro Phase)
+    ├── Claude Code CLI
+    ├── PHP CLI + Node + Git + Tools
+    ├── task_ws_<id> Volume (/workspace)
+    ├── KEIN Docker Socket
+    └── Credentials als Env-Vars (niemals persistent)
+```
+
+**Warum kein AI im Manager?** Der Manager-Container hat den Docker-Socket gemountet — damit kann er beliebige Container starten. Würde die KI dort laufen, hätte sie via Docker-Socket die Möglichkeit, aus ihrer Isolation auszubrechen. Deshalb läuft Claude Code ausschließlich im Worker, der keinen Socket-Zugriff hat.
+
+**Warum getrennte Images?** Der Worker ist ein eigenständiges, versioniertes Artefakt. Spätere Varianten (`argos-worker-node`, `argos-worker-python`) können denselben Manager nutzen. Die Trennung erlaubt unabhängige Builds und Releases.
 
 ## Sicherheits-Modell
 
-- **Volume pro Task.** Jeder Task bekommt ein eigenes Docker-Volume `task_ws_<task-id>`. Dynamisch erstellt beim `agent task new`, gelöscht beim `agent abort` oder optional beim `agent push`.
-- **Vollständige Trennung vom Host-Filesystem.** Kein Bind-Mount in Code-Verzeichnisse des Users. Worker sieht nur seine eigenen Volumes.
-- **Repo-Token mit minimalen Rechten.** Pro Task ein Fine-grained GitHub PAT (oder vergleichbar) mit Rechten nur auf das eine Repo. Token liegt auf dem Host in `~/.agent/tasks/<task-id>/credentials.env` (mode 600), wird pro Phase als Env-Variable reingereicht — niemals im Image, niemals im Volume persistiert.
-- **Claude-Auth via OAuth-Token.** User generiert einmal `claude setup-token` auf dem Host, Token landet in `~/.agent/claude_oauth_token` (mode 600), wird pro Phase als `CLAUDE_CODE_OAUTH_TOKEN` reingereicht.
-- **Egress offen.** Keine Netzwerk-Restriktionen — Worker muss zu Claude, GitHub, Composer, npm.
-- **Path-Hardening.** Worker validiert alle Pfad-Operationen mit `realpath` gegen das Workspace-Root des Tasks.
+- **Socket im Manager, nicht im Worker.** Manager spawnt Worker via Docker-Socket. Worker bekommt den Socket niemals.
+- **Volume pro Task.** Jeder Task bekommt ein eigenes Docker-Volume `task_ws_<task-id>`. Worker sieht nur sein eigenes Volume.
+- **Credentials ephemer.** Repo-Token und Claude-Token werden pro Phase als Env-Variablen an `docker run -e` übergeben — niemals im Image, niemals im Volume persistiert. Im Manager-Container liegen sie verschlüsselt in der DB.
+- **Kein Bind-Mount in Host-Verzeichnisse.** Worker sieht nur seinen Workspace, keine Host-Pfade.
+- **Egress offen.** Keine Netzwerk-Restriktionen im Worker — muss Claude API, GitHub, Composer, npm erreichen.
+- **Path-Hardening.** Worker validiert alle Pfad-Operationen mit `realpath` gegen `/workspace`.
 
 ## Komponenten-Übersicht
 
 ```
 argos/                              # Repo-Root (= Laravel-Projekt-Root)
-├── agent                           # Haupt-CLI (Bash)
-├── app/, config/, resources/, ...  # Laravel Web-UI (Filament)
-├── artisan, composer.json, ...     # Laravel-Standard-Dateien
-├── docker-compose.yml
-├── worker/                         # Docker-Worker (Bash)
-│   ├── docker/
-│   │   ├── Dockerfile              # Worker-Image (multi-stage)
-│   │   └── worker-entrypoint.sh    # Phase-Dispatcher im Container
-│   ├── lib/                        # Bash-Library
-│   │   ├── tasks.sh
-│   │   ├── credentials.sh
-│   │   ├── docker.sh
-│   │   ├── state.sh
-│   │   ├── lock.sh
-│   │   ├── logging.sh
-│   │   └── result.sh
-│   ├── phases/                     # Phase-Skripte
-│   │   ├── registry.sh
-│   │   ├── concept.sh
-│   │   ├── implement.sh
-│   │   ├── diff.sh
-│   │   ├── push.sh
-│   │   ├── respond.sh
-│   │   └── commit-message.sh
-│   ├── prompts/                    # System-Prompt-Templates
-│   │   ├── concept.system.md
-│   │   ├── implement.system.md
-│   │   ├── respond.system.md
-│   │   ├── commit-message.system.md
-│   │   └── user.global.system.md   # User-globale Konventionen
-│   ├── schemas/                    # JSON-Schemas
-│   └── tests/                      # Bash/Bats-Tests
-└── tests/, docs/, .github/workflows/
+├── app/, config/, resources/, ...  # Laravel Web-UI (Filament) + Queue-Jobs
+├── artisan, composer.json, ...     # Laravel-Standard
+├── docker-compose.yml              # Lokale Entwicklung
+├── docker/
+│   └── Dockerfile                  # Manager-Image (PHP + Nginx + Supervisor)
+└── worker/                         # Worker-Image
+    ├── docker/
+    │   ├── Dockerfile              # Worker-Image (PHP + Node + Claude Code)
+    │   └── worker-entrypoint.sh    # Phase-Dispatcher im Container
+    ├── lib/                        # Bash-Library
+    │   ├── state.sh
+    │   ├── lock.sh
+    │   ├── logging.sh
+    │   ├── result.sh
+    │   └── prompts.sh
+    ├── phases/                     # Phase-Skripte (Bash)
+    │   ├── registry.sh
+    │   ├── concept.sh
+    │   ├── implement.sh
+    │   ├── diff.sh
+    │   ├── push.sh
+    │   ├── respond.sh
+    │   └── commit-message.sh
+    ├── prompts/                    # System-Prompt-Templates
+    │   ├── concept.system.md
+    │   ├── implement.system.md
+    │   ├── respond.system.md
+    │   ├── commit-message.system.md
+    │   └── user.global.system.md
+    ├── schemas/                    # JSON-Schemas
+    └── tests/                      # Bash/Bats-Tests
 ```
 
-Auf dem Host wird zusätzlich angelegt:
+## State-Management
 
-```
-~/.agent/                           # User-State, nicht im Repo
-├── claude_oauth_token              # mode 600
-├── tasks/
-│   └── <task-id>/
-│       ├── credentials.env         # mode 600, REPO_URL+REPO_TOKEN+BASE_BRANCH
-│       └── description.md          # Task-Beschreibung, mode 644 (kein Secret)
-└── config                          # globale Settings (Editor-Präferenz etc.)
-```
+Die **Datenbank** (SQLite unter `/data/database.sqlite`) ist die primäre Quelle der Wahrheit für Task- und Phasen-State. Das Volume enthält den eigentlichen Workspace (Git-Repo, Code, Konzept, Logs).
+
+Fluss:
+1. PHP-Queue-Job startet Worker-Container via `docker run`
+2. Worker schreibt `/workspace/.agent/state.json` (lokal im Volume) während der Phase
+3. Nach Container-Exit liest PHP den State aus dem Volume (`docker run alpine cat …`) und schreibt ihn in die DB
+4. Web-UI zeigt immer den DB-State
 
 ## Phasen
 
@@ -82,150 +97,53 @@ Auf dem Host wird zusätzlich angelegt:
 
 **Zweck:** Aufgabe analysieren, Plan formulieren.
 
-**Vorbedingungen:** Task existiert, Volume vorhanden, `~/.agent/tasks/<task-id>/description.md` vorhanden.
-
-**Task-Beschreibung:** Liegt auf dem Host unter `~/.agent/tasks/<task-id>/description.md` (vom User in `agent task new` via `$EDITOR` erstellt). Wird bei jedem Phase-Run als read-only Bind-Mount auf `/run/agent/description.md` (NICHT in `/workspace`, sondern bewusst außerhalb — sonst legt Docker das parent-dir als root an und blockiert Schreibzugriff vom `agent`-User auf das Volume) im Container verfügbar. Die Datei kann auf dem Host jederzeit mit dem normalen Editor inspiziert werden — keine Container-Indirektion nötig.
-
 **Verhalten:**
-- Erstes Mal: Repo wird in das Task-Volume geklont (`/workspace`), Branch erstellt, Claude-Session startet mit System-Prompt aus den Prompt-Templates plus der Task-Beschreibung. Output: `/workspace/.agent/concept.md`.
-- Wiederholung (Default, inkrementell): Vorheriges Konzept + ggf. Anmerkungen werden mitgeladen, Claude überarbeitet. Vorherige Version landet in `/workspace/.agent/concept.history/concept.<timestamp>.md`.
-- Wiederholung mit `--fresh`: Vorheriges Konzept wird ins history-Verzeichnis verschoben, neuer Konzept-Lauf von vorne mit nur der Original-Aufgabe.
+- Erstes Mal: Repo klonen nach `/workspace`, Feature-Branch anlegen, Claude-Session mit System-Prompt + Task-Beschreibung. Output: `/workspace/.agent/concept.md`.
+- Wiederholung (inkrementell): Vorheriges Konzept + ggf. Anmerkungen als Input, Claude überarbeitet. Alte Version in `concept.history/`.
+- Mit `--fresh`: Vorheriges Konzept ins Archiv, neuer Lauf nur mit Original-Aufgabe.
 
-**Anmerkungen einbringen:**
-- `agent edit-concept <task-id>` öffnet `/workspace/.agent/concept.md` in `$EDITOR` (siehe „Editor-Integration").
-- Alternativ: User legt parallel eine Datei `/workspace/.agent/concept.notes.md` an. Der nächste `concept`-Lauf liest sie als zusätzlichen Input und verschiebt sie nach Verarbeitung in `concept.history/`.
+**Anmerkungen:** Über die Web-UI (Concept-Seite des Tasks) oder via `concept.notes.md` im Workspace.
 
 ### Phase `implement`
 
 **Zweck:** Code-Änderungen durchführen, Quality-Gates eigenständig durchlaufen.
 
-**Vorbedingungen:** `concept`-Phase ist mindestens einmal erfolgreich gelaufen.
-
 **Verhalten:**
-- Default `--fresh`: `git reset --hard origin/<base-branch>` und `git clean -fd` (ohne `-x`, behält `vendor/` und `node_modules/`), dann Toolchain-Setup (`composer install`, `npm ci` falls vorhanden), dann Claude-Session.
-- Mit `--continue`: kein Reset. Aufbau auf bestehenden uncommitted Änderungen.
+- Default (`--fresh`): `git reset --hard origin/<base-branch>` + `git clean -fd`, dann Toolchain-Setup (`composer install`, `npm ci`), dann Claude-Session.
+- Mit `--continue`: Kein Reset, Aufbau auf bestehenden Änderungen.
 
-Claude erhält den Implement-System-Prompt mit der Anweisung, **Pint und Tests selbständig auszuführen und Failures zu beheben bis grün**. Das ist der primäre Quality-Loop.
+Claude erhält den Implement-System-Prompt mit der Anweisung, **Pint und Tests selbständig auszuführen und Failures zu beheben bis grün**. Danach verifiziert der Worker-Entrypoint nochmals.
 
-**Verifikations-Phase nach Claude-Session** (Worker-Entrypoint):
-- Pint, Pest/PHPUnit, optional PHPStan werden nochmal ausgeführt
-- Bei rotem Status: Phase ist `quality_gate_failed`, Workspace bleibt im aktuellen Stand für `agent implement --continue` mit Failure-Output als Notes
-- Bei grünem Status: Phase ist `completed`
-
-**Logs:** vollständiger stdout/stderr von Claude und Quality-Gates landen in `/workspace/.agent/logs/`.
+Bei rotem Quality-Gate-Status: Phase `quality_gate_failed`, Workspace bleibt erhalten für `--continue`.
 
 ### Phase `diff`
 
-**Zweck:** Änderungen sichten vor dem Push.
+**Zweck:** Änderungen sichten vor dem Push. Read-only.
 
-**Vorbedingungen:** `implement` ist mit `completed` gelaufen.
-
-**Verhalten:**
-- Liest `git diff origin/<base-branch>...HEAD` plus `git status` aus dem Volume
-- Gibt strukturiert auf stdout aus, mit Farb-Codierung wenn ein TTY angeschlossen ist
-- Optional `agent diff <task-id> --stat` für Kurzfassung
-- Optional `agent diff <task-id> --file=<path>` für nur einen File
-
-Read-only, ändert keinen State. Beliebig oft aufrufbar.
+Liest `git diff origin/<base-branch>...HEAD` aus dem Volume. Wird in der Web-UI als Diff-Ansicht dargestellt. Via CLI: `docker exec argos php artisan agent:diff <task-id>`.
 
 ### Phase `push`
 
-**Zweck:** Branch zur Remote pushen.
+**Zweck:** Branch zur Remote pushen, PR erstellen.
 
-**Vorbedingungen:**
-- `implement` ist mit `completed` gelaufen
-- Es gibt nicht-leere Änderungen
+Ruft Sub-Phase `commit-message` auf (kurze Claude-Session → `subject` + `body`), committed, pusht, erstellt PR via GitHub REST API (Body aus `concept.md`).
 
-**Verhalten:**
-- Ruft Sub-Phase `commit-message` auf (kurze Claude-Session, JSON-Output mit `subject` und `body`)
-- `git add -A && git commit -m "<subject>" -m "<body>"`
-- `git push -u origin <branch>`
+### Phase `respond`
 
-Nach erfolgreichem Push fragt das CLI: „Workspace löschen? [y/N]". Bei `y` wird das Volume entfernt und Task-State unter `~/.agent/tasks/<task-id>` gelöscht. Default `N`.
+**Zweck:** PR-Review-Feedback einarbeiten.
 
-## Wiederholbarkeit & State-Tracking
-
-Im Workspace-Volume liegt unter `/workspace/.agent/state.json` ein Status-File mit allen Iterationen pro Phase, ihren Statuses, Timestamps. Schema in `worker/schemas/state.schema.json`.
-
-`agent status <task-id>` liest dieses File und zeigt es schön formatiert. `agent status` (ohne Argument) listet alle Tasks.
+Feedback wird in der Web-UI eingegeben und als `/workspace/.agent/respond.feedback.md` ins Volume geschrieben. Claude-Session mit Feedback als Input, dann automatisch `diff` + `push`.
 
 ## Phase-Erweiterbarkeit
 
-Phasen sind nicht hartcodiert in der CLI, sondern als einzelne Skripte unter `worker/phases/<name>.sh` definiert. Jede Phase liefert:
+Phasen sind Bash-Skripte in `worker/phases/<name>.sh` mit drei Funktionen:
+- `phase_<name>_run` — Hauptlogik
+- `phase_<name>_preconditions` — Vorbedingungsprüfung (Exit 0 = OK)
+- `phase_<name>_help` — Kurzbeschreibung
 
-- Eine Funktion `phase_<name>_run` — der eigentliche Code
-- Eine Funktion `phase_<name>_preconditions` — gibt 0 zurück wenn OK, sonst Exit-Code + Fehlermeldung auf stderr
-- Eine Funktion `phase_<name>_help` — kurze Beschreibung für `agent help <phase>`
+`worker/phases/registry.sh` listet alle aktiven Phasen. Neue Phase = neues Skript + Eintrag in Registry.
 
-Die `worker/phases/registry.sh` listet alle aktiven Phasen in Reihenfolge. Neue Phase hinzufügen = neues Skript + Eintrag in Registry. Vorhandene Phase ändern = nur das eine Skript.
-
-Beispiele für spätere Phasen:
-- `analyze` — pre-concept Repo-Inspektion
-- `revise` — gezielter Edit ohne Reset
-- `pr` — PR erstellen (Iteration 2)
-- `respond` — auf PR-Feedback antworten (Iteration 2)
-
-## CLI-Reference (`agent`)
-
-### Setup
-
-```bash
-./agent init
-# Baut Worker-Image, erstellt persistente Volumes (composer_cache, npm_cache),
-# fragt nach CLAUDE_CODE_OAUTH_TOKEN, fragt nach Symlink in ~/.local/bin/agent.
-```
-
-### Task-Lifecycle
-
-```bash
-./agent task new <task-id>
-# Interaktiv: REPO_URL, REPO_TOKEN (versteckte Eingabe), BASE_BRANCH,
-# Task-Beschreibung (Editor-Aufruf für mehrzeilige Texte).
-# Erstellt Volume task_ws_<task-id>, schreibt credentials.env (mode 600)
-# und description.md (mode 644) unter ~/.agent/tasks/<task-id>/.
-
-./agent task list                    # Listet alle Tasks mit Status.
-./agent task show <task-id>          # Zeigt Konfiguration des Tasks (ohne Token).
-./agent task delete <task-id>        # Identisch zu `agent abort`.
-```
-
-### Phasen
-
-```bash
-./agent concept <task-id> [--fresh]
-./agent implement <task-id> [--fresh|--continue] [--max-turns=N]
-./agent diff <task-id> [--stat] [--file=<path>]
-./agent push <task-id> [--auto-cleanup|--keep]
-```
-
-### Inspection & Editing
-
-```bash
-./agent show-concept <task-id>
-./agent edit-concept <task-id>
-./agent show-notes <task-id>
-./agent edit-notes <task-id>
-./agent logs <task-id> [--phase=<phase>] [--iteration=N]
-./agent shell <task-id>              # Bash im Worker-Container, Volume gemountet
-./agent status [<task-id>]
-```
-
-### Aufräumen
-
-```bash
-./agent abort <task-id>
-./agent prune                        # Verwaiste Volumes finden + cleanen
-```
-
-## Editor-Integration
-
-Konzept und Notes liegen im Volume, nicht auf dem Host — direktes Öffnen im Editor geht nicht.
-
-Lösung: `agent edit-concept` macht
-1. Container ausführen, der Datei aus Volume nach `/tmp/agent-edit-<random>.md` kopiert
-2. `$EDITOR /tmp/agent-edit-<random>.md`
-3. Container ausführen, der die Datei ins Volume zurückschreibt — mit Hash-Vergleich der Vorgänger-Version, um konkurrierende Änderungen zu erkennen
-4. Tempdatei löschen
+Auf PHP-Seite braucht jede Phase einen entsprechenden Artisan-Command und eine Queue-Job-Klasse (siehe `docs/EXTENDING.md`).
 
 ## Outputs & Artefakte
 
@@ -234,12 +152,12 @@ Jede Phase produziert:
 1. **Files im Volume** unter `/workspace/.agent/`:
    - `concept.md`, `concept.history/`, `concept.notes.md`
    - `quality-gates.<n>.json`
-   - `logs/<phase>.<n>.log`, `logs/entrypoint.<n>.log`
+   - `logs/<phase>.<n>.log`
    - `state.json`
 
-2. **Result-JSON auf stdout** (eine Zeile, am Ende der Phase, Schema in `worker/schemas/`). CLI pretty-printed das automatisch; mit `--json`-Flag kommt rohes JSON.
+2. **Result-JSON** (letzte Zeile stdout des Workers, Schema in `worker/schemas/`). PHP parst dieses nach Phase-Ende und schreibt relevante Felder in die DB.
 
-3. **Exit-Code:**
+3. **Exit-Codes:**
    - `0` — Phase erfolgreich
    - `2` — Vorbedingung nicht erfüllt
    - `3` — Auth-Problem (Claude oder Repo-Token)
@@ -250,73 +168,75 @@ Jede Phase produziert:
 
 ## Container-Aufbau
 
-### Image
+### Manager-Image (`argos-manager`)
 
-Multi-Stage-Dockerfile, finale Stage `worker`:
-- Basis: `php:8.3-cli-bookworm`
-- Tools: `git`, `gh`, `curl`, `unzip`, `jq`, `bash`, `coreutils`, `vim`, `nano`
-- PHP-Extensions: `mbstring`, `intl`, `pdo_sqlite`, `pdo_mysql`, `redis`, `zip`, `bcmath`, `gd`, `xml` (Laravel-Standard)
-- `composer` (latest stable)
-- `node` 20 + `npm`
+- Basis: `php:8.4-fpm-bookworm` + Nginx
+- Supervisor: php-fpm + nginx + `php artisan queue:work`
+- PHP-Extensions: Standard Laravel-Set
+- Docker CLI (nur Client, kein Daemon)
+- Composer, Node (für Asset-Build), kein Claude Code
+- Laravel-App + Filament
+
+### Worker-Image (`argos-worker`)
+
+- Basis: `php:8.4-cli-bookworm`
+- Node 20 + npm
 - `@anthropic-ai/claude-code` global via npm
-- Non-root User `agent` mit Home `/home/agent`
+- Git, gh, curl, jq, unzip, vim, nano
+- PHP-Extensions: mbstring, intl, pdo_sqlite, zip, bcmath, xml
+- Composer
+- Non-root User `agent` (uid 1000), Home `/home/agent`
 - Entrypoint: `/usr/local/bin/worker-entrypoint.sh`
+- Kein Docker Socket, kein Netz-Limit
 
 ### Volumes
 
 | Volume | Mount | Zweck | Lebensdauer |
-| --- | --- | --- | --- |
+|---|---|---|---|
+| `argos-data` | `/data` | SQLite-DB, persistente App-Daten | Permanent |
 | `composer_cache` | `/home/agent/.composer/cache` | Composer-Pakete | Permanent, geteilt |
 | `npm_cache` | `/home/agent/.npm` | npm-Pakete | Permanent, geteilt |
-| `task_ws_<task-id>` | `/workspace` | Task-Workspace | Pro Task, dynamisch |
+| `task_ws_<id>` | `/workspace` | Task-Workspace | Pro Task, dynamisch |
 
-Kein `claude_auth`-Volume — Auth läuft über `CLAUDE_CODE_OAUTH_TOKEN`-Env.
+## Deployment
 
-### Ports
+### Produktion (ein Container)
 
-Keine, der Worker exponiert nichts nach außen.
+```bash
+docker run -d \
+  --name argos \
+  -p 8080:80 \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v argos-data:/data \
+  -e CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-... \
+  -e APP_KEY=base64:... \
+  ghcr.io/nodus-it/argos:latest
+```
 
-### Resource Limits
+Web-UI: `http://localhost:8080/admin`
 
-Default in Compose: 4 GB RAM, 2 CPUs. Überschreibbar pro `agent`-Aufruf via `AGENT_MEM_LIMIT`/`AGENT_CPU_LIMIT`.
+CLI via exec:
+```bash
+docker exec -it argos php artisan agent:concept task-001
+```
+
+### Lokale Entwicklung
+
+```bash
+docker compose up          # startet manager + worker (build lokal)
+php artisan serve          # alternativ: Laravel dev-server
+```
 
 ## Boost-Strategie
 
-Du nutzt Laravel Boost in deinen Projekten. Für v1:
-
 - Worker hat keinen DB-Sidecar.
-- Implement-Prompt instruiert Claude, bei Bedarf temporär auf SQLite umzuschalten (`.env` ist gitignored, Änderungen landen nicht im Commit).
-- Boost-MCP-Server wird automatisch von Claude Code geladen wenn `.mcp.json` im Repo existiert (Standard bei Boost-Projekten).
-- Risiko: wenn `composer install` Post-Install-Hooks hat die DB-Migrations triggern und auf MariaDB hartcodieren, kann das fehlschlagen. Dann müssen wir in v2 doch einen Sidecar einbauen.
-
-## Verwendungs-Walkthrough
-
-```bash
-# Einmalig
-npm install -g @anthropic-ai/claude-code
-claude setup-token   # Token notieren
-./agent init         # Token eingeben, Image bauen
-
-# Pro Task
-./agent task new task-001
-# (interaktive Eingaben)
-
-./agent concept task-001
-./agent show-concept task-001
-./agent edit-concept task-001    # optional Anmerkungen
-./agent concept task-001         # inkrementelle Verfeinerung
-
-./agent implement task-001
-./agent diff task-001
-./agent implement task-001 --continue   # falls noch was zu fixen ist
-
-./agent push task-001
-```
+- Implement-Prompt instruiert Claude, bei Bedarf temporär auf SQLite umzuschalten (`.env` ist gitignored).
+- Boost-MCP-Server wird von Claude Code automatisch geladen wenn `.mcp.json` im Repo existiert.
+- Risiko: Post-Install-Hooks die DB-Migrations auf MariaDB triggern. Workaround in `docs/TROUBLESHOOTING.md`.
 
 ## Erweiterungspfad
 
-- **Iteration 2**: `pr`- und `respond`-Phasen, Worker bleibt gleich, nur neue Phase-Skripte
-- **Iteration 3**: Orchestrator-Container der `agent`-CLI selbst aufruft oder die Phase-Skripte direkt importiert; Polling von Task-Quellen
-- **Iteration 4**: UI (Filament), Multi-Provider, alles weitere
-
-Die `agent`-CLI bleibt der zentrale Einstieg. Sie wird in späteren Iterationen Subcommands für Konfiguration, Source-Verbindung etc. bekommen, aber ihre Existenz und Form bleiben stabil.
+- **Nächste Schritte**: Manager-Dockerfile, PhaseRunner auf `docker run` (statt `docker compose run`) umstellen, Credentials in DB verschlüsselt ablegen, Artisan-Commands als CLI-Einstieg
+- **Worker-Varianten**: `argos-worker-node`, `argos-worker-python` — gleicher Manager, anderes Worker-Image pro Task konfigurierbar
+- **DB-Sidecar optional**: MariaDB + Redis als optionales Compose-Profile wenn Boost-Projekte produktive DB brauchen
+- **Multi-Source**: Orchestrator liest GitHub Issues, GitLab, eigene Tools und legt Tasks automatisch an

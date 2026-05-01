@@ -1,84 +1,85 @@
 # Argos
 
-Dockerisierter Dev-Agent mit Web-UI. Nimmt eine Aufgabe entgegen, arbeitet sie phasenweise in einem isolierten Container ab und erstellt einen Pull Request.
+Web-First Dev-Agent. Nimmt eine Aufgabe entgegen, arbeitet sie phasenweise in einem isolierten Worker-Container ab und erstellt einen Pull Request.
 
 **Phasen:** `concept` → `implement` → `diff` → `push` (PR) → `respond` (Review-Feedback)
 
-Pro Task ein eigenes Docker-Volume — der Worker sieht nichts vom Host-Filesystem außerhalb seines Workspace.
+Zwei Images, ein User-Container: der Manager-Container spawnt Worker-Container via Docker-Socket. Die KI läuft ausschließlich im Worker — kein AI-Zugriff auf den Socket.
 
-## Komponenten
+## Architektur
 
-| Komponente | Ort | Zweck |
-| --- | --- | --- |
-| Laravel Web-UI | `app/`, `resources/` | Filament-Admin-Panel zur Task-Steuerung |
-| Docker Worker | `worker/` | Bash-Phasen-Runner in isoliertem Container |
-| Agent CLI | `./agent` | Terminal-Steuerung und Init |
+| Image | Zweck |
+|---|---|
+| `argos` (Manager) | Web-UI, Queue, Docker-Socket → spawnt Worker |
+| `argos-worker` | Claude Code, Git, PHP/Node — kein Socket, vollständig isoliert |
 
-## Setup
-
-**Voraussetzungen:**
-- Docker & Docker Compose v2
-- PHP 8.3+, Composer, Node 22+
-- `claude` CLI ([Claude Code](https://docs.claude.com/en/docs/claude-code/cli-reference))
-- `jq`
+## Betrieb
 
 ```bash
-# 1. Claude Code installieren und Token erzeugen
-npm install -g @anthropic-ai/claude-code
-claude setup-token   # Browser-OAuth → sk-ant-oat01-... Token
-
-# 2. Abhängigkeiten installieren + Worker-Image bauen
-composer install
-npm install && npm run build
-./agent init   # baut Worker-Image, speichert Token, optionaler Symlink
-
-# 3. Laravel initialisieren
-php artisan key:generate
-php artisan migrate
-php artisan serve
+docker run -d \
+  --name argos \
+  -p 8080:80 \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v argos-data:/data \
+  -e CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-... \
+  -e APP_KEY=base64:... \
+  ghcr.io/nodus-it/argos:latest
 ```
 
-Die Web-UI ist dann unter `http://localhost:8000/admin` erreichbar.
+Web-UI: `http://localhost:8080/admin`
+
+CLI via exec:
+```bash
+docker exec -it argos php artisan agent:concept task-001
+```
+
+## Lokale Entwicklung
+
+**Voraussetzungen:** Docker & Compose v2, PHP 8.4, Composer, Node 22+
+
+```bash
+composer install
+npm install && npm run build
+php artisan key:generate
+php artisan migrate
+php artisan serve        # Web-UI auf http://localhost:8000/admin
+
+# Worker-Image bauen:
+docker build -t argos-worker:latest worker/
+```
 
 ## Nutzung
 
-### Web-UI (empfohlen)
+### Web-UI
 
-Unter `/admin/tasks` einen Task anlegen (Repo-Profil, Name, Beschreibung), dann
-Phasen über die Buttons starten. Logs und Konzept in den Detailseiten einsehen.
-Review-Feedback über die Respond-Seite einreichen.
+Unter `/admin/tasks` Task anlegen (Repo-URL, Token, Branch, Beschreibung), dann Phasen über die Buttons starten. Logs, Konzept und Diff in den Detailseiten einsehen. Review-Feedback über die Respond-Seite einreichen.
 
-### Agent CLI
+### CLI
 
 ```bash
-./agent task new demo-task   # interaktiv: REPO_URL, TOKEN, BRANCH, Beschreibung
-./agent concept demo-task    # Plan generieren
-./agent implement demo-task  # Code + Quality-Gates
-./agent diff demo-task       # Änderungen reviewen
-./agent push demo-task       # Commit + PR erstellen
+docker exec -it argos php artisan agent:concept task-001
+docker exec -it argos php artisan agent:implement task-001
+docker exec -it argos php artisan agent:diff task-001
+docker exec -it argos php artisan agent:push task-001
 ```
-
-Voller Walkthrough: [`docs/EXAMPLE.md`](docs/EXAMPLE.md).
 
 ## Tests
 
 ```bash
 ./worker/tests/run-tests.sh                # alles: shellcheck + bats + integration
-./worker/tests/run-tests.sh --bats         # nur Bash-Unit-Tests
+./worker/tests/run-tests.sh --bats         # Bash-Unit-Tests
 ./worker/tests/run-tests.sh --integration  # Phase-Lifecycle gegen Mock-Claude
-./worker/tests/run-tests.sh --shellcheck   # nur Lint
+./worker/tests/run-tests.sh --shellcheck   # Lint
+php artisan test                           # PHP-Tests
 ```
-
-Alle Tests laufen über Docker, kein Host-Install nötig (außer Docker).
 
 ## Dokumentation
 
 | Datei | Inhalt |
-| --- | --- |
+|---|---|
 | [`CLAUDE.md`](CLAUDE.md) | Konventionen für Weiterentwicklung |
-| [`docs/WORKER-CONCEPT.md`](docs/WORKER-CONCEPT.md) | Architektur und Phasen-Design |
+| [`docs/WORKER-CONCEPT.md`](docs/WORKER-CONCEPT.md) | Architektur, Sicherheitsmodell, Phasen |
 | [`docs/IMPLEMENTATION.md`](docs/IMPLEMENTATION.md) | Implementierungs-Entscheidungen |
-| [`docs/BACKLOG.md`](docs/BACKLOG.md) | Roadmap nach v1 |
-| [`docs/EXAMPLE.md`](docs/EXAMPLE.md) | End-to-End Demo-Walkthrough |
-| [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) | Häufige Probleme und Fixes |
+| [`docs/BACKLOG.md`](docs/BACKLOG.md) | Roadmap |
+| [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) | Häufige Probleme |
 | [`docs/EXTENDING.md`](docs/EXTENDING.md) | Neue Phase / Lib-Funktion hinzufügen |
