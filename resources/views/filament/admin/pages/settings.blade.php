@@ -11,10 +11,13 @@
                 @else
                     <x-filament::badge color="danger">nicht gesetzt</x-filament::badge>
                     <span class="text-sm text-gray-500 dark:text-gray-400">
-                        Bitte <code>CLAUDE_CODE_OAUTH_TOKEN</code> in der Umgebungskonfiguration setzen.
+                        <code>CLAUDE_CODE_OAUTH_TOKEN</code> fehlt — Phasen können nicht ausgeführt werden.
                     </span>
                 @endif
             </div>
+            @if (!$claudeTokenSet)
+                @include('filament.admin.partials.claude-token-help')
+            @endif
         </x-filament::section>
 
         <x-filament::section heading="Datenbank">

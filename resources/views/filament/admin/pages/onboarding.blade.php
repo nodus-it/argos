@@ -15,9 +15,12 @@
                         <span class="text-sm text-gray-700 dark:text-gray-300"><code>CLAUDE_CODE_OAUTH_TOKEN</code> ist gesetzt</span>
                     @else
                         <x-heroicon-o-x-circle class="h-5 w-5 text-red-500 flex-shrink-0" />
-                        <span class="text-sm text-gray-700 dark:text-gray-300"><code>CLAUDE_CODE_OAUTH_TOKEN</code> fehlt — bitte in <code>.env</code> eintragen</span>
+                        <span class="text-sm text-gray-700 dark:text-gray-300"><code>CLAUDE_CODE_OAUTH_TOKEN</code> fehlt — Phasen können nicht ausgeführt werden</span>
                     @endif
                 </div>
+                @if(!$claudeTokenSet)
+                    @include('filament.admin.partials.claude-token-help')
+                @endif
                 <div class="flex items-center gap-3">
                     @if($workerImage)
                         <x-heroicon-o-check-circle class="h-5 w-5 text-emerald-500 flex-shrink-0" />
