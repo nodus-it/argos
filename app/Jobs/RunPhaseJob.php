@@ -29,5 +29,8 @@ class RunPhaseJob implements ShouldQueue
 
         $task->refresh();
         $stateReader->syncToDb($task);
+
+        $task->refresh();
+        $task->advanceWorkflow($this->phase, $task->current_status ?? 'failed');
     }
 }

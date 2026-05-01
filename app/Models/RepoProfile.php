@@ -18,12 +18,17 @@ class RepoProfile extends Model
         'token',
         'default_branch',
         'platform',
+        'worker_image',
+        'auto_concept',
+        'auto_pr',
     ];
 
     protected function casts(): array
     {
         return [
             'token' => 'encrypted',
+            'auto_concept' => 'boolean',
+            'auto_pr' => 'boolean',
         ];
     }
 
