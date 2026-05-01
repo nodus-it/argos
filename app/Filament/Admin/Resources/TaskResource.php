@@ -68,8 +68,8 @@ class TaskResource extends Resource
                 ->columnSpanFull(),
 
             Toggle::make('auto_concept')
-                ->label('Concept direkt starten')
-                ->helperText('Startet die Concept-Phase sofort nach dem Anlegen.')
+                ->label('Konzept direkt starten')
+                ->helperText('Startet die Konzept-Phase sofort nach dem Anlegen.')
                 ->default(fn (Get $get): bool => RepoProfile::find($get('repo_profile_id'))?->auto_concept ?? false)
                 ->columnSpanFull(),
         ]);

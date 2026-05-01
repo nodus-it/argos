@@ -211,10 +211,16 @@ phase_implement_run() {
         | tee "$stream_log" \
         | tee >(jq -rj '
             if .type == "assistant" then
-                (.message.content[]? | select(.type == "text") | .text // "")
+                (.message.content[]? |
+                    if .type == "text" then (.text // "")
+                    elif .type == "tool_use" then
+                        "\n[tool:" + .name + "] " +
+                        (.input.file_path // .input.command // (.input | tostring)[0:120]) + "\n"
+                    else empty end
+                )
             elif .type == "result" then "\n"
             else empty end
-          ' 2>/dev/null >&2) \
+          ' >&2 2>/dev/null) \
         | jq -c 'select(.type == "result")' \
         > "$result_json"
     local claude_exit=${PIPESTATUS[0]}

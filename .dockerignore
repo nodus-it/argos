@@ -1,0 +1,22 @@
+# Bootstrap cache — wird im Image neu generiert (composer post-autoload-dump)
+bootstrap/cache/*.php
+
+# Node & build artefacts
+node_modules/
+public/build/
+public/hot
+
+# Dev/test assets
+.env
+.env.*
+!.env.example
+storage/logs/*.log
+
+# CI / VCS
+.git/
+.github/
+
+# Dev tools
+.phpunit.cache/
+.phpunit.result.cache
+todo.md

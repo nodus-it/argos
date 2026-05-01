@@ -88,8 +88,8 @@ class RepoProfileResource extends Resource
                 ->maxLength(255),
 
             Toggle::make('auto_concept')
-                ->label('Concept automatisch starten')
-                ->helperText('Startet die Concept-Phase direkt nach dem Anlegen eines Tasks.'),
+                ->label('Konzept automatisch starten')
+                ->helperText('Startet die Konzept-Phase direkt nach dem Anlegen eines Tasks.'),
 
             Toggle::make('auto_pr')
                 ->label('PR automatisch erstellen')

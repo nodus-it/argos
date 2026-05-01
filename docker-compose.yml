@@ -1,14 +1,14 @@
 # Argos — Docker Compose (lokale Entwicklung)
 #
 # Zwei Images:
-#   manager  — Laravel-App, Web-UI, Queue-Worker, Docker-Socket für Worker-Spawn
+#   manager  — Laravel-App, Web-UI, Queue-Worker, MariaDB (all-in-one)
 #   worker   — Claude Code, Phasen-Runner (wird per `docker run` vom Manager gestartet)
 #
 # Der worker-Service hier dient nur zum lokalen Image-Build.
 # PhaseRunner startet Worker-Container direkt via `docker run`, nicht via compose.
 #
 # Profile:
-#   (kein Profile)  — Manager + MariaDB
+#   (kein Profile)  — nur Manager (inkl. integrierter MariaDB)
 #   build-only      — nur zum Bauen des Worker-Images
 
 services:
@@ -23,11 +23,13 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - argos-data:/data
+      - argos-db:/var/lib/mysql
       # Bind-Mount für lokale Entwicklung (hot-reload ohne Image-Rebuild)
       - .:/app
-      - /app/vendor        # vendor aus Image nutzen, nicht vom Host überschreiben
-      - /app/node_modules  # dto.
-      - /app/public/build  # dto.
+      - /app/vendor            # vendor aus Image nutzen, nicht vom Host überschreiben
+      - /app/node_modules      # dto.
+      - /app/public/build      # dto.
+      - /app/bootstrap/cache   # dto. — cache ohne dev-only providers (kein Pail)
     environment:
       APP_ENV:                  "${APP_ENV:-local}"
       APP_DEBUG:                "${APP_DEBUG:-true}"
@@ -35,37 +37,17 @@ services:
       CLAUDE_CODE_OAUTH_TOKEN:  "${CLAUDE_CODE_OAUTH_TOKEN:-}"
       ARGOS_WORKER_IMAGE:       "${ARGOS_WORKER_IMAGE:-argos-worker:latest}"
       ARGOS_CONFIG_DIR:         /data/config
-      DB_CONNECTION:            "${DB_CONNECTION:-mariadb}"
+      DB_CONNECTION:            "mariadb"
       QUEUE_CONNECTION:         database
       SESSION_DRIVER:           database
       CACHE_STORE:              database
-      # MariaDB connection (nur relevant wenn --profile db aktiv)
-      ARGOS_DB_HOST:            "${ARGOS_DB_HOST:-db}"
-      ARGOS_DB_PORT:            "${ARGOS_DB_PORT:-3306}"
+      # MariaDB läuft im selben Container — Verbindung via Unix-Socket
+      ARGOS_DB_HOST:            "127.0.0.1"
+      ARGOS_DB_PORT:            "3306"
+      ARGOS_DB_SOCKET:          "/run/mysqld/mysqld.sock"
       ARGOS_DB_DATABASE:        "${ARGOS_DB_DATABASE:-argos}"
       ARGOS_DB_USERNAME:        "${ARGOS_DB_USERNAME:-argos}"
       ARGOS_DB_PASSWORD:        "${ARGOS_DB_PASSWORD:-argos}"
-    depends_on:
-      db:
-        condition: service_healthy
-        required: false
-
-  db:
-    image: mariadb:11
-    restart: unless-stopped
-    environment:
-      MYSQL_ROOT_PASSWORD: "${MARIADB_ROOT_PASSWORD:-argos-root}"
-      MYSQL_DATABASE:      "${ARGOS_DB_DATABASE:-argos}"
-      MYSQL_USER:          "${ARGOS_DB_USERNAME:-argos}"
-      MYSQL_PASSWORD:      "${ARGOS_DB_PASSWORD:-argos}"
-    volumes:
-      - argos-db:/var/lib/mysql
-    healthcheck:
-      test: ["CMD", "mariadb-admin", "ping", "-h", "localhost",
-             "-u", "root", "--password=${MARIADB_ROOT_PASSWORD:-argos-root}"]
-      interval: 5s
-      timeout: 3s
-      retries: 20
 
   worker:
     image: argos-worker:latest

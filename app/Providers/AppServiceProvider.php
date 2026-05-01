@@ -37,15 +37,16 @@ class AppServiceProvider extends ServiceProvider
 
     private function configureDatabase(): void
     {
-        if ($this->canConnectToMariadb()) {
+        if (env('DB_CONNECTION') === 'mariadb' || $this->canConnectToMariadb()) {
             config(['database.default' => 'mariadb']);
+
             return;
         }
 
-        $sqlitePath = env('DB_DATABASE', config('argos.config_dir') . '/argos.db');
+        $sqlitePath = env('DB_DATABASE', config('argos.config_dir').'/argos.db');
         config([
-            'database.default'                        => 'sqlite',
-            'database.connections.sqlite.database'    => $sqlitePath,
+            'database.default' => 'sqlite',
+            'database.connections.sqlite.database' => $sqlitePath,
         ]);
 
         $this->ensureSqliteExists($sqlitePath);
@@ -54,7 +55,7 @@ class AppServiceProvider extends ServiceProvider
 
     private function canConnectToMariadb(): bool
     {
-        $c   = config('database.connections.mariadb');
+        $c = config('database.connections.mariadb');
         $dsn = "mysql:host={$c['host']};port={$c['port']};dbname={$c['database']};charset=utf8mb4";
 
         try {
@@ -63,6 +64,7 @@ class AppServiceProvider extends ServiceProvider
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             ]);
             unset($pdo);
+
             return true;
         } catch (PDOException) {
             return false;

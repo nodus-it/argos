@@ -7,14 +7,18 @@ FROM php:8.4-fpm-bookworm AS base
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# System packages: nginx, supervisor, docker CLI, node 22
+# System packages: nginx, supervisor, mariadb, docker CLI, node 22
 RUN set -eux; \
+    # policy-rc.d: verhindert Service-Start durch apt-postinstall im Container
+    printf '#!/bin/sh\nexit 101\n' > /usr/local/sbin/policy-rc.d; \
+    chmod +x /usr/local/sbin/policy-rc.d; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
         ca-certificates \
         curl \
         gnupg \
         git \
+        mariadb-server \
         nginx \
         supervisor \
         unzip \
@@ -27,6 +31,7 @@ RUN set -eux; \
         libxml2-dev \
         libsqlite3-dev \
         zlib1g-dev; \
+    rm /usr/local/sbin/policy-rc.d; \
     # Docker CLI (official apt repo)
     install -m 0755 -d /etc/apt/keyrings; \
     curl -fsSL https://download.docker.com/linux/debian/gpg \
@@ -70,6 +75,13 @@ RUN composer install --no-dev --no-scripts --no-autoloader --no-interaction
 
 # Copy app source
 COPY . .
+
+# Ensure required runtime directories exist (storage structure may be absent from context)
+RUN mkdir -p bootstrap/cache \
+        storage/logs \
+        storage/framework/cache/data \
+        storage/framework/sessions \
+        storage/framework/views
 
 # Finish install + frontend build
 RUN composer install --no-dev --optimize-autoloader --no-interaction \

@@ -18,8 +18,8 @@ enum WorkflowStatus: string
     {
         return match ($this) {
             self::Draft => 'Entwurf',
-            self::ConceptRunning => 'Concept läuft',
-            self::ConceptReview => 'Concept bereit',
+            self::ConceptRunning => 'Konzept läuft',
+            self::ConceptReview => 'Konzept bereit',
             self::ImplementRunning => 'Implementierung läuft',
             self::InReview => 'In Review',
             self::Completed => 'Abgeschlossen',

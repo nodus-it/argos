@@ -35,4 +35,8 @@ return [
         ],
     ],
 
+    'anthropic' => [
+        'token' => env('CLAUDE_CODE_OAUTH_TOKEN'),
+    ],
+
 ];

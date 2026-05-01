@@ -101,9 +101,18 @@ _concept_archive_to_history() {
             cp "$concept_file" "$hist_dir/concept.${ts}.md"
         fi
     fi
-    if [[ -f "$notes_file" ]]; then
-        # Notes werden immer move'd — sie sind one-shot.
-        mv "$notes_file" "$hist_dir/concept.notes.${ts}.md"
+    # Leere Notes-Dateien nicht archivieren — sie entstehen wenn kein Feedback gegeben wurde.
+    # Iteration (ITERATION-Env-Var) wird im Dateinamen kodiert fuer spaetere Zuordnung.
+    if [[ -f "$notes_file" && -s "$notes_file" ]]; then
+        local iter_suffix=""
+        [[ -n "${ITERATION:-}" ]] && iter_suffix=".iter${ITERATION}"
+        if [[ "$mode" == "move" ]]; then
+            mv "$notes_file" "$hist_dir/concept.notes.${ts}${iter_suffix}.md"
+        else
+            # Im copy-Modus nur kopieren — Notes werden NACH dem Claude-Call entfernt,
+            # damit _concept_build_user_prompt sie noch lesen kann.
+            cp "$notes_file" "$hist_dir/concept.notes.${ts}${iter_suffix}.md"
+        fi
     fi
 
     find "$hist_dir" -maxdepth 1 -type f -name 'concept.*.md' 2>/dev/null | wc -l
@@ -129,7 +138,7 @@ _concept_build_user_prompt() {
             printf '\n'
         fi
 
-        if [[ -f "$notes_file" ]]; then
+        if [[ -f "$notes_file" && -s "$notes_file" ]]; then
             printf '\n## Anmerkungen des Users (concept.notes.md)\n\n'
             cat "$notes_file"
             printf '\n'
@@ -174,8 +183,8 @@ phase_concept_run() {
         history_count="$(_concept_archive_to_history copy)"
     else
         history_count=0
-        # Notes ohne Konzept koennen vorhanden sein — auch archivieren wenn ja
-        if [[ -f /workspace/.agent/concept.notes.md ]]; then
+        # Notes ohne Konzept koennen vorhanden sein — auch archivieren wenn nicht leer
+        if [[ -f /workspace/.agent/concept.notes.md && -s /workspace/.agent/concept.notes.md ]]; then
             history_count="$(_concept_archive_to_history copy)"
         fi
     fi
@@ -193,27 +202,49 @@ phase_concept_run() {
     started_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
     started_epoch=$(date -u +%s)
 
-    local output_json="/workspace/.agent/logs/concept.${ITERATION}.json"
+    local stream_log="/workspace/.agent/logs/concept.${ITERATION}.stream.log"
+    local result_json="/workspace/.agent/logs/concept.${ITERATION}.result.json"
     local sysprompt_content
     sysprompt_content="$(cat "$sysprompt")"
 
-    log_info "concept: rufe claude (max-turns 15) auf — output nach $output_json"
-    if ! claude -p \
-            --append-system-prompt "$sysprompt_content" \
-            --output-format json \
-            --max-turns 15 \
-            --permission-mode bypassPermissions \
-            < "$user_prompt_path" \
-            > "$output_json"; then
-        echo "concept: claude call failed (exit non-zero)" >&2
+    log_info "concept: rufe claude (stream-json, max-turns 15) auf"
+
+    set +e
+    claude -p \
+        --append-system-prompt "$sysprompt_content" \
+        --output-format stream-json \
+        --verbose \
+        --max-turns 15 \
+        --permission-mode bypassPermissions \
+        < "$user_prompt_path" \
+        | tee "$stream_log" \
+        | tee >(jq -rj '
+            if .type == "assistant" then
+                (.message.content[]? |
+                    if .type == "text" then (.text // "")
+                    elif .type == "tool_use" then
+                        "\n[tool:" + .name + "] " +
+                        (.input.file_path // .input.command // (.input | tostring)[0:120]) + "\n"
+                    else empty end
+                )
+            elif .type == "result" then "\n"
+            else empty end
+          ' >&2 2>/dev/null) \
+        | jq -c 'select(.type == "result")' \
+        > "$result_json"
+    local claude_exit=${PIPESTATUS[0]}
+    set -e
+
+    if (( claude_exit != 0 )); then
+        echo "concept: claude call failed (exit $claude_exit)" >&2
         return 3
     fi
 
     local is_error
-    is_error="$(jq -r '.is_error // false' "$output_json" 2>/dev/null || echo true)"
+    is_error="$(jq -r '.is_error // false' "$result_json" 2>/dev/null || echo true)"
     if [[ "$is_error" != "false" ]]; then
         local err_msg
-        err_msg="$(jq -r '.result // "(no result field)"' "$output_json" 2>/dev/null)"
+        err_msg="$(jq -r '.result // "(no result field)"' "$result_json" 2>/dev/null)"
         echo "concept: claude returned is_error=true: $err_msg" >&2
         if echo "$err_msg" | grep -qiE "invalid api key|authentication|oauth|unauthorized|401|token.*expired|invalid_api_key"; then
             echo "  → Claude-OAuth-Token ungültig oder abgelaufen." >&2
@@ -225,7 +256,7 @@ phase_concept_run() {
 
     # Konzept-Text extrahieren und in concept.md schreiben
     local concept_text
-    concept_text="$(jq -r '.result' "$output_json")"
+    concept_text="$(jq -r '.result' "$result_json")"
     if [[ -z "$concept_text" || "$concept_text" == "null" ]]; then
         echo "concept: claude returned empty .result" >&2
         return 1
@@ -233,20 +264,21 @@ phase_concept_run() {
     printf '%s\n' "$concept_text" > "${concept_file}.tmp"
     mv "${concept_file}.tmp" "$concept_file"
 
-    # Notes nach Verarbeitung in history (bereits oben passiert wenn vorhanden — nochmal sicherstellen)
-    if [[ -f /workspace/.agent/concept.notes.md ]]; then
-        _concept_archive_to_history move >/dev/null
-    fi
+    # Notes entfernen — wurden am Anfang bereits per copy in die History archiviert.
+    # NICHT _concept_archive_to_history move aufrufen: das wuerde concept.md (gerade
+    # von Claude geschrieben) ebenfalls in die History verschieben und das Konzept
+    # damit aus dem Workspace loeschen.
+    rm -f /workspace/.agent/concept.notes.md
 
     # Result-JSON emittieren
     finished_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
     finished_epoch=$(date -u +%s)
     local duration_ms=$(( (finished_epoch - started_epoch) * 1000 ))
     local session_id cost input_tokens output_tokens
-    session_id="$(jq -r '.session_id // ""' "$output_json")"
-    cost="$(jq -r '.total_cost_usd // 0' "$output_json")"
-    input_tokens="$(jq -r '.usage.input_tokens // 0' "$output_json")"
-    output_tokens="$(jq -r '.usage.output_tokens // 0' "$output_json")"
+    session_id="$(jq -r '.session_id // ""' "$result_json")"
+    cost="$(jq -r '.total_cost_usd // 0' "$result_json")"
+    input_tokens="$(jq -r '.usage.input_tokens // 0' "$result_json")"
+    output_tokens="$(jq -r '.usage.output_tokens // 0' "$result_json")"
 
     result_emit \
         phase concept \
