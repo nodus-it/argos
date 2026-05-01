@@ -67,7 +67,7 @@ class ViewTask extends ViewRecord
                     $task = $this->getRecord();
                     $task->update(['workflow_status' => WorkflowStatus::Completed]);
                     Notification::make()->title('Task abgeschlossen')->success()->send();
-                    $this->redirect($this->getUrl());
+                    $this->redirect(TaskResource::getUrl('view', ['record' => $task]));
                 })
                 ->visible(fn (): bool => $this->getRecord()->workflow_status !== WorkflowStatus::Completed),
 
@@ -97,7 +97,7 @@ class ViewTask extends ViewRecord
                     app(StateReader::class)->syncToDb($task);
                     $task->refresh();
                     Notification::make()->title('Status aktualisiert')->success()->send();
-                    $this->redirect($this->getUrl());
+                    $this->redirect(TaskResource::getUrl('view', ['record' => $task]));
                 }),
         ];
     }
@@ -160,7 +160,7 @@ class ViewTask extends ViewRecord
                 }
                 RunPhaseJob::dispatch($task->id, $phase);
                 Notification::make()->title("{$label} gestartet")->success()->send();
-                $this->redirect($this->getUrl());
+                $this->redirect(TaskResource::getUrl('view', ['record' => $task]));
             });
     }
 }
