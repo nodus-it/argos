@@ -6,6 +6,11 @@
 #
 # Der worker-Service hier dient nur zum lokalen Image-Build.
 # PhaseRunner startet Worker-Container direkt via `docker run`, nicht via compose.
+#
+# Profile:
+#   (kein Profile) — Manager mit SQLite
+#   db             — Manager + MariaDB-Sidecar
+#   build-only     — nur zum Bauen des Worker-Images
 
 services:
 
@@ -36,7 +41,34 @@ services:
       QUEUE_CONNECTION:         database
       SESSION_DRIVER:           database
       CACHE_STORE:              database
-    depends_on: []
+      # MariaDB connection (nur relevant wenn --profile db aktiv)
+      ARGOS_DB_HOST:            "${ARGOS_DB_HOST:-db}"
+      ARGOS_DB_PORT:            "${ARGOS_DB_PORT:-3306}"
+      ARGOS_DB_DATABASE:        "${ARGOS_DB_DATABASE:-argos}"
+      ARGOS_DB_USERNAME:        "${ARGOS_DB_USERNAME:-argos}"
+      ARGOS_DB_PASSWORD:        "${ARGOS_DB_PASSWORD:-argos}"
+    depends_on:
+      db:
+        condition: service_healthy
+        required: false
+
+  db:
+    image: mariadb:11
+    profiles: [db]
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: "${MARIADB_ROOT_PASSWORD:-argos-root}"
+      MYSQL_DATABASE:      "${ARGOS_DB_DATABASE:-argos}"
+      MYSQL_USER:          "${ARGOS_DB_USERNAME:-argos}"
+      MYSQL_PASSWORD:      "${ARGOS_DB_PASSWORD:-argos}"
+    volumes:
+      - argos-db:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mariadb-admin", "ping", "-h", "localhost",
+             "-u", "root", "--password=${MARIADB_ROOT_PASSWORD:-argos-root}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
   worker:
     image: argos-worker:latest
@@ -54,5 +86,6 @@ services:
 
 volumes:
   argos-data:
+  argos-db:
   composer_cache:
   npm_cache:
