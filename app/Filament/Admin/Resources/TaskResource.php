@@ -9,6 +9,7 @@ use App\Jobs\RunPhaseJob;
 use App\Filament\Admin\Resources\TaskResource\Pages\ListTasks;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTask;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTaskConcept;
+use App\Filament\Admin\Resources\TaskResource\Pages\ViewTaskDiff;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTaskLogs;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTaskRespond;
 use App\Filament\Admin\Resources\TaskResource\RelationManagers\PhaseRunsRelationManager;
@@ -133,6 +134,7 @@ class TaskResource extends Resource
             'create'  => CreateTask::route('/create'),
             'view'    => ViewTask::route('/{record}'),
             'concept'  => ViewTaskConcept::route('/{record}/concept'),
+            'diff'     => ViewTaskDiff::route('/{record}/diff'),
             'logs'     => ViewTaskLogs::route('/{record}/logs'),
             'respond'  => ViewTaskRespond::route('/{record}/respond'),
         ];

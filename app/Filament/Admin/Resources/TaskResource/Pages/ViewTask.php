@@ -38,6 +38,11 @@ class ViewTask extends ViewRecord
                 ->color('gray')
                 ->url(TaskResource::getUrl('concept', ['record' => $this->getRecord()])),
             $this->phaseAction('implement', 'Implement', 'heroicon-o-code-bracket'),
+            Action::make('viewDiff')
+                ->label('Diff')
+                ->icon('heroicon-o-code-bracket-square')
+                ->color('gray')
+                ->url(TaskResource::getUrl('diff', ['record' => $this->getRecord()])),
             $this->phaseAction('push', 'Push', 'heroicon-o-arrow-up-tray'),
             Action::make('respond')
                 ->label('Respond')
