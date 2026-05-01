@@ -2,17 +2,17 @@
 
 Roadmap sortiert nach Priorität. Architektur-Grundlage: `docs/WORKER-CONCEPT.md`.
 
-## Laufend: Architektur-Umbau (Web First)
+## ~~Laufend: Architektur-Umbau (Web First)~~ — abgeschlossen
 
 Der Prototyp war CLI-first mit Bash-Steuerung. Das Zielbild ist Web First mit PHP als Steuerebene und einem einzigen User-Container. Folgende Umbau-Schritte stehen an:
 
-- [ ] **Manager-Dockerfile** (`docker/Dockerfile`): PHP + Nginx + Supervisor (php-fpm + nginx + queue:work). Basis für den Single-Container-Betrieb.
-- [ ] **`PhaseRunner` auf `docker run`** umstellen: statt `docker compose run --rm worker` direkt `docker run ghcr.io/nodus-it/argos-worker:latest` mit Socket-Mount im Manager.
-- [ ] **Credentials in DB**: Repo-Token und Claude-Token verschlüsselt in DB (`encrypted` Cast), nicht mehr im Dateisystem.
-- [ ] **`RunPhaseJob`**: Laravel Queue-Job der `PhaseRunner::run()` kapselt. Queue-Treiber: `database`.
-- [ ] **Artisan-Commands** (`agent:concept`, `agent:implement`, `agent:diff`, `agent:push`): synchroner Einstieg für `docker exec`-Nutzung.
-- [ ] **`docker-compose.yml` überarbeiten**: Manager-Service hinzufügen, Worker als Build-only-Target.
-- [ ] **GitHub Actions Build** (`.github/workflows/build.yml`): beide Images bauen und auf GHCR pushen.
+- [x] **Manager-Dockerfile** (`docker/Dockerfile`): PHP + Nginx + Supervisor (php-fpm + nginx + queue:work). Basis für den Single-Container-Betrieb. *(Mai 2026)*
+- [x] **`PhaseRunner` auf `docker run`** umstellen: statt `docker compose run --rm worker` direkt `docker run ghcr.io/nodus-it/argos-worker:latest` mit Socket-Mount im Manager. *(Mai 2026)*
+- [x] **Credentials in DB**: Repo-Token verschlüsselt in DB (`encrypted` Cast); Claude-Token via `CLAUDE_CODE_OAUTH_TOKEN` Env-Var. *(Mai 2026)*
+- [x] **`RunPhaseJob`**: Laravel Queue-Job der `PhaseRunner::runBlocking()` kapselt. Queue-Treiber: `database`. *(Mai 2026)*
+- [x] **Artisan-Commands** (`agent:concept`, `agent:implement`, `agent:diff`, `agent:push`): synchroner Einstieg für `docker exec`-Nutzung. *(Mai 2026)*
+- [x] **`docker-compose.yml` überarbeiten**: Manager-Service hinzufügen, Worker als Build-only-Target. *(Mai 2026)*
+- [x] **GitHub Actions Build** (`.github/workflows/build.yml`): beide Images bauen und auf GHCR pushen. *(Mai 2026)*
 
 ## Nächste Features
 
