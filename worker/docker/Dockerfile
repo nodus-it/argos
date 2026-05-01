@@ -80,7 +80,9 @@ COPY docker/worker-entrypoint.sh /usr/local/bin/worker-entrypoint.sh
 RUN chmod +x /usr/local/bin/worker-entrypoint.sh \
     && chown -R agent:agent /usr/local/share/agent \
     && mkdir -p /workspace \
-    && chown agent:agent /workspace
+    && chown agent:agent /workspace \
+    && mkdir -p /run/agent \
+    && chown agent:agent /run/agent
 
 USER agent
 WORKDIR /workspace

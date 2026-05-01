@@ -18,6 +18,7 @@ class PhaseRunner
     public function getPhaseLogPath(string $taskName, string $phase): string
     {
         $configDir = config('argos.config_dir');
+
         return "{$configDir}/tasks/{$taskName}/{$phase}.bg.log";
     }
 
@@ -42,33 +43,30 @@ class PhaseRunner
      */
     public function startBackground(Task $task, string $phase, array $flags = []): void
     {
-        $repoRoot = config('argos.repo_root');
         $cmd = $this->buildCommand($task, $phase, $flags);
         $logPath = $this->getPhaseLogPath($task->name, $phase);
 
         $logDir = dirname($logPath);
-        if (!is_dir($logDir)) {
+        if (! is_dir($logDir)) {
             mkdir($logDir, 0755, true);
         }
 
-        // Truncate old log so watch always starts from the beginning
         file_put_contents($logPath, '');
 
         $shellParts = array_map('escapeshellarg', $cmd);
-        $shellCmd = 'cd ' . escapeshellarg($repoRoot)
-            . ' && nohup ' . implode(' ', $shellParts)
-            . ' >> ' . escapeshellarg($logPath) . ' 2>&1 &';
+        $shellCmd = 'nohup '.implode(' ', $shellParts)
+            .' >> '.escapeshellarg($logPath).' 2>&1 &';
 
         PhaseRun::create([
-            'task_id'   => $task->id,
-            'phase'     => $phase,
+            'task_id' => $task->id,
+            'phase' => $phase,
             'iteration' => $task->phaseRuns()->where('phase', $phase)->count() + 1,
-            'status'    => 'running',
+            'status' => 'running',
             'started_at' => now(),
         ]);
 
         $task->update([
-            'current_phase'  => $phase,
+            'current_phase' => $phase,
             'current_status' => 'running',
         ]);
 
@@ -80,18 +78,17 @@ class PhaseRunner
      */
     public function run(Task $task, string $phase, array $flags = []): \Generator
     {
-        $repoRoot = config('argos.repo_root');
         $cmd = $this->buildCommand($task, $phase, $flags);
 
-        $process = new Process($cmd, $repoRoot);
+        $process = new Process($cmd);
         $process->setTimeout(null);
         $process->setIdleTimeout(null);
 
         $phaseRun = PhaseRun::create([
-            'task_id'    => $task->id,
-            'phase'      => $phase,
-            'iteration'  => $task->phaseRuns()->where('phase', $phase)->count() + 1,
-            'status'     => 'running',
+            'task_id' => $task->id,
+            'phase' => $phase,
+            'iteration' => $task->phaseRuns()->where('phase', $phase)->count() + 1,
+            'status' => 'running',
             'started_at' => now(),
         ]);
 
@@ -121,22 +118,19 @@ class PhaseRunner
         };
 
         $phaseRun->update([
-            'status'      => $status,
+            'status' => $status,
             'finished_at' => now(),
-            'exit_code'   => $exitCode,
+            'exit_code' => $exitCode,
         ]);
 
         $task->update([
-            'current_phase'  => $phase,
+            'current_phase' => $phase,
             'current_status' => $status,
         ]);
     }
 
     private function buildCommand(Task $task, string $phase, array $flags = []): array
     {
-        $repoRoot  = config('argos.repo_root');
-        $configDir = config('argos.config_dir');
-
         $profile = $task->repoProfile;
 
         if ($profile === null) {
@@ -145,40 +139,37 @@ class PhaseRunner
             );
         }
 
-        $claudeToken = $this->credentials->getClaudeToken();
+        // Token: env var takes precedence (containerised manager), file-based fallback for local dev
+        $claudeToken = config('argos.claude_token') ?? $this->credentials->getClaudeToken();
 
         if ($claudeToken === null) {
             throw new \RuntimeException(
-                'Kein Claude OAuth Token konfiguriert. Bitte zuerst `php artisan argos:init` ausführen.'
+                'Kein Claude OAuth Token konfiguriert. Bitte CLAUDE_CODE_OAUTH_TOKEN setzen.'
             );
         }
 
-        $descriptionPath = "{$configDir}/tasks/{$task->name}/description.md";
+        $workerImage = config('argos.worker_image', 'ghcr.io/nodus-it/argos-worker:latest');
+        $phaseFlags = $flags !== [] ? json_encode($flags) : '{}';
 
-        $cmd = [
-            'docker', 'compose',
-            '-f', "{$repoRoot}/docker-compose.yml",
-            'run', '--rm',
+        return [
+            'docker', 'run', '--rm',
             '-v', "task_ws_{$task->name}:/workspace",
-        ];
-
-        if (is_file($descriptionPath)) {
-            $cmd[] = '-v';
-            $cmd[] = "{$descriptionPath}:/run/agent/description.md:ro";
-        }
-
-        return array_merge($cmd, [
+            '-v', 'composer_cache:/home/agent/.composer/cache',
+            '-v', 'npm_cache:/home/agent/.npm',
+            '--memory', env('ARGOS_MEM_LIMIT', '4g'),
+            '--cpus',   env('ARGOS_CPU_LIMIT', '2'),
             '-e', "PHASE={$phase}",
             '-e', "TASK_ID={$task->name}",
             '-e', "REPO_URL={$profile->url}",
             '-e', "REPO_TOKEN={$profile->token}",
             '-e', "BASE_BRANCH={$profile->default_branch}",
             '-e', "CLAUDE_CODE_OAUTH_TOKEN={$claudeToken}",
-            '-e', 'PHASE_FLAGS=' . (($flags !== []) ? json_encode($flags) : '{}'),
+            '-e', "TASK_DESCRIPTION={$task->description}",
+            '-e', "PHASE_FLAGS={$phaseFlags}",
             '-e', 'LOG_LEVEL=info',
-            'worker',
+            $workerImage,
             $phase,
             $task->name,
-        ]);
+        ];
     }
 }

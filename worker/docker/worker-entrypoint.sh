@@ -185,6 +185,13 @@ _ep_on_signal() {
 main() {
     local arg="${1:-}"
 
+    # Write task description into the well-known path if passed as env var.
+    # This replaces the old file bind-mount from the host filesystem.
+    if [[ -n "${TASK_DESCRIPTION:-}" ]]; then
+        mkdir -p /run/agent
+        printf '%s' "$TASK_DESCRIPTION" > /run/agent/description.md
+    fi
+
     case "$arg" in
         ""|-h|--help|help)
             usage
