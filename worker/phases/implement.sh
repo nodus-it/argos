@@ -272,9 +272,11 @@ phase_implement_run() {
     finished_epoch=$(date -u +%s)
     local duration_ms=$(( (finished_epoch - started_epoch) * 1000 ))
 
-    local session_id cost
+    local session_id cost input_tokens output_tokens
     session_id="$(jq -r '.session_id // ""' "$result_json")"
     cost="$(jq -r '.total_cost_usd // 0' "$result_json")"
+    input_tokens="$(jq -r '.usage.input_tokens // 0' "$result_json")"
+    output_tokens="$(jq -r '.usage.output_tokens // 0' "$result_json")"
 
     local emit_args=(
         phase implement
@@ -289,6 +291,8 @@ phase_implement_run() {
         --raw quality_gates "$gates"
         claude_session_id "$session_id"
         --raw claude_total_cost_usd "$cost"
+        --int input_tokens "$input_tokens"
+        --int output_tokens "$output_tokens"
     )
     if [[ -n "$failed_gate" ]]; then
         emit_args+=(failed_gate "$failed_gate")

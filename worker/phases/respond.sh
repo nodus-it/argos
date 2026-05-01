@@ -162,9 +162,11 @@ phase_respond_run() {
         fi
     fi
 
-    local session_id cost status exit_code
+    local session_id cost input_tokens output_tokens status exit_code
     session_id="$(jq -r '.session_id // "unknown"' "$result_json" 2>/dev/null)"
     cost="$(jq -r '.total_cost_usd // 0' "$result_json" 2>/dev/null)"
+    input_tokens="$(jq -r '.usage.input_tokens // 0' "$result_json" 2>/dev/null)"
+    output_tokens="$(jq -r '.usage.output_tokens // 0' "$result_json" 2>/dev/null)"
 
     if [[ -n "$failed_gate" ]]; then
         status="quality_gate_failed"
@@ -190,7 +192,9 @@ phase_respond_run() {
         ${failed_gate:+failed_gate "$failed_gate"} \
         --raw quality_gates "$gates" \
         claude_session_id "$session_id" \
-        --raw claude_total_cost_usd "$cost"
+        --raw claude_total_cost_usd "$cost" \
+        --int input_tokens "$input_tokens" \
+        --int output_tokens "$output_tokens"
 
     return "$exit_code"
 }

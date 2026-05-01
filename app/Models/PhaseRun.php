@@ -22,6 +22,8 @@ class PhaseRun extends Model
         'exit_code',
         'result_json',
         'cost_usd',
+        'input_tokens',
+        'output_tokens',
     ];
 
     protected function casts(): array
@@ -31,6 +33,8 @@ class PhaseRun extends Model
             'finished_at' => 'datetime',
             'result_json' => 'array',
             'cost_usd' => 'decimal:6',
+            'input_tokens' => 'integer',
+            'output_tokens' => 'integer',
         ];
     }
 

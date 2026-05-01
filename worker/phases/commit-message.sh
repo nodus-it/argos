@@ -161,9 +161,11 @@ phase_commit_message_run() {
     finished_epoch=$(date -u +%s)
     local duration_ms=$(( (finished_epoch - started_epoch) * 1000 ))
 
-    local session_id cost
+    local session_id cost input_tokens output_tokens
     session_id="$(jq -r '.session_id // ""' "$output_json")"
     cost="$(jq -r '.total_cost_usd // 0' "$output_json")"
+    input_tokens="$(jq -r '.usage.input_tokens // 0' "$output_json")"
+    output_tokens="$(jq -r '.usage.output_tokens // 0' "$output_json")"
 
     result_emit \
         phase commit-message \
@@ -177,7 +179,9 @@ phase_commit_message_run() {
         subject "$subject" \
         body "$body" \
         claude_session_id "$session_id" \
-        --raw claude_total_cost_usd "$cost"
+        --raw claude_total_cost_usd "$cost" \
+        --int input_tokens "$input_tokens" \
+        --int output_tokens "$output_tokens"
 
     return 0
 }

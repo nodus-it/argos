@@ -45,7 +45,7 @@ class PhaseRunner
      */
     public function runLive(Task $task, string $phase, callable $output, array $flags = []): int
     {
-        $cmd     = $this->buildCommand($task, $phase, $flags);
+        $cmd = $this->buildCommand($task, $phase, $flags);
         $logPath = $this->getPhaseLogPath($task->name, $phase);
 
         $logDir = dirname($logPath);
@@ -56,48 +56,42 @@ class PhaseRunner
         file_put_contents($logPath, '');
 
         $phaseRun = PhaseRun::create([
-            'task_id'    => $task->id,
-            'phase'      => $phase,
-            'iteration'  => $task->phaseRuns()->where('phase', $phase)->count() + 1,
-            'status'     => 'running',
+            'task_id' => $task->id,
+            'phase' => $phase,
+            'iteration' => $task->phaseRuns()->where('phase', $phase)->count() + 1,
+            'status' => 'running',
             'started_at' => now(),
         ]);
 
         $task->update([
-            'current_phase'  => $phase,
+            'current_phase' => $phase,
             'current_status' => 'running',
         ]);
 
         $logHandle = fopen($logPath, 'a');
+        $stdout = '';
 
         $process = new Process($cmd);
         $process->setTimeout(null);
         $process->setIdleTimeout(null);
 
-        $process->run(function (string $type, string $chunk) use ($logHandle, $output): void {
+        $process->run(function (string $type, string $chunk) use ($logHandle, $output, &$stdout): void {
             fwrite($logHandle, $chunk);
             $output($chunk);
+            if ($type === Process::OUT) {
+                $stdout .= $chunk;
+            }
         });
 
         fclose($logHandle);
 
         $exitCode = $process->getExitCode() ?? 1;
+        $status = $this->exitCodeToStatus($exitCode);
 
-        $status = match ($exitCode) {
-            0 => 'completed',
-            4 => 'quality_gate_failed',
-            5 => 'no_changes',
-            default => 'failed',
-        };
-
-        $phaseRun->update([
-            'status'      => $status,
-            'finished_at' => now(),
-            'exit_code'   => $exitCode,
-        ]);
+        $phaseRun->update($this->phaseRunUpdate($status, $exitCode, $stdout));
 
         $task->update([
-            'current_phase'  => $phase,
+            'current_phase' => $phase,
             'current_status' => $status,
         ]);
 
@@ -110,7 +104,7 @@ class PhaseRunner
      */
     public function runBlocking(Task $task, string $phase, array $flags = []): void
     {
-        $cmd     = $this->buildCommand($task, $phase, $flags);
+        $cmd = $this->buildCommand($task, $phase, $flags);
         $logPath = $this->getPhaseLogPath($task->name, $phase);
 
         $logDir = dirname($logPath);
@@ -121,49 +115,105 @@ class PhaseRunner
         file_put_contents($logPath, '');
 
         $phaseRun = PhaseRun::create([
-            'task_id'    => $task->id,
-            'phase'      => $phase,
-            'iteration'  => $task->phaseRuns()->where('phase', $phase)->count() + 1,
-            'status'     => 'running',
+            'task_id' => $task->id,
+            'phase' => $phase,
+            'iteration' => $task->phaseRuns()->where('phase', $phase)->count() + 1,
+            'status' => 'running',
             'started_at' => now(),
         ]);
 
         $task->update([
-            'current_phase'  => $phase,
+            'current_phase' => $phase,
             'current_status' => 'running',
         ]);
 
         $logHandle = fopen($logPath, 'a');
+        $stdout = '';
 
         $process = new Process($cmd);
         $process->setTimeout(null);
         $process->setIdleTimeout(null);
 
-        $process->run(function (string $type, string $chunk) use ($logHandle): void {
+        $process->run(function (string $type, string $chunk) use ($logHandle, &$stdout): void {
             fwrite($logHandle, $chunk);
+            if ($type === Process::OUT) {
+                $stdout .= $chunk;
+            }
         });
 
         fclose($logHandle);
 
         $exitCode = $process->getExitCode() ?? 1;
+        $status = $this->exitCodeToStatus($exitCode);
 
-        $status = match ($exitCode) {
+        $phaseRun->update($this->phaseRunUpdate($status, $exitCode, $stdout));
+
+        $task->update([
+            'current_phase' => $phase,
+            'current_status' => $status,
+        ]);
+    }
+
+    private function exitCodeToStatus(int $exitCode): string
+    {
+        return match ($exitCode) {
             0 => 'completed',
             4 => 'quality_gate_failed',
             5 => 'no_changes',
             default => 'failed',
         };
+    }
 
-        $phaseRun->update([
-            'status'      => $status,
+    /**
+     * Build the PhaseRun update array, extracting cost/token data from the
+     * result JSON the worker emits as the last stdout line.
+     *
+     * @return array<string, mixed>
+     */
+    private function phaseRunUpdate(string $status, int $exitCode, string $stdout): array
+    {
+        $update = [
+            'status' => $status,
             'finished_at' => now(),
-            'exit_code'   => $exitCode,
-        ]);
+            'exit_code' => $exitCode,
+        ];
 
-        $task->update([
-            'current_phase'  => $phase,
-            'current_status' => $status,
-        ]);
+        $resultJson = $this->parseResultJson($stdout);
+        if ($resultJson !== null) {
+            $update['result_json'] = $resultJson;
+            $update['cost_usd'] = isset($resultJson['claude_total_cost_usd'])
+                ? (float) $resultJson['claude_total_cost_usd']
+                : null;
+            $update['input_tokens'] = isset($resultJson['input_tokens'])
+                ? (int) $resultJson['input_tokens']
+                : null;
+            $update['output_tokens'] = isset($resultJson['output_tokens'])
+                ? (int) $resultJson['output_tokens']
+                : null;
+        }
+
+        return $update;
+    }
+
+    /**
+     * Find the last line of stdout that is valid JSON with the worker result fields.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function parseResultJson(string $stdout): ?array
+    {
+        foreach (array_reverse(explode("\n", $stdout)) as $line) {
+            $line = trim($line);
+            if ($line === '') {
+                continue;
+            }
+            $decoded = json_decode($line, true);
+            if (is_array($decoded) && isset($decoded['phase'], $decoded['status'])) {
+                return $decoded;
+            }
+        }
+
+        return null;
     }
 
     private function buildCommand(Task $task, string $phase, array $flags = []): array
@@ -186,7 +236,7 @@ class PhaseRunner
         }
 
         $workerImage = config('argos.worker_image', 'ghcr.io/nodus-it/argos-worker:latest');
-        $phaseFlags  = $flags !== [] ? json_encode($flags) : '{}';
+        $phaseFlags = $flags !== [] ? json_encode($flags) : '{}';
 
         return [
             'docker', 'run', '--rm',

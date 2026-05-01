@@ -36,12 +36,12 @@ class PhaseRunsRelationManager extends RelationManager
                     ->label('Status')
                     ->badge()
                     ->color(fn (?string $state): string => match ($state) {
-                        'running'             => 'warning',
-                        'completed'           => 'success',
-                        'failed'              => 'danger',
+                        'running' => 'warning',
+                        'completed' => 'success',
+                        'failed' => 'danger',
                         'quality_gate_failed' => 'danger',
-                        'no_changes'          => 'info',
-                        default               => 'gray',
+                        'no_changes' => 'info',
+                        default => 'gray',
                     }),
 
                 TextColumn::make('started_at')
@@ -60,14 +60,31 @@ class PhaseRunsRelationManager extends RelationManager
                         ? (int) $record->started_at->diffInSeconds($record->finished_at)
                         : null
                     )
-                    ->formatStateUsing(fn (?int $state): string => $state !== null ? $state . 's' : '—'),
+                    ->formatStateUsing(fn (?int $state): string => $state !== null ? $state.'s' : '—'),
+
+                TextColumn::make('input_tokens')
+                    ->label('Input')
+                    ->formatStateUsing(fn ($state): string => $state !== null
+                        ? number_format((int) $state)
+                        : '—'
+                    )
+                    ->toggleable(),
+
+                TextColumn::make('output_tokens')
+                    ->label('Output')
+                    ->formatStateUsing(fn ($state): string => $state !== null
+                        ? number_format((int) $state)
+                        : '—'
+                    )
+                    ->toggleable(),
 
                 TextColumn::make('cost_usd')
                     ->label('Kosten')
                     ->formatStateUsing(fn ($state): string => $state !== null
-                        ? '$' . number_format((float) $state, 4)
+                        ? '$'.number_format((float) $state, 4)
                         : '—'
-                    ),
+                    )
+                    ->toggleable(),
             ])
             ->defaultSort('started_at', 'desc')
             ->headerActions([])
