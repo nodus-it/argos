@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Admin\Resources\TaskResource\Pages;
 
 use App\Domain\Phase\StateReader;
+use App\Enums\WorkflowStatus;
 use App\Filament\Admin\Resources\TaskResource;
 use App\Jobs\RunPhaseJob;
 use App\Models\Task;
@@ -93,6 +94,12 @@ class ViewTask extends ViewRecord
                     'no_changes' => 'info',
                     default => 'gray',
                 }),
+
+            TextEntry::make('workflow_status')
+                ->label('Workflow')
+                ->badge()
+                ->color(fn (?WorkflowStatus $state): string => $state?->color() ?? 'gray')
+                ->formatStateUsing(fn (?WorkflowStatus $state): string => $state?->label() ?? '—'),
 
             TextEntry::make('feature_branch')
                 ->label('Feature Branch')

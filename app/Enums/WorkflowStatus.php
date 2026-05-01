@@ -54,6 +54,7 @@ enum WorkflowStatus: string
             ['implement', 'quality_gate_failed'] => self::Failed,
             ['push', 'completed'] => self::InReview,
             ['push', 'failed'] => self::Failed,
+            ['respond', 'completed'] => self::InReview,
             ['respond', 'failed'] => self::Failed,
             default => null,
         };

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources;
 
+use App\Enums\WorkflowStatus;
 use App\Filament\Admin\Resources\TaskResource\Pages\CreateTask;
 use App\Filament\Admin\Resources\TaskResource\Pages\ListTasks;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTask;
@@ -104,6 +105,12 @@ class TaskResource extends Resource
                         default => 'gray',
                     })
                     ->placeholder('—'),
+
+                TextColumn::make('workflow_status')
+                    ->label('Workflow')
+                    ->badge()
+                    ->color(fn (?WorkflowStatus $state): string => $state?->color() ?? 'gray')
+                    ->formatStateUsing(fn (?WorkflowStatus $state): string => $state?->label() ?? '—'),
 
                 TextColumn::make('created_at')
                     ->label('Erstellt')
