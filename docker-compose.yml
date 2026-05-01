@@ -9,7 +9,7 @@ services:
   worker:
     image: agent-worker:latest
     build:
-      context: .
+      context: ./worker
       dockerfile: docker/Dockerfile
       target: worker
     volumes:

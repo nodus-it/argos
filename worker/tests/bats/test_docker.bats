@@ -19,10 +19,10 @@ setup() {
     }
     export -f docker
 
-    # shellcheck source=../../lib/tasks.sh
-    source lib/tasks.sh
-    # shellcheck source=../../lib/docker.sh
-    source lib/docker.sh
+    # shellcheck source=../../worker/lib/tasks.sh
+    source worker/lib/tasks.sh
+    # shellcheck source=../../worker/lib/docker.sh
+    source worker/lib/docker.sh
 }
 
 teardown() {

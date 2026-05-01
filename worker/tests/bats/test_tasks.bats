@@ -46,8 +46,8 @@ setup() {
     }
     export -f docker
 
-    # shellcheck source=../../lib/tasks.sh
-    source lib/tasks.sh
+    # shellcheck source=../../worker/lib/tasks.sh
+    source worker/lib/tasks.sh
 }
 
 teardown() {

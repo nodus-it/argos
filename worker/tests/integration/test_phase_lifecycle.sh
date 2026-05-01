@@ -14,8 +14,8 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-FIXTURES="$ROOT/tests/integration/fixtures"
+ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+FIXTURES="$ROOT/worker/tests/integration/fixtures"
 TASK_ID="lifecycle-$$"
 
 TEST_DIR="$(mktemp -d -t agent-it-XXXXXX)"

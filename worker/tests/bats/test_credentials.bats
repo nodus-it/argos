@@ -6,8 +6,8 @@ setup() {
     TEST_DIR="$(mktemp -d)"
     export AGENT_HOME="$TEST_DIR/.agent"
     export CLAUDE_TOKEN_FILE="$AGENT_HOME/claude_oauth_token"
-    # shellcheck source=../../lib/credentials.sh
-    source lib/credentials.sh
+    # shellcheck source=../../worker/lib/credentials.sh
+    source worker/lib/credentials.sh
 }
 
 teardown() {
@@ -25,7 +25,7 @@ teardown() {
     run --separate-stderr bash -c "
         export AGENT_HOME='$AGENT_HOME'
         export CLAUDE_TOKEN_FILE='$CLAUDE_TOKEN_FILE'
-        source lib/credentials.sh
+        source worker/lib/credentials.sh
         echo '' | credentials_save_claude_token
     "
     [ "$status" -ne 0 ]

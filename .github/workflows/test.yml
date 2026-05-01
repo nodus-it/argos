@@ -19,21 +19,21 @@ jobs:
           docker run --rm -v "$PWD:/mnt" -w /mnt koalaman/shellcheck:stable \
             --severity=warning \
             agent \
-            docker/worker-entrypoint.sh \
-            tests/run-tests.sh \
-            tests/run-bats.sh \
-            lib/*.sh \
-            phases/*.sh \
-            tests/integration/*.sh \
-            tests/integration/fixtures/mock-claude/claude \
-            tests/integration/fixtures/fake-remote-repo/setup.sh
+            worker/docker/worker-entrypoint.sh \
+            worker/tests/run-tests.sh \
+            worker/tests/run-bats.sh \
+            worker/lib/*.sh \
+            worker/phases/*.sh \
+            worker/tests/integration/*.sh \
+            worker/tests/integration/fixtures/mock-claude/claude \
+            worker/tests/integration/fixtures/fake-remote-repo/setup.sh
 
   bats:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: bats unit tests (via Docker, includes jq + check-jsonschema)
-        run: bash tests/run-bats.sh
+        run: bash worker/tests/run-bats.sh
 
   integration:
     runs-on: ubuntu-latest
@@ -42,4 +42,4 @@ jobs:
       - name: build worker image
         run: docker compose build worker
       - name: integration: phase lifecycle
-        run: bash tests/run-tests.sh --integration
+        run: bash worker/tests/run-tests.sh --integration

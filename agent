@@ -23,20 +23,20 @@ AGENT_REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export AGENT_REPO_ROOT
 
 # Lib-Files sourcen
-# shellcheck source=lib/logging.sh
-source "$AGENT_REPO_ROOT/lib/logging.sh"
-# shellcheck source=lib/error.sh
-source "$AGENT_REPO_ROOT/lib/error.sh"
-# shellcheck source=lib/credentials.sh
-source "$AGENT_REPO_ROOT/lib/credentials.sh"
-# shellcheck source=lib/tasks.sh
-source "$AGENT_REPO_ROOT/lib/tasks.sh"
-# shellcheck source=lib/docker.sh
-source "$AGENT_REPO_ROOT/lib/docker.sh"
-# shellcheck source=lib/parse_args.sh
-source "$AGENT_REPO_ROOT/lib/parse_args.sh"
-# shellcheck source=lib/help.sh
-source "$AGENT_REPO_ROOT/lib/help.sh"
+# shellcheck source=worker/lib/logging.sh
+source "$AGENT_REPO_ROOT/worker/lib/logging.sh"
+# shellcheck source=worker/lib/error.sh
+source "$AGENT_REPO_ROOT/worker/lib/error.sh"
+# shellcheck source=worker/lib/credentials.sh
+source "$AGENT_REPO_ROOT/worker/lib/credentials.sh"
+# shellcheck source=worker/lib/tasks.sh
+source "$AGENT_REPO_ROOT/worker/lib/tasks.sh"
+# shellcheck source=worker/lib/docker.sh
+source "$AGENT_REPO_ROOT/worker/lib/docker.sh"
+# shellcheck source=worker/lib/parse_args.sh
+source "$AGENT_REPO_ROOT/worker/lib/parse_args.sh"
+# shellcheck source=worker/lib/help.sh
+source "$AGENT_REPO_ROOT/worker/lib/help.sh"
 
 # ============================================================
 # Helper

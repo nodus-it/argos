@@ -3,8 +3,8 @@
 bats_require_minimum_version 1.5.0
 
 setup() {
-    # shellcheck source=../../lib/help.sh
-    source lib/help.sh
+    # shellcheck source=../../worker/lib/help.sh
+    source worker/lib/help.sh
 }
 
 @test "help_main listet alle Top-Level-Commands" {

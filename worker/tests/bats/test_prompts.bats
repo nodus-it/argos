@@ -20,8 +20,8 @@ EOF
     export BASE_BRANCH="main"
     export ITERATION="2"
 
-    # shellcheck source=../../lib/prompts.sh
-    source lib/prompts.sh
+    # shellcheck source=../../worker/lib/prompts.sh
+    source worker/lib/prompts.sh
 }
 
 teardown() {

@@ -3,8 +3,8 @@
 bats_require_minimum_version 1.5.0
 
 @test "EXIT_-Konstanten haben die in WORKER-CONCEPT.md festgelegten Werte" {
-    # shellcheck source=../../lib/error.sh
-    source lib/error.sh
+    # shellcheck source=../../worker/lib/error.sh
+    source worker/lib/error.sh
     [ "$EXIT_OK" -eq 0 ]
     [ "$EXIT_GENERAL" -eq 1 ]
     [ "$EXIT_PRECONDITION" -eq 2 ]
@@ -15,14 +15,14 @@ bats_require_minimum_version 1.5.0
 }
 
 @test "die exited mit gegebenem Code und schreibt Message auf stderr" {
-    run --separate-stderr bash -c 'source lib/error.sh; die 2 "boom"'
+    run --separate-stderr bash -c 'source worker/lib/error.sh; die 2 "boom"'
     [ "$status" -eq 2 ]
     [ -z "$output" ]
     [[ "$stderr" == *"Error: boom"* ]]
 }
 
 @test "die ohne Message gibt nichts auf stderr aus, exited aber" {
-    run --separate-stderr bash -c 'source lib/error.sh; die 4'
+    run --separate-stderr bash -c 'source worker/lib/error.sh; die 4'
     [ "$status" -eq 4 ]
     [ -z "$output" ]
     [ -z "$stderr" ]

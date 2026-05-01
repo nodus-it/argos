@@ -12,8 +12,8 @@ Du baust den **Claude Worker v1** — ein dockerisiertes Tool, das Dev-Tasks iso
 | Wie genau implementieren? | `IMPLEMENTATION.md` |
 | Wann ist v1 fertig? | `V1-DONE.md` |
 | Was kommt danach? | `BACKLOG.md` |
-| System-Prompts für die Claude-Sessions im Worker | `prompts/*.system.md` |
-| Schemas für State und Outputs | `schemas/*.schema.json` |
+| System-Prompts für die Claude-Sessions im Worker | `worker/prompts/*.system.md` |
+| Schemas für State und Outputs | `worker/schemas/*.schema.json` |
 
 **Diese Dateien sind die Grundwahrheit.** Wenn dein Code-Stand davon abweicht, ist der Code falsch — nicht die Spec. Falls du einen guten Grund siehst, von einer Entscheidung abzuweichen: erst im Chat fragen, dann ggf. die Spec anpassen, *dann* implementieren.
 
@@ -25,7 +25,7 @@ Du baust den **Claude Worker v1** — ein dockerisiertes Tool, das Dev-Tasks iso
 - `set -euo pipefail` am Anfang jedes Skripts (außer wenn explizit anders nötig)
 - `IFS=$'\n\t'` für sichere Wort-Trennung
 - Funktions-Namen: `<modul>_<aktion>` (z.B. `state_init`, `lock_acquire`)
-- Alle Funktionen in `lib/` haben Docstring-Kommentar oben:
+- Alle Funktionen in `worker/lib/` haben Docstring-Kommentar oben:
   ```bash
   # state_init: Erstellt initiales state.json für einen neuen Task.
   # Args: $1=task_id, $2=repo_url, $3=base_branch
@@ -42,24 +42,26 @@ Du baust den **Claude Worker v1** — ein dockerisiertes Tool, das Dev-Tasks iso
 
 Alle Bash-Files müssen `shellcheck`-clean sein (Severity error/warning). `info` und `style` sind optional.
 
-CI führt `shellcheck` über `agent`, `lib/`, `phases/`, `docker/worker-entrypoint.sh` und `tests/integration/*.sh` aus.
+CI führt `shellcheck` über `agent`, `worker/lib/`, `worker/phases/`, `worker/docker/worker-entrypoint.sh` und `worker/tests/integration/*.sh` aus.
 
 ### File-Layout
 
-- Eine Bibliothek pro Datei in `lib/`. Keine Mehrfach-Verantwortung.
-- Phase-Skripte in `phases/<name>.sh` enthalten *nur* die Funktionen `phase_<name>_run`, `phase_<name>_preconditions`, `phase_<name>_help`. Helfer-Funktionen kommen in `lib/`.
-- `docker/Dockerfile` und `docker/worker-entrypoint.sh` sind die einzigen Files unter `docker/`.
+- Eine Bibliothek pro Datei in `worker/lib/`. Keine Mehrfach-Verantwortung.
+- Phase-Skripte in `worker/phases/<name>.sh` enthalten *nur* die Funktionen `phase_<name>_run`, `phase_<name>_preconditions`, `phase_<name>_help`. Helfer-Funktionen kommen in `worker/lib/`.
+- `worker/docker/Dockerfile` und `worker/docker/worker-entrypoint.sh` sind die einzigen Files unter `worker/docker/`.
+- Die Laravel-Applikation lebt im Repo-Root (artisan, app/, config/, etc.) — `worker/` enthält ausschließlich den Docker-Worker.
 
 ### Dokumentation
 
-- Jede neue Funktion in `lib/` braucht einen Docstring.
+- Jede neue Funktion in `worker/lib/` braucht einen Docstring.
 - Bei Architektur-relevanten Änderungen: `WORKER-CONCEPT.md` oder `IMPLEMENTATION.md` mit aktualisieren.
 - Beispiel-Walkthrough in `docs/EXAMPLE.md` mit jedem neuen Feature aktuell halten.
 
 ### Tests
 
-- Bash-Unit-Tests mit `bats-core` unter `tests/bats/`. Pro Lib-Datei eine Test-Datei.
-- Integration-Tests unter `tests/integration/`. Mock-Claude und fake-remote-repo als Fixtures.
+- Bash-Unit-Tests mit `bats-core` unter `worker/tests/bats/`. Pro Lib-Datei eine Test-Datei.
+- Integration-Tests unter `worker/tests/integration/`. Mock-Claude und fake-remote-repo als Fixtures.
+- Laravel-Tests (PHP) unter `tests/` (root-Ebene).
 - Bei Bug-Fixes: erst Test schreiben der den Bug reproduziert, dann fixen.
 - Tests müssen offline laufen — kein Zugriff auf echtes GitHub, keine echte Claude-API.
 
@@ -89,7 +91,7 @@ CI führt `shellcheck` über `agent`, `lib/`, `phases/`, `docker/worker-entrypoi
 ## Wenn du fertig bist mit einem Schritt
 
 1. `shellcheck` über alle geänderten Bash-Files
-2. `bats tests/bats/` falls vorhanden
+2. `bash worker/tests/run-bats.sh` falls vorhanden
 3. Commit nach Conventional-Commits-Style
 4. Falls eine Annahme aus der Spec sich beim Bauen als falsch erwiesen hat: betroffenes Spec-Dokument anpassen *im selben Commit oder im Folge-Commit*
 
@@ -100,7 +102,7 @@ CI führt `shellcheck` über `agent`, `lib/`, `phases/`, `docker/worker-entrypoi
 docker compose build worker
 
 # Tests laufen lassen
-./tests/run-tests.sh
+./worker/tests/run-tests.sh
 
 # Manuelle Smoke-Tests gegen Test-Repo
 ./agent task new smoke-test

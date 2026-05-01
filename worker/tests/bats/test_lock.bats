@@ -5,8 +5,8 @@ bats_require_minimum_version 1.5.0
 setup() {
     TEST_DIR="$(mktemp -d)"
     export LOCK_FILE="$TEST_DIR/.lock"
-    # shellcheck source=../../lib/lock.sh
-    source lib/lock.sh
+    # shellcheck source=../../worker/lib/lock.sh
+    source worker/lib/lock.sh
 }
 
 teardown() {

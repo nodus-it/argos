@@ -3,12 +3,12 @@
 bats_require_minimum_version 1.5.0
 
 # Validiert, dass von result_emit produzierte JSONs gegen die
-# schemas/result.<phase>.schema.json validieren — Drift-Schutz zwischen
+# worker/schemas/result.<phase>.schema.json validieren — Drift-Schutz zwischen
 # lib/result.sh und Schema-Files.
 
 setup() {
-    # shellcheck source=../../lib/result.sh
-    source lib/result.sh
+    # shellcheck source=../../worker/lib/result.sh
+    source worker/lib/result.sh
     TEST_DIR="$(mktemp -d)"
 }
 
@@ -38,7 +38,7 @@ _validate() {
         claude_session_id sess-x \
         --raw claude_total_cost_usd 0.001 \
         > "$out"
-    _validate schemas/result.concept.schema.json "$out"
+    _validate worker/schemas/result.concept.schema.json "$out"
 }
 
 @test "result.implement passt zum Schema" {
@@ -57,7 +57,7 @@ _validate() {
         claude_session_id sess-y \
         --raw claude_total_cost_usd 0.05 \
         > "$out"
-    _validate schemas/result.implement.schema.json "$out"
+    _validate worker/schemas/result.implement.schema.json "$out"
 }
 
 @test "result.diff passt zum Schema" {
@@ -75,7 +75,7 @@ _validate() {
         --int insertions 30 \
         --int deletions 5 \
         > "$out"
-    _validate schemas/result.diff.schema.json "$out"
+    _validate worker/schemas/result.diff.schema.json "$out"
 }
 
 @test "result.push passt zum Schema" {
@@ -94,5 +94,5 @@ _validate() {
         remote_url https://example.com/r.git \
         commit_subject "feat: x" \
         > "$out"
-    _validate schemas/result.push.schema.json "$out"
+    _validate worker/schemas/result.push.schema.json "$out"
 }

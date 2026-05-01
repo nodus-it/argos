@@ -3,8 +3,8 @@
 bats_require_minimum_version 1.5.0
 
 setup() {
-    # shellcheck source=../../lib/parse_args.sh
-    source lib/parse_args.sh
+    # shellcheck source=../../worker/lib/parse_args.sh
+    source worker/lib/parse_args.sh
 }
 
 @test "concept task-001 — einfacher Phase-Aufruf" {

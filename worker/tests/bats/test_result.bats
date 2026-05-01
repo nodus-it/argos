@@ -3,8 +3,8 @@
 bats_require_minimum_version 1.5.0
 
 setup() {
-    # shellcheck source=../../lib/result.sh
-    source lib/result.sh
+    # shellcheck source=../../worker/lib/result.sh
+    source worker/lib/result.sh
 }
 
 @test "result_emit baut JSON mit allen Pflichtfeldern" {

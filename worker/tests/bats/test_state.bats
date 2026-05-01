@@ -5,8 +5,8 @@ bats_require_minimum_version 1.5.0
 setup() {
     TEST_DIR="$(mktemp -d)"
     export STATE_FILE="$TEST_DIR/state.json"
-    # shellcheck source=../../lib/state.sh
-    source lib/state.sh
+    # shellcheck source=../../worker/lib/state.sh
+    source worker/lib/state.sh
 }
 
 teardown() {
@@ -87,7 +87,7 @@ teardown() {
 
 @test "state_write_atomic refused invalid JSON" {
     state_init "task-001" "url" "main"
-    run --separate-stderr bash -c "STATE_FILE='$STATE_FILE'; source lib/state.sh; echo 'NOT JSON' | state_write_atomic"
+    run --separate-stderr bash -c "STATE_FILE='$STATE_FILE'; source worker/lib/state.sh; echo 'NOT JSON' | state_write_atomic"
     [ "$status" -ne 0 ]
     [[ "$stderr" == *"invalid JSON"* ]]
     # state.json muss unverändert bleiben
