@@ -23,6 +23,8 @@ class Task extends Model
         'description',
         'feature_branch',
         'pr_url',
+        'concept_md',
+        'concept_notes',
         'current_phase',
         'current_status',
         'workflow_status',

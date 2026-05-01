@@ -26,6 +26,9 @@ class PhaseRun extends Model
         'cost_usd',
         'input_tokens',
         'output_tokens',
+        'concept_md',
+        'concept_notes',
+        'stream_log',
     ];
 
     protected function casts(): array

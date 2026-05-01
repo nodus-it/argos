@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\TaskResource\Pages;
 
-use App\Domain\Phase\StateReader;
 use App\Enums\WorkflowStatus;
 use App\Filament\Admin\Resources\TaskResource;
 use App\Jobs\RunPhaseJob;
@@ -44,11 +43,11 @@ class ViewTaskConcept extends Page
                 ->url(fn () => TaskResource::getUrl('view', ['record' => $this->task])),
 
             Action::make('runConcept')
-                ->label('Concept neu ausführen')
+                ->label('Konzept neu ausführen')
                 ->icon('heroicon-o-arrow-path')
                 ->color('warning')
                 ->requiresConfirmation()
-                ->modalDescription('Startet einen neuen Concept-Lauf. Vorhandene Notes werden als Feedback übergeben.')
+                ->modalDescription('Startet einen neuen Konzept-Lauf. Vorhandene Notes werden als Feedback übergeben.')
                 ->action(function (): void {
                     if ($this->task->phaseRuns()->where('status', 'running')->exists()) {
                         Notification::make()->title('Phase läuft bereits')->warning()->send();
@@ -56,7 +55,7 @@ class ViewTaskConcept extends Page
                         return;
                     }
                     RunPhaseJob::dispatch($this->task->id, 'concept');
-                    Notification::make()->title('Concept gestartet')->success()->send();
+                    Notification::make()->title('Konzept gestartet')->success()->send();
                     $this->redirect(TaskResource::getUrl('logs', ['record' => $this->task]));
                 }),
         ];
@@ -83,13 +82,7 @@ class ViewTaskConcept extends Page
 
     public function saveNotes(): void
     {
-        $reader = app(StateReader::class);
-
-        if (! $reader->writeNotes($this->task->name, $this->notes)) {
-            Notification::make()->title('Notes konnten nicht gespeichert werden')->danger()->send();
-
-            return;
-        }
+        $this->task->update(['concept_notes' => $this->notes ?: null]);
 
         $this->editingNotes = false;
         Notification::make()->title('Notes gespeichert')->success()->send();
@@ -116,12 +109,9 @@ class ViewTaskConcept extends Page
 
     private function loadContent(): void
     {
-        $reader = app(StateReader::class);
-
-        $concept = $reader->readConcept($this->task->name);
-        $this->hasConceptmd = $concept !== null;
-        $this->conceptMarkdown = $concept ?? '';
-
-        $this->notes = $reader->readNotes($this->task->name) ?? '';
+        $this->task->refresh();
+        $this->hasConceptmd = $this->task->concept_md !== null;
+        $this->conceptMarkdown = $this->task->concept_md ?? '';
+        $this->notes = $this->task->concept_notes ?? '';
     }
 }

@@ -171,11 +171,14 @@ class PhaseRunnerTest extends TestCase
         $runner = $this->partialMock(PhaseRunner::class, function (MockInterface $mock) use ($processMock, &$capturedCmd): void {
             $mock->shouldAllowMockingProtectedMethods();
             $mock->shouldReceive('newProcess')
+                ->once()  // capture only the phase command, not postPhaseSync calls
                 ->andReturnUsing(function (array $cmd) use ($processMock, &$capturedCmd): Process {
                     $capturedCmd = $cmd;
 
                     return $processMock;
                 });
+            $mock->shouldReceive('writeNotesToVolume')->andReturn(null);
+            $mock->shouldReceive('postPhaseSync')->andReturn(null);
         });
 
         $runner->runBlocking($task, 'concept');
@@ -211,14 +214,16 @@ class PhaseRunnerTest extends TestCase
         $mock->shouldReceive('setTimeout')->andReturnSelf();
         $mock->shouldReceive('setIdleTimeout')->andReturnSelf();
         $mock->shouldReceive('run')
-            ->andReturnUsing(function (callable $callback) use ($stdout): int {
-                if ($stdout !== '') {
+            ->andReturnUsing(function (?callable $callback = null) use ($stdout): int {
+                if ($callback !== null && $stdout !== '') {
                     $callback(Process::OUT, $stdout);
                 }
 
                 return 0;
             });
         $mock->shouldReceive('getExitCode')->andReturn($exitCode);
+        $mock->shouldReceive('isSuccessful')->andReturn(true);
+        $mock->shouldReceive('getOutput')->andReturn('');
 
         return $mock;
     }
@@ -235,6 +240,9 @@ class PhaseRunnerTest extends TestCase
         $runner = $this->partialMock(PhaseRunner::class, function (MockInterface $mock) use ($processMock): void {
             $mock->shouldAllowMockingProtectedMethods();
             $mock->shouldReceive('newProcess')->andReturn($processMock);
+            // Isolate from postPhaseSync Docker calls in unit tests
+            $mock->shouldReceive('postPhaseSync')->andReturn(null);
+            $mock->shouldReceive('writeNotesToVolume')->andReturn(null);
         });
 
         $runner->runBlocking($task, $phase);

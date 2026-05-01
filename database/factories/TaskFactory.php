@@ -46,6 +46,7 @@ class TaskFactory extends Factory
             'workflow_status' => WorkflowStatus::ConceptReview,
             'current_phase' => 'concept',
             'current_status' => 'completed',
+            'concept_md' => "# Konzept\n\nTest-Konzept Inhalt.",
         ]);
     }
 

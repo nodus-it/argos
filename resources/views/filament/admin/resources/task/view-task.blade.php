@@ -1,0 +1,657 @@
+<x-filament-panels::page>
+
+    @php
+        /** @var \App\Models\Task $record */
+        $statusColorMap = [
+            'running'             => 'text-amber-400 bg-amber-400/10 ring-amber-400/30',
+            'completed'           => 'text-emerald-400 bg-emerald-400/10 ring-emerald-400/30',
+            'failed'              => 'text-red-400 bg-red-400/10 ring-red-400/30',
+            'quality_gate_failed' => 'text-red-400 bg-red-400/10 ring-red-400/30',
+            'no_changes'          => 'text-sky-400 bg-sky-400/10 ring-sky-400/30',
+            'pending'             => 'text-slate-400 bg-slate-400/10 ring-slate-400/30',
+        ];
+        $phaseRun = fn(string $phase) => ($phaseRuns[$phase] ?? collect())->last();
+        $phaseStatus = fn(string $phase) => $phaseRun($phase)?->status ?? 'pending';
+
+        // Eine Phase ist offen, wenn sie die aktuelle Phase ist — oder wenn noch keine
+        // Phase gelaufen ist und es concept ist.
+        $currentPhase = $record->current_phase;
+        $isOpen = fn(string $phase) => $currentPhase === $phase
+            || ($currentPhase === null && $phase === 'concept');
+    @endphp
+
+    {{-- ===================== TASK HEADER ===================== --}}
+    <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+
+        {{-- Title + Description --}}
+        <div class="lg:col-span-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-6 py-5 flex flex-col gap-3">
+            <div class="flex items-start gap-3">
+                <x-heroicon-o-clipboard-document-list class="h-5 w-5 text-gray-400 mt-0.5 flex-shrink-0" />
+                <div class="min-w-0">
+                    <h2 class="text-base font-semibold text-gray-900 dark:text-white break-words">{{ $record->name }}</h2>
+                    @if($record->description)
+                        <p class="mt-1.5 text-sm text-gray-600 dark:text-gray-400 leading-relaxed whitespace-pre-wrap break-words">{{ $record->description }}</p>
+                    @endif
+                </div>
+            </div>
+        </div>
+
+        {{-- Metadata box --}}
+        <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-5 py-4 flex flex-col gap-3">
+
+            {{-- Workflow status --}}
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-medium text-gray-500 dark:text-gray-400">Status</span>
+                <span @class([
+                    'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset',
+                    'text-gray-600 bg-gray-100 ring-gray-300 dark:text-gray-400 dark:bg-gray-800 dark:ring-gray-600' => $record->workflow_status->color() === 'gray',
+                    'text-amber-600 bg-amber-50 ring-amber-300 dark:text-amber-400 dark:bg-amber-400/10 dark:ring-amber-400/30' => $record->workflow_status->color() === 'warning',
+                    'text-blue-600 bg-blue-50 ring-blue-300 dark:text-blue-400 dark:bg-blue-400/10 dark:ring-blue-400/30' => in_array($record->workflow_status->color(), ['info', 'primary']),
+                    'text-emerald-600 bg-emerald-50 ring-emerald-300 dark:text-emerald-400 dark:bg-emerald-400/10 dark:ring-emerald-400/30' => $record->workflow_status->color() === 'success',
+                    'text-red-600 bg-red-50 ring-red-300 dark:text-red-400 dark:bg-red-400/10 dark:ring-red-400/30' => $record->workflow_status->color() === 'danger',
+                ])>{{ $record->workflow_status->label() }}</span>
+            </div>
+
+            {{-- Repo profile --}}
+            @if($record->repoProfile)
+                <div class="flex items-center justify-between gap-2">
+                    <span class="text-xs font-medium text-gray-500 dark:text-gray-400 flex-shrink-0">Repository</span>
+                    <span class="text-xs text-gray-700 dark:text-gray-300 truncate text-right">{{ $record->repoProfile->name }}</span>
+                </div>
+            @endif
+
+            {{-- Feature branch --}}
+            @if($record->feature_branch)
+                <div class="flex items-center justify-between gap-2">
+                    <span class="text-xs font-medium text-gray-500 dark:text-gray-400 flex-shrink-0">Branch</span>
+                    <code class="text-xs text-indigo-600 dark:text-indigo-400 font-mono truncate text-right">{{ $record->feature_branch }}</code>
+                </div>
+            @endif
+
+            {{-- PR URL --}}
+            @if($record->pr_url)
+                <div class="flex items-center justify-between gap-2">
+                    <span class="text-xs font-medium text-gray-500 dark:text-gray-400 flex-shrink-0">Pull Request</span>
+                    <a href="{{ $record->pr_url }}" target="_blank"
+                       class="text-xs text-primary-600 dark:text-primary-400 hover:underline truncate text-right max-w-[160px]">
+                        {{ parse_url($record->pr_url, PHP_URL_PATH) }}
+                    </a>
+                </div>
+            @endif
+
+            {{-- Total cost --}}
+            @php
+                $totalCost = $phaseRuns->flatten()->sum(fn($r) => (float) $r->cost_usd);
+                $totalTokens = $phaseRuns->flatten()->sum(fn($r) => ($r->input_tokens ?? 0) + ($r->output_tokens ?? 0));
+            @endphp
+            @if($totalCost > 0)
+                <div class="flex items-center justify-between gap-2">
+                    <span class="text-xs font-medium text-gray-500 dark:text-gray-400 flex-shrink-0">Kosten</span>
+                    <span class="text-xs text-gray-700 dark:text-gray-300">${{ number_format($totalCost, 4) }}</span>
+                </div>
+            @endif
+            @if($totalTokens > 0)
+                <div class="flex items-center justify-between gap-2">
+                    <span class="text-xs font-medium text-gray-500 dark:text-gray-400 flex-shrink-0">Tokens</span>
+                    <span class="text-xs text-gray-700 dark:text-gray-300">{{ number_format($totalTokens) }}</span>
+                </div>
+            @endif
+
+            {{-- Running indicator --}}
+            @if($record->current_status === 'running')
+                <div class="flex items-center gap-2 pt-1 border-t border-amber-100 dark:border-amber-900/40">
+                    <span class="flex h-2 w-2 relative flex-shrink-0">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                    </span>
+                    <span class="text-xs text-amber-600 dark:text-amber-400 font-medium">{{ $record->current_phase }} läuft</span>
+                    <span x-data="{ sec: {{ max(0, now()->timestamp - $record->updated_at->timestamp) }} }"
+                          x-init="setInterval(() => sec++, 1000)"
+                          x-text="Math.floor(sec/60) + ':' + String(sec % 60).padStart(2, '0')"
+                          class="ml-auto text-xs font-mono tabular-nums text-amber-500 dark:text-amber-400"></span>
+                </div>
+            @endif
+
+            {{-- Created at --}}
+            <div class="flex items-center justify-between gap-2 pt-1 border-t border-gray-100 dark:border-gray-800">
+                <span class="text-xs font-medium text-gray-500 dark:text-gray-400 flex-shrink-0">Erstellt</span>
+                <span class="text-xs text-gray-500 dark:text-gray-500">{{ $record->created_at?->format('d.m.Y H:i') }}</span>
+            </div>
+        </div>
+    </div>
+
+    {{-- ===================== CONCEPT PHASE ===================== --}}
+    @php $cStatus = $phaseStatus('concept'); $cRun = $phaseRun('concept'); @endphp
+    <div x-data="{ open: @js($isOpen('concept')) }" class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden">
+
+        {{-- Section header --}}
+        <button type="button" x-on:click="open = !open"
+                class="w-full flex items-center justify-between px-5 py-3.5 border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+            <div class="flex items-center gap-3">
+                <x-heroicon-o-light-bulb class="h-4 w-4 text-gray-400" />
+                <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">Konzept</span>
+                <span @class([
+                    'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset',
+                    $statusColorMap[$cStatus] ?? $statusColorMap['pending'],
+                ])>{{ $cStatus }}</span>
+            </div>
+            <div class="flex items-center gap-3 text-xs text-gray-400 dark:text-gray-500">
+                @if($cStatus === 'running')
+                    <span x-data="{ sec: {{ max(0, now()->timestamp - $record->updated_at->timestamp) }} }"
+                          x-init="setInterval(() => sec++, 1000)"
+                          x-text="Math.floor(sec/60) + ':' + String(sec % 60).padStart(2, '0')"
+                          class="font-mono tabular-nums text-amber-500"></span>
+                @else
+                    @if($cRun?->finished_at)
+                        <span>{{ $cRun->finished_at->format('d.m. H:i') }}</span>
+                    @endif
+                    @if($cRun?->cost_usd > 0)
+                        <span>${{ number_format((float) $cRun->cost_usd, 4) }}</span>
+                    @endif
+                @endif
+                <x-heroicon-o-chevron-down class="h-4 w-4 transition-transform duration-200" x-bind:class="open ? 'rotate-180' : ''" />
+            </div>
+        </button>
+
+        {{-- Indeterminate progress bar while running --}}
+        @if($cStatus === 'running')
+            <div class="h-0.5 bg-gray-100 dark:bg-gray-800 relative overflow-hidden">
+                <div class="absolute inset-y-0 w-1/3 bg-amber-400 rounded-full"
+                     style="animation: argos-sweep 1.6s ease-in-out infinite;"></div>
+            </div>
+        @endif
+
+        {{-- Section body with tabs --}}
+        <div x-show="open" x-collapse x-cloak>
+            <div x-data="{ tab: '{{ $conceptHtml ? 'concept' : 'log' }}' }">
+
+                {{-- Tab bar --}}
+                <div class="flex gap-1 px-4 pt-3 border-b border-gray-100 dark:border-gray-800">
+                    <button type="button"
+                            x-on:click="tab = 'concept'"
+                            x-bind:class="tab === 'concept' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'"
+                            class="px-3 pb-2.5 text-xs font-medium border-b-2 transition-colors">
+                        Konzept
+                    </button>
+                    <button type="button"
+                            x-on:click="tab = 'feedback'"
+                            x-bind:class="tab === 'feedback' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'"
+                            class="px-3 pb-2.5 text-xs font-medium border-b-2 transition-colors">
+                        Feedback
+                        @if($notes !== '')
+                            <span class="ml-1 inline-flex h-1.5 w-1.5 rounded-full bg-amber-400"></span>
+                        @endif
+                    </button>
+                    <button type="button"
+                            x-on:click="tab = 'log'"
+                            x-bind:class="tab === 'log' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'"
+                            class="px-3 pb-2.5 text-xs font-medium border-b-2 transition-colors">
+                        Log
+                        @if(!empty($conceptLog))
+                            <span class="ml-1 inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 text-xs text-gray-500 dark:text-gray-400">{{ count($conceptLog) }}</span>
+                        @endif
+                    </button>
+                </div>
+
+                {{-- Konzept tab --}}
+                <div x-show="tab === 'concept'" x-cloak class="px-6 py-5 flex flex-col gap-6">
+                    @if($conceptHtml)
+                        <div class="prose prose-sm dark:prose-invert max-w-none
+                            prose-headings:font-semibold prose-headings:text-gray-800 dark:prose-headings:text-gray-100
+                            prose-p:text-gray-600 dark:prose-p:text-gray-300
+                            prose-code:bg-gray-100 dark:prose-code:bg-gray-800 prose-code:rounded prose-code:px-1
+                            prose-code:text-gray-800 dark:prose-code:text-gray-200
+                            prose-pre:bg-gray-950 prose-pre:text-gray-200
+                            [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_pre_code]:rounded-none [&_pre_code]:text-inherit
+                            prose-li:text-gray-600 dark:prose-li:text-gray-300">
+                            {!! $conceptHtml !!}
+                        </div>
+                    @else
+                        <div class="flex flex-col items-center justify-center py-12 text-center gap-3">
+                            <x-heroicon-o-document-text class="h-10 w-10 text-gray-300 dark:text-gray-600" />
+                            <p class="text-sm text-gray-400 dark:text-gray-500">Noch kein Konzept vorhanden.</p>
+                        </div>
+                    @endif
+
+                    {{-- Frühere Konzept-Versionen --}}
+                    @if(!empty($conceptHistory))
+                        <div class="border-t border-gray-100 dark:border-gray-800 pt-4">
+                            <p class="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-3">
+                                Frühere Versionen ({{ count($conceptHistory) }})
+                            </p>
+                            <div class="flex flex-col gap-2">
+                                @foreach($conceptHistory as $entry)
+                                    <div x-data="{ open: false }"
+                                         class="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                                        <button type="button" x-on:click="open = !open"
+                                                class="w-full flex items-center justify-between px-4 py-2.5 bg-gray-50 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left">
+                                            <span class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ $entry['timestamp'] }}</span>
+                                            <x-heroicon-o-chevron-down class="h-3.5 w-3.5 text-gray-400 transition-transform duration-150 flex-shrink-0" x-bind:class="open ? 'rotate-180' : ''" />
+                                        </button>
+                                        <div x-show="open" x-collapse>
+                                            <div class="px-5 py-4 border-t border-gray-100 dark:border-gray-700 prose prose-sm dark:prose-invert max-w-none
+                                                prose-headings:font-semibold prose-code:bg-gray-100 dark:prose-code:bg-gray-800 prose-code:rounded prose-code:px-1
+                                                prose-code:text-gray-800 dark:prose-code:text-gray-200
+                                                prose-pre:bg-gray-950 prose-pre:text-gray-200
+                                                [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_pre_code]:text-inherit">
+                                                {!! \Illuminate\Support\Str::markdown($entry['content']) !!}
+                                            </div>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
+                </div>
+
+                {{-- Feedback tab --}}
+                <div x-show="tab === 'feedback'" x-cloak class="divide-y divide-gray-100 dark:divide-gray-800">
+
+                    {{-- Aktuelle Notes (editierbar) --}}
+                    <div class="px-6 py-5">
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Ausstehend</span>
+                            @if(!$editingNotes)
+                                <button type="button" wire:click="startEditingNotes"
+                                        class="inline-flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400 hover:underline">
+                                    <x-heroicon-o-pencil class="h-3 w-3" />
+                                    {{ $notes !== '' ? 'Bearbeiten' : 'Hinzufügen' }}
+                                </button>
+                            @endif
+                        </div>
+
+                        @if($editingNotes)
+                            <div class="flex flex-col gap-3">
+                                <p class="text-xs text-gray-500 dark:text-gray-400">
+                                    Wird beim nächsten Konzept-Lauf als Korrektur-Hinweis an Claude übergeben.
+                                </p>
+                                <textarea
+                                    wire:model="notes"
+                                    rows="8"
+                                    placeholder="Anmerkungen, Korrekturen, zusätzliche Anforderungen…"
+                                    class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none font-mono leading-relaxed"
+                                ></textarea>
+                                <div class="flex gap-2">
+                                    <button type="button" wire:click="saveNotes"
+                                            class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-4 py-2 transition-colors">
+                                        <x-heroicon-o-check class="h-3.5 w-3.5" />
+                                        Speichern
+                                    </button>
+                                    <button type="button" wire:click="cancelEditingNotes"
+                                            class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 text-xs font-medium px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                                        Abbrechen
+                                    </button>
+                                </div>
+                            </div>
+                        @elseif($notes !== '')
+                            <div class="flex items-start gap-2 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 px-4 py-3">
+                                <x-heroicon-o-chat-bubble-left-ellipsis class="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                                <pre class="whitespace-pre-wrap text-sm text-amber-900 dark:text-amber-200 font-mono leading-relaxed flex-1">{{ $notes }}</pre>
+                            </div>
+                            @if($record->current_status !== 'running' && $record->workflow_status !== \App\Enums\WorkflowStatus::Completed)
+                                <div class="flex items-center justify-between pt-3">
+                                    <span class="text-xs text-gray-500 dark:text-gray-400">Bereit zur Überarbeitung</span>
+                                    <button type="button" wire:click="reviseConcept"
+                                            class="inline-flex items-center gap-1.5 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold px-4 py-2 transition-colors">
+                                        <x-heroicon-o-light-bulb class="h-3.5 w-3.5" />
+                                        Konzept überarbeiten
+                                    </button>
+                                </div>
+                            @endif
+                        @else
+                            <p class="text-sm text-gray-400 dark:text-gray-500 italic">Kein ausstehender Feedback-Eintrag.</p>
+                        @endif
+                    </div>
+
+                    {{-- History --}}
+                    @if(!empty($notesHistory))
+                        <div class="px-6 py-4">
+                            <span class="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Verlauf ({{ count($notesHistory) }})</span>
+                            <div class="mt-3 flex flex-col gap-2">
+                                @foreach($notesHistory as $i => $entry)
+                                    <div x-data="{ open: true }"
+                                         class="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                                        <button type="button" x-on:click="open = !open"
+                                                class="w-full flex items-center justify-between px-4 py-2.5 bg-gray-50 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left">
+                                            <span class="text-xs font-medium text-gray-600 dark:text-gray-400">{{ $entry['timestamp'] }}</span>
+                                            <x-heroicon-o-chevron-down class="h-3.5 w-3.5 text-gray-400 transition-transform duration-150 flex-shrink-0" x-bind:class="open ? 'rotate-180' : ''" />
+                                        </button>
+                                        <div x-show="open" x-collapse>
+                                            <pre class="whitespace-pre-wrap text-xs text-gray-600 dark:text-gray-400 font-mono leading-relaxed px-4 py-3 border-t border-gray-100 dark:border-gray-700">{{ $entry['content'] }}</pre>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
+                </div>
+
+                {{-- Log tab --}}
+                <div x-show="tab === 'log'" x-cloak>
+                    @include('filament.admin.resources.task.partials.log-terminal', [
+                        'lines' => $conceptLog,
+                        'label' => 'concept.bg.log',
+                        'isRunning' => $cStatus === 'running',
+                    ])
+                    {{-- Frühere Log-Iterationen --}}
+                    @if(!empty($conceptLogIterations))
+                        <div class="border-t border-slate-800 bg-slate-950 px-4 py-3">
+                            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
+                                Frühere Iterationen ({{ count($conceptLogIterations) }})
+                            </p>
+                            <div class="flex flex-col gap-2">
+                                @foreach($conceptLogIterations as $iter)
+                                    @php $key = "concept.{$iter}"; @endphp
+                                    <div x-data="{ open: false, loaded: false }"
+                                         class="rounded-lg border border-slate-800 overflow-hidden">
+                                        <button type="button"
+                                                x-on:click="open = !open; if (open && !loaded) { loaded = true; $wire.loadLogIteration('concept', {{ $iter }}) }"
+                                                class="w-full flex items-center justify-between px-4 py-2.5 bg-slate-900 hover:bg-slate-800 transition-colors text-left">
+                                            <span class="text-xs font-medium text-slate-400">Iteration {{ $iter }}</span>
+                                            <x-heroicon-o-chevron-down class="h-3.5 w-3.5 text-slate-500 transition-transform duration-150 flex-shrink-0" x-bind:class="open ? 'rotate-180' : ''" />
+                                        </button>
+                                        <div x-show="open" x-collapse>
+                                            @if(isset($loadedLogIterations[$key]) && !empty($loadedLogIterations[$key]))
+                                                <div class="font-mono text-xs leading-5 p-4 overflow-y-auto max-h-96 bg-slate-950">
+                                                    @foreach($loadedLogIterations[$key] as $line)
+                                                        <div class="whitespace-pre-wrap break-all {{ $line['class'] }}">{{ $line['text'] !== '' ? $line['text'] : "\u{00a0}" }}</div>
+                                                    @endforeach
+                                                </div>
+                                            @elseif(isset($loadedLogIterations[$key]))
+                                                <p class="px-4 py-3 text-xs text-slate-500 italic bg-slate-950">Keine Einträge für Iteration {{ $iter }}.</p>
+                                            @else
+                                                <div class="flex items-center gap-2 px-4 py-3 bg-slate-950">
+                                                    <svg class="animate-spin h-3.5 w-3.5 text-slate-500" fill="none" viewBox="0 0 24 24">
+                                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                                                    </svg>
+                                                    <span class="text-xs text-slate-500">Wird geladen…</span>
+                                                </div>
+                                            @endif
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- ===================== IMPLEMENT PHASE ===================== --}}
+    @php $iStatus = $phaseStatus('implement'); $iRun = $phaseRun('implement'); @endphp
+    <div x-data="{ open: @js($isOpen('implement')) }"
+         class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden">
+
+        <button type="button" x-on:click="open = !open"
+                class="w-full flex items-center justify-between px-5 py-3.5 border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+            <div class="flex items-center gap-3">
+                <x-heroicon-o-code-bracket class="h-4 w-4 text-gray-400" />
+                <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">Implementierung</span>
+                <span @class([
+                    'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset',
+                    $statusColorMap[$iStatus] ?? $statusColorMap['pending'],
+                ])>{{ $iStatus }}</span>
+            </div>
+            <div class="flex items-center gap-3 text-xs text-gray-400 dark:text-gray-500">
+                @if($iStatus === 'running')
+                    <span x-data="{ sec: {{ max(0, now()->timestamp - $record->updated_at->timestamp) }} }"
+                          x-init="setInterval(() => sec++, 1000)"
+                          x-text="Math.floor(sec/60) + ':' + String(sec % 60).padStart(2, '0')"
+                          class="font-mono tabular-nums text-amber-500"></span>
+                @else
+                    @if($iRun?->finished_at)
+                        <span>{{ $iRun->finished_at->format('d.m. H:i') }}</span>
+                    @endif
+                    @if($iRun?->cost_usd > 0)
+                        <span>${{ number_format((float) $iRun->cost_usd, 4) }}</span>
+                    @endif
+                @endif
+                <x-heroicon-o-chevron-down class="h-4 w-4 transition-transform duration-200" x-bind:class="open ? 'rotate-180' : ''" />
+            </div>
+        </button>
+
+        {{-- Indeterminate progress bar while running --}}
+        @if($iStatus === 'running')
+            <div class="h-0.5 bg-gray-100 dark:bg-gray-800 relative overflow-hidden">
+                <div class="absolute inset-y-0 w-1/3 bg-amber-400 rounded-full"
+                     style="animation: argos-sweep 1.6s ease-in-out infinite;"></div>
+            </div>
+        @endif
+
+        <div x-show="open" x-collapse x-cloak>
+            <div x-data="{ tab: 'diff' }">
+
+                <div class="flex gap-1 px-4 pt-3 border-b border-gray-100 dark:border-gray-800">
+                    <button type="button"
+                            x-on:click="tab = 'diff'"
+                            x-bind:class="tab === 'diff' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'"
+                            class="px-3 pb-2.5 text-xs font-medium border-b-2 transition-colors">
+                        Diff
+                    </button>
+                    <button type="button"
+                            x-on:click="tab = 'log'"
+                            x-bind:class="tab === 'log' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'"
+                            class="px-3 pb-2.5 text-xs font-medium border-b-2 transition-colors">
+                        Log
+                        @if(!empty($implementLog))
+                            <span class="ml-1 inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 text-xs text-gray-500 dark:text-gray-400">{{ count($implementLog) }}</span>
+                        @endif
+                    </button>
+                </div>
+
+                {{-- Diff tab --}}
+                <div x-show="tab === 'diff'" x-cloak class="p-4">
+                    @if(!$diffLoaded)
+                        <div class="flex flex-col items-center justify-center py-10 gap-3">
+                            <x-heroicon-o-document-magnifying-glass class="h-10 w-10 text-gray-300 dark:text-gray-600" />
+                            <p class="text-sm text-gray-400 dark:text-gray-500">Diff wird nicht automatisch geladen.</p>
+                            <button type="button" wire:click="loadDiff" wire:loading.attr="disabled"
+                                    class="inline-flex items-center gap-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium px-4 py-2 transition-colors disabled:opacity-50">
+                                <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.class="animate-spin" />
+                                <span wire:loading.remove>Diff laden</span>
+                                <span wire:loading>Lade…</span>
+                            </button>
+                        </div>
+                    @else
+                        @if(trim($diffStat) !== '')
+                            <div class="mb-3 rounded-lg border border-slate-800 bg-slate-900 px-4 py-3 font-mono text-xs text-slate-300 whitespace-pre-wrap leading-5">{{ $diffStat }}</div>
+                        @endif
+
+                        <div class="rounded-xl overflow-hidden border border-slate-800 bg-slate-950">
+                            <div class="flex items-center justify-between px-4 py-2 bg-slate-900 border-b border-slate-800">
+                                <span class="text-xs text-slate-500 font-mono">git diff origin/{{ $record->repoProfile?->default_branch ?? 'main' }}...HEAD</span>
+                                <span class="text-xs text-slate-600 font-mono">{{ count($diffLines) }} Zeilen</span>
+                            </div>
+                            <div class="overflow-y-auto font-mono text-xs leading-5 p-4" style="max-height: 60vh;">
+                                @if(empty($diffLines))
+                                    <p class="text-slate-500 italic">Keine Änderungen gegenüber origin/{{ $record->repoProfile?->default_branch ?? 'main' }}.</p>
+                                @else
+                                    @foreach($diffLines as $line)
+                                        <div class="whitespace-pre break-all {{ $line['class'] }}">{{ $line['text'] !== '' ? $line['text'] : "\u{00a0}" }}</div>
+                                    @endforeach
+                                @endif
+                            </div>
+                        </div>
+                    @endif
+                </div>
+
+                {{-- Log tab --}}
+                <div x-show="tab === 'log'" x-cloak>
+                    @include('filament.admin.resources.task.partials.log-terminal', [
+                        'lines' => $implementLog,
+                        'label' => 'implement.bg.log',
+                        'isRunning' => $iStatus === 'running',
+                    ])
+                    {{-- Frühere Log-Iterationen --}}
+                    @if(!empty($implementLogIterations))
+                        <div class="border-t border-slate-800 bg-slate-950 px-4 py-3">
+                            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
+                                Frühere Iterationen ({{ count($implementLogIterations) }})
+                            </p>
+                            <div class="flex flex-col gap-2">
+                                @foreach($implementLogIterations as $iter)
+                                    @php $key = "implement.{$iter}"; @endphp
+                                    <div x-data="{ open: false, loaded: false }"
+                                         class="rounded-lg border border-slate-800 overflow-hidden">
+                                        <button type="button"
+                                                x-on:click="open = !open; if (open && !loaded) { loaded = true; $wire.loadLogIteration('implement', {{ $iter }}) }"
+                                                class="w-full flex items-center justify-between px-4 py-2.5 bg-slate-900 hover:bg-slate-800 transition-colors text-left">
+                                            <span class="text-xs font-medium text-slate-400">Iteration {{ $iter }}</span>
+                                            <x-heroicon-o-chevron-down class="h-3.5 w-3.5 text-slate-500 transition-transform duration-150 flex-shrink-0" x-bind:class="open ? 'rotate-180' : ''" />
+                                        </button>
+                                        <div x-show="open" x-collapse>
+                                            @if(isset($loadedLogIterations[$key]) && !empty($loadedLogIterations[$key]))
+                                                <div class="font-mono text-xs leading-5 p-4 overflow-y-auto max-h-96 bg-slate-950">
+                                                    @foreach($loadedLogIterations[$key] as $line)
+                                                        <div class="whitespace-pre-wrap break-all {{ $line['class'] }}">{{ $line['text'] !== '' ? $line['text'] : "\u{00a0}" }}</div>
+                                                    @endforeach
+                                                </div>
+                                            @elseif(isset($loadedLogIterations[$key]))
+                                                <p class="px-4 py-3 text-xs text-slate-500 italic bg-slate-950">Keine Einträge für Iteration {{ $iter }}.</p>
+                                            @else
+                                                <div class="flex items-center gap-2 px-4 py-3 bg-slate-950">
+                                                    <svg class="animate-spin h-3.5 w-3.5 text-slate-500" fill="none" viewBox="0 0 24 24">
+                                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                                                    </svg>
+                                                    <span class="text-xs text-slate-500">Wird geladen…</span>
+                                                </div>
+                                            @endif
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- ===================== PUSH PHASE ===================== --}}
+    @php $pStatus = $phaseStatus('push'); $pRun = $phaseRun('push'); @endphp
+    <div x-data="{ open: @js($isOpen('push')) }"
+         class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden">
+
+        <button type="button" x-on:click="open = !open"
+                class="w-full flex items-center justify-between px-5 py-3.5 border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+            <div class="flex items-center gap-3">
+                <x-heroicon-o-arrow-up-tray class="h-4 w-4 text-gray-400" />
+                <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">Push & Pull Request</span>
+                <span @class([
+                    'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset',
+                    $statusColorMap[$pStatus] ?? $statusColorMap['pending'],
+                ])>{{ $pStatus }}</span>
+            </div>
+            <div class="flex items-center gap-3 text-xs text-gray-400 dark:text-gray-500">
+                @if($pStatus === 'running')
+                    <span x-data="{ sec: {{ max(0, now()->timestamp - $record->updated_at->timestamp) }} }"
+                          x-init="setInterval(() => sec++, 1000)"
+                          x-text="Math.floor(sec/60) + ':' + String(sec % 60).padStart(2, '0')"
+                          class="font-mono tabular-nums text-amber-500"></span>
+                @else
+                    @if($pRun?->finished_at)
+                        <span>{{ $pRun->finished_at->format('d.m. H:i') }}</span>
+                    @endif
+                @endif
+                <x-heroicon-o-chevron-down class="h-4 w-4 transition-transform duration-200" x-bind:class="open ? 'rotate-180' : ''" />
+            </div>
+        </button>
+
+        {{-- Indeterminate progress bar while running --}}
+        @if($pStatus === 'running')
+            <div class="h-0.5 bg-gray-100 dark:bg-gray-800 relative overflow-hidden">
+                <div class="absolute inset-y-0 w-1/3 bg-amber-400 rounded-full"
+                     style="animation: argos-sweep 1.6s ease-in-out infinite;"></div>
+            </div>
+        @endif
+
+        <div x-show="open" x-collapse x-cloak>
+            <div x-data="{ tab: '{{ $record->pr_url ? 'pr' : 'log' }}' }">
+
+                <div class="flex gap-1 px-4 pt-3 border-b border-gray-100 dark:border-gray-800">
+                    <button type="button"
+                            x-on:click="tab = 'pr'"
+                            x-bind:class="tab === 'pr' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'"
+                            class="px-3 pb-2.5 text-xs font-medium border-b-2 transition-colors">
+                        Pull Request
+                    </button>
+                    <button type="button"
+                            x-on:click="tab = 'log'"
+                            x-bind:class="tab === 'log' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'"
+                            class="px-3 pb-2.5 text-xs font-medium border-b-2 transition-colors">
+                        Log
+                        @if(!empty($pushLog))
+                            <span class="ml-1 inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 text-xs text-gray-500 dark:text-gray-400">{{ count($pushLog) }}</span>
+                        @endif
+                    </button>
+                </div>
+
+                {{-- PR info tab --}}
+                <div x-show="tab === 'pr'" x-cloak class="px-6 py-5">
+                    @if($record->pr_url || $record->feature_branch)
+                        <div class="flex flex-col gap-4">
+                            @if($record->pr_url)
+                                <div class="flex items-start gap-3 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 px-4 py-3">
+                                    <x-heroicon-o-check-circle class="h-5 w-5 text-emerald-500 flex-shrink-0 mt-0.5" />
+                                    <div class="min-w-0">
+                                        <p class="text-sm font-medium text-emerald-700 dark:text-emerald-400">Pull Request erstellt</p>
+                                        <a href="{{ $record->pr_url }}" target="_blank"
+                                           class="mt-0.5 text-xs text-emerald-600 dark:text-emerald-500 hover:underline break-all">
+                                            {{ $record->pr_url }}
+                                        </a>
+                                    </div>
+                                </div>
+                            @endif
+
+                            @if($record->feature_branch)
+                                <div class="flex items-center gap-3">
+                                    <span class="text-xs font-medium text-gray-500 dark:text-gray-400 w-20 flex-shrink-0">Branch</span>
+                                    <code class="text-xs text-indigo-600 dark:text-indigo-400 font-mono bg-indigo-50 dark:bg-indigo-950/40 rounded px-2 py-1">{{ $record->feature_branch }}</code>
+                                </div>
+                            @endif
+
+                            @if($pRun?->result_json)
+                                @php $res = $pRun->result_json; @endphp
+                                @if(!empty($res['commit_sha']))
+                                    <div class="flex items-center gap-3">
+                                        <span class="text-xs font-medium text-gray-500 dark:text-gray-400 w-20 flex-shrink-0">Commit</span>
+                                        <code class="text-xs text-gray-600 dark:text-gray-400 font-mono">{{ substr($res['commit_sha'], 0, 12) }}</code>
+                                    </div>
+                                @endif
+                                @if(!empty($res['commit_subject']))
+                                    <div class="flex items-start gap-3">
+                                        <span class="text-xs font-medium text-gray-500 dark:text-gray-400 w-20 flex-shrink-0 mt-0.5">Message</span>
+                                        <span class="text-xs text-gray-700 dark:text-gray-300 leading-relaxed">{{ $res['commit_subject'] }}</span>
+                                    </div>
+                                @endif
+                            @endif
+                        </div>
+                    @else
+                        <div class="flex flex-col items-center justify-center py-10 text-center gap-3">
+                            <x-heroicon-o-arrow-up-tray class="h-10 w-10 text-gray-300 dark:text-gray-600" />
+                            <p class="text-sm text-gray-400 dark:text-gray-500">Noch kein Push durchgeführt.</p>
+                        </div>
+                    @endif
+                </div>
+
+                {{-- Log tab --}}
+                <div x-show="tab === 'log'" x-cloak>
+                    @include('filament.admin.resources.task.partials.log-terminal', [
+                        'lines' => $pushLog,
+                        'label' => 'push.bg.log',
+                        'isRunning' => $pStatus === 'running',
+                    ])
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Auto-Poll: alle 3s neu laden wenn eine Phase läuft --}}
+    @if($record->current_status === 'running')
+        <div wire:poll.3s="poll" class="hidden"></div>
+    @endif
+
+</x-filament-panels::page>

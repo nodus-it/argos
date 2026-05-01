@@ -11,7 +11,7 @@ use Symfony\Component\Process\Process;
 class StateReader
 {
     /**
-     * Read state.json from a task's workspace volume.
+     * Read state.json from a task's workspace volume (used for tests and CLI diagnostics).
      */
     public function read(string $taskName): ?array
     {
@@ -41,133 +41,183 @@ class StateReader
         return $state['phases'][$phase]['current_status'] ?? null;
     }
 
-    public function readConcept(string $taskName): ?string
+    /**
+     * Read concept markdown from the DB (task.concept_md).
+     */
+    public function readConcept(Task $task): ?string
     {
-        $process = $this->newProcess([
-            'docker', 'run', '--rm',
-            '-v', 'task_ws_'.Task::slugifyName($taskName).':/workspace:ro',
-            'alpine',
-            'cat', '/workspace/.agent/concept.md',
-        ]);
-
-        $process->setTimeout(10);
-        $process->run();
-
-        if (! $process->isSuccessful()) {
-            return null;
-        }
-
-        $output = $process->getOutput();
-
-        return $output !== '' ? $output : null;
+        return $task->concept_md ?: null;
     }
 
-    public function writeNotes(string $taskName, string $content): bool
+    /**
+     * Read current notes from the DB (task.concept_notes).
+     */
+    public function readNotes(Task $task): ?string
     {
-        $process = $this->newProcess([
-            'docker', 'run', '--rm',
-            '-v', 'task_ws_'.Task::slugifyName($taskName).':/workspace',
-            'alpine',
-            'sh', '-c',
-            'mkdir -p /workspace/.agent && printf "%s" "$NOTE_CONTENT" > /workspace/.agent/concept.notes.md',
-        ]);
-
-        $process->setEnv(['NOTE_CONTENT' => $content]);
-        $process->setTimeout(10);
-        $process->run();
-
-        return $process->isSuccessful();
+        return $task->concept_notes ?: null;
     }
 
-    public function readNotes(string $taskName): ?string
+    /**
+     * Write notes to the DB (task.concept_notes).
+     * PhaseRunner copies them to the volume before the next concept phase.
+     */
+    public function writeNotes(Task $task, string $content): bool
     {
-        $process = $this->newProcess([
-            'docker', 'run', '--rm',
-            '-v', 'task_ws_'.Task::slugifyName($taskName).':/workspace:ro',
-            'alpine',
-            'cat', '/workspace/.agent/concept.notes.md',
-        ]);
+        $task->update(['concept_notes' => $content ?: null]);
 
-        $process->setTimeout(10);
-        $process->run();
+        return true;
+    }
 
-        if (! $process->isSuccessful()) {
-            return null;
+    /**
+     * Read notes history from concept phase_runs (newest first).
+     *
+     * @return array<int, array{timestamp: string, content: string}>
+     */
+    public function readNotesHistory(Task $task): array
+    {
+        return $task->phaseRuns()
+            ->where('phase', 'concept')
+            ->whereNotNull('concept_notes')
+            ->orderBy('iteration', 'desc')
+            ->get()
+            ->map(fn (PhaseRun $run) => [
+                'timestamp' => "Iteration {$run->iteration} · ".($run->finished_at?->format('d.m.Y H:i') ?? '—'),
+                'content' => $run->concept_notes,
+            ])
+            ->all();
+    }
+
+    /**
+     * Read concept version history from concept phase_runs (newest first, excluding current).
+     *
+     * @return array<int, array{timestamp: string, content: string}>
+     */
+    public function readConceptHistory(Task $task, ?int $currentIteration = null): array
+    {
+        return $task->phaseRuns()
+            ->where('phase', 'concept')
+            ->whereNotNull('concept_md')
+            ->when($currentIteration !== null, fn ($q) => $q->where('iteration', '!=', $currentIteration))
+            ->orderBy('iteration', 'desc')
+            ->get()
+            ->map(fn (PhaseRun $run) => [
+                'timestamp' => $run->finished_at?->format('d.m.Y H:i') ?? '—',
+                'content' => $run->concept_md,
+            ])
+            ->all();
+    }
+
+    /**
+     * List phase run iterations that have a stream log stored, descending.
+     *
+     * @return list<int>
+     */
+    public function listLogIterations(Task $task, string $phase): array
+    {
+        return $task->phaseRuns()
+            ->where('phase', $phase)
+            ->whereNotNull('stream_log')
+            ->orderBy('iteration', 'desc')
+            ->pluck('iteration')
+            ->map(fn ($v) => (int) $v)
+            ->all();
+    }
+
+    /**
+     * Parse a stream log stored in phase_runs.stream_log into displayable lines.
+     *
+     * @return array<int, array{text: string, class: string}>
+     */
+    public function readStreamLogIteration(Task $task, string $phase, int $iteration): array
+    {
+        $phaseRun = $task->phaseRuns()
+            ->where('phase', $phase)
+            ->where('iteration', $iteration)
+            ->first();
+
+        if ($phaseRun === null || $phaseRun->stream_log === null) {
+            return [];
         }
 
-        $output = $process->getOutput();
+        return $this->parseStreamLog($phaseRun->stream_log);
+    }
 
-        return $output !== '' ? $output : null;
+    /**
+     * Fix phase runs stuck in 'running' for more than 2 hours and sync pr_url from result_json.
+     * Pure DB operation — no Docker calls.
+     */
+    public function syncToDb(Task $task): void
+    {
+        PhaseRun::where('task_id', $task->id)
+            ->where('status', 'running')
+            ->where('started_at', '<', now()->subHours(2))
+            ->update([
+                'status' => 'failed',
+                'finished_at' => now(),
+            ]);
+
+        $pushRun = $task->phaseRuns()
+            ->where('phase', 'push')
+            ->where('status', 'completed')
+            ->latest('iteration')
+            ->first();
+
+        if ($pushRun !== null) {
+            $updates = [];
+            $prUrl = $pushRun->result_json['pr_url'] ?? null;
+            if ($prUrl !== null && $prUrl !== '' && $prUrl !== $task->pr_url) {
+                $updates['pr_url'] = $prUrl;
+            }
+            $branch = $pushRun->result_json['branch'] ?? null;
+            if ($branch !== null && $branch !== $task->feature_branch) {
+                $updates['feature_branch'] = $branch;
+            }
+            if ($updates !== []) {
+                $task->update($updates);
+            }
+        }
+    }
+
+    /**
+     * @return array<int, array{text: string, class: string}>
+     */
+    private function parseStreamLog(string $streamLog): array
+    {
+        $lines = [];
+        foreach (explode("\n", $streamLog) as $raw) {
+            $raw = trim($raw);
+            if ($raw === '') {
+                continue;
+            }
+            $event = json_decode($raw, true);
+            if (! is_array($event)) {
+                continue;
+            }
+
+            if ($event['type'] === 'assistant') {
+                foreach ($event['message']['content'] ?? [] as $block) {
+                    if ($block['type'] === 'text' && ($block['text'] ?? '') !== '') {
+                        $lines[] = ['text' => $block['text'], 'class' => 'text-slate-300'];
+                    } elseif ($block['type'] === 'tool_use') {
+                        $input = $block['input'] ?? [];
+                        $detail = $input['file_path'] ?? $input['command'] ?? json_encode($input);
+                        if (strlen((string) $detail) > 120) {
+                            $detail = substr((string) $detail, 0, 120);
+                        }
+                        $lines[] = ['text' => "[tool:{$block['name']}] {$detail}", 'class' => 'text-sky-400'];
+                    }
+                }
+            } elseif ($event['type'] === 'result' && isset($event['total_cost_usd'])) {
+                $cost = number_format((float) $event['total_cost_usd'], 6);
+                $lines[] = ['text' => "[INFO] Abgeschlossen · Kosten: \${$cost}", 'class' => 'text-emerald-400'];
+            }
+        }
+
+        return $lines;
     }
 
     protected function newProcess(array $cmd): Process
     {
         return new Process($cmd);
-    }
-
-    /**
-     * Read state.json and sync completed phases back into the DB.
-     * Call this when entering the task detail view to refresh stale 'running' records.
-     */
-    public function syncToDb(Task $task): void
-    {
-        $state = $this->read($task->name);
-        if ($state === null) {
-            return;
-        }
-
-        $phaseOrder = ['concept', 'implement', 'diff', 'push', 'respond'];
-        $lastPhase = null;
-        $lastStatus = null;
-
-        foreach ($phaseOrder as $phase) {
-            $phaseState = $state['phases'][$phase] ?? null;
-            if ($phaseState === null) {
-                continue;
-            }
-
-            $stateStatus = $phaseState['current_status'] ?? null;
-            if ($stateStatus === null || $stateStatus === 'pending') {
-                continue;
-            }
-
-            $lastPhase = $phase;
-            $lastStatus = $stateStatus;
-
-            if ($stateStatus === 'running') {
-                continue;
-            }
-
-            // Update DB records that are still marked 'running' for this phase
-            PhaseRun::where('task_id', $task->id)
-                ->where('phase', $phase)
-                ->where('status', 'running')
-                ->update([
-                    'status' => $stateStatus,
-                    'finished_at' => now(),
-                ]);
-        }
-
-        $updates = [];
-
-        if ($lastPhase !== null && $lastStatus !== null) {
-            $updates['current_phase'] = $lastPhase;
-            $updates['current_status'] = $lastStatus;
-        }
-
-        $featureBranch = $state['repo']['feature_branch'] ?? null;
-        if ($featureBranch !== null && $featureBranch !== $task->feature_branch) {
-            $updates['feature_branch'] = $featureBranch;
-        }
-
-        // pr_url kommt aus repo.pr_url (gesetzt von push.sh via state_set_pr_url)
-        $prUrl = $state['repo']['pr_url'] ?? null;
-        if ($prUrl !== null && $prUrl !== '' && $prUrl !== $task->pr_url) {
-            $updates['pr_url'] = $prUrl;
-        }
-
-        if ($updates !== []) {
-            $task->update($updates);
-        }
     }
 }

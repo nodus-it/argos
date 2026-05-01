@@ -359,10 +359,10 @@ class ArgosCommand extends Command
         $this->line(str_repeat('─', 60));
         $this->line('');
 
-        $existing = $this->stateReader->readNotes($task->name);
+        $existing = $task->concept_notes;
 
         if ($existing !== null) {
-            $this->line('Aktuelles Feedback (concept.notes.md):');
+            $this->line('Aktuelles Feedback:');
             $this->line($existing);
             $this->line('');
         }
@@ -377,23 +377,8 @@ class ArgosCommand extends Command
             return;
         }
 
-        $writeProcess = new Process([
-            'docker', 'run', '--rm',
-            '-i',
-            '-v', $task->volumeName().':/workspace',
-            'alpine',
-            'sh', '-c', 'mkdir -p /workspace/.agent && cat > /workspace/.agent/concept.notes.md',
-        ]);
-
-        $writeProcess->setInput($notes);
-        $writeProcess->setTimeout(15);
-        $writeProcess->run();
-
-        if ($writeProcess->isSuccessful()) {
-            info('Feedback gespeichert. Starte jetzt Concept neu um es einzuarbeiten.');
-        } else {
-            error('Feedback konnte nicht gespeichert werden.');
-        }
+        $task->update(['concept_notes' => $notes ?: null]);
+        info('Feedback gespeichert. Starte jetzt Concept neu um es einzuarbeiten.');
 
         sleep(2);
     }

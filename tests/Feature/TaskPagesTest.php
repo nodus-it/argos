@@ -37,10 +37,9 @@ class TaskPagesTest extends TestCase
 
         $this->mock(StateReader::class, function ($mock) {
             $mock->shouldReceive('syncToDb')->andReturn(null);
-            $mock->shouldReceive('readConcept')->andReturn("# Konzept\n\nTest-Konzept Inhalt.");
-            $mock->shouldReceive('readNotes')->andReturn('');
-            $mock->shouldReceive('writeNotes')->andReturn(true);
-            $mock->shouldReceive('writeFeedbackToVolume')->andReturn(null);
+            $mock->shouldReceive('readNotesHistory')->andReturn([]);
+            $mock->shouldReceive('readConceptHistory')->andReturn([]);
+            $mock->shouldReceive('listLogIterations')->andReturn([]);
         });
     }
 
@@ -78,6 +77,7 @@ class TaskPagesTest extends TestCase
     public function test_view_task_implement_action_dispatches_job(): void
     {
         $task = Task::factory()->create();
+        PhaseRun::factory()->create(['task_id' => $task->id, 'phase' => 'concept', 'status' => 'completed']);
 
         Livewire::test(ViewTask::class, ['record' => $task->getKey()])
             ->callAction('implement')
@@ -89,6 +89,7 @@ class TaskPagesTest extends TestCase
     public function test_view_task_push_action_dispatches_job(): void
     {
         $task = Task::factory()->create();
+        PhaseRun::factory()->create(['task_id' => $task->id, 'phase' => 'implement', 'status' => 'completed']);
 
         Livewire::test(ViewTask::class, ['record' => $task->getKey()])
             ->callAction('push')

@@ -22,6 +22,104 @@ class PhaseRunner
         return "{$configDir}/tasks/{$taskName}/{$phase}.bg.log";
     }
 
+    /**
+     * Before a concept phase: write task.concept_notes to concept.notes.md in the volume
+     * so the worker can read it. Returns the notes value that was written (for post-phase storage).
+     */
+    public function writeNotesToVolume(Task $task): ?string
+    {
+        $notes = $task->concept_notes;
+        if ($notes === null || $notes === '') {
+            return null;
+        }
+
+        $process = $this->newProcess([
+            'docker', 'run', '--rm', '-i',
+            '-v', $task->volumeName().':/workspace',
+            'alpine',
+            'sh', '-c',
+            'mkdir -p /workspace/.agent && cat > /workspace/.agent/concept.notes.md',
+        ]);
+        $process->setInput($notes);
+        $process->setTimeout(10);
+        $process->run();
+
+        return $notes;
+    }
+
+    /**
+     * After a phase completes: read generated content from the volume and store in the DB.
+     * Docker is called here (background job), never on page load.
+     */
+    public function postPhaseSync(Task $task, PhaseRun $phaseRun, string $phase, ?string $notesBeforeRun): void
+    {
+        if ($phase === 'concept') {
+            $conceptMd = $this->readFileFromVolume($task->volumeName(), '/workspace/.agent/concept.md');
+            $stateJson = $this->readFileFromVolume($task->volumeName(), '/workspace/.agent/state.json');
+
+            $phaseRunUpdate = [
+                'concept_md' => $conceptMd,
+                'concept_notes' => $notesBeforeRun,
+            ];
+            $phaseRun->update($phaseRunUpdate);
+
+            $taskUpdate = ['concept_notes' => null];
+            if ($conceptMd !== null) {
+                $taskUpdate['concept_md'] = $conceptMd;
+            }
+            if ($stateJson !== null) {
+                $state = json_decode($stateJson, true);
+                $featureBranch = $state['repo']['feature_branch'] ?? null;
+                if ($featureBranch !== null && $featureBranch !== $task->feature_branch) {
+                    $taskUpdate['feature_branch'] = $featureBranch;
+                }
+            }
+            $task->update($taskUpdate);
+        }
+
+        if (in_array($phase, ['implement', 'push'], true)) {
+            $streamLogPath = "/workspace/.agent/logs/{$phase}.{$phaseRun->iteration}.stream.log";
+            $streamLog = $this->readFileFromVolume($task->volumeName(), $streamLogPath);
+            if ($streamLog !== null) {
+                $phaseRun->update(['stream_log' => $streamLog]);
+            }
+        }
+
+        if ($phase === 'push') {
+            $resultJson = $phaseRun->result_json;
+            $taskUpdate = [];
+            if (isset($resultJson['branch']) && $resultJson['branch'] !== $task->feature_branch) {
+                $taskUpdate['feature_branch'] = $resultJson['branch'];
+            }
+            if (isset($resultJson['pr_url']) && $resultJson['pr_url'] !== '' && $resultJson['pr_url'] !== $task->pr_url) {
+                $taskUpdate['pr_url'] = $resultJson['pr_url'];
+            }
+            if ($taskUpdate !== []) {
+                $task->update($taskUpdate);
+            }
+        }
+    }
+
+    private function readFileFromVolume(string $volumeName, string $filePath): ?string
+    {
+        $process = $this->newProcess([
+            'docker', 'run', '--rm',
+            '-v', "{$volumeName}:/workspace:ro",
+            'alpine',
+            'cat', $filePath,
+        ]);
+        $process->setTimeout(10);
+        $process->run();
+
+        if (! $process->isSuccessful()) {
+            return null;
+        }
+
+        $output = $process->getOutput();
+
+        return $output !== '' ? $output : null;
+    }
+
     public function writeFeedbackToVolume(string $taskName, string $feedback): void
     {
         $process = $this->newProcess([
@@ -45,6 +143,8 @@ class PhaseRunner
      */
     public function runLive(Task $task, string $phase, callable $output, array $flags = []): int
     {
+        $notesBeforeRun = $phase === 'concept' ? $this->writeNotesToVolume($task) : null;
+
         $cmd = $this->buildCommand($task, $phase, $flags);
         $logPath = $this->getPhaseLogPath($task->name, $phase);
 
@@ -95,6 +195,9 @@ class PhaseRunner
             'current_status' => $status,
         ]);
 
+        $task->refresh();
+        $this->postPhaseSync($task, $phaseRun, $phase, $notesBeforeRun);
+
         return $exitCode;
     }
 
@@ -104,6 +207,8 @@ class PhaseRunner
      */
     public function runBlocking(Task $task, string $phase, array $flags = []): void
     {
+        $notesBeforeRun = $phase === 'concept' ? $this->writeNotesToVolume($task) : null;
+
         $cmd = $this->buildCommand($task, $phase, $flags);
         $logPath = $this->getPhaseLogPath($task->name, $phase);
 
@@ -152,6 +257,9 @@ class PhaseRunner
             'current_phase' => $phase,
             'current_status' => $status,
         ]);
+
+        $task->refresh();
+        $this->postPhaseSync($task, $phaseRun, $phase, $notesBeforeRun);
     }
 
     protected function newProcess(array $cmd): Process

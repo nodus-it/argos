@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Domain\Phase\PhaseRunner;
-use App\Domain\Phase\StateReader;
 use App\Enums\WorkflowStatus;
 use App\Jobs\RunPhaseJob;
 use App\Models\RepoProfile;
@@ -33,27 +32,8 @@ class RunPhaseJobTest extends TestCase
             ->once()
             ->with(\Mockery::on(fn ($t) => $t->id === $task->id), 'concept', []);
 
-        $stateReader = $this->mock(StateReader::class);
-        $stateReader->shouldReceive('syncToDb')->once();
-
         $job = new RunPhaseJob($task->id, 'concept');
-        $job->handle(app(PhaseRunner::class), app(StateReader::class));
-    }
-
-    public function test_handle_calls_sync_to_db_after_run(): void
-    {
-        $task = Task::factory()->create(['current_status' => 'completed']);
-
-        $this->mock(PhaseRunner::class)
-            ->shouldReceive('runBlocking');
-
-        $stateReader = $this->mock(StateReader::class);
-        $stateReader->shouldReceive('syncToDb')
-            ->once()
-            ->with(\Mockery::on(fn ($t) => $t->id === $task->id));
-
-        $job = new RunPhaseJob($task->id, 'concept');
-        $job->handle(app(PhaseRunner::class), app(StateReader::class));
+        $job->handle(app(PhaseRunner::class));
     }
 
     public function test_handle_passes_flags_to_run_blocking(): void
@@ -66,13 +46,11 @@ class RunPhaseJobTest extends TestCase
             ->once()
             ->with(\Mockery::any(), 'implement', $flags);
 
-        $this->mock(StateReader::class)->shouldReceive('syncToDb');
-
         $job = new RunPhaseJob($task->id, 'implement', $flags);
-        $job->handle(app(PhaseRunner::class), app(StateReader::class));
+        $job->handle(app(PhaseRunner::class));
     }
 
-    public function test_handle_advances_workflow_after_sync(): void
+    public function test_handle_advances_workflow_after_run(): void
     {
         $task = Task::factory()->create([
             'workflow_status' => WorkflowStatus::ConceptRunning,
@@ -80,10 +58,9 @@ class RunPhaseJobTest extends TestCase
         ]);
 
         $this->mock(PhaseRunner::class)->shouldReceive('runBlocking');
-        $this->mock(StateReader::class)->shouldReceive('syncToDb');
 
         $job = new RunPhaseJob($task->id, 'concept');
-        $job->handle(app(PhaseRunner::class), app(StateReader::class));
+        $job->handle(app(PhaseRunner::class));
 
         $this->assertSame(WorkflowStatus::ConceptReview, $task->fresh()->workflow_status);
     }
@@ -96,12 +73,10 @@ class RunPhaseJobTest extends TestCase
         ]);
 
         $this->mock(PhaseRunner::class)->shouldReceive('runBlocking');
-        $this->mock(StateReader::class)->shouldReceive('syncToDb');
 
         $job = new RunPhaseJob($task->id, 'concept');
-        $job->handle(app(PhaseRunner::class), app(StateReader::class));
+        $job->handle(app(PhaseRunner::class));
 
-        // concept + failed → Failed
         $this->assertSame(WorkflowStatus::Failed, $task->fresh()->workflow_status);
     }
 
@@ -122,10 +97,9 @@ class RunPhaseJobTest extends TestCase
         ]);
 
         $this->mock(PhaseRunner::class)->shouldReceive('runBlocking');
-        $this->mock(StateReader::class)->shouldReceive('syncToDb');
 
         $job = new RunPhaseJob($task->id, 'implement');
-        $job->handle(app(PhaseRunner::class), app(StateReader::class));
+        $job->handle(app(PhaseRunner::class));
 
         Bus::assertDispatched(RunPhaseJob::class, fn ($j) => $j->phase === 'push');
     }
