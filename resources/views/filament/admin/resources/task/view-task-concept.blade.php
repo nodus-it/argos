@@ -98,14 +98,13 @@
                         <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">Nächste Schritte</span>
                     </div>
                     <div class="px-5 py-4 flex flex-col gap-2">
-                        <a
-                            href="{{ TaskResource::getUrl('view', ['record' => $task]) }}"
-                            wire:navigate
+                        <button
+                            wire:click="startImplement"
                             class="flex items-center gap-2 rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                         >
                             <x-heroicon-o-code-bracket class="h-4 w-4 text-gray-400 flex-shrink-0" />
                             <span>Implement starten</span>
-                        </a>
+                        </button>
                         <button
                             wire:click="$dispatch('open-modal', { id: 'run-concept-again' })"
                             onclick="document.querySelector('[data-action=runConcept]')?.click()"

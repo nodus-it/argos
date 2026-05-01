@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace App\Filament\Admin\Resources\TaskResource\Pages;
 
 use App\Domain\Phase\StateReader;
-use App\Jobs\RunPhaseJob;
+use App\Enums\WorkflowStatus;
 use App\Filament\Admin\Resources\TaskResource;
+use App\Jobs\RunPhaseJob;
 use App\Models\Task;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
@@ -51,6 +52,7 @@ class ViewTaskConcept extends Page
                 ->action(function (): void {
                     if ($this->task->phaseRuns()->where('status', 'running')->exists()) {
                         Notification::make()->title('Phase läuft bereits')->warning()->send();
+
                         return;
                     }
                     RunPhaseJob::dispatch($this->task->id, 'concept');
@@ -83,8 +85,9 @@ class ViewTaskConcept extends Page
     {
         $reader = app(StateReader::class);
 
-        if (!$reader->writeNotes($this->task->name, $this->notes)) {
+        if (! $reader->writeNotes($this->task->name, $this->notes)) {
             Notification::make()->title('Notes konnten nicht gespeichert werden')->danger()->send();
+
             return;
         }
 
@@ -96,6 +99,19 @@ class ViewTaskConcept extends Page
     {
         $this->editingNotes = false;
         $this->loadContent();
+    }
+
+    public function startImplement(): void
+    {
+        if ($this->task->phaseRuns()->where('status', 'running')->exists()) {
+            Notification::make()->title('Phase läuft bereits')->warning()->send();
+
+            return;
+        }
+        $this->task->update(['workflow_status' => WorkflowStatus::ImplementRunning]);
+        RunPhaseJob::dispatch($this->task->id, 'implement');
+        Notification::make()->title('Implement gestartet')->success()->send();
+        $this->redirect(TaskResource::getUrl('logs', ['record' => $this->task]));
     }
 
     private function loadContent(): void
