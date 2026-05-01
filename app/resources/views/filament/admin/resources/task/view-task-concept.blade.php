@@ -1,3 +1,4 @@
+@php use App\Filament\Admin\Resources\TaskResource; @endphp
 <x-filament-panels::page>
 
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">

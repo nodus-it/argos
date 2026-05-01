@@ -32,7 +32,7 @@ class ViewTaskRespond extends Page
             Action::make('back')
                 ->label('← Zurück zur Task')
                 ->color('gray')
-                ->url(TaskResource::getUrl('view', ['record' => $this->task])),
+                ->url(fn () => TaskResource::getUrl('view', ['record' => $this->task])),
         ];
     }
 
