@@ -68,4 +68,8 @@ git -C "$work" add -A
 git -C "$work" commit --quiet -m "chore: initial demo skeleton"
 git -C "$work" push --quiet origin main
 
+# World-writable so the container user (uid 1000) can push back when
+# the bare repo is bind-mounted from a different host uid (e.g. CI runner).
+chmod -R a+w "$target"
+
 echo "fake-remote-repo initialized at: $target"
