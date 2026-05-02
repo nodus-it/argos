@@ -42,6 +42,9 @@ Then open <http://localhost:8080/admin>.
 
 > The manager pulls `ghcr.io/nodus-it/argos-worker:php8.4` on first task run. Override with `-e ARGOS_WORKER_IMAGE=...` if you build your own. Change the host port via the `-p` flag.
 
+> [!NOTE]
+> **Staging builds.** Every push to the `dev` branch publishes the bleeding edge as `ghcr.io/nodus-it/argos-manager:stage` (worker: `:stage-php8.3` / `:stage-php8.4`). These tags track unreleased work and may break — useful for previewing fixes, but do not pin production deployments to them. When you run the manager from `:stage`, also point it at the matching worker tag, e.g. `-e ARGOS_WORKER_IMAGE=ghcr.io/nodus-it/argos-worker:stage-php8.4`. Stick with `:latest` (or a `vX.Y.Z` tag) for stable use.
+
 ## First-time setup
 
 After the container is up, walk through these steps once:

@@ -89,6 +89,10 @@ RUN composer install --no-dev --optimize-autoloader --no-interaction \
     && npm run build \
     && chown -R www-data:www-data storage bootstrap/cache
 
+# Make /var/www writable for www-data so the docker CLI (called from
+# PhaseRunner via php-fpm/queue-worker) can manage its own ~/.docker config.
+RUN chown www-data:www-data /var/www
+
 # Nginx: remove default site, add Laravel config
 RUN rm -f /etc/nginx/sites-enabled/default
 COPY docker/nginx.conf /etc/nginx/sites-enabled/argos.conf
@@ -103,6 +107,22 @@ COPY docker/php-fpm.conf /usr/local/etc/php-fpm.d/argos.conf
 # Runtime entrypoint: docker socket group fix + migrations
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
+
+# Standalone defaults: the entrypoint provisions a local MariaDB with these
+# credentials, so the bare `docker run ...argos-manager` invocation in the
+# README boots without requiring callers to pass them in. docker-compose can
+# still override any of these via its `environment:` block.
+ENV DB_CONNECTION=mariadb \
+    ARGOS_DB_HOST=127.0.0.1 \
+    ARGOS_DB_PORT=3306 \
+    ARGOS_DB_SOCKET=/run/mysqld/mysqld.sock \
+    ARGOS_DB_DATABASE=argos \
+    ARGOS_DB_USERNAME=argos \
+    ARGOS_DB_PASSWORD=argos \
+    ARGOS_CONFIG_DIR=/data/config \
+    QUEUE_CONNECTION=database \
+    SESSION_DRIVER=database \
+    CACHE_STORE=database
 
 EXPOSE 80
 

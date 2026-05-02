@@ -88,7 +88,7 @@ class RepoProfileResource extends Resource
 
             TextInput::make('worker_image')
                 ->label('Worker-Image')
-                ->placeholder('ghcr.io/nodus-it/argos-worker:latest')
+                ->placeholder('ghcr.io/nodus-it/argos-worker:php8.4')
                 ->helperText('Leer lassen für globalen Standard aus ARGOS_WORKER_IMAGE.')
                 ->maxLength(255),
 
