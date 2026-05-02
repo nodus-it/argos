@@ -11,7 +11,6 @@ use App\Jobs\RunPhaseJob;
 use App\Models\RepoProfile;
 use App\Models\Task;
 use App\Models\User;
-use Filament\Actions\Testing\TestAction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Process;
@@ -100,74 +99,12 @@ class TaskResourceTest extends TestCase
         Bus::assertDispatched(RunPhaseJob::class, fn ($job) => $job->phase === 'concept');
     }
 
-    public function test_table_phase_action_marks_task_pending(): void
-    {
-        $task = Task::factory()->create();
-
-        Livewire::test(ListTasks::class)
-            ->callAction(TestAction::make('concept')->table($task));
-
-        $task->refresh();
-        $this->assertSame('concept', $task->current_phase);
-        $this->assertSame('pending', $task->current_status);
-    }
-
     public function test_create_requires_name_and_project(): void
     {
         Livewire::test(CreateTask::class)
             ->fillForm(['name' => null, 'repo_profile_id' => null])
             ->call('create')
             ->assertHasFormErrors(['name' => 'required', 'repo_profile_id' => 'required']);
-    }
-
-    public function test_table_concept_action_dispatches_job(): void
-    {
-        $task = Task::factory()->create();
-
-        Livewire::test(ListTasks::class)
-            ->callAction(TestAction::make('concept')->table($task))
-            ->assertNotified();
-
-        Bus::assertDispatched(RunPhaseJob::class, fn ($job) => $job->phase === 'concept' && $job->taskId === $task->id);
-    }
-
-    public function test_table_implement_action_dispatches_job(): void
-    {
-        $task = Task::factory()->create();
-
-        Livewire::test(ListTasks::class)
-            ->callAction(TestAction::make('implement')->table($task))
-            ->assertNotified();
-
-        Bus::assertDispatched(RunPhaseJob::class, fn ($job) => $job->phase === 'implement');
-    }
-
-    public function test_table_push_action_dispatches_job(): void
-    {
-        $task = Task::factory()->create();
-
-        Livewire::test(ListTasks::class)
-            ->callAction(TestAction::make('push')->table($task))
-            ->assertNotified();
-
-        Bus::assertDispatched(RunPhaseJob::class, fn ($job) => $job->phase === 'push');
-    }
-
-    public function test_phase_action_warns_when_already_running(): void
-    {
-        $task = Task::factory()->create();
-        $task->phaseRuns()->create([
-            'phase' => 'concept',
-            'iteration' => 1,
-            'status' => 'running',
-            'started_at' => now(),
-        ]);
-
-        Livewire::test(ListTasks::class)
-            ->callAction(TestAction::make('concept')->table($task))
-            ->assertNotified();
-
-        Bus::assertNotDispatched(RunPhaseJob::class);
     }
 
     public function test_list_shows_aggregated_cost_per_task(): void

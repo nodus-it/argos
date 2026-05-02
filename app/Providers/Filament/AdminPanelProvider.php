@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers\Filament;
 
+use App\Filament\Admin\Widgets\CurrentTasksWidget;
 use App\Filament\Admin\Widgets\StatsOverviewWidget;
 use App\Http\Middleware\AutoLoginMiddleware;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -47,6 +48,11 @@ class AdminPanelProvider extends PanelProvider
             ->discoverWidgets(in: app_path('Filament/Admin/Widgets'), for: 'App\Filament\Admin\Widgets')
             ->widgets([
                 StatsOverviewWidget::class,
+                CurrentTasksWidget::class,
+            ])
+            ->navigationGroups([
+                'Aufgaben',
+                'Konfiguration',
             ])
             ->middleware([
                 EncryptCookies::class,

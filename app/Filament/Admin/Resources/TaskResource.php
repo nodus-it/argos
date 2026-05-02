@@ -13,19 +13,16 @@ use App\Filament\Admin\Resources\TaskResource\Pages\ViewTaskDiff;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTaskLogs;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTaskRespond;
 use App\Filament\Admin\Resources\TaskResource\RelationManagers\PhaseRunsRelationManager;
-use App\Jobs\RunPhaseJob;
+use App\Filament\Admin\Widgets\CurrentTasksWidget;
 use App\Models\PhaseRun;
 use App\Models\RepoProfile;
 use App\Models\Task;
-use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
-use Filament\Actions\ViewAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
-use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
@@ -93,7 +90,10 @@ class TaskResource extends Resource
 
                 TextColumn::make('current_phase')
                     ->label('Phase')
-                    ->placeholder('—'),
+                    ->badge()
+                    ->icon(fn (?string $state): ?string => CurrentTasksWidget::phaseIcon($state))
+                    ->color(fn (?string $state): string => CurrentTasksWidget::phaseColor($state))
+                    ->formatStateUsing(fn (?string $state): string => CurrentTasksWidget::phaseLabel($state)),
 
                 TextColumn::make('current_status')
                     ->label('Status')
@@ -138,17 +138,7 @@ class TaskResource extends Resource
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
-            ->actions([
-                ViewAction::make(),
-                self::phaseAction('concept', 'Concept', 'heroicon-o-light-bulb'),
-                self::phaseAction('implement', 'Implement', 'heroicon-o-code-bracket'),
-                self::phaseAction('push', 'Push', 'heroicon-o-arrow-up-tray'),
-                Action::make('logs')
-                    ->label('Logs')
-                    ->icon('heroicon-o-command-line')
-                    ->color('gray')
-                    ->url(fn (Task $record): string => static::getUrl('logs', ['record' => $record])),
-            ])
+            ->recordUrl(fn (Task $record): string => static::getUrl('view', ['record' => $record]))
             ->bulkActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
@@ -185,22 +175,5 @@ class TaskResource extends Resource
             'logs' => ViewTaskLogs::route('/{record}/logs'),
             'respond' => ViewTaskRespond::route('/{record}/respond'),
         ];
-    }
-
-    private static function phaseAction(string $phase, string $label, string $icon): Action
-    {
-        return Action::make($phase)
-            ->label($label)
-            ->icon($icon)
-            ->action(function (Task $record) use ($phase, $label): void {
-                if ($record->phaseRuns()->where('status', 'running')->exists()) {
-                    Notification::make()->title('Phase läuft bereits')->warning()->send();
-
-                    return;
-                }
-                $record->update(['current_phase' => $phase, 'current_status' => 'pending']);
-                RunPhaseJob::dispatch($record->id, $phase);
-                Notification::make()->title("{$label} gestartet")->success()->send();
-            });
     }
 }

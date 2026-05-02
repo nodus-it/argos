@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Enums\WorkflowStatus;
 use App\Filament\Admin\Widgets\StatsOverviewWidget;
-use App\Models\PhaseRun;
+use App\Jobs\RunPhaseJob;
 use App\Models\Task;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -25,61 +27,86 @@ class StatsOverviewWidgetTest extends TestCase
     public function test_widget_renders_without_error_when_empty(): void
     {
         Livewire::test(StatsOverviewWidget::class)
-            ->assertSuccessful();
+            ->assertSuccessful()
+            ->assertSee('Laufende Worker')
+            ->assertSee('In Bearbeitung')
+            ->assertSee('Wartet auf dich');
     }
 
-    public function test_tasks_gesamt_zeigt_korrekte_anzahl(): void
+    public function test_running_workers_counts_only_reserved_phase_jobs(): void
     {
-        Task::factory()->count(3)->create();
+        config(['queue.default' => 'database']);
+
+        // Reserved RunPhaseJob → counts as a running worker.
+        DB::table('jobs')->insert([
+            'queue' => 'default',
+            'payload' => json_encode(['displayName' => RunPhaseJob::class]),
+            'attempts' => 1,
+            'reserved_at' => now()->timestamp,
+            'available_at' => now()->timestamp,
+            'created_at' => now()->timestamp,
+        ]);
+
+        // Queued but not reserved → does not count.
+        DB::table('jobs')->insert([
+            'queue' => 'default',
+            'payload' => json_encode(['displayName' => RunPhaseJob::class]),
+            'attempts' => 0,
+            'reserved_at' => null,
+            'available_at' => now()->timestamp,
+            'created_at' => now()->timestamp,
+        ]);
+
+        // Reserved job for an unrelated class → does not count.
+        DB::table('jobs')->insert([
+            'queue' => 'default',
+            'payload' => json_encode(['displayName' => 'App\\Jobs\\OtherJob']),
+            'attempts' => 1,
+            'reserved_at' => now()->timestamp,
+            'available_at' => now()->timestamp,
+            'created_at' => now()->timestamp,
+        ]);
 
         Livewire::test(StatsOverviewWidget::class)
+            ->assertSee('Laufende Worker')
+            ->assertSee('Container arbeiten gerade');
+    }
+
+    public function test_running_workers_returns_zero_when_queue_is_not_database(): void
+    {
+        config(['queue.default' => 'sync']);
+
+        Livewire::test(StatsOverviewWidget::class)
+            ->assertSee('Keine aktiven Worker');
+    }
+
+    public function test_in_progress_counts_tasks_with_running_workflow_status(): void
+    {
+        Task::factory()->create(['workflow_status' => WorkflowStatus::ConceptRunning]);
+        Task::factory()->create(['workflow_status' => WorkflowStatus::ImplementRunning]);
+        Task::factory()->create(['workflow_status' => WorkflowStatus::Draft]);
+
+        Livewire::test(StatsOverviewWidget::class)
+            ->assertSee('In Bearbeitung')
+            ->assertSee('2 Tasks laufen');
+    }
+
+    public function test_waiting_for_input_counts_review_and_failed_tasks(): void
+    {
+        Task::factory()->create(['workflow_status' => WorkflowStatus::ConceptReview]);
+        Task::factory()->create(['workflow_status' => WorkflowStatus::InReview]);
+        Task::factory()->create(['workflow_status' => WorkflowStatus::Failed]);
+        Task::factory()->create(['workflow_status' => WorkflowStatus::Completed]);
+
+        Livewire::test(StatsOverviewWidget::class)
+            ->assertSee('Wartet auf dich')
             ->assertSee('3');
     }
 
-    public function test_aktive_phasen_zaehlt_nur_running_runs(): void
+    public function test_zero_states_render_calm_messages(): void
     {
-        PhaseRun::factory()->running()->count(2)->create();
-        PhaseRun::factory()->count(1)->create(); // completed
-
         Livewire::test(StatsOverviewWidget::class)
-            ->assertSee('2');
-    }
-
-    public function test_abgeschlossen_heute_zaehlt_nur_completed_runs_von_heute(): void
-    {
-        PhaseRun::factory()->create(['status' => 'completed', 'finished_at' => now()]);
-        PhaseRun::factory()->create(['status' => 'completed', 'finished_at' => now()->subDay()]);
-
-        Livewire::test(StatsOverviewWidget::class)
-            ->assertSee('1');
-    }
-
-    public function test_aktive_phasen_zeigt_null_wenn_keine_aktiven(): void
-    {
-        PhaseRun::factory()->count(3)->create(); // all completed
-
-        Livewire::test(StatsOverviewWidget::class)
-            ->assertSee('0');
-    }
-
-    public function test_kosten_und_tokens_werden_aggregiert(): void
-    {
-        PhaseRun::factory()->create([
-            'cost_usd' => 0.25,
-            'input_tokens' => 1500,
-            'output_tokens' => 500,
-            'finished_at' => now(),
-        ]);
-        PhaseRun::factory()->create([
-            'cost_usd' => 0.75,
-            'input_tokens' => 2000,
-            'output_tokens' => 1000,
-            'finished_at' => now()->subDay(),
-        ]);
-
-        Livewire::test(StatsOverviewWidget::class)
-            ->assertSee('$1.0000')   // total
-            ->assertSee('$0.2500')   // today
-            ->assertSee('5,000');    // total tokens
+            ->assertSee('Keine aktiven Worker')
+            ->assertSee('Nichts zu tun');
     }
 }

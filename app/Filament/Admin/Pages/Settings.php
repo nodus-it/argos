@@ -43,6 +43,11 @@ class Settings extends Page implements HasForms
         return 'Einstellungen';
     }
 
+    public static function getNavigationSort(): ?int
+    {
+        return 2;
+    }
+
     public function getTitle(): string
     {
         return 'Einstellungen';

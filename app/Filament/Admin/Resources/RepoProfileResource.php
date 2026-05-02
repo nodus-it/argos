@@ -39,6 +39,11 @@ class RepoProfileResource extends Resource
         return 'Projekte';
     }
 
+    public static function getNavigationSort(): ?int
+    {
+        return 1;
+    }
+
     public static function getModelLabel(): string
     {
         return 'Projekt';
