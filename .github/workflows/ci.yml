@@ -52,8 +52,31 @@ jobs:
       - name: "integration: phase lifecycle"
         run: bash worker/tests/run-tests.sh --integration
 
+  php:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, pdo_sqlite, sqlite3
+          coverage: none
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Run PHP tests
+        run: php artisan test --compact
+
   build-manager:
-    needs: [shellcheck, bats, integration]
+    needs: [shellcheck, bats, integration, php]
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
@@ -96,7 +119,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   build-worker:
-    needs: [shellcheck, bats, integration]
+    needs: [shellcheck, bats, integration, php]
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:

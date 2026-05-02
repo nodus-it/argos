@@ -33,6 +33,7 @@ mode=unknown
 if [[ "$stdin" == *"Konzept-Aufgabe"* ]]; then mode=concept
 elif [[ "$stdin" == *"Implement-Phase"* ]]; then mode=implement
 elif [[ "$stdin" == *"Commit-Message generieren"* ]]; then mode=commit-message
+elif [[ "$stdin" == *"Respond-Phase"* ]]; then mode=respond
 fi
 
 case "$mode:$output_format" in
@@ -74,6 +75,11 @@ PHP
         cat <<'EOF'
 {"type":"result","subtype":"success","is_error":false,"result":"{\"subject\":\"feat: add HelloWorld greeter\",\"body\":\"Adds App\\\\Demo\\\\HelloWorld with greet() method and Pest test.\"}","structured_output":{"subject":"feat: add HelloWorld greeter","body":"Adds App\\Demo\\HelloWorld with greet() method and Pest test."},"session_id":"mock-cm-1","total_cost_usd":0.001,"num_turns":1}
 EOF
+        ;;
+    respond:stream-json)
+        printf '{"type":"system","subtype":"init","session_id":"mock-respond-1"}\n'
+        printf '{"type":"assistant","message":{"content":[{"type":"text","text":"Feedback wird eingearbeitet..."}]}}\n'
+        printf '{"type":"result","subtype":"success","is_error":false,"result":"Feedback eingearbeitet.","session_id":"mock-respond-1","total_cost_usd":0.002,"num_turns":2}\n'
         ;;
     *:*)
         printf '{"type":"result","subtype":"error","is_error":true,"result":"mock-claude: unknown prompt mode (mode=%s output=%s)","session_id":"mock-x","total_cost_usd":0}\n' "$mode" "$output_format" >&2

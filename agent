@@ -305,6 +305,12 @@ cmd_phase() {
         push)
             flags_json="$(_agent_phase_flags_json auto-cleanup keep force-unlock)"
             ;;
+        respond)
+            flags_json='{}'
+            ;;
+        *)
+            flags_json='{}'
+            ;;
     esac
     PHASE_FLAGS="$flags_json"
     export PHASE_FLAGS
@@ -560,7 +566,7 @@ main() {
                 *)      die "$EXIT_GENERAL" "Unbekanntes task-Subcommand '$ARG_SUBCOMMAND' (siehe agent help task)" ;;
             esac
             ;;
-        concept|implement|diff|push)
+        concept|implement|diff|push|respond)
             cmd_phase "$ARG_COMMAND"
             ;;
         show-concept)  cmd_show_concept ;;
