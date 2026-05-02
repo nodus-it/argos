@@ -109,7 +109,9 @@ RUN chmod +x /usr/local/bin/worker-entrypoint.sh \
     && mkdir -p /workspace \
     && chown agent:agent /workspace \
     && mkdir -p /run/agent \
-    && chown agent:agent /run/agent
+    && chown agent:agent /run/agent \
+    && mkdir -p /home/agent/.npm /home/agent/.composer/cache \
+    && chown -R agent:agent /home/agent/.npm /home/agent/.composer
 
 USER agent
 RUN git config --global --add safe.directory '*'
@@ -171,7 +173,9 @@ RUN chmod +x /usr/local/bin/worker-entrypoint.sh \
     && mkdir -p /workspace \
     && chown agent:agent /workspace \
     && mkdir -p /run/agent \
-    && chown agent:agent /run/agent
+    && chown agent:agent /run/agent \
+    && mkdir -p /home/agent/.npm /home/agent/.composer/cache \
+    && chown -R agent:agent /home/agent/.npm /home/agent/.composer
 
 USER agent
 RUN git config --global --add safe.directory '*'
