@@ -2,19 +2,16 @@
 
 ## Was hier passiert
 
-Du baust **Argos** — einen Web-First Dev-Agent mit zwei Docker-Images (Manager + Worker). Lies `docs/WORKER-CONCEPT.md` für das Big Picture und das Sicherheitsmodell.
+Du baust **Argos** — einen Web-First Dev-Agent mit zwei Docker-Images (Manager + Worker).
 
-## Wo was steht (Quellen der Wahrheit)
+## Wo was steht
 
-| Frage | Datei |
+| Frage | Quelle |
 | --- | --- |
-| Was bauen wir, Architektur, Sicherheitsmodell? | `docs/WORKER-CONCEPT.md` |
-| Wie genau implementieren? | `docs/IMPLEMENTATION.md` |
 | Was kommt als nächstes? | `docs/BACKLOG.md` |
 | System-Prompts für die Claude-Sessions im Worker | `worker/prompts/*.system.md` |
 | Schemas für State und Outputs | `worker/schemas/*.schema.json` |
-
-**Diese Dateien sind die Grundwahrheit.** Wenn dein Code-Stand davon abweicht, ist der Code falsch — nicht die Spec. Falls du einen guten Grund siehst, von einer Entscheidung abzuweichen: erst im Chat fragen, dann ggf. die Spec anpassen, *dann* implementieren.
+| Architektur und Implementierungsdetails | Der Code selbst |
 
 ## Konventionen
 
