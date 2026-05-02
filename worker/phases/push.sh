@@ -297,7 +297,7 @@ phase_push_run() {
     fi
 
     local push_log="/workspace/.agent/logs/git-push.${ITERATION}.log"
-    if ! git -C /workspace push -u origin "$feature_branch" "${push_opts[@]}" > "$push_log" 2>&1; then
+    if ! git -C /workspace push -u --force-with-lease origin "$feature_branch" "${push_opts[@]}" > "$push_log" 2>&1; then
         # URL ohne Token wiederherstellen vor return
         git -C /workspace remote set-url origin "$REPO_URL"
         local push_exit=1
