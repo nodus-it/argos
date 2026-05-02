@@ -36,10 +36,10 @@ elif [[ "$stdin" == *"Commit-Message generieren"* ]]; then mode=commit-message
 fi
 
 case "$mode:$output_format" in
-    concept:json)
-        cat <<'EOF'
-{"type":"result","subtype":"success","is_error":false,"result":"# Konzept: Mock HelloWorld\n\n## Verständnis der Aufgabe\n\nDemo-Aufgabe — eine HelloWorld-Klasse anlegen.\n\n## Geplante Änderungen\n\n- `app/Demo/HelloWorld.php` (neu): Klasse mit Methode greet()\n- `tests/Feature/Demo/HelloWorldTest.php` (neu): Pest-Test fuer greet()\n\n## Vorgehensweise\n\n1. Klasse anlegen.\n2. Test schreiben.\n","session_id":"mock-concept-1","total_cost_usd":0.001,"num_turns":1}
-EOF
+    concept:stream-json)
+        printf '{"type":"system","subtype":"init","session_id":"mock-concept-1"}\n'
+        printf '{"type":"assistant","message":{"content":[{"type":"text","text":"Konzept wird erstellt..."}]}}\n'
+        printf '{"type":"result","subtype":"success","is_error":false,"result":"# Konzept: Mock HelloWorld\n\n## Verstaendnis der Aufgabe\n\nDemo-Aufgabe - eine HelloWorld-Klasse anlegen.\n\n## Geplante Aenderungen\n\n- `app/Demo/HelloWorld.php` (neu): Klasse mit Methode greet()\n- `tests/Feature/Demo/HelloWorldTest.php` (neu): Pest-Test fuer greet()\n\n## Vorgehensweise\n\n1. Klasse anlegen.\n2. Test schreiben.\n","session_id":"mock-concept-1","total_cost_usd":0.001,"num_turns":1}\n'
         ;;
     implement:stream-json)
         # Mock simuliert "Code-Aenderung" indem es Files in /workspace anlegt.
