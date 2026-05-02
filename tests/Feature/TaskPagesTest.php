@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Domain\Phase\PhaseRunner;
 use App\Domain\Phase\StateReader;
 use App\Enums\WorkflowStatus;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTask;
@@ -42,6 +43,16 @@ class TaskPagesTest extends TestCase
             $mock->shouldReceive('readImplementHistory')->andReturn([]);
             $mock->shouldReceive('readImplementNotesHistory')->andReturn([]);
             $mock->shouldReceive('listLogIterations')->andReturn([]);
+        });
+
+        // PhaseRunner uses Symfony\Process directly (docker run …), which
+        // Laravel's Process::fake() does not intercept. On hosts without a
+        // docker socket — e.g. the worker container that runs phpunit during
+        // quality gates — the real exec fails. Stub the methods that the
+        // pages call so the tests check Filament behaviour, not Process I/O.
+        $this->mock(PhaseRunner::class, function ($mock) {
+            $mock->shouldReceive('writeFeedbackToVolume');
+            $mock->shouldIgnoreMissing();
         });
     }
 
