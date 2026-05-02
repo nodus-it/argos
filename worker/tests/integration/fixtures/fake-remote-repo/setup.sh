@@ -13,12 +13,10 @@ IFS=$'\n\t'
 target="${1:-$(cd "$(dirname "$0")" && pwd)/fake-remote.git}"
 
 # Remove previous repo; files created by docker containers (uid=1000) may
-# not be deletable by the CI runner, so tolerate failures and re-init on top.
+# not be deletable by the CI runner — tolerate failures and re-init on top.
 rm -rf "$target" 2>/dev/null || true
 mkdir -p "$target"
-# --shared=all makes git create every object world-writable (mode 0666/0777),
-# so any uid can delete them later — even across docker/host uid mismatches.
-git init --quiet --bare --shared=all --initial-branch=main "$target"
+git init --quiet --bare --initial-branch=main "$target"
 
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
@@ -71,5 +69,9 @@ echo "<?php" > "$work/tests/.gitkeep"
 git -C "$work" add -A
 git -C "$work" commit --quiet -m "chore: initial demo skeleton"
 git -C "$work" push --quiet origin main
+
+# World-writable so the container user (uid 1000) can push back when
+# the bare repo is bind-mounted from a different host uid (e.g. CI runner).
+chmod -R a+w "$target"
 
 echo "fake-remote-repo initialized at: $target"
