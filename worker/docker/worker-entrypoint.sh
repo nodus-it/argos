@@ -201,7 +201,7 @@ main() {
             shift
             exec bash "$@"
             ;;
-        concept|implement|diff|push|commit-message)
+        concept|implement|diff|push|commit-message|respond)
             local phase="$arg"
             local task_id="${2:-${TASK_ID:-}}"
             if [[ -z "$task_id" ]]; then
