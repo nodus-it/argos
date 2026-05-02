@@ -19,12 +19,15 @@ TEST_DIR="$(mktemp -d -t agent-it-XXXXXX)"
 export AGENT_HOME="$TEST_DIR/.agent"
 mkdir -p "$AGENT_HOME"
 
+FAKE_REMOTE="$TEST_DIR/fake-remote.git"
+
 cleanup() {
     local rc=$?
     set +e
     docker volume rm "task_ws_${TASK_ID}" 2>/dev/null
+    # TEST_DIR contains fake-remote.git; rm may partially fail on docker-owned
+    # objects (uid mismatch) — tolerate silently, the temp dir is ephemeral.
     rm -rf "$TEST_DIR"
-    rm -rf "$FIXTURES/fake-remote-repo/fake-remote.git"
     exit "$rc"
 }
 trap cleanup EXIT
@@ -39,7 +42,7 @@ fail() {
 }
 
 step "Setup: fake-remote-Repo initialisieren"
-"$FIXTURES/fake-remote-repo/setup.sh" >/dev/null
+"$FIXTURES/fake-remote-repo/setup.sh" "$FAKE_REMOTE" >/dev/null
 
 step "Setup: Claude-Token-Stub"
 echo "mock-token" > "$AGENT_HOME/claude_oauth_token"
@@ -71,7 +74,7 @@ services:
   worker:
     volumes:
       - $FIXTURES/mock-claude/claude:/usr/bin/claude:ro
-      - $FIXTURES/fake-remote-repo/fake-remote.git:/tmp/fake-remote.git
+      - $FAKE_REMOTE:/tmp/fake-remote.git
 EOF
 export AGENT_EXTRA_COMPOSE="$overlay"
 

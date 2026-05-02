@@ -22,12 +22,15 @@ TEST_DIR="$(mktemp -d -t agent-it-XXXXXX)"
 export AGENT_HOME="$TEST_DIR/.agent"
 mkdir -p "$AGENT_HOME"
 
+FAKE_REMOTE="$TEST_DIR/fake-remote.git"
+
 cleanup() {
     local rc=$?
     set +e
     docker volume rm "task_ws_${TASK_ID}" 2>/dev/null
+    # TEST_DIR contains fake-remote.git; rm may partially fail on docker-owned
+    # objects (uid mismatch) — tolerate silently, the temp dir is ephemeral.
     rm -rf "$TEST_DIR"
-    rm -rf "$FIXTURES/fake-remote-repo/fake-remote.git"
     exit "$rc"
 }
 trap cleanup EXIT
@@ -42,7 +45,7 @@ fail() {
 }
 
 step "Setup: fake-remote-Repo initialisieren"
-"$FIXTURES/fake-remote-repo/setup.sh" >/dev/null
+"$FIXTURES/fake-remote-repo/setup.sh" "$FAKE_REMOTE" >/dev/null
 
 step "Setup: Claude-Token-Stub schreiben"
 mkdir -p "$AGENT_HOME"
@@ -75,7 +78,7 @@ services:
   worker:
     volumes:
       - $FIXTURES/mock-claude/claude:/usr/bin/claude:ro
-      - $FIXTURES/fake-remote-repo/fake-remote.git:/tmp/fake-remote.git
+      - $FAKE_REMOTE:/tmp/fake-remote.git
 EOF
 export AGENT_EXTRA_COMPOSE="$overlay"
 
@@ -107,11 +110,11 @@ step "push $TASK_ID --keep"
 step "Verifikation: feature_branch existiert in fake-remote"
 feature_branch="$(docker run --rm -v "task_ws_${TASK_ID}:/workspace" --entrypoint sh argos-worker:latest -c 'jq -r .repo.feature_branch /workspace/.agent/state.json')"
 [[ "$feature_branch" == ai/${TASK_ID}-* ]] || fail "feature_branch ungewohnt: '$feature_branch'"
-remote_branches="$(git -C "$FIXTURES/fake-remote-repo/fake-remote.git" branch --list)"
+remote_branches="$(git -C "$FAKE_REMOTE" branch --list)"
 [[ "$remote_branches" == *"$feature_branch"* ]] || fail "Branch '$feature_branch' fehlt in fake-remote"
 
 step "Verifikation: Commit-Subject auf dem Branch beginnt mit 'feat:'"
-remote_commit="$(git -C "$FIXTURES/fake-remote-repo/fake-remote.git" log "$feature_branch" -1 --pretty=%s)"
+remote_commit="$(git -C "$FAKE_REMOTE" log "$feature_branch" -1 --pretty=%s)"
 [[ "$remote_commit" =~ ^feat: ]] || fail "remote commit subject = '$remote_commit'"
 
 printf '\n\033[1;32mPHASE LIFECYCLE OK\033[0m\n'
