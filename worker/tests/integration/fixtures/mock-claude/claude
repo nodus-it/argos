@@ -8,6 +8,12 @@
 #
 # Marker: "Konzept-Aufgabe" → concept, "Implement-Phase" → implement,
 # "Commit-Message generieren" → commit-message.
+#
+# MOCK_CLAUDE_ERROR_MODE überschreibt alle Phase-Antworten fuer Fehlerszenarien:
+#   rate_limit   — is_error=true, "rate limit exceeded"
+#   auth_error   — is_error=true, "invalid api key — 401 unauthorized"
+#   empty_result — is_error=false, result=""
+#   invalid_json — gibt kein valides JSON aus
 set -euo pipefail
 IFS=$'\n\t'
 
@@ -28,6 +34,25 @@ while [[ $# -gt 0 ]]; do
 done
 
 stdin="$(cat)"
+
+# Error-Modus überschreibt normale Phase-Antworten.
+if [[ -n "${MOCK_CLAUDE_ERROR_MODE:-}" ]]; then
+    case "$MOCK_CLAUDE_ERROR_MODE" in
+        rate_limit)
+            printf '{"type":"result","subtype":"error","is_error":true,"result":"rate limit exceeded — please retry later","session_id":"mock-err","total_cost_usd":0}\n'
+            ;;
+        auth_error)
+            printf '{"type":"result","subtype":"error","is_error":true,"result":"invalid api key — 401 unauthorized","session_id":"mock-err","total_cost_usd":0}\n'
+            ;;
+        empty_result)
+            printf '{"type":"result","subtype":"success","is_error":false,"result":"","session_id":"mock-err","total_cost_usd":0}\n'
+            ;;
+        invalid_json)
+            printf 'NOT VALID JSON\n'
+            ;;
+    esac
+    exit 0
+fi
 
 mode=unknown
 if [[ "$stdin" == *"Konzept-Aufgabe"* ]]; then mode=concept
