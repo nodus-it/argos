@@ -61,4 +61,25 @@ class StatsOverviewWidgetTest extends TestCase
         Livewire::test(StatsOverviewWidget::class)
             ->assertSee('0');
     }
+
+    public function test_kosten_und_tokens_werden_aggregiert(): void
+    {
+        PhaseRun::factory()->create([
+            'cost_usd' => 0.25,
+            'input_tokens' => 1500,
+            'output_tokens' => 500,
+            'finished_at' => now(),
+        ]);
+        PhaseRun::factory()->create([
+            'cost_usd' => 0.75,
+            'input_tokens' => 2000,
+            'output_tokens' => 1000,
+            'finished_at' => now()->subDay(),
+        ]);
+
+        Livewire::test(StatsOverviewWidget::class)
+            ->assertSee('$1.0000')   // total
+            ->assertSee('$0.2500')   // today
+            ->assertSee('5,000');    // total tokens
+    }
 }

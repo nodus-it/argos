@@ -1,24 +1,38 @@
 <x-filament-panels::page>
     <div class="space-y-6">
 
-        <x-filament::section heading="Claude OAuth Token">
-            <div class="flex items-center gap-3">
-                @if ($claudeTokenSet)
-                    <x-filament::badge color="success">gesetzt</x-filament::badge>
-                    <span class="text-sm text-gray-500 dark:text-gray-400">
-                        Token ist über <code>CLAUDE_CODE_OAUTH_TOKEN</code> konfiguriert.
-                    </span>
-                @else
-                    <x-filament::badge color="danger">nicht gesetzt</x-filament::badge>
-                    <span class="text-sm text-gray-500 dark:text-gray-400">
-                        <code>CLAUDE_CODE_OAUTH_TOKEN</code> fehlt — Phasen können nicht ausgeführt werden.
-                    </span>
-                @endif
-            </div>
-            @if (!$claudeTokenSet)
-                @include('filament.admin.partials.claude-token-help')
+        <div class="flex items-center gap-3">
+            @if ($tokenSource === 'env')
+                <x-filament::badge color="success">gesetzt</x-filament::badge>
+                <span class="text-sm text-gray-500 dark:text-gray-400">
+                    Token kommt aus <code>CLAUDE_CODE_OAUTH_TOKEN</code> (ENV).
+                </span>
+            @elseif ($tokenSource === 'file')
+                <x-filament::badge color="success">gesetzt</x-filament::badge>
+                <span class="text-sm text-gray-500 dark:text-gray-400">
+                    Token ist im Config-Verzeichnis hinterlegt.
+                </span>
+            @else
+                <x-filament::badge color="danger">nicht gesetzt</x-filament::badge>
+                <span class="text-sm text-gray-500 dark:text-gray-400">
+                    Phasen können nicht ausgeführt werden, bis ein Token hinterlegt ist.
+                </span>
             @endif
-        </x-filament::section>
+        </div>
+
+        <form wire:submit="save">
+            {{ $this->form }}
+
+            <div class="mt-4 flex flex-wrap gap-2">
+                @foreach ($this->getFormActions() as $action)
+                    {{ $action }}
+                @endforeach
+            </div>
+        </form>
+
+        @if ($tokenSource === 'none')
+            @include('filament.admin.partials.claude-token-help')
+        @endif
 
         <x-filament::section heading="Datenbank">
             <p class="text-sm text-gray-700 dark:text-gray-300">

@@ -95,7 +95,21 @@ class TaskResourceTest extends TestCase
 
         $task = Task::where('name', 'Auto Task')->first();
         $this->assertEquals(WorkflowStatus::ConceptRunning, $task->workflow_status);
+        $this->assertSame('concept', $task->current_phase);
+        $this->assertSame('pending', $task->current_status);
         Bus::assertDispatched(RunPhaseJob::class, fn ($job) => $job->phase === 'concept');
+    }
+
+    public function test_table_phase_action_marks_task_pending(): void
+    {
+        $task = Task::factory()->create();
+
+        Livewire::test(ListTasks::class)
+            ->callAction(TestAction::make('concept')->table($task));
+
+        $task->refresh();
+        $this->assertSame('concept', $task->current_phase);
+        $this->assertSame('pending', $task->current_status);
     }
 
     public function test_create_requires_name_and_project(): void
@@ -154,5 +168,34 @@ class TaskResourceTest extends TestCase
             ->assertNotified();
 
         Bus::assertNotDispatched(RunPhaseJob::class);
+    }
+
+    public function test_list_shows_aggregated_cost_per_task(): void
+    {
+        $task = Task::factory()->create();
+        $task->phaseRuns()->create([
+            'phase' => 'concept',
+            'iteration' => 1,
+            'status' => 'completed',
+            'started_at' => now()->subMinute(),
+            'finished_at' => now(),
+            'cost_usd' => 0.1234,
+            'input_tokens' => 1000,
+            'output_tokens' => 500,
+        ]);
+        $task->phaseRuns()->create([
+            'phase' => 'implement',
+            'iteration' => 1,
+            'status' => 'completed',
+            'started_at' => now()->subMinute(),
+            'finished_at' => now(),
+            'cost_usd' => 0.5,
+            'input_tokens' => 2000,
+            'output_tokens' => 1000,
+        ]);
+
+        Livewire::test(ListTasks::class)
+            ->assertSuccessful()
+            ->assertSee('$0.6234');
     }
 }

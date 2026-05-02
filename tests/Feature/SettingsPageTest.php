@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Domain\Credentials\CredentialStore;
 use App\Filament\Admin\Pages\Settings;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -14,10 +15,26 @@ class SettingsPageTest extends TestCase
 {
     use RefreshDatabase;
 
+    private string $tmpDir;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->actingAs(User::factory()->create());
+
+        $this->tmpDir = sys_get_temp_dir().'/argos_settings_'.uniqid();
+        mkdir($this->tmpDir, 0700, true);
+        config(['argos.config_dir' => $this->tmpDir]);
+        config(['argos.claude_token' => null]);
+    }
+
+    protected function tearDown(): void
+    {
+        foreach (glob($this->tmpDir.'/*') ?: [] as $f) {
+            unlink($f);
+        }
+        @rmdir($this->tmpDir);
+        parent::tearDown();
     }
 
     public function test_settings_page_renders(): void
@@ -56,5 +73,56 @@ class SettingsPageTest extends TestCase
 
         Livewire::test(Settings::class)
             ->assertSee('argos-worker:local');
+    }
+
+    public function test_save_persists_token_to_credential_store(): void
+    {
+        Livewire::test(Settings::class)
+            ->fillForm(['claude_token' => 'sk-ant-oat01-fresh'])
+            ->call('save')
+            ->assertNotified();
+
+        $this->assertSame('sk-ant-oat01-fresh', app(CredentialStore::class)->getClaudeToken());
+    }
+
+    public function test_save_with_empty_token_warns_and_does_not_persist(): void
+    {
+        Livewire::test(Settings::class)
+            ->fillForm(['claude_token' => ''])
+            ->call('save')
+            ->assertNotified();
+
+        $this->assertNull(app(CredentialStore::class)->getClaudeToken());
+    }
+
+    public function test_save_does_not_overwrite_when_env_token_is_present(): void
+    {
+        config(['argos.claude_token' => 'env-managed']);
+
+        Livewire::test(Settings::class)
+            ->fillForm(['claude_token' => 'attempted-override'])
+            ->call('save')
+            ->assertNotified();
+
+        $this->assertNull(app(CredentialStore::class)->getClaudeToken());
+    }
+
+    public function test_clear_token_removes_file_token(): void
+    {
+        app(CredentialStore::class)->setClaudeToken('tok-to-be-removed');
+
+        Livewire::test(Settings::class)
+            ->call('clearToken')
+            ->assertNotified();
+
+        $this->assertNull(app(CredentialStore::class)->getClaudeToken());
+    }
+
+    public function test_token_input_disabled_when_env_source(): void
+    {
+        config(['argos.claude_token' => 'env-tok']);
+
+        Livewire::test(Settings::class)
+            ->assertSee('CLAUDE_CODE_OAUTH_TOKEN');
     }
 }

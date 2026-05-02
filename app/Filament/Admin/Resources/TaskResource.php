@@ -14,6 +14,7 @@ use App\Filament\Admin\Resources\TaskResource\Pages\ViewTaskLogs;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTaskRespond;
 use App\Filament\Admin\Resources\TaskResource\RelationManagers\PhaseRunsRelationManager;
 use App\Jobs\RunPhaseJob;
+use App\Models\PhaseRun;
 use App\Models\RepoProfile;
 use App\Models\Task;
 use Filament\Actions\Action;
@@ -30,6 +31,7 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class TaskResource extends Resource
 {
@@ -97,6 +99,7 @@ class TaskResource extends Resource
                     ->label('Status')
                     ->badge()
                     ->color(fn (?string $state): string => match ($state) {
+                        'pending' => 'gray',
                         'running' => 'warning',
                         'completed' => 'success',
                         'failed' => 'danger',
@@ -111,6 +114,23 @@ class TaskResource extends Resource
                     ->badge()
                     ->color(fn (?WorkflowStatus $state): string => $state?->color() ?? 'gray')
                     ->formatStateUsing(fn (?WorkflowStatus $state): string => $state?->label() ?? '—'),
+
+                TextColumn::make('cost_total')
+                    ->label('Kosten')
+                    ->sortable()
+                    ->formatStateUsing(fn ($state): string => $state !== null && (float) $state > 0
+                        ? '$'.number_format((float) $state, 4)
+                        : '—'
+                    ),
+
+                TextColumn::make('tokens_total')
+                    ->label('Tokens')
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->formatStateUsing(fn ($state): string => $state !== null && (int) $state > 0
+                        ? number_format((int) $state)
+                        : '—'
+                    ),
 
                 TextColumn::make('created_at')
                     ->label('Erstellt')
@@ -143,6 +163,17 @@ class TaskResource extends Resource
         ];
     }
 
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->withSum('phaseRuns as cost_total', 'cost_usd')
+            ->addSelect([
+                'tokens_total' => PhaseRun::query()
+                    ->selectRaw('COALESCE(SUM(input_tokens), 0) + COALESCE(SUM(output_tokens), 0)')
+                    ->whereColumn('phase_runs.task_id', 'tasks.id'),
+            ]);
+    }
+
     public static function getPages(): array
     {
         return [
@@ -167,6 +198,7 @@ class TaskResource extends Resource
 
                     return;
                 }
+                $record->update(['current_phase' => $phase, 'current_status' => 'pending']);
                 RunPhaseJob::dispatch($record->id, $phase);
                 Notification::make()->title("{$label} gestartet")->success()->send();
             });

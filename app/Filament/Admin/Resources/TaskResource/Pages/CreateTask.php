@@ -24,7 +24,11 @@ class CreateTask extends CreateRecord
         Process::fromShellCommandline('docker volume create '.escapeshellarg($record->volumeName()))->run();
 
         if ($record->auto_concept) {
-            $record->update(['workflow_status' => WorkflowStatus::ConceptRunning]);
+            $record->update([
+                'workflow_status' => WorkflowStatus::ConceptRunning,
+                'current_phase' => 'concept',
+                'current_status' => 'pending',
+            ]);
             RunPhaseJob::dispatch($record->id, 'concept');
         }
 

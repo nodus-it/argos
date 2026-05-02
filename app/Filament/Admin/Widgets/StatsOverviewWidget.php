@@ -17,6 +17,12 @@ class StatsOverviewWidget extends BaseWidget
     {
         $activePhases = PhaseRun::where('status', 'running')->count();
 
+        $totalCost = (float) PhaseRun::sum('cost_usd');
+        $costToday = (float) PhaseRun::whereDate('finished_at', today())->sum('cost_usd');
+        $tokensTotal = (int) PhaseRun::query()
+            ->selectRaw('COALESCE(SUM(input_tokens), 0) + COALESCE(SUM(output_tokens), 0) as total')
+            ->value('total');
+
         return [
             Stat::make('Tasks gesamt', Task::count()),
 
@@ -30,6 +36,13 @@ class StatsOverviewWidget extends BaseWidget
                     ->count()
             )
                 ->color('success'),
+
+            Stat::make('Kosten gesamt', '$'.number_format($totalCost, 4))
+                ->description('heute: $'.number_format($costToday, 4))
+                ->color($totalCost > 0 ? 'primary' : 'gray'),
+
+            Stat::make('Tokens gesamt', number_format($tokensTotal))
+                ->color($tokensTotal > 0 ? 'primary' : 'gray'),
         ];
     }
 }
