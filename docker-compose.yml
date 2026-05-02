@@ -1,15 +1,15 @@
-# Argos — Docker Compose (lokale Entwicklung)
+# Argos — Docker Compose (local development)
 #
-# Zwei Images:
-#   manager  — Laravel-App, Web-UI, Queue-Worker, MariaDB (all-in-one)
-#   worker   — Claude Code, Phasen-Runner (wird per `docker run` vom Manager gestartet)
+# Two images:
+#   manager  — Laravel app, web UI, queue worker, MariaDB (all in one)
+#   worker   — Claude Code + phase runner (started by the manager via `docker run`)
 #
-# Der worker-Service hier dient nur zum lokalen Image-Build.
-# PhaseRunner startet Worker-Container direkt via `docker run`, nicht via compose.
+# The `worker` service below exists only to build the image locally.
+# PhaseRunner launches worker containers via `docker run`, not via compose.
 #
-# Profile:
-#   (kein Profile)  — nur Manager (inkl. integrierter MariaDB)
-#   build-only      — nur zum Bauen des Worker-Images
+# Profiles:
+#   (no profile)  — manager only (with the embedded MariaDB)
+#   build-only    — only used to build the worker image
 
 services:
 
@@ -24,16 +24,16 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - argos-data:/data
       - argos-db:/var/lib/mysql
-      # Bind-Mount für lokale Entwicklung (hot-reload ohne Image-Rebuild)
+      # Bind mount for local development (hot reload without rebuilding the image).
       - .:/app
-      - /app/vendor            # vendor aus Image nutzen, nicht vom Host überschreiben
-      - /app/node_modules      # dto.
-      - /app/public/build      # dto.
-      - /app/bootstrap/cache   # dto. — cache ohne dev-only providers (kein Pail)
+      - /app/vendor            # use vendor from the image, don't shadow with the host's
+      - /app/node_modules      # ditto
+      - /app/public/build      # ditto
+      - /app/bootstrap/cache   # ditto — cache without dev-only providers (no Pail)
     environment:
       APP_ENV:                  "${APP_ENV:-local}"
       APP_DEBUG:                "${APP_DEBUG:-true}"
-      APP_KEY:                  "${APP_KEY:?APP_KEY must be set}"
+      APP_KEY:                  "${APP_KEY:-}"
       CLAUDE_CODE_OAUTH_TOKEN:  "${CLAUDE_CODE_OAUTH_TOKEN:-}"
       ARGOS_WORKER_IMAGE:       "${ARGOS_WORKER_IMAGE:-argos-worker:latest}"
       ARGOS_CONFIG_DIR:         /data/config
@@ -41,7 +41,7 @@ services:
       QUEUE_CONNECTION:         database
       SESSION_DRIVER:           database
       CACHE_STORE:              database
-      # MariaDB läuft im selben Container — Verbindung via Unix-Socket
+      # MariaDB runs in the same container — connect via the Unix socket.
       ARGOS_DB_HOST:            "127.0.0.1"
       ARGOS_DB_PORT:            "3306"
       ARGOS_DB_SOCKET:          "/run/mysqld/mysqld.sock"
@@ -55,8 +55,8 @@ services:
       context: ./worker
       dockerfile: docker/Dockerfile
       target: worker
-    # Kein Start via compose — wird per `docker run` vom Manager gestartet.
-    # Dieser Service existiert nur damit `docker compose build worker` funktioniert.
+    # Not started via compose — the manager spawns workers via `docker run`.
+    # This service exists only so `docker compose build worker` works.
     profiles:
       - build-only
     volumes:

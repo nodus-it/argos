@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# worker-entrypoint.sh — Phase-Dispatcher im Container.
+# worker-entrypoint.sh — phase dispatcher inside the container.
 #
-# Wird vom Compose-Service `worker` als ENTRYPOINT aufgerufen mit
+# Invoked as the `worker` compose service ENTRYPOINT with
 #   <phase> <task_id>
-# fuer Phase-Aufrufe oder mit beliebigen Commands fuer ad-hoc Operationen
-# (echo, bash, etc.). Siehe IMPLEMENTATION.md Abschnitt 4.
+# for phase calls, or with an arbitrary command for ad-hoc work
+# (echo, bash, etc.).
 
 set -euo pipefail
 IFS=$'\n\t'
 
-# Pfad zum installierten Code im Image.
+# Path to the installed code inside the image.
 AGENT_SHARE="${AGENT_SHARE:-/usr/local/share/agent}"
 LIB_DIR="${LIB_DIR:-$AGENT_SHARE/lib}"
 PHASES_DIR="${PHASES_DIR:-$AGENT_SHARE/phases}"
@@ -25,22 +25,22 @@ usage() {
     cat <<'USAGE' >&2
 Usage:
   worker-entrypoint.sh <phase> <task_id>
-  worker-entrypoint.sh shell           — interaktive bash, /workspace gemountet
+  worker-entrypoint.sh shell           — interactive bash, /workspace mounted
   worker-entrypoint.sh -h | --help
 
-Bekannte Phasen:
+Known phases:
   concept | implement | diff | push | commit-message
 USAGE
 }
 
-# _ep_die: Echo + exit. Fuer den Pre-Dispatch-Pfad bevor lib/error.sh gesourced ist.
+# _ep_die: echo + exit. Used in the pre-dispatch path before lib/error.sh is sourced.
 _ep_die() {
     local code="$1"; shift
     [[ $# -gt 0 ]] && echo "Error: $*" >&2
     exit "$code"
 }
 
-# _ep_load_libs: Sourcet die noetigen Lib-Files. Reihenfolge wichtig (deps).
+# _ep_load_libs: source the required libraries; order matters (dependencies).
 _ep_load_libs() {
     # shellcheck disable=SC1091
     source "$LIB_DIR/logging.sh"
@@ -60,9 +60,9 @@ _ep_load_libs() {
     source "$PHASES_DIR/registry.sh"
 }
 
-# _ep_validate_env: Prueft Env-Variablen je nach Phase.
+# _ep_validate_env: check env variables per phase.
 # Args: $1=phase
-# Returns: 0 wenn ok, sonst exit-code.
+# Returns: 0 if ok, otherwise the exit code.
 _ep_validate_env() {
     local phase="$1"
     case "$phase" in
@@ -85,18 +85,17 @@ _ep_validate_env() {
     return 0
 }
 
-# _ep_init_state: Erstellt state.json falls noch nicht da.
+# _ep_init_state: create state.json if it doesn't exist yet.
 _ep_init_state() {
     local task_id="$1"
     if [[ ! -f "$STATE_FILE" ]]; then
-        log_info "init: erstelle $STATE_FILE"
+        log_info "init: creating $STATE_FILE"
         state_init "$task_id" "${REPO_URL:-}" "${BASE_BRANCH:-}"
     fi
 }
 
-# _ep_dispatch_phase: Komplettes Phase-Lifecycle: Lock, State, Run, Result.
+# _ep_dispatch_phase: full phase lifecycle — lock, state, run, result.
 # Args: $1=phase, $2=task_id
-# Returns: Exit-Code der Phase.
 _ep_dispatch_phase() {
     local phase="$1"
     local task_id="$2"
@@ -104,34 +103,30 @@ _ep_dispatch_phase() {
     _ep_init_state "$task_id"
 
     if ! state_validate; then
-        _ep_die "$EXIT_GENERAL" "state.json invalid (siehe oben)"
+        _ep_die "$EXIT_GENERAL" "state.json invalid (see above)"
     fi
 
-    # Lock setzen
     if ! lock_acquire "$phase"; then
         return "$EXIT_LOCK"
     fi
 
-    # Trap fuer Cleanup
     local phase_exit=1
     # shellcheck disable=SC2064
     trap "_ep_on_exit '$phase' '$task_id'" EXIT
     trap '_ep_on_signal' INT TERM
 
-    # Iteration anlegen — PHASE_FLAGS muss valides JSON sein (default '{}')
+    # PHASE_FLAGS must be valid JSON (default '{}').
     local flags_json="${PHASE_FLAGS:-}"
     [[ -z "$flags_json" ]] && flags_json='{}'
     ITERATION="$(state_add_iteration "$phase" "$flags_json")"
     export ITERATION
     log_info "phase $phase: iteration $ITERATION started"
 
-    # Phase laden
     if ! phase_load "$phase"; then
         state_update_iteration "$phase" "$ITERATION" failed 1 "phase_load failed"
         return 1
     fi
 
-    # Vorbedingungen
     local pre_func="phase_${phase//-/_}_preconditions"
     if declare -F "$pre_func" >/dev/null; then
         local pre_exit=0
@@ -142,7 +137,6 @@ _ep_dispatch_phase() {
         fi
     fi
 
-    # Phase ausfuehren
     local run_func="phase_${phase//-/_}_run"
     if ! declare -F "$run_func" >/dev/null; then
         state_update_iteration "$phase" "$ITERATION" failed 1 "run-function $run_func not found"
@@ -154,7 +148,7 @@ _ep_dispatch_phase() {
     phase_exit=$?
     set -e
 
-    # Status aus exit-code ableiten
+    # Derive the status from the exit code.
     local status err
     case "$phase_exit" in
         0) status=completed ;;
@@ -167,7 +161,7 @@ _ep_dispatch_phase() {
     return "$phase_exit"
 }
 
-# _ep_on_exit: Trap fuer EXIT — Lock release, Logging.
+# _ep_on_exit: trap for EXIT — release the lock, log.
 _ep_on_exit() {
     local phase="$1"
     local task_id="$2"
@@ -175,7 +169,7 @@ _ep_on_exit() {
     log_debug "exit: phase=$phase task=$task_id"
 }
 
-# _ep_on_signal: Trap fuer INT/TERM — Lock release + state-update.
+# _ep_on_signal: trap for INT/TERM — release the lock and exit.
 _ep_on_signal() {
     log_warn "signal received — releasing lock and exiting"
     lock_release || true

@@ -2,7 +2,7 @@
 
     <div class="max-w-2xl mx-auto space-y-6">
 
-        {{-- Schritt 1: Umgebung --}}
+        {{-- Step 1: environment check --}}
         <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden">
             <div class="flex items-center gap-3 px-5 py-3 border-b border-gray-100 dark:border-gray-800">
                 <span class="flex h-6 w-6 items-center justify-center rounded-full bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400 text-xs font-bold">1</span>
@@ -33,7 +33,7 @@
             </div>
         </div>
 
-        {{-- Schritt 2: Erstes Projekt --}}
+        {{-- Step 2: first project --}}
         <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden">
             <div class="flex items-center gap-3 px-5 py-3 border-b border-gray-100 dark:border-gray-800">
                 <span class="flex h-6 w-6 items-center justify-center rounded-full bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400 text-xs font-bold">2</span>

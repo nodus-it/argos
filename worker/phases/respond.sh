@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# phases/respond.sh — Phase respond: Review-Feedback einarbeiten.
+# phases/respond.sh — respond phase: incorporate review feedback.
 #
-# Liest /workspace/.agent/respond.feedback.md (vom Host via PhaseRunner geschrieben),
-# fuehrt eine Claude-Session durch und arbeitet das Feedback in den bestehenden
-# Feature-Branch ein. Quality-Gates werden anschliessend verifiziert.
-# Danach: push-Phase starten um den aktualisierten Branch zu pushen.
+# Reads /workspace/.agent/respond.feedback.md (written from the host by the
+# PhaseRunner), runs a Claude session, and applies the feedback to the
+# existing feature branch. Quality gates are verified afterwards. Run the
+# push phase next to push the updated branch.
 
 # shellcheck shell=bash
 
@@ -36,7 +36,7 @@ phase_respond_preconditions() {
     return 0
 }
 
-# _respond_build_user_prompt: Erzeugt User-Prompt fuer Claude-Respond-Session.
+# _respond_build_user_prompt: produce the user prompt for the Claude respond session.
 _respond_build_user_prompt() {
     local feedback_file=/workspace/.agent/respond.feedback.md
     local concept_file=/workspace/.agent/concept.md
@@ -67,13 +67,11 @@ phase_respond_run() {
     started_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
     started_epoch=$(date -u +%s)
 
-    # System-Prompt
     local sysprompt
     sysprompt="$(build_system_prompt respond)" || return 1
     local sysprompt_content
     sysprompt_content="$(cat "$sysprompt")"
 
-    # User-Prompt
     local user_prompt_path
     user_prompt_path="$(_respond_build_user_prompt | render_user_prompt respond user-prompt)"
 
@@ -81,7 +79,7 @@ phase_respond_run() {
     local result_json="/workspace/.agent/logs/respond.${ITERATION}.result.json"
     local max_turns="${MAX_TURNS:-50}"
 
-    log_info "respond: rufe claude (stream-json, max-turns $max_turns) auf"
+    log_info "respond: calling claude (stream-json, max-turns $max_turns)"
 
     set +e
     claude -p \
@@ -105,7 +103,7 @@ phase_respond_run() {
     set -e
 
     if [[ ! -s "$result_json" ]]; then
-        echo "respond: stream-json lieferte kein result-Event" >&2
+        echo "respond: stream-json produced no result event" >&2
         return 3
     fi
 
@@ -127,8 +125,8 @@ phase_respond_run() {
         log_warn "respond: claude exited with code $claude_exit"
     fi
 
-    # Quality-Gates (gleiche Logik wie implement)
-    log_info "respond: verifiziere Quality-Gates"
+    # Quality gates — same logic as implement.
+    log_info "respond: verifying quality gates"
     local gates='{"pint":"skip","pest":"skip","phpunit":"skip","phpstan":"skip"}'
     local failed_gate=""
 

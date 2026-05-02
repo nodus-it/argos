@@ -1,11 +1,9 @@
 <x-filament-panels::page>
 
-    {{-- Stat Summary --}}
     @if(trim($stat) !== '')
         <div class="rounded-xl border border-slate-600 bg-slate-800 px-4 py-3 font-mono text-xs text-slate-200 whitespace-pre-wrap leading-5">{{ $stat }}</div>
     @endif
 
-    {{-- Diff Viewer --}}
     @if($isEmpty)
         <div class="flex flex-col items-center justify-center py-20 gap-3">
             <x-heroicon-o-check-circle class="h-12 w-12 text-emerald-500/50" />
@@ -19,7 +17,6 @@
                 <div x-data="{ open: true }"
                      class="rounded-lg border border-slate-600 overflow-hidden bg-slate-900">
 
-                    {{-- File header --}}
                     <button type="button" x-on:click="open = !open"
                             class="w-full flex items-center justify-between px-4 py-2.5 bg-slate-800 hover:bg-slate-700 transition-colors text-left gap-3">
                         <div class="flex items-center gap-2 min-w-0">
@@ -41,17 +38,14 @@
                         </div>
                     </button>
 
-                    {{-- Diff content --}}
                     <div x-show="open" x-collapse>
                         <table class="w-full border-collapse font-mono text-xs leading-5">
                             @foreach($file['hunks'] as $hunk)
-                                {{-- Hunk header --}}
                                 <tr class="bg-sky-900/40 border-t border-b border-sky-800/50">
                                     <td class="w-12 px-2 py-1 text-slate-500 select-none text-right"></td>
                                     <td class="w-12 px-2 py-1 text-slate-500 select-none text-right"></td>
                                     <td class="px-3 py-1 text-sky-300/90 font-semibold">{{ $hunk['header'] }}</td>
                                 </tr>
-                                {{-- Lines --}}
                                 @foreach($hunk['lines'] as $dline)
                                     <tr @class([
                                         'border-b border-slate-700/50',
@@ -82,7 +76,6 @@
         </div>
     @endif
 
-    {{-- Timestamp --}}
     <p class="text-xs text-slate-600 text-right font-mono">Geladen: {{ $updatedAt }}</p>
 
 </x-filament-panels::page>

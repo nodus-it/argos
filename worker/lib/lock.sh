@@ -1,31 +1,29 @@
 #!/usr/bin/env bash
-# lib/lock.sh — Phase-Lock per File im Workspace.
+# lib/lock.sh — file-based phase lock inside the workspace.
 #
-# Lock liegt unter $LOCK_FILE (default /workspace/.agent/.lock) und enthält
-# JSON mit pid, phase, started_at. Stale-Locks (> LOCK_STALE_SECONDS) werden
-# nicht automatisch entfernt — der Benutzer muss `--force-unlock` setzen.
-#
-# Siehe IMPLEMENTATION.md Abschnitt 6.
+# Lock lives at $LOCK_FILE (default /workspace/.agent/.lock) and contains
+# JSON with pid, phase, started_at. Stale locks (> LOCK_STALE_SECONDS) are
+# *not* removed automatically — the user must pass `--force-unlock`.
 
 # shellcheck shell=bash
 
 LOCK_FILE="${LOCK_FILE:-/workspace/.agent/.lock}"
-# Default: 4 Stunden, override fuer Tests via LOCK_STALE_SECONDS=...
+# Default 4 hours; tests override via LOCK_STALE_SECONDS=...
 LOCK_STALE_SECONDS="${LOCK_STALE_SECONDS:-14400}"
 
-# _lock_now_epoch: Aktueller Unix-Timestamp (UTC).
+# _lock_now_epoch: current Unix timestamp (UTC).
 _lock_now_epoch() {
     date -u +%s
 }
 
-# _lock_iso_now: Aktueller ISO8601-UTC-Timestamp.
+# _lock_iso_now: current ISO8601 UTC timestamp.
 _lock_iso_now() {
     date -u +"%Y-%m-%dT%H:%M:%SZ"
 }
 
-# lock_acquire: Versucht den Lock zu setzen. Schreibt JSON via .tmp+mv.
+# lock_acquire: try to take the lock. Writes JSON via .tmp+mv.
 # Args: $1=phase
-# Returns: 0 wenn Lock akquiriert, 6 wenn jemand anderes lockt.
+# Returns: 0 if acquired, 6 if someone else already holds the lock.
 lock_acquire() {
     local phase="$1"
     mkdir -p "$(dirname "$LOCK_FILE")"
@@ -35,9 +33,9 @@ lock_acquire() {
         existing_phase="$(jq -r '.phase // "unknown"' "$LOCK_FILE" 2>/dev/null || echo unknown)"
         existing_started="$(jq -r '.started_at // "unknown"' "$LOCK_FILE" 2>/dev/null || echo unknown)"
         if lock_is_stale; then
-            echo "Lock ist stale ($existing_phase seit $existing_started, älter als ${LOCK_STALE_SECONDS}s) — erneute Acquisition braucht --force-unlock." >&2
+            echo "Lock is stale ($existing_phase since $existing_started, older than ${LOCK_STALE_SECONDS}s) — re-acquisition needs --force-unlock." >&2
         else
-            echo "Lock bereits gesetzt: $existing_phase seit $existing_started" >&2
+            echo "Lock already held: $existing_phase since $existing_started" >&2
         fi
         return 6
     fi
@@ -50,20 +48,18 @@ lock_acquire() {
     mv "${LOCK_FILE}.tmp" "$LOCK_FILE"
 }
 
-# lock_release: Entfernt den Lock-File (idempotent).
-# Returns: 0 immer.
+# lock_release: remove the lock file (idempotent).
 lock_release() {
     rm -f "$LOCK_FILE"
 }
 
-# lock_force_release: Entfernt den Lock auch wenn er existiert. Fuer --force-unlock.
-# Returns: 0 immer.
+# lock_force_release: remove the lock even if it exists. Used by --force-unlock.
 lock_force_release() {
     rm -f "$LOCK_FILE"
 }
 
-# lock_is_stale: Prueft ob der bestehende Lock-File aelter als LOCK_STALE_SECONDS ist.
-# Returns: 0 wenn stale, 1 wenn nicht stale oder kein Lock vorhanden.
+# lock_is_stale: true if the existing lock is older than LOCK_STALE_SECONDS.
+# Returns: 0 if stale, 1 if fresh or no lock present.
 lock_is_stale() {
     [[ -f "$LOCK_FILE" ]] || return 1
     local started_at started_epoch now_epoch age
@@ -75,8 +71,8 @@ lock_is_stale() {
     (( age >= LOCK_STALE_SECONDS ))
 }
 
-# lock_info: Gibt Phase + started_at + pid des aktuellen Locks tab-separiert aus.
-# Returns: 0; gibt nichts aus wenn kein Lock vorhanden.
+# lock_info: print phase + started_at + pid of the current lock, tab-separated.
+# Prints nothing if no lock is present.
 lock_info() {
     [[ -f "$LOCK_FILE" ]] || return 0
     jq -r '"\(.phase)\t\(.started_at)\t\(.pid)"' "$LOCK_FILE" 2>/dev/null

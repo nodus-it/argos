@@ -1,33 +1,31 @@
 #!/usr/bin/env bash
-# lib/parse_args.sh — Argument-Parser fuer die agent-CLI.
+# lib/parse_args.sh — argument parser for the agent CLI.
 #
-# Setzt nach Aufruf folgende globale Variablen (siehe IMPLEMENTATION.md 8.1):
-#   ARG_COMMAND          erstes positional, z.B. "concept", "task", "init"
-#   ARG_SUBCOMMAND       zweites positional fuer Subcommand-Familien
-#                        (aktuell nur "task" hat Subcommands: new|list|show|delete)
-#   ARG_TASK_ID          das erste positional nach Command/Subcommand
-#   ARG_FLAG_<NAME>      gesetzt fuer jedes long-Flag, "true" fuer Boolean
-#                        oder der Wert fuer --flag=value bzw. --flag value
-#   ARG_REMAINING        Array der noch nicht zugeordneten positionals
+# After parse_args runs, these globals are set:
+#   ARG_COMMAND          first positional, e.g. "concept", "task", "init"
+#   ARG_SUBCOMMAND       second positional for subcommand families
+#                        (currently only "task" has subcommands: new|list|show|delete)
+#   ARG_TASK_ID          first positional after command/subcommand
+#   ARG_FLAG_<NAME>      one entry per long flag; "true" for booleans or
+#                        the value for --flag=value / --flag value
+#   ARG_REMAINING        array of unconsumed positionals
 #
-# Konvention: Flag-Namen werden zu UPPER_SNAKE umgewandelt:
+# Naming: flags map to UPPER_SNAKE_CASE.
 #   --fresh         -> ARG_FLAG_FRESH=true
 #   --max-turns=50  -> ARG_FLAG_MAX_TURNS=50
 #   --auto-cleanup  -> ARG_FLAG_AUTO_CLEANUP=true
 
 # shellcheck shell=bash
 # shellcheck disable=SC2034
-# (ARG_* Variables werden vom Caller gelesen, nicht von dieser Datei.)
+# (ARG_* variables are read by callers, not by this file.)
 
-# Subcommand-Familien: Commands, deren erstes positional ein Subcommand ist.
 PARSE_ARGS_SUBCOMMAND_FAMILIES=(task)
 
-# Long-Flags die einen separaten Wert erwarten (--name value).
+# Long flags that take a separate value (--name value).
 PARSE_ARGS_VALUED_FLAGS=(max-turns file phase iteration task-description)
 
-# parse_args: Parsed CLI-Argumente und setzt globale Variablen.
-# Args: $@ = vollstaendige Kommandozeile (ohne $0)
-# Returns: 0 immer.
+# parse_args: parse CLI arguments into the globals listed in the header.
+# Args: $@ = the full command line (without $0)
 parse_args() {
     ARG_COMMAND=""
     ARG_SUBCOMMAND=""
@@ -97,8 +95,8 @@ parse_args() {
     ARG_REMAINING=("${positionals[@]}")
 }
 
-# _parse_args_set_flag: Setzt ARG_FLAG_<UPPER_SNAKE> = value.
-# Args: $1=name (long-flag, ohne --), $2=value
+# _parse_args_set_flag: set ARG_FLAG_<UPPER_SNAKE> = value.
+# Args: $1=name (long flag without --), $2=value
 _parse_args_set_flag() {
     local raw="$1"
     local val="$2"
@@ -107,7 +105,6 @@ _parse_args_set_flag() {
     printf -v "ARG_FLAG_$upper" '%s' "$val"
 }
 
-# _parse_args_is_subcommand_family: Prueft ob $1 in PARSE_ARGS_SUBCOMMAND_FAMILIES ist.
 _parse_args_is_subcommand_family() {
     local needle="$1"
     local item
@@ -117,7 +114,6 @@ _parse_args_is_subcommand_family() {
     return 1
 }
 
-# _parse_args_is_valued_flag: Prueft ob $1 in PARSE_ARGS_VALUED_FLAGS ist.
 _parse_args_is_valued_flag() {
     local needle="$1"
     local item

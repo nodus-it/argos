@@ -100,7 +100,6 @@ class ViewTaskLogs extends Page
 
         $content = file_get_contents($logPath) ?: '';
 
-        // Letzte 500 Zeilen
         $lines = explode("\n", $content);
         if (count($lines) > 500) {
             $lines = array_slice($lines, -500);
@@ -119,7 +118,6 @@ class ViewTaskLogs extends Page
 
         $result = [];
         foreach (explode("\n", $content) as $raw) {
-            // ANSI-Escape-Codes entfernen
             $line = (string) preg_replace('/\033\[[0-9;]*[mGKHFABCDJsu]/', '', $raw);
 
             $class = match (true) {

@@ -13,17 +13,16 @@
         $phaseRun = fn(string $phase) => ($phaseRuns[$phase] ?? collect())->last();
         $phaseStatus = fn(string $phase) => $phaseRun($phase)?->status ?? 'pending';
 
-        // Eine Phase ist offen, wenn sie die aktuelle Phase ist — oder wenn noch keine
-        // Phase gelaufen ist und es concept ist.
+        // A phase is open if it is the current one, or if no phase has run yet
+        // and we're showing concept.
         $currentPhase = $record->current_phase;
         $isOpen = fn(string $phase) => $currentPhase === $phase
             || ($currentPhase === null && $phase === 'concept');
     @endphp
 
-    {{-- ===================== TASK HEADER ===================== --}}
+    {{-- ===================== Task header ===================== --}}
     <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
 
-        {{-- Title + Description --}}
         <div class="lg:col-span-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-6 py-5 flex flex-col gap-3">
             <div class="flex items-start gap-3">
                 <x-heroicon-o-clipboard-document-list class="h-5 w-5 text-gray-400 mt-0.5 flex-shrink-0" />
@@ -36,10 +35,8 @@
             </div>
         </div>
 
-        {{-- Metadata box --}}
         <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-5 py-4 flex flex-col gap-3">
 
-            {{-- Workflow status --}}
             <div class="flex items-center justify-between">
                 <span class="text-xs font-medium text-gray-500 dark:text-gray-400">Status</span>
                 <span @class([
@@ -52,7 +49,6 @@
                 ])>{{ $record->workflow_status->label() }}</span>
             </div>
 
-            {{-- Repo profile --}}
             @if($record->repoProfile)
                 <div class="flex items-center justify-between gap-2">
                     <span class="text-xs font-medium text-gray-500 dark:text-gray-400 flex-shrink-0">Repository</span>
@@ -60,7 +56,6 @@
                 </div>
             @endif
 
-            {{-- Feature branch --}}
             @if($record->feature_branch)
                 <div class="flex items-center justify-between gap-2">
                     <span class="text-xs font-medium text-gray-500 dark:text-gray-400 flex-shrink-0">Branch</span>
@@ -68,7 +63,6 @@
                 </div>
             @endif
 
-            {{-- PR URL --}}
             @if($record->pr_url)
                 <div class="flex items-center justify-between gap-2">
                     <span class="text-xs font-medium text-gray-500 dark:text-gray-400 flex-shrink-0">Pull Request</span>
@@ -79,7 +73,6 @@
                 </div>
             @endif
 
-            {{-- Total cost --}}
             @php
                 $totalCost = $phaseRuns->flatten()->sum(fn($r) => (float) $r->cost_usd);
                 $totalTokens = $phaseRuns->flatten()->sum(fn($r) => ($r->input_tokens ?? 0) + ($r->output_tokens ?? 0));
@@ -97,7 +90,6 @@
                 </div>
             @endif
 
-            {{-- Running indicator --}}
             @if($record->current_status === 'running')
                 <div class="flex items-center gap-2 pt-1 border-t border-amber-100 dark:border-amber-900/40">
                     <span class="flex h-2 w-2 relative flex-shrink-0">
@@ -112,7 +104,6 @@
                 </div>
             @endif
 
-            {{-- Created at --}}
             <div class="flex items-center justify-between gap-2 pt-1 border-t border-gray-100 dark:border-gray-800">
                 <span class="text-xs font-medium text-gray-500 dark:text-gray-400 flex-shrink-0">Erstellt</span>
                 <span class="text-xs text-gray-500 dark:text-gray-500">{{ $record->created_at?->format('d.m.Y H:i') }}</span>
@@ -120,11 +111,10 @@
         </div>
     </div>
 
-    {{-- ===================== CONCEPT PHASE ===================== --}}
+    {{-- ===================== Concept phase ===================== --}}
     @php $cStatus = $phaseStatus('concept'); $cRun = $phaseRun('concept'); @endphp
     <div x-data="{ open: @js($isOpen('concept')) }" class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden">
 
-        {{-- Section header --}}
         <button type="button" x-on:click="open = !open"
                 class="w-full flex items-center justify-between px-5 py-3.5 border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
             <div class="flex items-center gap-3">
@@ -153,7 +143,6 @@
             </div>
         </button>
 
-        {{-- Indeterminate progress bar while running --}}
         @if($cStatus === 'running')
             <div class="h-0.5 bg-gray-100 dark:bg-gray-800 relative overflow-hidden">
                 <div class="absolute inset-y-0 w-1/3 bg-amber-400 rounded-full"
@@ -161,11 +150,9 @@
             </div>
         @endif
 
-        {{-- Section body with tabs --}}
         <div x-show="open" x-collapse x-cloak>
             <div x-data="{ tab: '{{ $conceptHtml ? 'concept' : 'log' }}' }">
 
-                {{-- Tab bar --}}
                 <div class="flex gap-1 px-4 pt-3 border-b border-gray-100 dark:border-gray-800">
                     <button type="button"
                             x-on:click="tab = 'concept'"
@@ -193,7 +180,7 @@
                     </button>
                 </div>
 
-                {{-- Konzept tab --}}
+                {{-- Concept tab --}}
                 <div x-show="tab === 'concept'" x-cloak class="px-6 py-5 flex flex-col gap-6">
                     @if($conceptHtml)
                         <div class="prose prose-sm dark:prose-invert max-w-none
@@ -213,7 +200,7 @@
                         </div>
                     @endif
 
-                    {{-- Frühere Konzept-Versionen --}}
+                    {{-- Earlier concept versions --}}
                     @if(!empty($conceptHistory))
                         <div class="border-t border-gray-100 dark:border-gray-800 pt-4">
                             <p class="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-3">
@@ -247,7 +234,7 @@
                 {{-- Feedback tab --}}
                 <div x-show="tab === 'feedback'" x-cloak class="divide-y divide-gray-100 dark:divide-gray-800">
 
-                    {{-- Aktuelle Notes (editierbar) --}}
+                    {{-- Pending notes (editable) --}}
                     <div class="px-6 py-5">
                         <div class="flex items-center justify-between mb-3">
                             <span class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Ausstehend</span>
@@ -333,7 +320,7 @@
                         'label' => 'concept.bg.log',
                         'isRunning' => $cStatus === 'running',
                     ])
-                    {{-- Frühere Log-Iterationen --}}
+                    {{-- Earlier log iterations --}}
                     @if(!empty($conceptLogIterations))
                         <div class="border-t border-slate-800 bg-slate-950 px-4 py-3">
                             <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
@@ -379,7 +366,7 @@
         </div>
     </div>
 
-    {{-- ===================== IMPLEMENT PHASE ===================== --}}
+    {{-- ===================== Implement phase ===================== --}}
     @php $iStatus = $phaseStatus('implement'); $iRun = $phaseRun('implement'); @endphp
     <div x-data="{ open: @js($isOpen('implement')) }"
          class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden">
@@ -412,7 +399,6 @@
             </div>
         </button>
 
-        {{-- Indeterminate progress bar while running --}}
         @if($iStatus === 'running')
             <div class="h-0.5 bg-gray-100 dark:bg-gray-800 relative overflow-hidden">
                 <div class="absolute inset-y-0 w-1/3 bg-amber-400 rounded-full"
@@ -423,7 +409,6 @@
         <div x-show="open" x-collapse x-cloak>
             <div x-data="{ tab: '{{ ($implementSummaryNontechnicalHtml || $implementSummaryTechnicalHtml) ? 'implement' : 'log' }}' }">
 
-                {{-- Tab bar --}}
                 <div class="flex gap-1 px-4 pt-3 border-b border-gray-100 dark:border-gray-800">
                     <button type="button"
                             x-on:click="tab = 'implement'"
@@ -457,11 +442,11 @@
                     </button>
                 </div>
 
-                {{-- ── Implementierung tab ──────────────────────────────────── --}}
+                {{-- ── Implementation tab ──────────────────────────────────── --}}
                 <div x-show="tab === 'implement'" x-cloak class="px-6 py-5 flex flex-col gap-6">
                     @if($implementSummaryNontechnicalHtml || $implementSummaryTechnicalHtml)
 
-                        {{-- Sub-tabs: Inhaltlich / Technisch --}}
+                        {{-- Sub-tabs: non-technical / technical --}}
                         <div x-data="{ view: 'nontechnical' }">
                             <div class="flex gap-2 mb-4">
                                 <button type="button"
@@ -484,7 +469,7 @@
                                 </button>
                             </div>
 
-                            {{-- Inhaltliche Zusammenfassung --}}
+                            {{-- Non-technical summary --}}
                             <div x-show="view === 'nontechnical'" x-cloak>
                                 @if($implementSummaryNontechnicalHtml)
                                     <div class="prose prose-sm dark:prose-invert max-w-none
@@ -502,7 +487,7 @@
                                 @endif
                             </div>
 
-                            {{-- Technische Zusammenfassung --}}
+                            {{-- Technical summary --}}
                             <div x-show="view === 'technical'" x-cloak>
                                 @if($implementSummaryTechnicalHtml)
                                     @if($implementQualityGates)
@@ -551,7 +536,7 @@
                         </div>
                     @endif
 
-                    {{-- Frühere Versionen --}}
+                    {{-- Earlier versions --}}
                     @if(!empty($implementHistory))
                         <div class="border-t border-gray-100 dark:border-gray-800 pt-4">
                             <p class="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-3">
@@ -624,18 +609,15 @@
                             <p class="text-sm text-gray-400 dark:text-gray-500">Keine Änderungen gegenüber origin/{{ $record->repoProfile?->default_branch ?? 'main' }}.</p>
                         </div>
                     @else
-                        {{-- Stat bar --}}
                         @if(trim($diffStat) !== '')
                             <div class="mb-3 rounded-lg border border-slate-600 bg-slate-800 px-4 py-2.5 font-mono text-xs text-slate-200 whitespace-pre-wrap leading-5">{{ $diffStat }}</div>
                         @endif
 
-                        {{-- Per-file diff blocks --}}
                         <div class="flex flex-col gap-2">
                             @foreach($diffFiles as $file)
                                 <div x-data="{ open: true }"
                                      class="rounded-lg border border-slate-600 overflow-hidden bg-slate-900">
 
-                                    {{-- File header --}}
                                     <button type="button" x-on:click="open = !open"
                                             class="w-full flex items-center justify-between px-4 py-2.5 bg-slate-800 hover:bg-slate-700 transition-colors text-left gap-3">
                                         <div class="flex items-center gap-2 min-w-0">
@@ -657,11 +639,9 @@
                                         </div>
                                     </button>
 
-                                    {{-- Diff content --}}
                                     <div x-show="open" x-collapse>
                                         <table class="w-full border-collapse font-mono text-xs leading-5">
                                             @foreach($file['hunks'] as $hunk)
-                                                {{-- Hunk header --}}
                                                 <tr class="bg-sky-900/40 border-t border-b border-sky-800/50">
                                                     <td class="w-12 px-2 py-1 text-slate-500 select-none text-right"></td>
                                                     <td class="w-12 px-2 py-1 text-slate-500 select-none text-right"></td>
@@ -669,7 +649,6 @@
                                                         <span class="font-semibold">{{ $hunk['header'] }}</span>
                                                     </td>
                                                 </tr>
-                                                {{-- Lines --}}
                                                 @foreach($hunk['lines'] as $dline)
                                                     <tr @class([
                                                         'border-b border-slate-700/50 group',
@@ -704,7 +683,7 @@
                 {{-- ── Feedback tab ──────────────────────────────────────────── --}}
                 <div x-show="tab === 'feedback'" x-cloak class="divide-y divide-gray-100 dark:divide-gray-800">
 
-                    {{-- Aktuelle Notes (editierbar) --}}
+                    {{-- Pending notes (editable) --}}
                     <div class="px-6 py-5">
                         <div class="flex items-center justify-between mb-3">
                             <span class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Ausstehend</span>
@@ -780,7 +759,7 @@
                         'label' => 'implement.bg.log',
                         'isRunning' => $iStatus === 'running',
                     ])
-                    {{-- Frühere Log-Iterationen --}}
+                    {{-- Earlier log iterations --}}
                     @if(!empty($implementLogIterations))
                         <div class="border-t border-slate-800 bg-slate-950 px-4 py-3">
                             <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
@@ -826,7 +805,7 @@
         </div>
     </div>
 
-    {{-- ===================== PUSH PHASE ===================== --}}
+    {{-- ===================== Push phase ===================== --}}
     @php $pStatus = $phaseStatus('push'); $pRun = $phaseRun('push'); @endphp
     <div x-data="{ open: @js($isOpen('push')) }"
          class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden">
@@ -856,7 +835,6 @@
             </div>
         </button>
 
-        {{-- Indeterminate progress bar while running --}}
         @if($pStatus === 'running')
             <div class="h-0.5 bg-gray-100 dark:bg-gray-800 relative overflow-hidden">
                 <div class="absolute inset-y-0 w-1/3 bg-amber-400 rounded-full"
@@ -885,7 +863,6 @@
                     </button>
                 </div>
 
-                {{-- PR info tab --}}
                 <div x-show="tab === 'pr'" x-cloak class="px-6 py-5">
                     @if($record->pr_url || $record->feature_branch)
                         <div class="flex flex-col gap-4">
@@ -933,7 +910,6 @@
                     @endif
                 </div>
 
-                {{-- Log tab --}}
                 <div x-show="tab === 'log'" x-cloak>
                     @include('filament.admin.resources.task.partials.log-terminal', [
                         'lines' => $pushLog,
@@ -945,7 +921,7 @@
         </div>
     </div>
 
-    {{-- Auto-Poll: alle 3s neu laden wenn eine Phase läuft --}}
+    {{-- Poll every 3s while a phase is running, so the UI auto-refreshes. --}}
     @if($record->current_status === 'running')
         <div wire:poll.3s="poll" class="hidden"></div>
     @endif

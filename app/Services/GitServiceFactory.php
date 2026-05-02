@@ -25,7 +25,7 @@ class GitServiceFactory
     }
 
     /**
-     * Für zukünftige OAuth-Flows: Token direkt übergeben ohne RepoProfile.
+     * Build a service from a raw token, for use cases (e.g. OAuth) that have no RepoProfile yet.
      */
     public function forPlatform(string $platform, string $token, string $instanceUrl = ''): GitServiceContract
     {

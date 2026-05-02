@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# phases/push.sh — Phase push: Branch zur Remote pushen.
+# phases/push.sh — push phase: push the feature branch to the remote.
 #
-# Ablauf:
-#   1. Vorbedingungen pruefen (implement completed, Aenderungen vorhanden)
-#   2. Sub-Phase commit-message aufrufen → produziert subject+body Files
+# Steps:
+#   1. check preconditions (implement completed, changes present)
+#   2. invoke the commit-message sub-phase → produces subject + body files
 #   3. git add -A && git commit -m "<subject>" -m "<body>"
 #   4. git push -u origin <feature_branch>
 #
-# Cleanup-Frage stellt der CLI-Layer auf dem Host, nicht der Worker.
+# The cleanup prompt is asked by the host CLI, not by the worker.
 
 # shellcheck shell=bash
 
@@ -31,8 +31,8 @@ phase_push_preconditions() {
     return 0
 }
 
-# _push_has_changes: Prueft ob es uncommitted Aenderungen oder lokale Commits ueber Base gibt.
-# Returns: 0 wenn ja, 1 wenn nichts zu pushen ist.
+# _push_has_changes: true if there are uncommitted changes or local commits ahead of base.
+# Returns: 0 if yes, 1 if there is nothing to push.
 _push_has_changes() {
     if [[ -n "$(git -C /workspace status --porcelain)" ]]; then
         return 0
@@ -48,7 +48,7 @@ _push_has_changes() {
     return 1
 }
 
-# _push_detect_platform: Gibt "github", "gitlab" oder "" zurueck.
+# _push_detect_platform: print "github", "gitlab", or "".
 _push_detect_platform() {
     case "$REPO_URL" in
         *github.com*) printf 'github' ;;
@@ -57,9 +57,9 @@ _push_detect_platform() {
     esac
 }
 
-# _push_pr_github: Erstellt einen GitHub Pull Request via REST API.
+# _push_pr_github: create a GitHub pull request via REST API.
 # Args: $1=feature_branch, $2=title, $3=body (optional)
-# Output: PR-URL auf stdout, leer bei Fehler.
+# Output: PR URL on stdout (empty on error).
 _push_pr_github() {
     local feature_branch="$1"
     local title="$2"
@@ -97,7 +97,7 @@ _push_pr_github() {
             pr_url="$(jq -r '.html_url' "$tmp_resp")"
             ;;
         422)
-            # PR existiert bereits — vorhandenen PR per List-API suchen
+            # PR already exists — look it up via the list API.
             local owner="${owner_repo%%/*}"
             pr_url="$(curl -s \
                 -H "Authorization: Bearer $REPO_TOKEN" \
@@ -107,16 +107,16 @@ _push_pr_github() {
                 2>>"$pr_log" \
                 | jq -r '.[0].html_url // empty')"
             if [[ -n "$pr_url" ]]; then
-                log_info "push: PR existiert bereits — aktualisiere Beschreibung ($pr_url)"
+                log_info "push: PR already exists — updating description ($pr_url)"
                 _push_pr_update_github "$pr_url" "$title" "$body"
                 _push_pr_comment_github "$pr_url" "$(_push_build_iteration_comment)"
             else
-                log_warn "push: PR existiert bereits, URL nicht ermittelbar"
+                log_warn "push: PR already exists but URL could not be determined"
             fi
             ;;
         *)
             cat "$tmp_resp" >> "$pr_log"
-            log_warn "push: PR-Erstellung fehlgeschlagen (HTTP $http_code, siehe logs/gh-pr.${ITERATION}.log)"
+            log_warn "push: PR creation failed (HTTP $http_code, see logs/gh-pr.${ITERATION}.log)"
             ;;
     esac
 
@@ -124,16 +124,16 @@ _push_pr_github() {
     printf '%s' "$pr_url"
 }
 
-# _push_pr_gitlab: Extrahiert die MR-URL aus dem git-push-Output (GitLab
-# schreibt die URL ins Push-Remote-Output wenn -o merge_request.create gesetzt).
+# _push_pr_gitlab: extract the MR URL from the git-push output. GitLab writes
+# it to the remote-side output when `-o merge_request.create` is set.
 # Args: $1=push_log
-# Output: MR-URL auf stdout, leer wenn nicht gefunden.
+# Output: MR URL on stdout, empty if not found.
 _push_pr_gitlab() {
     local push_log="$1"
     grep -oE 'https://[^[:space:]]*/merge_requests/[0-9]+' "$push_log" | head -1
 }
 
-# _push_build_iteration_comment: Baut Kommentar-Text fuer eine neue Implementierungs-Iteration.
+# _push_build_iteration_comment: build the comment text for a new implementation iteration.
 _push_build_iteration_comment() {
     local nontechnical_file=/workspace/.agent/implement.summary.nontechnical.md
     {
@@ -146,7 +146,7 @@ _push_build_iteration_comment() {
     }
 }
 
-# _push_pr_update_github: Aktualisiert Beschreibung eines bestehenden GitHub PR.
+# _push_pr_update_github: update the description of an existing GitHub PR.
 # Args: $1=pr_url, $2=title, $3=body (optional)
 _push_pr_update_github() {
     local pr_url="$1"
@@ -172,7 +172,7 @@ _push_pr_update_github() {
         >> "/workspace/.agent/logs/gh-pr.${ITERATION}.log" 2>&1 || true
 }
 
-# _push_pr_comment_github: Fuegt einen Kommentar zu einem bestehenden GitHub PR hinzu.
+# _push_pr_comment_github: post a comment on an existing GitHub PR.
 # Args: $1=pr_url, $2=comment_body
 _push_pr_comment_github() {
     local pr_url="$1"
@@ -205,9 +205,9 @@ phase_push_run() {
     started_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
     started_epoch=$(date -u +%s)
 
-    # No-changes-Pfad: kein Commit, kein Push
+    # No-changes path: skip commit and push.
     if ! _push_has_changes; then
-        log_warn "push: keine Aenderungen — nichts zu pushen"
+        log_warn "push: no changes — nothing to push"
         finished_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
         finished_epoch=$(date -u +%s)
         local duration_ms=$(( (finished_epoch - started_epoch) * 1000 ))
@@ -224,15 +224,15 @@ phase_push_run() {
         return 5
     fi
 
-    # Sub-Phase commit-message aufrufen
-    log_info "push: rufe Sub-Phase commit-message auf"
+    # Run the commit-message sub-phase.
+    log_info "push: invoking commit-message sub-phase"
     phase_load commit-message || {
-        echo "push: konnte commit-message Sub-Phase nicht laden" >&2
+        echo "push: failed to load commit-message sub-phase" >&2
         return 1
     }
     local cm_result_log="/workspace/.agent/logs/commit-message.result.${ITERATION}.json"
     if ! phase_commit_message_run > "$cm_result_log"; then
-        log_warn "push: commit-message fehlgeschlagen — verwende Fallback-Message"
+        log_warn "push: commit-message failed — using fallback message"
         local _fc
         _fc="$(git -C /workspace status --porcelain | wc -l | tr -d ' ')"
         printf 'chore: apply implementation changes (%s files)\n' "$_fc" \
@@ -243,20 +243,20 @@ phase_push_run() {
     local subject_file="/workspace/.agent/logs/commit-message.${ITERATION}.subject"
     local body_file="/workspace/.agent/logs/commit-message.${ITERATION}.body"
     if [[ ! -s "$subject_file" ]]; then
-        echo "push: subject-File fehlt oder leer ($subject_file)" >&2
+        echo "push: subject file missing or empty ($subject_file)" >&2
         return 1
     fi
     local subject body
     subject="$(cat "$subject_file")"
     body="$(cat "$body_file" 2>/dev/null || echo "")"
 
-    # git identity setzen falls noch nicht gesetzt
+    # Set git identity if not already configured.
     if [[ -z "$(git -C /workspace config --get user.email || true)" ]]; then
         git -C /workspace config user.email "agent@worker.local"
         git -C /workspace config user.name "Claude Worker Agent"
     fi
 
-    # Stage + Commit (wenn unstaged Aenderungen vorhanden sind)
+    # Stage + commit (only if there are staged changes).
     git -C /workspace add -A
     if ! git -C /workspace diff --cached --quiet; then
         if [[ -n "$body" && "$body" != $'\n' ]]; then
@@ -268,7 +268,7 @@ phase_push_run() {
         fi
     fi
 
-    # Platform erkennen und Push-Optionen fuer GitLab vorbereiten
+    # Detect the platform and prepare GitLab push options.
     local platform
     platform="$(_push_detect_platform)"
 
@@ -284,7 +284,7 @@ phase_push_run() {
         fi
     fi
 
-    # Push mit Token in der URL (defensiv: nicht loggen)
+    # Push with the token embedded in the URL (defensive: never log it).
     set +x
     local auth_url
     auth_url="$(git_auth_inject_token "$REPO_URL" "$REPO_TOKEN")"
@@ -298,14 +298,14 @@ phase_push_run() {
 
     local push_log="/workspace/.agent/logs/git-push.${ITERATION}.log"
     if ! git -C /workspace push -u --force-with-lease origin "$feature_branch" "${push_opts[@]}" > "$push_log" 2>&1; then
-        # URL ohne Token wiederherstellen vor return
+        # Restore the token-less URL before returning.
         git -C /workspace remote set-url origin "$REPO_URL"
         local push_exit=1
         if grep -qE "401|403|denied|[Aa]uthentication" "$push_log"; then
-            echo "push: Auth-Fehler beim git push (siehe $push_log)" >&2
+            echo "push: auth error on git push (see $push_log)" >&2
             push_exit=3
         else
-            echo "push: git push failed (siehe $push_log)" >&2
+            echo "push: git push failed (see $push_log)" >&2
         fi
         result_emit \
             phase push \
@@ -315,7 +315,7 @@ phase_push_run() {
             started_at "$started_at" \
             finished_at "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
             --int exit_code "$push_exit" \
-            error_message "git push failed (siehe ${push_log})"
+            error_message "git push failed (see ${push_log})"
         return "$push_exit"
     fi
     git -C /workspace remote set-url origin "$REPO_URL"
@@ -323,7 +323,7 @@ phase_push_run() {
     local commit_sha
     commit_sha="$(git -C /workspace rev-parse HEAD)"
 
-    # PR-Body: implement.summary.nontechnical als Haupt-Body, body als Ergaenzung
+    # PR body: implement.summary.nontechnical as the main body, the commit body as an addendum.
     local pr_body="$body"
     local _nontechnical_file=/workspace/.agent/implement.summary.nontechnical.md
     local _technical_file=/workspace/.agent/implement.summary.technical.md
@@ -342,14 +342,14 @@ phase_push_run() {
         pr_body="$(printf '%s\n\n<details><summary>Technische Details</summary>\n\n%s\n\n</details>' "$pr_body" "$_technical_content")"
     fi
 
-    # PR/MR erstellen oder URL aus Push-Output lesen
+    # Create the PR/MR or extract the URL from the push output.
     local pr_url=""
     case "$platform" in
         github) pr_url="$(_push_pr_github "$feature_branch" "$subject" "$pr_body")" ;;
         gitlab) pr_url="$(_push_pr_gitlab "$push_log")" ;;
     esac
     if [[ -n "$pr_url" ]]; then
-        log_info "push: PR/MR erstellt — $pr_url"
+        log_info "push: PR/MR created — $pr_url"
         state_set_pr_url "$pr_url"
     fi
 

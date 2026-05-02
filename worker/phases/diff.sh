@@ -1,11 +1,8 @@
 #!/usr/bin/env bash
-# phases/diff.sh — Phase diff: Aenderungen anzeigen vor dem Push.
+# phases/diff.sh — diff phase: show pending changes before push.
 #
-# Read-only. Liest `git diff origin/<base-branch>...HEAD` plus `git status`
-# und druckt das auf stdout mit Farben wenn TTY. Optional --stat und
-# --file=<path> via PHASE_FLAGS.
-#
-# Siehe WORKER-CONCEPT.md, Phase `diff`.
+# Read-only. Prints `git diff origin/<base-branch>...HEAD` plus `git status`
+# to stdout (coloured on a TTY). Optional --stat and --file=<path> via PHASE_FLAGS.
 
 # shellcheck shell=bash
 
@@ -15,11 +12,11 @@ phase_diff_help() {
 
 phase_diff_preconditions() {
     if [[ ! -d /workspace/.git ]]; then
-        echo "diff: /workspace nicht initialisiert (concept zuerst)." >&2
+        echo "diff: /workspace not initialised (run concept first)." >&2
         return 2
     fi
     if [[ -z "${BASE_BRANCH:-}" ]]; then
-        echo "diff: BASE_BRANCH nicht gesetzt." >&2
+        echo "diff: BASE_BRANCH not set." >&2
         return 2
     fi
     return 0
@@ -40,7 +37,7 @@ phase_diff_run() {
     started_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
     started_epoch=$(date -u +%s)
 
-    # Color/no-color je nach TTY
+    # Colour only when stdout is a TTY.
     local color_flag="--no-color"
     if [[ -t 1 ]]; then
         color_flag="--color=always"
@@ -48,7 +45,7 @@ phase_diff_run() {
 
     local base_ref="origin/$BASE_BRANCH"
     if ! git rev-parse --verify --quiet "$base_ref" >/dev/null; then
-        log_warn "diff: $base_ref nicht bekannt, versuche fetch"
+        log_warn "diff: $base_ref not known locally, attempting fetch"
         set +x
         if [[ -n "${REPO_URL:-}" && -n "${REPO_TOKEN:-}" ]]; then
             local auth_url
@@ -72,7 +69,7 @@ phase_diff_run() {
     printf '\n--- git status ---\n'
     git status --short
 
-    # Numstat fuer Result-JSON
+    # Numstat for the result JSON.
     local files_changed=0 insertions=0 deletions=0
     if git rev-parse --verify --quiet "$base_ref" >/dev/null; then
         local numstat_output

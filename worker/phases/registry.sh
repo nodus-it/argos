@@ -1,27 +1,26 @@
 #!/usr/bin/env bash
-# phases/registry.sh — Liste aktiver Phasen und Lifecycle-Reihenfolge.
+# phases/registry.sh — registered phases and lifecycle order.
 #
-# Wird vom Worker-Entrypoint gesourced. Bietet:
-#   - PHASE_NAMES                Alle bekannten Phasen (inkl. Sub-Phasen)
-#   - PHASE_ORDER_IN_LIFECYCLE   Default-Reihenfolge der User-Phasen
-#   - phase_load <name>          Sourcet phases/<name>.sh
-#   - phase_known <name>         Prueft ob die Phase registriert ist
+# Sourced by the worker entrypoint. Provides:
+#   - PHASE_NAMES                all known phases (incl. sub-phases)
+#   - PHASE_ORDER_IN_LIFECYCLE   default order of the user-facing phases
+#   - phase_load <name>          source phases/<name>.sh
+#   - phase_known <name>         true if the phase is registered
 #
-# Sub-Phasen (z.B. commit-message) sind in PHASE_NAMES aber NICHT in
-# PHASE_ORDER_IN_LIFECYCLE — sie werden von anderen Phasen aufgerufen.
+# Sub-phases (e.g. commit-message) appear in PHASE_NAMES but NOT in
+# PHASE_ORDER_IN_LIFECYCLE — they are invoked from other phases.
 
 # shellcheck shell=bash
 # shellcheck disable=SC2034
-# (Konstanten werden vom Caller gelesen.)
+# (constants are read by callers.)
 
 PHASE_NAMES=(concept implement diff push respond commit-message)
 PHASE_ORDER_IN_LIFECYCLE=(concept implement diff push respond)
 
 PHASES_DIR="${PHASES_DIR:-/usr/local/share/agent/phases}"
 
-# phase_known: Prueft ob $1 in PHASE_NAMES enthalten ist.
+# phase_known: true if $1 is in PHASE_NAMES.
 # Args: $1=phase_name
-# Returns: 0 wenn ja, 1 sonst.
 phase_known() {
     local needle="$1"
     local p
@@ -31,9 +30,9 @@ phase_known() {
     return 1
 }
 
-# phase_load: Sourcet phases/<name>.sh aus $PHASES_DIR.
+# phase_load: source phases/<name>.sh from $PHASES_DIR.
 # Args: $1=phase_name
-# Returns: 0 wenn geladen, 1 wenn nicht bekannt oder Datei fehlt.
+# Returns: 0 if loaded, 1 if unknown or the file is missing.
 phase_load() {
     local name="$1"
     if ! phase_known "$name"; then

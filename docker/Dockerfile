@@ -9,7 +9,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # System packages: nginx, supervisor, mariadb, docker CLI, node 22
 RUN set -eux; \
-    # policy-rc.d: verhindert Service-Start durch apt-postinstall im Container
+    # policy-rc.d prevents apt postinstall scripts from starting services in the container.
     printf '#!/bin/sh\nexit 101\n' > /usr/local/sbin/policy-rc.d; \
     chmod +x /usr/local/sbin/policy-rc.d; \
     apt-get update; \

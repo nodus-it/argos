@@ -2,7 +2,7 @@
 
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
 
-        {{-- Feedback-Eingabe (2/3 Breite) --}}
+        {{-- Feedback input (2/3 width) --}}
         <div class="lg:col-span-2 flex flex-col gap-4">
             <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden">
                 <div class="flex items-center justify-between px-5 py-3 border-b border-gray-100 dark:border-gray-800">
@@ -45,10 +45,10 @@
             </div>
         </div>
 
-        {{-- Kontext-Sidebar (1/3 Breite) --}}
+        {{-- Context sidebar (1/3 width) --}}
         <div class="flex flex-col gap-4">
 
-            {{-- Task-Info --}}
+            {{-- Task info --}}
             <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden">
                 <div class="px-5 py-3 border-b border-gray-100 dark:border-gray-800">
                     <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">Task-Status</span>
@@ -79,7 +79,7 @@
                 </div>
             </div>
 
-            {{-- Ablauf --}}
+            {{-- Workflow steps --}}
             <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden">
                 <div class="px-5 py-3 border-b border-gray-100 dark:border-gray-800">
                     <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">Ablauf</span>
@@ -106,7 +106,7 @@
                 </div>
             </div>
 
-            {{-- Links --}}
+            {{-- Quick links --}}
             <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden">
                 <div class="px-5 py-3 border-b border-gray-100 dark:border-gray-800">
                     <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">Schnellzugriff</span>

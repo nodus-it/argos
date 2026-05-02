@@ -88,7 +88,6 @@ class ArgosCommand extends Command
                 return;
             }
 
-            // Sync completed background phases back into the DB
             $this->stateReader->syncToDb($task);
             $task->refresh();
 
@@ -175,19 +174,17 @@ class ArgosCommand extends Command
         $finalStatus = 'unknown';
 
         while (true) {
-            // Stream new bytes from log
             $content = file_get_contents($logPath, false, null, $offset);
             if ($content !== false && $content !== '') {
                 echo $content;
                 $offset += strlen($content);
             }
 
-            // Check state.json every 2 seconds for completion
             $state = $this->stateReader->read($task->name);
             $phaseStatus = $state['phases'][$phase]['current_status'] ?? 'running';
 
             if ($phaseStatus !== 'running') {
-                // Drain any final bytes
+                // Drain any final bytes that arrived after the status flipped.
                 $remaining = file_get_contents($logPath, false, null, $offset);
                 if ($remaining !== false && $remaining !== '') {
                     echo $remaining;
@@ -211,7 +208,6 @@ class ArgosCommand extends Command
         $configDir = config('argos.config_dir');
         $phases = ['concept', 'implement', 'push', 'commit-message'];
 
-        // Nur Phasen anbieten für die ein Background-Log existiert
         $options = [];
         foreach ($phases as $phase) {
             $path = $this->phaseRunner->getPhaseLogPath($task->name, $phase);
@@ -220,7 +216,6 @@ class ArgosCommand extends Command
             }
         }
 
-        // Auch Logs direkt aus dem Volume anbieten
         $options['volume'] = '📦 Workspace-Logs (aus Volume)';
         $options['cancel'] = '← Zurück';
 
@@ -253,7 +248,6 @@ class ArgosCommand extends Command
 
     private function showVolumeLogs(Task $task): void
     {
-        // Verfügbare Log-Dateien im Volume auflisten
         $listProcess = new Process([
             'docker', 'run', '--rm',
             '-v', $task->volumeName().':/workspace:ro',
@@ -268,7 +262,6 @@ class ArgosCommand extends Command
         $this->line($listProcess->getOutput() ?: '(keine Logs vorhanden)');
         $this->line('');
 
-        // Dateiname abfragen
         $filename = text('Dateiname anzeigen (z.B. push.1.log, leer = abbrechen)');
         if ($filename === '') {
             return;
@@ -307,7 +300,6 @@ class ArgosCommand extends Command
 
         $branch = $task->repoProfile?->default_branch ?? 'main';
 
-        // Show committed changes vs origin AND uncommitted working-tree changes
         $process = new Process([
             'docker', 'run', '--rm',
             '-v', $task->volumeName().':/workspace:ro',
@@ -339,7 +331,6 @@ class ArgosCommand extends Command
         info("Konzept — {$task->name}");
         $this->line('');
 
-        // Read concept.md from volume
         $process = new Process([
             'docker', 'run', '--rm',
             '-v', $task->volumeName().':/workspace:ro',

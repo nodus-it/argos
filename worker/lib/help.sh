@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# lib/help.sh — Help-Texte fuer die agent-CLI.
+# lib/help.sh — help texts for the agent CLI.
 #
-# Convention: pro Top-Level-Command eine help_<command>-Funktion, die einen
-# kurzen Block auf stdout ausgibt. help_main() listet die Übersicht.
-# help_show <command> dispatcht zur passenden Funktion oder gibt main aus.
+# Convention: one help_<command> function per top-level command, each
+# printing a short block to stdout. help_main prints the overview and
+# help_show <command> dispatches to the right function.
 
 # shellcheck shell=bash
 
@@ -15,15 +15,15 @@ USAGE
     agent <command> [task-id] [flags]
 
 SETUP
-    init                         Image bauen, Token einrichten, optional Symlink
+    init                         build image, set up token, optional symlink
 
-TASK-LIFECYCLE
-    task new <task-id>           Volume + credentials.env anlegen, Description abfragen
-    task list                    Alle Tasks mit Status
-    task show <task-id>          Konfiguration eines Tasks (ohne Token)
-    task delete <task-id>        identisch zu `agent abort`
+TASK LIFECYCLE
+    task new <task-id>           create volume + credentials.env, prompt for description
+    task list                    list all tasks with status
+    task show <task-id>          show task config (without token)
+    task delete <task-id>        alias for `agent abort`
 
-PHASEN
+PHASES
     concept   <task-id> [--fresh]
     implement <task-id> [--fresh|--continue] [--max-turns=N]
     diff      <task-id> [--stat] [--file=<path>]
@@ -35,34 +35,34 @@ INSPECTION & EDITING
     show-notes     <task-id>
     edit-notes     <task-id>
     logs           <task-id> [--phase=<phase>] [--iteration=N]
-    shell          <task-id>     interaktive Bash im Worker, Volume gemountet
-    status         [<task-id>]   Zeigt Phase-Iterationen und current_status
+    shell          <task-id>     interactive bash in the worker, volume mounted
+    status         [<task-id>]   show phase iterations and current_status
 
 CLEANUP
-    abort          <task-id>     Volume und ~/.agent/tasks/<id> entfernen
-    prune                        verwaiste Volumes finden + cleanen
+    abort          <task-id>     remove volume and ~/.agent/tasks/<id>
+    prune                        find and clean orphaned volumes
 
-HILFE
-    help                         diese Übersicht
-    help <command>               detaillierter Hilfe-Block fuer einen Command
+HELP
+    help                         this overview
+    help <command>               detailed help block for one command
 
-Mehr Details: README.md, docs/EXAMPLE.md, docs/EXTENDING.md
+More: README.md, docs/EXAMPLE.md, docs/EXTENDING.md
 HELP
 }
 
 help_init() {
     cat <<'HELP'
-agent init — Setup von 0 auf einsatzbereit.
+agent init — set up from zero to ready.
 
-Was passiert:
-  1. Worker-Image bauen (`docker compose build worker`).
-  2. Persistente Caches anlegen (`composer_cache`, `npm_cache`).
-  3. Claude-OAuth-Token einlesen (versteckte Eingabe), nach
-     ~/.agent/claude_oauth_token speichern (mode 600).
-  4. Optional: Symlink ~/.local/bin/agent -> ./agent.
+What it does:
+  1. Build the worker image (`docker compose build worker`).
+  2. Create the persistent caches (`composer_cache`, `npm_cache`).
+  3. Read the Claude OAuth token (hidden input) and store it under
+     ~/.agent/claude_oauth_token (mode 600).
+  4. Optional: symlink ~/.local/bin/agent -> ./agent.
 
 Flags:
-  --update-token       nur den Token erneuern, kein Rebuild.
+  --update-token       refresh only the token, no rebuild.
 HELP
 }
 
@@ -71,14 +71,14 @@ help_task() {
 agent task <subcommand> [task-id]
 
 Subcommands:
-  new <task-id>      Interaktive Eingaben (REPO_URL, REPO_TOKEN versteckt,
-                     BASE_BRANCH, Task-Description in $EDITOR), legt Volume
-                     task_ws_<task-id> an und schreibt
+  new <task-id>      Interactive prompts (REPO_URL, REPO_TOKEN hidden,
+                     BASE_BRANCH, task description in $EDITOR). Creates the
+                     volume task_ws_<task-id> and writes
                      ~/.agent/tasks/<task-id>/credentials.env (mode 600).
-  list               Alle bekannten Tasks mit current_status pro Phase.
-  show <task-id>     Zeigt REPO_URL, BASE_BRANCH, feature_branch und Phase-Status
-                     (REPO_TOKEN wird nie ausgegeben).
-  delete <task-id>   Identisch zu `agent abort`.
+  list               All known tasks with current_status per phase.
+  show <task-id>     REPO_URL, BASE_BRANCH, feature_branch and phase status
+                     (REPO_TOKEN is never printed).
+  delete <task-id>   Alias for `agent abort`.
 HELP
 }
 
@@ -86,12 +86,12 @@ help_concept() {
     cat <<'HELP'
 agent concept <task-id> [--fresh]
 
-Konzept-Phase: Aufgabe analysieren, Plan formulieren.
-Output: /workspace/.agent/concept.md (im Volume).
+Concept phase: analyse the task, draft a plan.
+Output: /workspace/.agent/concept.md (in the volume).
 
-Default: inkrementelle Verfeinerung — vorheriges Konzept und
-concept.notes.md werden mit-eingelesen.
---fresh: ignoriert vorhandenes Konzept; vorherige Version wandert in
+Default: incremental refinement — the previous concept and concept.notes.md
+are read in.
+--fresh: ignore existing concept; the prior version is moved into
          concept.history/.
 HELP
 }
@@ -100,15 +100,15 @@ help_implement() {
     cat <<'HELP'
 agent implement <task-id> [--fresh|--continue] [--max-turns=N]
 
-Implement-Phase: Code-Änderungen umsetzen.
+Implement phase: apply the code changes.
 Default --fresh: git reset --hard origin/<base-branch>, git clean -fd,
-                Toolchain-Setup (composer install, npm ci falls vorhanden),
-                dann Claude-Session.
---continue:     kein Reset; baut auf bestehenden uncommitted Änderungen auf.
---max-turns=N:  override fuer Claude max-turns (default 50).
+                 toolchain setup (composer install, npm ci if present),
+                 then the Claude session.
+--continue:      no reset; builds on existing uncommitted changes.
+--max-turns=N:   override Claude max-turns (default 50).
 
-Quality-Gates: Pint und Pest/PHPUnit fuehrt Claude selbst aus.
-Worker prueft danach nochmal — bei rotem Status: status=quality_gate_failed.
+Quality gates: Claude runs Pint and Pest/PHPUnit itself.
+The worker re-checks afterwards — on failure: status=quality_gate_failed.
 HELP
 }
 
@@ -116,9 +116,9 @@ help_diff() {
     cat <<'HELP'
 agent diff <task-id> [--stat] [--file=<path>]
 
-Read-only: zeigt git diff origin/<base-branch>...HEAD aus dem Workspace.
---stat:           Kurzfassung (files, insertions, deletions).
---file=<path>:    nur ein File.
+Read-only: prints `git diff origin/<base-branch>...HEAD` from the workspace.
+--stat:           summary (files, insertions, deletions).
+--file=<path>:    just one file.
 HELP
 }
 
@@ -126,26 +126,25 @@ help_push() {
     cat <<'HELP'
 agent push <task-id> [--auto-cleanup|--keep]
 
-Generiert Commit-Message via Claude-Sub-Phase, committed und pusht den
-Feature-Branch zur Remote. Fragt danach nach Cleanup (default Nein).
---auto-cleanup:  Volume + Host-State direkt loeschen, ohne Frage.
---keep:          Nichts loeschen, ohne Frage.
+Generates the commit message via a Claude sub-phase, commits, and pushes the
+feature branch. Then prompts for cleanup (default: no).
+--auto-cleanup:  delete volume + host state without asking.
+--keep:          keep everything without asking.
 HELP
 }
 
-help_show_concept() { echo "agent show-concept <task-id> — gibt /workspace/.agent/concept.md aus (mit Pager wenn TTY)."; }
-help_edit_concept() { echo "agent edit-concept <task-id> — oeffnet concept.md in \$EDITOR (Copy-In/Out)."; }
-help_show_notes()   { echo "agent show-notes <task-id> — gibt concept.notes.md aus."; }
-help_edit_notes()   { echo "agent edit-notes <task-id> — oeffnet concept.notes.md in \$EDITOR."; }
-help_logs()         { echo "agent logs <task-id> [--phase=<phase>] [--iteration=N] — gibt Phase-Logs aus."; }
-help_shell()        { echo "agent shell <task-id> — interaktive Bash im Worker, Volume gemountet."; }
-help_status()       { echo "agent status [<task-id>] — Phase-Iterationen und current_status."; }
-help_abort()        { echo "agent abort <task-id> — Volume + ~/.agent/tasks/<id> komplett entfernen."; }
-help_prune()        { echo "agent prune — verwaiste Volumes (ohne Host-Side) interaktiv entfernen."; }
+help_show_concept() { echo "agent show-concept <task-id> — print /workspace/.agent/concept.md (paged on a TTY)."; }
+help_edit_concept() { echo "agent edit-concept <task-id> — open concept.md in \$EDITOR (copy in/out)."; }
+help_show_notes()   { echo "agent show-notes <task-id> — print concept.notes.md."; }
+help_edit_notes()   { echo "agent edit-notes <task-id> — open concept.notes.md in \$EDITOR."; }
+help_logs()         { echo "agent logs <task-id> [--phase=<phase>] [--iteration=N] — print phase logs."; }
+help_shell()        { echo "agent shell <task-id> — interactive bash in the worker, volume mounted."; }
+help_status()       { echo "agent status [<task-id>] — phase iterations and current_status."; }
+help_abort()        { echo "agent abort <task-id> — remove the volume and ~/.agent/tasks/<id>."; }
+help_prune()        { echo "agent prune — interactively remove orphaned volumes (no host side)."; }
 
-# help_show: Dispatch auf den richtigen Help-Block.
-# Args: $1=command (leer fuer main)
-# Returns: 0 immer.
+# help_show: dispatch to the matching help block.
+# Args: $1=command (empty for main)
 help_show() {
     local cmd="${1:-}"
     case "$cmd" in
@@ -166,7 +165,7 @@ help_show() {
         abort)                help_abort ;;
         prune)                help_prune ;;
         *)
-            echo "Kein Help-Eintrag fuer '$cmd'." >&2
+            echo "No help entry for '$cmd'." >&2
             help_main
             ;;
     esac

@@ -1,25 +1,23 @@
 #!/usr/bin/env bash
-# phases/concept.sh — Phase concept: Aufgabe analysieren, Plan formulieren.
+# phases/concept.sh — concept phase: analyse the task, draft the plan.
 #
-# Wird vom Worker-Entrypoint gesourced. Erwartet:
-#   - lib/{logging,error,result,state,prompts}.sh bereits gesourced
+# Sourced by the worker entrypoint. Expects:
+#   - lib/{logging,error,result,state,prompts}.sh already sourced
 #   - env: TASK_ID, REPO_URL, REPO_TOKEN, BASE_BRANCH, ITERATION,
 #          PHASE_FLAGS (JSON), CLAUDE_CODE_OAUTH_TOKEN
-#   - /workspace ist das Task-Volume (gemountet)
-#   - /workspace/.agent/description.md ist als read-only Bind-Mount
-#     vom Host vorhanden (siehe lib/docker.sh)
-#
-# Siehe IMPLEMENTATION.md Abschnitt 1.1 fuer den Claude-Aufruf.
+#   - /workspace is the task volume (mounted)
+#   - /workspace/.agent/description.md is bind-mounted read-only
+#     from the host (see lib/docker.sh)
 
 # shellcheck shell=bash
 
-# phase_concept_help: Kurzbeschreibung der Phase fuer `agent help concept`.
+# phase_concept_help: short description for `agent help concept`.
 phase_concept_help() {
     echo "Konzept-Phase: Aufgabe analysieren und Plan formulieren."
 }
 
-# phase_concept_preconditions: Prueft Vorbedingungen.
-# Returns: 0 wenn OK, sonst Exit-Code mit Fehlermeldung auf stderr.
+# phase_concept_preconditions: check the run is feasible.
+# Returns: 0 if OK, otherwise an exit code with a message on stderr.
 phase_concept_preconditions() {
     if [[ ! -f /run/agent/description.md ]]; then
         echo "concept: /run/agent/description.md fehlt — bitte 'agent task new' wiederholen oder description.md unter ~/.agent/tasks/<id>/ anlegen." >&2
@@ -36,8 +34,7 @@ phase_concept_preconditions() {
     return 0
 }
 
-# _concept_initial_clone: Klont das Repo ins Volume und legt feature_branch an.
-# Returns: 0 bei Erfolg, sonst Fehler.
+# _concept_initial_clone: clone the repo into the volume and create the feature branch.
 _concept_initial_clone() {
     set +x
     local auth_url
@@ -48,43 +45,43 @@ _concept_initial_clone() {
     slug="$(printf '%s' "${TASK_ID}" | tr ' /' '-' | tr -cd 'a-zA-Z0-9._-')"
     feature_branch="ai/${slug}-${now_epoch}"
 
-    # `git clone` weigert sich, in ein nicht-leeres /workspace zu clonen
-    # (`/workspace/.agent/` existiert schon). Stattdessen: init + fetch + checkout.
+    # `git clone` refuses to clone into a non-empty /workspace
+    # (/workspace/.agent/ already exists). Use init + fetch + checkout instead.
     cd /workspace || return 1
     if ! git init --quiet --initial-branch="$BASE_BRANCH" 2>/workspace/.agent/logs/clone.err; then
-        echo "concept: git init failed (siehe logs/clone.err)" >&2
+        echo "concept: git init failed (see logs/clone.err)" >&2
         return 1
     fi
-    # /workspace/.agent/ enthaelt unseren State und darf von 'git clean -fd' in
-    # spaeteren Phasen NICHT gelöscht werden. .git/info/exclude markiert das
-    # Verzeichnis lokal als ignored (kein Touch im fake-remote/Repo).
+    # /workspace/.agent/ holds our state and must NOT be wiped by `git clean -fd`
+    # in later phases. .git/info/exclude marks it as locally ignored (no churn
+    # against the fake-remote/repo).
     mkdir -p /workspace/.git/info
     grep -qxF '.agent/' /workspace/.git/info/exclude 2>/dev/null \
         || echo '.agent/' >> /workspace/.git/info/exclude
     git remote add origin "$auth_url" 2>/dev/null || git remote set-url origin "$auth_url"
     if ! git fetch --quiet --depth=1 origin "$BASE_BRANCH" 2>>/workspace/.agent/logs/clone.err; then
-        echo "concept: git fetch failed (siehe logs/clone.err)" >&2
+        echo "concept: git fetch failed (see logs/clone.err)" >&2
         git remote set-url origin "$REPO_URL"
-        # .git entfernen damit der naechste Aufruf einen sauberen Retry machen kann
+        # remove .git so the next attempt can retry from scratch
         rm -rf /workspace/.git
         return 1
     fi
     if ! git checkout -B "$feature_branch" "origin/$BASE_BRANCH" 2>>/workspace/.agent/logs/clone.err; then
-        echo "concept: git checkout failed (siehe logs/clone.err)" >&2
+        echo "concept: git checkout failed (see logs/clone.err)" >&2
         git remote set-url origin "$REPO_URL"
         rm -rf /workspace/.git
         return 1
     fi
-    # Originellen URL ohne Token zurueckschreiben damit credentials nicht
-    # im Workspace persistieren.
+    # restore the original (token-less) URL so credentials don't persist
+    # inside the workspace.
     git remote set-url origin "$REPO_URL"
 
     state_set_feature_branch "$feature_branch"
 }
 
-# _concept_archive_to_history: Verschiebt vorhandene Konzept-/Notes-Datei nach concept.history/.
+# _concept_archive_to_history: archive concept/notes into concept.history/.
 # Args: $1=mode ("move"|"copy")
-# Output: anzahl der jetzt vorhandenen history-Files.
+# Output: count of history files now present.
 _concept_archive_to_history() {
     local mode="$1"
     local concept_file=/workspace/.agent/concept.md
@@ -101,16 +98,16 @@ _concept_archive_to_history() {
             cp "$concept_file" "$hist_dir/concept.${ts}.md"
         fi
     fi
-    # Leere Notes-Dateien nicht archivieren — sie entstehen wenn kein Feedback gegeben wurde.
-    # Iteration (ITERATION-Env-Var) wird im Dateinamen kodiert fuer spaetere Zuordnung.
+    # Don't archive empty notes — those appear when no feedback was given.
+    # The iteration is encoded in the filename for later attribution.
     if [[ -f "$notes_file" && -s "$notes_file" ]]; then
         local iter_suffix=""
         [[ -n "${ITERATION:-}" ]] && iter_suffix=".iter${ITERATION}"
         if [[ "$mode" == "move" ]]; then
             mv "$notes_file" "$hist_dir/concept.notes.${ts}${iter_suffix}.md"
         else
-            # Im copy-Modus nur kopieren — Notes werden NACH dem Claude-Call entfernt,
-            # damit _concept_build_user_prompt sie noch lesen kann.
+            # In copy mode the file stays — notes are removed AFTER the Claude
+            # call so that _concept_build_user_prompt can still read them.
             cp "$notes_file" "$hist_dir/concept.notes.${ts}${iter_suffix}.md"
         fi
     fi
@@ -118,7 +115,7 @@ _concept_archive_to_history() {
     find "$hist_dir" -maxdepth 1 -type f -name 'concept.*.md' 2>/dev/null | wc -l
 }
 
-# _concept_build_user_prompt: Erzeugt User-Prompt-Markdown auf stdout.
+# _concept_build_user_prompt: produce the user-prompt markdown on stdout.
 # Args: $1=fresh ("true"|"false"), $2=has_existing ("true"|"false")
 _concept_build_user_prompt() {
     local fresh="$1" has_existing="$2"
@@ -150,8 +147,8 @@ _concept_build_user_prompt() {
     }
 }
 
-# phase_concept_run: Hauptlogik der Phase.
-# Returns: Exit-Code (0 erfolg, 1 general, 2 precondition, 3 auth).
+# phase_concept_run: main phase logic.
+# Returns: exit code (0 ok, 1 general, 2 precondition, 3 auth).
 phase_concept_run() {
     cd /workspace 2>/dev/null || {
         echo "concept: /workspace not mounted" >&2
@@ -163,14 +160,13 @@ phase_concept_run() {
     local fresh
     fresh="$(echo "${PHASE_FLAGS:-}" | jq -r '.fresh // false' 2>/dev/null || echo false)"
 
-    # Erstmaliges Setup: Repo klonen wenn noch nicht da
     if [[ ! -d /workspace/.git ]]; then
-        log_info "concept: kloning $REPO_URL nach /workspace"
+        log_info "concept: cloning $REPO_URL into /workspace"
         _concept_initial_clone || return 1
     fi
     cd /workspace || return 1
 
-    # History-Archivierung: bei --fresh move'n, sonst nur copy
+    # On --fresh move the prior concept aside; otherwise just copy it.
     local concept_file=/workspace/.agent/concept.md
     local has_existing=false
     [[ -f "$concept_file" ]] && has_existing=true
@@ -183,21 +179,18 @@ phase_concept_run() {
         history_count="$(_concept_archive_to_history copy)"
     else
         history_count=0
-        # Notes ohne Konzept koennen vorhanden sein — auch archivieren wenn nicht leer
+        # Notes without a concept can exist — archive them too if non-empty.
         if [[ -f /workspace/.agent/concept.notes.md && -s /workspace/.agent/concept.notes.md ]]; then
             history_count="$(_concept_archive_to_history copy)"
         fi
     fi
 
-    # System-Prompt mergen
     local sysprompt
     sysprompt="$(build_system_prompt concept)" || return 1
 
-    # User-Prompt rendern
     local user_prompt_path
     user_prompt_path="$(_concept_build_user_prompt "$fresh" "$has_existing" | render_user_prompt concept user-prompt)"
 
-    # Claude aufrufen
     local started_at finished_at started_epoch finished_epoch
     started_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
     started_epoch=$(date -u +%s)
@@ -207,7 +200,7 @@ phase_concept_run() {
     local sysprompt_content
     sysprompt_content="$(cat "$sysprompt")"
 
-    log_info "concept: rufe claude (stream-json, max-turns 15) auf"
+    log_info "concept: calling claude (stream-json, max-turns 15)"
 
     set +e
     claude -p \
@@ -254,7 +247,6 @@ phase_concept_run() {
         return 3
     fi
 
-    # Konzept-Text extrahieren und in concept.md schreiben
     local concept_text
     concept_text="$(jq -r '.result' "$result_json")"
     if [[ -z "$concept_text" || "$concept_text" == "null" ]]; then
@@ -264,13 +256,11 @@ phase_concept_run() {
     printf '%s\n' "$concept_text" > "${concept_file}.tmp"
     mv "${concept_file}.tmp" "$concept_file"
 
-    # Notes entfernen — wurden am Anfang bereits per copy in die History archiviert.
-    # NICHT _concept_archive_to_history move aufrufen: das wuerde concept.md (gerade
-    # von Claude geschrieben) ebenfalls in die History verschieben und das Konzept
-    # damit aus dem Workspace loeschen.
+    # Drop the notes file — it was already copied into history above. Don't
+    # call _concept_archive_to_history move here: that would also move the
+    # freshly written concept.md into history and clear it from the workspace.
     rm -f /workspace/.agent/concept.notes.md
 
-    # Result-JSON emittieren
     finished_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
     finished_epoch=$(date -u +%s)
     local duration_ms=$(( (finished_epoch - started_epoch) * 1000 ))

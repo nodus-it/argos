@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
-# phases/implement.sh — Phase implement: Code-Aenderungen umsetzen.
+# phases/implement.sh — implement phase: apply the code changes.
 #
-# Default: --fresh (git reset hard auf origin/$BASE_BRANCH, git clean -fd
-# ohne -x; behaelt vendor/, node_modules/), composer install/npm ci falls
-# vorhanden, dann Claude-Session. Quality-Gates (Pint, Pest/PHPUnit, optional
-# PHPStan) werden NACH der Claude-Session vom Worker zur Verifikation
-# durchlaufen — Claude soll Sie selbst schon erfolgreich gemacht haben.
-#
-# Siehe IMPLEMENTATION.md Abschnitt 1.2 (Claude-Aufruf) und 11 (Verifikation).
+# Default: --fresh (git reset --hard origin/$BASE_BRANCH, git clean -fd
+# without -x so vendor/ and node_modules/ survive), composer install / npm ci
+# if a manifest exists, then a Claude session. Quality gates (Pint,
+# Pest/PHPUnit, optional PHPStan) are re-run by the worker AFTER the Claude
+# session as a verification step — Claude is expected to have made them
+# pass already.
 
 # shellcheck shell=bash
 
@@ -35,8 +34,7 @@ phase_implement_preconditions() {
     return 0
 }
 
-# _implement_reset_branch: --fresh-Reset des Workspace.
-# Returns: 0 bei Erfolg, sonst Fehler.
+# _implement_reset_branch: --fresh reset of the workspace.
 _implement_reset_branch() {
     log_info "implement: git fetch + reset --hard origin/${BASE_BRANCH}"
     set +x
@@ -49,18 +47,18 @@ _implement_reset_branch() {
         return 1
     fi
     git -C /workspace reset --hard "origin/$BASE_BRANCH"
-    # -fd ohne -x: behaelt vendor/ und node_modules/ (gitignored)
+    # -fd without -x: keep vendor/ and node_modules/ (which are gitignored).
     git -C /workspace clean -fd
     git -C /workspace remote set-url origin "$REPO_URL"
 }
 
-# _implement_setup_toolchain: composer install / npm ci falls Manifest vorhanden.
+# _implement_setup_toolchain: composer install / npm ci if a manifest exists.
 _implement_setup_toolchain() {
     if [[ -f /workspace/composer.json ]]; then
         log_info "implement: composer install"
         if ! (cd /workspace && composer install --no-interaction --prefer-dist --no-progress 2>&1 \
                 | tee "/workspace/.agent/logs/composer-install.${ITERATION}.log") ; then
-            echo "implement: composer install failed (siehe logs)" >&2
+            echo "implement: composer install failed (see logs)" >&2
             return 1
         fi
     fi
@@ -68,14 +66,14 @@ _implement_setup_toolchain() {
         log_info "implement: npm ci"
         if ! (cd /workspace && npm ci --no-audit --no-fund 2>&1 \
                 | tee "/workspace/.agent/logs/npm-ci.${ITERATION}.log") ; then
-            echo "implement: npm ci failed (siehe logs)" >&2
+            echo "implement: npm ci failed (see logs)" >&2
             return 1
         fi
     fi
     return 0
 }
 
-# _implement_build_user_prompt: Erzeugt User-Prompt fuer Claude-Implement-Session.
+# _implement_build_user_prompt: produce the user prompt for the Claude implement session.
 _implement_build_user_prompt() {
     local concept_file=/workspace/.agent/concept.md
     local notes_file=/workspace/.agent/implement.notes.md
@@ -99,9 +97,9 @@ _implement_build_user_prompt() {
     }
 }
 
-# _implement_run_quality_gates: Fuehrt Pint, Pest/PHPUnit, optional PHPStan aus.
-# Output: JSON {pint, pest, phpunit, phpstan} auf stdout.
-# Return: 0 immer (Status wird im JSON erfasst).
+# _implement_run_quality_gates: run Pint, Pest/PHPUnit, optional PHPStan.
+# Output: JSON {pint, pest, phpunit, phpstan} on stdout.
+# Return: always 0 (status is captured in the JSON).
 _implement_run_quality_gates() {
     local gates='{"pint":"skip","pest":"skip","phpunit":"skip","phpstan":"skip"}'
 
@@ -144,10 +142,10 @@ _implement_run_quality_gates() {
     printf '%s' "$gates"
 }
 
-# _implement_quality_gate_verdict: Bestimmt failed-Gate-Name aus gates-JSON.
-# Args: $1=gates-json
-# Output: failed-gate-name oder leer
-# Return: 0 wenn alle blockierenden Gates ok, 4 wenn ein Block-Gate fail
+# _implement_quality_gate_verdict: derive the failing-gate name from the gates JSON.
+# Args: $1=gates_json
+# Output: failed-gate name, or empty.
+# Return: 0 if all blocking gates pass, 4 if one fails.
 _implement_quality_gate_verdict() {
     local gates="$1"
     local pint pest phpunit
@@ -177,7 +175,7 @@ phase_implement_run() {
     fresh="$(echo "${PHASE_FLAGS:-}" | jq -r '.fresh // false' 2>/dev/null || echo false)"
     continue_run="$(echo "${PHASE_FLAGS:-}" | jq -r '.continue // false' 2>/dev/null || echo false)"
 
-    # Default: fresh = true wenn weder fresh noch continue explizit gesetzt
+    # Default to fresh=true when neither --fresh nor --continue is set.
     if [[ "$fresh" == "false" && "$continue_run" == "false" ]]; then
         fresh="true"
     fi
@@ -187,15 +185,12 @@ phase_implement_run() {
     fi
     _implement_setup_toolchain || return 1
 
-    # System-Prompt mergen
     local sysprompt
     sysprompt="$(build_system_prompt implement)" || return 1
 
-    # User-Prompt rendern
     local user_prompt_path
     user_prompt_path="$(_implement_build_user_prompt | render_user_prompt implement user-prompt)"
 
-    # Claude aufrufen mit stream-json
     local started_at finished_at started_epoch finished_epoch
     started_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
     started_epoch=$(date -u +%s)
@@ -206,7 +201,7 @@ phase_implement_run() {
     sysprompt_content="$(cat "$sysprompt")"
     local max_turns="${MAX_TURNS:-50}"
 
-    log_info "implement: rufe claude (stream-json, max-turns $max_turns) auf"
+    log_info "implement: calling claude (stream-json, max-turns $max_turns)"
 
     set +e
     claude -p \
@@ -239,12 +234,12 @@ phase_implement_run() {
         log_warn "implement: claude exited with code $claude_exit"
     fi
 
-    # Notes nach dem Claude-Aufruf entfernen — wurden vor dem Lauf per writeImplementNotesToVolume
-    # aus der DB in die Datei geschrieben und sind jetzt nicht mehr benoetigt.
+    # Drop the notes file after the Claude call — it was written from the DB
+    # by writeImplementNotesToVolume before the run and is no longer needed.
     rm -f /workspace/.agent/implement.notes.md
 
     if [[ ! -s "$result_json" ]]; then
-        echo "implement: stream-json lieferte kein result-Event" >&2
+        echo "implement: stream-json produced no result event" >&2
         return 3
     fi
 
@@ -262,8 +257,8 @@ phase_implement_run() {
         return 3
     fi
 
-    # Verifikations-Phase: Quality-Gates ausfuehren
-    log_info "implement: verifiziere Quality-Gates (pint/pest/phpstan)"
+    # Verification step: run the quality gates.
+    log_info "implement: verifying quality gates (pint/pest/phpstan)"
     local gates
     gates="$(_implement_run_quality_gates)"
 
@@ -278,7 +273,7 @@ phase_implement_run() {
         status="quality_gate_failed"
     fi
 
-    # Geaenderte Files erkennen
+    # Collect the list of changed files.
     local changed_files_json='[]'
     if [[ -d /workspace/.git ]]; then
         local changed

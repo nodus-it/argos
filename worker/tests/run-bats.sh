@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# worker/tests/run-bats.sh — Bats-Unit-Tests via Docker ausführen.
+# worker/tests/run-bats.sh — run bats unit tests via docker.
 #
-# Bootstrap-Helper: baut das Test-Image (bats + jq) und führt alle .bats-Files
-# unter worker/tests/bats/ aus.
+# Bootstrap helper: builds the test image (bats + jq) and runs every .bats
+# file under worker/tests/bats/.
 set -euo pipefail
 IFS=$'\n\t'
 
@@ -10,7 +10,7 @@ repo_root="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$repo_root"
 
 if ! [[ -d worker/tests/bats ]] || ! compgen -G 'worker/tests/bats/*.bats' >/dev/null; then
-    echo "Keine Bats-Tests unter worker/tests/bats/ gefunden — überspringe."
+    echo "No bats tests under worker/tests/bats/ — skipping."
     exit 0
 fi
 

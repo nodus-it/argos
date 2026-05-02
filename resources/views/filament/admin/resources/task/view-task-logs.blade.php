@@ -1,6 +1,5 @@
 <x-filament-panels::page>
 
-    {{-- Phase Selector --}}
     <div class="flex items-center gap-2 flex-wrap">
         @foreach(['concept' => 'Concept', 'implement' => 'Implement', 'push' => 'Push'] as $p => $label)
             @php
@@ -48,7 +47,6 @@
         </div>
     </div>
 
-    {{-- Terminal Window --}}
     <div
         class="rounded-xl overflow-hidden border border-slate-800 shadow-2xl shadow-black/50 bg-slate-950"
         x-data="{
@@ -64,7 +62,6 @@
         x-init="scrollToBottom()"
         @scroll="autoScroll = ($refs.terminal.scrollHeight - $refs.terminal.scrollTop - $refs.terminal.clientHeight) < 40"
     >
-        {{-- Title Bar --}}
         <div class="flex items-center justify-between px-4 py-2.5 bg-slate-900 border-b border-slate-800">
             <span class="text-xs text-slate-500 font-mono">
                 argos · {{ $task->name }} · {{ $phase }}
@@ -82,7 +79,6 @@
             @endif
         </div>
 
-        {{-- Log Content --}}
         <div
             x-ref="terminal"
             class="overflow-y-auto font-mono text-xs leading-5 p-4 space-y-0"
@@ -104,7 +100,6 @@
             @endif
         </div>
 
-        {{-- Status Bar --}}
         <div class="flex items-center justify-between px-4 py-2 bg-slate-900 border-t border-slate-800 text-xs font-mono">
             <div class="flex items-center gap-3">
                 @php
@@ -128,7 +123,6 @@
         </div>
     </div>
 
-    {{-- Auto-scroll Hinweis --}}
     <div
         class="text-xs text-slate-500 text-center"
         x-data
@@ -138,7 +132,7 @@
         ↓ Scrolle nach unten für neueste Ausgabe — Auto-Scroll aktiv wenn du am Ende bist
     </div>
 
-    {{-- Livewire Poll (nur wenn running) --}}
+    {{-- Only poll while a phase is running, otherwise the terminal is static. --}}
     @if($isRunning)
         <div wire:poll.2000ms="poll" class="hidden"></div>
     @endif

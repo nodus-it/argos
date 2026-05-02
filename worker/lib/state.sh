@@ -1,27 +1,22 @@
 #!/usr/bin/env bash
-# lib/state.sh — Persistenz und Manipulation der Task-state.json.
+# lib/state.sh — persistence and manipulation of the per-task state.json.
 #
-# Schema in schemas/state.schema.json. Lifecycle und Felder beschrieben
-# in IMPLEMENTATION.md Abschnitt 2. Atomare Writes via .tmp+mv damit
-# Crashes die Datei nicht zerstören.
-#
-# Die Datei wird über STATE_FILE referenziert (default
-# /workspace/.agent/state.json). Tests können STATE_FILE überschreiben.
+# Schema in schemas/state.schema.json. Atomic writes via .tmp+mv so a crash
+# cannot corrupt the file. STATE_FILE is overridable for tests.
 
 # shellcheck shell=bash
 
 STATE_FILE="${STATE_FILE:-/workspace/.agent/state.json}"
 STATE_SCHEMA_VERSION=1
 
-# _state_now: Aktueller UTC-Timestamp im ISO8601-Format.
+# _state_now: current UTC timestamp in ISO8601.
 _state_now() {
     date -u +"%Y-%m-%dT%H:%M:%SZ"
 }
 
-# state_init: Erstellt initiales state.json fuer einen neuen Task.
+# state_init: write the initial state.json for a new task.
 # Args: $1=task_id, $2=repo_url, $3=base_branch
-# Output: keine; legt $STATE_FILE an.
-# Returns: 0 bei Erfolg, sonst Fehler von jq/mkdir/mv.
+# Returns: 0 on success.
 state_init() {
     local task_id="$1"
     local repo_url="$2"
@@ -60,8 +55,8 @@ state_init() {
     mv "${STATE_FILE}.tmp" "$STATE_FILE"
 }
 
-# state_read: Gibt aktuellen state.json-Inhalt auf stdout.
-# Returns: 0 bei Erfolg, 1 wenn Datei fehlt.
+# state_read: print the current state.json to stdout.
+# Returns: 0 on success, 1 if the file is missing.
 state_read() {
     if [[ ! -f "$STATE_FILE" ]]; then
         echo "state_read: $STATE_FILE not found" >&2
@@ -70,13 +65,11 @@ state_read() {
     cat "$STATE_FILE"
 }
 
-# state_write_atomic: Ersetzt state.json atomar durch JSON von stdin.
-# Stdin: vollständiges State-JSON
-# Returns: 0 bei Erfolg.
+# state_write_atomic: replace state.json atomically with JSON read from stdin.
+# Refuses to write unparseable JSON.
 state_write_atomic() {
     local content
     content="$(cat)"
-    # jq-Validierung: parsbar?
     if ! jq -e . <<< "$content" >/dev/null 2>&1; then
         echo "state_write_atomic: invalid JSON refused" >&2
         return 1
@@ -85,9 +78,8 @@ state_write_atomic() {
     mv "${STATE_FILE}.tmp" "$STATE_FILE"
 }
 
-# state_set_feature_branch: Setzt repo.feature_branch (Erst-Belegung beim ersten concept-Run).
+# state_set_feature_branch: set repo.feature_branch (first concept run only).
 # Args: $1=branch_name
-# Returns: 0 bei Erfolg.
 state_set_feature_branch() {
     local branch="$1"
     local now
@@ -98,14 +90,13 @@ state_set_feature_branch() {
     mv "${STATE_FILE}.tmp" "$STATE_FILE"
 }
 
-# state_get_feature_branch: Liefert repo.feature_branch oder leer.
+# state_get_feature_branch: print repo.feature_branch or empty string.
 state_get_feature_branch() {
     jq -r '.repo.feature_branch // ""' "$STATE_FILE"
 }
 
-# state_set_pr_url: Setzt repo.pr_url nach erfolgreichem push/MR.
+# state_set_pr_url: set repo.pr_url after a successful push/MR.
 # Args: $1=pr_url
-# Returns: 0 bei Erfolg.
 state_set_pr_url() {
     local pr_url="$1"
     local now
@@ -116,15 +107,14 @@ state_set_pr_url() {
     mv "${STATE_FILE}.tmp" "$STATE_FILE"
 }
 
-# state_get_pr_url: Liefert repo.pr_url oder leer.
+# state_get_pr_url: print repo.pr_url or empty string.
 state_get_pr_url() {
     jq -r '.repo.pr_url // ""' "$STATE_FILE"
 }
 
-# state_add_iteration: Fügt eine neue Iteration zur Phase hinzu.
-# Args: $1=phase, $2=flags_json (z.B. '{"fresh":false}'), $3=optional started_at
-# Output: Iterationsnummer (n) auf stdout.
-# Returns: 0 bei Erfolg.
+# state_add_iteration: append a new iteration to a phase.
+# Args: $1=phase, $2=flags_json (e.g. '{"fresh":false}'), $3=optional started_at
+# Output: the new iteration number on stdout.
 state_add_iteration() {
     local phase="$1"
     local flags_json="${2:-}"
@@ -161,10 +151,9 @@ state_add_iteration() {
     echo "$next_n"
 }
 
-# state_update_iteration: Setzt Endstatus einer laufenden Iteration.
+# state_update_iteration: finalise a running iteration.
 # Args: $1=phase, $2=n, $3=status, $4=exit_code,
 #       $5=optional error_message, $6=optional failed_gate
-# Returns: 0 bei Erfolg.
 state_update_iteration() {
     local phase="$1"
     local n="$2"
@@ -197,24 +186,22 @@ state_update_iteration() {
     mv "${STATE_FILE}.tmp" "$STATE_FILE"
 }
 
-# state_get_iteration_count: Anzahl Iterationen einer Phase.
+# state_get_iteration_count: number of iterations of a phase.
 # Args: $1=phase
-# Output: Zahl auf stdout.
 state_get_iteration_count() {
     local phase="$1"
     jq -r ".phases[\"$phase\"].iterations | length" "$STATE_FILE"
 }
 
-# state_get_current_status: Aktueller current_status einer Phase.
+# state_get_current_status: current_status of a phase.
 # Args: $1=phase
-# Output: Status-String auf stdout.
 state_get_current_status() {
     local phase="$1"
     jq -r ".phases[\"$phase\"].current_status" "$STATE_FILE"
 }
 
-# state_validate: Pruefe Pflichtfelder und Schema-Version. Manuelle Field-Checks.
-# Returns: 0 wenn OK, 1 sonst.
+# state_validate: check required top-level fields and schema_version.
+# Returns: 0 if valid, 1 otherwise.
 state_validate() {
     [[ -f "$STATE_FILE" ]] || { echo "state_validate: missing $STATE_FILE" >&2; return 1; }
 

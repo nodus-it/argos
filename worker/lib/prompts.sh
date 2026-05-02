@@ -1,26 +1,24 @@
 #!/usr/bin/env bash
-# lib/prompts.sh — System-Prompt-Komposition fuer Claude-Sessions.
+# lib/prompts.sh — system-prompt composition for Claude sessions.
 #
-# Siehe IMPLEMENTATION.md Abschnitt 10. Baut den finalen
-# System-Prompt aus mehreren Layern:
-#   1. /usr/local/share/agent/prompts/<phase>.system.md  (Worker-eigen)
-#   2. /usr/local/share/agent/prompts/user.global.system.md  (User-global, optional)
-#   3. Dynamische Marker (TASK_ID, BASE_BRANCH, ITERATION)
+# Builds the final system prompt from three layers:
+#   1. /usr/local/share/agent/prompts/<phase>.system.md (worker-owned)
+#   2. /usr/local/share/agent/prompts/user.global.system.md (user-global, optional)
+#   3. dynamic markers (TASK_ID, BASE_BRANCH, ITERATION)
 #
 # Output: /workspace/.agent/runtime/<phase>.system.merged.md
-#
-# Ueber PROMPTS_DIR / RUNTIME_DIR konfigurierbar fuer Tests.
+# PROMPTS_DIR / RUNTIME_DIR are overridable for tests.
 
 # shellcheck shell=bash
 
 PROMPTS_DIR="${PROMPTS_DIR:-/usr/local/share/agent/prompts}"
 RUNTIME_DIR="${RUNTIME_DIR:-/workspace/.agent/runtime}"
 
-# build_system_prompt: Erzeugt merged System-Prompt-Datei fuer eine Phase.
+# build_system_prompt: produce the merged system prompt for a phase.
 # Args: $1=phase
 # Required env: TASK_ID, BASE_BRANCH, ITERATION
-# Output: Pfad zur erzeugten Datei auf stdout.
-# Returns: 0 bei Erfolg, 1 wenn phase-spezifischer Prompt fehlt.
+# Output: path to the produced file on stdout.
+# Returns: 0 on success, 1 if the phase-specific prompt is missing.
 build_system_prompt() {
     local phase="$1"
     local phase_prompt="$PROMPTS_DIR/${phase}.system.md"
@@ -53,11 +51,10 @@ build_system_prompt() {
     echo "$out"
 }
 
-# render_user_prompt: Schreibt einen User-Prompt-File ins Runtime-Verzeichnis.
-# Args: $1=phase, $2=name (z.B. "user-prompt"), $3=optional content
-# Wenn $3 leer ist, wird stdin gelesen.
-# Output: Pfad zur Datei auf stdout.
-# Returns: 0 bei Erfolg.
+# render_user_prompt: write a user-prompt file into the runtime directory.
+# Args: $1=phase, $2=name (e.g. "user-prompt"), $3=optional content
+# If $3 is empty, content is read from stdin.
+# Output: path to the file on stdout.
 render_user_prompt() {
     local phase="$1"
     local name="$2"

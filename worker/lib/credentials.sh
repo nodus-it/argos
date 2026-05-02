@@ -1,23 +1,21 @@
 #!/usr/bin/env bash
-# lib/credentials.sh — Tokens und Repo-Credentials auf dem Host.
+# lib/credentials.sh — host-side storage for tokens and repo credentials.
 #
-# Speichert sensible Daten unter $AGENT_HOME (default ~/.agent) mit Mode 600.
-# Niemals loggen, niemals im Image, niemals im Volume — siehe
-# WORKER-CONCEPT.md "Sicherheits-Modell".
+# Sensitive data lives under $AGENT_HOME (default ~/.agent) with mode 600.
+# Never log, never bake into an image, never write to a task volume.
 #
-# Layout auf dem Host:
+# Host layout:
 #   $AGENT_HOME/claude_oauth_token              (mode 600)
 #   $AGENT_HOME/tasks/<task-id>/credentials.env (mode 600)
-#       Inhalt: REPO_URL=, REPO_TOKEN=, BASE_BRANCH=
+#       contents: REPO_URL=, REPO_TOKEN=, BASE_BRANCH=
 
 # shellcheck shell=bash
 
 AGENT_HOME="${AGENT_HOME:-$HOME/.agent}"
 CLAUDE_TOKEN_FILE="${CLAUDE_TOKEN_FILE:-$AGENT_HOME/claude_oauth_token}"
 
-# _credentials_atomic_write: Schreibt Inhalt von stdin atomar nach $1 mit Mode 600.
-# Args: $1=zielpfad
-# Returns: 0 bei Erfolg.
+# _credentials_atomic_write: atomically write stdin to $1 with mode 600.
+# Args: $1=target_path
 _credentials_atomic_write() {
     local target="$1"
     mkdir -p "$(dirname "$target")"
@@ -29,9 +27,8 @@ _credentials_atomic_write() {
     chmod 600 "$target"
 }
 
-# credentials_save_claude_token: Persistiert OAuth-Token von stdin.
-# Stdin: Token-String (z.B. sk-ant-oat01-...)
-# Returns: 0 bei Erfolg.
+# credentials_save_claude_token: persist the OAuth token from stdin.
+# Stdin: token string (e.g. sk-ant-oat01-...)
 credentials_save_claude_token() {
     local token
     token="$(cat)"
@@ -42,8 +39,8 @@ credentials_save_claude_token() {
     printf '%s\n' "$token" | _credentials_atomic_write "$CLAUDE_TOKEN_FILE"
 }
 
-# credentials_load_claude_token: Gibt den gespeicherten Token auf stdout aus.
-# Returns: 0 wenn Token vorhanden, 1 wenn nicht.
+# credentials_load_claude_token: print the stored token to stdout.
+# Returns: 0 if a token is present, 1 otherwise.
 credentials_load_claude_token() {
     if [[ ! -f "$CLAUDE_TOKEN_FILE" ]]; then
         echo "credentials_load_claude_token: $CLAUDE_TOKEN_FILE not found" >&2
@@ -52,22 +49,19 @@ credentials_load_claude_token() {
     head -n1 "$CLAUDE_TOKEN_FILE"
 }
 
-# credentials_has_claude_token: Prueft ob Token-File existiert und nicht-leer ist.
-# Returns: 0 wenn vorhanden, 1 wenn nicht.
+# credentials_has_claude_token: true if the token file exists and is non-empty.
 credentials_has_claude_token() {
     [[ -s "$CLAUDE_TOKEN_FILE" ]]
 }
 
-# _credentials_task_path: Pfad zum Task-Verzeichnis auf dem Host.
+# _credentials_task_path: host directory of a task.
 # Args: $1=task_id
-# Output: Pfad-String.
 _credentials_task_path() {
     echo "$AGENT_HOME/tasks/$1"
 }
 
-# credentials_save_task: Schreibt credentials.env fuer einen Task.
+# credentials_save_task: write credentials.env for a task.
 # Args: $1=task_id, $2=repo_url, $3=repo_token, $4=base_branch
-# Returns: 0 bei Erfolg.
 credentials_save_task() {
     local task_id="$1"
     local repo_url="$2"
@@ -84,10 +78,10 @@ credentials_save_task() {
     } | _credentials_atomic_write "$dir/credentials.env"
 }
 
-# credentials_load_task: Sourced credentials.env eines Tasks in die aktuelle Shell.
+# credentials_load_task: source credentials.env of a task into the current shell.
 # Args: $1=task_id
-# Side effect: setzt REPO_URL, REPO_TOKEN, BASE_BRANCH.
-# Returns: 0 wenn geladen, 1 wenn Datei fehlt.
+# Side effect: sets REPO_URL, REPO_TOKEN, BASE_BRANCH.
+# Returns: 0 if loaded, 1 if the file is missing.
 credentials_load_task() {
     local task_id="$1"
     local file
@@ -100,27 +94,24 @@ credentials_load_task() {
     source "$file"
 }
 
-# credentials_delete_task: Loescht das Task-Verzeichnis komplett.
+# credentials_delete_task: remove the task directory entirely (idempotent).
 # Args: $1=task_id
-# Returns: 0 immer (idempotent).
 credentials_delete_task() {
     local task_id="$1"
     rm -rf "$(_credentials_task_path "$task_id")"
 }
 
-# credentials_task_exists: Prueft ob Task-Eintrag existiert.
+# credentials_task_exists: true if a credentials entry exists for this task.
 # Args: $1=task_id
-# Returns: 0 wenn ja, 1 sonst.
 credentials_task_exists() {
     local task_id="$1"
     [[ -f "$(_credentials_task_path "$task_id")/credentials.env" ]]
 }
 
-# git_auth_inject_token: Baut HTTPS-URL mit oauth2-User und Token-Password.
+# git_auth_inject_token: build an HTTPS URL with `oauth2:<token>@` user-info.
 # Args: $1=repo_url, $2=token
-# Output: URL mit eingebautem Token auf stdout (oder unveraenderte URL fuer
-# nicht-https Schemes wie ssh/file/git).
-# Hinweis: niemals loggen — der Output enthaelt das Secret.
+# Output: URL with embedded token, or the original URL for non-https schemes.
+# Note: never log the output — it carries the secret.
 git_auth_inject_token() {
     local url="$1" token="$2"
     if [[ "$url" =~ ^https?:// ]]; then

@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
-# lib/result.sh — Phase-Result-JSON-Konstruktion auf stdout.
+# lib/result.sh — build the per-phase result JSON on stdout.
 #
-# Jede Phase emittiert am Ende ein einzelnes JSON-Objekt auf stdout
-# (siehe IMPLEMENTATION.md Abschnitt 7 und schemas/result.<phase>.schema.json).
-# Diese Library liefert eine zentrale `result_emit`-Funktion die das
-# Pflichtfeld-Set prüft und über jq sauberes JSON baut.
+# Each phase emits a single JSON object on stdout when it finishes
+# (see schemas/result.<phase>.schema.json). This library provides the
+# central `result_emit` function that checks the required fields and
+# uses jq to produce well-formed JSON.
 
 # shellcheck shell=bash
 
-# result_emit: Baut Phase-Result-JSON aus key/value-Paaren und gibt es auf stdout.
-# Args: $@ = Schlüssel/Wert-Paare alternierend (key value key value ...)
-#         oder spezielle Marker:
-#           --int <key> <value>   numerischer Wert (ohne JSON-Quoting)
-#           --raw <key> <jq>      roher jq-Ausdruck (z.B. Arrays, Objekte)
+# result_emit: build a phase-result JSON from key/value pairs and print it.
+# Args: $@ = alternating key/value pairs (key value key value ...) or a
+#         marker pair:
+#           --int <key> <value>   numeric value (no JSON quoting)
+#           --raw <key> <jq>      raw jq expression (e.g. arrays, objects)
 #
-# Nutzung:
+# Usage:
 #   result_emit \
 #       phase concept \
 #       task_id "$TASK_ID" \
@@ -26,10 +26,10 @@
 #       --int exit_code 0 \
 #       concept_path "/workspace/.agent/concept.md"
 #
-# Pflichtfelder (werden nach dem Bau geprüft):
+# Required fields (checked after build):
 #   phase, task_id, iteration, status, started_at, finished_at, exit_code
 #
-# Returns: 0 bei Erfolg, 1 wenn ein Pflichtfeld fehlt oder jq fehlschlägt.
+# Returns: 0 on success, 1 if a required field is missing or jq fails.
 result_emit() {
     local args=()
     local jq_filter='{}'
@@ -38,7 +38,6 @@ result_emit() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --int|--raw)
-                # Numerischer Wert oder roher jq-Ausdruck — kein Quoting
                 key="$2"
                 val="$3"
                 shift 3
@@ -46,7 +45,6 @@ result_emit() {
                 jq_filter+=" | .${key} = \$rv_${key}"
                 ;;
             *)
-                # Default: String key/value pair
                 key="$1"
                 val="$2"
                 shift 2

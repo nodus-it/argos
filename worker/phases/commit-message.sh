@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# phases/commit-message.sh — Sub-Phase: erzeugt Conventional-Commits-Message.
+# phases/commit-message.sh — sub-phase: produce a conventional-commits message.
 #
-# Wird von phases/push.sh aufgerufen. Liefert ein Result-JSON mit
-# subject + body. Defensives Parsing: zuerst .structured_output, sonst
-# Fallback auf .result | fromjson (siehe IMPLEMENTATION.md 1.3 Caveat).
+# Called from phases/push.sh. Returns a result JSON with subject + body.
+# Defensive parsing: try .structured_output first, then fall back to
+# `.result | fromjson`.
 #
-# Ergebnis-Files in /workspace/.agent/logs/:
-#   commit-message.${ITERATION}.json     — rohes Claude-Envelope
-#   commit-message.${ITERATION}.subject  — extrahierte Subject-Zeile
-#   commit-message.${ITERATION}.body     — extrahierter Body
+# Output files in /workspace/.agent/logs/:
+#   commit-message.${ITERATION}.json     — raw Claude envelope
+#   commit-message.${ITERATION}.subject  — extracted subject line
+#   commit-message.${ITERATION}.body     — extracted body
 
 # shellcheck shell=bash
 
@@ -28,7 +28,7 @@ phase_commit_message_preconditions() {
     return 0
 }
 
-# _commit_message_build_user_prompt: Erzeugt User-Prompt mit Diff + Konzept-Hinweis.
+# _commit_message_build_user_prompt: produce the user prompt with diff + concept reference.
 _commit_message_build_user_prompt() {
     local concept_file=/workspace/.agent/concept.md
     local base_ref="origin/${BASE_BRANCH:-main}"
@@ -54,12 +54,12 @@ _commit_message_build_user_prompt() {
     }
 }
 
-# _commit_message_extract: Liest envelope (stdin) und extrahiert subject+body.
-# Output: zwei Zeilen: <subject>\n<body> (body kann mehrzeilig sein, am Ende des Blocks).
-# Strategie:
-#   1) Versuche .structured_output.{subject,body}
-#   2) Fallback: .result als JSON parsen (.result | fromjson)
-# Returns: 0 wenn extrahiert, 1 sonst.
+# _commit_message_extract: read the envelope (stdin) and extract subject+body.
+# Output: two lines: <subject>\n<body> (body may be multi-line at the end).
+# Strategy:
+#   1) try .structured_output.{subject,body}
+#   2) fallback: parse .result as JSON (.result | fromjson)
+# Returns: 0 if extracted, 1 otherwise.
 _commit_message_extract() {
     local envelope
     envelope="$(cat)"
@@ -119,7 +119,7 @@ phase_commit_message_run() {
 
     local output_json="/workspace/.agent/logs/commit-message.${ITERATION}.json"
 
-    log_info "commit-message: rufe claude (json + json-schema) auf"
+    log_info "commit-message: calling claude (json + json-schema)"
     if ! claude -p \
             --append-system-prompt "$sysprompt_content" \
             --output-format json \

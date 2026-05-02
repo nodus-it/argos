@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# lib/tasks.sh — Task-Lifecycle (ID-Validierung, Volume-Management).
+# lib/tasks.sh — task lifecycle (id validation, volume management).
 #
-# Pro Task: ein Docker-Volume `task_ws_<task-id>`, dynamisch erstellt
-# beim `agent task new`, gelöscht beim `agent abort` oder optional
-# beim `agent push --auto-cleanup`. Siehe WORKER-CONCEPT.md.
+# One docker volume per task, named `task_ws_<task-id>`. Created on
+# `agent task new` and removed on `agent abort` (or optionally on
+# `agent push --auto-cleanup`).
 
 # shellcheck shell=bash
 
-# task_id_validate: Prueft Task-ID gegen ^[a-z0-9][a-z0-9-]*[a-z0-9]$, max 40 Zeichen,
-# oder einzelner alphanumerischer Char.
+# task_id_validate: validate the id against ^[a-z0-9][a-z0-9-]*[a-z0-9]$,
+# 40 chars max, or a single alphanumeric character.
 # Args: $1=task_id
-# Returns: 0 wenn gueltig, 1 sonst (mit Fehler auf stderr).
+# Returns: 0 if valid, 1 otherwise (error on stderr).
 task_id_validate() {
     local id="$1"
     if [[ -z "$id" ]]; then
@@ -35,51 +35,44 @@ task_id_validate() {
     return 1
 }
 
-# task_volume_name: Liefert den Volume-Namen fuer eine Task-ID.
+# task_volume_name: print the volume name for a task id.
 # Args: $1=task_id
-# Output: Volume-Name (task_ws_<id>) auf stdout.
 task_volume_name() {
     echo "task_ws_$1"
 }
 
-# task_create_volume: Erstellt das Docker-Volume des Tasks (idempotent).
+# task_create_volume: create the docker volume for a task (idempotent).
 # Args: $1=task_id
-# Returns: 0 bei Erfolg.
 task_create_volume() {
     local name
     name="$(task_volume_name "$1")"
     docker volume create "$name" >/dev/null
 }
 
-# task_delete_volume: Loescht das Docker-Volume des Tasks (idempotent).
+# task_delete_volume: delete the docker volume for a task (idempotent).
 # Args: $1=task_id
-# Returns: 0 immer.
 task_delete_volume() {
     local name
     name="$(task_volume_name "$1")"
     docker volume rm "$name" >/dev/null 2>&1 || true
 }
 
-# task_volume_exists: Prueft ob das Volume existiert.
+# task_volume_exists: true if the volume exists.
 # Args: $1=task_id
-# Returns: 0 wenn ja, 1 sonst.
 task_volume_exists() {
     local name
     name="$(task_volume_name "$1")"
     docker volume inspect "$name" >/dev/null 2>&1
 }
 
-# task_list_volumes: Liefert alle Task-Volumes (Namen ohne Prefix) zeilenweise.
-# Returns: 0 immer.
+# task_list_volumes: print all task volume names (without the prefix), one per line.
 task_list_volumes() {
     docker volume ls --filter "name=task_ws_" --format '{{.Name}}' \
         | sed 's/^task_ws_//'
 }
 
-# task_list: Liefert alle bekannten Tasks zeilenweise auf stdout.
-#   - Aus ~/.agent/tasks/* (Host-Side-State) und Volumes (Docker-Side).
-#   - Doppelt vorkommende Eintraege werden dedupliziert.
-# Returns: 0 immer.
+# task_list: print all known task ids, deduplicated.
+# Combines host-side state (~/.agent/tasks/*) and docker-side volumes.
 task_list() {
     {
         if [[ -d "${AGENT_HOME:-$HOME/.agent}/tasks" ]]; then
@@ -93,8 +86,7 @@ task_list() {
     } | sort -u
 }
 
-# task_orphans: Liefert Volumes die kein zugehöriges ~/.agent/tasks/-Verzeichnis haben.
-# Returns: 0 immer.
+# task_orphans: print volumes that have no matching ~/.agent/tasks/ entry.
 task_orphans() {
     local agent_tasks_dir="${AGENT_HOME:-$HOME/.agent}/tasks"
     local id
