@@ -43,6 +43,8 @@ jobs:
 
   integration:
     runs-on: ubuntu-latest
+    env:
+      APP_KEY: "base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
     steps:
       - uses: actions/checkout@v4
       - name: build worker image

@@ -3,8 +3,8 @@
 bats_require_minimum_version 1.5.0
 
 setup() {
-    # shellcheck source=../../worker/lib/logging.sh
-    source "$BATS_TEST_DIRNAME/../../worker/lib/logging.sh"
+    # shellcheck source=../../lib/logging.sh
+    source "$BATS_TEST_DIRNAME/../../lib/logging.sh"
 }
 
 @test "log_info schreibt nach stderr, nicht stdout" {

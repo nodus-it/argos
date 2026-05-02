@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # logging.sh: Zentrale Logging-Funktionen fuer den Worker.
 # Alle Ausgaben gehen auf stderr, damit stdout fuer strukturierten Output frei bleibt.
 # LOG_LEVEL=debug  -> debug+info+warn+error

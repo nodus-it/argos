@@ -21,7 +21,7 @@ teardown() {
     [ "$(jq -r .repo.url "$STATE_FILE")" = "https://example.com/repo.git" ]
     [ "$(jq -r .repo.base_branch "$STATE_FILE")" = "main" ]
     [ "$(jq -r .repo.feature_branch "$STATE_FILE")" = "null" ]
-    [ "$(jq -r '.phases | keys | join(",")' "$STATE_FILE")" = "concept,diff,implement,push" ]
+    [ "$(jq -r '.phases | keys | join(",")' "$STATE_FILE")" = "concept,diff,implement,push,respond" ]
     [ "$(jq -r '.phases.concept.current_status' "$STATE_FILE")" = "pending" ]
     [ "$(jq -r '.phases.implement.iterations | length' "$STATE_FILE")" = "0" ]
 }

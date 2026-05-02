@@ -14,7 +14,7 @@ phase_concept_run() { echo "concept ran"; }
 EOF
 
     # shellcheck source=../../phases/registry.sh
-    source phases/registry.sh
+    source worker/phases/registry.sh
 }
 
 teardown() {
