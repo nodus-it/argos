@@ -94,7 +94,7 @@ class ViewTaskLogs extends Page
         $configDir = config('argos.config_dir');
         $logPath = "{$configDir}/tasks/{$this->task->name}/{$this->phase}.bg.log";
 
-        if (!file_exists($logPath)) {
+        if (! file_exists($logPath)) {
             return '';
         }
 
@@ -124,12 +124,12 @@ class ViewTaskLogs extends Page
                 str_contains($line, '[ERROR]'),
                 str_contains($line, 'FAILED'),
                 str_contains($line, ': failed'),
-                str_contains($line, 'error:')     => 'text-red-400',
+                str_contains($line, 'error:') => 'text-red-400',
 
                 str_contains($line, '[WARN]'),
-                str_contains($line, 'warning:')   => 'text-amber-400',
+                str_contains($line, 'warning:') => 'text-amber-400',
 
-                str_contains($line, '[INFO]')      => 'text-slate-300',
+                str_contains($line, '[INFO]') => 'text-slate-300',
 
                 str_contains($line, 'completed'),
                 str_contains($line, ': OK'),
@@ -139,10 +139,10 @@ class ViewTaskLogs extends Page
                 str_starts_with(ltrim($line), '+') => 'text-emerald-500',
                 str_starts_with(ltrim($line), '-') => 'text-red-500',
 
-                str_starts_with($line, '...')      => 'text-slate-600',
-                $line === ''                        => 'text-slate-700',
+                str_starts_with($line, '...') => 'text-slate-600',
+                $line === '' => 'text-slate-700',
 
-                default                            => 'text-slate-400',
+                default => 'text-slate-400',
             };
 
             $result[] = ['text' => $line, 'class' => $class];

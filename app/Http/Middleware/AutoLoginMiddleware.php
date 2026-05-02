@@ -15,11 +15,11 @@ class AutoLoginMiddleware
 {
     public function handle(Request $request, Closure $next): Response
     {
-        if (!Auth::check()) {
+        if (! Auth::check()) {
             $user = User::firstOrCreate(
                 ['email' => 'admin@argos.local'],
                 [
-                    'name'     => 'Argos Admin',
+                    'name' => 'Argos Admin',
                     'password' => Hash::make('local'),
                 ],
             );

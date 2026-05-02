@@ -37,13 +37,21 @@ class AppServiceProvider extends ServiceProvider
 
     private function configureDatabase(): void
     {
-        if (env('DB_CONNECTION') === 'mariadb' || $this->canConnectToMariadb()) {
+        // If the caller (env, phpunit.xml, .env, …) explicitly chose a connection,
+        // honor it without probing or auto-migrating. Auto-detect only when nothing
+        // is set — otherwise we burn a 1 s TCP timeout per phpunit boot and risk
+        // overriding test config with the SQLite fallback.
+        if (env('DB_CONNECTION') !== null) {
+            return;
+        }
+
+        if ($this->canConnectToMariadb()) {
             config(['database.default' => 'mariadb']);
 
             return;
         }
 
-        $sqlitePath = env('DB_DATABASE', config('argos.config_dir').'/argos.db');
+        $sqlitePath = config('argos.config_dir').'/argos.db';
         config([
             'database.default' => 'sqlite',
             'database.connections.sqlite.database' => $sqlitePath,
@@ -73,6 +81,11 @@ class AppServiceProvider extends ServiceProvider
 
     private function ensureSqliteExists(string $path): void
     {
+        // Laravel convention: an in-memory database. Don't materialise it on disk.
+        if ($path === ':memory:') {
+            return;
+        }
+
         $dir = dirname($path);
 
         if (! is_dir($dir)) {

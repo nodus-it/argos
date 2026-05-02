@@ -20,11 +20,13 @@ abstract class AgentPhaseCommand extends Command
         $task = Task::where('name', $taskName)->first();
         if ($task === null) {
             $this->error("Task '{$taskName}' nicht gefunden.");
+
             return self::FAILURE;
         }
 
         if ($task->phaseRuns()->where('status', 'running')->exists()) {
             $this->error('Eine Phase läuft bereits.');
+
             return self::FAILURE;
         }
 

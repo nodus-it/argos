@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\TaskResource\Pages;
 
+use App\Domain\Phase\PhaseRunner;
 use App\Filament\Admin\Resources\TaskResource;
 use App\Jobs\RunPhaseJob;
 use App\Models\Task;
@@ -56,22 +57,25 @@ class ViewTaskRespond extends Page
 
         if ($feedback === '') {
             Notification::make()->title('Feedback darf nicht leer sein')->warning()->send();
+
             return;
         }
 
         if ($this->task->phaseRuns()->where('status', 'running')->exists()) {
             Notification::make()->title('Phase läuft bereits')->warning()->send();
+
             return;
         }
 
         try {
-            app(\App\Domain\Phase\PhaseRunner::class)->writeFeedbackToVolume($this->task->name, $feedback);
+            app(PhaseRunner::class)->writeFeedbackToVolume($this->task->name, $feedback);
         } catch (\Throwable $e) {
             Notification::make()
                 ->title('Fehler beim Schreiben des Feedbacks')
                 ->body($e->getMessage())
                 ->danger()
                 ->send();
+
             return;
         }
 
