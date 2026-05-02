@@ -106,15 +106,12 @@ class ViewTask extends ViewRecord
         /** @var Task $task */
         $task = $this->getRecord();
 
-        $hasRunningPhaseRun = $task->phaseRuns()->where('status', 'running')->exists();
-        if ($task->current_status !== 'running' || $hasRunningPhaseRun) {
-            $reader = app(StateReader::class);
-            $reader->syncToDb($task);
-            $task->refresh();
-            $this->notes = $task->concept_notes ?? '';
-            $this->implementNotes = $task->implement_notes ?? '';
-            $this->maybeAutoLoadDiff($task);
-        }
+        $reader = app(StateReader::class);
+        $reader->syncToDb($task);
+        $task->refresh();
+        $this->notes = $task->concept_notes ?? '';
+        $this->implementNotes = $task->implement_notes ?? '';
+        $this->maybeAutoLoadDiff($task);
     }
 
     public function loadDiff(): void

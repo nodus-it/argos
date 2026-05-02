@@ -421,7 +421,7 @@
         @endif
 
         <div x-show="open" x-collapse x-cloak>
-            <div x-data="{ tab: '{{ ($implementSummaryNontechnicalHtml || $implementSummaryTechnicalHtml) ? 'implement' : 'diff' }}' }">
+            <div x-data="{ tab: '{{ ($implementSummaryNontechnicalHtml || $implementSummaryTechnicalHtml) ? 'implement' : 'log' }}' }">
 
                 {{-- Tab bar --}}
                 <div class="flex gap-1 px-4 pt-3 border-b border-gray-100 dark:border-gray-800">
