@@ -97,6 +97,15 @@ _implement_build_user_prompt() {
     }
 }
 
+# _implement_changed_php_files: list PHP files modified or added by Claude in /workspace.
+# Output: NUL-separated list on stdout. Excludes deleted files and untracked-ignored paths.
+_implement_changed_php_files() {
+    (cd /workspace && {
+        git diff -z --name-only --diff-filter=ACMR HEAD -- '*.php'
+        git ls-files -z --others --exclude-standard -- '*.php'
+    } | sort -uz)
+}
+
 # _implement_run_quality_gates: run Pint, Pest/PHPUnit, optional PHPStan.
 # Output: JSON {pint, pest, phpunit, phpstan} on stdout.
 # Return: always 0 (status is captured in the JSON).
@@ -104,11 +113,22 @@ _implement_run_quality_gates() {
     local gates='{"pint":"skip","pest":"skip","phpunit":"skip","phpstan":"skip"}'
 
     if [[ -x /workspace/vendor/bin/pint ]]; then
-        if (cd /workspace && vendor/bin/pint --test) \
-                &> "/workspace/.agent/logs/pint.${ITERATION}.log"; then
-            gates="$(echo "$gates" | jq '.pint = "pass"')"
+        # Only check files Claude actually touched — pre-existing style debt
+        # in the rest of the repo is not Claude's to fix and would otherwise
+        # block every implement run.
+        local changed_files
+        changed_files="$(_implement_changed_php_files)"
+        if [[ -z "$changed_files" ]]; then
+            gates="$(echo "$gates" | jq '.pint = "skip"')"
         else
-            gates="$(echo "$gates" | jq '.pint = "fail"')"
+            if (cd /workspace && \
+                    printf '%s' "$changed_files" \
+                        | xargs -0 --no-run-if-empty vendor/bin/pint --test) \
+                    &> "/workspace/.agent/logs/pint.${ITERATION}.log"; then
+                gates="$(echo "$gates" | jq '.pint = "pass"')"
+            else
+                gates="$(echo "$gates" | jq '.pint = "fail"')"
+            fi
         fi
     fi
 

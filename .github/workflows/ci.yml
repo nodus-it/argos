@@ -34,14 +34,14 @@ jobs:
             worker/tests/integration/fixtures/mock-claude/claude \
             worker/tests/integration/fixtures/fake-remote-repo/setup.sh
 
-  bats:
+  worker-unit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
       - name: bats unit tests (via Docker, includes jq + check-jsonschema)
         run: bash worker/tests/run-bats.sh
 
-  integration:
+  worker-integration:
     runs-on: ubuntu-latest
     env:
       APP_KEY: "base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
@@ -49,10 +49,10 @@ jobs:
       - uses: actions/checkout@v6
       - name: build worker image
         run: docker compose build worker
-      - name: "integration: phase lifecycle"
+      - name: phase lifecycle integration test
         run: bash worker/tests/run-tests.sh --integration
 
-  php:
+  app-quality:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -72,11 +72,17 @@ jobs:
           cp .env.example .env
           php artisan key:generate
 
-      - name: Run PHP tests
+      - name: Pint (code style)
+        run: vendor/bin/pint --test --format agent
+
+      - name: PHPStan / Larastan (level 2 via baseline)
+        run: vendor/bin/phpstan analyse --no-progress --memory-limit=1G
+
+      - name: PHPUnit (feature + unit)
         run: php artisan test --compact
 
   build-manager:
-    needs: [shellcheck, bats, integration, php]
+    needs: [shellcheck, worker-unit, worker-integration, app-quality]
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
@@ -119,7 +125,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   build-worker:
-    needs: [shellcheck, bats, integration, php]
+    needs: [shellcheck, worker-unit, worker-integration, app-quality]
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:

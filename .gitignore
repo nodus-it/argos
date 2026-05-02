@@ -41,3 +41,7 @@ logs/
 # Test artifacts
 coverage/
 .bats-tmp/
+
+# Agent runtime artifacts (worker workspace)
+.agent/
+:memory:
