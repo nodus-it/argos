@@ -8,7 +8,7 @@
 # shellcheck shell=bash
 
 help_main() {
-    cat <<'HELP'
+    cat <<'HELPDOC'
 agent — Claude Worker CLI
 
 USAGE
@@ -47,11 +47,11 @@ HELP
     help <command>               detailed help block for one command
 
 More: README.md, docs/EXAMPLE.md, docs/EXTENDING.md
-HELP
+HELPDOC
 }
 
 help_init() {
-    cat <<'HELP'
+    cat <<'HELPDOC'
 agent init — set up from zero to ready.
 
 What it does:
@@ -63,11 +63,11 @@ What it does:
 
 Flags:
   --update-token       refresh only the token, no rebuild.
-HELP
+HELPDOC
 }
 
 help_task() {
-    cat <<'HELP'
+    cat <<'HELPDOC'
 agent task <subcommand> [task-id]
 
 Subcommands:
@@ -79,11 +79,11 @@ Subcommands:
   show <task-id>     REPO_URL, BASE_BRANCH, feature_branch and phase status
                      (REPO_TOKEN is never printed).
   delete <task-id>   Alias for `agent abort`.
-HELP
+HELPDOC
 }
 
 help_concept() {
-    cat <<'HELP'
+    cat <<'HELPDOC'
 agent concept <task-id> [--fresh]
 
 Concept phase: analyse the task, draft a plan.
@@ -93,11 +93,11 @@ Default: incremental refinement — the previous concept and concept.notes.md
 are read in.
 --fresh: ignore existing concept; the prior version is moved into
          concept.history/.
-HELP
+HELPDOC
 }
 
 help_implement() {
-    cat <<'HELP'
+    cat <<'HELPDOC'
 agent implement <task-id> [--fresh|--continue] [--max-turns=N]
 
 Implement phase: apply the code changes.
@@ -109,28 +109,28 @@ Default --fresh: git reset --hard origin/<base-branch>, git clean -fd,
 
 Quality gates: Claude runs Pint and Pest/PHPUnit itself.
 The worker re-checks afterwards — on failure: status=quality_gate_failed.
-HELP
+HELPDOC
 }
 
 help_diff() {
-    cat <<'HELP'
+    cat <<'HELPDOC'
 agent diff <task-id> [--stat] [--file=<path>]
 
 Read-only: prints `git diff origin/<base-branch>...HEAD` from the workspace.
 --stat:           summary (files, insertions, deletions).
 --file=<path>:    just one file.
-HELP
+HELPDOC
 }
 
 help_push() {
-    cat <<'HELP'
+    cat <<'HELPDOC'
 agent push <task-id> [--auto-cleanup|--keep]
 
 Generates the commit message via a Claude sub-phase, commits, and pushes the
 feature branch. Then prompts for cleanup (default: no).
 --auto-cleanup:  delete volume + host state without asking.
 --keep:          keep everything without asking.
-HELP
+HELPDOC
 }
 
 help_show_concept() { echo "agent show-concept <task-id> — print /workspace/.agent/concept.md (paged on a TTY)."; }
@@ -165,7 +165,7 @@ help_show() {
         abort)                help_abort ;;
         prune)                help_prune ;;
         *)
-            echo "No help entry for '$cmd'." >&2
+            echo "Kein Help-Eintrag fuer '$cmd'." >&2
             help_main
             ;;
     esac

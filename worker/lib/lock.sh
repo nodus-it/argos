@@ -33,9 +33,9 @@ lock_acquire() {
         existing_phase="$(jq -r '.phase // "unknown"' "$LOCK_FILE" 2>/dev/null || echo unknown)"
         existing_started="$(jq -r '.started_at // "unknown"' "$LOCK_FILE" 2>/dev/null || echo unknown)"
         if lock_is_stale; then
-            echo "Lock is stale ($existing_phase since $existing_started, older than ${LOCK_STALE_SECONDS}s) — re-acquisition needs --force-unlock." >&2
+            echo "Lock ist stale ($existing_phase seit $existing_started, älter als ${LOCK_STALE_SECONDS}s) — erneute Acquisition braucht --force-unlock." >&2
         else
-            echo "Lock already held: $existing_phase since $existing_started" >&2
+            echo "Lock bereits gesetzt: $existing_phase seit $existing_started" >&2
         fi
         return 6
     fi

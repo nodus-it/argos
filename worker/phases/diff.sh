@@ -12,11 +12,12 @@ phase_diff_help() {
 
 phase_diff_preconditions() {
     if [[ ! -d /workspace/.git ]]; then
-        echo "diff: /workspace not initialised (run concept first)." >&2
+        # User-facing CLI message kept in German for consistency with the other phases.
+        echo "diff: /workspace nicht initialisiert (concept zuerst)." >&2
         return 2
     fi
     if [[ -z "${BASE_BRANCH:-}" ]]; then
-        echo "diff: BASE_BRANCH not set." >&2
+        echo "diff: BASE_BRANCH nicht gesetzt." >&2
         return 2
     fi
     return 0
