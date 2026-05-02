@@ -8,6 +8,8 @@ use App\Domain\Credentials\CredentialStore;
 use App\Filament\Admin\Pages\Settings;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -77,6 +79,8 @@ class SettingsPageTest extends TestCase
 
     public function test_save_persists_token_to_credential_store(): void
     {
+        Http::fake(['https://api.anthropic.com/v1/models' => Http::response([], 200)]);
+
         Livewire::test(Settings::class)
             ->fillForm(['claude_token' => 'sk-ant-oat01-fresh'])
             ->call('save')
@@ -105,6 +109,32 @@ class SettingsPageTest extends TestCase
             ->assertNotified();
 
         $this->assertNull(app(CredentialStore::class)->getClaudeToken());
+    }
+
+    public function test_save_with_invalid_token_shows_error_and_does_not_persist(): void
+    {
+        Http::fake(['https://api.anthropic.com/v1/models' => Http::response([], 401)]);
+
+        Livewire::test(Settings::class)
+            ->fillForm(['claude_token' => 'sk-ant-oat01-invalid'])
+            ->call('save')
+            ->assertNotified('Token ungültig');
+
+        $this->assertNull(app(CredentialStore::class)->getClaudeToken());
+    }
+
+    public function test_save_with_network_error_saves_token_with_warning(): void
+    {
+        Http::fake(['https://api.anthropic.com/v1/models' => function () {
+            throw new ConnectionException;
+        }]);
+
+        Livewire::test(Settings::class)
+            ->fillForm(['claude_token' => 'sk-ant-oat01-unreachable'])
+            ->call('save')
+            ->assertNotified('Token gespeichert');
+
+        $this->assertSame('sk-ant-oat01-unreachable', app(CredentialStore::class)->getClaudeToken());
     }
 
     public function test_clear_token_removes_file_token(): void

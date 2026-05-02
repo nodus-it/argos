@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Admin\Pages;
 
 use App\Domain\Credentials\CredentialStore;
+use App\Services\Anthropic\AnthropicTokenValidator;
 use Filament\Actions\Action;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Concerns\InteractsWithForms;
@@ -89,7 +90,7 @@ class Settings extends Page implements HasForms
         if ($this->tokenSource === 'env') {
             Notification::make()
                 ->title('Token kommt aus der Umgebungsvariable')
-                ->body('Setze CLAUDE_CODE_OAUTH_TOKEN, um den Wert zu ändern.')
+                ->body('Der Token kommt aus der Umgebung und kann hier nicht geändert werden.')
                 ->warning()
                 ->send();
 
@@ -105,11 +106,31 @@ class Settings extends Page implements HasForms
             return;
         }
 
+        $valid = app(AnthropicTokenValidator::class)->validate($token);
+
+        if ($valid === false) {
+            Notification::make()
+                ->title('Token ungültig')
+                ->body('Der eingegebene Token wurde von der API abgelehnt. Bitte prüfen und erneut versuchen.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
         app(CredentialStore::class)->setClaudeToken($token);
         $this->tokenSource = 'file';
         $this->form->fill(['claude_token' => '']);
 
-        Notification::make()->title('Token gespeichert')->success()->send();
+        if ($valid === null) {
+            Notification::make()
+                ->title('Token gespeichert')
+                ->body('Hinweis: Token konnte nicht gegen die API geprüft werden — Verbindung nicht erreichbar.')
+                ->warning()
+                ->send();
+        } else {
+            Notification::make()->title('Token gespeichert')->success()->send();
+        }
     }
 
     public function clearToken(): void
@@ -164,7 +185,7 @@ class Settings extends Page implements HasForms
     private function tokenInputHelpText(): string
     {
         return match ($this->tokenSource) {
-            'env' => 'Wert kommt aus der Umgebung — kann nur durch Anpassen der Env-Variable geändert werden.',
+            'env' => 'Token kommt aus der Umgebung — im UI nicht änderbar.',
             'file' => 'Wird im Config-Verzeichnis abgelegt (mode 0600).',
             default => 'Wird im Config-Verzeichnis abgelegt (mode 0600). Token via "claude setup-token" erzeugen.',
         };

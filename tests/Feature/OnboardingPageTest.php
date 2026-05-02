@@ -41,7 +41,7 @@ class OnboardingPageTest extends TestCase
         config(['argos.claude_token' => 'sk-ant-test']);
 
         Livewire::test(Onboarding::class)
-            ->assertSee('CLAUDE_CODE_OAUTH_TOKEN');
+            ->assertSee('Claude Token ist konfiguriert');
     }
 
     public function test_can_create_project_via_onboarding(): void

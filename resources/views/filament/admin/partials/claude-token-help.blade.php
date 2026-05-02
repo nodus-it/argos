@@ -17,21 +17,13 @@
         <div class="flex gap-3">
             <span class="flex h-5 w-5 mt-0.5 items-center justify-center rounded-full bg-amber-200 dark:bg-amber-800 text-amber-700 dark:text-amber-300 text-xs font-bold flex-shrink-0">2</span>
             <div>
-                <p class="font-medium">Token in <code class="bg-amber-100 dark:bg-amber-900 px-1 rounded">.env</code> eintragen</p>
-                <pre class="mt-1.5 rounded bg-amber-100 dark:bg-amber-900 px-3 py-2 text-xs font-mono text-amber-800 dark:text-amber-200 overflow-x-auto">CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-...</pre>
-            </div>
-        </div>
-
-        <div class="flex gap-3">
-            <span class="flex h-5 w-5 mt-0.5 items-center justify-center rounded-full bg-amber-200 dark:bg-amber-800 text-amber-700 dark:text-amber-300 text-xs font-bold flex-shrink-0">3</span>
-            <div>
-                <p class="font-medium">Config neu laden</p>
-                <pre class="mt-1.5 rounded bg-amber-100 dark:bg-amber-900 px-3 py-2 text-xs font-mono text-amber-800 dark:text-amber-200 overflow-x-auto">php artisan config:clear</pre>
+                <p class="font-medium">Token hier eingeben und Speichern klicken</p>
+                <p class="mt-1.5 text-xs text-amber-700 dark:text-amber-400">Den kopierten Token in das Feld oben einfügen und auf „Token speichern" klicken.</p>
             </div>
         </div>
 
         <div class="rounded bg-amber-100 dark:bg-amber-900 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
-            <strong>Hinweis:</strong> Der Token läuft nach einigen Wochen ab. Einfach <code class="bg-amber-50 dark:bg-amber-950 px-1 rounded">claude setup-token</code> erneut ausführen und den neuen Token in <code class="bg-amber-50 dark:bg-amber-950 px-1 rounded">.env</code> eintragen.
+            <strong>Hinweis:</strong> Der Token läuft nach einigen Wochen ab. Einfach <code class="bg-amber-50 dark:bg-amber-950 px-1 rounded">claude setup-token</code> erneut ausführen und den neuen Token hier eingeben.
         </div>
 
     </div>
