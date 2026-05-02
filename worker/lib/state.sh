@@ -116,6 +116,11 @@ state_set_pr_url() {
     mv "${STATE_FILE}.tmp" "$STATE_FILE"
 }
 
+# state_get_pr_url: Liefert repo.pr_url oder leer.
+state_get_pr_url() {
+    jq -r '.repo.pr_url // ""' "$STATE_FILE"
+}
+
 # state_add_iteration: Fügt eine neue Iteration zur Phase hinzu.
 # Args: $1=phase, $2=flags_json (z.B. '{"fresh":false}'), $3=optional started_at
 # Output: Iterationsnummer (n) auf stdout.

@@ -25,6 +25,7 @@ class AnthropicUsageSidebar extends Component
 
     public function loadUsage(): void
     {
+        return;
         $data = Cache::remember('anthropic_usage', 60, function () {
             try {
                 $token = config('services.anthropic.token');
@@ -33,6 +34,7 @@ class AnthropicUsageSidebar extends Component
                     return null;
                 }
 
+                logger()->info('Try to load Anthropic usage');
                 $response = Http::withToken($token)
                     ->withHeaders([
                         'anthropic-beta' => 'oauth-2025-04-20',
@@ -42,11 +44,15 @@ class AnthropicUsageSidebar extends Component
                     ->get('https://api.anthropic.com/api/oauth/usage');
 
                 if (! $response->successful()) {
+                    logger()->error('Failed to load Anthropic usage', ['exception' => $response->json()]);
+
                     return null;
                 }
 
                 return $response->json();
-            } catch (\Throwable) {
+            } catch (\Throwable $e) {
+                logger()->error('Failed to load Anthropic usage', ['exception' => $e]);
+
                 return null;
             }
         });

@@ -106,7 +106,13 @@ _push_pr_github() {
                 "https://api.github.com/repos/$owner_repo/pulls?head=${owner}:${feature_branch}&state=open" \
                 2>>"$pr_log" \
                 | jq -r '.[0].html_url // empty')"
-            [[ -z "$pr_url" ]] && log_warn "push: PR existiert bereits, URL nicht ermittelbar"
+            if [[ -n "$pr_url" ]]; then
+                log_info "push: PR existiert bereits — aktualisiere Beschreibung ($pr_url)"
+                _push_pr_update_github "$pr_url" "$title" "$body"
+                _push_pr_comment_github "$pr_url" "$(_push_build_iteration_comment)"
+            else
+                log_warn "push: PR existiert bereits, URL nicht ermittelbar"
+            fi
             ;;
         *)
             cat "$tmp_resp" >> "$pr_log"
@@ -125,6 +131,67 @@ _push_pr_github() {
 _push_pr_gitlab() {
     local push_log="$1"
     grep -oE 'https://[^[:space:]]*/merge_requests/[0-9]+' "$push_log" | head -1
+}
+
+# _push_build_iteration_comment: Baut Kommentar-Text fuer eine neue Implementierungs-Iteration.
+_push_build_iteration_comment() {
+    local nontechnical_file=/workspace/.agent/implement.summary.nontechnical.md
+    {
+        printf '## Update — Iteration %s\n\n' "$ITERATION"
+        if [[ -f "$nontechnical_file" ]]; then
+            cat "$nontechnical_file"
+        else
+            printf '_Keine Zusammenfassung vorhanden._'
+        fi
+    }
+}
+
+# _push_pr_update_github: Aktualisiert Beschreibung eines bestehenden GitHub PR.
+# Args: $1=pr_url, $2=title, $3=body (optional)
+_push_pr_update_github() {
+    local pr_url="$1"
+    local title="$2"
+    local body="${3:-}"
+
+    local owner_repo pr_number
+    owner_repo="$(printf '%s' "$REPO_URL" | sed 's|https://github.com/||; s|\.git$||')"
+    pr_number="$(printf '%s' "$pr_url" | grep -oE '[0-9]+$')"
+    [[ -n "$owner_repo" && -n "$pr_number" ]] || return 0
+
+    set +x
+    curl -s \
+        -X PATCH \
+        -H "Authorization: Bearer $REPO_TOKEN" \
+        -H "Accept: application/vnd.github+json" \
+        -H "X-GitHub-Api-Version: 2022-11-28" \
+        "https://api.github.com/repos/$owner_repo/pulls/$pr_number" \
+        -d "$(jq -n \
+            --arg title "$title" \
+            --arg body  "$body" \
+            '{title:$title,body:$body}')" \
+        >> "/workspace/.agent/logs/gh-pr.${ITERATION}.log" 2>&1 || true
+}
+
+# _push_pr_comment_github: Fuegt einen Kommentar zu einem bestehenden GitHub PR hinzu.
+# Args: $1=pr_url, $2=comment_body
+_push_pr_comment_github() {
+    local pr_url="$1"
+    local comment_body="$2"
+
+    local owner_repo pr_number
+    owner_repo="$(printf '%s' "$REPO_URL" | sed 's|https://github.com/||; s|\.git$||')"
+    pr_number="$(printf '%s' "$pr_url" | grep -oE '[0-9]+$')"
+    [[ -n "$owner_repo" && -n "$pr_number" ]] || return 0
+
+    set +x
+    curl -s \
+        -X POST \
+        -H "Authorization: Bearer $REPO_TOKEN" \
+        -H "Accept: application/vnd.github+json" \
+        -H "X-GitHub-Api-Version: 2022-11-28" \
+        "https://api.github.com/repos/$owner_repo/issues/$pr_number/comments" \
+        -d "$(jq -n --arg body "$comment_body" '{body:$body}')" \
+        >> "/workspace/.agent/logs/gh-pr.${ITERATION}.log" 2>&1 || true
 }
 
 phase_push_run() {
@@ -256,16 +323,23 @@ phase_push_run() {
     local commit_sha
     commit_sha="$(git -C /workspace rev-parse HEAD)"
 
-    # PR-Body: concept.md voranstellen wenn vorhanden
+    # PR-Body: implement.summary.nontechnical als Haupt-Body, body als Ergaenzung
     local pr_body="$body"
-    if [[ -f /workspace/.agent/concept.md ]]; then
-        local concept_content
-        concept_content="$(cat /workspace/.agent/concept.md)"
+    local _nontechnical_file=/workspace/.agent/implement.summary.nontechnical.md
+    local _technical_file=/workspace/.agent/implement.summary.technical.md
+    if [[ -f "$_nontechnical_file" ]]; then
+        local _summary_content
+        _summary_content="$(cat "$_nontechnical_file")"
         if [[ -n "$body" ]]; then
-            pr_body="$(printf '%s\n\n---\n\n%s' "$concept_content" "$body")"
+            pr_body="$(printf '%s\n\n---\n\n%s' "$_summary_content" "$body")"
         else
-            pr_body="$concept_content"
+            pr_body="$_summary_content"
         fi
+    fi
+    if [[ -f "$_technical_file" ]]; then
+        local _technical_content
+        _technical_content="$(cat "$_technical_file")"
+        pr_body="$(printf '%s\n\n<details><summary>Technische Details</summary>\n\n%s\n\n</details>' "$pr_body" "$_technical_content")"
     fi
 
     # PR/MR erstellen oder URL aus Push-Output lesen

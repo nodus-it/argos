@@ -1,9 +1,9 @@
 {{-- log-terminal partial: $lines (array of {text,class}), $label (string), $isRunning (bool) --}}
-<div class="rounded-b-xl overflow-hidden bg-slate-950 border-t border-slate-800">
+<div class="rounded-b-xl overflow-hidden bg-slate-900 border-t border-slate-700">
 
     {{-- Title bar --}}
-    <div class="flex items-center justify-between px-4 py-2 bg-slate-900 border-b border-slate-800">
-        <span class="text-xs text-slate-500 font-mono">{{ $label }}</span>
+    <div class="flex items-center justify-between px-4 py-2 bg-slate-800 border-b border-slate-700">
+        <span class="text-xs text-slate-400 font-mono">{{ $label }}</span>
         <div class="flex items-center gap-2">
             @if($isRunning)
                 <span class="inline-flex items-center gap-1.5 text-xs text-amber-400 font-mono">
@@ -14,7 +14,7 @@
                     live
                 </span>
             @else
-                <span class="text-xs text-slate-600 font-mono">{{ count($lines) }} Zeilen</span>
+                <span class="text-xs text-slate-500 font-mono">{{ count($lines) }} Zeilen</span>
             @endif
         </div>
     </div>

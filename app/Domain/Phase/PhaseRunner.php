@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domain\Phase;
 
 use App\Domain\Credentials\CredentialStore;
+use App\Jobs\RunPhaseJob;
 use App\Models\PhaseRun;
 use App\Models\Task;
 use Symfony\Component\Process\Process;
@@ -120,6 +121,12 @@ class PhaseRunner
                 '/workspace/.agent/implement.summary.technical.md'
             );
 
+            // Fallback: wenn Claude keine Summary-Dateien geschrieben hat,
+            // extrahiere den result-Text aus dem stream_log.
+            if ($nontechnical === null && $phaseRun->stream_log !== null) {
+                $nontechnical = $this->extractResultTextFromStreamLog($phaseRun->stream_log);
+            }
+
             $phaseRun->update([
                 'implement_summary_nontechnical' => $nontechnical,
                 'implement_summary_technical' => $technical,
@@ -149,6 +156,24 @@ class PhaseRunner
                 $task->update($taskUpdate);
             }
         }
+    }
+
+    private function extractResultTextFromStreamLog(string $streamLog): ?string
+    {
+        foreach (array_reverse(explode("\n", $streamLog)) as $line) {
+            $line = trim($line);
+            if ($line === '') {
+                continue;
+            }
+            $event = json_decode($line, true);
+            if (is_array($event) && ($event['type'] ?? '') === 'result') {
+                $text = trim($event['result'] ?? '');
+
+                return $text !== '' ? $text : null;
+            }
+        }
+
+        return null;
     }
 
     private function readFileFromVolume(string $volumeName, string $filePath): ?string
@@ -319,6 +344,11 @@ class PhaseRunner
 
         $task->refresh();
         $this->postPhaseSync($task, $phaseRun, $phase, $notesBeforeRun);
+
+        // After a successful implement run with existing PR: auto-trigger push
+        if ($phase === 'implement' && $status === 'completed' && $task->fresh()->pr_url !== null) {
+            RunPhaseJob::dispatch($task->id, 'push');
+        }
     }
 
     protected function newProcess(array $cmd): Process

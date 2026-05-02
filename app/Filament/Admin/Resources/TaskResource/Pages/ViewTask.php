@@ -26,6 +26,8 @@ class ViewTask extends ViewRecord
 
     public bool $diffLoaded = false;
 
+    public int $diffLoadedForIteration = 0;
+
     public string $notes = '';
 
     public bool $editingNotes = false;
@@ -49,6 +51,8 @@ class ViewTask extends ViewRecord
 
         $this->notes = $task->concept_notes ?? '';
         $this->implementNotes = $task->implement_notes ?? '';
+
+        $this->maybeAutoLoadDiff($task);
     }
 
     public function startEditingNotes(): void
@@ -109,6 +113,7 @@ class ViewTask extends ViewRecord
             $task->refresh();
             $this->notes = $task->concept_notes ?? '';
             $this->implementNotes = $task->implement_notes ?? '';
+            $this->maybeAutoLoadDiff($task);
         }
     }
 
@@ -125,7 +130,7 @@ class ViewTask extends ViewRecord
             '-v', "{$vol}:/workspace:ro",
             '--entrypoint', 'sh', $image,
             '-c',
-            "git -C /workspace diff --stat origin/{$branch}...HEAD 2>/dev/null; "
+            "git -C /workspace diff --stat origin/{$branch} 2>/dev/null; "
             ."echo ''; "
             .'git -C /workspace status --short 2>/dev/null',
         ]);
@@ -138,12 +143,25 @@ class ViewTask extends ViewRecord
             '-v', "{$vol}:/workspace:ro",
             '--entrypoint', 'sh', $image,
             '-c',
-            "git -C /workspace diff origin/{$branch}...HEAD 2>/dev/null | head -c 131072",
+            "git -C /workspace diff origin/{$branch} 2>/dev/null | head -c 131072",
         ]);
         $diffProcess->setTimeout(15);
         $diffProcess->run();
         $this->diffFiles = $this->parseDiffStructured($diffProcess->getOutput());
         $this->diffLoaded = true;
+    }
+
+    private function maybeAutoLoadDiff(Task $task): void
+    {
+        $latestCompleted = (int) ($task->phaseRuns()
+            ->where('phase', 'implement')
+            ->where('status', 'completed')
+            ->max('iteration') ?? 0);
+
+        if ($latestCompleted > 0 && $latestCompleted > $this->diffLoadedForIteration) {
+            $this->loadDiff();
+            $this->diffLoadedForIteration = $latestCompleted;
+        }
     }
 
     public function loadLogIteration(string $phase, int $iteration): void
