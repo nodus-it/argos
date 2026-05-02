@@ -83,19 +83,19 @@ step "concept lifecycle-$$"
 "$ROOT/agent" concept "$TASK_ID" || fail "agent concept failed"
 
 step "Verifikation: concept.md im Volume vorhanden"
-volume_concept="$(docker run --rm -v "task_ws_${TASK_ID}:/workspace" --entrypoint sh agent-worker:latest -c 'cat /workspace/.agent/concept.md 2>/dev/null')"
+volume_concept="$(docker run --rm -v "task_ws_${TASK_ID}:/workspace" --entrypoint sh argos-worker:latest -c 'cat /workspace/.agent/concept.md 2>/dev/null')"
 [[ -n "$volume_concept" ]] || fail "concept.md fehlt oder ist leer"
 [[ "$volume_concept" == *"HelloWorld"* ]] || fail "concept.md erwaehnt HelloWorld nicht"
 
 step "Verifikation: state.json hat concept-Iteration completed"
-state_status="$(docker run --rm -v "task_ws_${TASK_ID}:/workspace" --entrypoint sh agent-worker:latest -c 'jq -r .phases.concept.current_status /workspace/.agent/state.json')"
+state_status="$(docker run --rm -v "task_ws_${TASK_ID}:/workspace" --entrypoint sh argos-worker:latest -c 'jq -r .phases.concept.current_status /workspace/.agent/state.json')"
 [[ "$state_status" == "completed" ]] || fail "concept current_status = '$state_status' (erwartet 'completed')"
 
 step "implement $TASK_ID"
 "$ROOT/agent" implement "$TASK_ID" || fail "agent implement failed"
 
 step "Verifikation: HelloWorld-Files vom Mock geschrieben"
-file_check="$(docker run --rm -v "task_ws_${TASK_ID}:/workspace" --entrypoint sh agent-worker:latest -c 'ls /workspace/app/Demo/HelloWorld.php /workspace/tests/Feature/Demo/HelloWorldTest.php')"
+file_check="$(docker run --rm -v "task_ws_${TASK_ID}:/workspace" --entrypoint sh argos-worker:latest -c 'ls /workspace/app/Demo/HelloWorld.php /workspace/tests/Feature/Demo/HelloWorldTest.php')"
 [[ "$file_check" == *"HelloWorld.php"* ]] || fail "HelloWorld.php fehlt"
 
 step "diff $TASK_ID"
@@ -105,7 +105,7 @@ step "push $TASK_ID --keep"
 "$ROOT/agent" push "$TASK_ID" --keep || fail "agent push failed"
 
 step "Verifikation: feature_branch existiert in fake-remote"
-feature_branch="$(docker run --rm -v "task_ws_${TASK_ID}:/workspace" --entrypoint sh agent-worker:latest -c 'jq -r .repo.feature_branch /workspace/.agent/state.json')"
+feature_branch="$(docker run --rm -v "task_ws_${TASK_ID}:/workspace" --entrypoint sh argos-worker:latest -c 'jq -r .repo.feature_branch /workspace/.agent/state.json')"
 [[ "$feature_branch" == ai/${TASK_ID}-* ]] || fail "feature_branch ungewohnt: '$feature_branch'"
 remote_branches="$(git -C "$FIXTURES/fake-remote-repo/fake-remote.git" branch --list)"
 [[ "$remote_branches" == *"$feature_branch"* ]] || fail "Branch '$feature_branch' fehlt in fake-remote"
