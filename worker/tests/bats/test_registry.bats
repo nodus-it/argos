@@ -34,7 +34,8 @@ teardown() {
     [ "${PHASE_ORDER_IN_LIFECYCLE[1]}" = "implement" ]
     [ "${PHASE_ORDER_IN_LIFECYCLE[2]}" = "diff" ]
     [ "${PHASE_ORDER_IN_LIFECYCLE[3]}" = "push" ]
-    [ "${#PHASE_ORDER_IN_LIFECYCLE[@]}" -eq 4 ]
+    [ "${PHASE_ORDER_IN_LIFECYCLE[4]}" = "respond" ]
+    [ "${#PHASE_ORDER_IN_LIFECYCLE[@]}" -eq 5 ]
 }
 
 @test "phase_known akzeptiert bekannte Phasen, lehnt andere ab" {

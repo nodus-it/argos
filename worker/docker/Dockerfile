@@ -112,6 +112,7 @@ RUN chmod +x /usr/local/bin/worker-entrypoint.sh \
     && chown agent:agent /run/agent
 
 USER agent
+RUN git config --global --add safe.directory '*'
 WORKDIR /workspace
 
 ENTRYPOINT ["/usr/local/bin/worker-entrypoint.sh"]
@@ -173,6 +174,7 @@ RUN chmod +x /usr/local/bin/worker-entrypoint.sh \
     && chown agent:agent /run/agent
 
 USER agent
+RUN git config --global --add safe.directory '*'
 WORKDIR /workspace
 
 ENTRYPOINT ["/usr/local/bin/worker-entrypoint.sh"]
