@@ -7,7 +7,10 @@ namespace Tests\Feature;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\CreateRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\EditRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\ListRepoProfiles;
+use App\Filament\Admin\Resources\RepoProfileResource\Pages\ViewRepoProfile;
+use App\Filament\Admin\Resources\RepoProfileResource\RelationManagers\TasksRelationManager;
 use App\Models\RepoProfile;
+use App\Models\Task;
 use App\Models\User;
 use App\Services\Git\RemoteBranchValidator;
 use Filament\Actions\Testing\TestAction;
@@ -201,5 +204,62 @@ class RepoProfileResourceTest extends TestCase
         Livewire::test(ListRepoProfiles::class)
             ->assertSee('GitHub Repo')
             ->assertSee('GitLab Repo');
+    }
+
+    public function test_view_page_renders(): void
+    {
+        $profile = RepoProfile::factory()->create();
+
+        Livewire::test(ViewRepoProfile::class, ['record' => $profile->getKey()])
+            ->assertSuccessful()
+            ->assertSee($profile->name);
+    }
+
+    public function test_view_page_masks_token(): void
+    {
+        $profile = RepoProfile::factory()->create(['token' => 'secret-pat-token']);
+
+        Livewire::test(ViewRepoProfile::class, ['record' => $profile->getKey()])
+            ->assertSuccessful()
+            ->assertSee('••••••••')
+            ->assertDontSee('secret-pat-token');
+    }
+
+    public function test_view_page_shows_no_token_placeholder_when_empty(): void
+    {
+        $profile = RepoProfile::factory()->create(['token' => null]);
+
+        Livewire::test(ViewRepoProfile::class, ['record' => $profile->getKey()])
+            ->assertSuccessful()
+            ->assertDontSee('••••••••');
+    }
+
+    public function test_tasks_relation_manager_shows_tasks(): void
+    {
+        $profile = RepoProfile::factory()->create();
+        $tasks = Task::factory()->count(2)->create(['repo_profile_id' => $profile->id]);
+
+        Livewire::test(TasksRelationManager::class, [
+            'ownerRecord' => $profile,
+            'pageClass' => ViewRepoProfile::class,
+        ])
+            ->assertSuccessful()
+            ->assertCanSeeTableRecords($tasks);
+    }
+
+    public function test_tasks_relation_manager_does_not_show_other_profile_tasks(): void
+    {
+        $profile = RepoProfile::factory()->create();
+        $otherProfile = RepoProfile::factory()->create();
+        $ownTask = Task::factory()->create(['repo_profile_id' => $profile->id]);
+        $foreignTask = Task::factory()->create(['repo_profile_id' => $otherProfile->id]);
+
+        Livewire::test(TasksRelationManager::class, [
+            'ownerRecord' => $profile,
+            'pageClass' => ViewRepoProfile::class,
+        ])
+            ->assertSuccessful()
+            ->assertCanSeeTableRecords([$ownTask])
+            ->assertCanNotSeeTableRecords([$foreignTask]);
     }
 }

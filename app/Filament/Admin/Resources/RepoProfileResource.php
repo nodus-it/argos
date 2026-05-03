@@ -8,6 +8,8 @@ use App\Domain\Worker\WorkerImage;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\CreateRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\EditRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\ListRepoProfiles;
+use App\Filament\Admin\Resources\RepoProfileResource\Pages\ViewRepoProfile;
+use App\Filament\Admin\Resources\RepoProfileResource\RelationManagers\TasksRelationManager;
 use App\Models\ConnectedAccount;
 use App\Models\RepoProfile;
 use App\Models\User;
@@ -20,6 +22,8 @@ use Filament\Actions\EditAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Infolists\Components\IconEntry;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
@@ -233,6 +237,51 @@ class RepoProfileResource extends Resource
         return $get('platform') === 'github' && self::githubAccount() !== null;
     }
 
+    public static function infolist(Schema $schema): Schema
+    {
+        return $schema->components([
+            Section::make('Allgemein')
+                ->schema([
+                    TextEntry::make('name')->label('Projektname'),
+
+                    TextEntry::make('platform')
+                        ->label('Plattform')
+                        ->badge()
+                        ->color(fn (string $state): string => match ($state) {
+                            'github' => 'gray',
+                            'gitlab' => 'warning',
+                            default => 'gray',
+                        }),
+
+                    IconEntry::make('auto_concept')
+                        ->label('Konzept automatisch starten')
+                        ->boolean(),
+
+                    IconEntry::make('auto_pr')
+                        ->label('PR automatisch erstellen')
+                        ->boolean(),
+
+                    TextEntry::make('worker_image')
+                        ->label('Worker-Image')
+                        ->placeholder('Globaler Default'),
+                ]),
+
+            Section::make('Repository')
+                ->schema([
+                    TextEntry::make('url')
+                        ->label('Repo-URL')
+                        ->copyable(),
+
+                    TextEntry::make('default_branch')
+                        ->label('Default Branch'),
+
+                    TextEntry::make('token')
+                        ->label('Token (PAT)')
+                        ->state(fn (RepoProfile $record): string => $record->getRawOriginal('token') !== null ? '••••••••' : '—'),
+                ]),
+        ]);
+    }
+
     public static function table(Table $table): Table
     {
         return $table
@@ -261,6 +310,7 @@ class RepoProfileResource extends Resource
                     ->label('Tasks')
                     ->counts('tasks'),
             ])
+            ->recordUrl(fn (RepoProfile $record): string => static::getUrl('view', ['record' => $record]))
             ->actions([
                 EditAction::make(),
                 DeleteAction::make(),
@@ -272,11 +322,19 @@ class RepoProfileResource extends Resource
             ]);
     }
 
+    public static function getRelationManagers(): array
+    {
+        return [
+            TasksRelationManager::class,
+        ];
+    }
+
     public static function getPages(): array
     {
         return [
             'index' => ListRepoProfiles::route('/'),
             'create' => CreateRepoProfile::route('/create'),
+            'view' => ViewRepoProfile::route('/{record}'),
             'edit' => EditRepoProfile::route('/{record}/edit'),
         ];
     }
