@@ -18,4 +18,25 @@ class EditRepoProfile extends EditRecord
             DeleteAction::make(),
         ];
     }
+
+    /**
+     * Derive github_repo / github_branch from the persisted url + default_branch
+     * so the OAuth pickers show the current values when the form opens.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    protected function mutateFormDataBeforeFill(array $data): array
+    {
+        $url = $data['url'] ?? null;
+        if (is_string($url) && preg_match('#^https?://github\.com/([^/]+/[^/]+?)(?:\.git)?/?$#', $url, $m)) {
+            $data['github_repo'] = $m[1];
+        }
+
+        if (isset($data['default_branch']) && is_string($data['default_branch'])) {
+            $data['github_branch'] = $data['default_branch'];
+        }
+
+        return $data;
+    }
 }

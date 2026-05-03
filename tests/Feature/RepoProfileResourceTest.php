@@ -90,12 +90,20 @@ class RepoProfileResourceTest extends TestCase
         ]);
     }
 
-    public function test_create_requires_name_url_platform(): void
+    public function test_create_requires_platform_first(): void
     {
         Livewire::test(CreateRepoProfile::class)
-            ->fillForm(['name' => null, 'url' => null, 'platform' => null])
+            ->fillForm(['platform' => null])
             ->call('create')
-            ->assertHasFormErrors(['name' => 'required', 'url' => 'required', 'platform' => 'required']);
+            ->assertHasFormErrors(['platform' => 'required']);
+    }
+
+    public function test_create_requires_name_and_url_after_platform_chosen(): void
+    {
+        Livewire::test(CreateRepoProfile::class)
+            ->fillForm(['platform' => 'gitlab', 'name' => null, 'url' => null])
+            ->call('create')
+            ->assertHasFormErrors(['name' => 'required', 'url' => 'required']);
     }
 
     public function test_create_rejects_invalid_url(): void
@@ -132,6 +140,34 @@ class RepoProfileResourceTest extends TestCase
         Livewire::test(EditRepoProfile::class, ['record' => $profile->getKey()])
             ->assertSuccessful()
             ->assertFormSet(['name' => $profile->name]);
+    }
+
+    public function test_edit_prefills_github_repo_and_branch_from_persisted_url(): void
+    {
+        $profile = RepoProfile::factory()->create([
+            'platform' => 'github',
+            'url' => 'https://github.com/acme/widget',
+            'default_branch' => 'develop',
+        ]);
+
+        Livewire::test(EditRepoProfile::class, ['record' => $profile->getKey()])
+            ->assertFormSet([
+                'github_repo' => 'acme/widget',
+                'github_branch' => 'develop',
+                'default_branch' => 'develop',
+            ]);
+    }
+
+    public function test_edit_prefills_handles_dot_git_suffix(): void
+    {
+        $profile = RepoProfile::factory()->create([
+            'platform' => 'github',
+            'url' => 'https://github.com/acme/widget.git',
+            'default_branch' => 'main',
+        ]);
+
+        Livewire::test(EditRepoProfile::class, ['record' => $profile->getKey()])
+            ->assertFormSet(['github_repo' => 'acme/widget']);
     }
 
     public function test_can_edit_repo_profile(): void

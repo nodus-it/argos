@@ -32,6 +32,43 @@ class GitHubGitService implements GitServiceContract
             ->json();
     }
 
+    /**
+     * Fetch repository metadata. Used to pre-select the API-reported
+     * default_branch when the user picks a repo in the form.
+     *
+     * @return array<string, mixed>
+     */
+    public function getRepository(string $owner, string $repo): array
+    {
+        return $this->http()
+            ->get("/repos/{$owner}/{$repo}")
+            ->throw()
+            ->json();
+    }
+
+    /**
+     * Returns the API-reported default branch of the given owner/repo,
+     * or null if the call fails (network/auth/not-found).
+     */
+    public function getDefaultBranch(string $ownerRepo): ?string
+    {
+        [$owner, $repo] = explode('/', $ownerRepo, 2) + ['', ''];
+
+        if ($owner === '' || $repo === '') {
+            return null;
+        }
+
+        try {
+            $data = $this->getRepository($owner, $repo);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        $branch = $data['default_branch'] ?? null;
+
+        return is_string($branch) && $branch !== '' ? $branch : null;
+    }
+
     public function createPullRequest(
         string $owner,
         string $repo,

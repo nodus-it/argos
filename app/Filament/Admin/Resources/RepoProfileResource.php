@@ -8,6 +8,7 @@ use App\Domain\Worker\WorkerImage;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\CreateRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\EditRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\ListRepoProfiles;
+use App\Models\ConnectedAccount;
 use App\Models\RepoProfile;
 use App\Models\User;
 use App\Rules\BranchExistsOnRemote;
@@ -20,6 +21,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
@@ -64,189 +66,171 @@ class RepoProfileResource extends Resource
     public static function form(Schema $schema): Schema
     {
         return $schema->components([
-            TextInput::make('name')
-                ->required()
-                ->maxLength(255),
+            // ── Block 1 ─ Plattform (gates everything below) ────────────────
+            Section::make('Plattform')
+                ->description('Wähle die Plattform — danach werden die weiteren Felder freigeschaltet.')
+                ->schema([
+                    Select::make('platform')
+                        ->label('Plattform')
+                        ->options([
+                            'github' => 'GitHub',
+                            'gitlab' => 'GitLab',
+                        ])
+                        ->required()
+                        ->live()
+                        ->native(false),
+                ]),
 
-            Select::make('platform')
-                ->options([
-                    'github' => 'GitHub',
-                    'gitlab' => 'GitLab',
-                ])
-                ->required()
-                ->live(),
+            // ── Block 2 ─ Allgemein ─────────────────────────────────────────
+            Section::make('Allgemein')
+                ->visible(fn (Get $get): bool => self::platformChosen($get))
+                ->schema([
+                    TextInput::make('name')
+                        ->label('Projektname')
+                        ->required()
+                        ->maxLength(255),
 
-            Select::make('github_repo')
-                ->label('GitHub-Repository')
-                ->options(function (): array {
-                    /** @var User $user */
-                    $user = Auth::user();
-                    $account = $user->connectedAccount('github');
+                    Toggle::make('auto_concept')
+                        ->label('Konzept automatisch starten')
+                        ->helperText('Startet die Konzept-Phase direkt nach dem Anlegen eines Tasks.'),
 
-                    if ($account === null) {
-                        return [];
-                    }
+                    Toggle::make('auto_pr')
+                        ->label('PR automatisch erstellen')
+                        ->helperText('Startet die Push-Phase automatisch nach erfolgreicher Implementierung.'),
 
-                    try {
-                        return (new GitHubGitService($account->token))->getRepoOptions();
-                    } catch (\Throwable) {
-                        return [];
-                    }
-                })
-                ->searchable()
-                ->live()
-                ->afterStateUpdated(function (Set $set, ?string $state): void {
-                    if ($state === null) {
-                        return;
-                    }
+                    Select::make('worker_image')
+                        ->label('Worker-Image')
+                        ->options(fn (Get $get): array => WorkerImage::optionsFor($get('worker_image')))
+                        ->placeholder('Globaler Default ('.config('argos.worker_image').')')
+                        ->helperText('Leer lassen für globalen Standard. Andere Tags müssen in config/argos.php oder per ARGOS_WORKER_IMAGE bekannt sein.')
+                        ->searchable()
+                        ->native(false),
+                ]),
 
-                    /** @var User $user */
-                    $user = Auth::user();
-                    $account = $user->connectedAccount('github');
+            // ── Block 3 ─ Repository (connected vs. manual) ─────────────────
+            Section::make('Repository')
+                ->visible(fn (Get $get): bool => self::platformChosen($get))
+                ->schema([
+                    // Connected-Pfad: GitHub mit OAuth-Account
+                    Select::make('github_repo')
+                        ->label('Repository')
+                        ->options(function (): array {
+                            $account = self::githubAccount();
+                            if ($account === null) {
+                                return [];
+                            }
+                            try {
+                                return (new GitHubGitService($account->token))->getRepoOptions();
+                            } catch (\Throwable) {
+                                return [];
+                            }
+                        })
+                        ->required()
+                        ->searchable()
+                        ->live()
+                        ->afterStateUpdated(function (Set $set, Get $get, ?string $state): void {
+                            if ($state === null || $state === '') {
+                                return;
+                            }
+                            $set('url', "https://github.com/{$state}");
 
-                    if ($account === null) {
-                        return;
-                    }
+                            if (! is_string($get('name')) || $get('name') === '') {
+                                $shortName = explode('/', $state, 2)[1] ?? $state;
+                                $set('name', $shortName);
+                            }
 
-                    $set('url', "https://github.com/{$state}");
+                            $account = self::githubAccount();
+                            if ($account === null) {
+                                return;
+                            }
+                            $apiDefault = (new GitHubGitService($account->token))->getDefaultBranch($state);
+                            if ($apiDefault !== null) {
+                                $set('github_branch', $apiDefault);
+                                $set('default_branch', $apiDefault);
+                            }
+                        })
+                        ->visible(fn (Get $get): bool => self::isConnectedPath($get))
+                        ->dehydrated(false),
 
-                    // Pre-fill the token from OAuth
-                    $set('token', null);
-                })
-                ->visible(function (Get $get): bool {
-                    if ($get('platform') !== 'github') {
-                        return false;
-                    }
+                    Select::make('github_branch')
+                        ->label('Default Branch')
+                        ->options(function (Get $get): array {
+                            $repo = $get('github_repo');
+                            if (! is_string($repo) || $repo === '') {
+                                return [];
+                            }
+                            $account = self::githubAccount();
+                            if ($account === null) {
+                                return [];
+                            }
+                            try {
+                                return (new GitHubGitService($account->token))->getBranchOptions($repo);
+                            } catch (\Throwable) {
+                                return [];
+                            }
+                        })
+                        ->required()
+                        ->searchable()
+                        ->live()
+                        ->afterStateUpdated(fn (Set $set, ?string $state) => $set('default_branch', $state ?? 'main'))
+                        ->visible(fn (Get $get): bool => self::isConnectedPath($get) && is_string($get('github_repo')) && $get('github_repo') !== '')
+                        ->dehydrated(false),
 
-                    /** @var User $user */
-                    $user = Auth::user();
+                    // Manual-Pfad: GitLab oder GitHub ohne OAuth
+                    TextInput::make('url')
+                        ->label('Repo-URL')
+                        ->required(fn (Get $get): bool => ! self::isConnectedPath($get))
+                        ->url()
+                        ->maxLength(500)
+                        ->visible(fn (Get $get): bool => ! self::isConnectedPath($get))
+                        ->dehydrated(),
 
-                    return $user->connectedAccount('github') !== null;
-                })
-                ->dehydrated(false),
+                    TextInput::make('token')
+                        ->label('Token (PAT)')
+                        ->password()
+                        ->revealable()
+                        ->maxLength(500)
+                        ->required()
+                        ->helperText(fn (Get $get): string => $get('platform') === 'github'
+                            ? 'Kein GitHub-Account verknüpft. PAT wird als Fallback verwendet.'
+                            : '')
+                        ->visible(fn (Get $get): bool => ! self::isConnectedPath($get)),
 
-            Select::make('github_branch')
-                ->label('Default Branch')
-                ->options(function (Get $get): array {
-                    $repo = $get('github_repo');
-
-                    if (! is_string($repo) || $repo === '') {
-                        return [];
-                    }
-
-                    /** @var User $user */
-                    $user = Auth::user();
-                    $account = $user->connectedAccount('github');
-
-                    if ($account === null) {
-                        return [];
-                    }
-
-                    try {
-                        return (new GitHubGitService($account->token))->getBranchOptions($repo);
-                    } catch (\Throwable) {
-                        return [];
-                    }
-                })
-                ->live()
-                ->afterStateUpdated(fn (Set $set, ?string $state) => $set('default_branch', $state ?? 'main'))
-                ->visible(function (Get $get): bool {
-                    if ($get('platform') !== 'github') {
-                        return false;
-                    }
-
-                    /** @var User $user */
-                    $user = Auth::user();
-
-                    return $user->connectedAccount('github') !== null && is_string($get('github_repo')) && $get('github_repo') !== '';
-                })
-                ->dehydrated(false),
-
-            TextInput::make('url')
-                ->label('Repo-URL')
-                ->required()
-                ->url()
-                ->maxLength(500),
-
-            TextInput::make('token')
-                ->label('Token (PAT)')
-                ->password()
-                ->revealable()
-                ->maxLength(500)
-                ->visible(function (Get $get): bool {
-                    if ($get('platform') !== 'github') {
-                        return true;
-                    }
-
-                    /** @var User $user */
-                    $user = Auth::user();
-
-                    return $user->connectedAccount('github') === null;
-                })
-                ->required(function (Get $get): bool {
-                    if ($get('platform') !== 'github') {
-                        return true;
-                    }
-
-                    /** @var User $user */
-                    $user = Auth::user();
-
-                    return $user->connectedAccount('github') === null;
-                })
-                ->helperText(function (Get $get): string {
-                    if ($get('platform') !== 'github') {
-                        return '';
-                    }
-
-                    /** @var User $user */
-                    $user = Auth::user();
-
-                    if ($user->connectedAccount('github') !== null) {
-                        return '';
-                    }
-
-                    return 'Kein GitHub-Account verknüpft. PAT wird als Fallback verwendet.';
-                }),
-
-            TextInput::make('default_branch')
-                ->label('Default Branch')
-                ->required()
-                ->default('main')
-                ->maxLength(255)
-                ->rules([
-                    fn (Get $get) => new BranchExistsOnRemote(
-                        url: is_string($get('url')) ? $get('url') : null,
-                        platform: is_string($get('platform')) ? $get('platform') : null,
-                        token: is_string($get('token')) ? $get('token') : null,
-                    ),
-                ])
-                ->visible(function (Get $get): bool {
-                    if ($get('platform') !== 'github') {
-                        return true;
-                    }
-
-                    /** @var User $user */
-                    $user = Auth::user();
-
-                    return $user->connectedAccount('github') === null || ! (is_string($get('github_repo')) && $get('github_repo') !== '');
-                }),
-
-            Select::make('worker_image')
-                ->label('Worker-Image')
-                ->options(fn (Get $get): array => WorkerImage::optionsFor($get('worker_image')))
-                ->placeholder('Globaler Default ('.config('argos.worker_image').')')
-                ->helperText('Leer lassen für globalen Standard. Andere Tags müssen in config/argos.php oder per ARGOS_WORKER_IMAGE bekannt sein.')
-                ->searchable()
-                ->native(false),
-
-            Toggle::make('auto_concept')
-                ->label('Konzept automatisch starten')
-                ->helperText('Startet die Konzept-Phase direkt nach dem Anlegen eines Tasks.'),
-
-            Toggle::make('auto_pr')
-                ->label('PR automatisch erstellen')
-                ->helperText('Startet die Push-Phase automatisch nach erfolgreicher Implementierung.'),
+                    TextInput::make('default_branch')
+                        ->label('Default Branch')
+                        ->required()
+                        ->default('main')
+                        ->maxLength(255)
+                        ->rules([
+                            fn (Get $get) => new BranchExistsOnRemote(
+                                url: is_string($get('url')) ? $get('url') : null,
+                                platform: is_string($get('platform')) ? $get('platform') : null,
+                                token: is_string($get('token')) ? $get('token') : null,
+                            ),
+                        ])
+                        ->visible(fn (Get $get): bool => ! self::isConnectedPath($get)),
+                ]),
         ]);
+    }
+
+    private static function githubAccount(): ?ConnectedAccount
+    {
+        /** @var User|null $user */
+        $user = Auth::user();
+
+        return $user?->connectedAccount('github');
+    }
+
+    private static function platformChosen(Get $get): bool
+    {
+        $platform = $get('platform');
+
+        return is_string($platform) && $platform !== '';
+    }
+
+    private static function isConnectedPath(Get $get): bool
+    {
+        return $get('platform') === 'github' && self::githubAccount() !== null;
     }
 
     public static function table(Table $table): Table
