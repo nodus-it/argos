@@ -61,6 +61,15 @@ class AnthropicUsageSidebar extends Component
                 return;
             }
 
+            // permission_error means the token lacks the user:profile scope —
+            // this won't change without a different token, so back off for 24h.
+            $errorType = $response->json('error.type');
+            if ($errorType === 'permission_error') {
+                Cache::put('anthropic_usage_backoff', true, 86400);
+
+                return;
+            }
+
             if (! $response->successful()) {
                 Cache::put('anthropic_usage_backoff', true, 300);
                 Log::channel('argos')->warning('Anthropic usage API error', ['status' => $response->status()]);
