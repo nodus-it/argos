@@ -185,3 +185,63 @@ quality_gate_verdict() {
     printf ''
     return 0
 }
+
+# quality_gate_fix_prompt: build a focused prompt to fix a failing gate.
+# Args: $1=gate_name, $2=log_file (path to gate output; may be absent)
+# Output: prompt text on stdout (pass to claude via stdin or temp file)
+quality_gate_fix_prompt() {
+    local gate="$1"
+    local log_file="${2:-}"
+    local max_log_lines=200
+
+    printf '# Quality-Gate-Fix: %s\n\n' "$gate"
+    printf 'Du befindest dich im Workspace `/workspace`. Nach deiner Implementierung ist das\n'
+    printf 'Quality-Gate `%s` fehlgeschlagen.\n\n' "$gate"
+
+    case "$gate" in
+        artisan)
+            printf '`php artisan list` schlägt fehl — die App bootet nicht.\n'
+            printf 'Typische Ursachen: fehlende Use-Statements, Tippfehler in einem Service Provider,\n'
+            printf 'fehlerhafte Config-Datei, fehlende Klasse in der Autoload-Map.\n'
+            printf 'Prüfe: `php artisan list --no-ansi` und analysiere den Stack-Trace.\n\n'
+            ;;
+        pint)
+            printf 'Code-Style (Pint) hat Verstösse gefunden.\n'
+            printf 'Führe `vendor/bin/pint` (ohne `--test`) aus um alle automatisch zu beheben,\n'
+            printf 'dann prüfe mit `vendor/bin/pint --test` ob alles grün ist.\n\n'
+            ;;
+        pest|phpunit)
+            printf 'Tests sind fehlgeschlagen.\n'
+            printf 'Analysiere jeden Failure: liegt es am Code oder am Test?\n'
+            printf 'Korrigiere und führe die Tests nochmals aus — iteriere bis alle grün sind.\n\n'
+            ;;
+        phpstan)
+            printf 'PHPStan hat Typ-Fehler oder andere statische Probleme gefunden.\n'
+            printf 'Behebe alle gemeldeten Probleme. Einträge in der Baseline (`phpstan-baseline.neon`)\n'
+            printf 'die nicht durch deine Änderungen entstanden sind, lass unangetastet.\n\n'
+            ;;
+        migrations)
+            printf 'Eine neue Migration enthält einen PHP-Syntaxfehler.\n'
+            printf 'Korrigiere den Fehler und prüfe mit `php -l <datei>` nach.\n\n'
+            ;;
+        debug_code)
+            printf 'Debug-Aufrufe (dd, dump, ray, var_dump, ddd) wurden in App-Code gefunden.\n'
+            printf 'Entferne alle Debug-Aufrufe aus den unten aufgelisteten Dateien.\n\n'
+            ;;
+    esac
+
+    if [[ -n "$log_file" && -f "$log_file" && -s "$log_file" ]]; then
+        printf '## Ausgabe des Gates\n\n```\n'
+        head -n "$max_log_lines" "$log_file"
+        local total_lines
+        total_lines="$(wc -l < "$log_file")"
+        if (( total_lines > max_log_lines )); then
+            printf '\n... (%d weitere Zeilen nicht angezeigt)\n' \
+                "$(( total_lines - max_log_lines ))"
+        fi
+        printf '```\n\n'
+    fi
+
+    printf 'Führe das Gate nach der Korrektur selbst nochmals aus um sicherzustellen\n'
+    printf 'dass es grün ist. KEIN git commit, KEIN git push.\n'
+}

@@ -245,16 +245,95 @@ phase_implement_run() {
         return 3
     fi
 
-    # Verification step: run the quality gates.
-    log_info "implement: verifying quality gates"
-    local gates
-    gates="$(quality_gates_run "$ITERATION")"
+    # Quality gate verification with remediation loop.
+    # If a gate fails the worker builds a focused fix prompt and runs a short
+    # Claude session (~30 turns) to correct the specific issue, then re-checks.
+    # Capped at GATE_RETRY_LIMIT attempts (default 3) to bound cost and time.
+    local max_gate_retries="${GATE_RETRY_LIMIT:-3}"
+    local gate_retry=0
+    local gates="" failed_gate="" gate_exit=0
 
-    local failed_gate gate_exit
-    set +e
-    failed_gate="$(quality_gate_verdict "$gates")"
-    gate_exit=$?
-    set -e
+    while true; do
+        local log_suffix="$ITERATION"
+        if (( gate_retry > 0 )); then
+            log_suffix="${ITERATION}.fix${gate_retry}"
+            log_info "implement: re-verifying quality gates (fix ${gate_retry}/${max_gate_retries})"
+        else
+            log_info "implement: verifying quality gates"
+        fi
+
+        gates="$(quality_gates_run "$log_suffix")"
+        set +e
+        failed_gate="$(quality_gate_verdict "$gates")"
+        gate_exit=$?
+        set -e
+
+        if [[ "$gate_exit" -eq 0 ]]; then break; fi
+
+        if (( gate_retry >= max_gate_retries )); then
+            log_warn "implement: '$failed_gate' still failing after ${max_gate_retries} fix attempt(s) — giving up"
+            break
+        fi
+
+        gate_retry=$(( gate_retry + 1 ))
+        log_info "implement: gate '$failed_gate' failed — starting fix session ${gate_retry}/${max_gate_retries}"
+
+        local gate_log
+        case "$failed_gate" in
+            artisan)    gate_log="/workspace/.agent/logs/artisan-smoke.${log_suffix}.log" ;;
+            pint)       gate_log="/workspace/.agent/logs/pint.${log_suffix}.log" ;;
+            pest)       gate_log="/workspace/.agent/logs/pest.${log_suffix}.log" ;;
+            phpunit)    gate_log="/workspace/.agent/logs/phpunit.${log_suffix}.log" ;;
+            phpstan)    gate_log="/workspace/.agent/logs/phpstan.${log_suffix}.log" ;;
+            migrations) gate_log="/workspace/.agent/logs/migrations.${log_suffix}.log" ;;
+            debug_code) gate_log="/workspace/.agent/logs/debug-code.${log_suffix}.log" ;;
+            *)          gate_log="" ;;
+        esac
+
+        local fix_prompt_path
+        fix_prompt_path="$(mktemp /tmp/argos-fix-XXXXXX.txt)"
+        quality_gate_fix_prompt "$failed_gate" "$gate_log" > "$fix_prompt_path"
+
+        local fix_stream_log="/workspace/.agent/logs/implement.${ITERATION}.fix${gate_retry}.stream.log"
+        local fix_result_json="/workspace/.agent/logs/implement.${ITERATION}.fix${gate_retry}.result.json"
+
+        set +e
+        claude -p \
+            --append-system-prompt "$sysprompt_content" \
+            --output-format stream-json \
+            --verbose \
+            --include-partial-messages \
+            --permission-mode bypassPermissions \
+            --max-turns "${GATE_FIX_MAX_TURNS:-30}" \
+            < "$fix_prompt_path" \
+            | tee "$fix_stream_log" \
+            | tee >(jq -rj '
+                if .type == "assistant" then
+                    (.message.content[]? |
+                        if .type == "text" then (.text // "")
+                        elif .type == "tool_use" then
+                            "\n[fix] " +
+                            (.input.file_path // .input.command // (.input | tostring)[0:80]) + "\n"
+                        else empty end
+                    )
+                elif .type == "result" then "\n"
+                else empty end
+              ' >&2 2>/dev/null) \
+            | jq -c 'select(.type == "result")' \
+            > "$fix_result_json"
+        local fix_exit=${PIPESTATUS[0]}
+        set -e
+
+        rm -f "$fix_prompt_path"
+
+        if (( fix_exit != 0 )); then
+            log_warn "implement: fix session exited with code $fix_exit"
+            if claude_check_usage_limit "$fix_stream_log"; then
+                echo "  → usage/rate limit during fix — backing off" >&2
+                return "$EXIT_USAGE_LIMIT"
+            fi
+        fi
+    done
 
     local status="completed"
     if (( gate_exit == 4 )); then
@@ -289,6 +368,7 @@ phase_implement_run() {
         finished_at "$finished_at"
         --int duration_ms "$duration_ms"
         --int exit_code "$gate_exit"
+        --int gate_retries "$gate_retry"
         --raw changed_files "$changed_files_json"
         --raw quality_gates "$gates"
         claude_session_id "$session_id"

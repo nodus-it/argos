@@ -133,14 +133,92 @@ phase_respond_run() {
         log_warn "respond: claude exited with code $claude_exit"
     fi
 
-    # Quality gates — shared logic from lib/quality.sh.
-    log_info "respond: verifying quality gates"
-    local gates failed_gate gate_exit
-    gates="$(quality_gates_run "$ITERATION")"
-    set +e
-    failed_gate="$(quality_gate_verdict "$gates")"
-    gate_exit=$?
-    set -e
+    # Quality gate verification with remediation loop — same logic as implement.
+    local max_gate_retries="${GATE_RETRY_LIMIT:-3}"
+    local gate_retry=0
+    local gates="" failed_gate="" gate_exit=0
+
+    while true; do
+        local log_suffix="$ITERATION"
+        if (( gate_retry > 0 )); then
+            log_suffix="${ITERATION}.fix${gate_retry}"
+            log_info "respond: re-verifying quality gates (fix ${gate_retry}/${max_gate_retries})"
+        else
+            log_info "respond: verifying quality gates"
+        fi
+
+        gates="$(quality_gates_run "$log_suffix")"
+        set +e
+        failed_gate="$(quality_gate_verdict "$gates")"
+        gate_exit=$?
+        set -e
+
+        if [[ "$gate_exit" -eq 0 ]]; then break; fi
+
+        if (( gate_retry >= max_gate_retries )); then
+            log_warn "respond: '$failed_gate' still failing after ${max_gate_retries} fix attempt(s) — giving up"
+            break
+        fi
+
+        gate_retry=$(( gate_retry + 1 ))
+        log_info "respond: gate '$failed_gate' failed — starting fix session ${gate_retry}/${max_gate_retries}"
+
+        local gate_log
+        case "$failed_gate" in
+            artisan)    gate_log="/workspace/.agent/logs/artisan-smoke.${log_suffix}.log" ;;
+            pint)       gate_log="/workspace/.agent/logs/pint.${log_suffix}.log" ;;
+            pest)       gate_log="/workspace/.agent/logs/pest.${log_suffix}.log" ;;
+            phpunit)    gate_log="/workspace/.agent/logs/phpunit.${log_suffix}.log" ;;
+            phpstan)    gate_log="/workspace/.agent/logs/phpstan.${log_suffix}.log" ;;
+            migrations) gate_log="/workspace/.agent/logs/migrations.${log_suffix}.log" ;;
+            debug_code) gate_log="/workspace/.agent/logs/debug-code.${log_suffix}.log" ;;
+            *)          gate_log="" ;;
+        esac
+
+        local fix_prompt_path
+        fix_prompt_path="$(mktemp /tmp/argos-fix-XXXXXX.txt)"
+        quality_gate_fix_prompt "$failed_gate" "$gate_log" > "$fix_prompt_path"
+
+        local fix_stream_log="/workspace/.agent/logs/respond.${ITERATION}.fix${gate_retry}.stream.log"
+        local fix_result_json="/workspace/.agent/logs/respond.${ITERATION}.fix${gate_retry}.result.json"
+
+        set +e
+        claude -p \
+            --append-system-prompt "$sysprompt_content" \
+            --output-format stream-json \
+            --verbose \
+            --include-partial-messages \
+            --permission-mode bypassPermissions \
+            --max-turns "${GATE_FIX_MAX_TURNS:-30}" \
+            < "$fix_prompt_path" \
+            | tee "$fix_stream_log" \
+            | tee >(jq -rj '
+                if .type == "assistant" then
+                    (.message.content[]? |
+                        if .type == "text" then (.text // "")
+                        elif .type == "tool_use" then
+                            "\n[fix] " +
+                            (.input.file_path // .input.command // (.input | tostring)[0:80]) + "\n"
+                        else empty end
+                    )
+                elif .type == "result" then "\n"
+                else empty end
+              ' >&2 2>/dev/null) \
+            | jq -c 'select(.type == "result")' \
+            > "$fix_result_json"
+        local fix_exit=${PIPESTATUS[0]}
+        set -e
+
+        rm -f "$fix_prompt_path"
+
+        if (( fix_exit != 0 )); then
+            log_warn "respond: fix session exited with code $fix_exit"
+            if claude_check_usage_limit "$fix_stream_log"; then
+                echo "  → usage/rate limit during fix — backing off" >&2
+                return "$EXIT_USAGE_LIMIT"
+            fi
+        fi
+    done
 
     local session_id cost input_tokens output_tokens status exit_code
     session_id="$(jq -r '.session_id // "unknown"' "$result_json" 2>/dev/null)"
