@@ -57,7 +57,10 @@ phase_diff_run() {
         fi
     fi
 
-    local diff_args=(diff "$color_flag" "${base_ref}...HEAD")
+    # Compare working tree against base — implement leaves changes uncommitted
+    # (push commits later). 3-dot ${base}...HEAD would only show committed
+    # changes and miss everything Claude just produced.
+    local diff_args=(diff "$color_flag" "${base_ref}")
     if [[ "$stat_only" == "true" ]]; then
         diff_args+=(--stat)
     fi
@@ -74,7 +77,7 @@ phase_diff_run() {
     local files_changed=0 insertions=0 deletions=0
     if git rev-parse --verify --quiet "$base_ref" >/dev/null; then
         local numstat_output
-        numstat_output="$(git diff --numstat "${base_ref}...HEAD" 2>/dev/null || echo "")"
+        numstat_output="$(git diff --numstat "${base_ref}" 2>/dev/null || echo "")"
         if [[ -n "$numstat_output" ]]; then
             files_changed="$(echo "$numstat_output" | wc -l)"
             insertions="$(echo "$numstat_output" | awk '{s+=$1} END {print s+0}')"

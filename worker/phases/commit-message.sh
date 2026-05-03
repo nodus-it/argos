@@ -44,9 +44,13 @@ _commit_message_build_user_prompt() {
             printf '\n\n'
         fi
 
-        printf '## git diff %s...HEAD\n\n```diff\n' "$base_ref"
+        # Compare working tree against base — push runs commit-message before
+        # `git commit`, so changes are still uncommitted at this point.
+        # 3-dot ${base}...HEAD would yield an empty diff and Claude would
+        # generate a generic message.
+        printf '## git diff %s\n\n```diff\n' "$base_ref"
         if git rev-parse --verify --quiet "$base_ref" >/dev/null; then
-            git diff --no-color "${base_ref}...HEAD" 2>/dev/null | head -n 800
+            git diff --no-color "${base_ref}" 2>/dev/null | head -n 800
         else
             git diff --no-color HEAD 2>/dev/null | head -n 800
         fi
