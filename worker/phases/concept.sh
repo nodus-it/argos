@@ -40,10 +40,9 @@ _concept_initial_clone() {
     local auth_url
     auth_url="$(git_auth_inject_token "$REPO_URL" "$REPO_TOKEN")"
 
-    local now_epoch feature_branch slug
-    now_epoch="$(date -u +%s)"
+    local feature_branch slug
     slug="$(printf '%s' "${TASK_ID}" | tr ' /' '-' | tr -cd 'a-zA-Z0-9._-')"
-    feature_branch="ai/${slug}-${now_epoch}"
+    feature_branch="feat/${slug}"
 
     # `git clone` refuses to clone into a non-empty /workspace
     # (/workspace/.agent/ already exists). Use init + fetch + checkout instead.
