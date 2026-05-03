@@ -53,7 +53,7 @@ teardown() {
     grep -q -- "CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-tok" "$DOCKER_LOG"
     grep -q -- 'PHASE_FLAGS={"fresh":true}' "$DOCKER_LOG"
     grep -q -- "MAX_TURNS=50" "$DOCKER_LOG"
-    grep -q -- " worker concept task-001" "$DOCKER_LOG"
+    grep -q -- " worker-php84 concept task-001" "$DOCKER_LOG"
 }
 
 @test "docker_run_phase setzt PHASE_FLAGS auf {} wenn leer" {

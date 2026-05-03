@@ -48,7 +48,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: build worker image
-        run: docker compose build worker-php84
+        run: |
+          docker compose build worker-php84
+          docker tag argos-worker:local-php8.4 argos-worker:latest
       - name: phase lifecycle integration test
         run: bash worker/tests/run-tests.sh --integration
 
