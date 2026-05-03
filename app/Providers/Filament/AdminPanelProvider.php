@@ -6,7 +6,7 @@ namespace App\Providers\Filament;
 
 use App\Filament\Admin\Widgets\CurrentTasksWidget;
 use App\Filament\Admin\Widgets\StatsOverviewWidget;
-use App\Http\Middleware\AutoLoginMiddleware;
+use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
@@ -54,6 +54,8 @@ class AdminPanelProvider extends PanelProvider
                 'Aufgaben',
                 'Konfiguration',
             ])
+            ->login()
+            ->profile()
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
@@ -64,9 +66,8 @@ class AdminPanelProvider extends PanelProvider
                 SubstituteBindings::class,
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
-                AutoLoginMiddleware::class,
             ])
-            ->authMiddleware([])
+            ->authMiddleware([Authenticate::class])
             ->renderHook(
                 PanelsRenderHook::HEAD_END,
                 fn (): HtmlString => new HtmlString(app(Vite::class)(['resources/css/app.css']))
