@@ -19,6 +19,33 @@ fi
 # Storage permissions for the dev bind mount.
 chmod -R a+w /app/storage/logs /app/storage/framework /app/bootstrap/cache 2>/dev/null || true
 
+# Sync composer dependencies if the host's vendor/ is missing or stale.
+# Primary path is `composer install` on the host (bind-mounted /app/vendor); this
+# block is the fallback for fresh clones, post-`git pull` lock changes, or hosts
+# without a local composer install.
+if [[ -f /app/composer.lock ]]; then
+    if [[ ! -f /app/vendor/autoload.php ]] \
+            || [[ /app/composer.lock -nt /app/vendor/composer/installed.json ]]; then
+        echo "Composer dependencies out of sync — running composer install..."
+        composer install \
+            --working-dir=/app \
+            --no-interaction \
+            --optimize-autoloader
+    fi
+fi
+
+# Refresh the package-discovery cache when it's stale relative to composer.lock.
+# bootstrap/cache is an anonymous volume in docker-compose, so it survives image
+# rebuilds — without this, a `composer require` on the host updates vendor/ but
+# leaves packages.php pointing at the old set of providers.
+if [[ -f /app/composer.lock ]]; then
+    if [[ ! -f /app/bootstrap/cache/packages.php ]] \
+            || [[ /app/composer.lock -nt /app/bootstrap/cache/packages.php ]]; then
+        echo "Package discovery cache stale — running package:discover..."
+        php /app/artisan package:discover --no-interaction --ansi || true
+    fi
+fi
+
 # Make the data volume writable for www-data.
 mkdir -p /data/config
 chown -R www-data:www-data /data
