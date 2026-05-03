@@ -169,12 +169,11 @@ class RepoProfileResource extends Resource
                                 return [];
                             }
                         })
-                        ->required()
+                        ->required(fn (Get $get): bool => self::isConnectedPath($get))
                         ->searchable()
                         ->live()
-                        ->afterStateUpdated(fn (Set $set, ?string $state) => $set('default_branch', $state ?? 'main'))
                         ->visible(fn (Get $get): bool => self::isConnectedPath($get) && is_string($get('github_repo')) && $get('github_repo') !== '')
-                        ->dehydrated(false),
+                        ->dehydrated(fn (Get $get): bool => self::isConnectedPath($get)),
 
                     // Manual-Pfad: GitLab oder GitHub ohne OAuth
                     TextInput::make('url')
@@ -198,7 +197,7 @@ class RepoProfileResource extends Resource
 
                     TextInput::make('default_branch')
                         ->label('Default Branch')
-                        ->required()
+                        ->required(fn (Get $get): bool => ! self::isConnectedPath($get))
                         ->default('main')
                         ->maxLength(255)
                         ->rules([
@@ -231,6 +230,23 @@ class RepoProfileResource extends Resource
     private static function isConnectedPath(Get $get): bool
     {
         return $get('platform') === 'github' && self::githubAccount() !== null;
+    }
+
+    /**
+     * The OAuth Select writes to `github_branch`, but the column is `default_branch`.
+     * Called from CreateRepoProfile and EditRepoProfile.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    public static function mutateBranchKey(array $data): array
+    {
+        if (isset($data['github_branch']) && is_string($data['github_branch']) && $data['github_branch'] !== '') {
+            $data['default_branch'] = $data['github_branch'];
+        }
+        unset($data['github_branch']);
+
+        return $data;
     }
 
     public static function table(Table $table): Table

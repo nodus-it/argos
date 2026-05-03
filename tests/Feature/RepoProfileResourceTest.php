@@ -7,11 +7,13 @@ namespace Tests\Feature;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\CreateRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\EditRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\ListRepoProfiles;
+use App\Models\ConnectedAccount;
 use App\Models\RepoProfile;
 use App\Models\User;
 use App\Services\Git\RemoteBranchValidator;
 use Filament\Actions\Testing\TestAction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -191,6 +193,40 @@ class RepoProfileResourceTest extends TestCase
             ->assertNotified();
 
         $this->assertDatabaseMissing(RepoProfile::class, ['id' => $profile->id]);
+    }
+
+    public function test_oauth_path_persists_default_branch_on_save(): void
+    {
+        ConnectedAccount::factory()->create([
+            'user_id' => $this->user->id,
+            'provider' => 'github',
+        ]);
+
+        Http::fake([
+            'api.github.com/user/repos*' => Http::response([
+                ['full_name' => 'acme/widget'],
+            ]),
+            'api.github.com/repos/acme/widget/branches*' => Http::response([
+                ['name' => 'main'],
+                ['name' => 'feature/php-app'],
+            ]),
+        ]);
+
+        $profile = RepoProfile::factory()->create([
+            'platform' => 'github',
+            'url' => 'https://github.com/acme/widget',
+            'default_branch' => 'main',
+        ]);
+
+        Livewire::test(EditRepoProfile::class, ['record' => $profile->getKey()])
+            ->fillForm(['github_branch' => 'feature/php-app'])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $this->assertDatabaseHas(RepoProfile::class, [
+            'id' => $profile->id,
+            'default_branch' => 'feature/php-app',
+        ]);
     }
 
     public function test_table_shows_platforms(): void
