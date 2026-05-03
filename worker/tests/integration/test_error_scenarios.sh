@@ -114,7 +114,7 @@ chmod 600 "$AGENT_HOME/claude_oauth_token"
 # --- Szenarien ---
 
 run_error_scenario "auth_error"   "auth_error"   3
-run_error_scenario "rate_limit"   "rate_limit"   3
+run_error_scenario "rate_limit"   "rate_limit"   7
 run_error_scenario "empty_result" "empty_result" 1
 run_error_scenario "invalid_json" "invalid_json" 3
 
