@@ -1,15 +1,63 @@
 # Argos Backlog
 
-Geplante Features und offene Verbesserungen. Items sind nach Reifegrad gruppiert: **Mittelfristig** sammelt ausgearbeitete Vorhaben und Skizzen, **Operations & Quality** kleinere Infrastruktur-Tickets. Was hier landet, ist noch nicht in Arbeit — laufende Tasks werden in der UI verwaltet.
+Geplante Features und offene Verbesserungen. Items sind nach Reifegrad gruppiert: **High Prio** sind angefasste Aufräum-Punkte mit klarer Richtung, **Mittelfristig** sammelt ausgearbeitete Vorhaben und Skizzen, **Operations & Quality** kleinere Infrastruktur-Tickets. Was hier landet, ist noch nicht in Arbeit — laufende Tasks werden in der UI verwaltet.
 
 ## Inhalt
 
+- [High Prio](#high-prio)
+  - [Aufräumen: `app/Domain/` auflösen, Inhalte nach `app/Services/`](#aufräumen-appdomain-auflösen-inhalte-nach-appservices)
+  - [Configs entrümpeln: fixe Defaults statt unnötiger ENV-Schalter](#configs-entrümpeln-fixe-defaults-statt-unnötiger-env-schalter)
 - [Mittelfristig](#mittelfristig)
   - [Interaktive User-Rückfragen während laufender Tasks](#interaktive-user-rückfragen-während-laufender-tasks)
   - [Sub-Tasks: KI-getriebene Aufgaben-Aufteilung](#sub-tasks-ki-getriebene-aufgaben-aufteilung-in-review-bare-häppchen)
   - [Test-Deployment: Optionale Test-Instanz nach Implementierung](#test-deployment-optionale-test-instanz-nach-implementierung)
+  - [Review-Phase: KI-Triage des eigenen Diffs](#review-phase-ki-triage-des-eigenen-diffs)
   - [Weitere Ideen](#weitere-ideen)
 - [Operations & Quality](#operations--quality)
+
+---
+
+## High Prio
+
+### Aufräumen: `app/Domain/` auflösen, Inhalte nach `app/Services/`
+
+Der `app/Domain/`-Tree (`Credentials/CredentialStore`, `Phase/PhaseRunner`, `Phase/StateReader`, `Task/TaskService`, `Worker/WorkerImage`) ist faktisch eine Service-Schicht — kein DDD-Aggregat, keine Value Objects, keine Repositories. Pro Unterordner liegt genau eine Klasse mit Service-Verhalten. Das ist Over-Layering: zwei parallele Verzeichnisse (`Domain/` und `Services/`) für dieselbe Verantwortung.
+
+#### Ansatz
+
+- Klassen 1:1 nach `app/Services/` verschieben — Namen behalten (`CredentialStore`, `PhaseRunner`, `StateReader`, `TaskService`, `WorkerImage`).
+- Namespaces (`App\Domain\…` → `App\Services\…`) per Suchen/Ersetzen ziehen, danach `composer dump-autoload`.
+- ServiceProvider-Bindings, Filament-Pages/Resources, Jobs, Commands und Tests auf neue Namespaces anpassen.
+- `app/Domain/` löschen.
+- Tests grün halten (`php artisan test --compact`).
+
+#### Out-of-Scope
+
+- Echtes DDD-Refactoring (Aggregate, Repos, Value Objects). Keine Notwendigkeit für eine geschlossene App in dieser Größe.
+
+---
+
+### Configs entrümpeln: fixe Defaults statt unnötiger ENV-Schalter
+
+Argos ist eine **geschlossene Anwendung** mit definiertem Deployment (Manager-Container + Worker-Container). Trotzdem schleppen `cache.php`, `session.php`, `queue.php`, `logging.php`, `mail.php`, `filesystems.php`, `database.php` etc. den Laravel-Standard-Zoo an `env()`-Schaltern mit (Driver-Auswahl, Connection-Auswahl, etc.) — das ist Cargo-Cult, niemand wird hier zur Laufzeit `SESSION_DRIVER=cookie` setzen.
+
+#### Ansatz
+
+- Configs durchgehen und unnötige `env()`-Calls durch fixe Defaults ersetzen — insbesondere:
+  - `session.driver`, `session.connection`, `session.cookie` → fix.
+  - `cache.default`, `cache.stores.*.driver` → fix (was wir tatsächlich nutzen).
+  - `queue.default`, `queue.connections.*.driver` → fix.
+  - `logging.default`, `logging.channels.*.driver` → fix.
+  - `filesystems.default` → fix.
+  - `database.default` → fix; nur Credentials (Host/User/Password/DB-Name) bleiben ENV-driven.
+- Beibehalten als ENV: was sich pro Deploy *wirklich* ändert (Credentials, `APP_KEY`, `APP_URL`, `APP_ENV`, `APP_DEBUG`, externe URLs/Tokens, Argos-spezifische Tunables aus `config/argos.php`).
+- `.env.example` synchron mitziehen — was nicht mehr per ENV gelesen wird, fliegt raus.
+- Pro Config kurzer Kommentar oben, was bewusst hartkodiert ist und warum (geschlossene App).
+
+#### Out-of-Scope
+
+- Keine Änderung an `config/argos.php` und Domain-spezifischen Tunables (Worker-Timeouts, Phase-Limits etc.) — die *sollen* ENV-driven bleiben.
+- Kein Wegfall von `APP_*`-Standards.
 
 ---
 
@@ -185,6 +233,45 @@ Die Spec sagt explizit: Worker bekommt kein Docker-Socket. Test-Deployments brau
 #### Offene Punkte (bewusst zurückgestellt)
 
 - **Routing-Mapping inkl. DNS**: Subdomain (`<task-slug>.test.<host>` → Wildcard-DNS-Pflicht), Pfad-basiert (`<host>/test/<slug>/` → kein DNS-Aufwand) oder Port-basiert (`:18000+offset` → ugly aber simpel). Wird in einem späteren Schritt entschieden, sobald wir das Feature konkret bauen — die DNS-Frage fällt automatisch mit ab.
+
+---
+
+### Review-Phase: KI-Triage des eigenen Diffs
+
+Nach dem Implement-Step läuft eine zusätzliche Review-Phase mit eigenem System-Prompt, die den Diff verifiziert und dem User die fragilen Stellen markiert. Die UI hebt diese Stellen im Diff-Viewer hervor, damit der menschliche Reviewer seine Aufmerksamkeit gezielt darauf richten kann.
+
+#### Motivation
+
+Der Wert liegt nicht im „bessere Bugs finden als der Implementer" — derselbe Modell-Stack reviewt sich selbst, da gewinnt man wenig zusätzliche Bug-Findung. Der Wert ist **Triage für den menschlichen Reviewer**: ein Prompt mit anderem Fokus („wo ist das fragil, wo wurden Annahmen gemacht, wo ist die Test-Abdeckung dünn?") und ohne Implementierungs-Bias („ich muss das fertig kriegen") zeigt dem User, auf welche 3-5 Stellen im Diff er besonders schauen sollte. Spart Review-Zeit, hebt das Vertrauen in den Rest des Diffs.
+
+#### Ansatz
+
+- Neue Phase `review` zwischen `implement` und `push` (oder als optionaler Schritt — pro Repo-Profile aktivierbar).
+- Eigener System-Prompt unter `worker/prompts/review.system.md`. Fokus: fragile Stellen, fehlende Edge-Cases, ungetestete Pfade, riskante Annahmen — **nicht** Code-Style, **nicht** „könnte man auch anders machen".
+- Strukturierter JSON-Output mit Severity, kein Freitext. Schema unter `worker/schemas/review.schema.json`:
+  ```json
+  {
+    "concerns": [
+      {"file": "app/Foo.php", "line": 42, "severity": "high|medium|low", "reason": "..."}
+    ],
+    "summary": "kurzer Gesamteindruck"
+  }
+  ```
+- Severity-Disziplin im Prompt: **`high` = real riskant, würde ich vor Merge fixen wollen**; `medium` = bemerkenswert, aber lebbar; `low` = Notiz. Prompt zwingt auf max. 3-5 `high`-Findings, sonst verliert das Signal seinen Wert.
+- KI fixt **nicht** selbst — würde sonst endlos laufen, weil ein Reviewer-Prompt immer irgendwas findet. Entscheidung bleibt beim User.
+- UI rendert nur `high` als hervorgehobene Linie im Diff-Viewer, `medium` ausklappbar, `low` geloggt. Plus ein Banner mit dem Summary über dem Diff.
+
+#### Out-of-Scope (bewusst)
+
+- **Auto-Fix-Loop** — der Reviewer findet immer was, ein Auto-Fix-Loop divergiert oder oszilliert. Wenn der User aus dem Review-Befund eine Änderung will, geht das über den bestehenden `respond`-Flow.
+- **Style/Convention-Reviews** — dafür sind Quality-Gates und Pint da.
+- **Cross-Phase-Review** — kein Review der gesamten Task-Historie, nur des aktuellen Implement-Diffs.
+- **Severity-Schwellen pro Repo-Profile** — erstmal hart im Prompt, Tuning später wenn nötig.
+
+#### Offene Fragen
+
+- Lohnt sich der zusätzliche Claude-Run kosten-/zeitmäßig? ~30% Overhead pro Task. Erste Version optional pro Repo-Profile, dann an echten Tasks messen, ob die Highlights den manuellen Review wirklich abkürzen oder nur Lärm sind.
+- Was, wenn der Reviewer einen `high`-Befund hat und der User trotzdem mergen will? Vermutlich: einfach mergen, kein Block. Befund bleibt im Task-Log dokumentiert.
 
 ---
 
