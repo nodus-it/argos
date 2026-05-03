@@ -12,6 +12,9 @@ return [
         'memory_limit' => env('ARGOS_MEM_LIMIT', '4g'),
         'cpu_limit' => env('ARGOS_CPU_LIMIT', '2'),
     ],
+    'implement' => [
+        'max_turns_default' => (int) env('ARGOS_MAX_TURNS_DEFAULT', 200),
+    ],
     'factories' => [
         'github_token' => env('GITHUB_TOKEN', 'test-token'),
     ],

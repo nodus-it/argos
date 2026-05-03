@@ -71,6 +71,15 @@ class TaskResource extends Resource
                 ->helperText('Startet die Konzept-Phase sofort nach dem Anlegen.')
                 ->default(fn (Get $get): bool => RepoProfile::find($get('repo_profile_id'))?->auto_concept ?? false)
                 ->columnSpanFull(),
+
+            TextInput::make('max_turns')
+                ->label('Max-Turns für Implement')
+                ->helperText('Obergrenze für Tool-Calls pro Implement-Lauf. Leer = Default '
+                    .config('argos.implement.max_turns_default', 200).'.')
+                ->numeric()
+                ->minValue(10)
+                ->maxValue(1000)
+                ->placeholder((string) config('argos.implement.max_turns_default', 200)),
         ]);
     }
 
@@ -101,11 +110,16 @@ class TaskResource extends Resource
                     ->color(fn (?string $state): string => match ($state) {
                         'pending' => 'gray',
                         'running' => 'warning',
+                        'paused' => 'warning',
                         'completed' => 'success',
                         'failed' => 'danger',
                         'quality_gate_failed' => 'danger',
                         'no_changes' => 'info',
                         default => 'gray',
+                    })
+                    ->formatStateUsing(fn (?string $state): string => match ($state) {
+                        'paused' => 'Pausiert',
+                        default => (string) $state,
                     })
                     ->placeholder('—'),
 

@@ -186,6 +186,14 @@ main() {
         printf '%s' "$TASK_DESCRIPTION" > /run/agent/description.md
     fi
 
+    # Make CLAUDE_CONFIG_DIR available before Claude is launched so its session
+    # state (~/.claude/projects/...) survives across worker container restarts.
+    # The manager points this at /workspace/.agent/claude-state which lives in
+    # the per-task volume; we just have to make sure it exists on first run.
+    if [[ -n "${CLAUDE_CONFIG_DIR:-}" ]]; then
+        mkdir -p "$CLAUDE_CONFIG_DIR"
+    fi
+
     case "$arg" in
         ""|-h|--help|help)
             usage

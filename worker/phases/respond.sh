@@ -77,7 +77,7 @@ phase_respond_run() {
 
     local stream_log="/workspace/.agent/logs/respond.${ITERATION}.stream.log"
     local result_json="/workspace/.agent/logs/respond.${ITERATION}.result.json"
-    local max_turns="${MAX_TURNS:-50}"
+    local max_turns="${MAX_TURNS:-200}"
 
     log_info "respond: calling claude (stream-json, max-turns $max_turns)"
 

@@ -97,6 +97,28 @@ _implement_build_user_prompt() {
     }
 }
 
+# _implement_build_continue_prompt: short user prompt for `claude --resume`.
+# Used when the previous run hit max-turns; the conversation history is
+# already in the resumed session, so we just need to nudge Claude to keep
+# going and finish the quality gates.
+_implement_build_continue_prompt() {
+    {
+        printf '# Implement-Phase fortsetzen\n\n'
+        printf 'Der vorherige Lauf wurde wegen des Turn-Limits abgebrochen. '
+        printf 'Die Sitzung wird jetzt fortgesetzt — du hast den vollen Kontext '
+        printf 'und siehst deine bisherigen Aenderungen im Workspace.\n\n'
+        printf 'Bitte mache jetzt fertig, was noch offen ist:\n'
+        printf '- pruefe `git status` und entscheide, welche Dateien noch fehlen\n'
+        printf '- vervollstaendige fehlende Tests / Migrationen / Routen\n'
+        printf '- lasse anschliessend die Quality-Gates lokal laufen '
+        printf '(Pint, Pest/PHPUnit, PHPStan falls konfiguriert) und iteriere bis gruen\n'
+        printf '- schreibe die Implementierungs-Summaries '
+        printf '(implement.summary.nontechnical.md / implement.summary.technical.md) '
+        printf 'falls noch nicht geschehen\n\n'
+        printf 'KEIN git commit, KEIN git push.\n'
+    }
+}
+
 # _implement_changed_php_files: list PHP files modified or added by Claude in /workspace.
 # Output: NUL-separated list on stdout. Excludes deleted files and untracked-ignored paths.
 _implement_changed_php_files() {
@@ -224,9 +246,27 @@ phase_implement_run() {
     local result_json="/workspace/.agent/logs/implement.${ITERATION}.result.json"
     local sysprompt_content
     sysprompt_content="$(cat "$sysprompt")"
-    local max_turns="${MAX_TURNS:-50}"
+    local max_turns="${MAX_TURNS:-200}"
 
-    log_info "implement: calling claude (stream-json, max-turns $max_turns)"
+    # Resume mode: if continue=true AND a previous session_id is provided AND
+    # its session file is still on disk, ask Claude to continue that session
+    # instead of starting fresh.
+    local resume_args=() resume_input="$user_prompt_path"
+    if [[ "$continue_run" == "true" && -n "${RESUME_SESSION_ID:-}" ]]; then
+        local cfg_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+        local session_file="$cfg_dir/projects/-workspace/${RESUME_SESSION_ID}.jsonl"
+        if [[ -f "$session_file" ]]; then
+            log_info "implement: resuming session $RESUME_SESSION_ID"
+            resume_args=(--resume "$RESUME_SESSION_ID")
+            local continue_prompt
+            continue_prompt="$(_implement_build_continue_prompt | render_user_prompt implement continue-prompt)"
+            resume_input="$continue_prompt"
+        else
+            log_warn "implement: RESUME_SESSION_ID set but session file not found ($session_file) — starting fresh session"
+        fi
+    fi
+
+    log_info "implement: calling claude (stream-json, max-turns $max_turns${resume_args[*]:+, resume})"
 
     set +e
     claude -p \
@@ -236,7 +276,8 @@ phase_implement_run() {
         --include-partial-messages \
         --permission-mode bypassPermissions \
         --max-turns "$max_turns" \
-        < "$user_prompt_path" \
+        "${resume_args[@]}" \
+        < "$resume_input" \
         | tee "$stream_log" \
         | tee >(jq -rj '
             if .type == "assistant" then

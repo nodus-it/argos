@@ -19,6 +19,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $started_at
  * @property Carbon|null $finished_at
  * @property int|null $exit_code
+ * @property string|null $stop_reason
  * @property array<string, mixed>|null $result_json
  * @property string|null $cost_usd
  * @property int|null $input_tokens
@@ -46,6 +47,7 @@ class PhaseRun extends Model
         'started_at',
         'finished_at',
         'exit_code',
+        'stop_reason',
         'result_json',
         'cost_usd',
         'input_tokens',

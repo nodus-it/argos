@@ -108,6 +108,20 @@ class PhaseRunner
             $streamLog = $this->readFileFromVolume($task->volumeName(), $streamLogPath);
             if ($streamLog !== null) {
                 $phaseRun->update(['stream_log' => $streamLog]);
+
+                if ($phase === 'implement') {
+                    $stopReason = $this->extractStopReasonFromStreamLog($streamLog);
+                    if ($stopReason !== null) {
+                        $phaseRun->update(['stop_reason' => $stopReason]);
+
+                        // Promote a max-turns hit from "failed" to "paused" so
+                        // the UI shows it as resumable, not as an error.
+                        if ($stopReason === 'error_max_turns' && $phaseRun->status === 'failed') {
+                            $phaseRun->update(['status' => 'paused']);
+                            $task->update(['current_status' => 'paused']);
+                        }
+                    }
+                }
             }
         }
 
@@ -398,6 +412,27 @@ class PhaseRunner
     }
 
     /**
+     * Find the last `result` event in a Claude stream log and return its
+     * subtype (e.g. "success", "error_max_turns", "error").
+     */
+    private function extractStopReasonFromStreamLog(string $streamLog): ?string
+    {
+        foreach (array_reverse(explode("\n", rtrim($streamLog))) as $line) {
+            if ($line === '' || ! str_contains($line, '"type":"result"')) {
+                continue;
+            }
+            $event = json_decode($line, true);
+            if (is_array($event) && ($event['type'] ?? '') === 'result') {
+                $subtype = $event['subtype'] ?? null;
+
+                return is_string($subtype) && $subtype !== '' ? $subtype : null;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Find the last line of stdout that is valid JSON with the worker result fields.
      *
      * @return array<string, mixed>|null
@@ -441,7 +476,10 @@ class PhaseRunner
             ?: config('argos.worker_image', 'ghcr.io/nodus-it/argos-worker:php8.4');
         $phaseFlags = $flags !== [] ? json_encode($flags) : '{}';
 
-        return [
+        $maxTurns = $this->resolveMaxTurns($task, $flags);
+        $resumeSessionId = $this->resolveResumeSessionId($task, $phase, $flags);
+
+        $cmd = [
             'docker', 'run', '--rm',
             '-v', $task->volumeName().':/workspace',
             '-v', 'composer_cache:/home/agent/.composer/cache',
@@ -456,10 +494,84 @@ class PhaseRunner
             '-e', "CLAUDE_CODE_OAUTH_TOKEN={$claudeToken}",
             '-e', "TASK_DESCRIPTION={$task->description}",
             '-e', "PHASE_FLAGS={$phaseFlags}",
+            '-e', "MAX_TURNS={$maxTurns}",
+            '-e', 'CLAUDE_CONFIG_DIR=/workspace/.agent/claude-state',
             '-e', 'LOG_LEVEL=info',
-            $workerImage,
-            $phase,
-            $task->name,
         ];
+
+        if ($resumeSessionId !== null) {
+            $cmd[] = '-e';
+            $cmd[] = "RESUME_SESSION_ID={$resumeSessionId}";
+        }
+
+        $cmd[] = $workerImage;
+        $cmd[] = $phase;
+        $cmd[] = $task->name;
+
+        return $cmd;
+    }
+
+    /**
+     * Resolve the effective max-turns budget for this run.
+     * Priority: explicit flags['max_turns'] > task setting > config default.
+     *
+     * @param  array<string, mixed>  $flags
+     */
+    private function resolveMaxTurns(Task $task, array $flags): int
+    {
+        if (isset($flags['max_turns']) && (int) $flags['max_turns'] > 0) {
+            return (int) $flags['max_turns'];
+        }
+        if ($task->max_turns !== null && $task->max_turns > 0) {
+            return $task->max_turns;
+        }
+
+        return (int) config('argos.implement.max_turns_default', 200);
+    }
+
+    /**
+     * For continue-mode implement runs: find the session_id of the last
+     * implement run so the worker can call `claude --resume <id>`.
+     *
+     * @param  array<string, mixed>  $flags
+     */
+    private function resolveResumeSessionId(Task $task, string $phase, array $flags): ?string
+    {
+        if ($phase !== 'implement') {
+            return null;
+        }
+        if (empty($flags['continue'])) {
+            return null;
+        }
+
+        $lastRun = $task->phaseRuns()
+            ->where('phase', 'implement')
+            ->orderByDesc('iteration')
+            ->first();
+
+        $sessionId = $lastRun?->result_json['claude_session_id'] ?? null;
+        if (! is_string($sessionId) || $sessionId === '') {
+            // Fallback: parse from stream_log (older runs may not have result_json populated yet)
+            $sessionId = $this->extractSessionIdFromStreamLog($lastRun?->stream_log);
+        }
+
+        return is_string($sessionId) && $sessionId !== '' ? $sessionId : null;
+    }
+
+    private function extractSessionIdFromStreamLog(?string $streamLog): ?string
+    {
+        if ($streamLog === null || $streamLog === '') {
+            return null;
+        }
+        // The first line is the system/init event with the session_id field.
+        $firstLine = strtok($streamLog, "\n");
+        if ($firstLine === false) {
+            return null;
+        }
+        $event = json_decode($firstLine, true);
+
+        return is_array($event) && isset($event['session_id']) && is_string($event['session_id'])
+            ? $event['session_id']
+            : null;
     }
 }

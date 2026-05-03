@@ -25,6 +25,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $current_status
  * @property WorkflowStatus $workflow_status
  * @property bool $auto_concept
+ * @property int|null $max_turns
  * @property string|null $concept_md
  * @property string|null $concept_notes
  * @property string|null $implement_summary_nontechnical
@@ -55,6 +56,7 @@ class Task extends Model
         'current_status',
         'workflow_status',
         'auto_concept',
+        'max_turns',
     ];
 
     protected function casts(): array
@@ -62,6 +64,7 @@ class Task extends Model
         return [
             'workflow_status' => WorkflowStatus::class,
             'auto_concept' => 'boolean',
+            'max_turns' => 'integer',
         ];
     }
 
