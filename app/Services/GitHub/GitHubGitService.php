@@ -53,6 +53,52 @@ class GitHubGitService implements GitServiceContract
             ->json();
     }
 
+    /**
+     * Returns repos as ['owner/repo' => 'owner/repo'] for use in Filament Select dropdowns.
+     *
+     * @return array<string, string>
+     */
+    public function getRepoOptions(): array
+    {
+        $repos = $this->listRepositories();
+
+        $options = [];
+        foreach ($repos as $repo) {
+            $fullName = $repo['full_name'] ?? null;
+            if (is_string($fullName) && $fullName !== '') {
+                $options[$fullName] = $fullName;
+            }
+        }
+
+        return $options;
+    }
+
+    /**
+     * Returns branches as ['branch' => 'branch'] for use in Filament Select dropdowns.
+     *
+     * @return array<string, string>
+     */
+    public function getBranchOptions(string $ownerRepo): array
+    {
+        [$owner, $repo] = explode('/', $ownerRepo, 2) + ['', ''];
+
+        if ($owner === '' || $repo === '') {
+            return [];
+        }
+
+        $branches = $this->listBranches($owner, $repo);
+
+        $options = [];
+        foreach ($branches as $branch) {
+            $name = $branch['name'] ?? null;
+            if (is_string($name) && $name !== '') {
+                $options[$name] = $name;
+            }
+        }
+
+        return $options;
+    }
+
     private function http(): PendingRequest
     {
         return Http::withHeaders([
