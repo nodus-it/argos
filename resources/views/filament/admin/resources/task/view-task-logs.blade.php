@@ -135,8 +135,8 @@
         </div>
     </div>
 
-    {{-- Only poll while a phase is running, otherwise the terminal is static. --}}
-    @if($isRunning)
+    {{-- Poll while running OR pending (so the worker pickup is reflected live). --}}
+    @if($isRunning || ($task->current_status === 'pending' && $task->current_phase === $phase))
         <div wire:poll.1500ms="poll" class="hidden"></div>
     @endif
 

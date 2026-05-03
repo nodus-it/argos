@@ -273,25 +273,6 @@ class ViewTask extends ViewRecord
                 ->visible(fn (): bool => $this->task()->workflow_status !== WorkflowStatus::Completed
                     && $this->task()->phaseRuns()->where('phase', 'implement')->where('status', 'completed')->exists()),
 
-            Action::make('respond')
-                ->label('Respond')
-                ->icon('heroicon-o-chat-bubble-left-right')
-                ->color('gray')
-                ->url(fn () => TaskResource::getUrl('respond', ['record' => $this->task()]))
-                ->visible(fn (): bool => $this->task()->workflow_status === WorkflowStatus::InReview),
-
-            Action::make('refresh')
-                ->label('Aktualisieren')
-                ->icon('heroicon-o-arrow-path')
-                ->color('gray')
-                ->action(function (): void {
-                    $task = $this->task();
-                    app(StateReader::class)->syncToDb($task);
-                    $task->refresh();
-                    Notification::make()->title('Status aktualisiert')->success()->send();
-                    $this->redirect(TaskResource::getUrl('view', ['record' => $task]));
-                }),
-
             Action::make('markCompleted')
                 ->label('Abschließen')
                 ->icon('heroicon-o-check-circle')

@@ -111,6 +111,14 @@
                           x-text="Math.floor(sec/60) + ':' + String(sec % 60).padStart(2, '0')"
                           class="ml-auto text-xs font-mono tabular-nums text-amber-500 dark:text-amber-400"></span>
                 </div>
+            @elseif($record->current_status === 'pending')
+                <div class="flex items-center gap-2 pt-1 border-t border-sky-100 dark:border-sky-900/40">
+                    <svg class="animate-spin h-3 w-3 text-sky-500 flex-shrink-0" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                    </svg>
+                    <span class="text-xs text-sky-600 dark:text-sky-400 font-medium">{{ $record->current_phase }} wartet auf Worker</span>
+                </div>
             @endif
 
             <div class="flex items-center justify-between gap-2 pt-1 border-t border-gray-100 dark:border-gray-800">
@@ -987,8 +995,8 @@
         </div>
     </div>
 
-    {{-- Poll every 3s while a phase is running, so the UI auto-refreshes. --}}
-    @if($record->current_status === 'running')
+    {{-- Poll every 3s while a phase is running OR pending (job queued, worker not yet picked it up). --}}
+    @if(in_array($record->current_status, ['running', 'pending'], true))
         <div wire:poll.3s="poll" class="hidden"></div>
     @endif
 
