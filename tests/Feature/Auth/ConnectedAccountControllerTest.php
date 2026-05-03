@@ -95,6 +95,35 @@ class ConnectedAccountControllerTest extends TestCase
         $response->assertRedirect(route('filament.admin.pages.connected-accounts'));
     }
 
+    public function test_redirect_with_onboarding_return_sets_session_marker(): void
+    {
+        $this->get(route('auth.github.redirect', ['return' => 'onboarding']));
+
+        $this->assertSame('onboarding', session('oauth.github.return'));
+    }
+
+    public function test_redirect_without_return_clears_session_marker(): void
+    {
+        session(['oauth.github.return' => 'onboarding']);
+
+        $this->get(route('auth.github.redirect'));
+
+        $this->assertNull(session('oauth.github.return'));
+    }
+
+    public function test_callback_redirects_to_onboarding_when_marker_set(): void
+    {
+        session(['oauth.github.return' => 'onboarding']);
+
+        $socialiteUser = $this->makeSocialiteUser();
+        $this->mockSocialiteCallback($socialiteUser);
+
+        $response = $this->get(route('auth.github.callback'));
+
+        $response->assertRedirect(route('filament.admin.pages.onboarding'));
+        $this->assertNull(session('oauth.github.return'));
+    }
+
     public function test_disconnect_removes_connected_account(): void
     {
         ConnectedAccount::factory()->create([

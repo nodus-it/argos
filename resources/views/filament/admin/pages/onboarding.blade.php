@@ -2,90 +2,115 @@
 
     <div class="max-w-2xl mx-auto space-y-6">
 
-        {{-- Step 1: environment check --}}
+        <p class="text-sm text-gray-500 dark:text-gray-400">
+            In drei Schritten ist Argos einsatzbereit: Claude-Token hinterlegen, optional GitHub verbinden und dann das erste Projekt anlegen.
+        </p>
+
+        {{-- Step 1: Claude Token --}}
         <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden">
             <div class="flex items-center gap-3 px-5 py-3 border-b border-gray-100 dark:border-gray-800">
-                <span class="flex h-6 w-6 items-center justify-center rounded-full bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400 text-xs font-bold">1</span>
-                <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">Umgebung prüfen</span>
-            </div>
-            <div class="px-5 py-4 space-y-3">
-                <div class="flex items-center gap-3">
-                    @if($claudeTokenSet)
-                        <x-heroicon-o-check-circle class="h-5 w-5 text-emerald-500 flex-shrink-0" />
-                        <span class="text-sm text-gray-700 dark:text-gray-300">Claude Token ist konfiguriert</span>
+                <span class="flex h-6 w-6 items-center justify-center rounded-full {{ $tokenSource !== 'none' ? 'bg-emerald-100 dark:bg-emerald-900 text-emerald-600 dark:text-emerald-400' : 'bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400' }} text-xs font-bold">
+                    @if($tokenSource !== 'none')
+                        <x-heroicon-s-check class="h-4 w-4" />
                     @else
-                        <x-heroicon-o-x-circle class="h-5 w-5 text-red-500 flex-shrink-0" />
-                        <span class="text-sm text-gray-700 dark:text-gray-300">Claude Token fehlt — bitte unter Einstellungen hinterlegen</span>
+                        1
                     @endif
-                </div>
-                @if(!$claudeTokenSet)
+                </span>
+                <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">Claude Token</span>
+            </div>
+            <div class="px-5 py-4 space-y-4">
+
+                @if($tokenSource === 'env')
+                    <div class="flex items-center gap-3">
+                        <x-heroicon-o-check-circle class="h-5 w-5 text-emerald-500 flex-shrink-0" />
+                        <span class="text-sm text-gray-700 dark:text-gray-300">Token kommt aus der Umgebungsvariable <code class="text-xs">CLAUDE_CODE_OAUTH_TOKEN</code> — nichts zu tun.</span>
+                    </div>
+                @elseif($tokenSource === 'file')
+                    <div class="flex items-center gap-3">
+                        <x-heroicon-o-check-circle class="h-5 w-5 text-emerald-500 flex-shrink-0" />
+                        <span class="text-sm text-gray-700 dark:text-gray-300">Token ist gespeichert.</span>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Token überschreiben</label>
+                        <div class="flex gap-2">
+                            <input wire:model="claudeToken" type="password" placeholder="sk-ant-oat01-…" autocomplete="off"
+                                class="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                            <button wire:click="saveClaudeToken" type="button"
+                                class="rounded-lg bg-primary-600 hover:bg-primary-700 px-4 py-2 text-sm font-medium text-white">
+                                Speichern
+                            </button>
+                        </div>
+                    </div>
+                @else
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Token <span class="text-red-500">*</span></label>
+                        <div class="flex gap-2">
+                            <input wire:model="claudeToken" type="password" placeholder="sk-ant-oat01-…" autocomplete="off"
+                                class="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                            <button wire:click="saveClaudeToken" type="button"
+                                class="rounded-lg bg-primary-600 hover:bg-primary-700 px-4 py-2 text-sm font-medium text-white">
+                                Speichern
+                            </button>
+                        </div>
+                        <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">Wird im Config-Verzeichnis abgelegt (mode 0600).</p>
+                    </div>
                     @include('filament.admin.partials.claude-token-help')
                 @endif
-                <div class="flex items-center gap-3">
-                    @if($workerImage)
-                        <x-heroicon-o-check-circle class="h-5 w-5 text-emerald-500 flex-shrink-0" />
-                        <span class="text-sm text-gray-700 dark:text-gray-300">Worker-Image: <code>{{ $workerImage }}</code></span>
-                    @else
-                        <x-heroicon-o-information-circle class="h-5 w-5 text-blue-500 flex-shrink-0" />
-                        <span class="text-sm text-gray-700 dark:text-gray-300"><code>ARGOS_WORKER_IMAGE</code> nicht gesetzt — Standardimage wird verwendet</span>
-                    @endif
-                </div>
+
             </div>
         </div>
 
-        {{-- Step 2: first project --}}
+        {{-- Step 2: GitHub verbinden (only if OAuth credentials configured) --}}
+        @if($githubOAuthAvailable)
+            <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden">
+                <div class="flex items-center gap-3 px-5 py-3 border-b border-gray-100 dark:border-gray-800">
+                    <span class="flex h-6 w-6 items-center justify-center rounded-full {{ $githubConnected ? 'bg-emerald-100 dark:bg-emerald-900 text-emerald-600 dark:text-emerald-400' : 'bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400' }} text-xs font-bold">
+                        @if($githubConnected)
+                            <x-heroicon-s-check class="h-4 w-4" />
+                        @else
+                            2
+                        @endif
+                    </span>
+                    <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">GitHub verbinden</span>
+                    <span class="ml-auto text-xs text-gray-400 dark:text-gray-500">optional</span>
+                </div>
+                <div class="px-5 py-4 space-y-3">
+                    @if($githubConnected)
+                        <div class="flex items-center gap-3">
+                            <x-heroicon-o-check-circle class="h-5 w-5 text-emerald-500 flex-shrink-0" />
+                            <span class="text-sm text-gray-700 dark:text-gray-300">GitHub-Account ist verbunden.</span>
+                        </div>
+                    @else
+                        <p class="text-sm text-gray-500 dark:text-gray-400">
+                            Verbinde deinen GitHub-Account per OAuth — danach kannst du Projekte ohne Personal Access Token anlegen.
+                        </p>
+                        <a href="{{ route('auth.github.redirect', ['return' => 'onboarding']) }}"
+                            class="inline-flex items-center gap-2 rounded-lg bg-gray-900 hover:bg-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600 px-4 py-2 text-sm font-medium text-white">
+                            <x-heroicon-o-arrow-right-circle class="h-4 w-4" />
+                            Mit GitHub verbinden
+                        </a>
+                    @endif
+                </div>
+            </div>
+        @endif
+
+        {{-- Step 3: First project --}}
         <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden">
             <div class="flex items-center gap-3 px-5 py-3 border-b border-gray-100 dark:border-gray-800">
-                <span class="flex h-6 w-6 items-center justify-center rounded-full bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400 text-xs font-bold">2</span>
+                <span class="flex h-6 w-6 items-center justify-center rounded-full bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400 text-xs font-bold">
+                    {{ $githubOAuthAvailable ? '3' : '2' }}
+                </span>
                 <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">Erstes Projekt anlegen</span>
             </div>
-            <div class="px-5 py-5">
-                <p class="mb-5 text-sm text-gray-500 dark:text-gray-400">
-                    Verbinde Argos mit einem Git-Repository. Weitere Projekte kannst du danach unter <strong>Konfiguration → Projekte</strong> anlegen.
+            <div class="px-5 py-4 space-y-3">
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                    Verbinde Argos mit einem Git-Repository. Weitere Projekte kannst du danach jederzeit unter <strong>Konfiguration → Projekte</strong> anlegen.
                 </p>
-
-                <form wire:submit.prevent class="space-y-4">
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Projektname <span class="text-red-500">*</span></label>
-                        <input wire:model="name" type="text" placeholder="Mein Projekt"
-                            class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" />
-                        @error('name') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Repo-URL <span class="text-red-500">*</span></label>
-                        <input wire:model="url" type="url" placeholder="https://github.com/org/repo"
-                            class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" />
-                        @error('url') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Personal Access Token</label>
-                        <input wire:model="token" type="password" placeholder="ghp_…"
-                            class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" />
-                        @error('token') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Platform <span class="text-red-500">*</span></label>
-                        <select wire:model="platform"
-                            class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500">
-                            <option value="">Bitte wählen…</option>
-                            <option value="github">GitHub</option>
-                            <option value="gitlab">GitLab</option>
-                        </select>
-                        @error('platform') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Default Branch <span class="text-red-500">*</span></label>
-                        <input wire:model="default_branch" type="text" placeholder="main"
-                            class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" />
-                        @error('default_branch') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
-                    </div>
-
-                </form>
+                <a href="{{ route('filament.admin.resources.repo-profiles.create') }}"
+                    class="inline-flex items-center gap-2 rounded-lg bg-primary-600 hover:bg-primary-700 px-4 py-2 text-sm font-medium text-white">
+                    <x-heroicon-o-rocket-launch class="h-4 w-4" />
+                    Projekt anlegen
+                </a>
             </div>
         </div>
 

@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Domain\Credentials\CredentialStore;
 use App\Filament\Admin\Pages\Onboarding;
 use App\Models\RepoProfile;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -19,6 +21,8 @@ class OnboardingPageTest extends TestCase
     {
         parent::setUp();
         $this->actingAs(User::factory()->create());
+        config(['argos.config_dir' => storage_path('framework/testing/argos-'.uniqid())]);
+        config(['argos.claude_token' => null]);
     }
 
     public function test_onboarding_page_renders(): void
@@ -30,53 +34,71 @@ class OnboardingPageTest extends TestCase
 
     public function test_onboarding_shows_token_help_when_missing(): void
     {
-        config(['argos.claude_token' => null]);
-
         Livewire::test(Onboarding::class)
             ->assertSee('claude setup-token');
     }
 
-    public function test_onboarding_shows_check_when_token_set(): void
+    public function test_onboarding_marks_token_done_when_env_set(): void
     {
         config(['argos.claude_token' => 'sk-ant-test']);
 
         Livewire::test(Onboarding::class)
-            ->assertSee('Claude Token ist konfiguriert');
+            ->assertSet('tokenSource', 'env')
+            ->assertSee('CLAUDE_CODE_OAUTH_TOKEN');
     }
 
-    public function test_can_create_project_via_onboarding(): void
+    public function test_save_claude_token_persists_and_updates_state(): void
     {
-        Livewire::test(Onboarding::class)
-            ->set('name', 'Mein Projekt')
-            ->set('url', 'https://github.com/org/repo')
-            ->set('platform', 'github')
-            ->set('default_branch', 'main')
-            ->call('createProject')
-            ->assertHasNoErrors()
-            ->assertRedirect();
+        Http::fake(['api.anthropic.com/*' => Http::response(['data' => []], 200)]);
 
-        $this->assertDatabaseHas(RepoProfile::class, ['name' => 'Mein Projekt']);
+        Livewire::test(Onboarding::class)
+            ->set('claudeToken', 'sk-ant-oat01-fake')
+            ->call('saveClaudeToken')
+            ->assertSet('tokenSource', 'file')
+            ->assertSet('claudeToken', '');
+
+        $this->assertSame('sk-ant-oat01-fake', app(CredentialStore::class)->getClaudeToken());
     }
 
-    public function test_onboarding_validates_required_fields(): void
+    public function test_save_claude_token_rejects_invalid_token(): void
     {
+        Http::fake(['api.anthropic.com/*' => Http::response('', 401)]);
+
         Livewire::test(Onboarding::class)
-            ->set('name', '')
-            ->set('url', '')
-            ->set('platform', '')
-            ->call('createProject')
-            ->assertHasErrors(['name', 'url', 'platform']);
+            ->set('claudeToken', 'sk-ant-bad')
+            ->call('saveClaudeToken')
+            ->assertSet('tokenSource', 'none');
+
+        $this->assertNull(app(CredentialStore::class)->getClaudeToken());
     }
 
-    public function test_onboarding_validates_url_format(): void
+    public function test_save_claude_token_rejects_empty_input(): void
     {
         Livewire::test(Onboarding::class)
-            ->set('name', 'Test')
-            ->set('url', 'keine-url')
-            ->set('platform', 'github')
-            ->set('default_branch', 'main')
-            ->call('createProject')
-            ->assertHasErrors(['url']);
+            ->set('claudeToken', '   ')
+            ->call('saveClaudeToken')
+            ->assertSet('tokenSource', 'none');
+    }
+
+    public function test_github_connect_button_only_visible_when_oauth_configured(): void
+    {
+        config(['services.github.client_id' => null, 'services.github.client_secret' => null]);
+
+        Livewire::test(Onboarding::class)
+            ->assertSet('githubOAuthAvailable', false)
+            ->assertDontSee('Mit GitHub verbinden');
+
+        config(['services.github.client_id' => 'cid', 'services.github.client_secret' => 'cs']);
+
+        Livewire::test(Onboarding::class)
+            ->assertSet('githubOAuthAvailable', true)
+            ->assertSee('Mit GitHub verbinden');
+    }
+
+    public function test_create_project_button_links_to_repo_profile_create(): void
+    {
+        Livewire::test(Onboarding::class)
+            ->assertSee(route('filament.admin.resources.repo-profiles.create'));
     }
 
     public function test_onboarding_hidden_from_nav_when_project_exists(): void

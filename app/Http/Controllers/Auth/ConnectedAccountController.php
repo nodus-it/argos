@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ConnectedAccount;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\AbstractProvider;
@@ -15,15 +16,23 @@ use Laravel\Socialite\Two\User as SocialiteUser;
 
 final class ConnectedAccountController extends Controller
 {
-    public function redirect(): RedirectResponse
+    private const RETURN_SESSION_KEY = 'oauth.github.return';
+
+    public function redirect(Request $request): RedirectResponse
     {
+        if ($request->query('return') === 'onboarding') {
+            $request->session()->put(self::RETURN_SESSION_KEY, 'onboarding');
+        } else {
+            $request->session()->forget(self::RETURN_SESSION_KEY);
+        }
+
         /** @var AbstractProvider $driver */
         $driver = Socialite::driver('github');
 
         return $driver->scopes(['repo'])->redirect();
     }
 
-    public function callback(): RedirectResponse
+    public function callback(Request $request): RedirectResponse
     {
         /** @var AbstractProvider $driver */
         $driver = Socialite::driver('github');
@@ -46,6 +55,12 @@ final class ConnectedAccountController extends Controller
                 'avatar' => $socialUser->getAvatar(),
             ]
         );
+
+        $returnTo = $request->session()->pull(self::RETURN_SESSION_KEY);
+
+        if ($returnTo === 'onboarding') {
+            return redirect()->route('filament.admin.pages.onboarding');
+        }
 
         return redirect()->route('filament.admin.pages.connected-accounts');
     }
