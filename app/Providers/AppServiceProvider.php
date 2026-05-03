@@ -10,6 +10,7 @@ use App\Console\Commands\AgentImplementCommand;
 use App\Console\Commands\AgentPushCommand;
 use App\Console\Commands\ArgosCommand;
 use App\Domain\Credentials\CredentialStore;
+use Illuminate\Support\Env;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\ServiceProvider;
 use PDO;
@@ -40,8 +41,10 @@ class AppServiceProvider extends ServiceProvider
         // If the caller (env, phpunit.xml, .env, …) explicitly chose a connection,
         // honor it without probing or auto-migrating. Auto-detect only when nothing
         // is set — otherwise we burn a 1 s TCP timeout per phpunit boot and risk
-        // overriding test config with the SQLite fallback.
-        if (env('DB_CONNECTION') !== null) {
+        // overriding test config with the SQLite fallback. Env::get() (not env())
+        // is used here because we genuinely need to know whether the variable
+        // was set rather than the resolved config value.
+        if (Env::get('DB_CONNECTION') !== null) {
             return;
         }
 

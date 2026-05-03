@@ -17,7 +17,7 @@ class RepoProfileFactory extends Factory
         return [
             'name' => fake()->words(2, true),
             'url' => 'https://github.com/test-org/test-repo',
-            'token' => env('GITHUB_TOKEN', 'test-token'),
+            'token' => config('argos.factories.github_token'),
             'platform' => 'github',
             'default_branch' => 'main',
             'worker_image' => null,

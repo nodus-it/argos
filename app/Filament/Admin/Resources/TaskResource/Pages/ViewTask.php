@@ -222,33 +222,32 @@ class ViewTask extends ViewRecord
     {
         return [
             $this->makePhaseAction('concept', 'Konzept erstellen', 'heroicon-o-light-bulb')
-                ->label(fn (): string => $this->getRecord()->phaseRuns()->where('phase', 'concept')->where('status', 'completed')->exists()
+                ->label(fn (): string => $this->task()->phaseRuns()->where('phase', 'concept')->where('status', 'completed')->exists()
                     ? 'Konzept aktualisieren'
                     : 'Konzept erstellen')
-                ->visible(fn (): bool => $this->getRecord()->workflow_status !== WorkflowStatus::Completed),
+                ->visible(fn (): bool => $this->task()->workflow_status !== WorkflowStatus::Completed),
 
             $this->makePhaseAction('implement', 'Implement', 'heroicon-o-code-bracket')
-                ->visible(fn (): bool => $this->getRecord()->workflow_status !== WorkflowStatus::Completed
-                    && $this->getRecord()->phaseRuns()->where('phase', 'concept')->where('status', 'completed')->exists()),
+                ->visible(fn (): bool => $this->task()->workflow_status !== WorkflowStatus::Completed
+                    && $this->task()->phaseRuns()->where('phase', 'concept')->where('status', 'completed')->exists()),
 
             $this->makePhaseAction('push', 'Push & PR', 'heroicon-o-arrow-up-tray')
-                ->visible(fn (): bool => $this->getRecord()->workflow_status !== WorkflowStatus::Completed
-                    && $this->getRecord()->phaseRuns()->where('phase', 'implement')->where('status', 'completed')->exists()),
+                ->visible(fn (): bool => $this->task()->workflow_status !== WorkflowStatus::Completed
+                    && $this->task()->phaseRuns()->where('phase', 'implement')->where('status', 'completed')->exists()),
 
             Action::make('respond')
                 ->label('Respond')
                 ->icon('heroicon-o-chat-bubble-left-right')
                 ->color('gray')
-                ->url(fn () => TaskResource::getUrl('respond', ['record' => $this->getRecord()]))
-                ->visible(fn (): bool => $this->getRecord()->workflow_status === WorkflowStatus::InReview),
+                ->url(fn () => TaskResource::getUrl('respond', ['record' => $this->task()]))
+                ->visible(fn (): bool => $this->task()->workflow_status === WorkflowStatus::InReview),
 
             Action::make('refresh')
                 ->label('Aktualisieren')
                 ->icon('heroicon-o-arrow-path')
                 ->color('gray')
                 ->action(function (): void {
-                    /** @var Task $task */
-                    $task = $this->getRecord();
+                    $task = $this->task();
                     app(StateReader::class)->syncToDb($task);
                     $task->refresh();
                     Notification::make()->title('Status aktualisiert')->success()->send();
@@ -262,13 +261,12 @@ class ViewTask extends ViewRecord
                 ->requiresConfirmation()
                 ->modalDescription('Task als abgeschlossen markieren? Der Workflow-Status wird auf "Abgeschlossen" gesetzt.')
                 ->action(function (): void {
-                    /** @var Task $task */
-                    $task = $this->getRecord();
+                    $task = $this->task();
                     $task->update(['workflow_status' => WorkflowStatus::Completed]);
                     Notification::make()->title('Task abgeschlossen')->success()->send();
                     $this->redirect(TaskResource::getUrl('view', ['record' => $task]));
                 })
-                ->visible(fn (): bool => $this->getRecord()->workflow_status !== WorkflowStatus::Completed),
+                ->visible(fn (): bool => $this->task()->workflow_status !== WorkflowStatus::Completed),
 
             Action::make('deleteVolume')
                 ->label('Workspace löschen')
@@ -277,15 +275,20 @@ class ViewTask extends ViewRecord
                 ->requiresConfirmation()
                 ->modalDescription('Den Docker-Volume für diesen Task löschen? Diese Aktion ist nicht rückgängig zu machen.')
                 ->action(function (): void {
-                    /** @var Task $task */
-                    $task = $this->getRecord();
+                    $task = $this->task();
                     Process::fromShellCommandline(
                         'docker volume rm '.escapeshellarg($task->volumeName())
                     )->run();
                     Notification::make()->title('Workspace gelöscht')->success()->send();
                 })
-                ->visible(fn (): bool => $this->getRecord()->workflow_status === WorkflowStatus::Completed),
+                ->visible(fn (): bool => $this->task()->workflow_status === WorkflowStatus::Completed),
         ];
+    }
+
+    private function task(): Task
+    {
+        /** @var Task */
+        return $this->getRecord();
     }
 
     public function reviseConcept(): void
@@ -308,10 +311,9 @@ class ViewTask extends ViewRecord
         return Action::make($phase)
             ->label($label)
             ->icon($icon)
-            ->disabled(fn (): bool => $this->getRecord()->current_status === 'running')
+            ->disabled(fn (): bool => $this->task()->current_status === 'running')
             ->action(function () use ($phase, $label): void {
-                /** @var Task $task */
-                $task = $this->getRecord();
+                $task = $this->task();
                 if ($task->phaseRuns()->where('status', 'running')->exists()) {
                     Notification::make()->title('Phase läuft bereits')->warning()->send();
 

@@ -15,6 +15,9 @@ use Filament\Pages\Page;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 
+/**
+ * @property Schema $form
+ */
 class Settings extends Page implements HasForms
 {
     use InteractsWithForms;

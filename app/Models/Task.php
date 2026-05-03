@@ -6,12 +6,35 @@ namespace App\Models;
 
 use App\Enums\WorkflowStatus;
 use App\Jobs\RunPhaseJob;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property string $id
+ * @property string $name
+ * @property string|null $repo_profile_id
+ * @property string $description
+ * @property string|null $feature_branch
+ * @property string|null $pr_url
+ * @property string|null $current_phase
+ * @property string|null $current_status
+ * @property WorkflowStatus $workflow_status
+ * @property bool $auto_concept
+ * @property string|null $concept_md
+ * @property string|null $concept_notes
+ * @property string|null $implement_summary_nontechnical
+ * @property string|null $implement_summary_technical
+ * @property string|null $implement_notes
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ * @property-read RepoProfile|null $repoProfile
+ * @property-read Collection<int, PhaseRun> $phaseRuns
+ */
 class Task extends Model
 {
     use HasFactory;
@@ -52,11 +75,17 @@ class Task extends Model
         return preg_replace('/[^a-zA-Z0-9_.-]/', '_', $name) ?? $name;
     }
 
+    /**
+     * @return BelongsTo<RepoProfile, $this>
+     */
     public function repoProfile(): BelongsTo
     {
         return $this->belongsTo(RepoProfile::class);
     }
 
+    /**
+     * @return HasMany<PhaseRun, $this>
+     */
     public function phaseRuns(): HasMany
     {
         return $this->hasMany(PhaseRun::class);
