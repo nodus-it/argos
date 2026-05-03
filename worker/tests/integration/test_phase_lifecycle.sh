@@ -75,7 +75,7 @@ step "Setup: Compose-Overlay mit absoluten Pfaden generieren"
 overlay="$TEST_DIR/docker-compose.test.yml"
 cat > "$overlay" <<EOF
 services:
-  worker:
+  worker-php84:
     volumes:
       - $FIXTURES/mock-claude/claude:/usr/bin/claude:ro
       - $FAKE_REMOTE:/tmp/fake-remote.git

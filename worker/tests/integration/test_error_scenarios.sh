@@ -69,7 +69,7 @@ EOF
     local overlay="$TEST_DIR/overlay-${name}.yml"
     cat > "$overlay" <<EOF
 services:
-  worker:
+  worker-php84:
     volumes:
       - $FIXTURES/mock-claude/claude:/usr/bin/claude:ro
       - $FAKE_REMOTE:/tmp/fake-remote.git

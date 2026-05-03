@@ -133,7 +133,7 @@ cmd_init() {
 
     if [[ "$update_only" != "true" ]]; then
         log_info "init: baue worker-Image (kann ein paar Minuten dauern)"
-        (cd "$AGENT_REPO_ROOT" && docker compose build worker)
+        (cd "$AGENT_REPO_ROOT" && docker compose build worker-php84)
     fi
 
     if credentials_has_claude_token && [[ "$update_only" != "true" ]]; then

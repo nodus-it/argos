@@ -2,7 +2,7 @@
 # lib/docker.sh — `docker compose run` wrapper used to launch worker phases.
 #
 # Expects lib/credentials.sh and lib/tasks.sh to be sourced first, and the
-# `worker` compose service to exist. AGENT_REPO_ROOT points at the repo
+# `worker-php84` compose service to exist. AGENT_REPO_ROOT points at the repo
 # directory containing docker-compose.yml (defaults to $PWD).
 
 # shellcheck shell=bash
@@ -63,7 +63,7 @@ docker_run_phase() {
         -e "PHASE_FLAGS=${PHASE_FLAGS:-$default_flags}" \
         -e "MAX_TURNS=${MAX_TURNS:-}" \
         -e "LOG_LEVEL=${LOG_LEVEL:-info}" \
-        worker "$phase" "$task_id"
+        worker-php84 "$phase" "$task_id"
 }
 
 # docker_run_shell: open an interactive shell in a worker with the task volume mounted.
@@ -78,7 +78,7 @@ docker_run_shell() {
         -v "$volume:/workspace" \
         -e "TASK_ID=$task_id" \
         --entrypoint bash \
-        worker -i
+        worker-php84 -i
 }
 
 # docker_copy_from_volume: copy a file out of a task volume to the host.
