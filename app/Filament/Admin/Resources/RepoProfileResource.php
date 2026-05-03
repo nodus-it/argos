@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources;
 
+use App\Domain\Worker\WorkerImage;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\CreateRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\EditRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\ListRepoProfiles;
@@ -16,6 +17,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -86,11 +88,13 @@ class RepoProfileResource extends Resource
                 ->default('main')
                 ->maxLength(255),
 
-            TextInput::make('worker_image')
+            Select::make('worker_image')
                 ->label('Worker-Image')
-                ->placeholder('ghcr.io/nodus-it/argos-worker:php8.4')
-                ->helperText('Leer lassen für globalen Standard aus ARGOS_WORKER_IMAGE.')
-                ->maxLength(255),
+                ->options(fn (Get $get): array => WorkerImage::optionsFor($get('worker_image')))
+                ->placeholder('Globaler Default ('.config('argos.worker_image').')')
+                ->helperText('Leer lassen für globalen Standard. Andere Tags müssen in config/argos.php oder per ARGOS_WORKER_IMAGE bekannt sein.')
+                ->searchable()
+                ->native(false),
 
             Toggle::make('auto_concept')
                 ->label('Konzept automatisch starten')

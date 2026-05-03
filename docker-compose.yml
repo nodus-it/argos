@@ -49,14 +49,31 @@ services:
       ARGOS_DB_USERNAME:        "${ARGOS_DB_USERNAME:-argos}"
       ARGOS_DB_PASSWORD:        "${ARGOS_DB_PASSWORD:-argos}"
 
-  worker:
-    image: argos-worker:latest
+  # Local worker images mirror the CI matrix: one per supported PHP version.
+  # Tag scheme is symmetric with stage/prod:
+  #   local: argos-worker:local-php8.3 / :local-php8.4
+  #   stage: ghcr.io/.../argos-worker:stage-php8.3 / :stage-php8.4
+  #   prod:  ghcr.io/.../argos-worker:php8.3 / :php8.4
+  # Workers are not started by compose; the manager spawns them via `docker run`.
+  # `docker compose --profile build-only build` builds both variants at once.
+  worker-php83:
+    image: argos-worker:local-php8.3
     build:
       context: ./worker
       dockerfile: docker/Dockerfile
       target: worker
-    # Not started via compose — the manager spawns workers via `docker run`.
-    # This service exists only so `docker compose build worker` works.
+    profiles:
+      - build-only
+    volumes:
+      - composer_cache:/home/agent/.composer/cache
+      - npm_cache:/home/agent/.npm
+
+  worker-php84:
+    image: argos-worker:local-php8.4
+    build:
+      context: ./worker
+      dockerfile: docker/Dockerfile
+      target: worker-php84
     profiles:
       - build-only
     volumes:

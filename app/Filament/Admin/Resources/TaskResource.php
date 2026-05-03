@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources;
 
+use App\Domain\Worker\WorkerImage;
 use App\Enums\WorkflowStatus;
 use App\Filament\Admin\Resources\TaskResource\Pages\CreateTask;
 use App\Filament\Admin\Resources\TaskResource\Pages\ListTasks;
@@ -80,6 +81,15 @@ class TaskResource extends Resource
                 ->minValue(10)
                 ->maxValue(1000)
                 ->placeholder((string) config('argos.implement.max_turns_default', 200)),
+
+            Select::make('worker_image')
+                ->label('Worker-Image (Override)')
+                ->options(fn (Get $get): array => WorkerImage::optionsFor($get('worker_image')))
+                ->placeholder(fn (Get $get): string => 'Default vom Projekt ('
+                    .(RepoProfile::find($get('repo_profile_id'))?->worker_image ?: config('argos.worker_image')).')')
+                ->helperText('Überschreibt das Image für genau diesen Task. Leer = Projekt-Default.')
+                ->searchable()
+                ->native(false),
         ]);
     }
 

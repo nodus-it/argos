@@ -283,6 +283,41 @@ class PhaseRunnerTest extends TestCase
         $this->assertSame('error_max_turns', $stopReason);
     }
 
+    public function test_build_command_uses_config_default_worker_image_when_unset(): void
+    {
+        $task = $this->taskWithProfile();
+        $task->repoProfile->update(['worker_image' => null]);
+        config(['argos.worker_image' => 'argos-worker:test']);
+
+        $cmd = $this->captureCommand($task, 'concept');
+
+        $this->assertContains('argos-worker:test', $cmd);
+    }
+
+    public function test_build_command_prefers_repo_profile_worker_image_over_config(): void
+    {
+        $task = $this->taskWithProfile();
+        $task->repoProfile->update(['worker_image' => 'argos-worker:profile']);
+        config(['argos.worker_image' => 'argos-worker:test']);
+
+        $cmd = $this->captureCommand($task, 'concept');
+
+        $this->assertContains('argos-worker:profile', $cmd);
+        $this->assertNotContains('argos-worker:test', $cmd);
+    }
+
+    public function test_build_command_prefers_task_worker_image_over_profile(): void
+    {
+        $task = $this->taskWithProfile();
+        $task->repoProfile->update(['worker_image' => 'argos-worker:profile']);
+        $task->update(['worker_image' => 'argos-worker:task']);
+
+        $cmd = $this->captureCommand($task, 'concept');
+
+        $this->assertContains('argos-worker:task', $cmd);
+        $this->assertNotContains('argos-worker:profile', $cmd);
+    }
+
     public function test_extract_stop_reason_returns_null_without_result_event(): void
     {
         $runner = app(PhaseRunner::class);

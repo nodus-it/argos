@@ -26,6 +26,7 @@ use Illuminate\Support\Carbon;
  * @property WorkflowStatus $workflow_status
  * @property bool $auto_concept
  * @property int|null $max_turns
+ * @property string|null $worker_image
  * @property string|null $concept_md
  * @property string|null $concept_notes
  * @property string|null $implement_summary_nontechnical
@@ -57,6 +58,7 @@ class Task extends Model
         'workflow_status',
         'auto_concept',
         'max_turns',
+        'worker_image',
     ];
 
     protected function casts(): array
