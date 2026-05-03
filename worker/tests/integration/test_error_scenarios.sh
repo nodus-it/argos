@@ -13,6 +13,11 @@ IFS=$'\n\t'
 ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 FIXTURES="$ROOT/worker/tests/integration/fixtures"
 
+# Exit-Code-Konstanten aus der einzigen Quelle der Wahrheit laden,
+# damit Tests nicht veralten wenn sich Codes aendern.
+# shellcheck source=../../lib/error.sh
+source "$ROOT/worker/lib/error.sh"
+
 TEST_DIR="$(mktemp -d -t agent-it-err-XXXXXX)"
 export AGENT_HOME="$TEST_DIR/.agent"
 mkdir -p "$AGENT_HOME"
@@ -113,9 +118,9 @@ chmod 600 "$AGENT_HOME/claude_oauth_token"
 
 # --- Szenarien ---
 
-run_error_scenario "auth_error"   "auth_error"   3
-run_error_scenario "rate_limit"   "rate_limit"   7
-run_error_scenario "empty_result" "empty_result" 1
-run_error_scenario "invalid_json" "invalid_json" 3
+run_error_scenario "auth_error"   "auth_error"   "$EXIT_AUTH"
+run_error_scenario "rate_limit"   "rate_limit"   "$EXIT_USAGE_LIMIT"
+run_error_scenario "empty_result" "empty_result" "$EXIT_GENERAL"
+run_error_scenario "invalid_json" "invalid_json" "$EXIT_AUTH"
 
 printf '\n\033[1;32mERROR SCENARIOS OK\033[0m\n'

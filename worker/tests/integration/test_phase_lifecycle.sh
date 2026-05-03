@@ -18,6 +18,10 @@ ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 FIXTURES="$ROOT/worker/tests/integration/fixtures"
 TASK_ID="lifecycle-$$"
 
+# Branch-Prefix aus der einzigen Quelle der Wahrheit laden.
+# shellcheck source=../../phases/concept.sh
+source "$ROOT/worker/phases/concept.sh"
+
 TEST_DIR="$(mktemp -d -t agent-it-XXXXXX)"
 export AGENT_HOME="$TEST_DIR/.agent"
 mkdir -p "$AGENT_HOME"
@@ -109,7 +113,7 @@ step "push $TASK_ID --keep"
 
 step "Verifikation: feature_branch existiert in fake-remote"
 feature_branch="$(docker run --rm -v "task_ws_${TASK_ID}:/workspace" --entrypoint sh argos-worker:latest -c 'jq -r .repo.feature_branch /workspace/.agent/state.json')"
-[[ "$feature_branch" == feat/${TASK_ID} ]] || fail "feature_branch ungewohnt: '$feature_branch'"
+[[ "$feature_branch" == ${CONCEPT_BRANCH_PREFIX}/${TASK_ID} ]] || fail "feature_branch ungewohnt: '$feature_branch'"
 remote_branches="$(git -C "$FAKE_REMOTE" branch --list)"
 [[ "$remote_branches" == *"$feature_branch"* ]] || fail "Branch '$feature_branch' fehlt in fake-remote"
 

@@ -11,6 +11,10 @@
 
 # shellcheck shell=bash
 
+# Single source of truth for the feature-branch prefix.
+# Tests and tooling should derive this value from here, not hardcode it.
+CONCEPT_BRANCH_PREFIX="feat"
+
 # phase_concept_help: short description for `agent help concept`.
 phase_concept_help() {
     echo "Konzept-Phase: Aufgabe analysieren und Plan formulieren."
@@ -42,7 +46,7 @@ _concept_initial_clone() {
 
     local feature_branch slug
     slug="$(printf '%s' "${TASK_ID}" | tr ' /' '-' | tr -cd 'a-zA-Z0-9._-')"
-    feature_branch="feat/${slug}"
+    feature_branch="${CONCEPT_BRANCH_PREFIX}/${slug}"
 
     # `git clone` refuses to clone into a non-empty /workspace
     # (/workspace/.agent/ already exists). Use init + fetch + checkout instead.
