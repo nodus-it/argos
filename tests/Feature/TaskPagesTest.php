@@ -142,6 +142,45 @@ class TaskPagesTest extends TestCase
             ->assertActionVisible('deleteVolume');
     }
 
+    public function test_continue_action_visible_only_when_implement_paused(): void
+    {
+        $running = Task::factory()->create();
+        PhaseRun::factory()->paused()->create(['task_id' => $running->id, 'phase' => 'implement']);
+
+        $other = Task::factory()->create();
+        PhaseRun::factory()->create(['task_id' => $other->id, 'phase' => 'implement', 'status' => 'completed']);
+
+        Livewire::test(ViewTask::class, ['record' => $running->getKey()])
+            ->assertActionVisible('continueImplement');
+
+        Livewire::test(ViewTask::class, ['record' => $other->getKey()])
+            ->assertActionHidden('continueImplement');
+    }
+
+    public function test_continue_action_dispatches_job_with_continue_and_max_turns(): void
+    {
+        $task = Task::factory()->create(['max_turns' => 250]);
+        PhaseRun::factory()->paused()->create(['task_id' => $task->id, 'phase' => 'implement']);
+
+        Livewire::test(ViewTask::class, ['record' => $task->getKey()])
+            ->callAction('continueImplement', ['max_turns' => 300])
+            ->assertNotified();
+
+        Bus::assertDispatched(RunPhaseJob::class, fn ($j) => $j->phase === 'implement'
+            && $j->flags === ['continue' => true, 'max_turns' => 300]);
+    }
+
+    public function test_paused_banner_renders_for_paused_implement_run(): void
+    {
+        $task = Task::factory()->create();
+        PhaseRun::factory()->paused()->create(['task_id' => $task->id, 'phase' => 'implement']);
+
+        Livewire::test(ViewTask::class, ['record' => $task->getKey()])
+            ->assertSuccessful()
+            ->assertSee('Implementierung pausiert')
+            ->assertSee('Turn-Limit');
+    }
+
     public function test_phase_action_warns_when_running(): void
     {
         $task = Task::factory()->create();

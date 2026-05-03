@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources;
 
+use App\Domain\Worker\WorkerImage;
 use App\Enums\WorkflowStatus;
 use App\Filament\Admin\Resources\TaskResource\Pages\CreateTask;
 use App\Filament\Admin\Resources\TaskResource\Pages\ListTasks;
@@ -71,6 +72,24 @@ class TaskResource extends Resource
                 ->helperText('Startet die Konzept-Phase sofort nach dem Anlegen.')
                 ->default(fn (Get $get): bool => RepoProfile::find($get('repo_profile_id'))?->auto_concept ?? false)
                 ->columnSpanFull(),
+
+            TextInput::make('max_turns')
+                ->label('Max-Turns für Implement')
+                ->helperText('Obergrenze für Tool-Calls pro Implement-Lauf. Leer = Default '
+                    .config('argos.implement.max_turns_default', 200).'.')
+                ->numeric()
+                ->minValue(10)
+                ->maxValue(1000)
+                ->placeholder((string) config('argos.implement.max_turns_default', 200)),
+
+            Select::make('worker_image')
+                ->label('Worker-Image (Override)')
+                ->options(fn (Get $get): array => WorkerImage::optionsFor($get('worker_image')))
+                ->placeholder(fn (Get $get): string => 'Default vom Projekt ('
+                    .(RepoProfile::find($get('repo_profile_id'))?->worker_image ?: config('argos.worker_image')).')')
+                ->helperText('Überschreibt das Image für genau diesen Task. Leer = Projekt-Default.')
+                ->searchable()
+                ->native(false),
         ]);
     }
 
@@ -101,11 +120,16 @@ class TaskResource extends Resource
                     ->color(fn (?string $state): string => match ($state) {
                         'pending' => 'gray',
                         'running' => 'warning',
+                        'paused' => 'warning',
                         'completed' => 'success',
                         'failed' => 'danger',
                         'quality_gate_failed' => 'danger',
                         'no_changes' => 'info',
                         default => 'gray',
+                    })
+                    ->formatStateUsing(fn (?string $state): string => match ($state) {
+                        'paused' => 'Pausiert',
+                        default => (string) $state,
                     })
                     ->placeholder('—'),
 

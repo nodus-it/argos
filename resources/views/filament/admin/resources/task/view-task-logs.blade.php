@@ -107,6 +107,8 @@
                 @endphp
                 @if($status === 'running')
                     <span class="text-amber-400">running</span>
+                @elseif($status === 'paused')
+                    <span class="text-amber-400">⏸ pausiert (Turn-Limit)</span>
                 @elseif($status === 'completed')
                     <span class="text-emerald-400">✓ completed</span>
                 @elseif($status === 'failed' || $status === 'quality_gate_failed')

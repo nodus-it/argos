@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -56,5 +57,18 @@ class RepoProfile extends Model
     public function tasks(): HasMany
     {
         return $this->hasMany(Task::class);
+    }
+
+    /**
+     * Normalise repo URLs on save: trim whitespace and strip trailing slashes.
+     * A trailing "/" survived in the URL otherwise leaks into
+     * `https://api.github.com/repos/<owner>/<repo>//pulls` and the GitHub REST
+     * API answers HTTP 404.
+     */
+    protected function url(): Attribute
+    {
+        return Attribute::make(
+            set: fn (?string $value): ?string => $value === null ? null : rtrim(trim($value), '/'),
+        );
     }
 }

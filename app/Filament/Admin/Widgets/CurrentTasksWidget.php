@@ -75,6 +75,7 @@ class CurrentTasksWidget extends BaseWidget
             WorkflowStatus::ConceptReview->value,
             WorkflowStatus::InReview->value,
             WorkflowStatus::Failed->value,
+            WorkflowStatus::ImplementPaused->value,
         ]);
 
         $running = $this->quotedList([

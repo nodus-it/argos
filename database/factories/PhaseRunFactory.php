@@ -44,4 +44,19 @@ class PhaseRunFactory extends Factory
             'exit_code' => 1,
         ]);
     }
+
+    public function paused(): static
+    {
+        return $this->state([
+            'status' => 'paused',
+            'stop_reason' => 'error_max_turns',
+            'exit_code' => 3,
+            'result_json' => [
+                'subtype' => 'error_max_turns',
+                'is_error' => true,
+                'num_turns' => 51,
+                'claude_session_id' => 'test-session-id',
+            ],
+        ]);
+    }
 }

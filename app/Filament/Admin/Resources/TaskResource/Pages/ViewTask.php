@@ -8,8 +8,10 @@ use App\Domain\Phase\StateReader;
 use App\Enums\WorkflowStatus;
 use App\Filament\Admin\Resources\TaskResource;
 use App\Jobs\RunPhaseJob;
+use App\Models\PhaseRun;
 use App\Models\Task;
 use Filament\Actions\Action;
+use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Illuminate\Support\Str;
@@ -231,6 +233,9 @@ class ViewTask extends ViewRecord
                 ->visible(fn (): bool => $this->task()->workflow_status !== WorkflowStatus::Completed
                     && $this->task()->phaseRuns()->where('phase', 'concept')->where('status', 'completed')->exists()),
 
+            $this->makeContinueImplementAction()
+                ->visible(fn (): bool => $this->lastImplementRun()?->status === 'paused'),
+
             $this->makePhaseAction('push', 'Push & PR', 'heroicon-o-arrow-up-tray')
                 ->visible(fn (): bool => $this->task()->workflow_status !== WorkflowStatus::Completed
                     && $this->task()->phaseRuns()->where('phase', 'implement')->where('status', 'completed')->exists()),
@@ -322,6 +327,63 @@ class ViewTask extends ViewRecord
                 $task->update(['current_phase' => $phase, 'current_status' => 'running']);
                 RunPhaseJob::dispatch($task->id, $phase);
                 Notification::make()->title("{$label} gestartet")->success()->send();
+                $this->redirect(TaskResource::getUrl('view', ['record' => $task]));
+            });
+    }
+
+    public function lastImplementRun(): ?PhaseRun
+    {
+        return $this->task()
+            ->phaseRuns()
+            ->where('phase', 'implement')
+            ->orderByDesc('iteration')
+            ->first();
+    }
+
+    private function makeContinueImplementAction(): Action
+    {
+        return Action::make('continueImplement')
+            ->label('Fortsetzen')
+            ->icon('heroicon-o-play-circle')
+            ->color('warning')
+            ->disabled(fn (): bool => $this->task()->current_status === 'running')
+            ->modalHeading('Implement fortsetzen')
+            ->modalDescription('Der vorherige Lauf wurde wegen des Turn-Limits angehalten. '
+                .'Die Sitzung wird mit vollem Kontext fortgesetzt.')
+            ->modalSubmitActionLabel('Fortsetzen')
+            ->schema([
+                TextInput::make('max_turns')
+                    ->label('Max-Turns für diesen Lauf')
+                    ->helperText('Frischer Turn-Budget. Vorbelegt mit dem vorherigen Wert.')
+                    ->numeric()
+                    ->minValue(10)
+                    ->maxValue(1000)
+                    ->required()
+                    ->default(fn (): int => $this->task()->max_turns
+                        ?? (int) config('argos.implement.max_turns_default', 200)),
+            ])
+            ->action(function (array $data): void {
+                $task = $this->task();
+                if ($task->phaseRuns()->where('status', 'running')->exists()) {
+                    Notification::make()->title('Phase läuft bereits')->warning()->send();
+
+                    return;
+                }
+
+                $maxTurns = (int) $data['max_turns'];
+                $task->update([
+                    'current_phase' => 'implement',
+                    'current_status' => 'running',
+                ]);
+                RunPhaseJob::dispatch($task->id, 'implement', [
+                    'continue' => true,
+                    'max_turns' => $maxTurns,
+                ]);
+                Notification::make()
+                    ->title('Implement fortgesetzt')
+                    ->body("Resume-Modus, max_turns={$maxTurns}")
+                    ->success()
+                    ->send();
                 $this->redirect(TaskResource::getUrl('view', ['record' => $task]));
             });
     }

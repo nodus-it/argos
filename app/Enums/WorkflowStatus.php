@@ -10,6 +10,7 @@ enum WorkflowStatus: string
     case ConceptRunning = 'concept_running';
     case ConceptReview = 'concept_review';
     case ImplementRunning = 'implement_running';
+    case ImplementPaused = 'implement_paused';
     case InReview = 'in_review';
     case Completed = 'completed';
     case Failed = 'failed';
@@ -21,6 +22,7 @@ enum WorkflowStatus: string
             self::ConceptRunning => 'Konzept läuft',
             self::ConceptReview => 'Konzept bereit',
             self::ImplementRunning => 'Implementierung läuft',
+            self::ImplementPaused => 'Pausiert (Turn-Limit)',
             self::InReview => 'In Review',
             self::Completed => 'Abgeschlossen',
             self::Failed => 'Fehlgeschlagen',
@@ -34,6 +36,7 @@ enum WorkflowStatus: string
             self::ConceptRunning => 'warning',
             self::ConceptReview => 'info',
             self::ImplementRunning => 'warning',
+            self::ImplementPaused => 'warning',
             self::InReview => 'primary',
             self::Completed => 'success',
             self::Failed => 'danger',
@@ -52,6 +55,7 @@ enum WorkflowStatus: string
             ['concept', 'quality_gate_failed'] => self::Failed,
             ['implement', 'failed'] => self::Failed,
             ['implement', 'quality_gate_failed'] => self::Failed,
+            ['implement', 'paused'] => self::ImplementPaused,
             ['push', 'completed'] => self::InReview,
             ['push', 'failed'] => self::Failed,
             ['respond', 'completed'] => self::InReview,

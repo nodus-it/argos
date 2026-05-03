@@ -105,7 +105,7 @@ Default --fresh: git reset --hard origin/<base-branch>, git clean -fd,
                  toolchain setup (composer install, npm ci if present),
                  then the Claude session.
 --continue:      no reset; builds on existing uncommitted changes.
---max-turns=N:   override Claude max-turns (default 50).
+--max-turns=N:   override Claude max-turns (default 200).
 
 Quality gates: Claude runs Pint and Pest/PHPUnit itself.
 The worker re-checks afterwards — on failure: status=quality_gate_failed.

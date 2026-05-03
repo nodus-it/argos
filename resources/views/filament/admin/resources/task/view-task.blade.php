@@ -4,11 +4,15 @@
         /** @var \App\Models\Task $record */
         $statusColorMap = [
             'running'             => 'text-amber-400 bg-amber-400/10 ring-amber-400/30',
+            'paused'              => 'text-amber-400 bg-amber-400/10 ring-amber-400/30',
             'completed'           => 'text-emerald-400 bg-emerald-400/10 ring-emerald-400/30',
             'failed'              => 'text-red-400 bg-red-400/10 ring-red-400/30',
             'quality_gate_failed' => 'text-red-400 bg-red-400/10 ring-red-400/30',
             'no_changes'          => 'text-sky-400 bg-sky-400/10 ring-sky-400/30',
             'pending'             => 'text-slate-400 bg-slate-400/10 ring-slate-400/30',
+        ];
+        $statusLabelMap = [
+            'paused' => 'pausiert',
         ];
         $phaseRun = fn(string $phase) => ($phaseRuns[$phase] ?? collect())->last();
         $phaseStatus = fn(string $phase) => $phaseRun($phase)?->status ?? 'pending';
@@ -111,6 +115,43 @@
         </div>
     </div>
 
+    {{-- ===================== Paused banner (max-turns) ===================== --}}
+    @php
+        $lastImplement = ($phaseRuns['implement'] ?? collect())->last();
+        $isPaused = $lastImplement?->status === 'paused';
+        $implementIterations = ($phaseRuns['implement'] ?? collect())->count();
+        $turnsUsed = data_get($lastImplement?->result_json, 'num_turns');
+    @endphp
+    @if($isPaused)
+        <div class="rounded-xl border border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/30 p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+            <div class="flex items-start gap-3 flex-1">
+                <x-heroicon-o-pause-circle class="h-6 w-6 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                <div>
+                    <p class="text-sm font-semibold text-amber-900 dark:text-amber-100">
+                        Implementierung pausiert — Turn-Limit erreicht
+                    </p>
+                    <p class="mt-1 text-sm text-amber-800 dark:text-amber-200/80">
+                        @if($turnsUsed)
+                            Der letzte Lauf hat <span class="font-mono">{{ $turnsUsed }}</span> Turns verbraucht.
+                        @endif
+                        Beim Fortsetzen wird die Claude-Sitzung mit vollem Kontext wiederaufgenommen
+                        — der Workspace-Stand bleibt erhalten.
+                        @if($implementIterations >= 3)
+                            <br><span class="font-medium">Hinweis:</span> Bereits {{ $implementIterations }}. Iteration —
+                            erwäge, das Konzept aufzuteilen statt weiter fortzusetzen.
+                        @endif
+                    </p>
+                </div>
+            </div>
+            <button type="button"
+                    wire:click="mountAction('continueImplement')"
+                    class="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 dark:bg-amber-700 dark:hover:bg-amber-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors flex-shrink-0">
+                <x-heroicon-m-play class="h-4 w-4" />
+                Fortsetzen
+            </button>
+        </div>
+    @endif
+
     {{-- ===================== Concept phase ===================== --}}
     @php $cStatus = $phaseStatus('concept'); $cRun = $phaseRun('concept'); @endphp
     <div x-data="{ open: @js($isOpen('concept')) }" class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden">
@@ -123,7 +164,7 @@
                 <span @class([
                     'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset',
                     $statusColorMap[$cStatus] ?? $statusColorMap['pending'],
-                ])>{{ $cStatus }}</span>
+                ])>{{ $statusLabelMap[$cStatus] ?? $cStatus }}</span>
             </div>
             <div class="flex items-center gap-3 text-xs text-gray-400 dark:text-gray-500">
                 @if($cStatus === 'running')
@@ -379,7 +420,7 @@
                 <span @class([
                     'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset',
                     $statusColorMap[$iStatus] ?? $statusColorMap['pending'],
-                ])>{{ $iStatus }}</span>
+                ])>{{ $statusLabelMap[$iStatus] ?? $iStatus }}</span>
             </div>
             <div class="flex items-center gap-3 text-xs text-gray-400 dark:text-gray-500">
                 @if($iStatus === 'running')
@@ -818,7 +859,7 @@
                 <span @class([
                     'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset',
                     $statusColorMap[$pStatus] ?? $statusColorMap['pending'],
-                ])>{{ $pStatus }}</span>
+                ])>{{ $statusLabelMap[$pStatus] ?? $pStatus }}</span>
             </div>
             <div class="flex items-center gap-3 text-xs text-gray-400 dark:text-gray-500">
                 @if($pStatus === 'running')

@@ -66,7 +66,7 @@ _push_pr_github() {
     local body="${3:-}"
 
     local owner_repo
-    owner_repo="$(printf '%s' "$REPO_URL" | sed 's|https://github.com/||; s|\.git$||')"
+    owner_repo="$(printf '%s' "$REPO_URL" | sed 's|https://github.com/||; s|/$||; s|\.git$||')"
     [[ -n "$owner_repo" ]] || return 0
 
     local pr_log="/workspace/.agent/logs/gh-pr.${ITERATION}.log"
@@ -154,7 +154,7 @@ _push_pr_update_github() {
     local body="${3:-}"
 
     local owner_repo pr_number
-    owner_repo="$(printf '%s' "$REPO_URL" | sed 's|https://github.com/||; s|\.git$||')"
+    owner_repo="$(printf '%s' "$REPO_URL" | sed 's|https://github.com/||; s|/$||; s|\.git$||')"
     pr_number="$(printf '%s' "$pr_url" | grep -oE '[0-9]+$')"
     [[ -n "$owner_repo" && -n "$pr_number" ]] || return 0
 
@@ -179,7 +179,7 @@ _push_pr_comment_github() {
     local comment_body="$2"
 
     local owner_repo pr_number
-    owner_repo="$(printf '%s' "$REPO_URL" | sed 's|https://github.com/||; s|\.git$||')"
+    owner_repo="$(printf '%s' "$REPO_URL" | sed 's|https://github.com/||; s|/$||; s|\.git$||')"
     pr_number="$(printf '%s' "$pr_url" | grep -oE '[0-9]+$')"
     [[ -n "$owner_repo" && -n "$pr_number" ]] || return 0
 
