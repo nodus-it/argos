@@ -7,6 +7,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (DB::getDriverName() === 'sqlite') {
+            return;
+        }
+
         DB::statement("ALTER TABLE tasks MODIFY current_status
             ENUM('pending','running','completed','failed','quality_gate_failed','no_changes','paused','rate_limited')
             NULL");
@@ -18,6 +22,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (DB::getDriverName() === 'sqlite') {
+            return;
+        }
+
         DB::statement("ALTER TABLE tasks MODIFY current_status
             ENUM('pending','running','completed','failed','quality_gate_failed','no_changes','paused')
             NULL");
