@@ -17,6 +17,7 @@ EXIT_AUTH=3
 EXIT_QUALITY_GATE=4
 EXIT_NO_CHANGES=5
 EXIT_LOCK=6
+EXIT_USAGE_LIMIT=7
 
 # die: exit with a code and an error message on stderr.
 # Args: $1=exit_code, $2..$N=message

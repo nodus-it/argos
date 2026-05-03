@@ -57,6 +57,8 @@ _ep_load_libs() {
     # shellcheck disable=SC1091
     source "$LIB_DIR/prompts.sh"
     # shellcheck disable=SC1091
+    source "$LIB_DIR/claude.sh"
+    # shellcheck disable=SC1091
     source "$PHASES_DIR/registry.sh"
 }
 
@@ -154,6 +156,7 @@ _ep_dispatch_phase() {
         0) status=completed ;;
         4) status=quality_gate_failed ;;
         5) status=no_changes ;;
+        7) status=usage_limit ;;
         *) status=failed; err="exit $phase_exit" ;;
     esac
     state_update_iteration "$phase" "$ITERATION" "$status" "$phase_exit" "${err:-}"

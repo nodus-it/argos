@@ -229,6 +229,10 @@ phase_concept_run() {
 
     if (( claude_exit != 0 )); then
         echo "concept: claude call failed (exit $claude_exit)" >&2
+        if claude_check_usage_limit "$stream_log"; then
+            echo "  → usage/rate limit — backing off" >&2
+            return "$EXIT_USAGE_LIMIT"
+        fi
         return 3
     fi
 
@@ -238,6 +242,10 @@ phase_concept_run() {
         local err_msg
         err_msg="$(jq -r '.result // "(no result field)"' "$result_json" 2>/dev/null)"
         echo "concept: claude returned is_error=true: $err_msg" >&2
+        if claude_check_usage_limit "" "$err_msg"; then
+            echo "  → usage/rate limit — backing off" >&2
+            return "$EXIT_USAGE_LIMIT"
+        fi
         if echo "$err_msg" | grep -qiE "invalid api key|authentication|oauth|unauthorized|401|token.*expired|invalid_api_key"; then
             echo "  → Claude-OAuth-Token ungültig oder abgelaufen." >&2
             echo "    Token erneuern: claude setup-token" >&2

@@ -74,6 +74,10 @@ class AdminPanelProvider extends PanelProvider
                 fn (): HtmlString => new HtmlString(app(Vite::class)(['resources/css/app.css']))
             )
             ->renderHook(
+                PanelsRenderHook::CONTENT_START,
+                fn (): string => Blade::render('@livewire(\'usage-limit-banner\')')
+            )
+            ->renderHook(
                 PanelsRenderHook::SIDEBAR_FOOTER,
                 fn (): string => Blade::render('@livewire(\'anthropic-usage-sidebar\')')
             );

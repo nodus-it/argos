@@ -104,6 +104,10 @@ phase_respond_run() {
 
     if [[ ! -s "$result_json" ]]; then
         echo "respond: stream-json produced no result event" >&2
+        if claude_check_usage_limit "$stream_log"; then
+            echo "  → usage/rate limit — backing off" >&2
+            return "$EXIT_USAGE_LIMIT"
+        fi
         return 3
     fi
 
@@ -113,6 +117,10 @@ phase_respond_run() {
         local err_msg
         err_msg="$(jq -r '.result // "(no result field)"' "$result_json" 2>/dev/null)"
         echo "respond: claude returned is_error=true: $err_msg" >&2
+        if claude_check_usage_limit "" "$err_msg"; then
+            echo "  → usage/rate limit — backing off" >&2
+            return "$EXIT_USAGE_LIMIT"
+        fi
         if echo "$err_msg" | grep -qiE "invalid api key|authentication|oauth|unauthorized|401|token.*expired|invalid_api_key"; then
             echo "  → Claude-OAuth-Token ungültig oder abgelaufen." >&2
             echo "    Token erneuern: claude setup-token" >&2

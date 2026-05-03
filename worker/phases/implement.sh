@@ -298,6 +298,11 @@ phase_implement_run() {
 
     if (( claude_exit != 0 )); then
         log_warn "implement: claude exited with code $claude_exit"
+        if claude_check_usage_limit "$stream_log"; then
+            echo "  → usage/rate limit — backing off" >&2
+            rm -f /workspace/.agent/implement.notes.md
+            return "$EXIT_USAGE_LIMIT"
+        fi
     fi
 
     # Drop the notes file after the Claude call — it was written from the DB
@@ -315,6 +320,10 @@ phase_implement_run() {
         local err_msg
         err_msg="$(jq -r '.result // "(no result field)"' "$result_json" 2>/dev/null)"
         echo "implement: claude returned is_error=true: $err_msg" >&2
+        if claude_check_usage_limit "" "$err_msg"; then
+            echo "  → usage/rate limit — backing off" >&2
+            return "$EXIT_USAGE_LIMIT"
+        fi
         if echo "$err_msg" | grep -qiE "invalid api key|authentication|oauth|unauthorized|401|token.*expired|invalid_api_key"; then
             echo "  → Claude-OAuth-Token ungültig oder abgelaufen." >&2
             echo "    Token erneuern: claude setup-token" >&2

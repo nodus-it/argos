@@ -8,6 +8,8 @@ use App\Domain\Credentials\CredentialStore;
 use App\Jobs\RunPhaseJob;
 use App\Models\PhaseRun;
 use App\Models\Task;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\Process\Process;
 
@@ -386,6 +388,11 @@ class PhaseRunner
 
         $phaseRun->update($this->phaseRunUpdate($status, $exitCode, $stdout));
 
+        if ($exitCode === 7) {
+            $resetAt = $this->readUsageLimitResetAt($task);
+            $this->storeUsageLimit($resetAt);
+        }
+
         $task->update([
             'current_phase' => $phase,
             'current_status' => $status,
@@ -412,6 +419,7 @@ class PhaseRunner
             0 => 'completed',
             4 => 'quality_gate_failed',
             5 => 'no_changes',
+            7 => 'rate_limited',
             default => 'failed',
         };
     }
@@ -627,5 +635,54 @@ class PhaseRunner
             'task_id' => $task->id,
             'phase' => $phase,
         ], $extra);
+    }
+
+    /**
+     * Read the usage_limit.env file the worker writes when it detects a rate limit.
+     * Returns the reset timestamp if the file contained one, otherwise null.
+     */
+    private function readUsageLimitResetAt(Task $task): ?Carbon
+    {
+        $content = $this->readFileFromVolume(
+            $task->volumeName(),
+            '/workspace/.agent/runtime/usage_limit.env'
+        );
+
+        if ($content === null) {
+            return null;
+        }
+
+        if (preg_match('/USAGE_LIMIT_RESET_AT=([^\s]+)/', $content, $m)) {
+            try {
+                return Carbon::parse(trim($m[1]));
+            } catch (\Throwable) {
+                // malformed timestamp — ignore
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Persist the active usage-limit signal in the application cache.
+     * The banner component and RunPhaseJob both read this key.
+     */
+    public function storeUsageLimit(?Carbon $resetAt): void
+    {
+        $data = [
+            'active' => true,
+            'reset_at' => $resetAt?->toIso8601String(),
+            'detected_at' => now()->toIso8601String(),
+        ];
+
+        $ttl = ($resetAt !== null && $resetAt->isFuture())
+            ? $resetAt->clone()->addMinutes(5)
+            : now()->addHours(2);
+
+        Cache::put('usage_limit', $data, $ttl);
+
+        Log::channel('argos')->warning('Usage limit detected and stored', [
+            'reset_at' => $data['reset_at'],
+        ]);
     }
 }
