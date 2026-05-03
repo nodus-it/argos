@@ -1,5 +1,5 @@
-<div wire:poll.60s="loadUsage" class="px-3 py-3 border-t border-gray-200 dark:border-white/10">
-    @if (!$error && ($fiveHour || $sevenDay))
+<div wire:poll.300s="loadUsage" class="px-3 py-3 border-t border-gray-200 dark:border-white/10">
+    @if($fiveHour || $sevenDay)
         <div class="space-y-2">
             @if ($fiveHour)
                 <x-anthropic-usage-bar

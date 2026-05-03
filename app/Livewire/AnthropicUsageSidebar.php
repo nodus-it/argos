@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Domain\Credentials\CredentialStore;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Livewire\Component;
 
 class AnthropicUsageSidebar extends Component
@@ -16,8 +18,6 @@ class AnthropicUsageSidebar extends Component
 
     public ?array $sevenDay = null;
 
-    public bool $error = false;
-
     public function mount(): void
     {
         $this->loadUsage();
@@ -25,45 +25,60 @@ class AnthropicUsageSidebar extends Component
 
     public function loadUsage(): void
     {
-        return;
-        $data = Cache::remember('anthropic_usage', 60, function () {
-            try {
-                $token = config('services.anthropic.token');
-
-                if (empty($token)) {
-                    return null;
-                }
-
-                logger()->info('Try to load Anthropic usage');
-                $response = Http::withToken($token)
-                    ->withHeaders([
-                        'anthropic-beta' => 'oauth-2025-04-20',
-                        'User-Agent' => 'claude-code/2.0.31',
-                    ])
-                    ->timeout(5)
-                    ->get('https://api.anthropic.com/api/oauth/usage');
-
-                if (! $response->successful()) {
-                    logger()->error('Failed to load Anthropic usage', ['exception' => $response->json()]);
-
-                    return null;
-                }
-
-                return $response->json();
-            } catch (\Throwable $e) {
-                logger()->error('Failed to load Anthropic usage', ['exception' => $e]);
-
-                return null;
-            }
-        });
-
-        if ($data === null) {
-            $this->error = true;
+        if (Cache::has('anthropic_usage')) {
+            $this->applyData(Cache::get('anthropic_usage'));
 
             return;
         }
 
-        $this->error = false;
+        $token = config('argos.claude_token')
+            ?? app(CredentialStore::class)->getClaudeToken();
+
+        if (empty($token)) {
+            return;
+        }
+
+        try {
+            $response = Http::withToken($token)
+                ->withHeaders([
+                    'anthropic-beta' => 'oauth-2025-04-20',
+                    'User-Agent' => 'claude-code/2.0.31',
+                ])
+                ->timeout(5)
+                ->get('https://api.anthropic.com/api/oauth/usage');
+
+            if ($response->status() === 429) {
+                // Back off for 10 minutes — don't hammer on rate limit
+                Cache::put('anthropic_usage', null, 600);
+
+                return;
+            }
+
+            if (! $response->successful()) {
+                Cache::put('anthropic_usage', null, 300);
+                Log::channel('argos')->warning('Anthropic usage API error', ['status' => $response->status()]);
+
+                return;
+            }
+
+            $data = $response->json();
+            Cache::put('anthropic_usage', $data, 300);
+            $this->applyData($data);
+        } catch (\Throwable $e) {
+            Cache::put('anthropic_usage', null, 300);
+            Log::channel('argos')->error('Anthropic usage API failed', ['error' => $e->getMessage()]);
+        }
+    }
+
+    private function applyData(?array $data): void
+    {
+        if ($data === null) {
+            $this->fiveHour = null;
+            $this->sevenDay = null;
+
+            return;
+        }
+
         $this->fiveHour = $this->formatPeriod($data['five_hour'] ?? null);
         $this->sevenDay = $this->formatPeriod($data['seven_day'] ?? null);
     }
@@ -74,7 +89,7 @@ class AnthropicUsageSidebar extends Component
      */
     private function formatPeriod(?array $period): ?array
     {
-        if ($period === null || $period['utilization'] === null) {
+        if ($period === null || ! isset($period['utilization']) || $period['utilization'] === null) {
             return null;
         }
 
@@ -83,9 +98,8 @@ class AnthropicUsageSidebar extends Component
         if (! empty($period['resets_at'])) {
             try {
                 $resetsAt = Carbon::parse($period['resets_at']);
-                $diff = now()->diffAsCarbonInterval($resetsAt, false);
 
-                if ($diff->totalSeconds > 0) {
+                if ($resetsAt->isFuture()) {
                     $resetsIn = $this->formatInterval($resetsAt);
                 }
             } catch (\Throwable) {
@@ -94,7 +108,7 @@ class AnthropicUsageSidebar extends Component
         }
 
         return [
-            'utilization' => (int) round($period['utilization']),
+            'utilization' => (int) round((float) $period['utilization']),
             'resets_in' => $resetsIn ?? '–',
         ];
     }
