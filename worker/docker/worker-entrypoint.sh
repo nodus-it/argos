@@ -108,6 +108,11 @@ _ep_dispatch_phase() {
         _ep_die "$EXIT_GENERAL" "state.json invalid (see above)"
     fi
 
+    if [[ "${FORCE_UNLOCK:-0}" == "1" ]]; then
+        log_warn "FORCE_UNLOCK gesetzt — bestehenden Lock freigeben"
+        lock_force_release
+    fi
+
     if ! lock_acquire "$phase"; then
         return "$EXIT_LOCK"
     fi

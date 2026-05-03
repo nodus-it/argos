@@ -130,16 +130,16 @@ class TaskPagesTest extends TestCase
             ->assertActionHidden('markCompleted');
     }
 
-    public function test_delete_volume_visible_only_when_completed(): void
+    public function test_mark_completed_visible_only_when_not_completed(): void
     {
         $incomplete = Task::factory()->inReview()->create();
         $complete = Task::factory()->completed()->create();
 
         Livewire::test(ViewTask::class, ['record' => $incomplete->getKey()])
-            ->assertActionHidden('deleteVolume');
+            ->assertActionVisible('markCompleted');
 
         Livewire::test(ViewTask::class, ['record' => $complete->getKey()])
-            ->assertActionVisible('deleteVolume');
+            ->assertActionHidden('markCompleted');
     }
 
     public function test_continue_action_visible_only_when_implement_paused(): void

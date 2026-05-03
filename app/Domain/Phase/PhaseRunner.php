@@ -6,7 +6,9 @@ namespace App\Domain\Phase;
 
 use App\Domain\Credentials\CredentialStore;
 use App\Jobs\RunPhaseJob;
+use App\Models\ConnectedAccount;
 use App\Models\PhaseRun;
+use App\Models\RepoProfile;
 use App\Models\Task;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -419,6 +421,7 @@ class PhaseRunner
             0 => 'completed',
             4 => 'quality_gate_failed',
             5 => 'no_changes',
+            6 => 'lock_blocked',
             7 => 'rate_limited',
             default => 'failed',
         };
@@ -508,10 +511,11 @@ class PhaseRunner
             );
         }
 
-        // Token: env var takes precedence (containerised manager), file-based fallback for local dev
-        $claudeToken = config('argos.claude_token') ?? $this->credentials->getClaudeToken();
+        // Token: env var takes precedence (containerised manager), file-based fallback for local dev.
+        // Use ?: instead of ?? so an empty string from the env also falls through to the file.
+        $claudeToken = config('argos.claude_token') ?: $this->credentials->getClaudeToken();
 
-        if ($claudeToken === null) {
+        if ($claudeToken === null || $claudeToken === '') {
             Log::channel('argos')->error('Phase cannot start: no Claude token configured', ['task' => $task->name, 'phase' => $phase]);
             throw new \RuntimeException(
                 'Kein Claude OAuth Token konfiguriert. Bitte CLAUDE_CODE_OAUTH_TOKEN setzen.'
@@ -536,7 +540,7 @@ class PhaseRunner
             '-e', "PHASE={$phase}",
             '-e', "TASK_ID={$task->name}",
             '-e', "REPO_URL={$profile->url}",
-            '-e', "REPO_TOKEN={$profile->token}",
+            '-e', "REPO_TOKEN={$this->resolveRepoToken($profile)}",
             '-e', "BASE_BRANCH={$profile->default_branch}",
             '-e', "CLAUDE_CODE_OAUTH_TOKEN={$claudeToken}",
             '-e', "TASK_DESCRIPTION={$task->description}",
@@ -551,6 +555,11 @@ class PhaseRunner
             $cmd[] = "RESUME_SESSION_ID={$resumeSessionId}";
         }
 
+        if (! empty($flags['force_unlock'])) {
+            $cmd[] = '-e';
+            $cmd[] = 'FORCE_UNLOCK=1';
+        }
+
         $cmd[] = $workerImage;
         $cmd[] = $phase;
         $cmd[] = $task->name;
@@ -560,6 +569,28 @@ class PhaseRunner
 
     /**
      * Resolve the effective max-turns budget for this run.
+     * Resolve the repo token: PAT from the profile, or OAuth token from the
+     * connected GitHub account when the profile has no token stored.
+     */
+    private function resolveRepoToken(RepoProfile $profile): string
+    {
+        if ($profile->token !== null) {
+            return $profile->token;
+        }
+
+        if ($profile->platform === 'github') {
+            $account = ConnectedAccount::where('provider', 'github')->first();
+            if ($account !== null) {
+                return $account->token;
+            }
+        }
+
+        throw new \RuntimeException(
+            'Kein Repository-Token konfiguriert. Bitte PAT im Projekt hinterlegen oder GitHub-Account verknüpfen.'
+        );
+    }
+
+    /**
      * Priority: explicit flags['max_turns'] > task setting > config default.
      *
      * @param  array<string, mixed>  $flags

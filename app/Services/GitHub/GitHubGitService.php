@@ -19,7 +19,7 @@ class GitHubGitService implements GitServiceContract
     public function listRepositories(): array
     {
         return $this->http()
-            ->get('/user/repos', ['per_page' => 100, 'sort' => 'updated', 'affiliation' => 'owner,collaborator'])
+            ->get('/user/repos', ['per_page' => 100, 'sort' => 'updated', 'affiliation' => 'owner,collaborator,organization_member'])
             ->throw()
             ->json();
     }

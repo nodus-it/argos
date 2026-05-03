@@ -273,6 +273,29 @@ class ViewTask extends ViewRecord
                 ->visible(fn (): bool => $this->task()->workflow_status !== WorkflowStatus::Completed
                     && $this->task()->phaseRuns()->where('phase', 'implement')->where('status', 'completed')->exists()),
 
+            Action::make('forceUnlockImplement')
+                ->label('Lock freigeben')
+                ->icon('heroicon-o-lock-open')
+                ->color('danger')
+                ->requiresConfirmation()
+                ->modalHeading('Lock erzwungen freigeben')
+                ->modalDescription('Der Worker-Lock ist noch gesetzt (vermutlich durch einen abgestürzten Container). '
+                    .'Den Lock freigeben und Implement neu starten?')
+                ->modalSubmitActionLabel('Freigeben & neu starten')
+                ->action(function (): void {
+                    $task = $this->task();
+                    if ($task->phaseRuns()->where('status', 'running')->exists()) {
+                        Notification::make()->title('Phase läuft bereits')->warning()->send();
+
+                        return;
+                    }
+                    $task->update(['current_phase' => 'implement', 'current_status' => 'running']);
+                    RunPhaseJob::dispatch($task->id, 'implement', ['force_unlock' => true]);
+                    Notification::make()->title('Lock freigegeben — Implement gestartet')->success()->send();
+                    $this->redirect(TaskResource::getUrl('view', ['record' => $task]));
+                })
+                ->visible(fn (): bool => $this->task()->current_status === 'lock_blocked'),
+
             Action::make('markCompleted')
                 ->label('Abschließen')
                 ->icon('heroicon-o-check-circle')

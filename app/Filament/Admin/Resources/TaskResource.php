@@ -26,6 +26,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -61,7 +62,10 @@ class TaskResource extends Resource
                 ->label('Projekt')
                 ->options(RepoProfile::all()->pluck('name', 'id'))
                 ->required()
-                ->live(),
+                ->live()
+                ->afterStateUpdated(function (Set $set, ?string $state): void {
+                    $set('auto_concept', RepoProfile::find($state)?->auto_concept ?? false);
+                }),
 
             Textarea::make('description')
                 ->rows(8)
@@ -124,11 +128,13 @@ class TaskResource extends Resource
                         'completed' => 'success',
                         'failed' => 'danger',
                         'quality_gate_failed' => 'danger',
+                        'lock_blocked' => 'danger',
                         'no_changes' => 'info',
                         default => 'gray',
                     })
                     ->formatStateUsing(fn (?string $state): string => match ($state) {
                         'paused' => 'Pausiert',
+                        'lock_blocked' => 'Lock blockiert',
                         default => (string) $state,
                     })
                     ->placeholder('—'),
