@@ -25,11 +25,15 @@ services:
       - argos-data:/data
       - argos-db:/var/lib/mysql
       # Bind mount for local development (hot reload without rebuilding the image).
+      # vendor/ is intentionally shared with the host — composer require on the host
+      # propagates immediately, and the entrypoint runs `composer install` whenever
+      # composer.lock drifts from vendor/composer/installed.json (e.g. after a fresh
+      # clone or git pull). The other anonymous volumes mask host artefacts that
+      # would otherwise shadow the image-built ones.
       - .:/app
-      - /app/vendor            # use vendor from the image, don't shadow with the host's
-      - /app/node_modules      # ditto
-      - /app/public/build      # ditto
-      - /app/bootstrap/cache   # ditto — cache without dev-only providers (no Pail)
+      - /app/node_modules
+      - /app/public/build
+      - /app/bootstrap/cache   # cache without dev-only providers (no Pail)
     environment:
       APP_ENV:                  "${APP_ENV:-local}"
       APP_DEBUG:                "${APP_DEBUG:-true}"
