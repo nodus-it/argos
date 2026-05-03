@@ -218,11 +218,15 @@ class ViewTask extends ViewRecord
         $currentConceptIter = ($phaseRuns['concept'] ?? collect())->last()?->iteration;
         $currentImplementIter = ($phaseRuns['implement'] ?? collect())->last()?->iteration;
 
+        $lastConceptRun = ($phaseRuns['concept'] ?? collect())->last();
         $lastImplementRun = ($phaseRuns['implement'] ?? collect())->last();
 
         return [
             'phaseRuns' => $phaseRuns,
             'conceptHtml' => $task->concept_md ? Str::markdown($task->concept_md) : null,
+            'conceptError' => $lastConceptRun?->status !== 'completed'
+                ? $lastConceptRun?->error_log
+                : null,
             'conceptLog' => $this->parseLogLines($this->readLogFile('concept')),
             'implementLog' => $this->parseLogLines($this->readLogFile('implement')),
             'pushLog' => $this->parseLogLines($this->readLogFile('push')),

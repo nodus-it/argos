@@ -10,6 +10,7 @@ use App\Filament\Admin\Resources\RepoProfileResource\Pages\EditRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\ListRepoProfiles;
 use App\Models\RepoProfile;
 use App\Models\User;
+use App\Rules\BranchExistsOnRemote;
 use App\Services\GitHub\GitHubGitService;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
@@ -182,6 +183,16 @@ class RepoProfileResource extends Resource
 
                     return $user->connectedAccount('github') === null;
                 })
+                ->required(function (Get $get): bool {
+                    if ($get('platform') !== 'github') {
+                        return true;
+                    }
+
+                    /** @var User $user */
+                    $user = Auth::user();
+
+                    return $user->connectedAccount('github') === null;
+                })
                 ->helperText(function (Get $get): string {
                     if ($get('platform') !== 'github') {
                         return '';
@@ -202,6 +213,13 @@ class RepoProfileResource extends Resource
                 ->required()
                 ->default('main')
                 ->maxLength(255)
+                ->rules([
+                    fn (Get $get) => new BranchExistsOnRemote(
+                        url: is_string($get('url')) ? $get('url') : null,
+                        platform: is_string($get('platform')) ? $get('platform') : null,
+                        token: is_string($get('token')) ? $get('token') : null,
+                    ),
+                ])
                 ->visible(function (Get $get): bool {
                     if ($get('platform') !== 'github') {
                         return true;

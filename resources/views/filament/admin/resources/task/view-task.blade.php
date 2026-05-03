@@ -248,6 +248,13 @@
                             prose-li:text-gray-600 dark:prose-li:text-gray-300">
                             {!! $conceptHtml !!}
                         </div>
+                    @elseif($conceptError)
+                        <div class="rounded-lg border border-red-200 dark:border-red-900/60 bg-red-50 dark:bg-red-900/20 p-4">
+                            <p class="text-xs font-semibold text-red-700 dark:text-red-400 uppercase tracking-wide mb-2">
+                                Konzept-Phase fehlgeschlagen
+                            </p>
+                            <pre class="font-mono text-xs leading-5 text-red-900 dark:text-red-200 whitespace-pre-wrap break-all">{{ $conceptError }}</pre>
+                        </div>
                     @else
                         <div class="flex flex-col items-center justify-center py-12 text-center gap-3">
                             <x-heroicon-o-document-text class="h-10 w-10 text-gray-300 dark:text-gray-600" />

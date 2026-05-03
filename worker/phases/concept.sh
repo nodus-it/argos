@@ -38,6 +38,17 @@ phase_concept_preconditions() {
     return 0
 }
 
+# _concept_emit_clone_err: stream the contents of logs/clone.err to stderr so
+# the host-side bg.log captures the real git error, not just a generic message.
+# Args: none. Reads /workspace/.agent/logs/clone.err if present.
+_concept_emit_clone_err() {
+    local err_file=/workspace/.agent/logs/clone.err
+    [[ -s "$err_file" ]] || return 0
+    echo "----- clone.err -----" >&2
+    sed 's/^/    /' "$err_file" >&2
+    echo "---------------------" >&2
+}
+
 # _concept_initial_clone: clone the repo into the volume and create the feature branch.
 _concept_initial_clone() {
     set +x
@@ -52,7 +63,8 @@ _concept_initial_clone() {
     # (/workspace/.agent/ already exists). Use init + fetch + checkout instead.
     cd /workspace || return 1
     if ! git init --quiet --initial-branch="$BASE_BRANCH" 2>/workspace/.agent/logs/clone.err; then
-        echo "concept: git init failed (see logs/clone.err)" >&2
+        echo "concept: git init failed" >&2
+        _concept_emit_clone_err
         return 1
     fi
     # /workspace/.agent/ holds our state and must NOT be wiped by `git clean -fd`
@@ -63,14 +75,16 @@ _concept_initial_clone() {
         || echo '.agent/' >> /workspace/.git/info/exclude
     git remote add origin "$auth_url" 2>/dev/null || git remote set-url origin "$auth_url"
     if ! git fetch --quiet --depth=1 origin "$BASE_BRANCH" 2>>/workspace/.agent/logs/clone.err; then
-        echo "concept: git fetch failed (see logs/clone.err)" >&2
+        echo "concept: git fetch failed (Branch '$BASE_BRANCH' im Repo $REPO_URL nicht gefunden?)" >&2
+        _concept_emit_clone_err
         git remote set-url origin "$REPO_URL"
         # remove .git so the next attempt can retry from scratch
         rm -rf /workspace/.git
         return 1
     fi
     if ! git checkout -B "$feature_branch" "origin/$BASE_BRANCH" 2>>/workspace/.agent/logs/clone.err; then
-        echo "concept: git checkout failed (see logs/clone.err)" >&2
+        echo "concept: git checkout failed" >&2
+        _concept_emit_clone_err
         git remote set-url origin "$REPO_URL"
         rm -rf /workspace/.git
         return 1

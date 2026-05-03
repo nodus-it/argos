@@ -27,6 +27,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $concept_md
  * @property string|null $concept_notes
  * @property string|null $stream_log
+ * @property string|null $error_log
  * @property string|null $implement_summary_nontechnical
  * @property string|null $implement_summary_technical
  * @property string|null $implement_notes
@@ -55,6 +56,7 @@ class PhaseRun extends Model
         'concept_md',
         'concept_notes',
         'stream_log',
+        'error_log',
         'implement_summary_nontechnical',
         'implement_summary_technical',
         'implement_notes',

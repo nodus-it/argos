@@ -9,6 +9,7 @@ use App\Filament\Admin\Resources\RepoProfileResource\Pages\EditRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\ListRepoProfiles;
 use App\Models\RepoProfile;
 use App\Models\User;
+use App\Services\Git\RemoteBranchValidator;
 use Filament\Actions\Testing\TestAction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -25,6 +26,31 @@ class RepoProfileResourceTest extends TestCase
         parent::setUp();
         $this->user = User::factory()->create();
         $this->actingAs($this->user);
+
+        // Bypass actual `git ls-remote` calls in unit tests — the offline test
+        // suite must not touch external services.
+        $this->fakeBranchValidator(['ok' => true, 'error' => null]);
+    }
+
+    /**
+     * @param  array{ok: bool, error: string|null}  $result
+     */
+    private function fakeBranchValidator(array $result): void
+    {
+        $fake = new class($result) extends RemoteBranchValidator
+        {
+            /**
+             * @param  array{ok: bool, error: string|null}  $result
+             */
+            public function __construct(private readonly array $result) {}
+
+            public function validate(string $url, string $branch, ?string $token = null): array
+            {
+                return $this->result;
+            }
+        };
+
+        $this->app->instance(RemoteBranchValidator::class, $fake);
     }
 
     public function test_list_page_renders(): void
@@ -49,6 +75,7 @@ class RepoProfileResourceTest extends TestCase
                 'name' => 'Test Projekt',
                 'url' => 'https://github.com/org/repo',
                 'platform' => 'github',
+                'token' => 'pat-123',
                 'default_branch' => 'main',
                 'auto_concept' => false,
                 'auto_pr' => false,
@@ -77,6 +104,25 @@ class RepoProfileResourceTest extends TestCase
             ->fillForm(['name' => 'Test', 'url' => 'not-a-url', 'platform' => 'github', 'default_branch' => 'main'])
             ->call('create')
             ->assertHasFormErrors(['url']);
+    }
+
+    public function test_create_rejects_default_branch_missing_on_remote(): void
+    {
+        $this->fakeBranchValidator([
+            'ok' => false,
+            'error' => "Branch 'main' nicht im Repository gefunden.",
+        ]);
+
+        Livewire::test(CreateRepoProfile::class)
+            ->fillForm([
+                'name' => 'Test',
+                'url' => 'https://github.com/foo/bar',
+                'platform' => 'github',
+                'default_branch' => 'main',
+                'token' => 'pat-123',
+            ])
+            ->call('create')
+            ->assertHasFormErrors(['default_branch']);
     }
 
     public function test_edit_page_renders_with_data(): void

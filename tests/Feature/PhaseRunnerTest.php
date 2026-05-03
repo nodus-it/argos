@@ -330,6 +330,62 @@ class PhaseRunnerTest extends TestCase
         $this->assertNull($stopReason);
     }
 
+    // --- postPhaseSync error_log capture ---
+
+    public function test_post_phase_sync_captures_clone_err_when_concept_failed(): void
+    {
+        $task = $this->taskWithProfile();
+        $phaseRun = PhaseRun::create([
+            'task_id' => $task->id,
+            'phase' => 'concept',
+            'iteration' => 1,
+            'status' => 'failed',
+        ]);
+
+        $runner = $this->partialMock(PhaseRunner::class, function (MockInterface $mock): void {
+            $mock->shouldAllowMockingProtectedMethods();
+            $mock->shouldReceive('readFileFromVolume')
+                ->andReturnUsing(function (string $volume, string $path): ?string {
+                    return match ($path) {
+                        '/workspace/.agent/concept.md' => null,
+                        '/workspace/.agent/state.json' => null,
+                        '/workspace/.agent/logs/clone.err' => "fatal: couldn't find remote ref main\n",
+                        default => null,
+                    };
+                });
+        });
+
+        $runner->postPhaseSync($task, $phaseRun, 'concept', null);
+
+        $this->assertSame("fatal: couldn't find remote ref main\n", $phaseRun->fresh()->error_log);
+    }
+
+    public function test_post_phase_sync_does_not_set_error_log_on_completed_concept(): void
+    {
+        $task = $this->taskWithProfile();
+        $phaseRun = PhaseRun::create([
+            'task_id' => $task->id,
+            'phase' => 'concept',
+            'iteration' => 1,
+            'status' => 'completed',
+        ]);
+
+        $runner = $this->partialMock(PhaseRunner::class, function (MockInterface $mock): void {
+            $mock->shouldAllowMockingProtectedMethods();
+            $mock->shouldReceive('readFileFromVolume')
+                ->andReturnUsing(function (string $volume, string $path): ?string {
+                    return match ($path) {
+                        '/workspace/.agent/concept.md' => "# Konzept\n\nInhalt.",
+                        default => null,
+                    };
+                });
+        });
+
+        $runner->postPhaseSync($task, $phaseRun, 'concept', null);
+
+        $this->assertNull($phaseRun->fresh()->error_log);
+    }
+
     // --- helpers ---
 
     /**

@@ -193,3 +193,27 @@ teardown() {
     notes_count="$(find /workspace/.agent/concept.history -name 'concept.notes.*' | wc -l)"
     [ "$notes_count" -eq 1 ]
 }
+
+# --- _concept_emit_clone_err ---
+
+@test "_concept_emit_clone_err: gibt Inhalt von clone.err nach stderr aus" {
+    mkdir -p /workspace/.agent/logs
+    printf "fatal: couldn't find remote ref main\n" > /workspace/.agent/logs/clone.err
+    output="$(_concept_emit_clone_err 2>&1 1>/dev/null)"
+    [[ "$output" == *"clone.err"* ]]
+    [[ "$output" == *"couldn't find remote ref main"* ]]
+}
+
+@test "_concept_emit_clone_err: leere clone.err produziert keine Ausgabe" {
+    mkdir -p /workspace/.agent/logs
+    : > /workspace/.agent/logs/clone.err
+    output="$(_concept_emit_clone_err 2>&1 1>/dev/null)"
+    [ -z "$output" ]
+}
+
+@test "_concept_emit_clone_err: fehlende clone.err produziert keine Ausgabe" {
+    mkdir -p /workspace/.agent/logs
+    rm -f /workspace/.agent/logs/clone.err
+    output="$(_concept_emit_clone_err 2>&1 1>/dev/null)"
+    [ -z "$output" ]
+}

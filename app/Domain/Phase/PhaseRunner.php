@@ -92,6 +92,16 @@ class PhaseRunner
                 'concept_md' => $conceptMd,
                 'concept_notes' => $notesBeforeRun,
             ];
+
+            // When concept fails before Claude runs (e.g. git clone), capture
+            // logs/clone.err so the user sees the real reason in the UI.
+            if ($phaseRun->status !== 'completed' && $conceptMd === null) {
+                $cloneErr = $this->readFileFromVolume($task->volumeName(), '/workspace/.agent/logs/clone.err');
+                if ($cloneErr !== null) {
+                    $phaseRunUpdate['error_log'] = $cloneErr;
+                }
+            }
+
             $phaseRun->update($phaseRunUpdate);
 
             $taskUpdate = ['concept_notes' => null];
@@ -195,7 +205,7 @@ class PhaseRunner
         return null;
     }
 
-    private function readFileFromVolume(string $volumeName, string $filePath): ?string
+    protected function readFileFromVolume(string $volumeName, string $filePath): ?string
     {
         $process = $this->newProcess([
             'docker', 'run', '--rm',
@@ -574,7 +584,7 @@ class PhaseRunner
      */
     private function resolveRepoToken(RepoProfile $profile): string
     {
-        if ($profile->token !== null) {
+        if ($profile->token !== null && $profile->token !== '') {
             return $profile->token;
         }
 
