@@ -270,6 +270,15 @@ class RepoProfileResourceTest extends TestCase
             ->assertDontSee('••••••••');
     }
 
+    public function test_view_page_includes_tasks_relation_manager(): void
+    {
+        $profile = RepoProfile::factory()->create();
+
+        Livewire::test(ViewRepoProfile::class, ['record' => $profile->getKey()])
+            ->assertSuccessful()
+            ->assertSeeLivewire(TasksRelationManager::class);
+    }
+
     public function test_tasks_relation_manager_shows_tasks(): void
     {
         $profile = RepoProfile::factory()->create();

@@ -60,6 +60,7 @@ CI führt `shellcheck` über `agent`, `worker/lib/`, `worker/phases/`, `worker/d
 - Laravel-Tests (PHP) unter `tests/` (root-Ebene).
 - Bei Bug-Fixes: erst Test schreiben der den Bug reproduziert, dann fixen.
 - Tests müssen offline laufen — kein Zugriff auf echtes GitHub, keine echte Claude-API.
+- Filament-Komponenten (RelationManager, Widgets, Header-Actions etc.) **immer auch über die einbettende Page testen**, nicht nur isoliert. Ein `Livewire::test(FooRelationManager::class, [...])` läuft auch dann grün, wenn der Manager in der Resource gar nicht registriert ist (z.B. falscher Hook-Name wie `getRelationManagers()` statt `getRelations()`). Mindestens ein Test pro Page muss die Verdrahtung verifizieren, etwa via `Livewire::test(ViewFooPage::class, ['record' => $r->getKey()])->assertSeeLivewire(FooRelationManager::class)`.
 
 ### Git
 
