@@ -146,6 +146,36 @@ _push_build_iteration_comment() {
     }
 }
 
+# _push_configure_repo_github: set squash-only merge and auto-delete-branch on the repo.
+# Idempotent. Logs a warning on failure (e.g. missing admin rights) but does not abort.
+_push_configure_repo_github() {
+    local owner_repo
+    owner_repo="$(printf '%s' "$REPO_URL" | sed 's|https://github.com/||; s|/$||; s|\.git$||')"
+    [[ -n "$owner_repo" ]] || return 0
+
+    set +x
+    local http_code
+    http_code="$(curl -s \
+        -o /dev/null \
+        -w '%{http_code}' \
+        -X PATCH \
+        -H "Authorization: Bearer $REPO_TOKEN" \
+        -H "Accept: application/vnd.github+json" \
+        -H "X-GitHub-Api-Version: 2022-11-28" \
+        "https://api.github.com/repos/$owner_repo" \
+        -d "$(jq -n '{
+            allow_squash_merge: true,
+            allow_merge_commit: false,
+            allow_rebase_merge: false,
+            delete_branch_on_merge: true
+        }')" 2>/dev/null)"
+    if [[ "$http_code" == "200" ]]; then
+        log_info "push: repo configured — squash-only, auto-delete branch on merge"
+    else
+        log_warn "push: repo-settings update skipped (HTTP $http_code) — squash/auto-delete not enforced"
+    fi
+}
+
 # _push_pr_update_github: update the description of an existing GitHub PR.
 # Args: $1=pr_url, $2=title, $3=body (optional)
 _push_pr_update_github() {
@@ -345,7 +375,10 @@ phase_push_run() {
     # Create the PR/MR or extract the URL from the push output.
     local pr_url=""
     case "$platform" in
-        github) pr_url="$(_push_pr_github "$feature_branch" "$subject" "$pr_body")" ;;
+        github)
+            pr_url="$(_push_pr_github "$feature_branch" "$subject" "$pr_body")"
+            _push_configure_repo_github
+            ;;
         gitlab) pr_url="$(_push_pr_gitlab "$push_log")" ;;
     esac
     if [[ -n "$pr_url" ]]; then

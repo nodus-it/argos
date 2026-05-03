@@ -264,29 +264,17 @@ class ViewTask extends ViewRecord
                 ->icon('heroicon-o-check-circle')
                 ->color('success')
                 ->requiresConfirmation()
-                ->modalDescription('Task als abgeschlossen markieren? Der Workflow-Status wird auf "Abgeschlossen" gesetzt.')
+                ->modalDescription('Task abschließen und Docker-Workspace löschen? Beide Aktionen sind nicht rückgängig zu machen.')
                 ->action(function (): void {
                     $task = $this->task();
                     $task->update(['workflow_status' => WorkflowStatus::Completed]);
+                    Process::fromShellCommandline(
+                        'docker volume rm '.escapeshellarg($task->volumeName())
+                    )->run();
                     Notification::make()->title('Task abgeschlossen')->success()->send();
                     $this->redirect(TaskResource::getUrl('view', ['record' => $task]));
                 })
                 ->visible(fn (): bool => $this->task()->workflow_status !== WorkflowStatus::Completed),
-
-            Action::make('deleteVolume')
-                ->label('Workspace löschen')
-                ->icon('heroicon-o-trash')
-                ->color('danger')
-                ->requiresConfirmation()
-                ->modalDescription('Den Docker-Volume für diesen Task löschen? Diese Aktion ist nicht rückgängig zu machen.')
-                ->action(function (): void {
-                    $task = $this->task();
-                    Process::fromShellCommandline(
-                        'docker volume rm '.escapeshellarg($task->volumeName())
-                    )->run();
-                    Notification::make()->title('Workspace gelöscht')->success()->send();
-                })
-                ->visible(fn (): bool => $this->task()->workflow_status === WorkflowStatus::Completed),
         ];
     }
 
