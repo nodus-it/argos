@@ -39,4 +39,16 @@ class EditRepoProfile extends EditRecord
 
         return $data;
     }
+
+    /**
+     * In the OAuth path the visible Select writes to `github_branch`; the real
+     * column is `default_branch`. Map it back before save and drop the helper key.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    protected function mutateFormDataBeforeSave(array $data): array
+    {
+        return RepoProfileResource::mutateBranchKey($data);
+    }
 }
