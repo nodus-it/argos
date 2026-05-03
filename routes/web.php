@@ -3,10 +3,17 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Auth\ConnectedAccountController;
+use App\Http\Controllers\TaskLogController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
-    return view('welcome');
+Route::get('/', fn () => redirect('/admin'));
+
+Route::middleware('auth')->group(function () {
+    Route::get('/tasks/{task}/logs/download', [TaskLogController::class, 'downloadPhaseLog'])
+        ->name('tasks.logs.download');
+
+    Route::get('/system/log/download', [TaskLogController::class, 'downloadAppLog'])
+        ->name('system.log.download');
 });
 
 Route::middleware('auth')->group(function () {

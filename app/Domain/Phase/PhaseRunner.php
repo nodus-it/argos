@@ -8,6 +8,7 @@ use App\Domain\Credentials\CredentialStore;
 use App\Jobs\RunPhaseJob;
 use App\Models\PhaseRun;
 use App\Models\Task;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\Process\Process;
 
 class PhaseRunner
@@ -257,11 +258,14 @@ class PhaseRunner
             'started_at' => now(),
         ]);
 
+        Log::channel('argos')->info('Phase started', $this->safeContext($task, $phase, ['iteration' => $phaseRun->iteration]));
+
         $task->update([
             'current_phase' => $phase,
             'current_status' => 'running',
         ]);
 
+        $startedAt = microtime(true);
         $logHandle = fopen($logPath, 'a');
         $stdout = '';
 
@@ -281,6 +285,20 @@ class PhaseRunner
 
         $exitCode = $process->getExitCode() ?? 1;
         $status = $this->exitCodeToStatus($exitCode);
+        $duration = round(microtime(true) - $startedAt, 2);
+
+        if ($exitCode !== 0) {
+            Log::channel('argos')->warning('Phase exited non-zero', $this->safeContext($task, $phase, [
+                'exit_code' => $exitCode,
+                'status' => $status,
+                'duration_s' => $duration,
+            ]));
+        } else {
+            Log::channel('argos')->info('Phase completed', $this->safeContext($task, $phase, [
+                'status' => $status,
+                'duration_s' => $duration,
+            ]));
+        }
 
         $phaseRun->update($this->phaseRunUpdate($status, $exitCode, $stdout));
 
@@ -325,11 +343,14 @@ class PhaseRunner
             'started_at' => now(),
         ]);
 
+        Log::channel('argos')->info('Phase started', $this->safeContext($task, $phase, ['iteration' => $phaseRun->iteration]));
+
         $task->update([
             'current_phase' => $phase,
             'current_status' => 'running',
         ]);
 
+        $startedAt = microtime(true);
         $logHandle = fopen($logPath, 'a');
         $stdout = '';
 
@@ -348,6 +369,20 @@ class PhaseRunner
 
         $exitCode = $process->getExitCode() ?? 1;
         $status = $this->exitCodeToStatus($exitCode);
+        $duration = round(microtime(true) - $startedAt, 2);
+
+        if ($exitCode !== 0) {
+            Log::channel('argos')->warning('Phase exited non-zero', $this->safeContext($task, $phase, [
+                'exit_code' => $exitCode,
+                'status' => $status,
+                'duration_s' => $duration,
+            ]));
+        } else {
+            Log::channel('argos')->info('Phase completed', $this->safeContext($task, $phase, [
+                'status' => $status,
+                'duration_s' => $duration,
+            ]));
+        }
 
         $phaseRun->update($this->phaseRunUpdate($status, $exitCode, $stdout));
 
@@ -361,6 +396,7 @@ class PhaseRunner
 
         // After a successful implement run with existing PR: auto-trigger push
         if ($phase === 'implement' && $status === 'completed' && $task->fresh()->pr_url !== null) {
+            Log::channel('argos')->info('Auto-triggering push after implement', $this->safeContext($task, 'push'));
             RunPhaseJob::dispatch($task->id, 'push');
         }
     }
@@ -458,6 +494,7 @@ class PhaseRunner
         $profile = $task->repoProfile;
 
         if ($profile === null) {
+            Log::channel('argos')->error('Phase cannot start: task has no repo profile', ['task' => $task->name, 'phase' => $phase]);
             throw new \RuntimeException(
                 "Task '{$task->name}' hat kein Repo-Profil — Phase kann nicht gestartet werden."
             );
@@ -467,6 +504,7 @@ class PhaseRunner
         $claudeToken = config('argos.claude_token') ?? $this->credentials->getClaudeToken();
 
         if ($claudeToken === null) {
+            Log::channel('argos')->error('Phase cannot start: no Claude token configured', ['task' => $task->name, 'phase' => $phase]);
             throw new \RuntimeException(
                 'Kein Claude OAuth Token konfiguriert. Bitte CLAUDE_CODE_OAUTH_TOKEN setzen.'
             );
@@ -574,5 +612,20 @@ class PhaseRunner
         return is_array($event) && isset($event['session_id']) && is_string($event['session_id'])
             ? $event['session_id']
             : null;
+    }
+
+    /**
+     * Build a log context array that is safe to persist — never includes tokens or credentials.
+     *
+     * @param  array<string, mixed>  $extra
+     * @return array<string, mixed>
+     */
+    private function safeContext(Task $task, string $phase, array $extra = []): array
+    {
+        return array_merge([
+            'task' => $task->name,
+            'task_id' => $task->id,
+            'phase' => $phase,
+        ], $extra);
     }
 }

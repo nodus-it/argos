@@ -45,3 +45,6 @@ coverage/
 # Agent runtime artifacts (worker workspace)
 .agent/
 :memory:
+
+# Local scratch notes
+todo.md

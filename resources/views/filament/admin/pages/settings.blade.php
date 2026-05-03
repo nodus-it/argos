@@ -52,5 +52,24 @@
             </p>
         </x-filament::section>
 
+        <x-filament::section heading="Logs">
+            <p class="text-sm text-gray-700 dark:text-gray-300">
+                Manager-Log (PHP-Seite): Phase-Starts, Fehler, Job-Dispatches.
+            </p>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400 mb-3">
+                Worker-Logs pro Phase sind im Task-View unter „Logs" abrufbar.
+            </p>
+            <x-filament::button
+                tag="a"
+                href="{{ route('system.log.download') }}"
+                target="_blank"
+                color="gray"
+                icon="heroicon-o-arrow-down-tray"
+                size="sm"
+            >
+                Application Log herunterladen
+            </x-filament::button>
+        </x-filament::section>
+
     </div>
 </x-filament-panels::page>

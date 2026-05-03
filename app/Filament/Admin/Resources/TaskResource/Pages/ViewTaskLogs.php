@@ -50,6 +50,14 @@ class ViewTaskLogs extends Page
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('downloadLog')
+                ->label('Log herunterladen')
+                ->icon('heroicon-o-arrow-down-tray')
+                ->color('gray')
+                ->url(fn () => route('tasks.logs.download', ['task' => $this->task->id, 'phase' => $this->phase]))
+                ->openUrlInNewTab()
+                ->visible(fn () => $this->currentLogExists()),
+
             Action::make('back')
                 ->label('← Zurück zur Task')
                 ->color('gray')
@@ -87,6 +95,13 @@ class ViewTaskLogs extends Page
         $this->lines = $this->parseLines($raw);
         $this->lineCount = count($this->lines);
         $this->updatedAt = now()->format('H:i:s');
+    }
+
+    private function currentLogExists(): bool
+    {
+        $configDir = config('argos.config_dir');
+
+        return file_exists("{$configDir}/tasks/{$this->task->name}/{$this->phase}.bg.log");
     }
 
     private function readLogFile(): string
