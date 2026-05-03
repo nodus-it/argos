@@ -16,7 +16,7 @@ final class AdminUserSeeder extends Seeder
             ['email' => 'admin@argos.local'],
             [
                 'name' => 'Argos Admin',
-                'password' => Hash::make(env('ADMIN_PASSWORD', '12345')),
+                'password' => Hash::make((string) config('argos.admin_password')),
             ],
         );
     }
