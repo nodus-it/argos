@@ -119,97 +119,10 @@ _implement_build_continue_prompt() {
     }
 }
 
-# _implement_changed_php_files: list PHP files modified or added by Claude in /workspace.
-# Output: NUL-separated list on stdout. Excludes deleted files and untracked-ignored paths.
-_implement_changed_php_files() {
-    (cd /workspace && {
-        git diff -z --name-only --diff-filter=ACMR HEAD -- '*.php'
-        git ls-files -z --others --exclude-standard -- '*.php'
-    } | sort -uz)
-}
-
-# _implement_run_quality_gates: run Pint, Pest/PHPUnit, PHPStan (when configured).
-# Output: JSON {pint, pest, phpunit, phpstan} on stdout.
-# Return: always 0 (status is captured in the JSON).
-_implement_run_quality_gates() {
-    local gates='{"pint":"skip","pest":"skip","phpunit":"skip","phpstan":"skip"}'
-
-    if [[ -x /workspace/vendor/bin/pint ]]; then
-        # Only check files Claude actually touched — pre-existing style debt
-        # in the rest of the repo is not Claude's to fix and would otherwise
-        # block every implement run.
-        # mapfile -d '' reads the NUL-separated list directly into an array;
-        # using $(...) would strip the NULs and concatenate filenames.
-        local -a changed_files=()
-        mapfile -d '' -t changed_files < <(_implement_changed_php_files)
-
-        if [[ ${#changed_files[@]} -eq 0 ]]; then
-            gates="$(echo "$gates" | jq '.pint = "skip"')"
-        else
-            if (cd /workspace && vendor/bin/pint --test "${changed_files[@]}") \
-                    &> "/workspace/.agent/logs/pint.${ITERATION}.log"; then
-                gates="$(echo "$gates" | jq '.pint = "pass"')"
-            else
-                gates="$(echo "$gates" | jq '.pint = "fail"')"
-            fi
-        fi
-    fi
-
-    if [[ -x /workspace/vendor/bin/pest ]]; then
-        if (cd /workspace && vendor/bin/pest --no-coverage) \
-                &> "/workspace/.agent/logs/pest.${ITERATION}.log"; then
-            gates="$(echo "$gates" | jq '.pest = "pass"')"
-        else
-            gates="$(echo "$gates" | jq '.pest = "fail"')"
-        fi
-    elif [[ -x /workspace/vendor/bin/phpunit ]]; then
-        if (cd /workspace && vendor/bin/phpunit) \
-                &> "/workspace/.agent/logs/phpunit.${ITERATION}.log"; then
-            gates="$(echo "$gates" | jq '.phpunit = "pass"')"
-        else
-            gates="$(echo "$gates" | jq '.phpunit = "fail"')"
-        fi
-    fi
-
-    if [[ -f /workspace/phpstan.neon || -f /workspace/phpstan.neon.dist ]] \
-            && [[ -x /workspace/vendor/bin/phpstan ]]; then
-        if (cd /workspace && vendor/bin/phpstan analyse --no-progress) \
-                &> "/workspace/.agent/logs/phpstan.${ITERATION}.log"; then
-            gates="$(echo "$gates" | jq '.phpstan = "pass"')"
-        else
-            gates="$(echo "$gates" | jq '.phpstan = "fail"')"
-        fi
-    fi
-
-    echo "$gates" > "/workspace/.agent/quality-gates.${ITERATION}.json"
-    printf '%s' "$gates"
-}
-
-# _implement_quality_gate_verdict: derive the failing-gate name from the gates JSON.
-# Args: $1=gates_json
-# Output: failed-gate name, or empty.
-# Return: 0 if all blocking gates pass, 4 if one fails.
-_implement_quality_gate_verdict() {
-    local gates="$1"
-    local pint pest phpunit phpstan
-    pint="$(echo "$gates" | jq -r '.pint')"
-    pest="$(echo "$gates" | jq -r '.pest')"
-    phpunit="$(echo "$gates" | jq -r '.phpunit')"
-    phpstan="$(echo "$gates" | jq -r '.phpstan')"
-    if [[ "$pint" == "fail" ]]; then
-        printf 'pint'; return 4
-    fi
-    if [[ "$pest" == "fail" ]]; then
-        printf 'pest'; return 4
-    fi
-    if [[ "$phpunit" == "fail" ]]; then
-        printf 'phpunit'; return 4
-    fi
-    if [[ "$phpstan" == "fail" ]]; then
-        printf 'phpstan'; return 4
-    fi
-    printf ''; return 0
-}
+# Backward-compat wrappers — implementation lives in lib/quality.sh.
+_implement_changed_php_files() { quality_changed_php_files; }
+_implement_run_quality_gates() { quality_gates_run "$@"; }
+_implement_quality_gate_verdict() { quality_gate_verdict "$@"; }
 
 phase_implement_run() {
     cd /workspace 2>/dev/null || {
@@ -333,13 +246,13 @@ phase_implement_run() {
     fi
 
     # Verification step: run the quality gates.
-    log_info "implement: verifying quality gates (pint/pest/phpstan)"
+    log_info "implement: verifying quality gates"
     local gates
-    gates="$(_implement_run_quality_gates)"
+    gates="$(quality_gates_run "$ITERATION")"
 
     local failed_gate gate_exit
     set +e
-    failed_gate="$(_implement_quality_gate_verdict "$gates")"
+    failed_gate="$(quality_gate_verdict "$gates")"
     gate_exit=$?
     set -e
 

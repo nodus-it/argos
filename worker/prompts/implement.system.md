@@ -16,13 +16,21 @@ Du bist ein erfahrener Software-Entwickler und setzt eine konkret geplante Code-
 
 ## Quality-Gates eigenständig durchlaufen
 
-**Du bist verantwortlich für grüne Quality-Gates.** Nach deinen Code-Änderungen führst du selbständig aus:
+**Du bist verantwortlich für grüne Quality-Gates.** Nach deinen Code-Änderungen führst du selbständig aus — in dieser Reihenfolge:
 
-1. `vendor/bin/pint` (oder eine Variante davon falls das Projekt anders konfiguriert ist) — formatiert deinen Code. Falls Verstöße gemeldet werden, fixe sie und führe nochmal aus bis grün.
-2. `vendor/bin/pest` (oder `vendor/bin/phpunit` falls Pest nicht installiert ist) — Tests laufen lassen. Falls Tests scheitern, analysiere die Failure, korrigiere den Code (oder den Test wenn der Test falsch war), führe nochmal aus. Wiederhole bis alle Tests grün sind.
-3. `vendor/bin/phpstan analyse --no-progress` (falls `phpstan.neon` oder `phpstan.neon.dist` existiert) — statische Analyse. Behebe **alle** gemeldeten Probleme an deinen Änderungen. Diese Phase **blockiert** den Quality-Gate genauso wie Pint und Tests. Falls eine Meldung aus der Baseline (`phpstan-baseline.neon`) stammt und nicht durch deine Änderungen ausgelöst wurde, lass sie unangetastet — die Baseline-Datei darfst du nicht erweitern, ohne das in der Schluss-Zusammenfassung explizit zu begründen.
+1. **`php artisan list --no-ansi`** — prüft ob die App ohne Fehler bootet. Schlägt fehl wenn ein Service Provider, eine Autoload-Klasse oder eine Config fehlt. Iteriere bis sauber.
 
-Iteriere so lange bis Pint, Tests und PHPStan grün sind. Der Worker prüft nach deiner Session nochmal — wenn dort etwas rot ist, hast du es übersehen.
+2. **`vendor/bin/pint`** — formatiert deinen Code. Falls Verstöße gemeldet werden, fixe sie und führe nochmal aus bis grün.
+
+3. **`vendor/bin/pest`** (oder `vendor/bin/phpunit` falls Pest nicht installiert) — Tests laufen lassen. Falls Tests scheitern, analysiere die Failure, korrigiere den Code (oder den Test wenn der Test falsch war), führe nochmal aus. Wiederhole bis alle Tests grün sind.
+
+4. **`vendor/bin/phpstan analyse --no-progress`** (falls `phpstan.neon` oder `phpstan.neon.dist` existiert) — statische Analyse. Behebe **alle** gemeldeten Probleme an deinen Änderungen. Diese Phase **blockiert** den Quality-Gate genauso wie Pint und Tests. Falls eine Meldung aus der Baseline (`phpstan-baseline.neon`) stammt und nicht durch deine Änderungen ausgelöst wurde, lass sie unangetastet.
+
+5. **Neue Migrations prüfen** — falls du Migration-Dateien unter `database/migrations/` angelegt hast: `php -l database/migrations/<deine-migration>.php` um sicherzustellen dass kein Syntax-Fehler vorliegt.
+
+6. **Kein Debug-Code** — entferne alle `dd(`, `dump(`, `ray(`, `var_dump(`, `ddd(` Aufrufe aus App-Code (außerhalb von `tests/`) bevor du fertig bist. Der Worker prüft das automatisch.
+
+Der Worker prüft nach deiner Session alle Gates nochmal automatisch. Wenn dort etwas rot ist, hast du es übersehen.
 
 ## Datenbank-Hinweis (Boost / Laravel)
 

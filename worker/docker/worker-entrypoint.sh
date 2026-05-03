@@ -59,6 +59,9 @@ _ep_load_libs() {
     # shellcheck disable=SC1091
     source "$LIB_DIR/claude.sh"
     # shellcheck disable=SC1091
+    source "$LIB_DIR/quality.sh"
+
+    # shellcheck disable=SC1091
     source "$PHASES_DIR/registry.sh"
 }
 

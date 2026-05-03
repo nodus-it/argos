@@ -133,40 +133,14 @@ phase_respond_run() {
         log_warn "respond: claude exited with code $claude_exit"
     fi
 
-    # Quality gates — same logic as implement.
+    # Quality gates — shared logic from lib/quality.sh.
     log_info "respond: verifying quality gates"
-    local gates='{"pint":"skip","pest":"skip","phpunit":"skip","phpstan":"skip"}'
-    local failed_gate=""
-
-    if [[ -x /workspace/vendor/bin/pint ]]; then
-        if (cd /workspace && vendor/bin/pint --test) \
-                &> "/workspace/.agent/logs/pint.${ITERATION}.log"; then
-            gates="$(echo "$gates" | jq '.pint = "pass"')"
-        else
-            gates="$(echo "$gates" | jq '.pint = "fail"')"
-            failed_gate="pint"
-        fi
-    fi
-
-    if [[ -z "$failed_gate" ]]; then
-        if [[ -x /workspace/vendor/bin/pest ]]; then
-            if (cd /workspace && vendor/bin/pest --no-coverage) \
-                    &> "/workspace/.agent/logs/pest.${ITERATION}.log"; then
-                gates="$(echo "$gates" | jq '.pest = "pass"')"
-            else
-                gates="$(echo "$gates" | jq '.pest = "fail"')"
-                failed_gate="pest"
-            fi
-        elif [[ -x /workspace/vendor/bin/phpunit ]]; then
-            if (cd /workspace && vendor/bin/phpunit) \
-                    &> "/workspace/.agent/logs/phpunit.${ITERATION}.log"; then
-                gates="$(echo "$gates" | jq '.phpunit = "pass"')"
-            else
-                gates="$(echo "$gates" | jq '.phpunit = "fail"')"
-                failed_gate="phpunit"
-            fi
-        fi
-    fi
+    local gates failed_gate gate_exit
+    gates="$(quality_gates_run "$ITERATION")"
+    set +e
+    failed_gate="$(quality_gate_verdict "$gates")"
+    gate_exit=$?
+    set -e
 
     local session_id cost input_tokens output_tokens status exit_code
     session_id="$(jq -r '.session_id // "unknown"' "$result_json" 2>/dev/null)"
@@ -174,7 +148,7 @@ phase_respond_run() {
     input_tokens="$(jq -r '.usage.input_tokens // 0' "$result_json" 2>/dev/null)"
     output_tokens="$(jq -r '.usage.output_tokens // 0' "$result_json" 2>/dev/null)"
 
-    if [[ -n "$failed_gate" ]]; then
+    if (( gate_exit == 4 )); then
         status="quality_gate_failed"
         exit_code=4
     else

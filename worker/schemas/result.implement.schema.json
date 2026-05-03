@@ -22,10 +22,14 @@
     "quality_gates": {
       "type": "object",
       "properties": {
-        "pint": {"enum": ["pass", "fail", "skip"]},
-        "pest": {"enum": ["pass", "fail", "skip"]},
-        "phpunit": {"enum": ["pass", "fail", "skip"]},
-        "phpstan": {"enum": ["pass", "fail", "skip"]}
+        "artisan":       {"enum": ["pass", "fail", "skip"]},
+        "pint":          {"enum": ["pass", "fail", "skip"]},
+        "pest":          {"enum": ["pass", "fail", "skip"]},
+        "phpunit":       {"enum": ["pass", "fail", "skip"]},
+        "phpstan":       {"enum": ["pass", "fail", "skip"]},
+        "migrations":    {"enum": ["pass", "fail", "skip"]},
+        "debug_code":    {"enum": ["pass", "fail", "skip"]},
+        "test_presence": {"enum": ["pass", "fail", "skip", "warn"]}
       }
     },
     "failed_gate": {"type": ["string", "null"]},

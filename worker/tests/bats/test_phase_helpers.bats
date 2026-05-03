@@ -8,6 +8,8 @@ setup() {
 
     # shellcheck source=../../phases/commit-message.sh
     source worker/phases/commit-message.sh
+    # shellcheck source=../../lib/quality.sh
+    source worker/lib/quality.sh
     # shellcheck source=../../phases/implement.sh
     source worker/phases/implement.sh
     # shellcheck source=../../phases/push.sh
@@ -58,41 +60,69 @@ teardown() {
     [ "$subject" = "chore: cleanup" ]
 }
 
-# --- _implement_quality_gate_verdict ---
+# --- quality_gate_verdict ---
 
-@test "_implement_quality_gate_verdict: alle skip → exit 0, keine Ausgabe" {
-    gates='{"pint":"skip","pest":"skip","phpunit":"skip","phpstan":"skip"}'
-    run _implement_quality_gate_verdict "$gates"
+@test "quality_gate_verdict: alle skip → exit 0, keine Ausgabe" {
+    gates='{"artisan":"skip","pint":"skip","pest":"skip","phpunit":"skip","phpstan":"skip","migrations":"skip","debug_code":"skip","test_presence":"skip"}'
+    run quality_gate_verdict "$gates"
     [ "$status" -eq 0 ]
     [ -z "$output" ]
 }
 
-@test "_implement_quality_gate_verdict: pint=fail → exit 4, gibt 'pint' aus" {
-    gates='{"pint":"fail","pest":"skip","phpunit":"skip","phpstan":"skip"}'
-    run _implement_quality_gate_verdict "$gates"
+@test "quality_gate_verdict: artisan=fail → exit 4, gibt 'artisan' aus" {
+    gates='{"artisan":"fail","pint":"skip","pest":"skip","phpunit":"skip","phpstan":"skip","migrations":"skip","debug_code":"skip","test_presence":"skip"}'
+    run quality_gate_verdict "$gates"
+    [ "$status" -eq 4 ]
+    [ "$output" = "artisan" ]
+}
+
+@test "quality_gate_verdict: pint=fail → exit 4, gibt 'pint' aus" {
+    gates='{"artisan":"pass","pint":"fail","pest":"skip","phpunit":"skip","phpstan":"skip","migrations":"skip","debug_code":"skip","test_presence":"skip"}'
+    run quality_gate_verdict "$gates"
     [ "$status" -eq 4 ]
     [ "$output" = "pint" ]
 }
 
-@test "_implement_quality_gate_verdict: pest=fail → exit 4, gibt 'pest' aus" {
-    gates='{"pint":"pass","pest":"fail","phpunit":"skip","phpstan":"skip"}'
-    run _implement_quality_gate_verdict "$gates"
+@test "quality_gate_verdict: pest=fail → exit 4, gibt 'pest' aus" {
+    gates='{"artisan":"pass","pint":"pass","pest":"fail","phpunit":"skip","phpstan":"skip","migrations":"skip","debug_code":"skip","test_presence":"skip"}'
+    run quality_gate_verdict "$gates"
     [ "$status" -eq 4 ]
     [ "$output" = "pest" ]
 }
 
-@test "_implement_quality_gate_verdict: phpunit=fail → exit 4, gibt 'phpunit' aus" {
-    gates='{"pint":"pass","pest":"skip","phpunit":"fail","phpstan":"skip"}'
-    run _implement_quality_gate_verdict "$gates"
+@test "quality_gate_verdict: phpunit=fail → exit 4, gibt 'phpunit' aus" {
+    gates='{"artisan":"pass","pint":"pass","pest":"skip","phpunit":"fail","phpstan":"skip","migrations":"skip","debug_code":"skip","test_presence":"skip"}'
+    run quality_gate_verdict "$gates"
     [ "$status" -eq 4 ]
     [ "$output" = "phpunit" ]
 }
 
-@test "_implement_quality_gate_verdict: phpstan=fail → exit 4, gibt 'phpstan' aus" {
-    gates='{"pint":"pass","pest":"pass","phpunit":"skip","phpstan":"fail"}'
-    run _implement_quality_gate_verdict "$gates"
+@test "quality_gate_verdict: phpstan=fail → exit 4, gibt 'phpstan' aus" {
+    gates='{"artisan":"pass","pint":"pass","pest":"pass","phpunit":"skip","phpstan":"fail","migrations":"skip","debug_code":"skip","test_presence":"skip"}'
+    run quality_gate_verdict "$gates"
     [ "$status" -eq 4 ]
     [ "$output" = "phpstan" ]
+}
+
+@test "quality_gate_verdict: migrations=fail → exit 4, gibt 'migrations' aus" {
+    gates='{"artisan":"pass","pint":"pass","pest":"pass","phpunit":"skip","phpstan":"pass","migrations":"fail","debug_code":"skip","test_presence":"skip"}'
+    run quality_gate_verdict "$gates"
+    [ "$status" -eq 4 ]
+    [ "$output" = "migrations" ]
+}
+
+@test "quality_gate_verdict: debug_code=fail → exit 4, gibt 'debug_code' aus" {
+    gates='{"artisan":"pass","pint":"pass","pest":"pass","phpunit":"skip","phpstan":"pass","migrations":"pass","debug_code":"fail","test_presence":"skip"}'
+    run quality_gate_verdict "$gates"
+    [ "$status" -eq 4 ]
+    [ "$output" = "debug_code" ]
+}
+
+@test "quality_gate_verdict: test_presence=warn ist nicht blockierend" {
+    gates='{"artisan":"pass","pint":"pass","pest":"pass","phpunit":"skip","phpstan":"pass","migrations":"pass","debug_code":"pass","test_presence":"warn"}'
+    run quality_gate_verdict "$gates"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
 }
 
 # --- _push_detect_platform ---

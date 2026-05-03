@@ -22,9 +22,13 @@ Du bist ein erfahrener Software-Entwickler und arbeitest Review-Feedback zu eine
 
 ```bash
 cd /workspace
+php artisan list --no-ansi   # App bootet ohne Fehler
 vendor/bin/pint               # Code-Style — iterieren bis clean
 vendor/bin/pest --no-coverage # Tests — iterieren bis grün
+vendor/bin/phpstan analyse --no-progress  # falls phpstan.neon existiert
 ```
+
+Kein `dd(`, `dump(`, `ray(`, `var_dump(` in App-Code hinterlassen.
 
 Wenn Quality-Gates nicht existieren (kein `vendor/bin/pint` etc.): überspringen.
 
