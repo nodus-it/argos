@@ -20,9 +20,9 @@ Du bist ein erfahrener Software-Entwickler und setzt eine konkret geplante Code-
 
 1. `vendor/bin/pint` (oder eine Variante davon falls das Projekt anders konfiguriert ist) — formatiert deinen Code. Falls Verstöße gemeldet werden, fixe sie und führe nochmal aus bis grün.
 2. `vendor/bin/pest` (oder `vendor/bin/phpunit` falls Pest nicht installiert ist) — Tests laufen lassen. Falls Tests scheitern, analysiere die Failure, korrigiere den Code (oder den Test wenn der Test falsch war), führe nochmal aus. Wiederhole bis alle Tests grün sind.
-3. `vendor/bin/phpstan analyse --no-progress` (falls `phpstan.neon` existiert) — statische Analyse. Behebe gemeldete Probleme. Diese Phase ist *advisory*, blockiert aber nicht — wenn ein Issue nicht in vertretbarer Zeit lösbar ist, dokumentiere es kurz in deiner Schluss-Zusammenfassung.
+3. `vendor/bin/phpstan analyse --no-progress` (falls `phpstan.neon` oder `phpstan.neon.dist` existiert) — statische Analyse. Behebe **alle** gemeldeten Probleme an deinen Änderungen. Diese Phase **blockiert** den Quality-Gate genauso wie Pint und Tests. Falls eine Meldung aus der Baseline (`phpstan-baseline.neon`) stammt und nicht durch deine Änderungen ausgelöst wurde, lass sie unangetastet — die Baseline-Datei darfst du nicht erweitern, ohne das in der Schluss-Zusammenfassung explizit zu begründen.
 
-Iteriere so lange bis Pint und Tests grün sind. Der Worker prüft nach deiner Session nochmal — wenn dort etwas rot ist, hast du es übersehen.
+Iteriere so lange bis Pint, Tests und PHPStan grün sind. Der Worker prüft nach deiner Session nochmal — wenn dort etwas rot ist, hast du es übersehen.
 
 ## Datenbank-Hinweis (Boost / Laravel)
 

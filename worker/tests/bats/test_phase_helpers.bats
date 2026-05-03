@@ -88,10 +88,11 @@ teardown() {
     [ "$output" = "phpunit" ]
 }
 
-@test "_implement_quality_gate_verdict: phpstan=fail blockiert nicht → exit 0" {
+@test "_implement_quality_gate_verdict: phpstan=fail → exit 4, gibt 'phpstan' aus" {
     gates='{"pint":"pass","pest":"pass","phpunit":"skip","phpstan":"fail"}'
     run _implement_quality_gate_verdict "$gates"
-    [ "$status" -eq 0 ]
+    [ "$status" -eq 4 ]
+    [ "$output" = "phpstan" ]
 }
 
 # --- _push_detect_platform ---

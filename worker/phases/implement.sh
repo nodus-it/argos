@@ -4,9 +4,9 @@
 # Default: --fresh (git reset --hard origin/$BASE_BRANCH, git clean -fd
 # without -x so vendor/ and node_modules/ survive), composer install / npm ci
 # if a manifest exists, then a Claude session. Quality gates (Pint,
-# Pest/PHPUnit, optional PHPStan) are re-run by the worker AFTER the Claude
-# session as a verification step — Claude is expected to have made them
-# pass already.
+# Pest/PHPUnit, PHPStan when configured) are re-run by the worker AFTER the
+# Claude session as a verification step — Claude is expected to have made
+# them pass already. All four are blocking.
 
 # shellcheck shell=bash
 
@@ -106,7 +106,7 @@ _implement_changed_php_files() {
     } | sort -uz)
 }
 
-# _implement_run_quality_gates: run Pint, Pest/PHPUnit, optional PHPStan.
+# _implement_run_quality_gates: run Pint, Pest/PHPUnit, PHPStan (when configured).
 # Output: JSON {pint, pest, phpunit, phpstan} on stdout.
 # Return: always 0 (status is captured in the JSON).
 _implement_run_quality_gates() {
@@ -155,7 +155,7 @@ _implement_run_quality_gates() {
                 &> "/workspace/.agent/logs/phpstan.${ITERATION}.log"; then
             gates="$(echo "$gates" | jq '.phpstan = "pass"')"
         else
-            gates="$(echo "$gates" | jq '.phpstan = "advisory_fail"')"
+            gates="$(echo "$gates" | jq '.phpstan = "fail"')"
         fi
     fi
 
@@ -169,10 +169,11 @@ _implement_run_quality_gates() {
 # Return: 0 if all blocking gates pass, 4 if one fails.
 _implement_quality_gate_verdict() {
     local gates="$1"
-    local pint pest phpunit
+    local pint pest phpunit phpstan
     pint="$(echo "$gates" | jq -r '.pint')"
     pest="$(echo "$gates" | jq -r '.pest')"
     phpunit="$(echo "$gates" | jq -r '.phpunit')"
+    phpstan="$(echo "$gates" | jq -r '.phpstan')"
     if [[ "$pint" == "fail" ]]; then
         printf 'pint'; return 4
     fi
@@ -181,6 +182,9 @@ _implement_quality_gate_verdict() {
     fi
     if [[ "$phpunit" == "fail" ]]; then
         printf 'phpunit'; return 4
+    fi
+    if [[ "$phpstan" == "fail" ]]; then
+        printf 'phpstan'; return 4
     fi
     printf ''; return 0
 }

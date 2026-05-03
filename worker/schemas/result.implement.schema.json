@@ -25,7 +25,7 @@
         "pint": {"enum": ["pass", "fail", "skip"]},
         "pest": {"enum": ["pass", "fail", "skip"]},
         "phpunit": {"enum": ["pass", "fail", "skip"]},
-        "phpstan": {"enum": ["pass", "advisory_fail", "skip"]}
+        "phpstan": {"enum": ["pass", "fail", "skip"]}
       }
     },
     "failed_gate": {"type": ["string", "null"]},
