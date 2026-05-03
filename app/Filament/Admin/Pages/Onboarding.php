@@ -69,6 +69,21 @@ class Onboarding extends Page
         $this->githubConnected = $user !== null && $user->connectedAccount('github') !== null;
     }
 
+    public function disconnectGitHub(): void
+    {
+        /** @var User|null $user */
+        $user = Auth::user();
+
+        if ($user === null) {
+            return;
+        }
+
+        $user->connectedAccounts()->where('provider', 'github')->delete();
+        $this->refreshState();
+
+        Notification::make()->title('GitHub-Verbindung getrennt')->success()->send();
+    }
+
     public function saveClaudeToken(): void
     {
         if ($this->tokenSource === 'env') {

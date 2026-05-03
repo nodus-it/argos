@@ -95,6 +95,26 @@ class OnboardingPageTest extends TestCase
             ->assertSee('Mit GitHub verbinden');
     }
 
+    public function test_disconnect_github_removes_connected_account(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        $user->connectedAccounts()->create([
+            'provider' => 'github',
+            'provider_id' => '12345',
+            'token' => 'gho_test',
+            'nickname' => 'tester',
+        ]);
+
+        Livewire::test(Onboarding::class)
+            ->assertSet('githubConnected', true)
+            ->call('disconnectGitHub')
+            ->assertSet('githubConnected', false);
+
+        $this->assertSame(0, $user->connectedAccounts()->where('provider', 'github')->count());
+    }
+
     public function test_create_project_button_links_to_repo_profile_create(): void
     {
         Livewire::test(Onboarding::class)

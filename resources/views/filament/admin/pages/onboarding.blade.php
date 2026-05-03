@@ -76,10 +76,21 @@
                 </div>
                 <div class="px-5 py-4 space-y-3">
                     @if($githubConnected)
-                        <div class="flex items-center gap-3">
-                            <x-heroicon-o-check-circle class="h-5 w-5 text-emerald-500 flex-shrink-0" />
-                            <span class="text-sm text-gray-700 dark:text-gray-300">GitHub-Account ist verbunden.</span>
+                        <div class="flex items-center justify-between gap-3">
+                            <div class="flex items-center gap-3">
+                                <x-heroicon-o-check-circle class="h-5 w-5 text-emerald-500 flex-shrink-0" />
+                                <span class="text-sm text-gray-700 dark:text-gray-300">GitHub-Account ist verbunden.</span>
+                            </div>
+                            <button wire:click="disconnectGitHub" type="button"
+                                wire:confirm="GitHub-Verbindung wirklich trennen?"
+                                class="rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300">
+                                Trennen
+                            </button>
                         </div>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">
+                            Tipp: Wenn du beim Verbinden keine Auswahlmaske mehr siehst, widerrufe die App zuerst auf
+                            <a href="https://github.com/settings/applications" target="_blank" rel="noopener" class="underline hover:text-gray-700 dark:hover:text-gray-300">github.com/settings/applications</a>.
+                        </p>
                     @else
                         <p class="text-sm text-gray-500 dark:text-gray-400">
                             Verbinde deinen GitHub-Account per OAuth — danach kannst du Projekte ohne Personal Access Token anlegen.
