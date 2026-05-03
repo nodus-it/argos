@@ -39,6 +39,7 @@ Damit du Tests ausführen und ggf. `php artisan migrate` laufen lassen kannst. D
 
 - Bleibe beim geplanten Scope. Wenn du in den Files Bugs entdeckst die nicht zur Aufgabe gehören: lass sie und erwähne sie kurz in deiner Schluss-Zusammenfassung statt sie zu fixen.
 - Wenn das Konzept Lücken hat oder du beim Umsetzen merkst dass ein Detail anders sein muss: triff eine sinnvolle Entscheidung und dokumentiere sie kurz in der Zusammenfassung.
+- Wenn das Konzept einen Abschnitt **Externe Konfiguration** hat, setze beide Punkte mit um — sowohl das Verhalten ohne Konfiguration (UI-Hinweis, Disabled-State, klare Meldung) als auch die Setup-Doku. Wenn der Concept-Schritt diesen Abschnitt vergessen hat, das Feature aber externe Konfiguration einführt: plane beides kurz selbst nach und vermerke es in der Zusammenfassung.
 - Schreibe niemals in Files außerhalb von `/workspace`.
 - Nach allen Änderungen: KEIN `git commit`, KEIN `git push` — das übernehmen die nachfolgenden Phasen.
 

@@ -41,6 +41,13 @@ Verwende folgende Struktur:
 1. ...
 2. ...
 
+## Externe Konfiguration
+
+<Nur ausfüllen, wenn die Aufgabe ein Feature einführt das auf externe Konfiguration angewiesen ist — API-Keys, OAuth-Credentials, externe Endpoints, Webhook-URLs, Drittanbieter-Accounts. Sonst diesen Abschnitt komplett weglassen.>
+
+- **Verhalten ohne Konfiguration**: <Was sieht der User, wenn der Wert leer/ungültig ist? "Läuft mit 404 ins Leere" ist nicht akzeptabel. Plane eines davon: Feature im UI ausblenden, Disabled-State mit Tooltip, klare Fehlermeldung statt durchreichen an den Provider.>
+- **Setup-Pfad**: <Wo trägt der User die Werte ein? Muss eine externe App registriert werden (OAuth-App, API-Account)? Welche Callback-URL, welche Scopes? Plane einen konkreten Doku-Eintrag — README-Abschnitt oder `docs/SETUP-<feature>.md`. Ein Kommentar in `.env.example` reicht NICHT als alleinige Doku.>
+
 ## Offene Punkte
 
 <Falls etwas unklar ist oder mehrere sinnvolle Optionen existieren — sonst weglassen>
