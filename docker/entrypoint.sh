@@ -108,6 +108,7 @@ FLUSH PRIVILEGES;
 SQL
 
 php /app/artisan migrate --force --no-interaction
+php /app/artisan db:seed --class=AdminUserSeeder --force --no-interaction
 
 # Stop the temporary instance cleanly — supervisord restarts MariaDB next.
 mariadb-admin --socket=/run/mysqld/mysqld.sock -u root --password='' shutdown
