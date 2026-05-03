@@ -50,17 +50,27 @@
     <div
         class="rounded-xl overflow-hidden border border-slate-800 shadow-2xl shadow-black/50 bg-slate-950"
         x-data="{
-            autoScroll: true,
-            lineCount: {{ $lineCount }},
+            atBottom: true,
+            init() {
+                $nextTick(() => this.scrollToBottom());
+                const obs = new MutationObserver(() => this.maybeScroll());
+                obs.observe(this.$refs.terminal, { childList: true, subtree: true, characterData: true });
+                this._obs = obs;
+            },
+            destroy() { this._obs && this._obs.disconnect(); },
             scrollToBottom() {
                 const el = this.$refs.terminal;
-                if (el && this.autoScroll) {
-                    el.scrollTop = el.scrollHeight;
-                }
+                if (el) el.scrollTop = el.scrollHeight;
+            },
+            maybeScroll() {
+                if (this.atBottom) requestAnimationFrame(() => this.scrollToBottom());
+            },
+            onScroll() {
+                const el = this.$refs.terminal;
+                if (!el) return;
+                this.atBottom = (el.scrollHeight - el.scrollTop - el.clientHeight) < 40;
             }
         }"
-        x-init="scrollToBottom()"
-        @scroll="autoScroll = ($refs.terminal.scrollHeight - $refs.terminal.scrollTop - $refs.terminal.clientHeight) < 40"
     >
         <div class="flex items-center justify-between px-4 py-2.5 bg-slate-900 border-b border-slate-800">
             <span class="text-xs text-slate-500 font-mono">
@@ -83,7 +93,7 @@
             x-ref="terminal"
             class="overflow-y-auto font-mono text-xs leading-5 p-4 space-y-0"
             style="height: 60vh; min-height: 400px;"
-            x-on:livewire:update.window="$nextTick(() => { lineCount !== {{ $lineCount }} && (lineCount = {{ $lineCount }}, scrollToBottom()) })"
+            @scroll="onScroll()"
         >
             @if(empty($lines))
                 <p class="text-slate-600 italic">Kein Log vorhanden für Phase „{{ $phase }}".</p>
@@ -125,18 +135,9 @@
         </div>
     </div>
 
-    <div
-        class="text-xs text-slate-500 text-center"
-        x-data
-        x-show="!$refs.terminal?.scrollTop || ($refs.terminal?.scrollHeight - $refs.terminal?.scrollTop - $refs.terminal?.clientHeight) > 40"
-        x-cloak
-    >
-        ↓ Scrolle nach unten für neueste Ausgabe — Auto-Scroll aktiv wenn du am Ende bist
-    </div>
-
     {{-- Only poll while a phase is running, otherwise the terminal is static. --}}
     @if($isRunning)
-        <div wire:poll.2000ms="poll" class="hidden"></div>
+        <div wire:poll.1500ms="poll" class="hidden"></div>
     @endif
 
 </x-filament-panels::page>

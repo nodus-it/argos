@@ -72,6 +72,15 @@ class ViewTask extends ViewRecord
         Notification::make()->title('Feedback gespeichert')->success()->send();
     }
 
+    public function saveNotesAndRevise(): void
+    {
+        /** @var Task $task */
+        $task = $this->getRecord();
+        $task->update(['concept_notes' => $this->notes ?: null]);
+        $this->editingNotes = false;
+        $this->reviseConcept();
+    }
+
     public function cancelEditingNotes(): void
     {
         /** @var Task $task */
@@ -93,6 +102,30 @@ class ViewTask extends ViewRecord
 
         $this->editingImplementNotes = false;
         Notification::make()->title('Feedback gespeichert')->success()->send();
+    }
+
+    public function saveImplementNotesAndRevise(): void
+    {
+        /** @var Task $task */
+        $task = $this->getRecord();
+        $task->update(['implement_notes' => $this->implementNotes ?: null]);
+        $this->editingImplementNotes = false;
+        $this->reviseImplement();
+    }
+
+    public function reviseImplement(): void
+    {
+        /** @var Task $task */
+        $task = $this->getRecord();
+        if ($task->phaseRuns()->where('status', 'running')->exists()) {
+            Notification::make()->title('Phase läuft bereits')->warning()->send();
+
+            return;
+        }
+        $task->update(['current_phase' => 'implement', 'current_status' => 'running']);
+        RunPhaseJob::dispatch($task->id, 'implement');
+        Notification::make()->title('Implementierung gestartet')->success()->send();
+        $this->redirect(TaskResource::getUrl('view', ['record' => $task]));
     }
 
     public function cancelEditingImplementNotes(): void

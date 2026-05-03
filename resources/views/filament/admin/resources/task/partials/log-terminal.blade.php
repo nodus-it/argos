@@ -19,20 +19,26 @@
         </div>
     </div>
 
-    {{-- Log content with auto-scroll --}}
+    {{-- Log content with auto-scroll (MutationObserver — robust against Livewire morphing) --}}
     <div
         x-data="{
             atBottom: true,
+            init() {
+                $nextTick(() => this.scrollToBottom());
+                const obs = new MutationObserver(() => this.maybeScroll());
+                obs.observe(this.$el, { childList: true, subtree: true, characterData: true });
+                this._obs = obs;
+            },
+            destroy() { this._obs && this._obs.disconnect(); },
+            scrollToBottom() { this.$el.scrollTop = this.$el.scrollHeight; },
+            maybeScroll() {
+                if (this.atBottom) requestAnimationFrame(() => this.scrollToBottom());
+            },
             onScroll() {
                 this.atBottom = (this.$el.scrollHeight - this.$el.scrollTop - this.$el.clientHeight) < 60;
-            },
-            scrollDown() {
-                if (this.atBottom) { this.$el.scrollTop = this.$el.scrollHeight; }
             }
         }"
-        x-init="scrollDown()"
         x-on:scroll="onScroll()"
-        x-on:livewire:update.window.debounce.200ms="$nextTick(() => scrollDown())"
         class="overflow-y-auto font-mono text-xs leading-5 p-4"
         style="max-height: 50vh; min-height: 120px;"
     >

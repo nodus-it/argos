@@ -68,11 +68,16 @@
             @endif
 
             @if($record->pr_url)
+                @php
+                    preg_match('#/pull/(\d+)#', $record->pr_url, $prMatch);
+                    $prNumber = $prMatch[1] ?? null;
+                @endphp
                 <div class="flex items-center justify-between gap-2">
                     <span class="text-xs font-medium text-gray-500 dark:text-gray-400 flex-shrink-0">Pull Request</span>
                     <a href="{{ $record->pr_url }}" target="_blank"
-                       class="text-xs text-primary-600 dark:text-primary-400 hover:underline truncate text-right max-w-[160px]">
-                        {{ parse_url($record->pr_url, PHP_URL_PATH) }}
+                       class="inline-flex items-center gap-1 text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline">
+                        {{ $prNumber ? "PR #{$prNumber}" : 'Öffnen' }}
+                        <x-heroicon-o-arrow-top-right-on-square class="h-3 w-3" />
                     </a>
                 </div>
             @endif
@@ -192,7 +197,8 @@
         @endif
 
         <div x-show="open" x-collapse x-cloak>
-            <div x-data="{ tab: '{{ $conceptHtml ? 'concept' : 'log' }}' }">
+            <div wire:key="concept-tabs-{{ $conceptHtml ? 'done' : 'pending' }}"
+                 x-data="{ tab: '{{ $conceptHtml ? 'concept' : 'log' }}' }">
 
                 <div class="flex gap-1 px-4 pt-3 border-b border-gray-100 dark:border-gray-800">
                     <button type="button"
@@ -299,12 +305,19 @@
                                     placeholder="Anmerkungen, Korrekturen, zusätzliche Anforderungen…"
                                     class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none font-mono leading-relaxed"
                                 ></textarea>
-                                <div class="flex gap-2">
+                                <div class="flex flex-wrap gap-2">
                                     <button type="button" wire:click="saveNotes"
                                             class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-4 py-2 transition-colors">
                                         <x-heroicon-o-check class="h-3.5 w-3.5" />
                                         Speichern
                                     </button>
+                                    @if($record->current_status !== 'running' && $record->workflow_status !== \App\Enums\WorkflowStatus::Completed)
+                                        <button type="button" wire:click="saveNotesAndRevise"
+                                                class="inline-flex items-center gap-1.5 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold px-4 py-2 transition-colors">
+                                            <x-heroicon-o-light-bulb class="h-3.5 w-3.5" />
+                                            Speichern &amp; Konzept überarbeiten
+                                        </button>
+                                    @endif
                                     <button type="button" wire:click="cancelEditingNotes"
                                             class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 text-xs font-medium px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                                         Abbrechen
@@ -448,7 +461,11 @@
         @endif
 
         <div x-show="open" x-collapse x-cloak>
-            <div x-data="{ tab: '{{ ($implementSummaryNontechnicalHtml || $implementSummaryTechnicalHtml) ? 'implement' : 'log' }}' }">
+            @php
+                $implementReady = $implementSummaryNontechnicalHtml || $implementSummaryTechnicalHtml;
+            @endphp
+            <div wire:key="implement-tabs-{{ $implementReady ? 'done' : 'pending' }}"
+                 x-data="{ tab: '{{ $implementReady ? 'implement' : 'log' }}' }">
 
                 <div class="flex gap-1 px-4 pt-3 border-b border-gray-100 dark:border-gray-800">
                     <button type="button"
@@ -748,12 +765,19 @@
                                     placeholder="Anmerkungen, Korrekturen, zusätzliche Anforderungen für den nächsten Implement-Lauf…"
                                     class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none font-mono leading-relaxed"
                                 ></textarea>
-                                <div class="flex gap-2">
+                                <div class="flex flex-wrap gap-2">
                                     <button type="button" wire:click="saveImplementNotes"
                                             class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-4 py-2 transition-colors">
                                         <x-heroicon-o-check class="h-3.5 w-3.5" />
                                         Speichern
                                     </button>
+                                    @if($record->current_status !== 'running' && $record->workflow_status !== \App\Enums\WorkflowStatus::Completed)
+                                        <button type="button" wire:click="saveImplementNotesAndRevise"
+                                                class="inline-flex items-center gap-1.5 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold px-4 py-2 transition-colors">
+                                            <x-heroicon-o-code-bracket class="h-3.5 w-3.5" />
+                                            Speichern &amp; Implementierung überarbeiten
+                                        </button>
+                                    @endif
                                     <button type="button" wire:click="cancelEditingImplementNotes"
                                             class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 text-xs font-medium px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                                         Abbrechen
@@ -884,7 +908,8 @@
         @endif
 
         <div x-show="open" x-collapse x-cloak>
-            <div x-data="{ tab: '{{ $record->pr_url ? 'pr' : 'log' }}' }">
+            <div wire:key="push-tabs-{{ $record->pr_url ? 'done' : 'pending' }}"
+                 x-data="{ tab: '{{ $record->pr_url ? 'pr' : 'log' }}' }">
 
                 <div class="flex gap-1 px-4 pt-3 border-b border-gray-100 dark:border-gray-800">
                     <button type="button"
