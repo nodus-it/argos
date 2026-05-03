@@ -25,8 +25,16 @@ class AnthropicUsageSidebar extends Component
 
     public function loadUsage(): void
     {
-        if (Cache::has('anthropic_usage')) {
+        // Show stale data while backing off from a previous error/rate-limit.
+        if (Cache::has('anthropic_usage_backoff')) {
             $this->applyData(Cache::get('anthropic_usage'));
+
+            return;
+        }
+
+        // Serve fresh cached data without hitting the API.
+        if (($data = Cache::get('anthropic_usage')) !== null) {
+            $this->applyData($data);
 
             return;
         }
@@ -48,24 +56,25 @@ class AnthropicUsageSidebar extends Component
                 ->get('https://api.anthropic.com/api/oauth/usage');
 
             if ($response->status() === 429) {
-                // Back off for 10 minutes — don't hammer on rate limit
-                Cache::put('anthropic_usage', null, 600);
+                Cache::put('anthropic_usage_backoff', true, 600);
 
                 return;
             }
 
             if (! $response->successful()) {
-                Cache::put('anthropic_usage', null, 300);
+                Cache::put('anthropic_usage_backoff', true, 300);
                 Log::channel('argos')->warning('Anthropic usage API error', ['status' => $response->status()]);
 
                 return;
             }
 
             $data = $response->json();
-            Cache::put('anthropic_usage', $data, 300);
+            // Cache successful data for 30 min so stale data stays visible during backoff periods.
+            Cache::put('anthropic_usage', $data, 1800);
+            Cache::forget('anthropic_usage_backoff');
             $this->applyData($data);
         } catch (\Throwable $e) {
-            Cache::put('anthropic_usage', null, 300);
+            Cache::put('anthropic_usage_backoff', true, 300);
             Log::channel('argos')->error('Anthropic usage API failed', ['error' => $e->getMessage()]);
         }
     }
