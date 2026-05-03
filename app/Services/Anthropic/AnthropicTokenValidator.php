@@ -19,6 +19,7 @@ final class AnthropicTokenValidator
         try {
             $response = Http::withToken($token)
                 ->withHeaders([
+                    'anthropic-version' => '2023-06-01',
                     'anthropic-beta' => 'oauth-2025-04-20',
                     'User-Agent' => 'claude-code/2.0.31',
                 ])
