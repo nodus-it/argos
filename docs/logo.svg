@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 280" role="img" aria-label="Argos">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0f172a"/>
+      <stop offset="1" stop-color="#1e1b4b"/>
+    </linearGradient>
+    <linearGradient id="iris" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#a5b4fc"/>
+      <stop offset="1" stop-color="#6366f1"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="960" height="280" rx="28" fill="url(#bg)"/>
+
+  <g transform="translate(60 40)">
+    <rect width="200" height="200" rx="44" fill="#0b1024"/>
+    <path d="M 24,100 Q 100,40 176,100 Q 100,160 24,100 Z" fill="#e2e8f0"/>
+    <circle cx="100" cy="100" r="42" fill="#1e293b"/>
+    <circle cx="100" cy="100" r="26" fill="url(#iris)"/>
+    <path d="M 90,86 L 110,100 L 90,114" stroke="#eef2ff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    <circle cx="118" cy="84" r="9" fill="url(#glow)"/>
+  </g>
+
+  <g transform="translate(310 0)" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" fill="#f8fafc">
+    <text x="0" y="150" font-size="116" font-weight="800" letter-spacing="6">ARGOS</text>
+    <text x="6" y="200" font-size="22" font-weight="500" fill="#a5b4fc" letter-spacing="3">WEB-FIRST DEV AGENT</text>
+    <text x="6" y="232" font-size="18" font-weight="400" fill="#94a3b8" letter-spacing="1">concept · implement · diff · push · respond</text>
+  </g>
+</svg>

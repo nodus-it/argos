@@ -1,0 +1,116 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version (z.B. 0.2.0, ohne v-Prefix)'
+        required: true
+        type: string
+      prerelease:
+        description: 'Pre-Release-Suffix (alpha.1, beta.1, rc.1) — leer für stable'
+        required: false
+        type: string
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0   # wichtig: volle History für git log + describe
+          ref: develop
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Validate version input
+        run: |
+          if [[ ! "${{ inputs.version }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::version muss SemVer X.Y.Z sein, ohne v-Prefix (z.B. 0.2.0)"
+            exit 1
+          fi
+
+      - name: Compute tag name
+        id: tag
+        run: |
+          if [ -n "${{ inputs.prerelease }}" ]; then
+            echo "name=v${{ inputs.version }}-${{ inputs.prerelease }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=v${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Fail if tag already exists
+        run: |
+          if git rev-parse "${{ steps.tag.outputs.name }}" >/dev/null 2>&1; then
+            echo "::error::Tag ${{ steps.tag.outputs.name }} existiert bereits"
+            exit 1
+          fi
+
+      - name: Build changelog entry
+        run: |
+          # Letztes stable Tag suchen (Pre-Releases überspringen), damit das
+          # Changelog eines stable Releases alle Commits seit dem letzten
+          # stable umfasst — nicht nur die Delta seit dem letzten alpha/beta/rc.
+          LAST_TAG=$(git tag --list 'v*' --sort=-v:refname \
+                      | grep -Ev -- '-(alpha|beta|rc)' \
+                      | head -n1)
+          if [ -z "$LAST_TAG" ]; then
+            RANGE="HEAD"
+          else
+            RANGE="$LAST_TAG..HEAD"
+          fi
+
+          {
+            echo "## [${{ steps.tag.outputs.name }}] - $(date +%Y-%m-%d)"
+            echo ""
+            git log "$RANGE" --pretty=format:"- %s (%h)" --no-merges
+            echo ""
+            echo ""
+          } > /tmp/entry.md
+
+          if [ ! -f CHANGELOG.md ]; then
+            printf "# Changelog\n\n" > CHANGELOG.md
+          fi
+
+          # neuen Eintrag oben einfügen, unter dem "# Changelog"-Header
+          {
+            head -n 2 CHANGELOG.md
+            cat /tmp/entry.md
+            tail -n +3 CHANGELOG.md
+          } > CHANGELOG.md.new
+          mv CHANGELOG.md.new CHANGELOG.md
+
+      - name: Commit changelog to develop
+        run: |
+          git add CHANGELOG.md
+          git commit -m "chore: changelog for ${{ steps.tag.outputs.name }}"
+          git push origin develop
+
+      - name: Merge develop into master
+        run: |
+          git fetch origin master:master
+          git checkout master
+          git merge --no-ff develop -m "Release ${{ steps.tag.outputs.name }}"
+
+      - name: Tag and push
+        run: |
+          git tag -a "${{ steps.tag.outputs.name }}" -m "Release ${{ steps.tag.outputs.name }}"
+          git push origin master
+          git push origin "${{ steps.tag.outputs.name }}"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          FLAGS=""
+          [ -n "${{ inputs.prerelease }}" ] && FLAGS="--prerelease"
+          gh release create "${{ steps.tag.outputs.name }}" \
+            --target master \
+            --title "${{ steps.tag.outputs.name }}" \
+            --notes-file /tmp/entry.md \
+            $FLAGS
