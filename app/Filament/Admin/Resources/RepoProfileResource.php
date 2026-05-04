@@ -228,7 +228,9 @@ class RepoProfileResource extends Resource
                             }
                             try {
                                 return (new GitHubGitService($account->token))->getRepoOptions();
-                            } catch (\Throwable) {
+                            } catch (\Throwable $e) {
+                                report($e);
+
                                 return [];
                             }
                         })
@@ -272,7 +274,9 @@ class RepoProfileResource extends Resource
                             }
                             try {
                                 return (new GitHubGitService($account->token))->getBranchOptions($repo);
-                            } catch (\Throwable) {
+                            } catch (\Throwable $e) {
+                                report($e);
+
                                 return [];
                             }
                         })
@@ -292,7 +296,9 @@ class RepoProfileResource extends Resource
                             }
                             try {
                                 return (new GitLabGitService($account->token, $account->getInstanceUrl()))->getRepoOptions();
-                            } catch (\Throwable) {
+                            } catch (\Throwable $e) {
+                                report($e);
+
                                 return [];
                             }
                         })
@@ -337,7 +343,9 @@ class RepoProfileResource extends Resource
                             }
                             try {
                                 return (new GitLabGitService($account->token, $account->getInstanceUrl()))->getBranchOptions($repo);
-                            } catch (\Throwable) {
+                            } catch (\Throwable $e) {
+                                report($e);
+
                                 return [];
                             }
                         })
@@ -357,7 +365,9 @@ class RepoProfileResource extends Resource
                             }
                             try {
                                 return (new BitbucketGitService($account->token))->getRepoOptions();
-                            } catch (\Throwable) {
+                            } catch (\Throwable $e) {
+                                report($e);
+
                                 return [];
                             }
                         })
@@ -401,7 +411,9 @@ class RepoProfileResource extends Resource
                             }
                             try {
                                 return (new BitbucketGitService($account->token))->getBranchOptions($repo);
-                            } catch (\Throwable) {
+                            } catch (\Throwable $e) {
+                                report($e);
+
                                 return [];
                             }
                         })
@@ -473,7 +485,9 @@ class RepoProfileResource extends Resource
 
                             try {
                                 return app(GitServiceFactory::class)->forPlatform($platform, $token, $instanceUrl)->getBranchOptions($ownerRepo);
-                            } catch (\Throwable) {
+                            } catch (\Throwable $e) {
+                                report($e);
+
                                 return [];
                             }
                         })
