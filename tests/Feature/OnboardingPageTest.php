@@ -29,7 +29,7 @@ class OnboardingPageTest extends TestCase
     {
         Livewire::test(Onboarding::class)
             ->assertSuccessful()
-            ->assertSee('Argos einrichten');
+            ->assertSee('Set up Argos');
     }
 
     public function test_onboarding_shows_token_help_when_missing(): void
@@ -86,13 +86,13 @@ class OnboardingPageTest extends TestCase
 
         Livewire::test(Onboarding::class)
             ->assertSet('githubOAuthAvailable', false)
-            ->assertDontSee('Mit GitHub verbinden');
+            ->assertDontSee('Connect with GitHub');
 
         config(['services.github.client_id' => 'cid', 'services.github.client_secret' => 'cs']);
 
         Livewire::test(Onboarding::class)
             ->assertSet('githubOAuthAvailable', true)
-            ->assertSee('Mit GitHub verbinden');
+            ->assertSee('Connect with GitHub');
     }
 
     public function test_disconnect_github_removes_connected_account(): void

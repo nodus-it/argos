@@ -3,19 +3,19 @@
 
         <div class="flex items-center gap-3">
             @if ($tokenSource === 'env')
-                <x-filament::badge color="success">gesetzt</x-filament::badge>
+                <x-filament::badge color="success">{{ __('settings.blade.badge_set') }}</x-filament::badge>
                 <span class="text-sm text-gray-500 dark:text-gray-400">
-                    Token kommt aus <code>CLAUDE_CODE_OAUTH_TOKEN</code> (ENV).
+                    {!! __('settings.blade.token_from_env') !!}
                 </span>
             @elseif ($tokenSource === 'file')
-                <x-filament::badge color="success">gesetzt</x-filament::badge>
+                <x-filament::badge color="success">{{ __('settings.blade.badge_set') }}</x-filament::badge>
                 <span class="text-sm text-gray-500 dark:text-gray-400">
-                    Token ist im Config-Verzeichnis hinterlegt.
+                    {{ __('settings.blade.token_from_file') }}
                 </span>
             @else
-                <x-filament::badge color="danger">nicht gesetzt</x-filament::badge>
+                <x-filament::badge color="danger">{{ __('settings.blade.badge_not_set') }}</x-filament::badge>
                 <span class="text-sm text-gray-500 dark:text-gray-400">
-                    Phasen können nicht ausgeführt werden, bis ein Token hinterlegt ist.
+                    {{ __('settings.blade.token_missing') }}
                 </span>
             @endif
         </div>
@@ -34,30 +34,30 @@
             @include('filament.admin.partials.claude-token-help')
         @endif
 
-        <x-filament::section heading="Datenbank">
+        <x-filament::section heading="{{ __('settings.blade.db_section') }}">
             <p class="text-sm text-gray-700 dark:text-gray-300">
-                Aktive Verbindung: <strong>{{ $dbConnection }}</strong>
+                {!! __('settings.blade.db_connection', ['connection' => $dbConnection]) !!}
             </p>
             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                Konfigurierbar über <code>DB_CONNECTION</code> und <code>DB_DATABASE</code>.
+                {!! __('settings.blade.db_config_hint') !!}
             </p>
         </x-filament::section>
 
-        <x-filament::section heading="Worker Image">
+        <x-filament::section heading="{{ __('settings.blade.worker_section') }}">
             <p class="text-sm text-gray-700 dark:text-gray-300">
                 <code>{{ $workerImage }}</code>
             </p>
             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                Konfigurierbar über <code>ARGOS_WORKER_IMAGE</code>.
+                {!! __('settings.blade.worker_config_hint') !!}
             </p>
         </x-filament::section>
 
-        <x-filament::section heading="Logs">
+        <x-filament::section heading="{{ __('settings.blade.logs_section') }}">
             <p class="text-sm text-gray-700 dark:text-gray-300">
-                Manager-Log (PHP-Seite): Phase-Starts, Fehler, Job-Dispatches.
+                {{ __('settings.blade.logs_description') }}
             </p>
             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400 mb-3">
-                Worker-Logs pro Phase sind im Task-View unter „Logs" abrufbar.
+                {{ __('settings.blade.logs_hint') }}
             </p>
             <x-filament::button
                 tag="a"
@@ -67,7 +67,7 @@
                 icon="heroicon-o-arrow-down-tray"
                 size="sm"
             >
-                Application Log herunterladen
+                {{ __('settings.blade.logs_download') }}
             </x-filament::button>
         </x-filament::section>
 

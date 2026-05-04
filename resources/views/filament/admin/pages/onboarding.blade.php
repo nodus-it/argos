@@ -3,7 +3,7 @@
     <div class="max-w-2xl mx-auto space-y-6">
 
         <p class="text-sm text-gray-500 dark:text-gray-400">
-            In drei Schritten ist Argos einsatzbereit: Claude-Token hinterlegen, optional GitHub verbinden und dann das erste Projekt anlegen.
+            {{ __('onboarding.intro') }}
         </p>
 
         {{-- Step 1: Claude Token --}}
@@ -16,41 +16,41 @@
                         1
                     @endif
                 </span>
-                <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">Claude Token</span>
+                <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">{{ __('onboarding.steps.claude_token') }}</span>
             </div>
             <div class="px-5 py-4 space-y-4">
 
                 @if($tokenSource === 'env')
                     <div class="flex items-center gap-3">
                         <x-heroicon-o-check-circle class="h-5 w-5 text-emerald-500 flex-shrink-0" />
-                        <span class="text-sm text-gray-700 dark:text-gray-300">Token kommt aus der Umgebungsvariable <code class="text-xs">CLAUDE_CODE_OAUTH_TOKEN</code> — nichts zu tun.</span>
+                        <span class="text-sm text-gray-700 dark:text-gray-300">{!! __('onboarding.token.from_env') !!}</span>
                     </div>
                 @elseif($tokenSource === 'file')
                     <div class="flex items-center gap-3">
                         <x-heroicon-o-check-circle class="h-5 w-5 text-emerald-500 flex-shrink-0" />
-                        <span class="text-sm text-gray-700 dark:text-gray-300">Token ist gespeichert.</span>
+                        <span class="text-sm text-gray-700 dark:text-gray-300">{{ __('onboarding.token.is_saved') }}</span>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Token überschreiben</label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('onboarding.token.override_label') }}</label>
                         <div class="flex gap-2">
-                            <input wire:model="claudeToken" type="password" placeholder="sk-ant-oat01-…" autocomplete="off"
+                            <input wire:model="claudeToken" type="password" placeholder="{{ __('onboarding.token.placeholder') }}" autocomplete="off"
                                 class="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-500" />
                             <x-filament::button wire:click="saveClaudeToken" type="button">
-                                Speichern
+                                {{ __('onboarding.token.save_button') }}
                             </x-filament::button>
                         </div>
                     </div>
                 @else
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Token <span class="text-red-500">*</span></label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('onboarding.token.label') }} <span class="text-red-500">*</span></label>
                         <div class="flex gap-2">
-                            <input wire:model="claudeToken" type="password" placeholder="sk-ant-oat01-…" autocomplete="off"
+                            <input wire:model="claudeToken" type="password" placeholder="{{ __('onboarding.token.placeholder') }}" autocomplete="off"
                                 class="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-500" />
                             <x-filament::button wire:click="saveClaudeToken" type="button">
-                                Speichern
+                                {{ __('onboarding.token.save_button') }}
                             </x-filament::button>
                         </div>
-                        <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">Wird im Config-Verzeichnis abgelegt (mode 0600).</p>
+                        <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">{{ __('onboarding.token.help') }}</p>
                     </div>
                     @include('filament.admin.partials.claude-token-help')
                 @endif
@@ -69,39 +69,39 @@
                             2
                         @endif
                     </span>
-                    <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">GitHub verbinden</span>
-                    <span class="ml-auto text-xs text-gray-400 dark:text-gray-500">optional</span>
+                    <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">{{ __('onboarding.steps.github_connect') }}</span>
+                    <span class="ml-auto text-xs text-gray-400 dark:text-gray-500">{{ __('onboarding.steps.github_optional') }}</span>
                 </div>
                 <div class="px-5 py-4 space-y-3">
                     @if($githubConnected)
                         <div class="flex items-center justify-between gap-3">
                             <div class="flex items-center gap-3">
                                 <x-heroicon-o-check-circle class="h-5 w-5 text-emerald-500 flex-shrink-0" />
-                                <span class="text-sm text-gray-700 dark:text-gray-300">GitHub-Account ist verbunden.</span>
+                                <span class="text-sm text-gray-700 dark:text-gray-300">{{ __('onboarding.github.connected') }}</span>
                             </div>
                             <x-filament::button
                                 wire:click="disconnectGitHub"
-                                wire:confirm="GitHub-Verbindung wirklich trennen?"
+                                wire:confirm="{{ __('onboarding.github.disconnect') }}?"
                                 color="gray"
                                 size="sm"
                             >
-                                Trennen
+                                {{ __('onboarding.github.disconnect') }}
                             </x-filament::button>
                         </div>
                         <p class="text-xs text-gray-500 dark:text-gray-400">
-                            Tipp: Wenn du beim Verbinden keine Auswahlmaske mehr siehst, widerrufe die App zuerst auf
+                            {{ __('onboarding.github.tip') }}
                             <a href="https://github.com/settings/applications" target="_blank" rel="noopener" class="underline hover:text-gray-700 dark:hover:text-gray-300">github.com/settings/applications</a>.
                         </p>
                     @else
                         <p class="text-sm text-gray-500 dark:text-gray-400">
-                            Verbinde deinen GitHub-Account per OAuth — danach kannst du Projekte ohne Personal Access Token anlegen.
+                            {{ __('onboarding.github.description') }}
                         </p>
                         <x-filament::button
                             tag="a"
                             href="{{ route('auth.github.redirect', ['return' => 'onboarding']) }}"
                             icon="heroicon-o-arrow-right-circle"
                         >
-                            Mit GitHub verbinden
+                            {{ __('onboarding.github.connect_button') }}
                         </x-filament::button>
                     @endif
                 </div>
@@ -114,18 +114,18 @@
                 <span class="flex h-6 w-6 items-center justify-center rounded-full bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400 text-xs font-bold">
                     {{ $githubOAuthAvailable ? '3' : '2' }}
                 </span>
-                <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">Erstes Projekt anlegen</span>
+                <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">{{ __('onboarding.steps.first_project') }}</span>
             </div>
             <div class="px-5 py-4 space-y-3">
                 <p class="text-sm text-gray-500 dark:text-gray-400">
-                    Verbinde Argos mit einem Git-Repository. Weitere Projekte kannst du danach jederzeit unter <strong>Konfiguration → Projekte</strong> anlegen.
+                    {!! __('onboarding.project.description') !!}
                 </p>
                 <x-filament::button
                     tag="a"
                     href="{{ route('filament.admin.resources.repo-profiles.create') }}"
                     icon="heroicon-o-rocket-launch"
                 >
-                    Projekt anlegen
+                    {{ __('onboarding.project.create_button') }}
                 </x-filament::button>
             </div>
         </div>

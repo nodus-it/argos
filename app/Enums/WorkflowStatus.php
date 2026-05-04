@@ -18,14 +18,14 @@ enum WorkflowStatus: string
     public function label(): string
     {
         return match ($this) {
-            self::Draft => 'Entwurf',
-            self::ConceptRunning => 'Konzept läuft',
-            self::ConceptReview => 'Konzept bereit',
-            self::ImplementRunning => 'Implementierung läuft',
-            self::ImplementPaused => 'Pausiert (Turn-Limit)',
-            self::InReview => 'In Review',
-            self::Completed => 'Abgeschlossen',
-            self::Failed => 'Fehlgeschlagen',
+            self::Draft => __('enums.workflow_status.draft'),
+            self::ConceptRunning => __('enums.workflow_status.concept_running'),
+            self::ConceptReview => __('enums.workflow_status.concept_review'),
+            self::ImplementRunning => __('enums.workflow_status.implement_running'),
+            self::ImplementPaused => __('enums.workflow_status.implement_paused'),
+            self::InReview => __('enums.workflow_status.in_review'),
+            self::Completed => __('enums.workflow_status.completed'),
+            self::Failed => __('enums.workflow_status.failed'),
         };
     }
 

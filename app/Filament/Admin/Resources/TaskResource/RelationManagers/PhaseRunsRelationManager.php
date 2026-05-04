@@ -8,12 +8,16 @@ use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
 
 class PhaseRunsRelationManager extends RelationManager
 {
     protected static string $relationship = 'phaseRuns';
 
-    protected static ?string $title = 'Phase-Läufe';
+    public static function getTitle(Model $ownerRecord, string $pageClass): string
+    {
+        return __('enums.phase_runs.title');
+    }
 
     public function form(Schema $schema): Schema
     {
@@ -25,15 +29,15 @@ class PhaseRunsRelationManager extends RelationManager
         return $table
             ->columns([
                 TextColumn::make('phase')
-                    ->label('Phase')
+                    ->label(__('enums.phase_runs.columns.phase'))
                     ->sortable(),
 
                 TextColumn::make('iteration')
-                    ->label('#')
+                    ->label(__('enums.phase_runs.columns.iteration'))
                     ->sortable(),
 
                 TextColumn::make('status')
-                    ->label('Status')
+                    ->label(__('enums.phase_runs.columns.status'))
                     ->badge()
                     ->color(fn (?string $state): string => match ($state) {
                         'running' => 'warning',
@@ -45,17 +49,17 @@ class PhaseRunsRelationManager extends RelationManager
                     }),
 
                 TextColumn::make('started_at')
-                    ->label('Gestartet')
+                    ->label(__('enums.phase_runs.columns.started'))
                     ->dateTime('d.m.Y H:i:s')
                     ->sortable(),
 
                 TextColumn::make('finished_at')
-                    ->label('Beendet')
+                    ->label(__('enums.phase_runs.columns.finished'))
                     ->dateTime('d.m.Y H:i:s')
                     ->sortable(),
 
                 TextColumn::make('duration')
-                    ->label('Dauer')
+                    ->label(__('enums.phase_runs.columns.duration'))
                     ->state(fn ($record): ?int => ($record->started_at && $record->finished_at)
                         ? (int) $record->started_at->diffInSeconds($record->finished_at)
                         : null
@@ -63,7 +67,7 @@ class PhaseRunsRelationManager extends RelationManager
                     ->formatStateUsing(fn (?int $state): string => $state !== null ? $state.'s' : '—'),
 
                 TextColumn::make('input_tokens')
-                    ->label('Input')
+                    ->label(__('enums.phase_runs.columns.input'))
                     ->formatStateUsing(fn ($state): string => $state !== null
                         ? number_format((int) $state)
                         : '—'
@@ -71,7 +75,7 @@ class PhaseRunsRelationManager extends RelationManager
                     ->toggleable(),
 
                 TextColumn::make('output_tokens')
-                    ->label('Output')
+                    ->label(__('enums.phase_runs.columns.output'))
                     ->formatStateUsing(fn ($state): string => $state !== null
                         ? number_format((int) $state)
                         : '—'
@@ -79,7 +83,7 @@ class PhaseRunsRelationManager extends RelationManager
                     ->toggleable(),
 
                 TextColumn::make('cost_usd')
-                    ->label('Kosten')
+                    ->label(__('enums.phase_runs.columns.cost'))
                     ->formatStateUsing(fn ($state): string => $state !== null
                         ? '$'.number_format((float) $state, 4)
                         : '—'

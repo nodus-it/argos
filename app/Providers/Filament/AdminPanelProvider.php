@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Providers\Filament;
 
+use App\Filament\Admin\Pages\Profile;
 use App\Filament\Admin\Widgets\CurrentTasksWidget;
 use App\Filament\Admin\Widgets\StatsOverviewWidget;
 use App\Http\Middleware\RedirectToOnboarding;
+use App\Http\Middleware\SetUserLocale;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -53,11 +55,11 @@ class AdminPanelProvider extends PanelProvider
                 CurrentTasksWidget::class,
             ])
             ->navigationGroups([
-                'Aufgaben',
-                'Konfiguration',
+                __('navigation.groups.tasks'),
+                __('navigation.groups.configuration'),
             ])
             ->login()
-            ->profile()
+            ->profile(Profile::class)
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
@@ -69,7 +71,7 @@ class AdminPanelProvider extends PanelProvider
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
             ])
-            ->authMiddleware([Authenticate::class, RedirectToOnboarding::class])
+            ->authMiddleware([Authenticate::class, SetUserLocale::class, RedirectToOnboarding::class])
             ->renderHook(
                 PanelsRenderHook::HEAD_END,
                 function (): HtmlString {

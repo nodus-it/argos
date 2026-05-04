@@ -43,7 +43,7 @@ class SettingsPageTest extends TestCase
     {
         Livewire::test(Settings::class)
             ->assertSuccessful()
-            ->assertSee('Einstellungen');
+            ->assertSee('Settings');
     }
 
     public function test_settings_shows_token_missing_state(): void
@@ -51,7 +51,7 @@ class SettingsPageTest extends TestCase
         config(['argos.claude_token' => null]);
 
         Livewire::test(Settings::class)
-            ->assertSee('nicht gesetzt')
+            ->assertSee('not set')
             ->assertSee('claude setup-token');
     }
 
@@ -60,7 +60,7 @@ class SettingsPageTest extends TestCase
         config(['argos.claude_token' => 'sk-ant-test-token']);
 
         Livewire::test(Settings::class)
-            ->assertSee('gesetzt');
+            ->assertSee('set');
     }
 
     public function test_settings_shows_db_connection(): void
@@ -118,7 +118,7 @@ class SettingsPageTest extends TestCase
         Livewire::test(Settings::class)
             ->fillForm(['claude_token' => 'sk-ant-oat01-invalid'])
             ->call('save')
-            ->assertNotified('Token ungültig');
+            ->assertNotified('Token invalid');
 
         $this->assertNull(app(CredentialStore::class)->getClaudeToken());
     }
@@ -132,7 +132,7 @@ class SettingsPageTest extends TestCase
         Livewire::test(Settings::class)
             ->fillForm(['claude_token' => 'sk-ant-oat01-unreachable'])
             ->call('save')
-            ->assertNotified('Token gespeichert');
+            ->assertNotified('Token saved');
 
         $this->assertSame('sk-ant-oat01-unreachable', app(CredentialStore::class)->getClaudeToken());
     }

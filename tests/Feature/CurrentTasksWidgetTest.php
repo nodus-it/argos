@@ -26,7 +26,7 @@ class CurrentTasksWidgetTest extends TestCase
     {
         Livewire::test(CurrentTasksWidget::class)
             ->assertSuccessful()
-            ->assertSee('Noch keine Tasks');
+            ->assertSee('No tasks yet');
     }
 
     public function test_widget_lists_existing_tasks(): void

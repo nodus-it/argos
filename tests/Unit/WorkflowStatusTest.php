@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit;
 
 use App\Enums\WorkflowStatus;
-use PHPUnit\Framework\TestCase;
+use Tests\TestCase;
 
 class WorkflowStatusTest extends TestCase
 {

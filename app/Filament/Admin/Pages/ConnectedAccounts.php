@@ -22,12 +22,12 @@ class ConnectedAccounts extends Page
 
     public static function getNavigationGroup(): ?string
     {
-        return 'Konfiguration';
+        return __('accounts.navigation_group');
     }
 
     public static function getNavigationLabel(): string
     {
-        return 'Verknüpfte Accounts';
+        return __('accounts.navigation_label');
     }
 
     public static function getNavigationSort(): ?int
@@ -37,7 +37,7 @@ class ConnectedAccounts extends Page
 
     public function getTitle(): string
     {
-        return 'Verknüpfte Accounts';
+        return __('accounts.title');
     }
 
     /**
@@ -63,7 +63,7 @@ class ConnectedAccounts extends Page
 
         if (! $hasGitHub) {
             $actions[] = Action::make('connectGitHub')
-                ->label('Mit GitHub verbinden')
+                ->label(__('accounts.actions.connect_github'))
                 ->icon('heroicon-o-arrow-right-circle')
                 ->url(route('auth.github.redirect'));
         }
@@ -79,7 +79,7 @@ class ConnectedAccounts extends Page
         $user->connectedAccounts()->where('provider', 'github')->delete();
 
         Notification::make()
-            ->title('GitHub-Verbindung getrennt')
+            ->title(__('accounts.notifications.github_disconnected'))
             ->success()
             ->send();
     }

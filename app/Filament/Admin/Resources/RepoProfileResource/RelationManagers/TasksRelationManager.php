@@ -12,12 +12,16 @@ use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
 
 class TasksRelationManager extends RelationManager
 {
     protected static string $relationship = 'tasks';
 
-    protected static ?string $title = 'Tasks';
+    public static function getTitle(Model $ownerRecord, string $pageClass): string
+    {
+        return __('projects.columns.tasks');
+    }
 
     public function form(Schema $schema): Schema
     {
@@ -30,19 +34,19 @@ class TasksRelationManager extends RelationManager
             ->defaultSort('created_at', 'desc')
             ->columns([
                 TextColumn::make('name')
-                    ->label('Name')
+                    ->label(__('widgets.current_tasks.columns.task'))
                     ->searchable()
                     ->sortable(),
 
                 TextColumn::make('current_phase')
-                    ->label('Phase')
+                    ->label(__('tasks.columns.phase'))
                     ->badge()
                     ->icon(fn (?string $state): ?string => CurrentTasksWidget::phaseIcon($state))
                     ->color(fn (?string $state): string => CurrentTasksWidget::phaseColor($state))
                     ->formatStateUsing(fn (?string $state): string => CurrentTasksWidget::phaseLabel($state)),
 
                 TextColumn::make('current_status')
-                    ->label('Status')
+                    ->label(__('tasks.columns.status'))
                     ->badge()
                     ->color(fn (?string $state): string => match ($state) {
                         'pending' => 'gray',
@@ -56,20 +60,20 @@ class TasksRelationManager extends RelationManager
                         default => 'gray',
                     })
                     ->formatStateUsing(fn (?string $state): string => match ($state) {
-                        'paused' => 'Pausiert',
-                        'lock_blocked' => 'Lock blockiert',
+                        'paused' => __('common.status.paused'),
+                        'lock_blocked' => __('common.status.lock_blocked'),
                         default => (string) $state,
                     })
                     ->placeholder('—'),
 
                 TextColumn::make('workflow_status')
-                    ->label('Workflow')
+                    ->label(__('tasks.columns.workflow'))
                     ->badge()
                     ->color(fn (?WorkflowStatus $state): string => $state?->color() ?? 'gray')
                     ->formatStateUsing(fn (?WorkflowStatus $state): string => $state?->label() ?? '—'),
 
                 TextColumn::make('created_at')
-                    ->label('Erstellt')
+                    ->label(__('tasks.columns.created'))
                     ->since()
                     ->sortable(),
             ])

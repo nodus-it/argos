@@ -37,18 +37,24 @@ class StatsOverviewWidget extends BaseWidget
             ->count();
 
         return [
-            Stat::make('Laufende Worker', $runningWorkers)
-                ->description($runningWorkers > 0 ? 'Container arbeiten gerade' : 'Keine aktiven Worker')
+            Stat::make(__('widgets.stats.running_workers'), $runningWorkers)
+                ->description($runningWorkers > 0
+                    ? __('widgets.stats.workers_active')
+                    : __('widgets.stats.workers_idle'))
                 ->descriptionIcon('heroicon-m-cpu-chip')
                 ->color($runningWorkers > 0 ? 'warning' : 'gray'),
 
-            Stat::make('In Bearbeitung', $inProgress)
-                ->description($inProgress === 1 ? '1 Task läuft' : "{$inProgress} Tasks laufen")
+            Stat::make(__('widgets.stats.in_progress'), $inProgress)
+                ->description($inProgress === 1
+                    ? __('widgets.stats.tasks_running_one')
+                    : __('widgets.stats.tasks_running_many', ['count' => $inProgress]))
                 ->descriptionIcon('heroicon-m-arrow-path')
                 ->color($inProgress > 0 ? 'info' : 'gray'),
 
-            Stat::make('Wartet auf dich', $waitingForInput)
-                ->description($waitingForInput > 0 ? 'Review oder Antwort offen' : 'Nichts zu tun')
+            Stat::make(__('widgets.stats.waiting'), $waitingForInput)
+                ->description($waitingForInput > 0
+                    ? __('widgets.stats.review_open')
+                    : __('widgets.stats.nothing_todo'))
                 ->descriptionIcon('heroicon-m-hand-raised')
                 ->color($waitingForInput > 0 ? 'primary' : 'success'),
         ];

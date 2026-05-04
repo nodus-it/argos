@@ -38,7 +38,7 @@ class Onboarding extends Page
 
     public static function getNavigationLabel(): string
     {
-        return 'Einrichtung';
+        return __('onboarding.navigation_label');
     }
 
     public static function shouldRegisterNavigation(): bool
@@ -48,7 +48,7 @@ class Onboarding extends Page
 
     public function getTitle(): string
     {
-        return 'Argos einrichten';
+        return __('onboarding.title');
     }
 
     public function mount(): void
@@ -80,14 +80,14 @@ class Onboarding extends Page
         $user->connectedAccounts()->where('provider', 'github')->delete();
         $this->refreshState();
 
-        Notification::make()->title('GitHub-Verbindung getrennt')->success()->send();
+        Notification::make()->title(__('onboarding.notifications.github_disconnected'))->success()->send();
     }
 
     public function saveClaudeToken(): void
     {
         if ($this->tokenSource === 'env') {
             Notification::make()
-                ->title('Token kommt aus der Umgebungsvariable')
+                ->title(__('onboarding.notifications.env_token'))
                 ->warning()
                 ->send();
 
@@ -97,7 +97,7 @@ class Onboarding extends Page
         $token = trim($this->claudeToken);
 
         if ($token === '') {
-            Notification::make()->title('Bitte einen Token eingeben')->warning()->send();
+            Notification::make()->title(__('onboarding.notifications.empty_token'))->warning()->send();
 
             return;
         }
@@ -106,8 +106,8 @@ class Onboarding extends Page
 
         if ($valid === false) {
             Notification::make()
-                ->title('Token ungültig')
-                ->body('Der eingegebene Token wurde von der API abgelehnt.')
+                ->title(__('onboarding.notifications.invalid_token_title'))
+                ->body(__('onboarding.notifications.invalid_token_body'))
                 ->danger()
                 ->send();
 
@@ -120,12 +120,12 @@ class Onboarding extends Page
 
         if ($valid === null) {
             Notification::make()
-                ->title('Token gespeichert')
-                ->body('Hinweis: Token konnte nicht gegen die API geprüft werden — Verbindung nicht erreichbar.')
+                ->title(__('onboarding.notifications.saved_title'))
+                ->body(__('onboarding.notifications.saved_unreachable_body'))
                 ->warning()
                 ->send();
         } else {
-            Notification::make()->title('Token gespeichert')->success()->send();
+            Notification::make()->title(__('onboarding.notifications.saved_title'))->success()->send();
         }
     }
 }
