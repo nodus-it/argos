@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="tests/External/bootstrap.php"
+         colors="true"
+>
+    <!--
+        External Provider Contract Tests.
+
+        Hits real provider APIs (GitHub/GitLab/Bitbucket) and writes to a
+        dedicated test repository. Not part of the default `php artisan test`
+        run; invoke explicitly via:
+
+            php artisan test [c]onfiguration=phpunit.external.xml
+
+        Credentials live in .env.testing.external (gitignored). See
+        docs/PROVIDER-TEST-SETUP.md for setup steps.
+    -->
+    <testsuites>
+        <testsuite name="External">
+            <directory>tests/External</directory>
+        </testsuite>
+    </testsuites>
+    <php>
+        <env name="APP_ENV" value="testing" force="true"/>
+        <env name="APP_KEY" value="base64:zTobRxr7TepBXVjM/E3kjKGAwnxWQ7QWMMXaInQYKKg=" force="true"/>
+        <env name="APP_MAINTENANCE_DRIVER" value="file" force="true"/>
+        <env name="BCRYPT_ROUNDS" value="4" force="true"/>
+        <env name="DB_CONNECTION" value="sqlite" force="true"/>
+        <env name="DB_DATABASE" value=":memory:" force="true"/>
+        <env name="DB_URL" value="" force="true"/>
+        <env name="PULSE_ENABLED" value="false" force="true"/>
+        <env name="TELESCOPE_ENABLED" value="false" force="true"/>
+        <env name="NIGHTWATCH_ENABLED" value="false" force="true"/>
+
+        <server name="APP_ENV" value="testing" force="true"/>
+        <server name="APP_KEY" value="base64:zTobRxr7TepBXVjM/E3kjKGAwnxWQ7QWMMXaInQYKKg=" force="true"/>
+        <server name="APP_MAINTENANCE_DRIVER" value="file" force="true"/>
+        <server name="BCRYPT_ROUNDS" value="4" force="true"/>
+        <server name="DB_CONNECTION" value="sqlite" force="true"/>
+        <server name="DB_DATABASE" value=":memory:" force="true"/>
+        <server name="DB_URL" value="" force="true"/>
+        <server name="PULSE_ENABLED" value="false" force="true"/>
+        <server name="TELESCOPE_ENABLED" value="false" force="true"/>
+        <server name="NIGHTWATCH_ENABLED" value="false" force="true"/>
+    </php>
+</phpunit>

@@ -23,6 +23,7 @@ logs/
 .env.local
 .env.backup
 .env.production
+.env.testing.external
 *.local
 /auth.json
 
