@@ -45,6 +45,11 @@ class ConnectedAccounts extends Page
         return filled(config('services.gitlab.client_id'));
     }
 
+    public function isBitbucketConfigured(): bool
+    {
+        return filled(config('services.bitbucket.client_id'));
+    }
+
     /**
      * @return array<string, ConnectedAccount|null>
      */
@@ -56,6 +61,7 @@ class ConnectedAccounts extends Page
         return [
             'github' => $user->connectedAccount('github'),
             'gitlab' => $user->connectedAccount('gitlab'),
+            'bitbucket' => $user->connectedAccount('bitbucket'),
         ];
     }
 
@@ -65,6 +71,7 @@ class ConnectedAccounts extends Page
         $user = Auth::user();
         $hasGitHub = $user->connectedAccount('github') !== null;
         $hasGitLab = $user->connectedAccount('gitlab') !== null;
+        $hasBitbucket = $user->connectedAccount('bitbucket') !== null;
 
         $actions = [];
 
@@ -80,6 +87,13 @@ class ConnectedAccounts extends Page
                 ->label(__('accounts.actions.connect_gitlab'))
                 ->icon('heroicon-o-arrow-right-circle')
                 ->url(route('auth.gitlab.redirect'));
+        }
+
+        if ($this->isBitbucketConfigured() && ! $hasBitbucket) {
+            $actions[] = Action::make('connectBitbucket')
+                ->label(__('accounts.actions.connect_bitbucket'))
+                ->icon('heroicon-o-arrow-right-circle')
+                ->url(route('auth.bitbucket.redirect'));
         }
 
         return $actions;
@@ -107,6 +121,19 @@ class ConnectedAccounts extends Page
 
         Notification::make()
             ->title(__('accounts.notifications.gitlab_disconnected'))
+            ->success()
+            ->send();
+    }
+
+    public function disconnectBitbucket(): void
+    {
+        /** @var User $user */
+        $user = Auth::user();
+
+        $user->connectedAccounts()->where('provider', 'bitbucket')->delete();
+
+        Notification::make()
+            ->title(__('accounts.notifications.bitbucket_disconnected'))
             ->success()
             ->send();
     }
