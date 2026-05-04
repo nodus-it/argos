@@ -13,10 +13,10 @@ use App\Filament\Admin\Resources\RepoProfileResource\RelationManagers\TasksRelat
 use App\Models\ConnectedAccount;
 use App\Models\RepoProfile;
 use App\Models\User;
-use App\Rules\BranchExistsOnRemote;
 use App\Services\Bitbucket\BitbucketGitService;
 use App\Services\GitHub\GitHubGitService;
 use App\Services\GitLab\GitLabGitService;
+use App\Services\GitServiceFactory;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
@@ -417,6 +417,7 @@ class RepoProfileResource extends Resource
                         ->required(fn (Get $get): bool => ! self::isConnectedPath($get))
                         ->url()
                         ->maxLength(500)
+                        ->live(onBlur: true)
                         ->visible(fn (Get $get): bool => ! self::isConnectedPath($get))
                         ->dehydrated(),
 
@@ -426,6 +427,7 @@ class RepoProfileResource extends Resource
                         ->revealable()
                         ->maxLength(500)
                         ->required(fn (Get $get): bool => ! self::isConnectedPath($get))
+                        ->live(onBlur: true)
                         ->helperText(function (Get $get): string {
                             if ($get('platform') === 'bitbucket') {
                                 return self::bitbucketAccount() !== null
@@ -441,19 +443,48 @@ class RepoProfileResource extends Resource
                         })
                         ->visible(fn (Get $get): bool => ! self::isConnectedPath($get)),
 
-                    TextInput::make('default_branch')
+                    Select::make('default_branch')
                         ->label(__('projects.fields.default_branch_label'))
-                        ->required(fn (Get $get): bool => ! self::isConnectedPath($get))
-                        ->default('main')
-                        ->maxLength(255)
-                        ->rules([
-                            fn (Get $get) => new BranchExistsOnRemote(
-                                url: is_string($get('url')) ? $get('url') : null,
-                                platform: is_string($get('platform')) ? $get('platform') : null,
-                                token: is_string($get('token')) ? $get('token') : null,
-                            ),
-                        ])
-                        ->visible(fn (Get $get): bool => ! self::isConnectedPath($get)),
+                        ->options(function (Get $get): array {
+                            $url = $get('url');
+                            $token = $get('token');
+                            $platform = $get('platform');
+
+                            if (! is_string($url) || $url === '' || ! is_string($token) || $token === '' || ! is_string($platform) || $platform === '') {
+                                return [];
+                            }
+
+                            $path = parse_url($url, PHP_URL_PATH) ?? '';
+                            $path = rtrim($path, '/');
+                            if (str_ends_with($path, '.git')) {
+                                $path = substr($path, 0, -4);
+                            }
+                            $ownerRepo = ltrim($path, '/');
+
+                            if ($ownerRepo === '') {
+                                return [];
+                            }
+
+                            $instanceUrl = '';
+                            if ($platform === 'gitlab') {
+                                $parsed = parse_url($url);
+                                $instanceUrl = ($parsed['scheme'] ?? 'https').'://'.($parsed['host'] ?? 'gitlab.com');
+                            }
+
+                            try {
+                                return app(GitServiceFactory::class)->forPlatform($platform, $token, $instanceUrl)->getBranchOptions($ownerRepo);
+                            } catch (\Throwable) {
+                                return [];
+                            }
+                        })
+                        ->visible(fn (Get $get): bool => ! self::isConnectedPath($get)
+                            && is_string($get('url')) && $get('url') !== ''
+                            && is_string($get('token')) && $get('token') !== '')
+                        ->required(fn (Get $get): bool => ! self::isConnectedPath($get)
+                            && is_string($get('url')) && $get('url') !== ''
+                            && is_string($get('token')) && $get('token') !== '')
+                        ->searchable()
+                        ->native(false),
                 ]),
         ]);
     }

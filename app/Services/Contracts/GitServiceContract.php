@@ -17,6 +17,13 @@ interface GitServiceContract
     public function listBranches(string $owner, string $repo): array;
 
     /**
+     * Returns branches as ['branch' => 'branch'] for use in Filament Select dropdowns.
+     *
+     * @return array<string, string>
+     */
+    public function getBranchOptions(string $ownerRepo): array;
+
+    /**
      * @param  array<string, mixed>  $options  e.g. draft, reviewers, labels
      * @return array<string, mixed>
      */
