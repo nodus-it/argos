@@ -43,10 +43,32 @@ class BitbucketGitService implements GitProviderContract
 
     public function listRepositories(): array
     {
-        $response = $this->http()->get('/repositories', ['role' => 'member', 'pagelen' => 100]);
-        $response->throw();
+        // Atlassian removed the cross-workspace /repositories endpoint (CHANGE-2770).
+        // The replacement is per-workspace, so we fan out: list workspaces the user
+        // has access to, then list repos within each.
+        $workspaces = $this->http()
+            ->get('/user/permissions/workspaces', ['pagelen' => 100])
+            ->throw()
+            ->json('values', []);
 
-        return $response->json('values', []);
+        $repos = [];
+        foreach ($workspaces as $perm) {
+            $slug = $perm['workspace']['slug'] ?? null;
+            if (! is_string($slug) || $slug === '') {
+                continue;
+            }
+
+            $values = $this->http()
+                ->get("/repositories/{$slug}", ['role' => 'member', 'pagelen' => 100])
+                ->throw()
+                ->json('values', []);
+
+            foreach ($values as $repo) {
+                $repos[] = $repo;
+            }
+        }
+
+        return $repos;
     }
 
     public function listBranches(string $owner, string $repo): array

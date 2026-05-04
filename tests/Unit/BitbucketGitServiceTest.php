@@ -59,7 +59,12 @@ class BitbucketGitServiceTest extends TestCase
     public function test_get_repo_options_returns_keyed_array(): void
     {
         Http::fake([
-            'https://api.bitbucket.org/2.0/repositories*' => Http::response([
+            'https://api.bitbucket.org/2.0/user/permissions/workspaces*' => Http::response([
+                'values' => [
+                    ['workspace' => ['slug' => 'acme']],
+                ],
+            ]),
+            'https://api.bitbucket.org/2.0/repositories/acme*' => Http::response([
                 'values' => [
                     ['full_name' => 'acme/alpha'],
                     ['full_name' => 'acme/beta'],
@@ -70,6 +75,51 @@ class BitbucketGitServiceTest extends TestCase
         $options = (new BitbucketGitService('user:pass'))->getRepoOptions();
 
         $this->assertSame(['acme/alpha' => 'acme/alpha', 'acme/beta' => 'acme/beta'], $options);
+    }
+
+    public function test_list_repositories_merges_repos_across_workspaces(): void
+    {
+        Http::fake([
+            'https://api.bitbucket.org/2.0/user/permissions/workspaces*' => Http::response([
+                'values' => [
+                    ['workspace' => ['slug' => 'acme']],
+                    ['workspace' => ['slug' => 'globex']],
+                ],
+            ]),
+            'https://api.bitbucket.org/2.0/repositories/acme*' => Http::response([
+                'values' => [['full_name' => 'acme/alpha']],
+            ]),
+            'https://api.bitbucket.org/2.0/repositories/globex*' => Http::response([
+                'values' => [['full_name' => 'globex/beta']],
+            ]),
+        ]);
+
+        $repos = (new BitbucketGitService('user:pass'))->listRepositories();
+
+        $this->assertCount(2, $repos);
+        $this->assertSame('acme/alpha', $repos[0]['full_name']);
+        $this->assertSame('globex/beta', $repos[1]['full_name']);
+    }
+
+    public function test_list_repositories_skips_workspace_entries_without_slug(): void
+    {
+        Http::fake([
+            'https://api.bitbucket.org/2.0/user/permissions/workspaces*' => Http::response([
+                'values' => [
+                    ['workspace' => ['slug' => '']],
+                    ['workspace' => []],
+                    ['workspace' => ['slug' => 'acme']],
+                ],
+            ]),
+            'https://api.bitbucket.org/2.0/repositories/acme*' => Http::response([
+                'values' => [['full_name' => 'acme/alpha']],
+            ]),
+        ]);
+
+        $repos = (new BitbucketGitService('user:pass'))->listRepositories();
+
+        $this->assertCount(1, $repos);
+        $this->assertSame('acme/alpha', $repos[0]['full_name']);
     }
 
     public function test_get_branch_options_returns_keyed_array(): void
@@ -99,7 +149,7 @@ class BitbucketGitServiceTest extends TestCase
     public function test_uses_basic_auth_for_pat_token(): void
     {
         Http::fake([
-            'https://api.bitbucket.org/2.0/repositories*' => Http::response(['values' => []]),
+            'https://api.bitbucket.org/2.0/user/permissions/workspaces*' => Http::response(['values' => []]),
         ]);
 
         (new BitbucketGitService('myuser:mysecret'))->listRepositories();
@@ -114,7 +164,7 @@ class BitbucketGitServiceTest extends TestCase
     public function test_uses_bearer_auth_for_oauth_token(): void
     {
         Http::fake([
-            'https://api.bitbucket.org/2.0/repositories*' => Http::response(['values' => []]),
+            'https://api.bitbucket.org/2.0/user/permissions/workspaces*' => Http::response(['values' => []]),
         ]);
 
         (new BitbucketGitService('oauthtokenwithoutcolon'))->listRepositories();
