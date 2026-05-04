@@ -121,6 +121,12 @@ class OnboardingPageTest extends TestCase
             ->assertSee(route('filament.admin.resources.repo-profiles.create'));
     }
 
+    public function test_create_project_not_in_header_actions(): void
+    {
+        Livewire::test(Onboarding::class)
+            ->assertActionDoesNotExist('createProject');
+    }
+
     public function test_onboarding_hidden_from_nav_when_project_exists(): void
     {
         RepoProfile::factory()->create();
