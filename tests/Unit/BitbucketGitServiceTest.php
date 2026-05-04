@@ -59,7 +59,7 @@ class BitbucketGitServiceTest extends TestCase
     public function test_get_repo_options_returns_keyed_array(): void
     {
         Http::fake([
-            'https://api.bitbucket.org/2.0/user/permissions/workspaces*' => Http::response([
+            'https://api.bitbucket.org/2.0/user/workspaces*' => Http::response([
                 'values' => [
                     ['workspace' => ['slug' => 'acme']],
                 ],
@@ -80,7 +80,7 @@ class BitbucketGitServiceTest extends TestCase
     public function test_list_repositories_merges_repos_across_workspaces(): void
     {
         Http::fake([
-            'https://api.bitbucket.org/2.0/user/permissions/workspaces*' => Http::response([
+            'https://api.bitbucket.org/2.0/user/workspaces*' => Http::response([
                 'values' => [
                     ['workspace' => ['slug' => 'acme']],
                     ['workspace' => ['slug' => 'globex']],
@@ -104,7 +104,7 @@ class BitbucketGitServiceTest extends TestCase
     public function test_list_repositories_skips_workspace_entries_without_slug(): void
     {
         Http::fake([
-            'https://api.bitbucket.org/2.0/user/permissions/workspaces*' => Http::response([
+            'https://api.bitbucket.org/2.0/user/workspaces*' => Http::response([
                 'values' => [
                     ['workspace' => ['slug' => '']],
                     ['workspace' => []],
@@ -149,7 +149,7 @@ class BitbucketGitServiceTest extends TestCase
     public function test_uses_basic_auth_for_pat_token(): void
     {
         Http::fake([
-            'https://api.bitbucket.org/2.0/user/permissions/workspaces*' => Http::response(['values' => []]),
+            'https://api.bitbucket.org/2.0/user/workspaces*' => Http::response(['values' => []]),
         ]);
 
         (new BitbucketGitService('myuser:mysecret'))->listRepositories();
@@ -164,7 +164,7 @@ class BitbucketGitServiceTest extends TestCase
     public function test_uses_bearer_auth_for_oauth_token(): void
     {
         Http::fake([
-            'https://api.bitbucket.org/2.0/user/permissions/workspaces*' => Http::response(['values' => []]),
+            'https://api.bitbucket.org/2.0/user/workspaces*' => Http::response(['values' => []]),
         ]);
 
         (new BitbucketGitService('oauthtokenwithoutcolon'))->listRepositories();

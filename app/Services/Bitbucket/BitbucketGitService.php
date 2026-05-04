@@ -43,17 +43,19 @@ class BitbucketGitService implements GitProviderContract
 
     public function listRepositories(): array
     {
-        // Atlassian removed the cross-workspace /repositories endpoint (CHANGE-2770).
-        // The replacement is per-workspace, so we fan out: list workspaces the user
-        // has access to, then list repos within each.
+        // Atlassian's CHANGE-2770 deprecation walked through three endpoints:
+        // /repositories, /user/permissions/workspaces, and /workspaces are all
+        // gone. /2.0/user/workspaces is the surviving (and explicitly announced)
+        // replacement — values are workspace_access records with the slug
+        // nested under .workspace.slug.
         $workspaces = $this->http()
-            ->get('/user/permissions/workspaces', ['pagelen' => 100])
+            ->get('/user/workspaces', ['pagelen' => 100])
             ->throw()
             ->json('values', []);
 
         $repos = [];
-        foreach ($workspaces as $perm) {
-            $slug = $perm['workspace']['slug'] ?? null;
+        foreach ($workspaces as $access) {
+            $slug = $access['workspace']['slug'] ?? null;
             if (! is_string($slug) || $slug === '') {
                 continue;
             }

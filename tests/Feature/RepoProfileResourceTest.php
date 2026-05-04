@@ -490,7 +490,7 @@ class RepoProfileResourceTest extends TestCase
             'api.bitbucket.org/2.0/repositories/acme/widget' => Http::response([
                 'mainbranch' => ['name' => 'main'],
             ]),
-            'api.bitbucket.org/2.0/user/permissions/workspaces*' => Http::response([
+            'api.bitbucket.org/2.0/user/workspaces*' => Http::response([
                 'values' => [['workspace' => ['slug' => 'acme']]],
             ]),
             'api.bitbucket.org/2.0/repositories/acme*' => Http::response([

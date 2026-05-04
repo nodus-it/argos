@@ -14,14 +14,14 @@ use Tests\External\Support\ProviderTestConfig;
 final class BitbucketContractTest extends ProviderContractTestCase
 {
     /**
-     * `listRepositories` is a user-level workspace discovery operation:
-     * Atlassian's replacement endpoint for the deprecated cross-workspace
-     * `/repositories` is `/user/permissions/workspaces`, which a Repository
-     * Access Token cannot call (no `account` scope, returns HTTP 410). The
-     * Filament form mirrors this — the Bitbucket PAT path shows a free-text
-     * input, not a repo dropdown, so this method only ever runs in the
-     * OAuth path. We exercise the OAuth path manually via `test:providers`,
-     * not from the External suite.
+     * `listRepositories` is a user-level workspace discovery operation —
+     * GET /2.0/workspaces requires the `account` scope, which Repository
+     * Access Tokens do not carry (CHANGE-2770 also retired the older
+     * /user/permissions/workspaces fallback). The Filament form mirrors
+     * this: the Bitbucket PAT path shows a free-text input, not a repo
+     * dropdown, so this method only ever runs in the OAuth path. We
+     * exercise the OAuth path manually via `test:providers`, not from
+     * the External suite.
      */
     public function test_list_repositories_includes_test_repo(): void
     {
