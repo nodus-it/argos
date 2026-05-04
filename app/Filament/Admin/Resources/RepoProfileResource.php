@@ -154,7 +154,7 @@ class RepoProfileResource extends Resource
                             }
                         })
                         ->visible(fn (Get $get): bool => self::isConnectedPath($get))
-                        ->dehydrated(false),
+                        ->dehydrated(fn (Get $get): bool => self::isConnectedPath($get)),
 
                     Select::make('github_branch')
                         ->label('Default Branch')
@@ -237,18 +237,26 @@ class RepoProfileResource extends Resource
     }
 
     /**
-     * The OAuth Select writes to `github_branch`, but the column is `default_branch`.
-     * Called from CreateRepoProfile and EditRepoProfile.
+     * Im OAuth-Pfad schreiben die sichtbaren Picker in `github_repo` und
+     * `github_branch`; die DB-Spalten heißen aber `url` und `default_branch`.
+     * Diese Methode mappt die Werte zurück und entfernt die Helper-Keys aus
+     * den Form-Daten — aufgerufen aus CreateRepoProfile (BeforeCreate) und
+     * EditRepoProfile (BeforeSave).
      *
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
-    public static function mutateBranchKey(array $data): array
+    public static function mutateOauthFields(array $data): array
     {
+        if (isset($data['github_repo']) && is_string($data['github_repo']) && $data['github_repo'] !== '') {
+            $data['url'] = "https://github.com/{$data['github_repo']}";
+        }
+
         if (isset($data['github_branch']) && is_string($data['github_branch']) && $data['github_branch'] !== '') {
             $data['default_branch'] = $data['github_branch'];
         }
-        unset($data['github_branch']);
+
+        unset($data['github_repo'], $data['github_branch']);
 
         return $data;
     }

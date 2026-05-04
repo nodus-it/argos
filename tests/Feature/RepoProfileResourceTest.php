@@ -198,6 +198,45 @@ class RepoProfileResourceTest extends TestCase
         $this->assertDatabaseMissing(RepoProfile::class, ['id' => $profile->id]);
     }
 
+    public function test_oauth_path_creates_repo_profile_with_url_from_github_repo(): void
+    {
+        ConnectedAccount::factory()->create([
+            'user_id' => $this->user->id,
+            'provider' => 'github',
+        ]);
+
+        Http::fake([
+            'api.github.com/user/repos*' => Http::response([
+                ['full_name' => 'acme/widget'],
+            ]),
+            'api.github.com/repos/acme/widget' => Http::response([
+                'default_branch' => 'main',
+            ]),
+            'api.github.com/repos/acme/widget/branches*' => Http::response([
+                ['name' => 'main'],
+                ['name' => 'develop'],
+            ]),
+        ]);
+
+        Livewire::test(CreateRepoProfile::class)
+            ->fillForm([
+                'platform' => 'github',
+                'name' => 'Widget',
+                'github_repo' => 'acme/widget',
+                'github_branch' => 'main',
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors()
+            ->assertRedirect();
+
+        $this->assertDatabaseHas(RepoProfile::class, [
+            'name' => 'Widget',
+            'platform' => 'github',
+            'url' => 'https://github.com/acme/widget',
+            'default_branch' => 'main',
+        ]);
+    }
+
     public function test_oauth_path_persists_default_branch_on_save(): void
     {
         ConnectedAccount::factory()->create([
