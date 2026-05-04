@@ -29,4 +29,11 @@ interface GitServiceContract
         string $baseBranch,
         array $options = [],
     ): array;
+
+    /**
+     * Returns the API-reported default branch for "owner/repo", or null on
+     * failure (network/auth/not-found). Used by the Filament form to
+     * pre-select the branch dropdown when the user picks a repo.
+     */
+    public function getDefaultBranch(string $ownerRepo): ?string;
 }

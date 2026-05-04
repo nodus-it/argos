@@ -43,6 +43,34 @@ class GitLabGitService implements GitProviderContract
             ->json();
     }
 
+    /**
+     * Returns the API-reported default branch of the given owner/repo,
+     * or null if the call fails (network/auth/not-found).
+     */
+    public function getDefaultBranch(string $ownerRepo): ?string
+    {
+        [$owner, $repo] = explode('/', $ownerRepo, 2) + ['', ''];
+
+        if ($owner === '' || $repo === '') {
+            return null;
+        }
+
+        $projectPath = $this->encodePath($owner, $repo);
+
+        try {
+            $data = $this->http()
+                ->get("/projects/{$projectPath}")
+                ->throw()
+                ->json();
+        } catch (\Throwable) {
+            return null;
+        }
+
+        $branch = $data['default_branch'] ?? null;
+
+        return is_string($branch) && $branch !== '' ? $branch : null;
+    }
+
     public function createPullRequest(
         string $owner,
         string $repo,
