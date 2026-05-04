@@ -100,6 +100,20 @@ class GitHubGitService implements GitProviderContract
             ->json();
     }
 
+    public function commentOnPullRequest(
+        string $owner,
+        string $repo,
+        int|string $pullRequestId,
+        string $body,
+    ): array {
+        // GitHub treats PRs as a special kind of issue; PR comments live on the
+        // issues/{number}/comments endpoint, with the PR number used as issue id.
+        return $this->http()
+            ->post("/repos/{$owner}/{$repo}/issues/{$pullRequestId}/comments", ['body' => $body])
+            ->throw()
+            ->json();
+    }
+
     /**
      * Returns repos as ['owner/repo' => 'owner/repo'] for use in Filament Select dropdowns.
      *

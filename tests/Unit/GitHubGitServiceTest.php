@@ -53,4 +53,22 @@ class GitHubGitServiceTest extends TestCase
 
         $this->assertNull($branch);
     }
+
+    public function test_comment_on_pull_request_posts_to_issues_endpoint(): void
+    {
+        Http::fake([
+            'https://api.github.com/repos/acme/widget/issues/42/comments' => Http::response([
+                'id' => 9001, 'body' => 'hello',
+            ]),
+        ]);
+
+        $response = (new GitHubGitService('tok'))->commentOnPullRequest('acme', 'widget', 42, 'hello');
+
+        $this->assertSame(9001, $response['id']);
+        Http::assertSent(function ($request): bool {
+            return $request->method() === 'POST'
+                && str_contains($request->url(), '/issues/42/comments')
+                && ($request->data()['body'] ?? null) === 'hello';
+        });
+    }
 }

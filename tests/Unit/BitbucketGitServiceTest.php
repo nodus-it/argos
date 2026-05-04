@@ -175,4 +175,22 @@ class BitbucketGitServiceTest extends TestCase
             return str_starts_with($authHeader, 'Bearer ');
         });
     }
+
+    public function test_comment_on_pull_request_wraps_body_in_content_raw(): void
+    {
+        Http::fake([
+            'https://api.bitbucket.org/2.0/repositories/acme/widget/pullrequests/3/comments' => Http::response([
+                'id' => 9001,
+            ]),
+        ]);
+
+        $response = (new BitbucketGitService('user:pass'))->commentOnPullRequest('acme', 'widget', 3, 'hello');
+
+        $this->assertSame(9001, $response['id']);
+        Http::assertSent(function ($request): bool {
+            return $request->method() === 'POST'
+                && str_contains($request->url(), '/pullrequests/3/comments')
+                && ($request->data()['content']['raw'] ?? null) === 'hello';
+        });
+    }
 }

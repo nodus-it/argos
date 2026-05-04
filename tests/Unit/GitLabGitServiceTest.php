@@ -66,4 +66,22 @@ class GitLabGitServiceTest extends TestCase
 
         $this->assertSame('main', $branch);
     }
+
+    public function test_comment_on_pull_request_posts_to_merge_request_notes(): void
+    {
+        Http::fake([
+            'https://gitlab.com/api/v4/projects/acme%2Fwidget/merge_requests/7/notes' => Http::response([
+                'id' => 9001, 'body' => 'hello',
+            ]),
+        ]);
+
+        $response = (new GitLabGitService('tok'))->commentOnPullRequest('acme', 'widget', 7, 'hello');
+
+        $this->assertSame(9001, $response['id']);
+        Http::assertSent(function ($request): bool {
+            return $request->method() === 'POST'
+                && str_contains($request->url(), '/merge_requests/7/notes')
+                && ($request->data()['body'] ?? null) === 'hello';
+        });
+    }
 }

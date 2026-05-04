@@ -101,6 +101,21 @@ class BitbucketGitService implements GitProviderContract
             ->json();
     }
 
+    public function commentOnPullRequest(
+        string $owner,
+        string $repo,
+        int|string $pullRequestId,
+        string $body,
+    ): array {
+        // Bitbucket nests the body under content.raw, unlike GitHub/GitLab.
+        return $this->http()
+            ->post("/repositories/{$owner}/{$repo}/pullrequests/{$pullRequestId}/comments", [
+                'content' => ['raw' => $body],
+            ])
+            ->throw()
+            ->json();
+    }
+
     /**
      * Returns repos as ['workspace/slug' => 'workspace/slug'] for Filament Select dropdowns.
      *

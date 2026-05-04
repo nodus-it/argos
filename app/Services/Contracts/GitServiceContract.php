@@ -36,4 +36,19 @@ interface GitServiceContract
      * pre-select the branch dropdown when the user picks a repo.
      */
     public function getDefaultBranch(string $ownerRepo): ?string;
+
+    /**
+     * Posts a comment on the given pull/merge request. Used by the worker's
+     * push phase to log iteration progress on the PR. PR identifier types
+     * differ per provider (GitHub `int $number`, GitLab `int $iid`,
+     * Bitbucket `int $id`) — `int|string` keeps the contract agnostic.
+     *
+     * @return array<string, mixed>
+     */
+    public function commentOnPullRequest(
+        string $owner,
+        string $repo,
+        int|string $pullRequestId,
+        string $body,
+    ): array;
 }
