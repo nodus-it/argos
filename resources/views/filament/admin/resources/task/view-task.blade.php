@@ -12,7 +12,7 @@
             'pending'             => 'text-slate-400 bg-slate-400/10 ring-slate-400/30',
         ];
         $statusLabelMap = [
-            'paused' => 'pausiert',
+            'paused' => __('tasks.view.labels.status_paused'),
         ];
         $phaseRun = fn(string $phase) => ($phaseRuns[$phase] ?? collect())->last();
         $phaseStatus = fn(string $phase) => $phaseRun($phase)?->status ?? 'pending';
@@ -42,7 +42,7 @@
         <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-5 py-4 flex flex-col gap-3">
 
             <div class="flex items-center justify-between">
-                <span class="text-xs font-medium text-gray-500 dark:text-gray-400">Status</span>
+                <span class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ __('tasks.view.labels.status') }}</span>
                 <span @class([
                     'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset',
                     'text-gray-600 bg-gray-100 ring-gray-300 dark:text-gray-400 dark:bg-gray-800 dark:ring-gray-600' => $record->workflow_status->color() === 'gray',
@@ -55,21 +55,21 @@
 
             @if($record->repoProfile)
                 <div class="flex items-center justify-between gap-2">
-                    <span class="text-xs font-medium text-gray-500 dark:text-gray-400 flex-shrink-0">Repository</span>
+                    <span class="text-xs font-medium text-gray-500 dark:text-gray-400 flex-shrink-0">{{ __('tasks.view.labels.repository') }}</span>
                     <span class="text-xs text-gray-700 dark:text-gray-300 truncate text-right">{{ $record->repoProfile->name }}</span>
                 </div>
             @endif
 
             @if($record->base_branch || $record->repoProfile?->default_branch)
                 <div class="flex items-center justify-between gap-2">
-                    <span class="text-xs font-medium text-gray-500 dark:text-gray-400 flex-shrink-0">Base Branch</span>
+                    <span class="text-xs font-medium text-gray-500 dark:text-gray-400 flex-shrink-0">{{ __('tasks.view.labels.base_branch') }}</span>
                     <code class="text-xs text-indigo-600 dark:text-indigo-400 font-mono truncate text-right">{{ $record->base_branch ?? $record->repoProfile?->default_branch }}</code>
                 </div>
             @endif
 
             @if($record->feature_branch)
                 <div class="flex items-center justify-between gap-2">
-                    <span class="text-xs font-medium text-gray-500 dark:text-gray-400 flex-shrink-0">Branch</span>
+                    <span class="text-xs font-medium text-gray-500 dark:text-gray-400 flex-shrink-0">{{ __('tasks.view.labels.branch') }}</span>
                     <code class="text-xs text-indigo-600 dark:text-indigo-400 font-mono truncate text-right">{{ $record->feature_branch }}</code>
                 </div>
             @endif
@@ -80,10 +80,10 @@
                     $prNumber = $prMatch[1] ?? null;
                 @endphp
                 <div class="flex items-center justify-between gap-2">
-                    <span class="text-xs font-medium text-gray-500 dark:text-gray-400 flex-shrink-0">Pull Request</span>
+                    <span class="text-xs font-medium text-gray-500 dark:text-gray-400 flex-shrink-0">{{ __('tasks.view.labels.pull_request') }}</span>
                     <a href="{{ $record->pr_url }}" target="_blank"
                        class="inline-flex items-center gap-1 text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline">
-                        {{ $prNumber ? "PR #{$prNumber}" : 'Öffnen' }}
+                        {{ $prNumber ? "PR #{$prNumber}" : __('tasks.view.labels.open') }}
                         <x-heroicon-o-arrow-top-right-on-square class="h-3 w-3" />
                     </a>
                 </div>
@@ -95,13 +95,13 @@
             @endphp
             @if($totalCost > 0)
                 <div class="flex items-center justify-between gap-2">
-                    <span class="text-xs font-medium text-gray-500 dark:text-gray-400 flex-shrink-0">Kosten</span>
+                    <span class="text-xs font-medium text-gray-500 dark:text-gray-400 flex-shrink-0">{{ __('tasks.view.labels.cost') }}</span>
                     <span class="text-xs text-gray-700 dark:text-gray-300">${{ number_format($totalCost, 4) }}</span>
                 </div>
             @endif
             @if($totalTokens > 0)
                 <div class="flex items-center justify-between gap-2">
-                    <span class="text-xs font-medium text-gray-500 dark:text-gray-400 flex-shrink-0">Tokens</span>
+                    <span class="text-xs font-medium text-gray-500 dark:text-gray-400 flex-shrink-0">{{ __('tasks.view.labels.tokens') }}</span>
                     <span class="text-xs text-gray-700 dark:text-gray-300">{{ number_format($totalTokens) }}</span>
                 </div>
             @endif
@@ -112,7 +112,7 @@
                         <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
                         <span class="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
                     </span>
-                    <span class="text-xs text-amber-600 dark:text-amber-400 font-medium">{{ $record->current_phase }} läuft</span>
+                    <span class="text-xs text-amber-600 dark:text-amber-400 font-medium">{{ __('tasks.view.labels.phase_running', ['phase' => $record->current_phase]) }}</span>
                     <span x-data="{ sec: {{ max(0, now()->timestamp - ($record->currentPhaseStartedAt()?->timestamp ?? now()->timestamp)) }} }"
                           x-init="setInterval(() => sec++, 1000)"
                           x-text="Math.floor(sec/60) + ':' + String(sec % 60).padStart(2, '0')"
@@ -124,12 +124,12 @@
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
                     </svg>
-                    <span class="text-xs text-sky-600 dark:text-sky-400 font-medium">{{ $record->current_phase }} wartet auf Worker</span>
+                    <span class="text-xs text-sky-600 dark:text-sky-400 font-medium">{{ __('tasks.view.labels.phase_waiting', ['phase' => $record->current_phase]) }}</span>
                 </div>
             @endif
 
             <div class="flex items-center justify-between gap-2 pt-1 border-t border-gray-100 dark:border-gray-800">
-                <span class="text-xs font-medium text-gray-500 dark:text-gray-400 flex-shrink-0">Erstellt</span>
+                <span class="text-xs font-medium text-gray-500 dark:text-gray-400 flex-shrink-0">{{ __('tasks.view.labels.created') }}</span>
                 <span class="text-xs text-gray-500 dark:text-gray-500">{{ $record->created_at?->format('d.m.Y H:i') }}</span>
             </div>
         </div>
@@ -148,17 +148,15 @@
                 <x-heroicon-o-pause-circle class="h-6 w-6 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
                 <div>
                     <p class="text-sm font-semibold text-amber-900 dark:text-amber-100">
-                        Implementierung pausiert — Turn-Limit erreicht
+                        {{ __('tasks.view.implement.paused_title') }}
                     </p>
                     <p class="mt-1 text-sm text-amber-800 dark:text-amber-200/80">
                         @if($turnsUsed)
-                            Der letzte Lauf hat <span class="font-mono">{{ $turnsUsed }}</span> Turns verbraucht.
+                            {{ __('tasks.view.implement.paused_turns_used', ['turns' => $turnsUsed]) }}
                         @endif
-                        Beim Fortsetzen wird die Claude-Sitzung mit vollem Kontext wiederaufgenommen
-                        — der Workspace-Stand bleibt erhalten.
+                        {{ __('tasks.view.implement.paused_resume_hint') }}
                         @if($implementIterations >= 3)
-                            <br><span class="font-medium">Hinweis:</span> Bereits {{ $implementIterations }}. Iteration —
-                            erwäge, das Konzept aufzuteilen statt weiter fortzusetzen.
+                            <br><span class="font-medium">{{ __('tasks.view.implement.paused_hint_label') }}</span> {{ __('tasks.view.implement.paused_iteration_warning', ['count' => $implementIterations]) }}
                         @endif
                     </p>
                 </div>
@@ -167,7 +165,7 @@
                     wire:click="mountAction('continueImplement')"
                     class="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 dark:bg-amber-700 dark:hover:bg-amber-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors flex-shrink-0">
                 <x-heroicon-m-play class="h-4 w-4" />
-                Fortsetzen
+                {{ __('tasks.view.actions.continue') }}
             </button>
         </div>
     @endif
@@ -180,7 +178,7 @@
                 class="w-full flex items-center justify-between px-5 py-3.5 border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
             <div class="flex items-center gap-3">
                 <x-heroicon-o-light-bulb class="h-4 w-4 text-gray-400" />
-                <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">Konzept</span>
+                <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">{{ __('tasks.view.concept.title') }}</span>
                 <span @class([
                     'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset',
                     $statusColorMap[$cStatus] ?? $statusColorMap['pending'],
@@ -220,13 +218,13 @@
                             x-on:click="tab = 'concept'"
                             x-bind:class="tab === 'concept' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'"
                             class="px-3 pb-2.5 text-xs font-medium border-b-2 transition-colors">
-                        Konzept
+                        {{ __('tasks.view.concept.tab_concept') }}
                     </button>
                     <button type="button"
                             x-on:click="tab = 'feedback'"
                             x-bind:class="tab === 'feedback' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'"
                             class="px-3 pb-2.5 text-xs font-medium border-b-2 transition-colors">
-                        Feedback
+                        {{ __('tasks.view.concept.tab_feedback') }}
                         @if($notes !== '')
                             <span class="ml-1 inline-flex h-1.5 w-1.5 rounded-full bg-amber-400"></span>
                         @endif
@@ -235,7 +233,7 @@
                             x-on:click="tab = 'log'"
                             x-bind:class="tab === 'log' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'"
                             class="px-3 pb-2.5 text-xs font-medium border-b-2 transition-colors">
-                        Log
+                        {{ __('tasks.view.concept.tab_log') }}
                         @if(!empty($conceptLog))
                             <span class="ml-1 inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 text-xs text-gray-500 dark:text-gray-400">{{ count($conceptLog) }}</span>
                         @endif
@@ -258,14 +256,14 @@
                     @elseif($conceptError)
                         <div class="rounded-lg border border-red-200 dark:border-red-900/60 bg-red-50 dark:bg-red-900/20 p-4">
                             <p class="text-xs font-semibold text-red-700 dark:text-red-400 uppercase tracking-wide mb-2">
-                                Konzept-Phase fehlgeschlagen
+                                {{ __('tasks.view.concept.phase_failed') }}
                             </p>
                             <pre class="font-mono text-xs leading-5 text-red-900 dark:text-red-200 whitespace-pre-wrap break-all">{{ $conceptError }}</pre>
                         </div>
                     @else
                         <div class="flex flex-col items-center justify-center py-12 text-center gap-3">
                             <x-heroicon-o-document-text class="h-10 w-10 text-gray-300 dark:text-gray-600" />
-                            <p class="text-sm text-gray-400 dark:text-gray-500">Noch kein Konzept vorhanden.</p>
+                            <p class="text-sm text-gray-400 dark:text-gray-500">{{ __('tasks.view.concept.empty') }}</p>
                         </div>
                     @endif
 
@@ -273,7 +271,7 @@
                     @if(!empty($conceptHistory))
                         <div class="border-t border-gray-100 dark:border-gray-800 pt-4">
                             <p class="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-3">
-                                Frühere Versionen ({{ count($conceptHistory) }})
+                                {{ __('tasks.view.concept.earlier_versions', ['count' => count($conceptHistory)]) }}
                             </p>
                             <div class="flex flex-col gap-2">
                                 @foreach($conceptHistory as $entry)
@@ -306,12 +304,12 @@
                     {{-- Pending notes (editable) --}}
                     <div class="px-6 py-5">
                         <div class="flex items-center justify-between mb-3">
-                            <span class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Ausstehend</span>
+                            <span class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">{{ __('tasks.view.feedback.pending') }}</span>
                             @if(!$editingNotes)
                                 <button type="button" wire:click="startEditingNotes"
                                         class="inline-flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400 hover:underline">
                                     <x-heroicon-o-pencil class="h-3 w-3" />
-                                    {{ $notes !== '' ? 'Bearbeiten' : 'Hinzufügen' }}
+                                    {{ $notes !== '' ? __('tasks.view.actions.edit') : __('tasks.view.actions.add') }}
                                 </button>
                             @endif
                         </div>
@@ -319,30 +317,30 @@
                         @if($editingNotes)
                             <div class="flex flex-col gap-3">
                                 <p class="text-xs text-gray-500 dark:text-gray-400">
-                                    Wird beim nächsten Konzept-Lauf als Korrektur-Hinweis an Claude übergeben.
+                                    {{ __('tasks.view.feedback.concept_hint') }}
                                 </p>
                                 <textarea
                                     wire:model="notes"
                                     rows="8"
-                                    placeholder="Anmerkungen, Korrekturen, zusätzliche Anforderungen…"
+                                    placeholder="{{ __('tasks.view.feedback.concept_placeholder') }}"
                                     class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none font-mono leading-relaxed"
                                 ></textarea>
                                 <div class="flex flex-wrap gap-2">
                                     <button type="button" wire:click="saveNotes"
                                             class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-4 py-2 transition-colors">
                                         <x-heroicon-o-check class="h-3.5 w-3.5" />
-                                        Speichern
+                                        {{ __('tasks.view.actions.save') }}
                                     </button>
                                     @if($record->current_status !== 'running' && $record->workflow_status !== \App\Enums\WorkflowStatus::Completed)
                                         <button type="button" wire:click="saveNotesAndRevise"
                                                 class="inline-flex items-center gap-1.5 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold px-4 py-2 transition-colors">
                                             <x-heroicon-o-light-bulb class="h-3.5 w-3.5" />
-                                            Speichern &amp; Konzept überarbeiten
+                                            {{ __('tasks.view.actions.save_and_revise_concept') }}
                                         </button>
                                     @endif
                                     <button type="button" wire:click="cancelEditingNotes"
                                             class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 text-xs font-medium px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                                        Abbrechen
+                                        {{ __('tasks.view.actions.cancel') }}
                                     </button>
                                 </div>
                             </div>
@@ -353,23 +351,23 @@
                             </div>
                             @if($record->current_status !== 'running' && $record->workflow_status !== \App\Enums\WorkflowStatus::Completed)
                                 <div class="flex items-center justify-between pt-3">
-                                    <span class="text-xs text-gray-500 dark:text-gray-400">Bereit zur Überarbeitung</span>
+                                    <span class="text-xs text-gray-500 dark:text-gray-400">{{ __('tasks.view.feedback.ready_to_revise') }}</span>
                                     <button type="button" wire:click="reviseConcept"
                                             class="inline-flex items-center gap-1.5 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold px-4 py-2 transition-colors">
                                         <x-heroicon-o-light-bulb class="h-3.5 w-3.5" />
-                                        Konzept überarbeiten
+                                        {{ __('tasks.view.actions.revise_concept') }}
                                     </button>
                                 </div>
                             @endif
                         @else
-                            <p class="text-sm text-gray-400 dark:text-gray-500 italic">Kein ausstehender Feedback-Eintrag.</p>
+                            <p class="text-sm text-gray-400 dark:text-gray-500 italic">{{ __('tasks.view.feedback.no_pending') }}</p>
                         @endif
                     </div>
 
                     {{-- History --}}
                     @if(!empty($notesHistory))
                         <div class="px-6 py-4">
-                            <span class="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Verlauf ({{ count($notesHistory) }})</span>
+                            <span class="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">{{ __('tasks.view.feedback.history', ['count' => count($notesHistory)]) }}</span>
                             <div class="mt-3 flex flex-col gap-2">
                                 @foreach($notesHistory as $i => $entry)
                                     <div x-data="{ open: true }"
@@ -400,7 +398,7 @@
                     @if(!empty($conceptLogIterations))
                         <div class="border-t border-slate-800 bg-slate-950 px-4 py-3">
                             <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
-                                Frühere Iterationen ({{ count($conceptLogIterations) }})
+                                {{ __('tasks.view.logs.earlier_iterations', ['count' => count($conceptLogIterations)]) }}
                             </p>
                             <div class="flex flex-col gap-2">
                                 @foreach($conceptLogIterations as $iter)
@@ -410,7 +408,7 @@
                                         <button type="button"
                                                 x-on:click="open = !open; if (open && !loaded) { loaded = true; $wire.loadLogIteration('concept', {{ $iter }}) }"
                                                 class="w-full flex items-center justify-between px-4 py-2.5 bg-slate-900 hover:bg-slate-800 transition-colors text-left">
-                                            <span class="text-xs font-medium text-slate-400">Iteration {{ $iter }}</span>
+                                            <span class="text-xs font-medium text-slate-400">{{ __('tasks.view.logs.iteration', ['number' => $iter]) }}</span>
                                             <x-heroicon-o-chevron-down class="h-3.5 w-3.5 text-slate-500 transition-transform duration-150 flex-shrink-0" x-bind:class="open ? 'rotate-180' : ''" />
                                         </button>
                                         <div x-show="open" x-collapse>
@@ -421,14 +419,14 @@
                                                     @endforeach
                                                 </div>
                                             @elseif(isset($loadedLogIterations[$key]))
-                                                <p class="px-4 py-3 text-xs text-slate-500 italic bg-slate-950">Keine Einträge für Iteration {{ $iter }}.</p>
+                                                <p class="px-4 py-3 text-xs text-slate-500 italic bg-slate-950">{{ __('tasks.view.logs.no_entries_iteration', ['number' => $iter]) }}</p>
                                             @else
                                                 <div class="flex items-center gap-2 px-4 py-3 bg-slate-950">
                                                     <svg class="animate-spin h-3.5 w-3.5 text-slate-500" fill="none" viewBox="0 0 24 24">
                                                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                                                     </svg>
-                                                    <span class="text-xs text-slate-500">Wird geladen…</span>
+                                                    <span class="text-xs text-slate-500">{{ __('tasks.view.logs.loading') }}</span>
                                                 </div>
                                             @endif
                                         </div>
@@ -451,7 +449,7 @@
                 class="w-full flex items-center justify-between px-5 py-3.5 border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
             <div class="flex items-center gap-3">
                 <x-heroicon-o-code-bracket class="h-4 w-4 text-gray-400" />
-                <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">Implementierung</span>
+                <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">{{ __('tasks.view.implement.title') }}</span>
                 <span @class([
                     'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset',
                     $statusColorMap[$iStatus] ?? $statusColorMap['pending'],
@@ -494,19 +492,19 @@
                             x-on:click="tab = 'implement'"
                             x-bind:class="tab === 'implement' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'"
                             class="px-3 pb-2.5 text-xs font-medium border-b-2 transition-colors">
-                        Implementierung
+                        {{ __('tasks.view.implement.tab_implement') }}
                     </button>
                     <button type="button"
                             x-on:click="tab = 'diff'"
                             x-bind:class="tab === 'diff' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'"
                             class="px-3 pb-2.5 text-xs font-medium border-b-2 transition-colors">
-                        Diff
+                        {{ __('tasks.view.implement.tab_diff') }}
                     </button>
                     <button type="button"
                             x-on:click="tab = 'feedback'"
                             x-bind:class="tab === 'feedback' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'"
                             class="px-3 pb-2.5 text-xs font-medium border-b-2 transition-colors">
-                        Feedback
+                        {{ __('tasks.view.concept.tab_feedback') }}
                         @if($implementNotes !== '')
                             <span class="ml-1 inline-flex h-1.5 w-1.5 rounded-full bg-amber-400"></span>
                         @endif
@@ -515,7 +513,7 @@
                             x-on:click="tab = 'log'"
                             x-bind:class="tab === 'log' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'"
                             class="px-3 pb-2.5 text-xs font-medium border-b-2 transition-colors">
-                        Log
+                        {{ __('tasks.view.concept.tab_log') }}
                         @if(!empty($implementLog))
                             <span class="ml-1 inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 text-xs text-gray-500 dark:text-gray-400">{{ count($implementLog) }}</span>
                         @endif
@@ -536,7 +534,7 @@
                                             : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'"
                                         class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors">
                                     <x-heroicon-o-user-group class="h-3.5 w-3.5" />
-                                    Inhaltliche Zusammenfassung
+                                    {{ __('tasks.view.implement.summary_nontechnical') }}
                                 </button>
                                 <button type="button"
                                         x-on:click="view = 'technical'"
@@ -545,7 +543,7 @@
                                             : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'"
                                         class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors">
                                     <x-heroicon-o-code-bracket class="h-3.5 w-3.5" />
-                                    Technische Zusammenfassung
+                                    {{ __('tasks.view.implement.summary_technical') }}
                                 </button>
                             </div>
 
@@ -563,7 +561,7 @@
                                         {!! $implementSummaryNontechnicalHtml !!}
                                     </div>
                                 @else
-                                    <p class="text-sm text-gray-400 dark:text-gray-500 italic">Keine inhaltliche Zusammenfassung vorhanden.</p>
+                                    <p class="text-sm text-gray-400 dark:text-gray-500 italic">{{ __('tasks.view.implement.no_nontechnical') }}</p>
                                 @endif
                             </div>
 
@@ -603,7 +601,7 @@
                                         {!! $implementSummaryTechnicalHtml !!}
                                     </div>
                                 @else
-                                    <p class="text-sm text-gray-400 dark:text-gray-500 italic">Keine technische Zusammenfassung vorhanden.</p>
+                                    <p class="text-sm text-gray-400 dark:text-gray-500 italic">{{ __('tasks.view.implement.no_technical') }}</p>
                                 @endif
                             </div>
                         </div>
@@ -611,8 +609,8 @@
                     @else
                         <div class="flex flex-col items-center justify-center py-12 text-center gap-3">
                             <x-heroicon-o-code-bracket-square class="h-10 w-10 text-gray-300 dark:text-gray-600" />
-                            <p class="text-sm text-gray-400 dark:text-gray-500">Noch keine Zusammenfassung vorhanden.</p>
-                            <p class="text-xs text-gray-400 dark:text-gray-500">Wird nach dem nächsten Implement-Lauf automatisch erstellt.</p>
+                            <p class="text-sm text-gray-400 dark:text-gray-500">{{ __('tasks.view.implement.no_summary') }}</p>
+                            <p class="text-xs text-gray-400 dark:text-gray-500">{{ __('tasks.view.implement.summary_auto_hint') }}</p>
                         </div>
                     @endif
 
@@ -620,7 +618,7 @@
                     @if(!empty($implementHistory))
                         <div class="border-t border-gray-100 dark:border-gray-800 pt-4">
                             <p class="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-3">
-                                Frühere Versionen ({{ count($implementHistory) }})
+                                {{ __('tasks.view.implement.earlier_versions', ['count' => count($implementHistory)]) }}
                             </p>
                             <div class="flex flex-col gap-2">
                                 @foreach($implementHistory as $entry)
@@ -635,10 +633,10 @@
                                             <div class="border-t border-gray-100 dark:border-gray-700 px-4 pt-3 pb-1 flex gap-2">
                                                 <button type="button" x-on:click="view = 'nontechnical'"
                                                         x-bind:class="view === 'nontechnical' ? 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300' : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'"
-                                                        class="rounded px-2 py-1 text-xs font-medium transition-colors">Inhaltlich</button>
+                                                        class="rounded px-2 py-1 text-xs font-medium transition-colors">{{ __('tasks.view.implement.nontechnical_short') }}</button>
                                                 <button type="button" x-on:click="view = 'technical'"
                                                         x-bind:class="view === 'technical' ? 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300' : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'"
-                                                        class="rounded px-2 py-1 text-xs font-medium transition-colors">Technisch</button>
+                                                        class="rounded px-2 py-1 text-xs font-medium transition-colors">{{ __('tasks.view.implement.technical_short') }}</button>
                                             </div>
                                             <div x-show="view === 'nontechnical'" x-cloak
                                                  class="px-5 py-4 prose prose-sm dark:prose-invert max-w-none
@@ -648,7 +646,7 @@
                                                 @if($entry['nontechnical'])
                                                     {!! \Illuminate\Support\Str::markdown($entry['nontechnical']) !!}
                                                 @else
-                                                    <p class="text-sm text-gray-400 italic">Keine inhaltliche Zusammenfassung.</p>
+                                                    <p class="text-sm text-gray-400 italic">{{ __('tasks.view.implement.no_nontechnical_short') }}</p>
                                                 @endif
                                             </div>
                                             <div x-show="view === 'technical'" x-cloak
@@ -659,7 +657,7 @@
                                                 @if($entry['technical'])
                                                     {!! \Illuminate\Support\Str::markdown($entry['technical']) !!}
                                                 @else
-                                                    <p class="text-sm text-gray-400 italic">Keine technische Zusammenfassung.</p>
+                                                    <p class="text-sm text-gray-400 italic">{{ __('tasks.view.implement.no_technical_short') }}</p>
                                                 @endif
                                             </div>
                                         </div>
@@ -675,18 +673,18 @@
                     @if(!$diffLoaded)
                         <div class="flex flex-col items-center justify-center py-10 gap-3">
                             <x-heroicon-o-document-magnifying-glass class="h-10 w-10 text-gray-300 dark:text-gray-600" />
-                            <p class="text-sm text-gray-400 dark:text-gray-500">Diff wird nicht automatisch geladen.</p>
+                            <p class="text-sm text-gray-400 dark:text-gray-500">{{ __('tasks.view.diff.not_loaded') }}</p>
                             <button type="button" wire:click="loadDiff" wire:loading.attr="disabled"
                                     class="inline-flex items-center gap-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium px-4 py-2 transition-colors disabled:opacity-50">
                                 <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.class="animate-spin" />
-                                <span wire:loading.remove>Diff laden</span>
-                                <span wire:loading>Lade…</span>
+                                <span wire:loading.remove>{{ __('tasks.view.diff.load_button') }}</span>
+                                <span wire:loading>{{ __('tasks.view.diff.loading') }}</span>
                             </button>
                         </div>
                     @elseif(empty($diffFiles))
                         <div class="flex flex-col items-center justify-center py-10 gap-3">
                             <x-heroicon-o-check-circle class="h-10 w-10 text-emerald-500/60" />
-                            <p class="text-sm text-gray-400 dark:text-gray-500">Keine Änderungen gegenüber origin/{{ $record->repoProfile?->default_branch ?? 'main' }}.</p>
+                            <p class="text-sm text-gray-400 dark:text-gray-500">{{ __('tasks.view.diff.no_changes', ['branch' => $record->repoProfile?->default_branch ?? 'main']) }}</p>
                         </div>
                     @else
                         @if(trim($diffStat) !== '')
@@ -702,9 +700,9 @@
                                             class="w-full flex items-center justify-between px-4 py-2.5 bg-slate-800 hover:bg-slate-700 transition-colors text-left gap-3">
                                         <div class="flex items-center gap-2 min-w-0">
                                             @if($file['is_new'])
-                                                <span class="flex-shrink-0 inline-flex items-center rounded px-1.5 py-0.5 text-xs font-semibold bg-emerald-900/50 text-emerald-400 ring-1 ring-emerald-700">NEU</span>
+                                                <span class="flex-shrink-0 inline-flex items-center rounded px-1.5 py-0.5 text-xs font-semibold bg-emerald-900/50 text-emerald-400 ring-1 ring-emerald-700">{{ __('tasks.view.diff.badge_new') }}</span>
                                             @elseif($file['is_deleted'])
-                                                <span class="flex-shrink-0 inline-flex items-center rounded px-1.5 py-0.5 text-xs font-semibold bg-red-900/50 text-red-400 ring-1 ring-red-700">GELÖSCHT</span>
+                                                <span class="flex-shrink-0 inline-flex items-center rounded px-1.5 py-0.5 text-xs font-semibold bg-red-900/50 text-red-400 ring-1 ring-red-700">{{ __('tasks.view.diff.badge_deleted') }}</span>
                                             @endif
                                             <span class="font-mono text-xs text-slate-200 truncate">{{ $file['to_path'] ?: $file['from_path'] }}</span>
                                         </div>
@@ -766,12 +764,12 @@
                     {{-- Pending notes (editable) --}}
                     <div class="px-6 py-5">
                         <div class="flex items-center justify-between mb-3">
-                            <span class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Ausstehend</span>
+                            <span class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">{{ __('tasks.view.feedback.pending') }}</span>
                             @if(!$editingImplementNotes)
                                 <button type="button" wire:click="startEditingImplementNotes"
                                         class="inline-flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400 hover:underline">
                                     <x-heroicon-o-pencil class="h-3 w-3" />
-                                    {{ $implementNotes !== '' ? 'Bearbeiten' : 'Hinzufügen' }}
+                                    {{ $implementNotes !== '' ? __('tasks.view.actions.edit') : __('tasks.view.actions.add') }}
                                 </button>
                             @endif
                         </div>
@@ -779,30 +777,30 @@
                         @if($editingImplementNotes)
                             <div class="flex flex-col gap-3">
                                 <p class="text-xs text-gray-500 dark:text-gray-400">
-                                    Wird beim nächsten Implement-Lauf als Korrektur-Hinweis an Claude übergeben.
+                                    {{ __('tasks.view.feedback.implement_hint') }}
                                 </p>
                                 <textarea
                                     wire:model="implementNotes"
                                     rows="8"
-                                    placeholder="Anmerkungen, Korrekturen, zusätzliche Anforderungen für den nächsten Implement-Lauf…"
+                                    placeholder="{{ __('tasks.view.feedback.implement_placeholder') }}"
                                     class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none font-mono leading-relaxed"
                                 ></textarea>
                                 <div class="flex flex-wrap gap-2">
                                     <button type="button" wire:click="saveImplementNotes"
                                             class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-4 py-2 transition-colors">
                                         <x-heroicon-o-check class="h-3.5 w-3.5" />
-                                        Speichern
+                                        {{ __('tasks.view.actions.save') }}
                                     </button>
                                     @if($record->current_status !== 'running' && $record->workflow_status !== \App\Enums\WorkflowStatus::Completed)
                                         <button type="button" wire:click="saveImplementNotesAndRevise"
                                                 class="inline-flex items-center gap-1.5 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold px-4 py-2 transition-colors">
                                             <x-heroicon-o-code-bracket class="h-3.5 w-3.5" />
-                                            Speichern &amp; Implementierung überarbeiten
+                                            {{ __('tasks.view.actions.save_and_revise_implement') }}
                                         </button>
                                     @endif
                                     <button type="button" wire:click="cancelEditingImplementNotes"
                                             class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 text-xs font-medium px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                                        Abbrechen
+                                        {{ __('tasks.view.actions.cancel') }}
                                     </button>
                                 </div>
                             </div>
@@ -812,14 +810,14 @@
                                 <pre class="whitespace-pre-wrap text-sm text-amber-900 dark:text-amber-200 font-mono leading-relaxed flex-1">{{ $implementNotes }}</pre>
                             </div>
                         @else
-                            <p class="text-sm text-gray-400 dark:text-gray-500 italic">Kein ausstehender Feedback-Eintrag.</p>
+                            <p class="text-sm text-gray-400 dark:text-gray-500 italic">{{ __('tasks.view.feedback.no_pending') }}</p>
                         @endif
                     </div>
 
                     {{-- History --}}
                     @if(!empty($implementNotesHistory))
                         <div class="px-6 py-4">
-                            <span class="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Verlauf ({{ count($implementNotesHistory) }})</span>
+                            <span class="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">{{ __('tasks.view.feedback.history', ['count' => count($implementNotesHistory)]) }}</span>
                             <div class="mt-3 flex flex-col gap-2">
                                 @foreach($implementNotesHistory as $entry)
                                     <div x-data="{ open: true }"
@@ -850,7 +848,7 @@
                     @if(!empty($implementLogIterations))
                         <div class="border-t border-slate-800 bg-slate-950 px-4 py-3">
                             <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
-                                Frühere Iterationen ({{ count($implementLogIterations) }})
+                                {{ __('tasks.view.logs.earlier_iterations', ['count' => count($implementLogIterations)]) }}
                             </p>
                             <div class="flex flex-col gap-2">
                                 @foreach($implementLogIterations as $iter)
@@ -860,7 +858,7 @@
                                         <button type="button"
                                                 x-on:click="open = !open; if (open && !loaded) { loaded = true; $wire.loadLogIteration('implement', {{ $iter }}) }"
                                                 class="w-full flex items-center justify-between px-4 py-2.5 bg-slate-900 hover:bg-slate-800 transition-colors text-left">
-                                            <span class="text-xs font-medium text-slate-400">Iteration {{ $iter }}</span>
+                                            <span class="text-xs font-medium text-slate-400">{{ __('tasks.view.logs.iteration', ['number' => $iter]) }}</span>
                                             <x-heroicon-o-chevron-down class="h-3.5 w-3.5 text-slate-500 transition-transform duration-150 flex-shrink-0" x-bind:class="open ? 'rotate-180' : ''" />
                                         </button>
                                         <div x-show="open" x-collapse>
@@ -871,14 +869,14 @@
                                                     @endforeach
                                                 </div>
                                             @elseif(isset($loadedLogIterations[$key]))
-                                                <p class="px-4 py-3 text-xs text-slate-500 italic bg-slate-950">Keine Einträge für Iteration {{ $iter }}.</p>
+                                                <p class="px-4 py-3 text-xs text-slate-500 italic bg-slate-950">{{ __('tasks.view.logs.no_entries_iteration', ['number' => $iter]) }}</p>
                                             @else
                                                 <div class="flex items-center gap-2 px-4 py-3 bg-slate-950">
                                                     <svg class="animate-spin h-3.5 w-3.5 text-slate-500" fill="none" viewBox="0 0 24 24">
                                                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                                                     </svg>
-                                                    <span class="text-xs text-slate-500">Wird geladen…</span>
+                                                    <span class="text-xs text-slate-500">{{ __('tasks.view.logs.loading') }}</span>
                                                 </div>
                                             @endif
                                         </div>
@@ -901,7 +899,7 @@
                 class="w-full flex items-center justify-between px-5 py-3.5 border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
             <div class="flex items-center gap-3">
                 <x-heroicon-o-arrow-up-tray class="h-4 w-4 text-gray-400" />
-                <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">Push & Pull Request</span>
+                <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">{{ __('tasks.view.push.title') }}</span>
                 <span @class([
                     'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset',
                     $statusColorMap[$pStatus] ?? $statusColorMap['pending'],
@@ -938,13 +936,13 @@
                             x-on:click="tab = 'pr'"
                             x-bind:class="tab === 'pr' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'"
                             class="px-3 pb-2.5 text-xs font-medium border-b-2 transition-colors">
-                        Pull Request
+                        {{ __('tasks.view.push.tab_pr') }}
                     </button>
                     <button type="button"
                             x-on:click="tab = 'log'"
                             x-bind:class="tab === 'log' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'"
                             class="px-3 pb-2.5 text-xs font-medium border-b-2 transition-colors">
-                        Log
+                        {{ __('tasks.view.concept.tab_log') }}
                         @if(!empty($pushLog))
                             <span class="ml-1 inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 text-xs text-gray-500 dark:text-gray-400">{{ count($pushLog) }}</span>
                         @endif
@@ -958,7 +956,7 @@
                                 <div class="flex items-start gap-3 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 px-4 py-3">
                                     <x-heroicon-o-check-circle class="h-5 w-5 text-emerald-500 flex-shrink-0 mt-0.5" />
                                     <div class="min-w-0">
-                                        <p class="text-sm font-medium text-emerald-700 dark:text-emerald-400">Pull Request erstellt</p>
+                                        <p class="text-sm font-medium text-emerald-700 dark:text-emerald-400">{{ __('tasks.view.push.pr_created') }}</p>
                                         <a href="{{ $record->pr_url }}" target="_blank"
                                            class="mt-0.5 text-xs text-emerald-600 dark:text-emerald-500 hover:underline break-all">
                                             {{ $record->pr_url }}
@@ -969,7 +967,7 @@
 
                             @if($record->feature_branch)
                                 <div class="flex items-center gap-3">
-                                    <span class="text-xs font-medium text-gray-500 dark:text-gray-400 w-20 flex-shrink-0">Branch</span>
+                                    <span class="text-xs font-medium text-gray-500 dark:text-gray-400 w-20 flex-shrink-0">{{ __('tasks.view.labels.branch') }}</span>
                                     <code class="text-xs text-indigo-600 dark:text-indigo-400 font-mono bg-indigo-50 dark:bg-indigo-950/40 rounded px-2 py-1">{{ $record->feature_branch }}</code>
                                 </div>
                             @endif
@@ -978,13 +976,13 @@
                                 @php $res = $pRun->result_json; @endphp
                                 @if(!empty($res['commit_sha']))
                                     <div class="flex items-center gap-3">
-                                        <span class="text-xs font-medium text-gray-500 dark:text-gray-400 w-20 flex-shrink-0">Commit</span>
+                                        <span class="text-xs font-medium text-gray-500 dark:text-gray-400 w-20 flex-shrink-0">{{ __('tasks.view.labels.commit') }}</span>
                                         <code class="text-xs text-gray-600 dark:text-gray-400 font-mono">{{ substr($res['commit_sha'], 0, 12) }}</code>
                                     </div>
                                 @endif
                                 @if(!empty($res['commit_subject']))
                                     <div class="flex items-start gap-3">
-                                        <span class="text-xs font-medium text-gray-500 dark:text-gray-400 w-20 flex-shrink-0 mt-0.5">Message</span>
+                                        <span class="text-xs font-medium text-gray-500 dark:text-gray-400 w-20 flex-shrink-0 mt-0.5">{{ __('tasks.view.labels.message') }}</span>
                                         <span class="text-xs text-gray-700 dark:text-gray-300 leading-relaxed">{{ $res['commit_subject'] }}</span>
                                     </div>
                                 @endif
@@ -993,7 +991,7 @@
                     @else
                         <div class="flex flex-col items-center justify-center py-10 text-center gap-3">
                             <x-heroicon-o-arrow-up-tray class="h-10 w-10 text-gray-300 dark:text-gray-600" />
-                            <p class="text-sm text-gray-400 dark:text-gray-500">Noch kein Push durchgeführt.</p>
+                            <p class="text-sm text-gray-400 dark:text-gray-500">{{ __('tasks.view.push.no_push') }}</p>
                         </div>
                     @endif
                 </div>

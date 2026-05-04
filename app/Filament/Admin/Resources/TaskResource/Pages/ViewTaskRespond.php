@@ -31,7 +31,7 @@ class ViewTaskRespond extends Page
     {
         return [
             Action::make('back')
-                ->label('← Zurück zur Task')
+                ->label(__('tasks.view.actions.back'))
                 ->color('gray')
                 ->url(fn () => TaskResource::getUrl('view', ['record' => $this->task])),
         ];
@@ -39,7 +39,7 @@ class ViewTaskRespond extends Page
 
     public function getTitle(): string
     {
-        return "Review-Feedback — {$this->task->name}";
+        return __('tasks.view.respond.title').' — '.$this->task->name;
     }
 
     public function getBreadcrumbs(): array
@@ -47,7 +47,7 @@ class ViewTaskRespond extends Page
         return [
             TaskResource::getUrl() => 'Tasks',
             TaskResource::getUrl('view', ['record' => $this->task]) => $this->task->name,
-            '#' => 'Respond',
+            '#' => __('tasks.view.respond.breadcrumb'),
         ];
     }
 
@@ -56,13 +56,13 @@ class ViewTaskRespond extends Page
         $feedback = trim($this->feedback);
 
         if ($feedback === '') {
-            Notification::make()->title('Feedback darf nicht leer sein')->warning()->send();
+            Notification::make()->title(__('tasks.view.actions.feedback_empty'))->warning()->send();
 
             return;
         }
 
         if ($this->task->phaseRuns()->where('status', 'running')->exists()) {
-            Notification::make()->title('Phase läuft bereits')->warning()->send();
+            Notification::make()->title(__('tasks.view.actions.phase_already_running'))->warning()->send();
 
             return;
         }
@@ -71,7 +71,7 @@ class ViewTaskRespond extends Page
             app(PhaseRunner::class)->writeFeedbackToVolume($this->task->name, $feedback);
         } catch (\Throwable $e) {
             Notification::make()
-                ->title('Fehler beim Schreiben des Feedbacks')
+                ->title(__('tasks.view.actions.feedback_write_error'))
                 ->body($e->getMessage())
                 ->danger()
                 ->send();
@@ -81,7 +81,7 @@ class ViewTaskRespond extends Page
 
         RunPhaseJob::dispatch($this->task->id, 'respond');
 
-        Notification::make()->title('Respond gestartet')->success()->send();
+        Notification::make()->title(__('tasks.view.actions.respond_started'))->success()->send();
 
         $this->redirect(TaskResource::getUrl('logs', ['record' => $this->task]));
     }

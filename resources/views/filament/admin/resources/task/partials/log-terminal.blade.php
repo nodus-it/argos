@@ -14,7 +14,7 @@
                     live
                 </span>
             @else
-                <span class="text-xs text-slate-500 font-mono">{{ count($lines) }} Zeilen</span>
+                <span class="text-xs text-slate-500 font-mono">{{ __('tasks.view.logs.line_count_short', ['count' => count($lines)]) }}</span>
             @endif
         </div>
     </div>
@@ -43,7 +43,7 @@
         style="max-height: 50vh; min-height: 120px;"
     >
         @if(empty($lines))
-            <p class="text-slate-600 italic">Kein Log vorhanden.</p>
+            <p class="text-slate-600 italic">{{ __('tasks.view.logs.no_log_generic') }}</p>
         @else
             @foreach($lines as $line)
                 <div class="whitespace-pre-wrap break-all {{ $line['class'] }}">{{ $line['text'] !== '' ? $line['text'] : "\u{00a0}" }}</div>

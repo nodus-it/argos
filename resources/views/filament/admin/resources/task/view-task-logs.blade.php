@@ -35,15 +35,15 @@
                         <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
                         <span class="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
                     </span>
-                    Live
+                    {{ __('tasks.view.logs.status_live') }}
                 </span>
             @else
                 <span class="inline-flex items-center gap-1.5 text-slate-500">
                     <span class="h-2 w-2 rounded-full bg-slate-600"></span>
-                    Beendet
+                    {{ __('tasks.view.logs.status_idle') }}
                 </span>
             @endif
-            <span>{{ $lineCount }} Zeilen · {{ $updatedAt }}</span>
+            <span>{{ __('tasks.view.logs.line_count', ['count' => $lineCount, 'updated_at' => $updatedAt]) }}</span>
         </div>
     </div>
 
@@ -96,7 +96,7 @@
             @scroll="onScroll()"
         >
             @if(empty($lines))
-                <p class="text-slate-600 italic">Kein Log vorhanden für Phase „{{ $phase }}".</p>
+                <p class="text-slate-600 italic">{{ __('tasks.view.logs.no_log', ['phase' => $phase]) }}</p>
             @else
                 @foreach($lines as $line)
                     <div class="whitespace-pre-wrap break-all {{ $line['class'] }}">{{ $line['text'] ?: '&nbsp;' }}</div>
@@ -118,7 +118,7 @@
                 @if($status === 'running')
                     <span class="text-amber-400">running</span>
                 @elseif($status === 'paused')
-                    <span class="text-amber-400">⏸ pausiert (Turn-Limit)</span>
+                    <span class="text-amber-400">{{ __('tasks.view.logs.status_paused') }}</span>
                 @elseif($status === 'completed')
                     <span class="text-emerald-400">✓ completed</span>
                 @elseif($status === 'failed' || $status === 'quality_gate_failed')

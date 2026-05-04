@@ -8,7 +8,7 @@
         <div class="flex flex-col items-center justify-center py-20 gap-3">
             <x-heroicon-o-check-circle class="h-12 w-12 text-emerald-500/50" />
             <p class="text-sm text-slate-400">
-                Keine Änderungen gegenüber origin/{{ $task->repoProfile?->default_branch ?? 'main' }}.
+                {{ __('tasks.view.diff.no_changes', ['branch' => $task->repoProfile?->default_branch ?? 'main']) }}
             </p>
         </div>
     @else
@@ -21,9 +21,9 @@
                             class="w-full flex items-center justify-between px-4 py-2.5 bg-slate-800 hover:bg-slate-700 transition-colors text-left gap-3">
                         <div class="flex items-center gap-2 min-w-0">
                             @if($file['is_new'])
-                                <span class="flex-shrink-0 inline-flex items-center rounded px-1.5 py-0.5 text-xs font-semibold bg-emerald-900/50 text-emerald-400 ring-1 ring-emerald-700">NEU</span>
+                                <span class="flex-shrink-0 inline-flex items-center rounded px-1.5 py-0.5 text-xs font-semibold bg-emerald-900/50 text-emerald-400 ring-1 ring-emerald-700">{{ __('tasks.view.diff.badge_new') }}</span>
                             @elseif($file['is_deleted'])
-                                <span class="flex-shrink-0 inline-flex items-center rounded px-1.5 py-0.5 text-xs font-semibold bg-red-900/50 text-red-400 ring-1 ring-red-700">GELÖSCHT</span>
+                                <span class="flex-shrink-0 inline-flex items-center rounded px-1.5 py-0.5 text-xs font-semibold bg-red-900/50 text-red-400 ring-1 ring-red-700">{{ __('tasks.view.diff.badge_deleted') }}</span>
                             @endif
                             <span class="font-mono text-xs text-slate-200 truncate">{{ $file['to_path'] ?: $file['from_path'] }}</span>
                         </div>
@@ -76,6 +76,6 @@
         </div>
     @endif
 
-    <p class="text-xs text-slate-600 text-right font-mono">Geladen: {{ $updatedAt }}</p>
+    <p class="text-xs text-slate-600 text-right font-mono">{{ __('tasks.view.diff.loaded_at', ['updated_at' => $updatedAt]) }}</p>
 
 </x-filament-panels::page>
