@@ -103,6 +103,22 @@ class RepoProfile extends Model
     }
 
     /**
+     * Extracts the `owner/repo` path from the stored URL, stripping the scheme,
+     * host, leading slash, and any `.git` suffix. Works for GitHub, GitLab
+     * (including subgroups), and Bitbucket.
+     */
+    public function getOwnerRepo(): string
+    {
+        $path = parse_url($this->url, PHP_URL_PATH) ?? '';
+        $path = rtrim($path, '/');
+        if (str_ends_with($path, '.git')) {
+            $path = substr($path, 0, -4);
+        }
+
+        return ltrim($path, '/');
+    }
+
+    /**
      * Normalise repo URLs on save: trim whitespace and strip trailing slashes.
      * A trailing "/" survived in the URL otherwise leaks into
      * `https://api.github.com/repos/<owner>/<repo>//pulls` and the GitHub REST

@@ -18,6 +18,7 @@ use App\Filament\Admin\Widgets\CurrentTasksWidget;
 use App\Models\PhaseRun;
 use App\Models\RepoProfile;
 use App\Models\Task;
+use App\Services\GitServiceFactory;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Forms\Components\Select;
@@ -85,11 +86,27 @@ class TaskResource extends Resource
                 ->maxValue(1000)
                 ->placeholder((string) config('argos.implement.max_turns_default', 200)),
 
-            TextInput::make('base_branch')
+            Select::make('base_branch')
                 ->label(__('tasks.fields.base_branch_label'))
                 ->helperText(__('tasks.fields.base_branch_helper'))
+                ->options(function (Get $get): array {
+                    $profileId = $get('repo_profile_id');
+                    if (! is_string($profileId) || $profileId === '') {
+                        return [];
+                    }
+                    $profile = RepoProfile::find($profileId);
+                    if ($profile === null) {
+                        return [];
+                    }
+                    try {
+                        return app(GitServiceFactory::class)->fromRepoProfile($profile)->getBranchOptions($profile->getOwnerRepo());
+                    } catch (\Throwable) {
+                        return [];
+                    }
+                })
                 ->placeholder(fn (Get $get): string => RepoProfile::find($get('repo_profile_id'))?->default_branch ?? 'main')
-                ->maxLength(255),
+                ->searchable()
+                ->native(false),
 
             Select::make('worker_image')
                 ->label(__('tasks.fields.worker_image_label'))

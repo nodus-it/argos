@@ -13,7 +13,6 @@ use App\Models\ConnectedAccount;
 use App\Models\RepoProfile;
 use App\Models\Task;
 use App\Models\User;
-use App\Services\Git\RemoteBranchValidator;
 use Filament\Actions\Testing\TestAction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -31,31 +30,6 @@ class RepoProfileResourceTest extends TestCase
         parent::setUp();
         $this->user = User::factory()->create();
         $this->actingAs($this->user);
-
-        // Bypass actual `git ls-remote` calls in unit tests — the offline test
-        // suite must not touch external services.
-        $this->fakeBranchValidator(['ok' => true, 'error' => null]);
-    }
-
-    /**
-     * @param  array{ok: bool, error: string|null}  $result
-     */
-    private function fakeBranchValidator(array $result): void
-    {
-        $fake = new class($result) extends RemoteBranchValidator
-        {
-            /**
-             * @param  array{ok: bool, error: string|null}  $result
-             */
-            public function __construct(private readonly array $result) {}
-
-            public function validate(string $url, string $branch, ?string $token = null): array
-            {
-                return $this->result;
-            }
-        };
-
-        $this->app->instance(RemoteBranchValidator::class, $fake);
     }
 
     public function test_list_page_renders(): void
@@ -75,6 +49,10 @@ class RepoProfileResourceTest extends TestCase
 
     public function test_can_create_repo_profile(): void
     {
+        Http::fake([
+            'api.github.com/repos/org/repo/branches*' => Http::response([['name' => 'main']]),
+        ]);
+
         Livewire::test(CreateRepoProfile::class)
             ->fillForm([
                 'name' => 'Test Projekt',
@@ -119,25 +97,6 @@ class RepoProfileResourceTest extends TestCase
             ->assertHasFormErrors(['url']);
     }
 
-    public function test_create_rejects_default_branch_missing_on_remote(): void
-    {
-        $this->fakeBranchValidator([
-            'ok' => false,
-            'error' => "Branch 'main' nicht im Repository gefunden.",
-        ]);
-
-        Livewire::test(CreateRepoProfile::class)
-            ->fillForm([
-                'name' => 'Test',
-                'url' => 'https://github.com/foo/bar',
-                'platform' => 'github',
-                'default_branch' => 'main',
-                'token' => 'pat-123',
-            ])
-            ->call('create')
-            ->assertHasFormErrors(['default_branch']);
-    }
-
     public function test_edit_page_renders_with_data(): void
     {
         $profile = RepoProfile::factory()->create();
@@ -177,6 +136,10 @@ class RepoProfileResourceTest extends TestCase
 
     public function test_can_edit_repo_profile(): void
     {
+        Http::fake([
+            'api.github.com/repos/test-org/test-repo/branches*' => Http::response([['name' => 'main']]),
+        ]);
+
         $profile = RepoProfile::factory()->create();
 
         Livewire::test(EditRepoProfile::class, ['record' => $profile->getKey()])
@@ -279,6 +242,10 @@ class RepoProfileResourceTest extends TestCase
 
     public function test_can_create_repo_profile_with_pat(): void
     {
+        Http::fake([
+            'api.github.com/repos/org/repo/branches*' => Http::response([['name' => 'main']]),
+        ]);
+
         Livewire::test(CreateRepoProfile::class)
             ->fillForm([
                 'name' => 'PAT Projekt',
@@ -335,6 +302,10 @@ class RepoProfileResourceTest extends TestCase
 
     public function test_switching_to_pat_clears_connected_account_id_on_save(): void
     {
+        Http::fake([
+            'api.github.com/repos/org/repo/branches*' => Http::response([['name' => 'main']]),
+        ]);
+
         $account = ConnectedAccount::factory()->create([
             'user_id' => $this->user->id,
             'provider' => 'github',
@@ -442,6 +413,12 @@ class RepoProfileResourceTest extends TestCase
 
     public function test_can_create_bitbucket_repo_profile_with_pat(): void
     {
+        Http::fake([
+            'api.bitbucket.org/2.0/repositories/myworkspace/myrepo/refs/branches*' => Http::response([
+                'values' => [['name' => 'main']],
+            ]),
+        ]);
+
         Livewire::test(CreateRepoProfile::class)
             ->fillForm([
                 'name' => 'Bitbucket Projekt',
