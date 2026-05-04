@@ -7,7 +7,6 @@ namespace Tests\External;
 use App\Services\Contracts\GitProviderContract;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
-use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Component\Process\Process;
 use Tests\External\Support\AuthenticatedCloneUrl;
 use Tests\External\Support\CleanupQueue;
@@ -19,10 +18,15 @@ use Tests\TestCase;
 /**
  * Shared test body for every Git provider's external contract suite.
  *
- * Subclasses only deliver provider-specific glue: config (which env vars to
- * read), how to instantiate the provider service from a token, how to extract
- * the PR identifier from the API response, and how to close the PR for
+ * Subclasses only deliver provider-specific glue: how to instantiate the
+ * service, how to extract the PR identifier, and how to close the PR for
  * cleanup. Every test method below runs unchanged across all providers.
+ *
+ * The suite tests the PAT path only. OAuth round-trips share the same
+ * Bearer-auth code path on GitHub and GitLab and would not exercise new
+ * code; on Bitbucket the OAuth path is exercised manually via the
+ * `test:providers` artisan helper, which feeds DB-resident OAuth tokens
+ * into the same suite.
  */
 abstract class ProviderContractTestCase extends TestCase
 {
@@ -49,20 +53,6 @@ abstract class ProviderContractTestCase extends TestCase
      */
     abstract protected function closePullRequestViaApi(int|string $id, string $token): void;
 
-    /**
-     * Provider-stable name for the data set, used by phpunit's output:
-     * e.g. 'PAT' or 'OAuth'.
-     *
-     * @return array<string, array{0: string}>
-     */
-    public static function authMethods(): array
-    {
-        return [
-            'PAT' => ['pat'],
-            'OAuth' => ['oauth'],
-        ];
-    }
-
     protected function setUp(): void
     {
         parent::setUp();
@@ -71,7 +61,7 @@ abstract class ProviderContractTestCase extends TestCase
 
         if (! $this->config->isFullyConfigured()) {
             $this->markTestSkipped(
-                "External-Suite für {$this->config->providerKey}: Credentials oder Test-Repo-Felder nicht gesetzt."
+                "External-Suite für {$this->config->providerKey}: PAT nicht gesetzt (siehe .env.testing.external)."
             );
         }
 
@@ -97,27 +87,14 @@ abstract class ProviderContractTestCase extends TestCase
         parent::tearDown();
     }
 
-    /**
-     * Resolves the configured token for the given auth kind, or skips the
-     * test cleanly when the corresponding env var is empty.
-     */
-    protected function resolveToken(string $authKind): string
+    protected function token(): string
     {
-        $token = $authKind === 'pat' ? $this->config->patToken : $this->config->oauthToken;
-        if ($token === null) {
-            $this->markTestSkipped(
-                "{$this->config->providerKey}: kein {$authKind}-Token konfiguriert."
-            );
-        }
-
-        return $token;
+        return $this->config->patToken ?? '';
     }
 
-    #[DataProvider('authMethods')]
-    public function test_list_repositories_includes_test_repo(string $authKind): void
+    public function test_list_repositories_includes_test_repo(): void
     {
-        $token = $this->resolveToken($authKind);
-        $service = $this->makeService($token);
+        $service = $this->makeService($this->token());
 
         $repos = $service->listRepositories();
 
@@ -139,11 +116,9 @@ abstract class ProviderContractTestCase extends TestCase
         );
     }
 
-    #[DataProvider('authMethods')]
-    public function test_list_branches_includes_default_branch(string $authKind): void
+    public function test_list_branches_includes_default_branch(): void
     {
-        $token = $this->resolveToken($authKind);
-        $service = $this->makeService($token);
+        $service = $this->makeService($this->token());
 
         $branches = $service->listBranches($this->config->testRepoOwner, $this->config->testRepo);
 
@@ -161,15 +136,12 @@ abstract class ProviderContractTestCase extends TestCase
         );
     }
 
-    #[DataProvider('authMethods')]
-    public function test_git_clone_succeeds(string $authKind): void
+    public function test_git_clone_succeeds(): void
     {
-        $token = $this->resolveToken($authKind);
         $authUrl = AuthenticatedCloneUrl::build(
             $this->config->providerKey,
             $this->config->repoCloneUrl,
-            $authKind,
-            $token,
+            $this->token(),
         );
 
         $tmp = $this->makeTempDir('clone');
@@ -186,10 +158,9 @@ abstract class ProviderContractTestCase extends TestCase
         $this->assertFileExists("{$tmp}/.git/HEAD");
     }
 
-    #[DataProvider('authMethods')]
-    public function test_pull_request_round_trip(string $authKind): void
+    public function test_pull_request_round_trip(): void
     {
-        $token = $this->resolveToken($authKind);
+        $token = $this->token();
         $service = $this->makeService($token);
 
         $branchName = RandomizedRefName::branch('pr-roundtrip');
@@ -198,7 +169,6 @@ abstract class ProviderContractTestCase extends TestCase
         $authUrl = AuthenticatedCloneUrl::build(
             $this->config->providerKey,
             $this->config->repoCloneUrl,
-            $authKind,
             $token,
         );
 
@@ -248,6 +218,8 @@ abstract class ProviderContractTestCase extends TestCase
      * Helper for direct HTTP calls in cleanup hooks (e.g. closing a PR). Uses
      * Laravel's HTTP client with the same scrubbing/throw-on-4xx semantics
      * as the production provider services.
+     *
+     * @param  array<string, string>  $extraHeaders
      */
     protected function http(string $token, array $extraHeaders = []): PendingRequest
     {
@@ -258,7 +230,7 @@ abstract class ProviderContractTestCase extends TestCase
         ]);
     }
 
-    /** @param array<int, string> $cmd */
+    /** @param  array<int, string>  $cmd */
     private function runGit(string $cwd, array $cmd, ?int $expectExit = null): void
     {
         $process = new Process($cmd, is_dir($cwd) ? $cwd : null);

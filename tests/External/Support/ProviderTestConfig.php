@@ -5,11 +5,14 @@ declare(strict_types=1);
 namespace Tests\External\Support;
 
 /**
- * Resolves credentials and test-repo coordinates for a single provider from
- * environment variables. The naming scheme is `<PROVIDER>_<KEY>` —
- * e.g. `GITHUB_PAT`, `GITHUB_TEST_REPO_OWNER`, `GITLAB_INSTANCE_URL`.
+ * Resolves credentials and test-repo coordinates for a single provider.
  *
- * @phpstan-type AuthMethod array{0: string, 1: string}
+ * Coordinates (owner, repo, branch, clone URL, instance URL) are hard-coded
+ * in tests/External/providers.defaults.php. Per-key environment variables
+ * (`<PROVIDER>_TEST_REPO_OWNER`, …) override the defaults — useful for local
+ * sandbox testing or self-hosted GitLab.
+ *
+ * Tokens always come from the environment: `<PROVIDER>_PAT`.
  */
 final class ProviderTestConfig
 {
@@ -17,7 +20,6 @@ final class ProviderTestConfig
         public readonly string $providerKey,
         public readonly string $instanceUrl,
         public readonly ?string $patToken,
-        public readonly ?string $oauthToken,
         public readonly string $testRepoOwner,
         public readonly string $testRepo,
         public readonly string $defaultBranch,
@@ -27,48 +29,39 @@ final class ProviderTestConfig
     public static function fromEnv(string $providerKey): self
     {
         $prefix = strtoupper($providerKey);
+        $defaults = self::loadDefaults($providerKey);
 
         return new self(
             providerKey: $providerKey,
-            instanceUrl: self::env("{$prefix}_INSTANCE_URL", self::defaultInstanceUrl($providerKey)),
+            instanceUrl: self::env("{$prefix}_INSTANCE_URL", $defaults['instanceUrl'] ?? ''),
             patToken: self::envOptional("{$prefix}_PAT"),
-            oauthToken: self::envOptional("{$prefix}_OAUTH_TOKEN"),
-            testRepoOwner: self::env("{$prefix}_TEST_REPO_OWNER"),
-            testRepo: self::env("{$prefix}_TEST_REPO"),
-            defaultBranch: self::env("{$prefix}_DEFAULT_BRANCH", 'main'),
-            repoCloneUrl: self::env("{$prefix}_TEST_REPO_CLONE_URL"),
+            testRepoOwner: self::env("{$prefix}_TEST_REPO_OWNER", $defaults['testRepoOwner'] ?? ''),
+            testRepo: self::env("{$prefix}_TEST_REPO", $defaults['testRepo'] ?? ''),
+            defaultBranch: self::env("{$prefix}_DEFAULT_BRANCH", $defaults['defaultBranch'] ?? 'main'),
+            repoCloneUrl: self::env("{$prefix}_TEST_REPO_CLONE_URL", $defaults['repoCloneUrl'] ?? ''),
         );
-    }
-
-    public function hasAnyToken(): bool
-    {
-        return $this->patToken !== null || $this->oauthToken !== null;
     }
 
     public function isFullyConfigured(): bool
     {
-        return $this->hasAnyToken()
+        return $this->patToken !== null
             && $this->testRepoOwner !== ''
             && $this->testRepo !== ''
             && $this->repoCloneUrl !== '';
     }
 
     /**
-     * Tokens to iterate over in the data provider. Only configured ones are returned.
-     *
-     * @return array<string, AuthMethod>
+     * @return array{instanceUrl?: string, testRepoOwner?: string, testRepo?: string, defaultBranch?: string, repoCloneUrl?: string}
      */
-    public function configuredAuthMethods(): array
+    private static function loadDefaults(string $providerKey): array
     {
-        $methods = [];
-        if ($this->patToken !== null) {
-            $methods['PAT'] = ['pat', $this->patToken];
-        }
-        if ($this->oauthToken !== null) {
-            $methods['OAuth'] = ['oauth', $this->oauthToken];
+        static $cache = null;
+        if ($cache === null) {
+            $path = __DIR__.'/../providers.defaults.php';
+            $cache = is_file($path) ? require $path : [];
         }
 
-        return $methods;
+        return $cache[$providerKey] ?? [];
     }
 
     private static function env(string $key, string $default = ''): string
@@ -89,15 +82,5 @@ final class ProviderTestConfig
         }
 
         return $value;
-    }
-
-    private static function defaultInstanceUrl(string $providerKey): string
-    {
-        return match ($providerKey) {
-            'github' => 'https://github.com',
-            'gitlab' => 'https://gitlab.com',
-            'bitbucket' => 'https://bitbucket.org',
-            default => '',
-        };
     }
 }
