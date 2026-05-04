@@ -49,7 +49,9 @@ return [
         'client_id' => env('GITLAB_CLIENT_ID'),
         'client_secret' => env('GITLAB_CLIENT_SECRET'),
         'redirect' => env('GITLAB_REDIRECT_URI', '/auth/gitlab/callback'),
-        'instance_uri' => env('GITLAB_INSTANCE_URL', 'https://gitlab.com'),
+        // socialiteproviders/gitlab concatenates this verbatim with 'oauth/authorize',
+        // so we MUST guarantee a trailing slash. rtrim+'/' is idempotent on either form.
+        'instance_uri' => rtrim((string) env('GITLAB_INSTANCE_URL', 'https://gitlab.com'), '/').'/',
     ],
 
     'bitbucket' => [
