@@ -26,8 +26,8 @@
                     @else
                         <div class="flex flex-col items-center justify-center py-16 text-center gap-3">
                             <x-heroicon-o-document-text class="h-10 w-10 text-gray-300 dark:text-gray-600" />
-                            <p class="text-sm text-gray-400 dark:text-gray-500">Noch kein Konzept vorhanden.</p>
-                            <p class="text-xs text-gray-400 dark:text-gray-600">Starte die Concept-Phase um ein Konzept zu generieren.</p>
+                            <p class="text-sm text-gray-400 dark:text-gray-500">{{ __('tasks.view.concept.empty') }}</p>
+                            <p class="text-xs text-gray-400 dark:text-gray-600">{{ __('tasks.view.concept.start_hint') }}</p>
                         </div>
                     @endif
                 </div>
@@ -38,13 +38,13 @@
         <div class="flex flex-col gap-4">
             <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden">
                 <div class="flex items-center justify-between px-5 py-3 border-b border-gray-100 dark:border-gray-800">
-                    <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">Feedback / Notes</span>
+                    <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">{{ __('tasks.view.concept.notes_title') }}</span>
                     @if(!$editingNotes)
                         <button
                             wire:click="startEditingNotes"
                             class="text-xs text-primary-600 dark:text-primary-400 hover:underline"
                         >
-                            Bearbeiten
+                            {{ __('tasks.view.actions.edit') }}
                         </button>
                     @endif
                 </div>
@@ -54,7 +54,7 @@
                         <textarea
                             wire:model="notes"
                             rows="12"
-                            placeholder="Anmerkungen zum Konzept, Korrekturen, zusätzliche Anforderungen…"
+                            placeholder="{{ __('tasks.view.concept.notes_placeholder') }}"
                             class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none font-mono"
                         ></textarea>
                         <div class="flex gap-2 mt-3">
@@ -62,29 +62,29 @@
                                 wire:click="saveNotes"
                                 class="flex-1 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium py-2 transition-colors"
                             >
-                                Speichern
+                                {{ __('tasks.view.actions.save') }}
                             </button>
                             <button
                                 wire:click="cancelEditingNotes"
                                 class="rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 text-sm font-medium px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                             >
-                                Abbrechen
+                                {{ __('tasks.view.actions.cancel') }}
                             </button>
                         </div>
                     @elseif($notes !== '')
                         <pre class="whitespace-pre-wrap text-xs text-gray-600 dark:text-gray-400 font-mono leading-relaxed">{{ $notes }}</pre>
                         <p class="mt-3 text-xs text-gray-400 dark:text-gray-600 italic">
-                            Notes werden beim nächsten Concept-Lauf als Feedback übergeben.
+                            {{ __('tasks.view.concept.notes_hint') }}
                         </p>
                     @else
                         <div class="flex flex-col items-center justify-center py-8 text-center gap-2">
                             <x-heroicon-o-pencil-square class="h-8 w-8 text-gray-300 dark:text-gray-600" />
-                            <p class="text-xs text-gray-400 dark:text-gray-500">Keine Notes vorhanden.</p>
+                            <p class="text-xs text-gray-400 dark:text-gray-500">{{ __('tasks.view.concept.no_notes') }}</p>
                             <button
                                 wire:click="startEditingNotes"
                                 class="mt-1 text-xs text-primary-600 dark:text-primary-400 hover:underline"
                             >
-                                Notes hinzufügen
+                                {{ __('tasks.view.actions.add_notes') }}
                             </button>
                         </div>
                     @endif
@@ -95,7 +95,7 @@
             @if($hasConceptmd)
                 <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden">
                     <div class="px-5 py-3 border-b border-gray-100 dark:border-gray-800">
-                        <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">Nächste Schritte</span>
+                        <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">{{ __('tasks.view.concept.next_steps') }}</span>
                     </div>
                     <div class="px-5 py-4 flex flex-col gap-2">
                         <button
@@ -103,7 +103,7 @@
                             class="flex items-center gap-2 rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                         >
                             <x-heroicon-o-code-bracket class="h-4 w-4 text-gray-400 flex-shrink-0" />
-                            <span>Implement starten</span>
+                            <span>{{ __('tasks.view.actions.start_implement') }}</span>
                         </button>
                         <button
                             wire:click="$dispatch('open-modal', { id: 'run-concept-again' })"
@@ -111,7 +111,7 @@
                             class="flex items-center gap-2 rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                         >
                             <x-heroicon-o-arrow-path class="h-4 w-4 text-gray-400 flex-shrink-0" />
-                            <span>Konzept überarbeiten</span>
+                            <span>{{ __('tasks.view.actions.revise_concept') }}</span>
                         </button>
                     </div>
                 </div>

@@ -189,8 +189,8 @@ class TaskPagesTest extends TestCase
 
         Livewire::test(ViewTask::class, ['record' => $task->getKey()])
             ->assertSuccessful()
-            ->assertSee('Implementierung pausiert')
-            ->assertSee('Turn-Limit');
+            ->assertSee('Implementation paused')
+            ->assertSee('turn limit');
     }
 
     public function test_phase_action_warns_when_running(): void
@@ -289,7 +289,7 @@ class TaskPagesTest extends TestCase
 
         Livewire::test(ViewTaskRespond::class, ['record' => $task->getKey()])
             ->assertSuccessful()
-            ->assertSee('Review-Feedback');
+            ->assertSee('Review Feedback');
     }
 
     public function test_respond_submit_feedback_dispatches_job(): void

@@ -38,24 +38,24 @@ class ViewTaskConcept extends Page
     {
         return [
             Action::make('back')
-                ->label('← Zurück zur Task')
+                ->label(__('tasks.view.actions.back'))
                 ->color('gray')
                 ->url(fn () => TaskResource::getUrl('view', ['record' => $this->task])),
 
             Action::make('runConcept')
-                ->label('Konzept neu ausführen')
+                ->label(__('tasks.view.actions.run_concept'))
                 ->icon('heroicon-o-arrow-path')
                 ->color('warning')
                 ->requiresConfirmation()
-                ->modalDescription('Startet einen neuen Konzept-Lauf. Vorhandene Notes werden als Feedback übergeben.')
+                ->modalDescription(__('tasks.view.actions.run_concept_description'))
                 ->action(function (): void {
                     if ($this->task->phaseRuns()->where('status', 'running')->exists()) {
-                        Notification::make()->title('Phase läuft bereits')->warning()->send();
+                        Notification::make()->title(__('tasks.view.actions.phase_already_running'))->warning()->send();
 
                         return;
                     }
                     RunPhaseJob::dispatch($this->task->id, 'concept');
-                    Notification::make()->title('Konzept gestartet')->success()->send();
+                    Notification::make()->title(__('tasks.view.actions.concept_started'))->success()->send();
                     $this->redirect(TaskResource::getUrl('logs', ['record' => $this->task]));
                 }),
         ];
@@ -63,7 +63,7 @@ class ViewTaskConcept extends Page
 
     public function getTitle(): string
     {
-        return "Konzept — {$this->task->name}";
+        return __('tasks.view.concept.title').' — '.$this->task->name;
     }
 
     public function getBreadcrumbs(): array
@@ -71,7 +71,7 @@ class ViewTaskConcept extends Page
         return [
             TaskResource::getUrl() => 'Tasks',
             TaskResource::getUrl('view', ['record' => $this->task]) => $this->task->name,
-            '#' => 'Konzept',
+            '#' => __('tasks.view.concept.breadcrumb'),
         ];
     }
 
@@ -85,7 +85,7 @@ class ViewTaskConcept extends Page
         $this->task->update(['concept_notes' => $this->notes ?: null]);
 
         $this->editingNotes = false;
-        Notification::make()->title('Notes gespeichert')->success()->send();
+        Notification::make()->title(__('tasks.view.actions.notes_saved'))->success()->send();
     }
 
     public function cancelEditingNotes(): void
@@ -97,13 +97,13 @@ class ViewTaskConcept extends Page
     public function startImplement(): void
     {
         if ($this->task->phaseRuns()->where('status', 'running')->exists()) {
-            Notification::make()->title('Phase läuft bereits')->warning()->send();
+            Notification::make()->title(__('tasks.view.actions.phase_already_running'))->warning()->send();
 
             return;
         }
         $this->task->update(['workflow_status' => WorkflowStatus::ImplementRunning]);
         RunPhaseJob::dispatch($this->task->id, 'implement');
-        Notification::make()->title('Implement gestartet')->success()->send();
+        Notification::make()->title(__('tasks.view.actions.implement_started'))->success()->send();
         $this->redirect(TaskResource::getUrl('logs', ['record' => $this->task]));
     }
 
