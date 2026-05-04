@@ -50,7 +50,19 @@ class RemoteBranchValidatorTest extends TestCase
 
         $this->assertFalse($result['ok']);
         $this->assertStringNotContainsString('s3cret', (string) $result['error']);
-        $this->assertStringContainsString('oauth2:***', (string) $result['error']);
+        $this->assertStringContainsString('://***@', (string) $result['error']);
+    }
+
+    public function test_scrubs_bitbucket_x_token_auth_from_error_message(): void
+    {
+        $stderr = "fatal: unable to access 'https://x-token-auth:s3cret@bitbucket.org/ws/repo/'\n";
+        $validator = $this->validatorWithProcess(exitCode: 128, stderr: $stderr);
+
+        $result = $validator->validate('https://bitbucket.org/ws/repo', 'main', token: 's3cret');
+
+        $this->assertFalse($result['ok']);
+        $this->assertStringNotContainsString('s3cret', (string) $result['error']);
+        $this->assertStringContainsString('://***@', (string) $result['error']);
     }
 
     public function test_passes_token_via_url_when_https(): void
@@ -62,6 +74,28 @@ class RemoteBranchValidatorTest extends TestCase
 
         $this->assertNotNull($captured);
         $this->assertContains('https://oauth2:tok-123@github.com/foo/bar', $captured);
+    }
+
+    public function test_uses_x_token_auth_for_bitbucket_bearer_token(): void
+    {
+        $captured = null;
+        $validator = $this->validatorCapturingCommand(0, $captured);
+
+        $validator->validate('https://bitbucket.org/ws/repo', 'main', token: 'no-colon-token');
+
+        $this->assertNotNull($captured);
+        $this->assertContains('https://x-token-auth:no-colon-token@bitbucket.org/ws/repo', $captured);
+    }
+
+    public function test_uses_basic_user_info_for_bitbucket_token_with_colon(): void
+    {
+        $captured = null;
+        $validator = $this->validatorCapturingCommand(0, $captured);
+
+        $validator->validate('https://bitbucket.org/ws/repo', 'main', token: 'user:secret');
+
+        $this->assertNotNull($captured);
+        $this->assertContains('https://user:secret@bitbucket.org/ws/repo', $captured);
     }
 
     public function test_does_not_inject_token_for_non_https_urls(): void

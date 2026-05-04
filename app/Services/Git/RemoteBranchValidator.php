@@ -47,11 +47,21 @@ class RemoteBranchValidator
 
     private function injectToken(string $url, ?string $token): string
     {
-        if ($token === null || $token === '' || ! preg_match('#^https?://#', $url)) {
+        if ($token === null || $token === '' || ! preg_match('#^(https?://)(.*)$#', $url, $m)) {
             return $url;
         }
 
-        return preg_replace('#^(https?://)#', '$1oauth2:'.$token.'@', $url, 1) ?? $url;
+        // Provider-specific user-info shape, mirroring BitbucketGitService's
+        // auto-detection: a Bitbucket token containing a colon is "user:secret"
+        // (Basic), one without is Bearer-style and needs the magic
+        // x-token-auth user. GitHub and GitLab take any token via oauth2:<token>.
+        $userInfo = match (true) {
+            str_contains($m[2], 'bitbucket.org') && str_contains($token, ':') => $token,
+            str_contains($m[2], 'bitbucket.org') => "x-token-auth:{$token}",
+            default => "oauth2:{$token}",
+        };
+
+        return $m[1].$userInfo.'@'.$m[2];
     }
 
     private function extractError(string $stderr): ?string
@@ -66,6 +76,8 @@ class RemoteBranchValidator
 
     private function scrubToken(string $line): string
     {
-        return preg_replace('#oauth2:[^@/]+@#', 'oauth2:***@', $line) ?? $line;
+        // Match any embedded user-info segment ("user:secret" or "x-token-auth:token"
+        // or "oauth2:token") between scheme:// and @, replace with ***.
+        return preg_replace('#(://)[^/@\s]+@#', '$1***@', $line) ?? $line;
     }
 }
