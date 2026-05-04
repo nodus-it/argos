@@ -114,7 +114,15 @@ RUN chmod +x /usr/local/bin/worker-entrypoint.sh \
     && chown -R agent:agent /home/agent/.npm /home/agent/.composer
 
 USER agent
-RUN git config --global --add safe.directory '*'
+# safe.directory: clones happen as `agent` into bind-mounted /workspace, where
+# the host UID may differ from the container's — git would otherwise refuse.
+# http.postBuffer + http.version: workaround for the GnuTLS-linked Debian git
+# dropping the sideband stream on large pack files (curl 56 / GnuTLS -110)
+# behind some reverse proxies. 500 MiB postBuffer forces a single request,
+# HTTP/1.1 dodges proxies with broken HTTP/2 sideband handling.
+RUN git config --global --add safe.directory '*' \
+    && git config --global http.postBuffer 524288000 \
+    && git config --global http.version HTTP/1.1
 WORKDIR /workspace
 
 ENTRYPOINT ["/usr/local/bin/worker-entrypoint.sh"]
@@ -178,7 +186,15 @@ RUN chmod +x /usr/local/bin/worker-entrypoint.sh \
     && chown -R agent:agent /home/agent/.npm /home/agent/.composer
 
 USER agent
-RUN git config --global --add safe.directory '*'
+# safe.directory: clones happen as `agent` into bind-mounted /workspace, where
+# the host UID may differ from the container's — git would otherwise refuse.
+# http.postBuffer + http.version: workaround for the GnuTLS-linked Debian git
+# dropping the sideband stream on large pack files (curl 56 / GnuTLS -110)
+# behind some reverse proxies. 500 MiB postBuffer forces a single request,
+# HTTP/1.1 dodges proxies with broken HTTP/2 sideband handling.
+RUN git config --global --add safe.directory '*' \
+    && git config --global http.postBuffer 524288000 \
+    && git config --global http.version HTTP/1.1
 WORKDIR /workspace
 
 ENTRYPOINT ["/usr/local/bin/worker-entrypoint.sh"]

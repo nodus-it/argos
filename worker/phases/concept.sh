@@ -49,6 +49,32 @@ _concept_emit_clone_err() {
     echo "---------------------" >&2
 }
 
+# _concept_classify_fetch_err: classify the contents of clone.err into one of
+# the known git fetch failure modes. Output: a short tag on stdout — one of
+# "branch_not_found", "auth", "network", "unknown".
+# Args: none. Reads /workspace/.agent/logs/clone.err.
+_concept_classify_fetch_err() {
+    local err_file=/workspace/.agent/logs/clone.err
+    [[ -s "$err_file" ]] || { echo "unknown"; return 0; }
+
+    # Order matters: auth/network signals are more specific than the generic
+    # "couldn't find remote ref" line that some servers emit on auth failure.
+    if grep -qiE 'authentication failed|invalid credentials|HTTP 401|HTTP 403|could not read Username' "$err_file"; then
+        echo "auth"
+        return 0
+    fi
+    if grep -qiE 'TLS connection|GnuTLS|SSL_read|RPC failed|early EOF|unexpected disconnect|fetch-pack: invalid|Could not resolve host|Connection refused|Connection reset|Operation timed out|HTTP 5[0-9]{2}' "$err_file"; then
+        echo "network"
+        return 0
+    fi
+    if grep -qiE "couldn't find remote ref|fatal: Remote branch .* not found|HTTP 404" "$err_file"; then
+        echo "branch_not_found"
+        return 0
+    fi
+
+    echo "unknown"
+}
+
 # _concept_initial_clone: clone the repo into the volume and create the feature branch.
 _concept_initial_clone() {
     set +x
@@ -75,7 +101,22 @@ _concept_initial_clone() {
         || echo '.agent/' >> /workspace/.git/info/exclude
     git remote add origin "$auth_url" 2>/dev/null || git remote set-url origin "$auth_url"
     if ! git fetch --quiet --depth=1 origin "$BASE_BRANCH" 2>>/workspace/.agent/logs/clone.err; then
-        echo "concept: git fetch failed (Branch '$BASE_BRANCH' im Repo $REPO_URL nicht gefunden?)" >&2
+        local kind
+        kind="$(_concept_classify_fetch_err)"
+        case "$kind" in
+            branch_not_found)
+                echo "concept: git fetch failed — Branch '$BASE_BRANCH' im Repo $REPO_URL nicht gefunden." >&2
+                ;;
+            auth)
+                echo "concept: git fetch failed — Authentifizierung am Repo $REPO_URL abgelehnt (Token gültig? Scope ausreichend?)." >&2
+                ;;
+            network)
+                echo "concept: git fetch failed — Netzwerk-/TLS-Fehler beim Verbinden mit $REPO_URL (siehe clone.err für Details)." >&2
+                ;;
+            *)
+                echo "concept: git fetch failed (siehe clone.err für Details)." >&2
+                ;;
+        esac
         _concept_emit_clone_err
         git remote set-url origin "$REPO_URL"
         # remove .git so the next attempt can retry from scratch

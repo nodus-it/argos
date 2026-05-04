@@ -217,3 +217,51 @@ teardown() {
     output="$(_concept_emit_clone_err 2>&1 1>/dev/null)"
     [ -z "$output" ]
 }
+
+# --- _concept_classify_fetch_err ---
+
+@test "_concept_classify_fetch_err: branch_not_found bei 'couldn't find remote ref'" {
+    mkdir -p /workspace/.agent/logs
+    printf "fatal: couldn't find remote ref refs/heads/nope\n" > /workspace/.agent/logs/clone.err
+    [ "$(_concept_classify_fetch_err)" = "branch_not_found" ]
+}
+
+@test "_concept_classify_fetch_err: branch_not_found bei HTTP 404" {
+    mkdir -p /workspace/.agent/logs
+    printf "fatal: unable to access ...: The requested URL returned error: HTTP 404\n" > /workspace/.agent/logs/clone.err
+    [ "$(_concept_classify_fetch_err)" = "branch_not_found" ]
+}
+
+@test "_concept_classify_fetch_err: auth bei HTTP 401" {
+    mkdir -p /workspace/.agent/logs
+    printf "fatal: Authentication failed for 'https://example.com/repo.git/'\nHTTP 401\n" > /workspace/.agent/logs/clone.err
+    [ "$(_concept_classify_fetch_err)" = "auth" ]
+}
+
+@test "_concept_classify_fetch_err: network bei GnuTLS recv error" {
+    mkdir -p /workspace/.agent/logs
+    cat > /workspace/.agent/logs/clone.err <<'EOF'
+error: RPC failed; curl 56 GnuTLS recv error (-110): The TLS connection was non-properly terminated.
+fetch-pack: unexpected disconnect while reading sideband packet
+fatal: early EOF
+EOF
+    [ "$(_concept_classify_fetch_err)" = "network" ]
+}
+
+@test "_concept_classify_fetch_err: network bei Connection refused" {
+    mkdir -p /workspace/.agent/logs
+    printf "fatal: unable to access ...: Failed to connect to host: Connection refused\n" > /workspace/.agent/logs/clone.err
+    [ "$(_concept_classify_fetch_err)" = "network" ]
+}
+
+@test "_concept_classify_fetch_err: unknown bei leerem clone.err" {
+    mkdir -p /workspace/.agent/logs
+    : > /workspace/.agent/logs/clone.err
+    [ "$(_concept_classify_fetch_err)" = "unknown" ]
+}
+
+@test "_concept_classify_fetch_err: unknown bei nicht klassifizierbarer Meldung" {
+    mkdir -p /workspace/.agent/logs
+    printf "some weird unparseable git error message\n" > /workspace/.agent/logs/clone.err
+    [ "$(_concept_classify_fetch_err)" = "unknown" ]
+}
