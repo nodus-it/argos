@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\External;
 
 use App\Services\Contracts\GitProviderContract;
+use App\Services\Git\RemoteBranchValidator;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
 use Symfony\Component\Process\Process;
@@ -133,6 +134,37 @@ abstract class ProviderContractTestCase extends TestCase
             $this->config->defaultBranch,
             $names,
             "Default-Branch '{$this->config->defaultBranch}' nicht in listBranches gefunden."
+        );
+    }
+
+    public function test_get_default_branch_returns_configured_default(): void
+    {
+        $service = $this->makeService($this->token());
+
+        $branch = $service->getDefaultBranch(
+            "{$this->config->testRepoOwner}/{$this->config->testRepo}"
+        );
+
+        $this->assertSame(
+            $this->config->defaultBranch,
+            $branch,
+            "getDefaultBranch lieferte '{$branch}', erwartet war '{$this->config->defaultBranch}'."
+        );
+    }
+
+    public function test_remote_branch_validator_finds_default_branch(): void
+    {
+        $validator = new RemoteBranchValidator;
+
+        $result = $validator->validate(
+            $this->config->repoCloneUrl,
+            $this->config->defaultBranch,
+            $this->token(),
+        );
+
+        $this->assertTrue(
+            $result['ok'],
+            'RemoteBranchValidator::validate() schlug fehl: '.($result['error'] ?? '(keine Fehlermeldung)')
         );
     }
 
