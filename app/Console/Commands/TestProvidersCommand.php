@@ -7,6 +7,7 @@ namespace App\Console\Commands;
 use App\Models\ConnectedAccount;
 use App\Models\RepoProfile;
 use App\Models\User;
+use Dotenv\Dotenv;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
@@ -171,7 +172,7 @@ class TestProvidersCommand extends Command
             return;
         }
 
-        $dotenv = Dotenv\Dotenv::createImmutable(dirname($path), basename($path));
+        $dotenv = Dotenv::createImmutable(dirname($path), basename($path));
         $dotenv->load();
 
         foreach ($_ENV as $key => $value) {

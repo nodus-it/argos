@@ -35,32 +35,6 @@ Der `app/Domain/`-Tree (`Credentials/CredentialStore`, `Phase/PhaseRunner`, `Pha
 
 - Echtes DDD-Refactoring (Aggregate, Repos, Value Objects). Keine Notwendigkeit für eine geschlossene App in dieser Größe.
 
----
-
-### Configs entrümpeln: fixe Defaults statt unnötiger ENV-Schalter
-
-Argos ist eine **geschlossene Anwendung** mit definiertem Deployment (Manager-Container + Worker-Container). Trotzdem schleppen `cache.php`, `session.php`, `queue.php`, `logging.php`, `mail.php`, `filesystems.php`, `database.php` etc. den Laravel-Standard-Zoo an `env()`-Schaltern mit (Driver-Auswahl, Connection-Auswahl, etc.) — das ist Cargo-Cult, niemand wird hier zur Laufzeit `SESSION_DRIVER=cookie` setzen.
-
-#### Ansatz
-
-- Configs durchgehen und unnötige `env()`-Calls durch fixe Defaults ersetzen — insbesondere:
-  - `session.driver`, `session.connection`, `session.cookie` → fix.
-  - `cache.default`, `cache.stores.*.driver` → fix (was wir tatsächlich nutzen).
-  - `queue.default`, `queue.connections.*.driver` → fix.
-  - `logging.default`, `logging.channels.*.driver` → fix.
-  - `filesystems.default` → fix.
-  - `database.default` → fix; nur Credentials (Host/User/Password/DB-Name) bleiben ENV-driven.
-- Beibehalten als ENV: was sich pro Deploy *wirklich* ändert (Credentials, `APP_KEY`, `APP_URL`, `APP_ENV`, `APP_DEBUG`, externe URLs/Tokens, Argos-spezifische Tunables aus `config/argos.php`).
-- `.env.example` synchron mitziehen — was nicht mehr per ENV gelesen wird, fliegt raus.
-- Pro Config kurzer Kommentar oben, was bewusst hartkodiert ist und warum (geschlossene App).
-
-#### Out-of-Scope
-
-- Keine Änderung an `config/argos.php` und Domain-spezifischen Tunables (Worker-Timeouts, Phase-Limits etc.) — die *sollen* ENV-driven bleiben.
-- Kein Wegfall von `APP_*`-Standards.
-
----
-
 ## Mittelfristig
 
 ### Interaktive User-Rückfragen während laufender Tasks
