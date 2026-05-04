@@ -47,6 +47,7 @@ class TestProvidersCommand extends Command
         }
 
         // Phase A: PAT-Profile aus .env.testing.external + defaults seeden.
+        $this->loadExternalEnv();
         $patSeeded = $this->seedPatProfiles($defaults);
 
         // Phase B: User auffordern, OAuth-Accounts manuell zu verbinden.
@@ -153,6 +154,34 @@ class TestProvidersCommand extends Command
         $data = require $path;
 
         return is_array($data) ? $data : [];
+    }
+
+    /**
+     * Load .env.testing.external so subsequent getenv('*_PAT') calls see the
+     * tokens. The file is gitignored and intentionally not auto-loaded by the
+     * Laravel bootstrap (containment — keeps the test PATs out of every web
+     * request and queue worker), so we read it explicitly here.
+     */
+    private function loadExternalEnv(): void
+    {
+        $path = base_path('.env.testing.external');
+        if (! is_file($path)) {
+            $this->warn('Keine .env.testing.external gefunden — PAT-Profile werden übersprungen.');
+
+            return;
+        }
+
+        $dotenv = Dotenv\Dotenv::createImmutable(dirname($path), basename($path));
+        $dotenv->load();
+
+        foreach ($_ENV as $key => $value) {
+            if (! is_string($value)) {
+                continue;
+            }
+            if (getenv($key) === false || getenv($key) === '') {
+                putenv("{$key}={$value}");
+            }
+        }
     }
 
     /**
