@@ -85,6 +85,21 @@ phase_diff_run() {
         fi
     fi
 
+    # Untracked (new) files are invisible to git diff --numstat; count them separately.
+    local untracked_files
+    untracked_files="$(git ls-files --others --exclude-standard 2>/dev/null)"
+    if [[ -n "$untracked_files" ]]; then
+        local untracked_count=0 untracked_insertions=0
+        untracked_count="$(echo "$untracked_files" | wc -l | tr -d ' ')"
+        while IFS= read -r f; do
+            local line_count=0
+            line_count="$(wc -l < "$f" 2>/dev/null | tr -d ' ')" || line_count=0
+            (( untracked_insertions += line_count )) || true
+        done <<< "$untracked_files"
+        (( files_changed += untracked_count )) || true
+        (( insertions += untracked_insertions )) || true
+    fi
+
     finished_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
     finished_epoch=$(date -u +%s)
     local duration_ms=$(( (finished_epoch - started_epoch) * 1000 ))

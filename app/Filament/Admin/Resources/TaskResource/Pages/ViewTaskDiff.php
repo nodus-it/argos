@@ -80,7 +80,8 @@ class ViewTaskDiff extends Page
             '--entrypoint', 'sh',
             $image,
             '-c',
-            "git -C /workspace diff --stat origin/{$branch}...HEAD 2>/dev/null; "
+            "git -C /workspace diff --stat origin/{$branch} 2>/dev/null; "
+            .'git -C /workspace ls-files --others --exclude-standard 2>/dev/null | while IFS= read -r f; do echo " (neu) $f"; done; '
             ."echo ''; "
             .'git -C /workspace status --short 2>/dev/null',
         ]);
@@ -94,7 +95,10 @@ class ViewTaskDiff extends Page
             '--entrypoint', 'sh',
             $image,
             '-c',
-            "git -C /workspace diff origin/{$branch}...HEAD 2>/dev/null | head -c 131072",
+            "{ git -C /workspace diff origin/{$branch} 2>/dev/null; "
+            .'git -C /workspace ls-files --others --exclude-standard 2>/dev/null | while IFS= read -r f; do '
+            .'git -C /workspace diff --no-index -- /dev/null "$f" 2>/dev/null || true; '
+            .'done; } | head -c 131072',
         ]);
         $diffProcess->setTimeout(15);
         $diffProcess->run();
