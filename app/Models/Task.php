@@ -97,6 +97,19 @@ class Task extends Model
     }
 
     /**
+     * Returns the started_at timestamp of the most recently started PhaseRun,
+     * or null if no PhaseRun has been started yet.
+     */
+    public function currentPhaseStartedAt(): ?Carbon
+    {
+        return $this->phaseRuns()
+            ->whereNotNull('started_at')
+            ->latest('started_at')
+            ->first()
+            ?->started_at;
+    }
+
+    /**
      * Advance workflow_status based on what a completed phase returned.
      * Also auto-dispatches push if the project has auto_pr enabled after implement.
      */

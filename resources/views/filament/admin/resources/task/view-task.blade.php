@@ -106,7 +106,7 @@
                         <span class="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
                     </span>
                     <span class="text-xs text-amber-600 dark:text-amber-400 font-medium">{{ $record->current_phase }} läuft</span>
-                    <span x-data="{ sec: {{ max(0, now()->timestamp - $record->updated_at->timestamp) }} }"
+                    <span x-data="{ sec: {{ max(0, now()->timestamp - ($record->currentPhaseStartedAt()?->timestamp ?? now()->timestamp)) }} }"
                           x-init="setInterval(() => sec++, 1000)"
                           x-text="Math.floor(sec/60) + ':' + String(sec % 60).padStart(2, '0')"
                           class="ml-auto text-xs font-mono tabular-nums text-amber-500 dark:text-amber-400"></span>
@@ -181,7 +181,7 @@
             </div>
             <div class="flex items-center gap-3 text-xs text-gray-400 dark:text-gray-500">
                 @if($cStatus === 'running')
-                    <span x-data="{ sec: {{ max(0, now()->timestamp - $record->updated_at->timestamp) }} }"
+                    <span x-data="{ sec: {{ max(0, now()->timestamp - ($cRun?->started_at?->timestamp ?? now()->timestamp)) }} }"
                           x-init="setInterval(() => sec++, 1000)"
                           x-text="Math.floor(sec/60) + ':' + String(sec % 60).padStart(2, '0')"
                           class="font-mono tabular-nums text-amber-500"></span>
@@ -452,7 +452,7 @@
             </div>
             <div class="flex items-center gap-3 text-xs text-gray-400 dark:text-gray-500">
                 @if($iStatus === 'running')
-                    <span x-data="{ sec: {{ max(0, now()->timestamp - $record->updated_at->timestamp) }} }"
+                    <span x-data="{ sec: {{ max(0, now()->timestamp - ($iRun?->started_at?->timestamp ?? now()->timestamp)) }} }"
                           x-init="setInterval(() => sec++, 1000)"
                           x-text="Math.floor(sec/60) + ':' + String(sec % 60).padStart(2, '0')"
                           class="font-mono tabular-nums text-amber-500"></span>
@@ -902,7 +902,7 @@
             </div>
             <div class="flex items-center gap-3 text-xs text-gray-400 dark:text-gray-500">
                 @if($pStatus === 'running')
-                    <span x-data="{ sec: {{ max(0, now()->timestamp - $record->updated_at->timestamp) }} }"
+                    <span x-data="{ sec: {{ max(0, now()->timestamp - ($pRun?->started_at?->timestamp ?? now()->timestamp)) }} }"
                           x-init="setInterval(() => sec++, 1000)"
                           x-text="Math.floor(sec/60) + ':' + String(sec % 60).padStart(2, '0')"
                           class="font-mono tabular-nums text-amber-500"></span>
