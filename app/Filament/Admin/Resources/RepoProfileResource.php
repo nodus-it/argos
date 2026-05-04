@@ -15,6 +15,7 @@ use App\Models\RepoProfile;
 use App\Models\User;
 use App\Rules\BranchExistsOnRemote;
 use App\Services\GitHub\GitHubGitService;
+use App\Services\GitLab\GitLabGitService;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
@@ -111,24 +112,21 @@ class RepoProfileResource extends Resource
                         ->native(false),
                 ]),
 
-            // ── Block 3 ─ Authentifizierung (nur GitHub mit OAuth-Account) ──
+            // ── Block 3 ─ Authentifizierung ─────────────────────────────────
             Section::make(__('projects.sections.authentication'))
-                ->visible(fn (Get $get): bool => $get('platform') === 'github' && self::githubAccount() !== null)
+                ->visible(fn (Get $get): bool => self::hasOAuthAccount($get))
                 ->schema([
                     Select::make('auth_method')
                         ->label(__('projects.fields.auth_method_label'))
-                        ->options([
-                            'pat' => __('projects.fields.auth_method_pat'),
-                            'oauth' => __('projects.fields.auth_method_oauth'),
-                        ])
+                        ->options(fn (Get $get): array => self::authMethodOptions($get))
                         ->default('pat')
                         ->required()
                         ->live()
                         ->native(false)
-                        ->afterStateUpdated(function (Set $set, ?string $state): void {
+                        ->afterStateUpdated(function (Set $set, Get $get, ?string $state): void {
                             if ($state === 'oauth') {
                                 $set('token', null);
-                                $account = self::githubAccount();
+                                $account = self::connectedAccountFor($get);
                                 if ($account !== null) {
                                     $set('connected_account_id', $account->id);
                                 }
@@ -139,19 +137,22 @@ class RepoProfileResource extends Resource
                         ->dehydrated(),
 
                     Select::make('connected_account_id')
-                        ->label(__('projects.fields.github_account_label'))
-                        ->options(function (): array {
+                        ->label(fn (Get $get): string => $get('platform') === 'gitlab'
+                            ? __('projects.fields.gitlab_account_label')
+                            : __('projects.fields.github_account_label'))
+                        ->options(function (Get $get): array {
                             /** @var User|null $user */
                             $user = Auth::user();
                             if ($user === null) {
                                 return [];
                             }
+                            $provider = is_string($get('platform')) ? $get('platform') : 'github';
 
                             return $user->connectedAccounts()
-                                ->where('provider', 'github')
+                                ->where('provider', $provider)
                                 ->get()
                                 ->mapWithKeys(fn (ConnectedAccount $account): array => [
-                                    $account->id => $account->name ?? $account->nickname ?? "GitHub #{$account->id}",
+                                    $account->id => $account->name ?? $account->nickname ?? ucfirst($provider)." #{$account->id}",
                                 ])
                                 ->all();
                         })
@@ -203,8 +204,8 @@ class RepoProfileResource extends Resource
                                 $set('default_branch', $apiDefault);
                             }
                         })
-                        ->visible(fn (Get $get): bool => self::isConnectedPath($get))
-                        ->dehydrated(fn (Get $get): bool => self::isConnectedPath($get)),
+                        ->visible(fn (Get $get): bool => self::isGithubConnectedPath($get))
+                        ->dehydrated(fn (Get $get): bool => self::isGithubConnectedPath($get)),
 
                     Select::make('github_branch')
                         ->label(__('projects.fields.default_branch_label'))
@@ -223,11 +224,67 @@ class RepoProfileResource extends Resource
                                 return [];
                             }
                         })
-                        ->required(fn (Get $get): bool => self::isConnectedPath($get))
+                        ->required(fn (Get $get): bool => self::isGithubConnectedPath($get))
                         ->searchable()
                         ->live()
-                        ->visible(fn (Get $get): bool => self::isConnectedPath($get) && is_string($get('github_repo')) && $get('github_repo') !== '')
-                        ->dehydrated(fn (Get $get): bool => self::isConnectedPath($get)),
+                        ->visible(fn (Get $get): bool => self::isGithubConnectedPath($get) && is_string($get('github_repo')) && $get('github_repo') !== '')
+                        ->dehydrated(fn (Get $get): bool => self::isGithubConnectedPath($get)),
+
+                    // Connected-Pfad: GitLab mit OAuth-Account
+                    Select::make('gitlab_repo')
+                        ->label(__('projects.infolist.repo_url'))
+                        ->options(function (): array {
+                            $account = self::gitlabAccount();
+                            if ($account === null) {
+                                return [];
+                            }
+                            try {
+                                return (new GitLabGitService($account->token, $account->getInstanceUrl()))->getRepoOptions();
+                            } catch (\Throwable) {
+                                return [];
+                            }
+                        })
+                        ->required()
+                        ->searchable()
+                        ->live()
+                        ->afterStateUpdated(function (Set $set, Get $get, ?string $state): void {
+                            if ($state === null || $state === '') {
+                                return;
+                            }
+                            $account = self::gitlabAccount();
+                            $instanceUrl = $account?->getInstanceUrl() ?? 'https://gitlab.com';
+                            $set('url', "{$instanceUrl}/{$state}");
+
+                            if (! is_string($get('name')) || $get('name') === '') {
+                                $shortName = explode('/', $state, 2)[1] ?? $state;
+                                $set('name', $shortName);
+                            }
+                        })
+                        ->visible(fn (Get $get): bool => self::isGitlabConnectedPath($get))
+                        ->dehydrated(fn (Get $get): bool => self::isGitlabConnectedPath($get)),
+
+                    Select::make('gitlab_branch')
+                        ->label(__('projects.fields.default_branch_label'))
+                        ->options(function (Get $get): array {
+                            $repo = $get('gitlab_repo');
+                            if (! is_string($repo) || $repo === '') {
+                                return [];
+                            }
+                            $account = self::gitlabAccount();
+                            if ($account === null) {
+                                return [];
+                            }
+                            try {
+                                return (new GitLabGitService($account->token, $account->getInstanceUrl()))->getBranchOptions($repo);
+                            } catch (\Throwable) {
+                                return [];
+                            }
+                        })
+                        ->required(fn (Get $get): bool => self::isGitlabConnectedPath($get))
+                        ->searchable()
+                        ->live()
+                        ->visible(fn (Get $get): bool => self::isGitlabConnectedPath($get) && is_string($get('gitlab_repo')) && $get('gitlab_repo') !== '')
+                        ->dehydrated(fn (Get $get): bool => self::isGitlabConnectedPath($get)),
 
                     // Manual-Pfad: GitLab oder GitHub ohne OAuth
                     TextInput::make('url')
@@ -274,6 +331,25 @@ class RepoProfileResource extends Resource
         return $user?->connectedAccount('github');
     }
 
+    private static function gitlabAccount(): ?ConnectedAccount
+    {
+        /** @var User|null $user */
+        $user = Auth::user();
+
+        return $user?->connectedAccount('gitlab');
+    }
+
+    private static function connectedAccountFor(Get $get): ?ConnectedAccount
+    {
+        $platform = $get('platform');
+
+        return match ($platform) {
+            'github' => self::githubAccount(),
+            'gitlab' => self::gitlabAccount(),
+            default => null,
+        };
+    }
+
     private static function platformChosen(Get $get): bool
     {
         $platform = $get('platform');
@@ -281,16 +357,55 @@ class RepoProfileResource extends Resource
         return is_string($platform) && $platform !== '';
     }
 
+    private static function hasOAuthAccount(Get $get): bool
+    {
+        $platform = $get('platform');
+        if ($platform === 'github') {
+            return self::githubAccount() !== null;
+        }
+        if ($platform === 'gitlab') {
+            return self::gitlabAccount() !== null;
+        }
+
+        return false;
+    }
+
+    private static function authMethodOptions(Get $get): array
+    {
+        $platform = $get('platform');
+        $oauthLabel = $platform === 'gitlab'
+            ? __('projects.fields.auth_method_oauth_gitlab')
+            : __('projects.fields.auth_method_oauth');
+
+        return [
+            'pat' => __('projects.fields.auth_method_pat'),
+            'oauth' => $oauthLabel,
+        ];
+    }
+
     private static function isConnectedPath(Get $get): bool
+    {
+        return self::isGithubConnectedPath($get) || self::isGitlabConnectedPath($get);
+    }
+
+    private static function isGithubConnectedPath(Get $get): bool
     {
         return $get('platform') === 'github'
             && $get('auth_method') === 'oauth'
             && self::githubAccount() !== null;
     }
 
+    private static function isGitlabConnectedPath(Get $get): bool
+    {
+        return $get('platform') === 'gitlab'
+            && $get('auth_method') === 'oauth'
+            && self::gitlabAccount() !== null;
+    }
+
     /**
-     * Im OAuth-Pfad schreiben die sichtbaren Picker in `github_repo` und
-     * `github_branch`; die DB-Spalten heißen aber `url` und `default_branch`.
+     * Im OAuth-Pfad schreiben die sichtbaren Picker in `github_repo` /
+     * `github_branch` (GitHub) oder `gitlab_repo` / `gitlab_branch` (GitLab);
+     * die DB-Spalten heißen aber `url` und `default_branch`.
      * Diese Methode mappt die Werte zurück und entfernt die Helper-Keys aus
      * den Form-Daten — aufgerufen aus CreateRepoProfile (BeforeCreate) und
      * EditRepoProfile (BeforeSave).
@@ -300,17 +415,29 @@ class RepoProfileResource extends Resource
      */
     public static function mutateOauthFields(array $data): array
     {
-        // Ensure auth_method has a value (e.g. when the auth section is hidden for gitlab)
+        // Ensure auth_method has a value (e.g. when the auth section is hidden)
         if (! isset($data['auth_method']) || $data['auth_method'] === '') {
             $data['auth_method'] = 'pat';
         }
 
+        // GitHub OAuth path: map github_repo/github_branch → url/default_branch
         if (isset($data['github_repo']) && is_string($data['github_repo']) && $data['github_repo'] !== '') {
             $data['url'] = "https://github.com/{$data['github_repo']}";
         }
 
         if (isset($data['github_branch']) && is_string($data['github_branch']) && $data['github_branch'] !== '') {
             $data['default_branch'] = $data['github_branch'];
+        }
+
+        // GitLab OAuth path: map gitlab_repo/gitlab_branch → url/default_branch
+        if (isset($data['gitlab_repo']) && is_string($data['gitlab_repo']) && $data['gitlab_repo'] !== '') {
+            $account = self::gitlabAccount();
+            $instanceUrl = $account?->getInstanceUrl() ?? 'https://gitlab.com';
+            $data['url'] = "{$instanceUrl}/{$data['gitlab_repo']}";
+        }
+
+        if (isset($data['gitlab_branch']) && is_string($data['gitlab_branch']) && $data['gitlab_branch'] !== '') {
+            $data['default_branch'] = $data['gitlab_branch'];
         }
 
         // Clear token when using oauth
@@ -323,7 +450,7 @@ class RepoProfileResource extends Resource
             $data['connected_account_id'] = null;
         }
 
-        unset($data['github_repo'], $data['github_branch']);
+        unset($data['github_repo'], $data['github_branch'], $data['gitlab_repo'], $data['gitlab_branch']);
 
         return $data;
     }

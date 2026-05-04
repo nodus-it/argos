@@ -21,6 +21,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $name
  * @property string|null $nickname
  * @property string|null $avatar
+ * @property string|null $instance_url
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read User $user
@@ -40,6 +41,7 @@ class ConnectedAccount extends Model
         'name',
         'nickname',
         'avatar',
+        'instance_url',
     ];
 
     protected function casts(): array
@@ -49,6 +51,14 @@ class ConnectedAccount extends Model
             'refresh_token' => 'encrypted',
             'expires_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Returns the GitLab instance URL, defaulting to https://gitlab.com for public GitLab.
+     */
+    public function getInstanceUrl(): string
+    {
+        return $this->instance_url ?? 'https://gitlab.com';
     }
 
     /**

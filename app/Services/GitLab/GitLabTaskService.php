@@ -87,7 +87,7 @@ class GitLabTaskService implements TaskServiceContract
     private function http(): PendingRequest
     {
         return Http::withHeaders([
-            'PRIVATE-TOKEN' => $this->token,
+            'Authorization' => "Bearer {$this->token}",
             'Content-Type' => 'application/json',
         ])->baseUrl("{$this->instanceUrl}/api/v4");
     }

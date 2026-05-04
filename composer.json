@@ -12,6 +12,7 @@
         "laravel/framework": "^13.0",
         "laravel/socialite": "^5.27",
         "laravel/tinker": "^3.0",
+        "socialiteproviders/gitlab": "^4.1",
         "symfony/process": "^8.0"
     },
     "require-dev": {

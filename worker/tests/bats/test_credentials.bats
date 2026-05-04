@@ -78,3 +78,32 @@ teardown() {
     run credentials_task_exists task-x
     [ "$status" -eq 1 ]
 }
+
+@test "credentials_save_task persists REPO_PLATFORM when provided" {
+    credentials_save_task task-plat "https://gitlab.com/a/b.git" "gloo_tok" "main" "gitlab"
+    file="$AGENT_HOME/tasks/task-plat/credentials.env"
+    [ -f "$file" ]
+    grep -q "REPO_PLATFORM" "$file"
+}
+
+@test "credentials_load_task sets REPO_PLATFORM" {
+    credentials_save_task task-plat2 "https://gitlab.com/a/b.git" "gloo_tok" "main" "gitlab"
+    credentials_load_task task-plat2
+    [ "$REPO_PLATFORM" = "gitlab" ]
+}
+
+@test "credentials_save_task omits REPO_PLATFORM when not provided" {
+    credentials_save_task task-noplatform "https://github.com/a/b.git" "ghp_tok" "main"
+    file="$AGENT_HOME/tasks/task-noplatform/credentials.env"
+    [ -f "$file" ]
+    # REPO_PLATFORM line should NOT be present
+    run grep "REPO_PLATFORM" "$file"
+    [ "$status" -ne 0 ]
+}
+
+@test "credentials_save_task REPO_PLATFORM round-trip with github" {
+    credentials_save_task task-gh "https://github.com/a/b.git" "ghp_tok" "main" "github"
+    credentials_load_task task-gh
+    [ "$REPO_PLATFORM" = "github" ]
+    [ "$REPO_URL" = "https://github.com/a/b.git" ]
+}

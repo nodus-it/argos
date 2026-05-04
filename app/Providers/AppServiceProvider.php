@@ -15,9 +15,12 @@ use App\Services\GitLab\GitLabGitService;
 use App\Services\GitProviderRegistry;
 use Illuminate\Support\Env;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use PDO;
 use PDOException;
+use SocialiteProviders\GitLab\GitLabExtendSocialite;
+use SocialiteProviders\Manager\SocialiteWasCalled;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -47,6 +50,8 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        Event::listen(SocialiteWasCalled::class, GitLabExtendSocialite::class.'@handle');
+
         $this->commands([
             ArgosCommand::class,
             AgentConceptCommand::class,

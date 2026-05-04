@@ -40,6 +40,11 @@ class ConnectedAccounts extends Page
         return __('accounts.title');
     }
 
+    public function isGitLabConfigured(): bool
+    {
+        return filled(config('services.gitlab.client_id'));
+    }
+
     /**
      * @return array<string, ConnectedAccount|null>
      */
@@ -50,6 +55,7 @@ class ConnectedAccounts extends Page
 
         return [
             'github' => $user->connectedAccount('github'),
+            'gitlab' => $user->connectedAccount('gitlab'),
         ];
     }
 
@@ -58,6 +64,7 @@ class ConnectedAccounts extends Page
         /** @var User $user */
         $user = Auth::user();
         $hasGitHub = $user->connectedAccount('github') !== null;
+        $hasGitLab = $user->connectedAccount('gitlab') !== null;
 
         $actions = [];
 
@@ -66,6 +73,13 @@ class ConnectedAccounts extends Page
                 ->label(__('accounts.actions.connect_github'))
                 ->icon('heroicon-o-arrow-right-circle')
                 ->url(route('auth.github.redirect'));
+        }
+
+        if ($this->isGitLabConfigured() && ! $hasGitLab) {
+            $actions[] = Action::make('connectGitLab')
+                ->label(__('accounts.actions.connect_gitlab'))
+                ->icon('heroicon-o-arrow-right-circle')
+                ->url(route('auth.gitlab.redirect'));
         }
 
         return $actions;
@@ -80,6 +94,19 @@ class ConnectedAccounts extends Page
 
         Notification::make()
             ->title(__('accounts.notifications.github_disconnected'))
+            ->success()
+            ->send();
+    }
+
+    public function disconnectGitLab(): void
+    {
+        /** @var User $user */
+        $user = Auth::user();
+
+        $user->connectedAccounts()->where('provider', 'gitlab')->delete();
+
+        Notification::make()
+            ->title(__('accounts.notifications.gitlab_disconnected'))
             ->success()
             ->send();
     }

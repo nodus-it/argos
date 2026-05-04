@@ -25,4 +25,13 @@ Route::middleware('auth')->group(function () {
 
     Route::post('/auth/github/disconnect', [ConnectedAccountController::class, 'disconnect'])
         ->name('auth.github.disconnect');
+
+    Route::get('/auth/gitlab/redirect', [ConnectedAccountController::class, 'redirectGitlab'])
+        ->name('auth.gitlab.redirect');
+
+    Route::get('/auth/gitlab/callback', [ConnectedAccountController::class, 'callbackGitlab'])
+        ->name('auth.gitlab.callback');
+
+    Route::post('/auth/gitlab/disconnect', [ConnectedAccountController::class, 'disconnectGitlab'])
+        ->name('auth.gitlab.disconnect');
 });
