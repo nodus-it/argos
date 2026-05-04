@@ -84,4 +84,20 @@ class GitLabGitServiceTest extends TestCase
                 && ($request->data()['body'] ?? null) === 'hello';
         });
     }
+
+    public function test_update_pull_request_puts_title_and_description(): void
+    {
+        Http::fake([
+            'https://gitlab.com/api/v4/projects/acme%2Fwidget/merge_requests/7' => Http::response(['iid' => 7]),
+        ]);
+
+        (new GitLabGitService('tok'))->updatePullRequest('acme', 'widget', 7, 'new title', 'new body');
+
+        Http::assertSent(function ($request): bool {
+            return $request->method() === 'PUT'
+                && str_contains($request->url(), '/merge_requests/7')
+                && ($request->data()['title'] ?? null) === 'new title'
+                && ($request->data()['description'] ?? null) === 'new body';
+        });
+    }
 }

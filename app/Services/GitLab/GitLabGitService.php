@@ -108,6 +108,24 @@ class GitLabGitService implements GitProviderContract
             ->json();
     }
 
+    public function updatePullRequest(
+        string $owner,
+        string $repo,
+        int|string $pullRequestId,
+        string $title,
+        string $body,
+    ): array {
+        $projectPath = $this->encodePath($owner, $repo);
+
+        return $this->http()
+            ->put("/projects/{$projectPath}/merge_requests/{$pullRequestId}", [
+                'title' => $title,
+                'description' => $body,
+            ])
+            ->throw()
+            ->json();
+    }
+
     /**
      * Returns projects as ['namespace/name' => 'namespace/name'] for use in Filament Select dropdowns.
      *

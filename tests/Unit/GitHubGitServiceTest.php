@@ -71,4 +71,20 @@ class GitHubGitServiceTest extends TestCase
                 && ($request->data()['body'] ?? null) === 'hello';
         });
     }
+
+    public function test_update_pull_request_patches_title_and_body(): void
+    {
+        Http::fake([
+            'https://api.github.com/repos/acme/widget/pulls/42' => Http::response(['number' => 42]),
+        ]);
+
+        (new GitHubGitService('tok'))->updatePullRequest('acme', 'widget', 42, 'new title', 'new body');
+
+        Http::assertSent(function ($request): bool {
+            return $request->method() === 'PATCH'
+                && str_contains($request->url(), '/pulls/42')
+                && ($request->data()['title'] ?? null) === 'new title'
+                && ($request->data()['body'] ?? null) === 'new body';
+        });
+    }
 }

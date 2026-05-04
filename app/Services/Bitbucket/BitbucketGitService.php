@@ -116,6 +116,22 @@ class BitbucketGitService implements GitProviderContract
             ->json();
     }
 
+    public function updatePullRequest(
+        string $owner,
+        string $repo,
+        int|string $pullRequestId,
+        string $title,
+        string $body,
+    ): array {
+        return $this->http()
+            ->put("/repositories/{$owner}/{$repo}/pullrequests/{$pullRequestId}", [
+                'title' => $title,
+                'description' => $body,
+            ])
+            ->throw()
+            ->json();
+    }
+
     /**
      * Returns repos as ['workspace/slug' => 'workspace/slug'] for Filament Select dropdowns.
      *

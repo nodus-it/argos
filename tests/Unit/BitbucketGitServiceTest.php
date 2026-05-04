@@ -193,4 +193,20 @@ class BitbucketGitServiceTest extends TestCase
                 && ($request->data()['content']['raw'] ?? null) === 'hello';
         });
     }
+
+    public function test_update_pull_request_puts_title_and_description(): void
+    {
+        Http::fake([
+            'https://api.bitbucket.org/2.0/repositories/acme/widget/pullrequests/3' => Http::response(['id' => 3]),
+        ]);
+
+        (new BitbucketGitService('user:pass'))->updatePullRequest('acme', 'widget', 3, 'new title', 'new body');
+
+        Http::assertSent(function ($request): bool {
+            return $request->method() === 'PUT'
+                && str_ends_with($request->url(), '/pullrequests/3')
+                && ($request->data()['title'] ?? null) === 'new title'
+                && ($request->data()['description'] ?? null) === 'new body';
+        });
+    }
 }

@@ -114,6 +114,22 @@ class GitHubGitService implements GitProviderContract
             ->json();
     }
 
+    public function updatePullRequest(
+        string $owner,
+        string $repo,
+        int|string $pullRequestId,
+        string $title,
+        string $body,
+    ): array {
+        return $this->http()
+            ->patch("/repos/{$owner}/{$repo}/pulls/{$pullRequestId}", [
+                'title' => $title,
+                'body' => $body,
+            ])
+            ->throw()
+            ->json();
+    }
+
     /**
      * Returns repos as ['owner/repo' => 'owner/repo'] for use in Filament Select dropdowns.
      *

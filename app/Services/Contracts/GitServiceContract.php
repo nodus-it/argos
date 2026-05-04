@@ -51,4 +51,19 @@ interface GitServiceContract
         int|string $pullRequestId,
         string $body,
     ): array;
+
+    /**
+     * Updates the title and description of an existing pull/merge request.
+     * Used by the worker's push phase when re-opening or refreshing a PR
+     * after an additional implementation iteration.
+     *
+     * @return array<string, mixed>
+     */
+    public function updatePullRequest(
+        string $owner,
+        string $repo,
+        int|string $pullRequestId,
+        string $title,
+        string $body,
+    ): array;
 }
