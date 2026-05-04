@@ -244,6 +244,18 @@ abstract class ProviderContractTestCase extends TestCase
         );
 
         $this->assertNotSame('', (string) $prId, 'Konnte PR-Id nicht aus Response extrahieren.');
+
+        // Same flow the worker's push phase exercises: post an iteration
+        // comment on the freshly created PR. No explicit cleanup — comments
+        // are tied to the PR and disappear when the PR gets closed in tearDown.
+        $comment = $service->commentOnPullRequest(
+            $this->config->testRepoOwner,
+            $this->config->testRepo,
+            $prId,
+            'argos contract test comment',
+        );
+
+        $this->assertNotEmpty($comment, 'commentOnPullRequest lieferte leere Antwort.');
     }
 
     /**
