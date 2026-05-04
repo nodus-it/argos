@@ -42,7 +42,7 @@ setup() {
 
 @test "_push_detect_platform returns empty for unknown URL without REPO_PLATFORM" {
     unset REPO_PLATFORM
-    export REPO_URL="https://bitbucket.org/org/repo.git"
+    export REPO_URL="https://example.com/org/repo.git"
     result="$(_push_detect_platform)"
     [ "$result" = "" ]
 }
