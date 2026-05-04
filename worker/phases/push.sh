@@ -116,7 +116,7 @@ _push_pr_github() {
             if [[ -n "$pr_url" ]]; then
                 log_info "push: PR already exists — updating description ($pr_url)"
                 _push_pr_update_github "$pr_url" "$title" "$body"
-                _push_pr_comment_github "$pr_url" "$(_push_build_iteration_comment)"
+                pr_comment "$pr_url" "$(_push_build_iteration_comment)"
             else
                 log_warn "push: PR already exists but URL could not be determined"
             fi
@@ -284,28 +284,6 @@ _push_pr_update_github() {
             --arg title "$title" \
             --arg body  "$body" \
             '{title:$title,body:$body}')" \
-        >> "/workspace/.agent/logs/gh-pr.${ITERATION}.log" 2>&1 || true
-}
-
-# _push_pr_comment_github: post a comment on an existing GitHub PR.
-# Args: $1=pr_url, $2=comment_body
-_push_pr_comment_github() {
-    local pr_url="$1"
-    local comment_body="$2"
-
-    local owner_repo pr_number
-    owner_repo="$(printf '%s' "$REPO_URL" | sed 's|https://github.com/||; s|/$||; s|\.git$||')"
-    pr_number="$(printf '%s' "$pr_url" | grep -oE '[0-9]+$')"
-    [[ -n "$owner_repo" && -n "$pr_number" ]] || return 0
-
-    set +x
-    curl -s \
-        -X POST \
-        -H "Authorization: Bearer $REPO_TOKEN" \
-        -H "Accept: application/vnd.github+json" \
-        -H "X-GitHub-Api-Version: 2022-11-28" \
-        "https://api.github.com/repos/$owner_repo/issues/$pr_number/comments" \
-        -d "$(jq -n --arg body "$comment_body" '{body:$body}')" \
         >> "/workspace/.agent/logs/gh-pr.${ITERATION}.log" 2>&1 || true
 }
 
