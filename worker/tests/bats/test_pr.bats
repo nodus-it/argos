@@ -143,3 +143,59 @@ teardown() {
 
     grep -qF '"content":{"raw":"der inhalt"}' "$curl_log"
 }
+
+# ── pr_update dispatcher ──────────────────────────────────────────────────────
+
+@test "pr_update: leerer Title oder leere URL → no-op" {
+    pr_update "" "title" "body"
+    pr_update "https://github.com/x/y/pull/1" "" "body"
+    [ ! -s "$curl_log" ]
+}
+
+@test "pr_update: unbekannte Plattform → log_warn, kein curl" {
+    unset REPO_PLATFORM
+    pr_update "https://unknown.example.com/foo/bar/pulls/1" "title" "body"
+    [ ! -s "$curl_log" ]
+}
+
+# ── _pr_update_github ─────────────────────────────────────────────────────────
+
+@test "_pr_update_github: PATCH auf /pulls/{n} mit title und body" {
+    export REPO_URL="https://github.com/acme/widget.git"
+    export REPO_TOKEN="ghp_token"
+
+    pr_update "https://github.com/acme/widget/pull/42" "Neuer Titel" "Neuer Body"
+
+    grep -qF 'PATCH' "$curl_log"
+    grep -qF 'https://api.github.com/repos/acme/widget/pulls/42' "$curl_log"
+    grep -qF '"title":"Neuer Titel"' "$curl_log"
+    grep -qF '"body":"Neuer Body"' "$curl_log"
+}
+
+# ── _pr_update_gitlab ─────────────────────────────────────────────────────────
+
+@test "_pr_update_gitlab: PUT auf /merge_requests/{iid} mit title und description" {
+    export REPO_URL="https://gitlab.com/grp/proj.git"
+    export REPO_TOKEN="glpat-token"
+
+    pr_update "https://gitlab.com/grp/proj/-/merge_requests/7" "T" "B"
+
+    grep -qF 'PUT' "$curl_log"
+    grep -qF 'https://gitlab.com/api/v4/projects/grp%2Fproj/merge_requests/7' "$curl_log"
+    grep -qF '"title":"T"' "$curl_log"
+    grep -qF '"description":"B"' "$curl_log"
+}
+
+# ── _pr_update_bitbucket ──────────────────────────────────────────────────────
+
+@test "_pr_update_bitbucket: PUT auf /pullrequests/{id} mit title und description" {
+    export REPO_URL="https://bitbucket.org/ws/repo"
+    export REPO_TOKEN="tok"
+
+    pr_update "https://bitbucket.org/ws/repo/pull-requests/3" "T" "B"
+
+    grep -qF 'PUT' "$curl_log"
+    grep -qF 'https://api.bitbucket.org/2.0/repositories/ws/repo/pullrequests/3' "$curl_log"
+    grep -qF '"title":"T"' "$curl_log"
+    grep -qF '"description":"B"' "$curl_log"
+}

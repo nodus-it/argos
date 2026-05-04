@@ -115,7 +115,7 @@ _push_pr_github() {
                 | jq -r '.[0].html_url // empty')"
             if [[ -n "$pr_url" ]]; then
                 log_info "push: PR already exists — updating description ($pr_url)"
-                _push_pr_update_github "$pr_url" "$title" "$body"
+                pr_update "$pr_url" "$title" "$body"
                 pr_comment "$pr_url" "$(_push_build_iteration_comment)"
             else
                 log_warn "push: PR already exists but URL could not be determined"
@@ -259,32 +259,6 @@ _push_configure_repo_github() {
     else
         log_warn "push: repo-settings update skipped (HTTP $http_code) — squash/auto-delete not enforced"
     fi
-}
-
-# _push_pr_update_github: update the description of an existing GitHub PR.
-# Args: $1=pr_url, $2=title, $3=body (optional)
-_push_pr_update_github() {
-    local pr_url="$1"
-    local title="$2"
-    local body="${3:-}"
-
-    local owner_repo pr_number
-    owner_repo="$(printf '%s' "$REPO_URL" | sed 's|https://github.com/||; s|/$||; s|\.git$||')"
-    pr_number="$(printf '%s' "$pr_url" | grep -oE '[0-9]+$')"
-    [[ -n "$owner_repo" && -n "$pr_number" ]] || return 0
-
-    set +x
-    curl -s \
-        -X PATCH \
-        -H "Authorization: Bearer $REPO_TOKEN" \
-        -H "Accept: application/vnd.github+json" \
-        -H "X-GitHub-Api-Version: 2022-11-28" \
-        "https://api.github.com/repos/$owner_repo/pulls/$pr_number" \
-        -d "$(jq -n \
-            --arg title "$title" \
-            --arg body  "$body" \
-            '{title:$title,body:$body}')" \
-        >> "/workspace/.agent/logs/gh-pr.${ITERATION}.log" 2>&1 || true
 }
 
 phase_push_run() {

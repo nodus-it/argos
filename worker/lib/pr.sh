@@ -10,6 +10,26 @@
 
 # shellcheck shell=bash
 
+# pr_update: update title and description on the given PR/MR. Logs and never
+# aborts — a failed metadata update is not worth tearing down a successful push.
+# Args: $1=pr_url, $2=title, $3=body
+pr_update() {
+    local pr_url="$1" title="$2" body="$3"
+    [[ -n "$pr_url" && -n "$title" ]] || return 0
+
+    local platform
+    platform="$(_pr_detect_platform "$pr_url")"
+    case "$platform" in
+        github)    _pr_update_github    "$pr_url" "$title" "$body" ;;
+        gitlab)    _pr_update_gitlab    "$pr_url" "$title" "$body" ;;
+        bitbucket) _pr_update_bitbucket "$pr_url" "$title" "$body" ;;
+        *)
+            log_warn "pr_update: unbekannte Plattform für URL '$pr_url' — Update nicht angewendet"
+            return 0
+            ;;
+    esac
+}
+
 # pr_comment: post a comment on the given PR/MR. Logs and never aborts —
 # a failed comment is not worth tearing down a successful push for.
 # Args: $1=pr_url, $2=comment_body
@@ -95,6 +115,84 @@ _pr_comment_gitlab() {
         "${instance}/api/v4/projects/${project_enc}/merge_requests/${iid}/notes" \
         -d "$(jq -cn --arg body "$body" '{body:$body}')" \
         >> "/workspace/.agent/logs/pr-comment.${ITERATION:-0}.log" 2>&1 || true
+}
+
+# _pr_update_github: PATCH /repos/{owner}/{repo}/pulls/{n} {title, body}.
+_pr_update_github() {
+    local pr_url="$1" title="$2" body="$3"
+    local owner_repo pr_number
+    owner_repo="$(printf '%s' "$REPO_URL" | sed 's|https://github.com/||; s|/$||; s|\.git$||')"
+    pr_number="$(printf '%s' "$pr_url" | grep -oE '[0-9]+$')"
+    [[ -n "$owner_repo" && -n "$pr_number" ]] || {
+        log_warn "pr_update(github): owner/repo oder pr_number nicht extrahierbar"
+        return 0
+    }
+
+    set +x
+    curl -s \
+        -X PATCH \
+        -H "Authorization: Bearer $REPO_TOKEN" \
+        -H "Accept: application/vnd.github+json" \
+        -H "X-GitHub-Api-Version: 2022-11-28" \
+        "https://api.github.com/repos/${owner_repo}/pulls/${pr_number}" \
+        -d "$(jq -cn --arg title "$title" --arg body "$body" '{title:$title,body:$body}')" \
+        >> "/workspace/.agent/logs/pr-update.${ITERATION:-0}.log" 2>&1 || true
+}
+
+# _pr_update_gitlab: PUT {instance}/api/v4/projects/{enc}/merge_requests/{iid} {title, description}.
+_pr_update_gitlab() {
+    local pr_url="$1" title="$2" body="$3"
+    local instance project iid project_enc
+    instance="$(printf '%s' "$pr_url" | sed -E 's|^(https?://[^/]+)/.*|\1|')"
+    iid="$(printf '%s' "$pr_url" | grep -oE '/-/merge_requests/[0-9]+' | grep -oE '[0-9]+$')"
+    project="$(printf '%s' "$pr_url" | sed -E 's|^https?://[^/]+/||; s|/-/merge_requests/.*||')"
+    [[ -n "$instance" && -n "$project" && -n "$iid" ]] || {
+        log_warn "pr_update(gitlab): instance/project/iid nicht extrahierbar aus '$pr_url'"
+        return 0
+    }
+    project_enc="${project//\//%2F}"
+
+    set +x
+    curl -s \
+        -X PUT \
+        -H "Authorization: Bearer $REPO_TOKEN" \
+        -H "Content-Type: application/json" \
+        "${instance}/api/v4/projects/${project_enc}/merge_requests/${iid}" \
+        -d "$(jq -cn --arg title "$title" --arg body "$body" '{title:$title,description:$body}')" \
+        >> "/workspace/.agent/logs/pr-update.${ITERATION:-0}.log" 2>&1 || true
+}
+
+# _pr_update_bitbucket: PUT /repositories/{ws}/{repo}/pullrequests/{id} {title, description}.
+# Same auth dispatch as _pr_comment_bitbucket.
+_pr_update_bitbucket() {
+    local pr_url="$1" title="$2" body="$3"
+    local workspace_slug pr_id workspace slug
+    workspace_slug="$(printf '%s' "$pr_url" | sed -E 's|^https?://bitbucket\.org/||; s|/pull-requests/.*||')"
+    pr_id="$(printf '%s' "$pr_url" | grep -oE '/pull-requests/[0-9]+' | grep -oE '[0-9]+$')"
+    workspace="${workspace_slug%%/*}"
+    slug="${workspace_slug#*/}"
+    [[ -n "$workspace" && -n "$slug" && -n "$pr_id" ]] || {
+        log_warn "pr_update(bitbucket): workspace/slug/id nicht extrahierbar aus '$pr_url'"
+        return 0
+    }
+
+    local auth_header
+    set +x
+    if printf '%s' "$REPO_TOKEN" | grep -q ':'; then
+        local encoded
+        encoded="$(printf '%s' "$REPO_TOKEN" | base64 -w 0)"
+        auth_header="Basic ${encoded}"
+    else
+        auth_header="Bearer ${REPO_TOKEN}"
+    fi
+
+    curl -s \
+        -X PUT \
+        -H "Authorization: ${auth_header}" \
+        -H "Content-Type: application/json" \
+        "https://api.bitbucket.org/2.0/repositories/${workspace}/${slug}/pullrequests/${pr_id}" \
+        -d "$(jq -cn --arg title "$title" --arg body "$body" '{title:$title,description:$body}')" \
+        >> "/workspace/.agent/logs/pr-update.${ITERATION:-0}.log" 2>&1 || true
 }
 
 # _pr_comment_bitbucket: POST /repositories/{ws}/{repo}/pullrequests/{id}/comments
