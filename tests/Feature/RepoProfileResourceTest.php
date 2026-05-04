@@ -200,7 +200,7 @@ class RepoProfileResourceTest extends TestCase
 
     public function test_oauth_path_creates_repo_profile_with_url_from_github_repo(): void
     {
-        ConnectedAccount::factory()->create([
+        $account = ConnectedAccount::factory()->create([
             'user_id' => $this->user->id,
             'provider' => 'github',
         ]);
@@ -221,6 +221,8 @@ class RepoProfileResourceTest extends TestCase
         Livewire::test(CreateRepoProfile::class)
             ->fillForm([
                 'platform' => 'github',
+                'auth_method' => 'oauth',
+                'connected_account_id' => $account->id,
                 'name' => 'Widget',
                 'github_repo' => 'acme/widget',
                 'github_branch' => 'main',
@@ -234,12 +236,13 @@ class RepoProfileResourceTest extends TestCase
             'platform' => 'github',
             'url' => 'https://github.com/acme/widget',
             'default_branch' => 'main',
+            'auth_method' => 'oauth',
         ]);
     }
 
     public function test_oauth_path_persists_default_branch_on_save(): void
     {
-        ConnectedAccount::factory()->create([
+        $account = ConnectedAccount::factory()->create([
             'user_id' => $this->user->id,
             'provider' => 'github',
         ]);
@@ -256,8 +259,11 @@ class RepoProfileResourceTest extends TestCase
 
         $profile = RepoProfile::factory()->create([
             'platform' => 'github',
+            'auth_method' => 'oauth',
+            'connected_account_id' => $account->id,
             'url' => 'https://github.com/acme/widget',
             'default_branch' => 'main',
+            'token' => null,
         ]);
 
         Livewire::test(EditRepoProfile::class, ['record' => $profile->getKey()])
@@ -268,6 +274,93 @@ class RepoProfileResourceTest extends TestCase
         $this->assertDatabaseHas(RepoProfile::class, [
             'id' => $profile->id,
             'default_branch' => 'feature/php-app',
+        ]);
+    }
+
+    public function test_can_create_repo_profile_with_pat(): void
+    {
+        Livewire::test(CreateRepoProfile::class)
+            ->fillForm([
+                'name' => 'PAT Projekt',
+                'platform' => 'github',
+                'auth_method' => 'pat',
+                'url' => 'https://github.com/org/repo',
+                'token' => 'ghp_pattoken',
+                'default_branch' => 'main',
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors()
+            ->assertRedirect();
+
+        $this->assertDatabaseHas(RepoProfile::class, [
+            'name' => 'PAT Projekt',
+            'auth_method' => 'pat',
+            'connected_account_id' => null,
+        ]);
+    }
+
+    public function test_create_with_oauth_saves_connected_account_id(): void
+    {
+        $account = ConnectedAccount::factory()->create([
+            'user_id' => $this->user->id,
+            'provider' => 'github',
+        ]);
+
+        Http::fake([
+            'api.github.com/user/repos*' => Http::response([['full_name' => 'org/repo']]),
+            'api.github.com/repos/org/repo/branches*' => Http::response([['name' => 'main']]),
+        ]);
+
+        Livewire::test(CreateRepoProfile::class)
+            ->fillForm([
+                'name' => 'OAuth Projekt',
+                'platform' => 'github',
+                'auth_method' => 'oauth',
+                'connected_account_id' => $account->id,
+                'github_repo' => 'org/repo',
+                'github_branch' => 'main',
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors()
+            ->assertRedirect();
+
+        $this->assertDatabaseHas(RepoProfile::class, [
+            'name' => 'OAuth Projekt',
+            'auth_method' => 'oauth',
+            'connected_account_id' => $account->id,
+            'url' => 'https://github.com/org/repo',
+            'default_branch' => 'main',
+        ]);
+    }
+
+    public function test_switching_to_pat_clears_connected_account_id_on_save(): void
+    {
+        $account = ConnectedAccount::factory()->create([
+            'user_id' => $this->user->id,
+            'provider' => 'github',
+        ]);
+
+        $profile = RepoProfile::factory()->create([
+            'platform' => 'github',
+            'auth_method' => 'oauth',
+            'connected_account_id' => $account->id,
+            'token' => null,
+        ]);
+
+        Livewire::test(EditRepoProfile::class, ['record' => $profile->getKey()])
+            ->fillForm([
+                'auth_method' => 'pat',
+                'token' => 'new-pat-token',
+                'url' => 'https://github.com/org/repo',
+                'default_branch' => 'main',
+            ])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $this->assertDatabaseHas(RepoProfile::class, [
+            'id' => $profile->id,
+            'auth_method' => 'pat',
+            'connected_account_id' => null,
         ]);
     }
 

@@ -19,6 +19,8 @@ class RepoProfileFactory extends Factory
             'url' => 'https://github.com/test-org/test-repo',
             'token' => config('argos.factories.github_token'),
             'platform' => 'github',
+            'auth_method' => 'pat',
+            'connected_account_id' => null,
             'default_branch' => 'main',
             'worker_image' => null,
             'auto_concept' => false,

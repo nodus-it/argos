@@ -10,6 +10,9 @@ use App\Console\Commands\AgentImplementCommand;
 use App\Console\Commands\AgentPushCommand;
 use App\Console\Commands\ArgosCommand;
 use App\Domain\Credentials\CredentialStore;
+use App\Services\GitHub\GitHubGitService;
+use App\Services\GitLab\GitLabGitService;
+use App\Services\GitProviderRegistry;
 use Illuminate\Support\Env;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\ServiceProvider;
@@ -21,6 +24,25 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(CredentialStore::class);
+
+        $this->app->singleton(GitProviderRegistry::class, function (): GitProviderRegistry {
+            $registry = new GitProviderRegistry;
+
+            $registry->register(
+                'github',
+                fn (string $token, string $instanceUrl): GitHubGitService => new GitHubGitService($token),
+            );
+
+            $registry->register(
+                'gitlab',
+                fn (string $token, string $instanceUrl): GitLabGitService => new GitLabGitService(
+                    $token,
+                    $instanceUrl ?: 'https://gitlab.com',
+                ),
+            );
+
+            return $registry;
+        });
     }
 
     public function boot(): void

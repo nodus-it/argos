@@ -4,16 +4,26 @@ declare(strict_types=1);
 
 namespace App\Services\GitLab;
 
-use App\Services\Contracts\GitServiceContract;
+use App\Services\Contracts\GitProviderContract;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
 
-class GitLabGitService implements GitServiceContract
+class GitLabGitService implements GitProviderContract
 {
     public function __construct(
         private readonly string $token,
         private readonly string $instanceUrl = 'https://gitlab.com',
     ) {}
+
+    public function getProviderKey(): string
+    {
+        return 'gitlab';
+    }
+
+    public function label(): string
+    {
+        return 'GitLab';
+    }
 
     public function listRepositories(): array
     {

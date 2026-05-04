@@ -22,12 +22,17 @@ class EditRepoProfile extends EditRecord
     /**
      * Derive github_repo / github_branch from the persisted url + default_branch
      * so the OAuth pickers show the current values when the form opens.
+     * Also ensure auth_method has a sensible default.
      *
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
     protected function mutateFormDataBeforeFill(array $data): array
     {
+        if (! isset($data['auth_method']) || $data['auth_method'] === '') {
+            $data['auth_method'] = 'pat';
+        }
+
         $url = $data['url'] ?? null;
         if (is_string($url) && preg_match('#^https?://github\.com/([^/]+/[^/]+?)(?:\.git)?/?$#', $url, $m)) {
             $data['github_repo'] = $m[1];

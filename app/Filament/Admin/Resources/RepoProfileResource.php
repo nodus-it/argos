@@ -111,7 +111,57 @@ class RepoProfileResource extends Resource
                         ->native(false),
                 ]),
 
-            // ── Block 3 ─ Repository (connected vs. manual) ─────────────────
+            // ── Block 3 ─ Authentifizierung (nur GitHub mit OAuth-Account) ──
+            Section::make('Authentifizierung')
+                ->visible(fn (Get $get): bool => $get('platform') === 'github' && self::githubAccount() !== null)
+                ->schema([
+                    Select::make('auth_method')
+                        ->label('Authentifizierungsmethode')
+                        ->options([
+                            'pat' => 'Personal Access Token (PAT)',
+                            'oauth' => 'OAuth (GitHub)',
+                        ])
+                        ->default('pat')
+                        ->required()
+                        ->live()
+                        ->native(false)
+                        ->afterStateUpdated(function (Set $set, ?string $state): void {
+                            if ($state === 'oauth') {
+                                $set('token', null);
+                                $account = self::githubAccount();
+                                if ($account !== null) {
+                                    $set('connected_account_id', $account->id);
+                                }
+                            } else {
+                                $set('connected_account_id', null);
+                            }
+                        })
+                        ->dehydrated(),
+
+                    Select::make('connected_account_id')
+                        ->label('GitHub-Account')
+                        ->options(function (): array {
+                            /** @var User|null $user */
+                            $user = Auth::user();
+                            if ($user === null) {
+                                return [];
+                            }
+
+                            return $user->connectedAccounts()
+                                ->where('provider', 'github')
+                                ->get()
+                                ->mapWithKeys(fn (ConnectedAccount $account): array => [
+                                    $account->id => $account->name ?? $account->nickname ?? "GitHub #{$account->id}",
+                                ])
+                                ->all();
+                        })
+                        ->visible(fn (Get $get): bool => $get('auth_method') === 'oauth')
+                        ->required(fn (Get $get): bool => $get('auth_method') === 'oauth')
+                        ->native(false)
+                        ->dehydrated(),
+                ]),
+
+            // ── Block 4 ─ Repository (connected vs. manual) ─────────────────
             Section::make('Repository')
                 ->visible(fn (Get $get): bool => self::platformChosen($get))
                 ->schema([
@@ -193,9 +243,9 @@ class RepoProfileResource extends Resource
                         ->password()
                         ->revealable()
                         ->maxLength(500)
-                        ->required()
-                        ->helperText(fn (Get $get): string => $get('platform') === 'github'
-                            ? 'Kein GitHub-Account verknüpft. PAT wird als Fallback verwendet.'
+                        ->required(fn (Get $get): bool => ! self::isConnectedPath($get))
+                        ->helperText(fn (Get $get): string => $get('platform') === 'github' && self::githubAccount() !== null
+                            ? 'GitHub-Account verfügbar — wechsle zu "Authentifizierung" für OAuth.'
                             : '')
                         ->visible(fn (Get $get): bool => ! self::isConnectedPath($get)),
 
@@ -233,7 +283,9 @@ class RepoProfileResource extends Resource
 
     private static function isConnectedPath(Get $get): bool
     {
-        return $get('platform') === 'github' && self::githubAccount() !== null;
+        return $get('platform') === 'github'
+            && $get('auth_method') === 'oauth'
+            && self::githubAccount() !== null;
     }
 
     /**
@@ -248,12 +300,27 @@ class RepoProfileResource extends Resource
      */
     public static function mutateOauthFields(array $data): array
     {
+        // Ensure auth_method has a value (e.g. when the auth section is hidden for gitlab)
+        if (! isset($data['auth_method']) || $data['auth_method'] === '') {
+            $data['auth_method'] = 'pat';
+        }
+
         if (isset($data['github_repo']) && is_string($data['github_repo']) && $data['github_repo'] !== '') {
             $data['url'] = "https://github.com/{$data['github_repo']}";
         }
 
         if (isset($data['github_branch']) && is_string($data['github_branch']) && $data['github_branch'] !== '') {
             $data['default_branch'] = $data['github_branch'];
+        }
+
+        // Clear token when using oauth
+        if ($data['auth_method'] === 'oauth') {
+            $data['token'] = null;
+        }
+
+        // Clear connected_account_id when using pat
+        if ($data['auth_method'] === 'pat') {
+            $data['connected_account_id'] = null;
         }
 
         unset($data['github_repo'], $data['github_branch']);
@@ -275,6 +342,18 @@ class RepoProfileResource extends Resource
                             'github' => 'gray',
                             'gitlab' => 'warning',
                             default => 'gray',
+                        }),
+
+                    TextEntry::make('auth_method')
+                        ->label('Authentifizierung')
+                        ->badge()
+                        ->color(fn (string $state): string => match ($state) {
+                            'oauth' => 'success',
+                            default => 'gray',
+                        })
+                        ->formatStateUsing(fn (string $state): string => match ($state) {
+                            'oauth' => 'OAuth',
+                            default => 'PAT',
                         }),
 
                     IconEntry::make('auto_concept')
