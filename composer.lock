@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "0f70bf6bdb0ff978ab02071e5cb6dec0",
+    "content-hash": "438977df2ef3d12bee7b123c6282905d",
     "packages": [
         {
             "name": "blade-ui-kit/blade-heroicons",
@@ -5599,6 +5599,47 @@
                 }
             ],
             "time": "2022-12-17T21:53:22+00:00"
+        },
+        {
+            "name": "socialiteproviders/bitbucket",
+            "version": "4.1.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/SocialiteProviders/Bitbucket.git",
+                "reference": "b0c945a4ebc0fe29166650bbf5cfae5c4aaefc2a"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/SocialiteProviders/Bitbucket/zipball/b0c945a4ebc0fe29166650bbf5cfae5c4aaefc2a",
+                "reference": "b0c945a4ebc0fe29166650bbf5cfae5c4aaefc2a",
+                "shasum": ""
+            },
+            "require": {
+                "ext-json": "*",
+                "php": "^7.2 || ^8.0",
+                "socialiteproviders/manager": "~4.0"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "SocialiteProviders\\Bitbucket\\": ""
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Anton Komarev",
+                    "email": "ell@cybercog.su"
+                }
+            ],
+            "description": "Bitbucket OAuth2 Provider for Laravel Socialite",
+            "support": {
+                "source": "https://github.com/SocialiteProviders/Bitbucket/tree/4.1.0"
+            },
+            "time": "2020-12-01T23:10:59+00:00"
         },
         {
             "name": "socialiteproviders/gitlab",
