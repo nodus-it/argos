@@ -48,12 +48,13 @@ _push_has_changes() {
     return 1
 }
 
-# _push_detect_platform: print "github", "gitlab", or "".
+# _push_detect_platform: print "github", "gitlab", "bitbucket", or "".
 _push_detect_platform() {
     case "$REPO_URL" in
-        *github.com*) printf 'github' ;;
-        *gitlab*)     printf 'gitlab' ;;
-        *)            printf '' ;;
+        *github.com*)    printf 'github' ;;
+        *gitlab*)        printf 'gitlab' ;;
+        *bitbucket.org*) printf 'bitbucket' ;;
+        *)               printf '' ;;
     esac
 }
 
@@ -131,6 +132,84 @@ _push_pr_github() {
 _push_pr_gitlab() {
     local push_log="$1"
     grep -oE 'https://[^[:space:]]*/merge_requests/[0-9]+' "$push_log" | head -1
+}
+
+# _push_pr_bitbucket: create a Bitbucket pull request via REST API.
+# Supports both PAT (username:app_password → Basic Auth) and OAuth (Bearer).
+# Args: $1=feature_branch, $2=title, $3=body (optional)
+# Output: PR URL on stdout (empty on error).
+_push_pr_bitbucket() {
+    local feature_branch="$1"
+    local title="$2"
+    local body="${3:-}"
+
+    # Extract workspace/slug from REPO_URL (https://bitbucket.org/workspace/slug[.git][/])
+    local workspace_slug
+    workspace_slug="$(printf '%s' "$REPO_URL" | sed 's|https://bitbucket.org/||; s|/$||; s|\.git$||')"
+    [[ -n "$workspace_slug" ]] || return 0
+
+    local workspace slug
+    workspace="${workspace_slug%%/*}"
+    slug="${workspace_slug#*/}"
+    [[ -n "$workspace" && -n "$slug" ]] || return 0
+
+    local pr_log="/workspace/.agent/logs/bb-pr.${ITERATION}.log"
+    local tmp_resp
+    tmp_resp="$(mktemp)"
+
+    # Build auth header — PAT: "username:app_password" → Basic; OAuth: Bearer.
+    local auth_header
+    set +x
+    if printf '%s' "$REPO_TOKEN" | grep -q ':'; then
+        local encoded_creds
+        encoded_creds="$(printf '%s' "$REPO_TOKEN" | base64 -w 0)"
+        auth_header="Basic ${encoded_creds}"
+    else
+        auth_header="Bearer ${REPO_TOKEN}"
+    fi
+
+    local http_code
+    http_code="$(curl -s \
+        -o "$tmp_resp" \
+        -w '%{http_code}' \
+        -X POST \
+        -H "Authorization: ${auth_header}" \
+        -H "Content-Type: application/json" \
+        "https://api.bitbucket.org/2.0/repositories/${workspace}/${slug}/pullrequests" \
+        -d "$(jq -n \
+            --arg title "$title" \
+            --arg body  "$body" \
+            --arg base  "$BASE_BRANCH" \
+            --arg head  "$feature_branch" \
+            '{title:$title,description:$body,source:{branch:{name:$head}},destination:{branch:{name:$base}}}')" \
+        2>"$pr_log")"
+
+    local pr_url=""
+    case "$http_code" in
+        201)
+            pr_url="$(jq -r '.links.html.href' "$tmp_resp")"
+            ;;
+        409)
+            # PR already exists — find it via the list endpoint.
+            pr_url="$(curl -s \
+                -H "Authorization: ${auth_header}" \
+                "https://api.bitbucket.org/2.0/repositories/${workspace}/${slug}/pullrequests?q=source.branch.name+%3D+%22${feature_branch}%22+AND+state+%3D+%22OPEN%22" \
+                2>>"$pr_log" \
+                | jq -r '.values[0].links.html.href // empty')"
+            if [[ -n "$pr_url" ]]; then
+                log_info "push: Bitbucket PR already exists — $pr_url"
+            else
+                log_warn "push: Bitbucket PR already exists but URL could not be determined"
+            fi
+            ;;
+        *)
+            cat "$tmp_resp" >> "$pr_log"
+            log_warn "push: Bitbucket PR creation failed (HTTP $http_code, see logs/bb-pr.${ITERATION}.log)"
+            ;;
+    esac
+
+    rm -f "$tmp_resp"
+    printf '%s' "$pr_url"
 }
 
 # _push_build_iteration_comment: build the comment text for a new implementation iteration.
@@ -379,7 +458,8 @@ phase_push_run() {
             pr_url="$(_push_pr_github "$feature_branch" "$subject" "$pr_body")"
             _push_configure_repo_github
             ;;
-        gitlab) pr_url="$(_push_pr_gitlab "$push_log")" ;;
+        gitlab)     pr_url="$(_push_pr_gitlab "$push_log")" ;;
+        bitbucket)  pr_url="$(_push_pr_bitbucket "$feature_branch" "$subject" "$pr_body")" ;;
     esac
     if [[ -n "$pr_url" ]]; then
         log_info "push: PR/MR created — $pr_url"

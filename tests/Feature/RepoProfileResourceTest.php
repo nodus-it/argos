@@ -439,4 +439,94 @@ class RepoProfileResourceTest extends TestCase
             ->assertCanSeeTableRecords([$ownTask])
             ->assertCanNotSeeTableRecords([$foreignTask]);
     }
+
+    public function test_can_create_bitbucket_repo_profile_with_pat(): void
+    {
+        Livewire::test(CreateRepoProfile::class)
+            ->fillForm([
+                'name' => 'Bitbucket Projekt',
+                'platform' => 'bitbucket',
+                'auth_method' => 'pat',
+                'url' => 'https://bitbucket.org/myworkspace/myrepo',
+                'token' => 'myuser:myapppassword',
+                'default_branch' => 'main',
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors()
+            ->assertRedirect();
+
+        $this->assertDatabaseHas(RepoProfile::class, [
+            'name' => 'Bitbucket Projekt',
+            'platform' => 'bitbucket',
+            'url' => 'https://bitbucket.org/myworkspace/myrepo',
+            'auth_method' => 'pat',
+        ]);
+    }
+
+    public function test_bitbucket_oauth_path_creates_repo_profile(): void
+    {
+        $account = ConnectedAccount::factory()->create([
+            'user_id' => $this->user->id,
+            'provider' => 'bitbucket',
+        ]);
+
+        // More-specific patterns must come first; Http::fake matches in definition order.
+        Http::fake([
+            'api.bitbucket.org/2.0/repositories/acme/widget/refs/branches*' => Http::response([
+                'values' => [['name' => 'main'], ['name' => 'develop']],
+            ]),
+            'api.bitbucket.org/2.0/repositories/acme/widget' => Http::response([
+                'mainbranch' => ['name' => 'main'],
+            ]),
+            'api.bitbucket.org/2.0/repositories*' => Http::response([
+                'values' => [['full_name' => 'acme/widget']],
+            ]),
+        ]);
+
+        Livewire::test(CreateRepoProfile::class)
+            ->fillForm([
+                'platform' => 'bitbucket',
+                'auth_method' => 'oauth',
+                'connected_account_id' => $account->id,
+                'name' => 'Widget',
+                'bitbucket_repo' => 'acme/widget',
+                'bitbucket_branch' => 'main',
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors()
+            ->assertRedirect();
+
+        $this->assertDatabaseHas(RepoProfile::class, [
+            'name' => 'Widget',
+            'platform' => 'bitbucket',
+            'url' => 'https://bitbucket.org/acme/widget',
+            'default_branch' => 'main',
+            'auth_method' => 'oauth',
+            'connected_account_id' => $account->id,
+        ]);
+    }
+
+    public function test_edit_prefills_bitbucket_repo_and_branch_from_persisted_url(): void
+    {
+        $profile = RepoProfile::factory()->create([
+            'platform' => 'bitbucket',
+            'url' => 'https://bitbucket.org/acme/myrepo',
+            'default_branch' => 'develop',
+        ]);
+
+        Livewire::test(EditRepoProfile::class, ['record' => $profile->getKey()])
+            ->assertFormSet([
+                'bitbucket_repo' => 'acme/myrepo',
+                'bitbucket_branch' => 'develop',
+                'default_branch' => 'develop',
+            ]);
+    }
+
+    public function test_table_shows_bitbucket_platform(): void
+    {
+        RepoProfile::factory()->create(['platform' => 'bitbucket', 'name' => 'Bitbucket Repo']);
+
+        Livewire::test(ListRepoProfiles::class)
+            ->assertSee('Bitbucket Repo');
+    }
 }
