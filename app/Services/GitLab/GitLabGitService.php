@@ -66,6 +66,52 @@ class GitLabGitService implements GitProviderContract
             ->json();
     }
 
+    /**
+     * Returns projects as ['namespace/name' => 'namespace/name'] for use in Filament Select dropdowns.
+     *
+     * @return array<string, string>
+     */
+    public function getRepoOptions(): array
+    {
+        $projects = $this->listRepositories();
+
+        $options = [];
+        foreach ($projects as $project) {
+            $path = $project['path_with_namespace'] ?? null;
+            if (is_string($path) && $path !== '') {
+                $options[$path] = $path;
+            }
+        }
+
+        return $options;
+    }
+
+    /**
+     * Returns branches as ['branch' => 'branch'] for use in Filament Select dropdowns.
+     *
+     * @return array<string, string>
+     */
+    public function getBranchOptions(string $ownerRepo): array
+    {
+        [$owner, $repo] = explode('/', $ownerRepo, 2) + ['', ''];
+
+        if ($owner === '' || $repo === '') {
+            return [];
+        }
+
+        $branches = $this->listBranches($owner, $repo);
+
+        $options = [];
+        foreach ($branches as $branch) {
+            $name = $branch['name'] ?? null;
+            if (is_string($name) && $name !== '') {
+                $options[$name] = $name;
+            }
+        }
+
+        return $options;
+    }
+
     private function encodePath(string $owner, string $repo): string
     {
         return urlencode("{$owner}/{$repo}");
@@ -74,7 +120,7 @@ class GitLabGitService implements GitProviderContract
     private function http(): PendingRequest
     {
         return Http::withHeaders([
-            'PRIVATE-TOKEN' => $this->token,
+            'Authorization' => "Bearer {$this->token}",
             'Content-Type' => 'application/json',
         ])->baseUrl("{$this->instanceUrl}/api/v4");
     }

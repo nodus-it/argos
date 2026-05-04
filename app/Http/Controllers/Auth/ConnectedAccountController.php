@@ -16,14 +16,18 @@ use Laravel\Socialite\Two\User as SocialiteUser;
 
 final class ConnectedAccountController extends Controller
 {
-    private const RETURN_SESSION_KEY = 'oauth.github.return';
+    private const GITHUB_RETURN_SESSION_KEY = 'oauth.github.return';
+
+    private const GITLAB_RETURN_SESSION_KEY = 'oauth.gitlab.return';
+
+    // ── GitHub ────────────────────────────────────────────────────────────────
 
     public function redirect(Request $request): RedirectResponse
     {
         if ($request->query('return') === 'onboarding') {
-            $request->session()->put(self::RETURN_SESSION_KEY, 'onboarding');
+            $request->session()->put(self::GITHUB_RETURN_SESSION_KEY, 'onboarding');
         } else {
-            $request->session()->forget(self::RETURN_SESSION_KEY);
+            $request->session()->forget(self::GITHUB_RETURN_SESSION_KEY);
         }
 
         /** @var AbstractProvider $driver */
@@ -56,7 +60,7 @@ final class ConnectedAccountController extends Controller
             ]
         );
 
-        $returnTo = $request->session()->pull(self::RETURN_SESSION_KEY);
+        $returnTo = $request->session()->pull(self::GITHUB_RETURN_SESSION_KEY);
 
         if ($returnTo === 'onboarding') {
             return redirect()->route('filament.admin.pages.onboarding');
@@ -71,6 +75,68 @@ final class ConnectedAccountController extends Controller
         $user = Auth::user();
 
         $user->connectedAccounts()->where('provider', 'github')->delete();
+
+        return redirect()->route('filament.admin.pages.connected-accounts');
+    }
+
+    // ── GitLab ────────────────────────────────────────────────────────────────
+
+    public function redirectGitlab(Request $request): RedirectResponse
+    {
+        if ($request->query('return') === 'onboarding') {
+            $request->session()->put(self::GITLAB_RETURN_SESSION_KEY, 'onboarding');
+        } else {
+            $request->session()->forget(self::GITLAB_RETURN_SESSION_KEY);
+        }
+
+        /** @var AbstractProvider $driver */
+        $driver = Socialite::driver('gitlab');
+
+        return $driver->scopes(['read_user', 'api'])->redirect();
+    }
+
+    public function callbackGitlab(Request $request): RedirectResponse
+    {
+        /** @var AbstractProvider $driver */
+        $driver = Socialite::driver('gitlab');
+
+        /** @var SocialiteUser $socialUser */
+        $socialUser = $driver->user();
+
+        /** @var User $user */
+        $user = Auth::user();
+
+        $instanceUrl = rtrim((string) config('services.gitlab.instance_uri', 'https://gitlab.com'), '/');
+
+        ConnectedAccount::updateOrCreate(
+            ['user_id' => $user->id, 'provider' => 'gitlab'],
+            [
+                'provider_id' => (string) $socialUser->getId(),
+                'token' => (string) $socialUser->token,
+                'refresh_token' => $socialUser->refreshToken,
+                'expires_at' => $socialUser->expiresIn ? now()->addSeconds($socialUser->expiresIn) : null,
+                'name' => $socialUser->getName(),
+                'nickname' => $socialUser->getNickname(),
+                'avatar' => $socialUser->getAvatar(),
+                'instance_url' => $instanceUrl === 'https://gitlab.com' ? null : $instanceUrl,
+            ]
+        );
+
+        $returnTo = $request->session()->pull(self::GITLAB_RETURN_SESSION_KEY);
+
+        if ($returnTo === 'onboarding') {
+            return redirect()->route('filament.admin.pages.onboarding');
+        }
+
+        return redirect()->route('filament.admin.pages.connected-accounts');
+    }
+
+    public function disconnectGitlab(): RedirectResponse
+    {
+        /** @var User $user */
+        $user = Auth::user();
+
+        $user->connectedAccounts()->where('provider', 'gitlab')->delete();
 
         return redirect()->route('filament.admin.pages.connected-accounts');
     }

@@ -38,12 +38,17 @@ class EditRepoProfile extends EditRecord
             $data['github_repo'] = $m[1];
         }
 
+        if (is_string($url) && ($data['platform'] ?? '') === 'gitlab' && preg_match('#^(https?://[^/]+)/(.+?)(?:\.git)?/?$#', $url, $m)) {
+            $data['gitlab_repo'] = $m[2];
+        }
+
         if (is_string($url) && preg_match('#^https?://bitbucket\.org/([^/]+/[^/]+?)(?:\.git)?/?$#', $url, $m)) {
             $data['bitbucket_repo'] = $m[1];
         }
 
         if (isset($data['default_branch']) && is_string($data['default_branch'])) {
             $data['github_branch'] = $data['default_branch'];
+            $data['gitlab_branch'] = $data['default_branch'];
             $data['bitbucket_branch'] = $data['default_branch'];
         }
 

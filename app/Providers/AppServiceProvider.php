@@ -21,6 +21,7 @@ use Illuminate\Support\ServiceProvider;
 use PDO;
 use PDOException;
 use SocialiteProviders\Bitbucket\BitbucketExtendSocialite;
+use SocialiteProviders\GitLab\GitLabExtendSocialite;
 use SocialiteProviders\Manager\SocialiteWasCalled;
 
 class AppServiceProvider extends ServiceProvider
@@ -56,7 +57,8 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        Event::listen(SocialiteWasCalled::class, BitbucketExtendSocialite::class);
+        Event::listen(SocialiteWasCalled::class, GitLabExtendSocialite::class.'@handle');
+        Event::listen(SocialiteWasCalled::class, BitbucketExtendSocialite::class.'@handle');
 
         $this->commands([
             ArgosCommand::class,

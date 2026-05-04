@@ -61,12 +61,13 @@ _credentials_task_path() {
 }
 
 # credentials_save_task: write credentials.env for a task.
-# Args: $1=task_id, $2=repo_url, $3=repo_token, $4=base_branch
+# Args: $1=task_id, $2=repo_url, $3=repo_token, $4=base_branch, $5=repo_platform (optional)
 credentials_save_task() {
     local task_id="$1"
     local repo_url="$2"
     local repo_token="$3"
     local base_branch="$4"
+    local repo_platform="${5:-}"
     local dir
     dir="$(_credentials_task_path "$task_id")"
     mkdir -p "$dir"
@@ -75,12 +76,13 @@ credentials_save_task() {
         printf 'REPO_URL=%q\n' "$repo_url"
         printf 'REPO_TOKEN=%q\n' "$repo_token"
         printf 'BASE_BRANCH=%q\n' "$base_branch"
+        [[ -n "$repo_platform" ]] && printf 'REPO_PLATFORM=%q\n' "$repo_platform"
     } | _credentials_atomic_write "$dir/credentials.env"
 }
 
 # credentials_load_task: source credentials.env of a task into the current shell.
 # Args: $1=task_id
-# Side effect: sets REPO_URL, REPO_TOKEN, BASE_BRANCH.
+# Side effect: sets REPO_URL, REPO_TOKEN, BASE_BRANCH, REPO_PLATFORM (if present).
 # Returns: 0 if loaded, 1 if the file is missing.
 credentials_load_task() {
     local task_id="$1"

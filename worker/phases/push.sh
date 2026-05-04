@@ -49,7 +49,13 @@ _push_has_changes() {
 }
 
 # _push_detect_platform: print "github", "gitlab", "bitbucket", or "".
+# Prefers the REPO_PLATFORM env var (set by the manager) so Self-Hosted GitLab
+# instances with non-obvious hostnames are detected correctly.
 _push_detect_platform() {
+    if [[ -n "${REPO_PLATFORM:-}" ]]; then
+        printf '%s' "$REPO_PLATFORM"
+        return
+    fi
     case "$REPO_URL" in
         *github.com*)    printf 'github' ;;
         *gitlab*)        printf 'gitlab' ;;

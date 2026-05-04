@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "eb5534730de1f4fc2491b69091c9116b",
+    "content-hash": "0f70bf6bdb0ff978ab02071e5cb6dec0",
     "packages": [
         {
             "name": "blade-ui-kit/blade-heroicons",
@@ -5601,17 +5601,17 @@
             "time": "2022-12-17T21:53:22+00:00"
         },
         {
-            "name": "socialiteproviders/bitbucket",
+            "name": "socialiteproviders/gitlab",
             "version": "4.1.0",
             "source": {
                 "type": "git",
-                "url": "https://github.com/SocialiteProviders/Bitbucket.git",
-                "reference": "b0c945a4ebc0fe29166650bbf5cfae5c4aaefc2a"
+                "url": "https://github.com/SocialiteProviders/GitLab.git",
+                "reference": "a8f67d3b02c9ee8c70c25c6728417c0eddcbbb9d"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/SocialiteProviders/Bitbucket/zipball/b0c945a4ebc0fe29166650bbf5cfae5c4aaefc2a",
-                "reference": "b0c945a4ebc0fe29166650bbf5cfae5c4aaefc2a",
+                "url": "https://api.github.com/repos/SocialiteProviders/GitLab/zipball/a8f67d3b02c9ee8c70c25c6728417c0eddcbbb9d",
+                "reference": "a8f67d3b02c9ee8c70c25c6728417c0eddcbbb9d",
                 "shasum": ""
             },
             "require": {
@@ -5622,7 +5622,7 @@
             "type": "library",
             "autoload": {
                 "psr-4": {
-                    "SocialiteProviders\\Bitbucket\\": ""
+                    "SocialiteProviders\\GitLab\\": ""
                 }
             },
             "notification-url": "https://packagist.org/downloads/",
@@ -5631,13 +5631,13 @@
             ],
             "authors": [
                 {
-                    "name": "Anton Komarev",
-                    "email": "ell@cybercog.su"
+                    "name": "Christoffer Martinsen",
+                    "email": "christoffermartinsen@gmail.com"
                 }
             ],
-            "description": "Bitbucket OAuth2 Provider for Laravel Socialite",
+            "description": "GitLab OAuth2 Provider for Laravel Socialite",
             "support": {
-                "source": "https://github.com/SocialiteProviders/Bitbucket/tree/4.1.0"
+                "source": "https://github.com/SocialiteProviders/GitLab/tree/4.1.0"
             },
             "time": "2020-12-01T23:10:59+00:00"
         },
