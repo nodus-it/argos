@@ -256,6 +256,19 @@ abstract class ProviderContractTestCase extends TestCase
         );
 
         $this->assertNotEmpty($comment, 'commentOnPullRequest lieferte leere Antwort.');
+
+        // Refresh title and description on the same PR. Worker calls this on
+        // re-iteration to update the PR body with the latest implementation
+        // summary. No cleanup either — closing the PR discards the metadata.
+        $updated = $service->updatePullRequest(
+            $this->config->testRepoOwner,
+            $this->config->testRepo,
+            $prId,
+            'argos contract test [updated]',
+            'Updated by argos contract suite.',
+        );
+
+        $this->assertNotEmpty($updated, 'updatePullRequest lieferte leere Antwort.');
     }
 
     /**
