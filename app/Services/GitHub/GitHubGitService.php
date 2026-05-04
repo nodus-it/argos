@@ -4,17 +4,27 @@ declare(strict_types=1);
 
 namespace App\Services\GitHub;
 
-use App\Services\Contracts\GitServiceContract;
+use App\Services\Contracts\GitProviderContract;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
 
-class GitHubGitService implements GitServiceContract
+class GitHubGitService implements GitProviderContract
 {
     private const BASE_URL = 'https://api.github.com';
 
     private const API_VERSION = '2022-11-28';
 
     public function __construct(private readonly string $token) {}
+
+    public function getProviderKey(): string
+    {
+        return 'github';
+    }
+
+    public function label(): string
+    {
+        return 'GitHub';
+    }
 
     public function listRepositories(): array
     {

@@ -6,7 +6,6 @@ namespace App\Domain\Phase;
 
 use App\Domain\Credentials\CredentialStore;
 use App\Jobs\RunPhaseJob;
-use App\Models\ConnectedAccount;
 use App\Models\PhaseRun;
 use App\Models\RepoProfile;
 use App\Models\Task;
@@ -577,27 +576,9 @@ class PhaseRunner
         return $cmd;
     }
 
-    /**
-     * Resolve the effective max-turns budget for this run.
-     * Resolve the repo token: PAT from the profile, or OAuth token from the
-     * connected GitHub account when the profile has no token stored.
-     */
     private function resolveRepoToken(RepoProfile $profile): string
     {
-        if ($profile->token !== null && $profile->token !== '') {
-            return $profile->token;
-        }
-
-        if ($profile->platform === 'github') {
-            $account = ConnectedAccount::where('provider', 'github')->first();
-            if ($account !== null) {
-                return $account->token;
-            }
-        }
-
-        throw new \RuntimeException(
-            'Kein Repository-Token konfiguriert. Bitte PAT im Projekt hinterlegen oder GitHub-Account verknüpfen.'
-        );
+        return $profile->resolveToken();
     }
 
     /**

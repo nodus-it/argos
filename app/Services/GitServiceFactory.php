@@ -6,22 +6,19 @@ namespace App\Services;
 
 use App\Models\RepoProfile;
 use App\Services\Contracts\GitServiceContract;
-use App\Services\GitHub\GitHubGitService;
-use App\Services\GitLab\GitLabGitService;
-use InvalidArgumentException;
 
 class GitServiceFactory
 {
+    public function __construct(private readonly GitProviderRegistry $registry) {}
+
     public function fromRepoProfile(RepoProfile $profile): GitServiceContract
     {
-        return match ($profile->platform) {
-            'github' => new GitHubGitService($profile->token),
-            'gitlab' => new GitLabGitService(
-                token: $profile->token,
-                instanceUrl: $this->extractInstanceUrl($profile->url),
-            ),
-            default => throw new InvalidArgumentException("Unbekannte Platform: {$profile->platform}"),
-        };
+        $token = $profile->resolveToken();
+        $instanceUrl = $profile->platform === 'gitlab'
+            ? $this->extractInstanceUrl($profile->url)
+            : '';
+
+        return $this->registry->make($profile->platform, $token, $instanceUrl);
     }
 
     /**
@@ -29,11 +26,7 @@ class GitServiceFactory
      */
     public function forPlatform(string $platform, string $token, string $instanceUrl = ''): GitServiceContract
     {
-        return match ($platform) {
-            'github' => new GitHubGitService($token),
-            'gitlab' => new GitLabGitService($token, $instanceUrl ?: 'https://gitlab.com'),
-            default => throw new InvalidArgumentException("Unbekannte Platform: {$platform}"),
-        };
+        return $this->registry->make($platform, $token, $instanceUrl);
     }
 
     private function extractInstanceUrl(string $repoUrl): string

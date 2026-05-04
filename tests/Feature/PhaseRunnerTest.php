@@ -6,9 +6,11 @@ namespace Tests\Feature;
 
 use App\Domain\Credentials\CredentialStore;
 use App\Domain\Phase\PhaseRunner;
+use App\Models\ConnectedAccount;
 use App\Models\PhaseRun;
 use App\Models\RepoProfile;
 use App\Models\Task;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery\MockInterface;
 use Symfony\Component\Process\Process;
@@ -386,6 +388,89 @@ class PhaseRunnerTest extends TestCase
         $this->assertNull($phaseRun->fresh()->error_log);
     }
 
+    // --- resolveRepoToken / per-profile token resolution ---
+
+    public function test_build_command_uses_pat_token_when_auth_method_is_pat(): void
+    {
+        $task = $this->taskWithProfile(['auth_method' => 'pat', 'token' => 'my-secret-pat']);
+
+        $cmd = $this->captureCommand($task, 'concept');
+
+        $this->assertContains('REPO_TOKEN=my-secret-pat', $cmd);
+    }
+
+    public function test_build_command_uses_connected_account_token_when_auth_method_is_oauth(): void
+    {
+        $user = User::factory()->create();
+        $account = ConnectedAccount::factory()->create([
+            'user_id' => $user->id,
+            'provider' => 'github',
+            'token' => 'oauth-token-from-account',
+        ]);
+
+        $profile = RepoProfile::factory()->create([
+            'url' => 'https://github.com/org/repo',
+            'platform' => 'github',
+            'auth_method' => 'oauth',
+            'connected_account_id' => $account->id,
+            'token' => null,
+        ]);
+
+        $task = Task::factory()->create([
+            'name' => 'oauth-task',
+            'repo_profile_id' => $profile->id,
+        ]);
+
+        $cmd = $this->captureCommand($task, 'concept');
+
+        $this->assertContains('REPO_TOKEN=oauth-token-from-account', $cmd);
+    }
+
+    public function test_build_command_throws_when_auth_method_is_pat_but_token_missing(): void
+    {
+        $profile = RepoProfile::factory()->create([
+            'url' => 'https://github.com/org/repo',
+            'platform' => 'github',
+            'auth_method' => 'pat',
+            'token' => null,
+        ]);
+
+        $task = Task::factory()->create([
+            'name' => 'no-token-task',
+            'repo_profile_id' => $profile->id,
+        ]);
+
+        $runner = app(PhaseRunner::class);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageMatches('/PAT/');
+
+        $runner->runBlocking($task, 'concept');
+    }
+
+    public function test_build_command_throws_when_auth_method_is_oauth_but_no_account_linked(): void
+    {
+        $profile = RepoProfile::factory()->create([
+            'url' => 'https://github.com/org/repo',
+            'platform' => 'github',
+            'auth_method' => 'oauth',
+            'connected_account_id' => null,
+            'token' => null,
+        ]);
+
+        $task = Task::factory()->create([
+            'name' => 'no-account-task',
+            'repo_profile_id' => $profile->id,
+        ]);
+
+        $runner = app(PhaseRunner::class);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageMatches('/OAuth/');
+
+        $runner->runBlocking($task, 'concept');
+    }
+
     // --- helpers ---
 
     /**
@@ -419,13 +504,16 @@ class PhaseRunnerTest extends TestCase
         return $captured;
     }
 
-    private function taskWithProfile(): Task
+    /**
+     * @param  array<string, mixed>  $profileAttributes
+     */
+    private function taskWithProfile(array $profileAttributes = []): Task
     {
-        $profile = RepoProfile::factory()->create([
+        $profile = RepoProfile::factory()->create(array_merge([
             'url' => 'https://github.com/org/repo',
             'default_branch' => 'main',
             'auto_pr' => false,
-        ]);
+        ], $profileAttributes));
 
         return Task::factory()->create([
             'name' => 'test-task',
