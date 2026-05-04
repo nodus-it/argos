@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Domain\Phase\PhaseRunner;
+use App\Domain\Task\WorkflowService;
 use App\Enums\WorkflowStatus;
 use App\Jobs\RunPhaseJob;
 use App\Models\RepoProfile;
@@ -33,7 +34,7 @@ class RunPhaseJobTest extends TestCase
             ->with(\Mockery::on(fn ($t) => $t->id === $task->id), 'concept', []);
 
         $job = new RunPhaseJob($task->id, 'concept');
-        $job->handle(app(PhaseRunner::class));
+        $job->handle(app(PhaseRunner::class), app(WorkflowService::class));
     }
 
     public function test_handle_passes_flags_to_run_blocking(): void
@@ -47,7 +48,7 @@ class RunPhaseJobTest extends TestCase
             ->with(\Mockery::any(), 'implement', $flags);
 
         $job = new RunPhaseJob($task->id, 'implement', $flags);
-        $job->handle(app(PhaseRunner::class));
+        $job->handle(app(PhaseRunner::class), app(WorkflowService::class));
     }
 
     public function test_handle_advances_workflow_after_run(): void
@@ -60,7 +61,7 @@ class RunPhaseJobTest extends TestCase
         $this->mock(PhaseRunner::class)->shouldReceive('runBlocking');
 
         $job = new RunPhaseJob($task->id, 'concept');
-        $job->handle(app(PhaseRunner::class));
+        $job->handle(app(PhaseRunner::class), app(WorkflowService::class));
 
         $this->assertSame(WorkflowStatus::ConceptReview, $task->fresh()->workflow_status);
     }
@@ -75,7 +76,7 @@ class RunPhaseJobTest extends TestCase
         $this->mock(PhaseRunner::class)->shouldReceive('runBlocking');
 
         $job = new RunPhaseJob($task->id, 'concept');
-        $job->handle(app(PhaseRunner::class));
+        $job->handle(app(PhaseRunner::class), app(WorkflowService::class));
 
         $this->assertSame(WorkflowStatus::Failed, $task->fresh()->workflow_status);
     }
@@ -99,7 +100,7 @@ class RunPhaseJobTest extends TestCase
         $this->mock(PhaseRunner::class)->shouldReceive('runBlocking');
 
         $job = new RunPhaseJob($task->id, 'implement');
-        $job->handle(app(PhaseRunner::class));
+        $job->handle(app(PhaseRunner::class), app(WorkflowService::class));
 
         Bus::assertDispatched(RunPhaseJob::class, fn ($j) => $j->phase === 'push');
     }

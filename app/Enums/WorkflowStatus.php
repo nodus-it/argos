@@ -44,6 +44,31 @@ enum WorkflowStatus: string
     }
 
     /**
+     * Whether a phase can be retried from this workflow status.
+     */
+    public function canRetryPhase(string $phase): bool
+    {
+        return match ($this) {
+            self::Failed => true,
+            self::ImplementPaused => $phase === 'implement',
+            default => false,
+        };
+    }
+
+    /**
+     * The workflow status to transition to when retrying a failed or paused phase.
+     */
+    public function retryingPhase(string $phase): self
+    {
+        return match ($phase) {
+            'concept' => self::ConceptRunning,
+            'implement', 'push' => self::ImplementRunning,
+            'respond' => self::InReview,
+            default => $this,
+        };
+    }
+
+    /**
      * Advance the workflow after a phase completes.
      * Returns the next status or null if no change is needed.
      */

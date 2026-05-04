@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domain\Phase;
 
 use App\Domain\Credentials\CredentialStore;
+use App\Domain\Task\WorkflowService;
 use App\Jobs\RunPhaseJob;
 use App\Models\PhaseRun;
 use App\Models\RepoProfile;
@@ -263,20 +264,9 @@ class PhaseRunner
 
         file_put_contents($logPath, '');
 
-        $phaseRun = PhaseRun::create([
-            'task_id' => $task->id,
-            'phase' => $phase,
-            'iteration' => $task->phaseRuns()->where('phase', $phase)->count() + 1,
-            'status' => 'running',
-            'started_at' => now(),
-        ]);
+        $phaseRun = app(WorkflowService::class)->startPhase($task, $phase);
 
         Log::channel('argos')->info('Phase started', $this->safeContext($task, $phase, ['iteration' => $phaseRun->iteration]));
-
-        $task->update([
-            'current_phase' => $phase,
-            'current_status' => 'running',
-        ]);
 
         $startedAt = microtime(true);
         $logHandle = fopen($logPath, 'a');
@@ -348,20 +338,9 @@ class PhaseRunner
 
         file_put_contents($logPath, '');
 
-        $phaseRun = PhaseRun::create([
-            'task_id' => $task->id,
-            'phase' => $phase,
-            'iteration' => $task->phaseRuns()->where('phase', $phase)->count() + 1,
-            'status' => 'running',
-            'started_at' => now(),
-        ]);
+        $phaseRun = app(WorkflowService::class)->startPhase($task, $phase);
 
         Log::channel('argos')->info('Phase started', $this->safeContext($task, $phase, ['iteration' => $phaseRun->iteration]));
-
-        $task->update([
-            'current_phase' => $phase,
-            'current_status' => 'running',
-        ]);
 
         $startedAt = microtime(true);
         $logHandle = fopen($logPath, 'a');
