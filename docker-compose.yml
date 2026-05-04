@@ -8,16 +8,41 @@
 # PhaseRunner launches worker containers via `docker run`, not via compose.
 #
 # Profiles:
-#   (no profile)  — manager only (with the embedded MariaDB)
-#   build-only    — only used to build the worker image
+#   (no profile)  — manager + auto worker-build (test/dev default)
+#   build-only    — manual rebuild of the worker images on demand
+#
+# To skip the auto-build (e.g. when worker_image points at a registry tag),
+# bring the manager up with `docker compose up --no-deps manager`.
+# To rebuild the worker without restarting the manager:
+#   docker exec -it argos php artisan worker:build
 
 services:
+
+  # Builds argos-worker:local-php8.{3,4} on every `docker compose up`.
+  # Layer cache makes this near-instant when nothing in worker/ changed.
+  # The manager waits for completion via depends_on, so the spawn path
+  # always finds an up-to-date image.
+  worker-build:
+    image: docker:cli
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./worker:/build:ro
+    working_dir: /build
+    command: >
+      sh -c "set -e;
+        docker build -t argos-worker:local-php8.4 -f docker/Dockerfile --target worker-php84 .;
+        docker build -t argos-worker:local-php8.3 -f docker/Dockerfile --target worker ."
+    restart: "no"
 
   manager:
     build:
       context: .
       dockerfile: docker/Dockerfile
       target: manager
+    depends_on:
+      worker-build:
+        condition: service_completed_successfully
+        required: false
     ports:
       - "${ARGOS_PORT:-8080}:80"
     volumes:
@@ -38,7 +63,6 @@ services:
       APP_ENV:                  "${APP_ENV:-local}"
       APP_DEBUG:                "${APP_DEBUG:-true}"
       APP_KEY:                  "${APP_KEY:-}"
-      CLAUDE_CODE_OAUTH_TOKEN:  "${CLAUDE_CODE_OAUTH_TOKEN:-}"
       ARGOS_WORKER_IMAGE:       "${ARGOS_WORKER_IMAGE:-argos-worker:latest}"
       ARGOS_CONFIG_DIR:         /data/config
       DB_CONNECTION:            "mariadb"
