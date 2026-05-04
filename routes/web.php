@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Auth\BitbucketConnectedAccountController;
 use App\Http\Controllers\Auth\ConnectedAccountController;
 use App\Http\Controllers\TaskLogController;
 use Illuminate\Support\Facades\Route;
@@ -34,4 +35,13 @@ Route::middleware('auth')->group(function () {
 
     Route::post('/auth/gitlab/disconnect', [ConnectedAccountController::class, 'disconnectGitlab'])
         ->name('auth.gitlab.disconnect');
+
+    Route::get('/auth/bitbucket/redirect', [BitbucketConnectedAccountController::class, 'redirect'])
+        ->name('auth.bitbucket.redirect');
+
+    Route::get('/auth/bitbucket/callback', [BitbucketConnectedAccountController::class, 'callback'])
+        ->name('auth.bitbucket.callback');
+
+    Route::post('/auth/bitbucket/disconnect', [BitbucketConnectedAccountController::class, 'disconnect'])
+        ->name('auth.bitbucket.disconnect');
 });

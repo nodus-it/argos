@@ -14,6 +14,7 @@ use App\Models\ConnectedAccount;
 use App\Models\RepoProfile;
 use App\Models\User;
 use App\Rules\BranchExistsOnRemote;
+use App\Services\Bitbucket\BitbucketGitService;
 use App\Services\GitHub\GitHubGitService;
 use App\Services\GitLab\GitLabGitService;
 use Filament\Actions\BulkActionGroup;
@@ -80,6 +81,7 @@ class RepoProfileResource extends Resource
                         ->options([
                             'github' => __('projects.fields.platform_github'),
                             'gitlab' => __('projects.fields.platform_gitlab'),
+                            'bitbucket' => __('projects.fields.platform_bitbucket'),
                         ])
                         ->required()
                         ->live()
@@ -112,7 +114,7 @@ class RepoProfileResource extends Resource
                         ->native(false),
                 ]),
 
-            // ── Block 3 ─ Authentifizierung ─────────────────────────────────
+            // ── Block 3a ─ Authentifizierung (GitHub/GitLab mit OAuth-Account) ─
             Section::make(__('projects.sections.authentication'))
                 ->visible(fn (Get $get): bool => self::hasOAuthAccount($get))
                 ->schema([
@@ -153,6 +155,56 @@ class RepoProfileResource extends Resource
                                 ->get()
                                 ->mapWithKeys(fn (ConnectedAccount $account): array => [
                                     $account->id => $account->name ?? $account->nickname ?? ucfirst($provider)." #{$account->id}",
+                                ])
+                                ->all();
+                        })
+                        ->visible(fn (Get $get): bool => $get('auth_method') === 'oauth')
+                        ->required(fn (Get $get): bool => $get('auth_method') === 'oauth')
+                        ->native(false)
+                        ->dehydrated(),
+                ]),
+
+            // ── Block 3b ─ Authentifizierung (Bitbucket mit OAuth-Account) ─
+            Section::make(__('projects.sections.authentication'))
+                ->visible(fn (Get $get): bool => $get('platform') === 'bitbucket' && self::bitbucketAccount() !== null)
+                ->schema([
+                    Select::make('auth_method')
+                        ->label(__('projects.fields.auth_method_label'))
+                        ->options([
+                            'pat' => __('projects.fields.auth_method_pat'),
+                            'oauth' => __('projects.fields.auth_method_oauth_bitbucket'),
+                        ])
+                        ->default('pat')
+                        ->required()
+                        ->live()
+                        ->native(false)
+                        ->afterStateUpdated(function (Set $set, ?string $state): void {
+                            if ($state === 'oauth') {
+                                $set('token', null);
+                                $account = self::bitbucketAccount();
+                                if ($account !== null) {
+                                    $set('connected_account_id', $account->id);
+                                }
+                            } else {
+                                $set('connected_account_id', null);
+                            }
+                        })
+                        ->dehydrated(),
+
+                    Select::make('connected_account_id')
+                        ->label(__('projects.fields.bitbucket_account_label'))
+                        ->options(function (): array {
+                            /** @var User|null $user */
+                            $user = Auth::user();
+                            if ($user === null) {
+                                return [];
+                            }
+
+                            return $user->connectedAccounts()
+                                ->where('provider', 'bitbucket')
+                                ->get()
+                                ->mapWithKeys(fn (ConnectedAccount $account): array => [
+                                    $account->id => $account->name ?? $account->nickname ?? "Bitbucket #{$account->id}",
                                 ])
                                 ->all();
                         })
@@ -286,7 +338,71 @@ class RepoProfileResource extends Resource
                         ->visible(fn (Get $get): bool => self::isGitlabConnectedPath($get) && is_string($get('gitlab_repo')) && $get('gitlab_repo') !== '')
                         ->dehydrated(fn (Get $get): bool => self::isGitlabConnectedPath($get)),
 
-                    // Manual-Pfad: GitLab oder GitHub ohne OAuth
+                    // Connected-Pfad: Bitbucket mit OAuth-Account
+                    Select::make('bitbucket_repo')
+                        ->label(__('projects.infolist.repo_url'))
+                        ->options(function (): array {
+                            $account = self::bitbucketAccount();
+                            if ($account === null) {
+                                return [];
+                            }
+                            try {
+                                return (new BitbucketGitService($account->token))->getRepoOptions();
+                            } catch (\Throwable) {
+                                return [];
+                            }
+                        })
+                        ->required()
+                        ->searchable()
+                        ->live()
+                        ->afterStateUpdated(function (Set $set, Get $get, ?string $state): void {
+                            if ($state === null || $state === '') {
+                                return;
+                            }
+                            $set('url', "https://bitbucket.org/{$state}");
+
+                            if (! is_string($get('name')) || $get('name') === '') {
+                                $shortName = explode('/', $state, 2)[1] ?? $state;
+                                $set('name', $shortName);
+                            }
+
+                            $account = self::bitbucketAccount();
+                            if ($account === null) {
+                                return;
+                            }
+                            $apiDefault = (new BitbucketGitService($account->token))->getDefaultBranch($state);
+                            if ($apiDefault !== null) {
+                                $set('bitbucket_branch', $apiDefault);
+                                $set('default_branch', $apiDefault);
+                            }
+                        })
+                        ->visible(fn (Get $get): bool => self::isBitbucketConnectedPath($get))
+                        ->dehydrated(fn (Get $get): bool => self::isBitbucketConnectedPath($get)),
+
+                    Select::make('bitbucket_branch')
+                        ->label(__('projects.fields.default_branch_label'))
+                        ->options(function (Get $get): array {
+                            $repo = $get('bitbucket_repo');
+                            if (! is_string($repo) || $repo === '') {
+                                return [];
+                            }
+                            $account = self::bitbucketAccount();
+                            if ($account === null) {
+                                return [];
+                            }
+                            try {
+                                return (new BitbucketGitService($account->token))->getBranchOptions($repo);
+                            } catch (\Throwable) {
+                                return [];
+                            }
+                        })
+                        ->required(fn (Get $get): bool => self::isBitbucketConnectedPath($get))
+                        ->searchable()
+                        ->live()
+                        ->visible(fn (Get $get): bool => self::isBitbucketConnectedPath($get) && is_string($get('bitbucket_repo')) && $get('bitbucket_repo') !== '')
+                        ->dehydrated(fn (Get $get): bool => self::isBitbucketConnectedPath($get)),
+
+                    // Manual-Pfad: GitLab, GitHub ohne OAuth, oder Bitbucket ohne OAuth
                     TextInput::make('url')
                         ->label(__('projects.fields.repo_url_label'))
                         ->required(fn (Get $get): bool => ! self::isConnectedPath($get))
@@ -301,9 +417,19 @@ class RepoProfileResource extends Resource
                         ->revealable()
                         ->maxLength(500)
                         ->required(fn (Get $get): bool => ! self::isConnectedPath($get))
-                        ->helperText(fn (Get $get): string => $get('platform') === 'github' && self::githubAccount() !== null
-                            ? __('projects.fields.token_helper_oauth_available')
-                            : '')
+                        ->helperText(function (Get $get): string {
+                            if ($get('platform') === 'bitbucket') {
+                                return self::bitbucketAccount() !== null
+                                    ? __('projects.fields.token_helper_bitbucket_oauth_available')
+                                    : __('projects.fields.token_helper_bitbucket');
+                            }
+
+                            if ($get('platform') === 'github' && self::githubAccount() !== null) {
+                                return __('projects.fields.token_helper_oauth_available');
+                            }
+
+                            return '';
+                        })
                         ->visible(fn (Get $get): bool => ! self::isConnectedPath($get)),
 
                     TextInput::make('default_branch')
@@ -337,6 +463,14 @@ class RepoProfileResource extends Resource
         $user = Auth::user();
 
         return $user?->connectedAccount('gitlab');
+    }
+
+    private static function bitbucketAccount(): ?ConnectedAccount
+    {
+        /** @var User|null $user */
+        $user = Auth::user();
+
+        return $user?->connectedAccount('bitbucket');
     }
 
     private static function connectedAccountFor(Get $get): ?ConnectedAccount
@@ -385,7 +519,9 @@ class RepoProfileResource extends Resource
 
     private static function isConnectedPath(Get $get): bool
     {
-        return self::isGithubConnectedPath($get) || self::isGitlabConnectedPath($get);
+        return self::isGithubConnectedPath($get)
+            || self::isGitlabConnectedPath($get)
+            || self::isBitbucketConnectedPath($get);
     }
 
     private static function isGithubConnectedPath(Get $get): bool
@@ -400,6 +536,13 @@ class RepoProfileResource extends Resource
         return $get('platform') === 'gitlab'
             && $get('auth_method') === 'oauth'
             && self::gitlabAccount() !== null;
+    }
+
+    private static function isBitbucketConnectedPath(Get $get): bool
+    {
+        return $get('platform') === 'bitbucket'
+            && $get('auth_method') === 'oauth'
+            && self::bitbucketAccount() !== null;
     }
 
     /**
@@ -440,6 +583,15 @@ class RepoProfileResource extends Resource
             $data['default_branch'] = $data['gitlab_branch'];
         }
 
+        // Bitbucket OAuth path: map bitbucket_repo/bitbucket_branch → url/default_branch
+        if (isset($data['bitbucket_repo']) && is_string($data['bitbucket_repo']) && $data['bitbucket_repo'] !== '') {
+            $data['url'] = "https://bitbucket.org/{$data['bitbucket_repo']}";
+        }
+
+        if (isset($data['bitbucket_branch']) && is_string($data['bitbucket_branch']) && $data['bitbucket_branch'] !== '') {
+            $data['default_branch'] = $data['bitbucket_branch'];
+        }
+
         // Clear token when using oauth
         if ($data['auth_method'] === 'oauth') {
             $data['token'] = null;
@@ -450,7 +602,14 @@ class RepoProfileResource extends Resource
             $data['connected_account_id'] = null;
         }
 
-        unset($data['github_repo'], $data['github_branch'], $data['gitlab_repo'], $data['gitlab_branch']);
+        unset(
+            $data['github_repo'],
+            $data['github_branch'],
+            $data['gitlab_repo'],
+            $data['gitlab_branch'],
+            $data['bitbucket_repo'],
+            $data['bitbucket_branch'],
+        );
 
         return $data;
     }
@@ -468,6 +627,7 @@ class RepoProfileResource extends Resource
                         ->color(fn (string $state): string => match ($state) {
                             'github' => 'gray',
                             'gitlab' => 'warning',
+                            'bitbucket' => 'info',
                             default => 'gray',
                         }),
 
@@ -525,6 +685,7 @@ class RepoProfileResource extends Resource
                     ->color(fn (string $state): string => match ($state) {
                         'github' => 'gray',
                         'gitlab' => 'warning',
+                        'bitbucket' => 'info',
                         default => 'gray',
                     }),
 

@@ -10,6 +10,7 @@ use App\Console\Commands\AgentImplementCommand;
 use App\Console\Commands\AgentPushCommand;
 use App\Console\Commands\ArgosCommand;
 use App\Domain\Credentials\CredentialStore;
+use App\Services\Bitbucket\BitbucketGitService;
 use App\Services\GitHub\GitHubGitService;
 use App\Services\GitLab\GitLabGitService;
 use App\Services\GitProviderRegistry;
@@ -19,6 +20,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use PDO;
 use PDOException;
+use SocialiteProviders\Bitbucket\BitbucketExtendSocialite;
 use SocialiteProviders\GitLab\GitLabExtendSocialite;
 use SocialiteProviders\Manager\SocialiteWasCalled;
 
@@ -44,6 +46,11 @@ class AppServiceProvider extends ServiceProvider
                 ),
             );
 
+            $registry->register(
+                'bitbucket',
+                fn (string $token, string $instanceUrl): BitbucketGitService => new BitbucketGitService($token),
+            );
+
             return $registry;
         });
     }
@@ -51,6 +58,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Event::listen(SocialiteWasCalled::class, GitLabExtendSocialite::class.'@handle');
+        Event::listen(SocialiteWasCalled::class, BitbucketExtendSocialite::class.'@handle');
 
         $this->commands([
             ArgosCommand::class,

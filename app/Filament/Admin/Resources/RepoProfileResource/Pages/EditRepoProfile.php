@@ -20,9 +20,9 @@ class EditRepoProfile extends EditRecord
     }
 
     /**
-     * Derive github_repo / github_branch from the persisted url + default_branch
-     * so the OAuth pickers show the current values when the form opens.
-     * Also ensure auth_method has a sensible default.
+     * Derive github_repo / github_branch and bitbucket_repo / bitbucket_branch
+     * from the persisted url + default_branch so the OAuth pickers show the
+     * current values when the form opens. Also ensures auth_method has a default.
      *
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
@@ -42,9 +42,14 @@ class EditRepoProfile extends EditRecord
             $data['gitlab_repo'] = $m[2];
         }
 
+        if (is_string($url) && preg_match('#^https?://bitbucket\.org/([^/]+/[^/]+?)(?:\.git)?/?$#', $url, $m)) {
+            $data['bitbucket_repo'] = $m[1];
+        }
+
         if (isset($data['default_branch']) && is_string($data['default_branch'])) {
             $data['github_branch'] = $data['default_branch'];
             $data['gitlab_branch'] = $data['default_branch'];
+            $data['bitbucket_branch'] = $data['default_branch'];
         }
 
         return $data;

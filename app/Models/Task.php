@@ -19,6 +19,7 @@ use Illuminate\Support\Carbon;
  * @property string $name
  * @property string|null $repo_profile_id
  * @property string $description
+ * @property string|null $base_branch
  * @property string|null $feature_branch
  * @property string|null $pr_url
  * @property string|null $current_phase
@@ -46,6 +47,7 @@ class Task extends Model
         'name',
         'repo_profile_id',
         'description',
+        'base_branch',
         'feature_branch',
         'pr_url',
         'concept_md',
