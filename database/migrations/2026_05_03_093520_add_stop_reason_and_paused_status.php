@@ -16,6 +16,14 @@ return new class extends Migration
         });
 
         if (DB::getDriverName() === 'sqlite') {
+            Schema::table('tasks', function (Blueprint $table): void {
+                $table->enum('workflow_status', [
+                    'draft', 'concept_running', 'concept_review',
+                    'implement_running', 'implement_paused',
+                    'in_review', 'completed', 'failed',
+                ])->default('draft')->change();
+            });
+
             return;
         }
 

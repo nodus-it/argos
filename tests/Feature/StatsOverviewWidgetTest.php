@@ -103,6 +103,16 @@ class StatsOverviewWidgetTest extends TestCase
             ->assertSee('3');
     }
 
+    public function test_waiting_for_input_counts_implement_paused_tasks(): void
+    {
+        Task::factory()->create(['workflow_status' => WorkflowStatus::ImplementPaused]);
+        Task::factory()->create(['workflow_status' => WorkflowStatus::Draft]); // not counted
+
+        Livewire::test(StatsOverviewWidget::class)
+            ->assertSee('Review oder Antwort offen')
+            ->assertSee('1');
+    }
+
     public function test_zero_states_render_calm_messages(): void
     {
         Livewire::test(StatsOverviewWidget::class)

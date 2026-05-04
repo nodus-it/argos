@@ -353,7 +353,11 @@ class ViewTask extends ViewRecord
 
                     return;
                 }
-                $task->update(['current_phase' => $phase, 'current_status' => 'running']);
+                $updates = ['current_phase' => $phase, 'current_status' => 'running'];
+                if ($phase === 'implement') {
+                    $updates['workflow_status'] = WorkflowStatus::ImplementRunning;
+                }
+                $task->update($updates);
                 RunPhaseJob::dispatch($task->id, $phase);
                 Notification::make()->title("{$label} gestartet")->success()->send();
                 $this->redirect(TaskResource::getUrl('view', ['record' => $task]));

@@ -30,6 +30,7 @@ class StatsOverviewWidget extends BaseWidget
         $waitingForInput = Task::query()
             ->whereIn('workflow_status', [
                 WorkflowStatus::ConceptReview,
+                WorkflowStatus::ImplementPaused,
                 WorkflowStatus::InReview,
                 WorkflowStatus::Failed,
             ])
