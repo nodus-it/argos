@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Domain\Phase\PhaseRunner;
+use App\Domain\Task\WorkflowService;
 use App\Enums\WorkflowStatus;
 use App\Jobs\RunPhaseJob;
 use App\Models\PhaseRun;
@@ -239,7 +240,7 @@ class FeedbackWorkflowTest extends TestCase
             $mock->shouldReceive('postPhaseSync')->andReturn(null);
         });
 
-        (new RunPhaseJob($task->id, $phase))->handle(app(PhaseRunner::class));
+        (new RunPhaseJob($task->id, $phase))->handle(app(PhaseRunner::class), app(WorkflowService::class));
     }
 
     /**
@@ -255,7 +256,7 @@ class FeedbackWorkflowTest extends TestCase
             $mock->shouldReceive('newProcess')->andReturn($processMock);
         });
 
-        (new RunPhaseJob($task->id, $phase))->handle(app(PhaseRunner::class));
+        (new RunPhaseJob($task->id, $phase))->handle(app(PhaseRunner::class), app(WorkflowService::class));
     }
 
     private function makeProcessMock(int $exitCode): Process

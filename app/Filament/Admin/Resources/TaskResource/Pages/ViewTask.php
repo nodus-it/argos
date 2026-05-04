@@ -122,7 +122,11 @@ class ViewTask extends ViewRecord
 
             return;
         }
-        $task->update(['current_phase' => 'implement', 'current_status' => 'running']);
+        $task->update([
+            'workflow_status' => WorkflowStatus::ImplementRunning,
+            'current_phase' => 'implement',
+            'current_status' => 'running',
+        ]);
         RunPhaseJob::dispatch($task->id, 'implement');
         Notification::make()->title('Implementierung gestartet')->success()->send();
         $this->redirect(TaskResource::getUrl('view', ['record' => $task]));
@@ -293,7 +297,11 @@ class ViewTask extends ViewRecord
 
                         return;
                     }
-                    $task->update(['current_phase' => 'implement', 'current_status' => 'running']);
+                    $task->update([
+                        'workflow_status' => WorkflowStatus::ImplementRunning,
+                        'current_phase' => 'implement',
+                        'current_status' => 'running',
+                    ]);
                     RunPhaseJob::dispatch($task->id, 'implement', ['force_unlock' => true]);
                     Notification::make()->title('Lock freigegeben — Implement gestartet')->success()->send();
                     $this->redirect(TaskResource::getUrl('view', ['record' => $task]));
@@ -405,6 +413,7 @@ class ViewTask extends ViewRecord
 
                 $maxTurns = (int) $data['max_turns'];
                 $task->update([
+                    'workflow_status' => WorkflowStatus::ImplementRunning,
                     'current_phase' => 'implement',
                     'current_status' => 'running',
                 ]);

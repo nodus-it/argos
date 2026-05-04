@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domain\Phase;
 
+use App\Domain\Task\WorkflowService;
 use App\Models\PhaseRun;
 use App\Models\Task;
 use Symfony\Component\Process\Process;
@@ -191,13 +192,7 @@ class StateReader
      */
     public function syncToDb(Task $task): void
     {
-        PhaseRun::where('task_id', $task->id)
-            ->where('status', 'running')
-            ->where('started_at', '<', now()->subHours(2))
-            ->update([
-                'status' => 'failed',
-                'finished_at' => now(),
-            ]);
+        app(WorkflowService::class)->markStaleRunsAsFailed($task);
 
         $pushRun = $task->phaseRuns()
             ->where('phase', 'push')
