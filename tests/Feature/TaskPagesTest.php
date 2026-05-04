@@ -99,6 +99,18 @@ class TaskPagesTest extends TestCase
         Bus::assertDispatched(RunPhaseJob::class, fn ($j) => $j->phase === 'implement');
     }
 
+    public function test_view_task_implement_action_sets_workflow_status_to_implement_running(): void
+    {
+        $task = Task::factory()->create(['workflow_status' => WorkflowStatus::ConceptReview]);
+        PhaseRun::factory()->create(['task_id' => $task->id, 'phase' => 'concept', 'status' => 'completed']);
+
+        Livewire::test(ViewTask::class, ['record' => $task->getKey()])
+            ->callAction('implement')
+            ->assertNotified();
+
+        $this->assertEquals(WorkflowStatus::ImplementRunning, $task->fresh()->workflow_status);
+    }
+
     public function test_view_task_push_action_dispatches_job(): void
     {
         $task = Task::factory()->create();
