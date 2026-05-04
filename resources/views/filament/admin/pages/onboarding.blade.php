@@ -34,11 +34,10 @@
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Token überschreiben</label>
                         <div class="flex gap-2">
                             <input wire:model="claudeToken" type="password" placeholder="sk-ant-oat01-…" autocomplete="off"
-                                class="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" />
-                            <button wire:click="saveClaudeToken" type="button"
-                                class="rounded-lg bg-primary-600 hover:bg-primary-700 px-4 py-2 text-sm font-medium text-white">
+                                class="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-500" />
+                            <x-filament::button wire:click="saveClaudeToken" type="button">
                                 Speichern
-                            </button>
+                            </x-filament::button>
                         </div>
                     </div>
                 @else
@@ -46,11 +45,10 @@
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Token <span class="text-red-500">*</span></label>
                         <div class="flex gap-2">
                             <input wire:model="claudeToken" type="password" placeholder="sk-ant-oat01-…" autocomplete="off"
-                                class="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" />
-                            <button wire:click="saveClaudeToken" type="button"
-                                class="rounded-lg bg-primary-600 hover:bg-primary-700 px-4 py-2 text-sm font-medium text-white">
+                                class="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-500" />
+                            <x-filament::button wire:click="saveClaudeToken" type="button">
                                 Speichern
-                            </button>
+                            </x-filament::button>
                         </div>
                         <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">Wird im Config-Verzeichnis abgelegt (mode 0600).</p>
                     </div>
@@ -81,11 +79,14 @@
                                 <x-heroicon-o-check-circle class="h-5 w-5 text-emerald-500 flex-shrink-0" />
                                 <span class="text-sm text-gray-700 dark:text-gray-300">GitHub-Account ist verbunden.</span>
                             </div>
-                            <button wire:click="disconnectGitHub" type="button"
+                            <x-filament::button
+                                wire:click="disconnectGitHub"
                                 wire:confirm="GitHub-Verbindung wirklich trennen?"
-                                class="rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300">
+                                color="gray"
+                                size="sm"
+                            >
                                 Trennen
-                            </button>
+                            </x-filament::button>
                         </div>
                         <p class="text-xs text-gray-500 dark:text-gray-400">
                             Tipp: Wenn du beim Verbinden keine Auswahlmaske mehr siehst, widerrufe die App zuerst auf
@@ -95,11 +96,13 @@
                         <p class="text-sm text-gray-500 dark:text-gray-400">
                             Verbinde deinen GitHub-Account per OAuth — danach kannst du Projekte ohne Personal Access Token anlegen.
                         </p>
-                        <a href="{{ route('auth.github.redirect', ['return' => 'onboarding']) }}"
-                            class="inline-flex items-center gap-2 rounded-lg bg-gray-900 hover:bg-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600 px-4 py-2 text-sm font-medium text-white">
-                            <x-heroicon-o-arrow-right-circle class="h-4 w-4" />
+                        <x-filament::button
+                            tag="a"
+                            href="{{ route('auth.github.redirect', ['return' => 'onboarding']) }}"
+                            icon="heroicon-o-arrow-right-circle"
+                        >
                             Mit GitHub verbinden
-                        </a>
+                        </x-filament::button>
                     @endif
                 </div>
             </div>
@@ -117,11 +120,13 @@
                 <p class="text-sm text-gray-500 dark:text-gray-400">
                     Verbinde Argos mit einem Git-Repository. Weitere Projekte kannst du danach jederzeit unter <strong>Konfiguration → Projekte</strong> anlegen.
                 </p>
-                <a href="{{ route('filament.admin.resources.repo-profiles.create') }}"
-                    class="inline-flex items-center gap-2 rounded-lg bg-primary-600 hover:bg-primary-700 px-4 py-2 text-sm font-medium text-white">
-                    <x-heroicon-o-rocket-launch class="h-4 w-4" />
+                <x-filament::button
+                    tag="a"
+                    href="{{ route('filament.admin.resources.repo-profiles.create') }}"
+                    icon="heroicon-o-rocket-launch"
+                >
                     Projekt anlegen
-                </a>
+                </x-filament::button>
             </div>
         </div>
 

@@ -8,7 +8,6 @@ use App\Domain\Credentials\CredentialStore;
 use App\Models\RepoProfile;
 use App\Models\User;
 use App\Services\Anthropic\AnthropicTokenValidator;
-use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Auth;
@@ -128,15 +127,5 @@ class Onboarding extends Page
         } else {
             Notification::make()->title('Token gespeichert')->success()->send();
         }
-    }
-
-    protected function getHeaderActions(): array
-    {
-        return [
-            Action::make('createProject')
-                ->label('Erstes Projekt anlegen')
-                ->icon('heroicon-o-rocket-launch')
-                ->url(route('filament.admin.resources.repo-profiles.create')),
-        ];
     }
 }

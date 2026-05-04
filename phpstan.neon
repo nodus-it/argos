@@ -11,3 +11,6 @@ parameters:
 
     excludePaths:
         - bootstrap/cache/*
+
+    bootstrapFiles:
+        - phpstan-bootstrap.php
