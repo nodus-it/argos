@@ -311,6 +311,15 @@ class RepoProfileResource extends Resource
                                 $shortName = explode('/', $state, 2)[1] ?? $state;
                                 $set('name', $shortName);
                             }
+
+                            if ($account === null) {
+                                return;
+                            }
+                            $apiDefault = (new GitLabGitService($account->token, $account->getInstanceUrl()))->getDefaultBranch($state);
+                            if ($apiDefault !== null) {
+                                $set('gitlab_branch', $apiDefault);
+                                $set('default_branch', $apiDefault);
+                            }
                         })
                         ->visible(fn (Get $get): bool => self::isGitlabConnectedPath($get))
                         ->dehydrated(fn (Get $get): bool => self::isGitlabConnectedPath($get)),

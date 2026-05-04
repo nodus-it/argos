@@ -240,6 +240,41 @@ class RepoProfileResourceTest extends TestCase
         ]);
     }
 
+    public function test_gitlab_oauth_path_preselects_default_branch_from_api(): void
+    {
+        $account = ConnectedAccount::factory()->create([
+            'user_id' => $this->user->id,
+            'provider' => 'gitlab',
+        ]);
+
+        // More-specific patterns first; Http::fake matches in definition order.
+        Http::fake([
+            'gitlab.com/api/v4/projects/acme%2Fwidget/repository/branches*' => Http::response([
+                ['name' => 'main'],
+                ['name' => 'develop'],
+            ]),
+            'gitlab.com/api/v4/projects/acme%2Fwidget' => Http::response([
+                'default_branch' => 'develop',
+            ]),
+            'gitlab.com/api/v4/projects*' => Http::response([
+                ['path_with_namespace' => 'acme/widget'],
+            ]),
+        ]);
+
+        Livewire::test(CreateRepoProfile::class)
+            ->fillForm([
+                'platform' => 'gitlab',
+                'auth_method' => 'oauth',
+                'connected_account_id' => $account->id,
+                'name' => 'Widget',
+                'gitlab_repo' => 'acme/widget',
+            ])
+            ->assertFormSet([
+                'gitlab_branch' => 'develop',
+                'default_branch' => 'develop',
+            ]);
+    }
+
     public function test_oauth_path_persists_default_branch_on_save(): void
     {
         $account = ConnectedAccount::factory()->create([
