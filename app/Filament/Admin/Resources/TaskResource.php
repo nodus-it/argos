@@ -85,6 +85,12 @@ class TaskResource extends Resource
                 ->maxValue(1000)
                 ->placeholder((string) config('argos.implement.max_turns_default', 200)),
 
+            TextInput::make('base_branch')
+                ->label(__('tasks.fields.base_branch_label'))
+                ->helperText(__('tasks.fields.base_branch_helper'))
+                ->placeholder(fn (Get $get): string => RepoProfile::find($get('repo_profile_id'))?->default_branch ?? 'main')
+                ->maxLength(255),
+
             Select::make('worker_image')
                 ->label(__('tasks.fields.worker_image_label'))
                 ->options(fn (Get $get): array => WorkerImage::optionsFor($get('worker_image')))
