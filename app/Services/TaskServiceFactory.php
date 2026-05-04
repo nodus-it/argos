@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\RepoProfile;
+use App\Services\Bitbucket\BitbucketTaskService;
 use App\Services\Contracts\TaskServiceContract;
 use App\Services\GitHub\GitHubTaskService;
 use App\Services\GitLab\GitLabTaskService;
@@ -20,6 +21,7 @@ class TaskServiceFactory
                 token: $profile->token,
                 instanceUrl: $this->extractInstanceUrl($profile->url),
             ),
+            'bitbucket' => new BitbucketTaskService($profile->token),
             default => throw new InvalidArgumentException("Unbekannte Platform: {$profile->platform}"),
         };
     }
@@ -32,6 +34,7 @@ class TaskServiceFactory
         return match ($platform) {
             'github' => new GitHubTaskService($token),
             'gitlab' => new GitLabTaskService($token, $instanceUrl ?: 'https://gitlab.com'),
+            'bitbucket' => new BitbucketTaskService($token),
             default => throw new InvalidArgumentException("Unbekannte Platform: {$platform}"),
         };
     }
