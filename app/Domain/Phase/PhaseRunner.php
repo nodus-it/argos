@@ -550,7 +550,7 @@ class PhaseRunner
             '-e', "TASK_ID={$task->name}",
             '-e', "REPO_URL={$profile->url}",
             '-e', "REPO_TOKEN={$this->resolveRepoToken($profile)}",
-            '-e', "BASE_BRANCH={$profile->default_branch}",
+            '-e', 'BASE_BRANCH='.($task->base_branch ?: $profile->default_branch),
             '-e', "CLAUDE_CODE_OAUTH_TOKEN={$claudeToken}",
             '-e', "TASK_DESCRIPTION={$task->description}",
             '-e', "PHASE_FLAGS={$phaseFlags}",

@@ -320,6 +320,38 @@ class PhaseRunnerTest extends TestCase
         $this->assertNotContains('argos-worker:profile', $cmd);
     }
 
+    // --- base_branch override ---
+
+    public function test_build_command_uses_profile_default_branch_when_task_base_branch_is_null(): void
+    {
+        $task = $this->taskWithProfile(['default_branch' => 'develop']);
+
+        $cmd = $this->captureCommand($task, 'concept');
+
+        $this->assertContains('BASE_BRANCH=develop', $cmd);
+    }
+
+    public function test_build_command_uses_task_base_branch_when_set(): void
+    {
+        $task = $this->taskWithProfile(['default_branch' => 'main']);
+        $task->update(['base_branch' => 'feature/custom-base']);
+
+        $cmd = $this->captureCommand($task, 'concept');
+
+        $this->assertContains('BASE_BRANCH=feature/custom-base', $cmd);
+        $this->assertNotContains('BASE_BRANCH=main', $cmd);
+    }
+
+    public function test_build_command_falls_back_to_profile_branch_when_task_base_branch_is_empty_string(): void
+    {
+        $task = $this->taskWithProfile(['default_branch' => 'staging']);
+        $task->update(['base_branch' => '']);
+
+        $cmd = $this->captureCommand($task, 'concept');
+
+        $this->assertContains('BASE_BRANCH=staging', $cmd);
+    }
+
     public function test_extract_stop_reason_returns_null_without_result_event(): void
     {
         $runner = app(PhaseRunner::class);

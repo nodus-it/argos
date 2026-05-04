@@ -60,6 +60,13 @@
                 </div>
             @endif
 
+            @if($record->base_branch || $record->repoProfile?->default_branch)
+                <div class="flex items-center justify-between gap-2">
+                    <span class="text-xs font-medium text-gray-500 dark:text-gray-400 flex-shrink-0">Base Branch</span>
+                    <code class="text-xs text-indigo-600 dark:text-indigo-400 font-mono truncate text-right">{{ $record->base_branch ?? $record->repoProfile?->default_branch }}</code>
+                </div>
+            @endif
+
             @if($record->feature_branch)
                 <div class="flex items-center justify-between gap-2">
                     <span class="text-xs font-medium text-gray-500 dark:text-gray-400 flex-shrink-0">Branch</span>
