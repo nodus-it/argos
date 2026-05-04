@@ -39,12 +39,12 @@ class Settings extends Page implements HasForms
 
     public static function getNavigationGroup(): ?string
     {
-        return 'Konfiguration';
+        return __('settings.navigation_group');
     }
 
     public static function getNavigationLabel(): string
     {
-        return 'Einstellungen';
+        return __('settings.navigation_label');
     }
 
     public static function getNavigationSort(): ?int
@@ -54,7 +54,7 @@ class Settings extends Page implements HasForms
 
     public function getTitle(): string
     {
-        return 'Einstellungen';
+        return __('settings.title');
     }
 
     public function mount(): void
@@ -71,11 +71,11 @@ class Settings extends Page implements HasForms
     {
         return $schema
             ->components([
-                Section::make('Claude OAuth Token')
+                Section::make(__('settings.token_section_heading'))
                     ->description($this->tokenSourceDescription())
                     ->components([
                         TextInput::make('claude_token')
-                            ->label('Token')
+                            ->label(__('settings.token_field.label'))
                             ->password()
                             ->revealable()
                             ->autocomplete('off')
@@ -92,8 +92,8 @@ class Settings extends Page implements HasForms
     {
         if ($this->tokenSource === 'env') {
             Notification::make()
-                ->title('Token kommt aus der Umgebungsvariable')
-                ->body('Der Token kommt aus der Umgebung und kann hier nicht geändert werden.')
+                ->title(__('settings.notifications.env_token_title'))
+                ->body(__('settings.notifications.env_token_body'))
                 ->warning()
                 ->send();
 
@@ -104,7 +104,7 @@ class Settings extends Page implements HasForms
         $token = trim((string) ($data['claude_token'] ?? ''));
 
         if ($token === '') {
-            Notification::make()->title('Bitte einen Token eingeben')->warning()->send();
+            Notification::make()->title(__('settings.notifications.empty_token'))->warning()->send();
 
             return;
         }
@@ -113,8 +113,8 @@ class Settings extends Page implements HasForms
 
         if ($valid === false) {
             Notification::make()
-                ->title('Token ungültig')
-                ->body('Der eingegebene Token wurde von der API abgelehnt. Bitte prüfen und erneut versuchen.')
+                ->title(__('settings.notifications.invalid_token_title'))
+                ->body(__('settings.notifications.invalid_token_body'))
                 ->danger()
                 ->send();
 
@@ -127,12 +127,12 @@ class Settings extends Page implements HasForms
 
         if ($valid === null) {
             Notification::make()
-                ->title('Token gespeichert')
-                ->body('Hinweis: Token konnte nicht gegen die API geprüft werden — Verbindung nicht erreichbar.')
+                ->title(__('settings.notifications.saved_title'))
+                ->body(__('settings.notifications.saved_unreachable_body'))
                 ->warning()
                 ->send();
         } else {
-            Notification::make()->title('Token gespeichert')->success()->send();
+            Notification::make()->title(__('settings.notifications.saved_title'))->success()->send();
         }
     }
 
@@ -146,19 +146,19 @@ class Settings extends Page implements HasForms
         $this->tokenSource = app(CredentialStore::class)->claudeTokenSource();
         $this->form->fill(['claude_token' => '']);
 
-        Notification::make()->title('Token entfernt')->success()->send();
+        Notification::make()->title(__('settings.notifications.removed'))->success()->send();
     }
 
     protected function getFormActions(): array
     {
         return [
             Action::make('save')
-                ->label('Token speichern')
+                ->label(__('settings.actions.save'))
                 ->submit('save')
                 ->disabled(fn (): bool => $this->tokenSource === 'env'),
 
             Action::make('clearToken')
-                ->label('Token entfernen')
+                ->label(__('settings.actions.remove'))
                 ->color('danger')
                 ->requiresConfirmation()
                 ->action('clearToken')
@@ -174,23 +174,25 @@ class Settings extends Page implements HasForms
     private function tokenSourceDescription(): string
     {
         return match ($this->tokenSource) {
-            'env' => 'Token ist über die Umgebungsvariable CLAUDE_CODE_OAUTH_TOKEN konfiguriert. Eingaben hier sind deaktiviert.',
-            'file' => 'Token ist gespeichert. Eingabe überschreibt den vorhandenen Wert.',
-            default => 'Kein Token konfiguriert — Phasen können nicht ausgeführt werden, bis du einen Token hinterlegst.',
+            'env' => __('settings.token_source.env'),
+            'file' => __('settings.token_source.file'),
+            default => __('settings.token_source.none'),
         };
     }
 
     private function tokenInputPlaceholder(): string
     {
-        return $this->tokenSource === 'env' ? '••• (aus Environment) •••' : 'sk-ant-oat01-…';
+        return $this->tokenSource === 'env'
+            ? __('settings.token_field.placeholder_env')
+            : __('settings.token_field.placeholder_other');
     }
 
     private function tokenInputHelpText(): string
     {
         return match ($this->tokenSource) {
-            'env' => 'Token kommt aus der Umgebung — im UI nicht änderbar.',
-            'file' => 'Wird im Config-Verzeichnis abgelegt (mode 0600).',
-            default => 'Wird im Config-Verzeichnis abgelegt (mode 0600). Token via "claude setup-token" erzeugen.',
+            'env' => __('settings.token_field.help_env'),
+            'file' => __('settings.token_field.help_file'),
+            default => __('settings.token_field.help_none'),
         };
     }
 }

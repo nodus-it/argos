@@ -28,13 +28,13 @@ class ConnectedAccountsPageTest extends TestCase
     {
         Livewire::test(ConnectedAccounts::class)
             ->assertSuccessful()
-            ->assertSee('Verknüpfte Accounts');
+            ->assertSee('Connected Accounts');
     }
 
     public function test_shows_not_connected_state_when_no_github_account(): void
     {
         Livewire::test(ConnectedAccounts::class)
-            ->assertSee('Nicht verbunden');
+            ->assertSee('Not connected');
     }
 
     public function test_shows_connected_state_when_github_account_exists(): void
@@ -46,14 +46,14 @@ class ConnectedAccountsPageTest extends TestCase
         ]);
 
         Livewire::test(ConnectedAccounts::class)
-            ->assertSee('Verbunden')
+            ->assertSee('Connected')
             ->assertSee('myuser');
     }
 
     public function test_shows_connect_button_when_not_connected(): void
     {
         Livewire::test(ConnectedAccounts::class)
-            ->assertSee('Mit GitHub verbinden');
+            ->assertSee('Connect with GitHub');
     }
 
     public function test_disconnect_removes_connected_account(): void
@@ -82,12 +82,12 @@ class ConnectedAccountsPageTest extends TestCase
 
         Livewire::test(ConnectedAccounts::class)
             ->call('disconnectGitHub')
-            ->assertNotified('GitHub-Verbindung getrennt');
+            ->assertNotified('GitHub connection disconnected');
     }
 
     public function test_page_is_in_settings_navigation_group(): void
     {
-        $this->assertSame('Konfiguration', ConnectedAccounts::getNavigationGroup());
+        $this->assertSame('Configuration', ConnectedAccounts::getNavigationGroup());
     }
 
     public function test_only_current_users_account_shown(): void
@@ -102,6 +102,6 @@ class ConnectedAccountsPageTest extends TestCase
 
         Livewire::test(ConnectedAccounts::class)
             ->assertDontSee('other-user')
-            ->assertSee('Nicht verbunden');
+            ->assertSee('Not connected');
     }
 }

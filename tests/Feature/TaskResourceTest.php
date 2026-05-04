@@ -47,7 +47,7 @@ class TaskResourceTest extends TestCase
 
         Livewire::test(ListTasks::class)
             ->assertSuccessful()
-            ->assertSee('Entwurf');
+            ->assertSee('Draft');
     }
 
     public function test_create_page_renders(): void

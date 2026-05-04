@@ -43,7 +43,7 @@ class TaskResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return 'Aufgaben';
+        return __('tasks.navigation_group');
     }
 
     public static function getNavigationLabel(): string
@@ -59,7 +59,7 @@ class TaskResource extends Resource
                 ->maxLength(255),
 
             Select::make('repo_profile_id')
-                ->label('Projekt')
+                ->label(__('tasks.fields.project'))
                 ->options(RepoProfile::all()->pluck('name', 'id'))
                 ->required()
                 ->live()
@@ -72,26 +72,25 @@ class TaskResource extends Resource
                 ->columnSpanFull(),
 
             Toggle::make('auto_concept')
-                ->label('Konzept direkt starten')
-                ->helperText('Startet die Konzept-Phase sofort nach dem Anlegen.')
+                ->label(__('tasks.fields.auto_concept_label'))
+                ->helperText(__('tasks.fields.auto_concept_helper'))
                 ->default(fn (Get $get): bool => RepoProfile::find($get('repo_profile_id'))?->auto_concept ?? false)
                 ->columnSpanFull(),
 
             TextInput::make('max_turns')
-                ->label('Max-Turns für Implement')
-                ->helperText('Obergrenze für Tool-Calls pro Implement-Lauf. Leer = Default '
-                    .config('argos.implement.max_turns_default', 200).'.')
+                ->label(__('tasks.fields.max_turns_label'))
+                ->helperText(__('tasks.fields.max_turns_helper', ['default' => config('argos.implement.max_turns_default', 200)]))
                 ->numeric()
                 ->minValue(10)
                 ->maxValue(1000)
                 ->placeholder((string) config('argos.implement.max_turns_default', 200)),
 
             Select::make('worker_image')
-                ->label('Worker-Image (Override)')
+                ->label(__('tasks.fields.worker_image_label'))
                 ->options(fn (Get $get): array => WorkerImage::optionsFor($get('worker_image')))
                 ->placeholder(fn (Get $get): string => 'Default vom Projekt ('
                     .(RepoProfile::find($get('repo_profile_id'))?->worker_image ?: config('argos.worker_image')).')')
-                ->helperText('Überschreibt das Image für genau diesen Task. Leer = Projekt-Default.')
+                ->helperText(__('tasks.fields.worker_image_helper'))
                 ->searchable()
                 ->native(false),
         ]);
@@ -108,18 +107,18 @@ class TaskResource extends Resource
                     ->sortable(),
 
                 TextColumn::make('repoProfile.name')
-                    ->label('Projekt')
+                    ->label(__('tasks.columns.project'))
                     ->sortable(),
 
                 TextColumn::make('current_phase')
-                    ->label('Phase')
+                    ->label(__('tasks.columns.phase'))
                     ->badge()
                     ->icon(fn (?string $state): ?string => CurrentTasksWidget::phaseIcon($state))
                     ->color(fn (?string $state): string => CurrentTasksWidget::phaseColor($state))
                     ->formatStateUsing(fn (?string $state): string => CurrentTasksWidget::phaseLabel($state)),
 
                 TextColumn::make('current_status')
-                    ->label('Status')
+                    ->label(__('tasks.columns.status'))
                     ->badge()
                     ->color(fn (?string $state): string => match ($state) {
                         'pending' => 'gray',
@@ -133,20 +132,20 @@ class TaskResource extends Resource
                         default => 'gray',
                     })
                     ->formatStateUsing(fn (?string $state): string => match ($state) {
-                        'paused' => 'Pausiert',
-                        'lock_blocked' => 'Lock blockiert',
+                        'paused' => __('common.status.paused'),
+                        'lock_blocked' => __('common.status.lock_blocked'),
                         default => (string) $state,
                     })
                     ->placeholder('—'),
 
                 TextColumn::make('workflow_status')
-                    ->label('Workflow')
+                    ->label(__('tasks.columns.workflow'))
                     ->badge()
                     ->color(fn (?WorkflowStatus $state): string => $state?->color() ?? 'gray')
                     ->formatStateUsing(fn (?WorkflowStatus $state): string => $state?->label() ?? '—'),
 
                 TextColumn::make('cost_total')
-                    ->label('Kosten')
+                    ->label(__('tasks.columns.cost'))
                     ->sortable()
                     ->formatStateUsing(fn ($state): string => $state !== null && (float) $state > 0
                         ? '$'.number_format((float) $state, 4)
@@ -154,7 +153,7 @@ class TaskResource extends Resource
                     ),
 
                 TextColumn::make('tokens_total')
-                    ->label('Tokens')
+                    ->label(__('tasks.columns.tokens'))
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->formatStateUsing(fn ($state): string => $state !== null && (int) $state > 0
@@ -163,7 +162,7 @@ class TaskResource extends Resource
                     ),
 
                 TextColumn::make('created_at')
-                    ->label('Erstellt')
+                    ->label(__('tasks.columns.created'))
                     ->since()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),

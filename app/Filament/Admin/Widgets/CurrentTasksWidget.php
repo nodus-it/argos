@@ -10,16 +10,20 @@ use App\Models\Task;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget as BaseWidget;
+use Illuminate\Contracts\Support\Htmlable;
 
 class CurrentTasksWidget extends BaseWidget
 {
-    protected static ?string $heading = 'Aktuelle Tasks';
-
     protected int|string|array $columnSpan = 'full';
 
     protected static ?int $sort = 2;
 
     protected ?string $pollingInterval = '5s';
+
+    protected function getTableHeading(): string|Htmlable|null
+    {
+        return __('widgets.current_tasks.heading');
+    }
 
     public function table(Table $table): Table
     {
@@ -35,34 +39,34 @@ class CurrentTasksWidget extends BaseWidget
             ->paginated(false)
             ->columns([
                 TextColumn::make('name')
-                    ->label('Task')
+                    ->label(__('widgets.current_tasks.columns.task'))
                     ->weight('medium')
                     ->searchable(),
 
                 TextColumn::make('repoProfile.name')
-                    ->label('Projekt')
+                    ->label(__('widgets.current_tasks.columns.project'))
                     ->color('gray'),
 
                 TextColumn::make('current_phase')
-                    ->label('Phase')
+                    ->label(__('widgets.current_tasks.columns.phase'))
                     ->badge()
                     ->icon(fn (?string $state): ?string => self::phaseIcon($state))
                     ->color(fn (?string $state): string => self::phaseColor($state))
                     ->formatStateUsing(fn (?string $state): string => self::phaseLabel($state)),
 
                 TextColumn::make('workflow_status')
-                    ->label('Workflow')
+                    ->label(__('widgets.current_tasks.columns.workflow'))
                     ->badge()
                     ->color(fn (?WorkflowStatus $state): string => $state?->color() ?? 'gray')
                     ->formatStateUsing(fn (?WorkflowStatus $state): string => $state?->label() ?? '—'),
 
                 TextColumn::make('updated_at')
-                    ->label('Zuletzt')
+                    ->label(__('widgets.current_tasks.columns.last_updated'))
                     ->since()
                     ->color('gray'),
             ])
-            ->emptyStateHeading('Noch keine Tasks')
-            ->emptyStateDescription('Lege unter Aufgaben → Tasks deinen ersten Task an.')
+            ->emptyStateHeading(__('widgets.current_tasks.empty_heading'))
+            ->emptyStateDescription(__('widgets.current_tasks.empty_description'))
             ->emptyStateIcon('heroicon-o-queue-list');
     }
 
@@ -127,11 +131,11 @@ class CurrentTasksWidget extends BaseWidget
     public static function phaseLabel(?string $state): string
     {
         return match ($state) {
-            'concept' => 'Concept',
-            'implement' => 'Implement',
-            'diff' => 'Diff',
-            'push' => 'Push',
-            'respond' => 'Respond',
+            'concept' => __('enums.phases.concept'),
+            'implement' => __('enums.phases.implement'),
+            'diff' => __('enums.phases.diff'),
+            'push' => __('enums.phases.push'),
+            'respond' => __('enums.phases.respond'),
             null, '' => '—',
             default => ucfirst($state),
         };

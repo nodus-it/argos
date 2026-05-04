@@ -28,9 +28,9 @@ class StatsOverviewWidgetTest extends TestCase
     {
         Livewire::test(StatsOverviewWidget::class)
             ->assertSuccessful()
-            ->assertSee('Laufende Worker')
-            ->assertSee('In Bearbeitung')
-            ->assertSee('Wartet auf dich');
+            ->assertSee('Running Workers')
+            ->assertSee('In Progress')
+            ->assertSee('Waiting for you');
     }
 
     public function test_running_workers_counts_only_reserved_phase_jobs(): void
@@ -68,8 +68,8 @@ class StatsOverviewWidgetTest extends TestCase
         ]);
 
         Livewire::test(StatsOverviewWidget::class)
-            ->assertSee('Laufende Worker')
-            ->assertSee('Container arbeiten gerade');
+            ->assertSee('Running Workers')
+            ->assertSee('Containers working');
     }
 
     public function test_running_workers_returns_zero_when_queue_is_not_database(): void
@@ -77,7 +77,7 @@ class StatsOverviewWidgetTest extends TestCase
         config(['queue.default' => 'sync']);
 
         Livewire::test(StatsOverviewWidget::class)
-            ->assertSee('Keine aktiven Worker');
+            ->assertSee('No active workers');
     }
 
     public function test_in_progress_counts_tasks_with_running_workflow_status(): void
@@ -87,8 +87,8 @@ class StatsOverviewWidgetTest extends TestCase
         Task::factory()->create(['workflow_status' => WorkflowStatus::Draft]);
 
         Livewire::test(StatsOverviewWidget::class)
-            ->assertSee('In Bearbeitung')
-            ->assertSee('2 Tasks laufen');
+            ->assertSee('In Progress')
+            ->assertSee('2 tasks running');
     }
 
     public function test_waiting_for_input_counts_review_and_failed_tasks(): void
@@ -99,7 +99,7 @@ class StatsOverviewWidgetTest extends TestCase
         Task::factory()->create(['workflow_status' => WorkflowStatus::Completed]);
 
         Livewire::test(StatsOverviewWidget::class)
-            ->assertSee('Wartet auf dich')
+            ->assertSee('Waiting for you')
             ->assertSee('3');
     }
 
@@ -109,14 +109,14 @@ class StatsOverviewWidgetTest extends TestCase
         Task::factory()->create(['workflow_status' => WorkflowStatus::Draft]); // not counted
 
         Livewire::test(StatsOverviewWidget::class)
-            ->assertSee('Review oder Antwort offen')
+            ->assertSee('Review or response pending')
             ->assertSee('1');
     }
 
     public function test_zero_states_render_calm_messages(): void
     {
         Livewire::test(StatsOverviewWidget::class)
-            ->assertSee('Keine aktiven Worker')
-            ->assertSee('Nichts zu tun');
+            ->assertSee('No active workers')
+            ->assertSee('Nothing to do');
     }
 }

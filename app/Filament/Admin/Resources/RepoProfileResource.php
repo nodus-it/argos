@@ -44,12 +44,12 @@ class RepoProfileResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return 'Konfiguration';
+        return __('projects.navigation_group');
     }
 
     public static function getNavigationLabel(): string
     {
-        return 'Projekte';
+        return __('projects.navigation_label');
     }
 
     public static function getNavigationSort(): ?int
@@ -59,26 +59,26 @@ class RepoProfileResource extends Resource
 
     public static function getModelLabel(): string
     {
-        return 'Projekt';
+        return __('projects.model_label');
     }
 
     public static function getPluralModelLabel(): string
     {
-        return 'Projekte';
+        return __('projects.model_label_plural');
     }
 
     public static function form(Schema $schema): Schema
     {
         return $schema->components([
             // ── Block 1 ─ Plattform (gates everything below) ────────────────
-            Section::make('Plattform')
-                ->description('Wähle die Plattform — danach werden die weiteren Felder freigeschaltet.')
+            Section::make(__('projects.sections.platform'))
+                ->description(__('projects.sections.platform_description'))
                 ->schema([
                     Select::make('platform')
-                        ->label('Plattform')
+                        ->label(__('projects.fields.platform'))
                         ->options([
-                            'github' => 'GitHub',
-                            'gitlab' => 'GitLab',
+                            'github' => __('projects.fields.platform_github'),
+                            'gitlab' => __('projects.fields.platform_gitlab'),
                         ])
                         ->required()
                         ->live()
@@ -86,40 +86,40 @@ class RepoProfileResource extends Resource
                 ]),
 
             // ── Block 2 ─ Allgemein ─────────────────────────────────────────
-            Section::make('Allgemein')
+            Section::make(__('projects.sections.general'))
                 ->visible(fn (Get $get): bool => self::platformChosen($get))
                 ->schema([
                     TextInput::make('name')
-                        ->label('Projektname')
+                        ->label(__('projects.fields.project_name'))
                         ->required()
                         ->maxLength(255),
 
                     Toggle::make('auto_concept')
-                        ->label('Konzept automatisch starten')
-                        ->helperText('Startet die Konzept-Phase direkt nach dem Anlegen eines Tasks.'),
+                        ->label(__('projects.fields.auto_concept_label'))
+                        ->helperText(__('projects.fields.auto_concept_helper')),
 
                     Toggle::make('auto_pr')
-                        ->label('PR automatisch erstellen')
-                        ->helperText('Startet die Push-Phase automatisch nach erfolgreicher Implementierung.'),
+                        ->label(__('projects.fields.auto_pr_label'))
+                        ->helperText(__('projects.fields.auto_pr_helper')),
 
                     Select::make('worker_image')
-                        ->label('Worker-Image')
+                        ->label(__('projects.fields.worker_image_label'))
                         ->options(fn (Get $get): array => WorkerImage::optionsFor($get('worker_image')))
-                        ->placeholder('Globaler Default ('.config('argos.worker_image').')')
-                        ->helperText('Leer lassen für globalen Standard. Andere Tags müssen in config/argos.php oder per ARGOS_WORKER_IMAGE bekannt sein.')
+                        ->placeholder(__('projects.fields.worker_image_placeholder', ['image' => config('argos.worker_image')]))
+                        ->helperText(__('projects.fields.worker_image_helper'))
                         ->searchable()
                         ->native(false),
                 ]),
 
             // ── Block 3 ─ Authentifizierung (nur GitHub mit OAuth-Account) ──
-            Section::make('Authentifizierung')
+            Section::make(__('projects.sections.authentication'))
                 ->visible(fn (Get $get): bool => $get('platform') === 'github' && self::githubAccount() !== null)
                 ->schema([
                     Select::make('auth_method')
-                        ->label('Authentifizierungsmethode')
+                        ->label(__('projects.fields.auth_method_label'))
                         ->options([
-                            'pat' => 'Personal Access Token (PAT)',
-                            'oauth' => 'OAuth (GitHub)',
+                            'pat' => __('projects.fields.auth_method_pat'),
+                            'oauth' => __('projects.fields.auth_method_oauth'),
                         ])
                         ->default('pat')
                         ->required()
@@ -139,7 +139,7 @@ class RepoProfileResource extends Resource
                         ->dehydrated(),
 
                     Select::make('connected_account_id')
-                        ->label('GitHub-Account')
+                        ->label(__('projects.fields.github_account_label'))
                         ->options(function (): array {
                             /** @var User|null $user */
                             $user = Auth::user();
@@ -162,12 +162,12 @@ class RepoProfileResource extends Resource
                 ]),
 
             // ── Block 4 ─ Repository (connected vs. manual) ─────────────────
-            Section::make('Repository')
+            Section::make(__('projects.sections.repository'))
                 ->visible(fn (Get $get): bool => self::platformChosen($get))
                 ->schema([
                     // Connected-Pfad: GitHub mit OAuth-Account
                     Select::make('github_repo')
-                        ->label('Repository')
+                        ->label(__('projects.infolist.repo_url'))
                         ->options(function (): array {
                             $account = self::githubAccount();
                             if ($account === null) {
@@ -207,7 +207,7 @@ class RepoProfileResource extends Resource
                         ->dehydrated(fn (Get $get): bool => self::isConnectedPath($get)),
 
                     Select::make('github_branch')
-                        ->label('Default Branch')
+                        ->label(__('projects.fields.default_branch_label'))
                         ->options(function (Get $get): array {
                             $repo = $get('github_repo');
                             if (! is_string($repo) || $repo === '') {
@@ -231,7 +231,7 @@ class RepoProfileResource extends Resource
 
                     // Manual-Pfad: GitLab oder GitHub ohne OAuth
                     TextInput::make('url')
-                        ->label('Repo-URL')
+                        ->label(__('projects.fields.repo_url_label'))
                         ->required(fn (Get $get): bool => ! self::isConnectedPath($get))
                         ->url()
                         ->maxLength(500)
@@ -239,18 +239,18 @@ class RepoProfileResource extends Resource
                         ->dehydrated(),
 
                     TextInput::make('token')
-                        ->label('Token (PAT)')
+                        ->label(__('projects.fields.token_label'))
                         ->password()
                         ->revealable()
                         ->maxLength(500)
                         ->required(fn (Get $get): bool => ! self::isConnectedPath($get))
                         ->helperText(fn (Get $get): string => $get('platform') === 'github' && self::githubAccount() !== null
-                            ? 'GitHub-Account verfügbar — wechsle zu "Authentifizierung" für OAuth.'
+                            ? __('projects.fields.token_helper_oauth_available')
                             : '')
                         ->visible(fn (Get $get): bool => ! self::isConnectedPath($get)),
 
                     TextInput::make('default_branch')
-                        ->label('Default Branch')
+                        ->label(__('projects.fields.default_branch_label'))
                         ->required(fn (Get $get): bool => ! self::isConnectedPath($get))
                         ->default('main')
                         ->maxLength(255)
@@ -331,12 +331,12 @@ class RepoProfileResource extends Resource
     public static function infolist(Schema $schema): Schema
     {
         return $schema->components([
-            Section::make('Allgemein')
+            Section::make(__('projects.sections.general'))
                 ->schema([
-                    TextEntry::make('name')->label('Projektname'),
+                    TextEntry::make('name')->label(__('projects.infolist.project_name')),
 
                     TextEntry::make('platform')
-                        ->label('Plattform')
+                        ->label(__('projects.infolist.platform'))
                         ->badge()
                         ->color(fn (string $state): string => match ($state) {
                             'github' => 'gray',
@@ -345,7 +345,7 @@ class RepoProfileResource extends Resource
                         }),
 
                     TextEntry::make('auth_method')
-                        ->label('Authentifizierung')
+                        ->label(__('projects.infolist.authentication'))
                         ->badge()
                         ->color(fn (string $state): string => match ($state) {
                             'oauth' => 'success',
@@ -357,29 +357,29 @@ class RepoProfileResource extends Resource
                         }),
 
                     IconEntry::make('auto_concept')
-                        ->label('Konzept automatisch starten')
+                        ->label(__('projects.infolist.auto_concept'))
                         ->boolean(),
 
                     IconEntry::make('auto_pr')
-                        ->label('PR automatisch erstellen')
+                        ->label(__('projects.infolist.auto_pr'))
                         ->boolean(),
 
                     TextEntry::make('worker_image')
-                        ->label('Worker-Image')
-                        ->placeholder('Globaler Default'),
+                        ->label(__('projects.infolist.worker_image'))
+                        ->placeholder(__('projects.infolist.worker_image_placeholder')),
                 ]),
 
-            Section::make('Repository')
+            Section::make(__('projects.sections.repository'))
                 ->schema([
                     TextEntry::make('url')
-                        ->label('Repo-URL')
+                        ->label(__('projects.infolist.repo_url'))
                         ->copyable(),
 
                     TextEntry::make('default_branch')
-                        ->label('Default Branch'),
+                        ->label(__('projects.infolist.default_branch')),
 
                     TextEntry::make('token')
-                        ->label('Token (PAT)')
+                        ->label(__('projects.infolist.token'))
                         ->state(fn (RepoProfile $record): string => $record->getRawOriginal('token') !== null ? '••••••••' : '—'),
                 ]),
         ]);
@@ -402,7 +402,7 @@ class RepoProfileResource extends Resource
                     }),
 
                 TextColumn::make('default_branch')
-                    ->label('Branch'),
+                    ->label(__('projects.columns.branch')),
 
                 TextColumn::make('url')
                     ->copyable()
@@ -410,7 +410,7 @@ class RepoProfileResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('tasks_count')
-                    ->label('Tasks')
+                    ->label(__('projects.columns.tasks'))
                     ->counts('tasks'),
             ])
             ->recordUrl(fn (RepoProfile $record): string => static::getUrl('view', ['record' => $record]))
