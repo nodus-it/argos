@@ -13,6 +13,23 @@ use Tests\External\Support\ProviderTestConfig;
 
 final class BitbucketContractTest extends ProviderContractTestCase
 {
+    /**
+     * `listRepositories` is a user-level workspace discovery operation:
+     * Atlassian's replacement endpoint for the deprecated cross-workspace
+     * `/repositories` is `/user/permissions/workspaces`, which a Repository
+     * Access Token cannot call (no `account` scope, returns HTTP 410). The
+     * Filament form mirrors this — the Bitbucket PAT path shows a free-text
+     * input, not a repo dropdown, so this method only ever runs in the
+     * OAuth path. We exercise the OAuth path manually via `test:providers`,
+     * not from the External suite.
+     */
+    public function test_list_repositories_includes_test_repo(): void
+    {
+        $this->markTestSkipped(
+            'Bitbucket Repository Access Tokens lack workspace-level scope; listRepositories is OAuth-only.'
+        );
+    }
+
     protected function makeConfig(): ProviderTestConfig
     {
         return ProviderTestConfig::fromEnv('bitbucket');
@@ -33,9 +50,15 @@ final class BitbucketContractTest extends ProviderContractTestCase
         $owner = $this->config->testRepoOwner;
         $repo = $this->config->testRepo;
 
-        // Bitbucket has no "close" — only "decline" leaves the PR persisted but inactive.
+        // Bitbucket has no "close" — only "decline" leaves the PR persisted but
+        // inactive. The endpoint demands a JSON body even though all fields are
+        // optional; an empty object satisfies the validator.
         $this->bitbucketHttp($token)
-            ->post("https://api.bitbucket.org/2.0/repositories/{$owner}/{$repo}/pullrequests/{$id}/decline")
+            ->asJson()
+            ->post(
+                "https://api.bitbucket.org/2.0/repositories/{$owner}/{$repo}/pullrequests/{$id}/decline",
+                (object) [],
+            )
             ->throw();
     }
 
