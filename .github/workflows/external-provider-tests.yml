@@ -1,0 +1,66 @@
+name: External Provider Contract Tests
+
+# Hits the real GitHub/GitLab/Bitbucket APIs and writes to dedicated test
+# repositories, so this workflow is opt-in. It runs on a weekly schedule
+# (catch silent provider API regressions) and on demand via the Actions UI.
+# The repository PATs are stored as repo secrets — see docs/PROVIDER-TEST-SETUP.md
+# for which scopes each token needs and which test repo it must be limited to.
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Sonntag 04:00 UTC. Times of day with low traffic on all three providers
+    # so we don't fight rate limits or release windows.
+    - cron: '0 4 * * 0'
+
+permissions:
+  contents: read
+
+# Two simultaneous runs would race over branch creation / PR cleanup on the
+# shared test repos. Serialize.
+concurrency:
+  group: external-provider-tests
+  cancel-in-progress: false
+
+jobs:
+  external-tests:
+    name: PHP 8.4 vs all three providers
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # Note on naming: GitHub Actions reserves the GITHUB_* prefix for secret
+    # *names*, so the repo secret is EXTERNAL_GITHUB_PAT and we re-export it
+    # under the GITHUB_PAT name that ProviderTestConfig reads.
+    env:
+      GITHUB_PAT: ${{ secrets.EXTERNAL_GITHUB_PAT }}
+      GITLAB_PAT: ${{ secrets.EXTERNAL_GITLAB_PAT }}
+      BITBUCKET_PAT: ${{ secrets.EXTERNAL_BITBUCKET_PAT }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup PHP 8.4
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, pdo_sqlite, sqlite3
+          coverage: none
+
+      - name: Cache composer vendor
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: ${{ runner.os }}-php8.4-${{ hashFiles('composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-php8.4-
+
+      - name: composer install
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Configure git author for test commits
+        run: |
+          git config --global user.email "argos-ci@example.invalid"
+          git config --global user.name "Argos CI"
+
+      - name: Run external contract suite
+        run: php artisan test --configuration=phpunit.external.xml
