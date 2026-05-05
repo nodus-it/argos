@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Auth;
 
 use App\Models\ConnectedAccount;
+use App\Models\RepoProfile;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Socialite\Contracts\Factory as SocialiteFactory;
@@ -138,6 +139,26 @@ class ConnectedAccountControllerTest extends TestCase
             'user_id' => $this->user->id,
             'provider' => 'github',
         ]);
+    }
+
+    public function test_callback_relinks_orphaned_profiles_after_reconnect(): void
+    {
+        // Vorher verbunden, dann disconnect → Profil zeigt auf NULL
+        $orphan = RepoProfile::factory()->create([
+            'platform' => 'github',
+            'auth_method' => 'oauth',
+            'connected_account_id' => null,
+            'url' => 'https://github.com/nodus-it/repo',
+        ]);
+
+        $this->mockSocialiteCallback($this->makeSocialiteUser());
+
+        $this->get(route('auth.github.callback'));
+
+        $newAccount = ConnectedAccount::where('user_id', $this->user->id)
+            ->where('provider', 'github')
+            ->firstOrFail();
+        $this->assertSame($newAccount->id, $orphan->fresh()->connected_account_id);
     }
 
     public function test_disconnect_is_no_op_when_not_connected(): void

@@ -47,7 +47,7 @@ final class ConnectedAccountController extends Controller
         /** @var User $user */
         $user = Auth::user();
 
-        ConnectedAccount::updateOrCreate(
+        $account = ConnectedAccount::updateOrCreate(
             ['user_id' => $user->id, 'provider' => 'github'],
             [
                 'provider_id' => (string) $socialUser->getId(),
@@ -59,6 +59,8 @@ final class ConnectedAccountController extends Controller
                 'avatar' => $socialUser->getAvatar(),
             ]
         );
+
+        $account->relinkOrphanedRepoProfiles();
 
         $returnTo = $request->session()->pull(self::GITHUB_RETURN_SESSION_KEY);
 
@@ -108,7 +110,7 @@ final class ConnectedAccountController extends Controller
 
         $instanceUrl = rtrim((string) config('services.gitlab.instance_uri', 'https://gitlab.com'), '/');
 
-        ConnectedAccount::updateOrCreate(
+        $account = ConnectedAccount::updateOrCreate(
             ['user_id' => $user->id, 'provider' => 'gitlab'],
             [
                 'provider_id' => (string) $socialUser->getId(),
@@ -121,6 +123,8 @@ final class ConnectedAccountController extends Controller
                 'instance_url' => $instanceUrl === 'https://gitlab.com' ? null : $instanceUrl,
             ]
         );
+
+        $account->relinkOrphanedRepoProfiles();
 
         $returnTo = $request->session()->pull(self::GITLAB_RETURN_SESSION_KEY);
 

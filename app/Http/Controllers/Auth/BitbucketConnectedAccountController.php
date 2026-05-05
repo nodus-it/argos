@@ -43,7 +43,7 @@ final class BitbucketConnectedAccountController extends Controller
         /** @var User $user */
         $user = Auth::user();
 
-        ConnectedAccount::updateOrCreate(
+        $account = ConnectedAccount::updateOrCreate(
             ['user_id' => $user->id, 'provider' => 'bitbucket'],
             [
                 'provider_id' => (string) $socialUser->getId(),
@@ -55,6 +55,8 @@ final class BitbucketConnectedAccountController extends Controller
                 'avatar' => $socialUser->getAvatar(),
             ]
         );
+
+        $account->relinkOrphanedRepoProfiles();
 
         $returnTo = $request->session()->pull(self::RETURN_SESSION_KEY);
 
