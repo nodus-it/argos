@@ -1,5 +1,17 @@
 name: Release
 
+# Cuts a new release from develop:
+#   1. Verify the latest CI run on develop is green.
+#   2. Build the changelog entry (range = since last stable for stable
+#      releases, since last tag of any kind for pre-releases).
+#   3. Bump config/argos.php version + (for stable releases) prepend the
+#      entry to CHANGELOG.md. Pre-release notes only land in the GitHub
+#      Release body — see docs/CONTRIBUTING.md "Changelog policy".
+#   4. Commit on develop, fast-forward master, push tag X.Y.Z (no v-prefix),
+#      create the GitHub Release.
+# The CI workflow picks up the tag push and produces the manager/worker
+# images with the matching :X.Y.Z tags.
+
 on:
   workflow_dispatch:
     inputs:
@@ -12,16 +24,27 @@ on:
         required: false
         type: string
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   release:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: read
     steps:
       - uses: actions/checkout@v6
         with:
-          fetch-depth: 0   # wichtig: volle History für git log + describe
+          fetch-depth: 0   # volle History für git log + describe
           ref: develop
+          # Fine-grained PAT eines Repo-Admins — der Default-GITHUB_TOKEN
+          # bzw. github-actions[bot] kann per GitHub-Design nicht ins
+          # master-Ruleset-Bypass aufgenommen werden. Im Ruleset steht nur
+          # "Repository admin" als Bypass; dieser PAT läuft als Admin und
+          # darf damit nach master pushen + den Tag setzen.
+          token: ${{ secrets.RELEASE_TOKEN }}
 
       - name: Configure git
         run: |
@@ -34,14 +57,20 @@ jobs:
             echo "::error::version muss SemVer X.Y.Z sein, ohne v-Prefix (z.B. 0.2.0)"
             exit 1
           fi
+          if [[ -n "${{ inputs.prerelease }}" && ! "${{ inputs.prerelease }}" =~ ^[A-Za-z0-9.-]+$ ]]; then
+            echo "::error::prerelease-Suffix darf nur [A-Za-z0-9.-] enthalten (z.B. beta.1)"
+            exit 1
+          fi
 
       - name: Compute tag name
         id: tag
         run: |
           if [ -n "${{ inputs.prerelease }}" ]; then
-            echo "name=v${{ inputs.version }}-${{ inputs.prerelease }}" >> "$GITHUB_OUTPUT"
+            echo "name=${{ inputs.version }}-${{ inputs.prerelease }}" >> "$GITHUB_OUTPUT"
+            echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
           else
-            echo "name=v${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+            echo "name=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+            echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Fail if tag already exists
@@ -51,33 +80,85 @@ jobs:
             exit 1
           fi
 
-      - name: Build changelog entry
+      - name: Verify latest CI run on develop is green
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
-          # Letztes stable Tag suchen (Pre-Releases überspringen), damit das
-          # Changelog eines stable Releases alle Commits seit dem letzten
-          # stable umfasst — nicht nur die Delta seit dem letzten alpha/beta/rc.
-          LAST_TAG=$(git tag --list 'v*' --sort=-v:refname \
-                      | grep -Ev -- '-(alpha|beta|rc)' \
-                      | head -n1)
+          # Wir wollen nicht versehentlich einen Release schneiden, wenn der
+          # letzte CI-Lauf auf develop rot ist. Wir prüfen den jüngsten
+          # *abgeschlossenen* Run des CI-Workflows auf dem aktuellen develop-HEAD.
+          DEVELOP_SHA=$(git rev-parse HEAD)
+          STATUS=$(gh run list \
+            --workflow=ci.yml \
+            --branch=develop \
+            --limit=1 \
+            --json databaseId,headSha,status,conclusion \
+            --jq ".[] | select(.headSha==\"$DEVELOP_SHA\") | .conclusion")
+
+          if [ -z "$STATUS" ]; then
+            echo "::error::Für develop@$DEVELOP_SHA gibt es keinen abgeschlossenen CI-Run. Erst CI laufen lassen, dann releasen."
+            exit 1
+          fi
+          if [ "$STATUS" != "success" ]; then
+            echo "::error::Letzter CI-Run auf develop ist '$STATUS', nicht 'success'. Release abgebrochen."
+            exit 1
+          fi
+          echo "CI auf develop@$DEVELOP_SHA: success"
+
+      - name: Determine commit range for changelog
+        id: range
+        run: |
+          # Stable: Range seit dem letzten Stable-Tag (Pre-Release-Tags überspringen),
+          #   damit das CHANGELOG-Entry sauber alle Änderungen seit dem letzten
+          #   stable Release abbildet.
+          # Pre-Release: Range seit dem letzten Tag *jeder Art*, damit jede Beta
+          #   nur ihr Delta zur Vorgänger-Beta zeigt (sonst dupliziert sich der
+          #   Inhalt zwischen beta.1, beta.2, ...).
+          if [ "${{ steps.tag.outputs.is_prerelease }}" = "true" ]; then
+            LAST_TAG=$(git tag --list --sort=-v:refname | head -n1)
+          else
+            LAST_TAG=$(git tag --list --sort=-v:refname \
+                        | grep -Ev -- '-(alpha|beta|rc)' \
+                        | head -n1)
+          fi
           if [ -z "$LAST_TAG" ]; then
             RANGE="HEAD"
           else
             RANGE="$LAST_TAG..HEAD"
           fi
+          echo "range=$RANGE" >> "$GITHUB_OUTPUT"
+          echo "Range: $RANGE"
 
+      - name: Build changelog entry (release notes file)
+        run: |
           {
             echo "## [${{ steps.tag.outputs.name }}] - $(date +%Y-%m-%d)"
             echo ""
-            git log "$RANGE" --pretty=format:"- %s (%h)" --no-merges
+            git log "${{ steps.range.outputs.range }}" --pretty=format:"- %s (%h)" --no-merges
             echo ""
             echo ""
           } > /tmp/entry.md
+          echo "──── Release Notes ────"
+          cat /tmp/entry.md
 
+      - name: Bump version in config/argos.php
+        run: |
+          # Wir setzen *nur* den $argosVersion-Wert um — env('ARGOS_VERSION', ...)
+          # respektiert das weiterhin.
+          if ! grep -qE "^\\\$argosVersion = '[^']+';" config/argos.php; then
+            echo "::error::config/argos.php enthält keinen \$argosVersion-Eintrag im erwarteten Format"
+            exit 1
+          fi
+          sed -i "s/^\\\$argosVersion = '[^']*';/\\\$argosVersion = '${{ steps.tag.outputs.name }}';/" config/argos.php
+          echo "── Diff config/argos.php ──"
+          git --no-pager diff config/argos.php
+
+      - name: Update CHANGELOG.md (stable releases only)
+        if: steps.tag.outputs.is_prerelease == 'false'
+        run: |
           if [ ! -f CHANGELOG.md ]; then
             printf "# Changelog\n\n" > CHANGELOG.md
           fi
-
-          # neuen Eintrag oben einfügen, unter dem "# Changelog"-Header
           {
             head -n 2 CHANGELOG.md
             cat /tmp/entry.md
@@ -85,32 +166,34 @@ jobs:
           } > CHANGELOG.md.new
           mv CHANGELOG.md.new CHANGELOG.md
 
-      - name: Commit changelog to develop
+      - name: Commit version bump on develop
         run: |
-          git add CHANGELOG.md
-          git commit -m "chore: changelog for ${{ steps.tag.outputs.name }}"
+          git add config/argos.php
+          if [ "${{ steps.tag.outputs.is_prerelease }}" = "false" ]; then
+            git add CHANGELOG.md
+          fi
+          git commit -m "chore(release): ${{ steps.tag.outputs.name }}"
           git push origin develop
 
-      - name: Merge develop into master
+      - name: Fast-forward master and tag
         run: |
           git fetch origin master:master
           git checkout master
           git merge --no-ff develop -m "Release ${{ steps.tag.outputs.name }}"
-
-      - name: Tag and push
-        run: |
           git tag -a "${{ steps.tag.outputs.name }}" -m "Release ${{ steps.tag.outputs.name }}"
-          git push origin master
-          git push origin "${{ steps.tag.outputs.name }}"
+          # Atomic push: master + tag in einem Schritt — entweder beide oder keiner.
+          git push --atomic origin master "${{ steps.tag.outputs.name }}"
 
       - name: Create GitHub Release
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
-          FLAGS=""
-          [ -n "${{ inputs.prerelease }}" ] && FLAGS="--prerelease"
+          FLAGS=()
+          if [ "${{ steps.tag.outputs.is_prerelease }}" = "true" ]; then
+            FLAGS+=(--prerelease)
+          fi
           gh release create "${{ steps.tag.outputs.name }}" \
             --target master \
             --title "${{ steps.tag.outputs.name }}" \
             --notes-file /tmp/entry.md \
-            $FLAGS
+            "${FLAGS[@]}"
