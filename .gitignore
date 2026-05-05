@@ -53,6 +53,7 @@ coverage/
 
 # Local scratch notes
 todo.md
+docs/BACKLOG.md
 
 # Stage secrets (never commit)
 .tools/bash/.env.stage
