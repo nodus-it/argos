@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources;
 
+use App\Enums\AuthMethod;
 use App\Enums\GitProvider;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\CreateRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\EditRepoProfile;
@@ -685,14 +686,8 @@ class RepoProfileResource extends Resource
                     TextEntry::make('auth_method')
                         ->label(__('projects.infolist.authentication'))
                         ->badge()
-                        ->color(fn (string $state): string => match ($state) {
-                            'oauth' => 'success',
-                            default => 'gray',
-                        })
-                        ->formatStateUsing(fn (string $state): string => match ($state) {
-                            'oauth' => 'OAuth',
-                            default => 'PAT',
-                        }),
+                        ->color(fn (AuthMethod $state): string => $state->color())
+                        ->formatStateUsing(fn (AuthMethod $state): string => $state->label()),
 
                     IconEntry::make('auto_concept')
                         ->label(__('projects.infolist.auto_concept'))
