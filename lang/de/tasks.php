@@ -8,6 +8,7 @@ return [
 
     'fields' => [
         'project' => 'Projekt',
+        'description_helper' => 'Konkrete Akzeptanzkriterien führen zu besseren PRs. Was soll passieren, *warum*, und woran erkennst du das Ergebnis?',
         'auto_concept_label' => 'Konzept direkt starten',
         'auto_concept_helper' => 'Startet die Konzept-Phase sofort nach dem Anlegen.',
         'max_turns_label' => 'Max-Turns für Implement',

@@ -71,6 +71,7 @@ class TaskResource extends Resource
 
             Textarea::make('description')
                 ->rows(8)
+                ->helperText(__('tasks.fields.description_helper'))
                 ->columnSpanFull(),
 
             Toggle::make('auto_concept')

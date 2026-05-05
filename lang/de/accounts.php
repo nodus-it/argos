@@ -35,5 +35,7 @@ return [
         'bitbucket_not_connected_description' => 'Verbinde deinen Bitbucket-Account, um Repos und Branches direkt auszuwählen.',
         'connect_bitbucket' => 'Mit Bitbucket verbinden',
         'bitbucket_not_configured_description' => 'Setze BITBUCKET_CLIENT_ID und BITBUCKET_CLIENT_SECRET in deiner .env, um die Bitbucket-Integration zu aktivieren.',
+        'setup_link' => 'Setup-Anleitung',
+        'github_not_configured_description' => 'Setze GITHUB_CLIENT_ID und GITHUB_CLIENT_SECRET in deiner .env, um die GitHub-OAuth-Integration zu aktivieren.',
     ],
 ];

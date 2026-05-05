@@ -41,4 +41,24 @@ return [
     'factories' => [
         'github_token' => env('GITHUB_TOKEN', 'test-token'),
     ],
+
+    /*
+     * Public documentation URLs surfaced from in-app help hints. Centralising
+     * them here keeps every "Learn more" link in a single place — when the
+     * docs move or get a versioned URL, change it once.
+     */
+    'docs' => [
+        'base' => 'https://github.com/nodus-it/argos/blob/master/docs',
+        'setup' => 'https://github.com/nodus-it/argos/blob/master/docs/SETUP.md',
+        'configuration' => 'https://github.com/nodus-it/argos/blob/master/docs/CONFIGURATION.md',
+        'oauth' => 'https://github.com/nodus-it/argos/blob/master/docs/OAUTH.md',
+        'setup_github' => 'https://github.com/nodus-it/argos/blob/master/docs/SETUP-GITHUB.md',
+        'setup_gitlab' => 'https://github.com/nodus-it/argos/blob/master/docs/SETUP-GITLAB.md',
+        'setup_bitbucket' => 'https://github.com/nodus-it/argos/blob/master/docs/SETUP-BITBUCKET.md',
+        'contributing' => 'https://github.com/nodus-it/argos/blob/master/docs/CONTRIBUTING.md',
+        'github_pat' => 'https://github.com/settings/tokens',
+        'gitlab_pat' => 'https://gitlab.com/-/user_settings/personal_access_tokens',
+        'bitbucket_app_passwords' => 'https://bitbucket.org/account/settings/app-passwords/',
+        'claude_setup_token' => 'https://docs.claude.com/en/docs/claude-code/quickstart',
+    ],
 ];

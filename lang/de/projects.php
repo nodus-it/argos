@@ -39,9 +39,10 @@ return [
         'bitbucket_account_label' => 'Bitbucket-Account',
         'repo_url_label' => 'Repo-URL',
         'token_label' => 'Token (PAT)',
-        'token_helper_oauth_available' => 'GitHub-Account verfügbar — wechsle zu "Authentifizierung" für OAuth.',
-        'token_helper_bitbucket' => 'Format: username:app_password (nicht dein Account-Passwort). App Passwords findest du in den Bitbucket Personal Settings.',
+        'token_helper_oauth_available' => 'Account verbunden — wechsle zu "Authentifizierung" für OAuth.',
+        'token_helper_bitbucket' => 'Format: username:app_password (nicht dein Account-Passwort).',
         'token_helper_bitbucket_oauth_available' => 'Bitbucket-Account verbunden — wechsle zu "Authentifizierung" für OAuth.',
+        'token_create_link' => 'Token erstellen',
         'default_branch_label' => 'Default Branch',
         'global_default' => 'Globaler Default',
     ],
@@ -62,5 +63,21 @@ return [
     'columns' => [
         'branch' => 'Branch',
         'tasks' => 'Tasks',
+    ],
+
+    'platform_hints' => [
+        'github' => [
+            'heading' => 'GitHub-Setup',
+            'body' => 'Personal Access Token mit `repo`-Scope reicht. Token erstellen: github.com/settings/tokens. Komplette Anleitung in der Doku.',
+        ],
+        'gitlab' => [
+            'heading' => 'GitLab-Setup',
+            'body' => 'Self-Hosted GitLab funktioniert auch — `GITLAB_INSTANCE_URL` setzen. Token braucht `api` und `write_repository`.',
+        ],
+        'bitbucket' => [
+            'heading' => 'Bitbucket-Setup',
+            'body' => 'Bitbucket nutzt App Passwords. Token-Format: <code>username:app_password</code> (nicht dein Account-Passwort).',
+        ],
+        'docs_link' => 'Schritt-für-Schritt-Anleitung →',
     ],
 ];

@@ -8,6 +8,7 @@ return [
 
     'fields' => [
         'project' => 'Project',
+        'description_helper' => 'Concrete acceptance criteria lead to better PRs. What should happen, *why*, and how will you know it worked?',
         'auto_concept_label' => 'Start concept immediately',
         'auto_concept_helper' => 'Starts the concept phase immediately after creation.',
         'max_turns_label' => 'Max turns for implement',
