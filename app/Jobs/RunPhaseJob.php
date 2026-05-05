@@ -6,8 +6,8 @@ namespace App\Jobs;
 
 use App\Enums\PhaseStatus;
 use App\Models\Task;
-use App\Services\PhaseRunner;
-use App\Services\WorkflowService;
+use App\Services\Workflow\PhaseRunner;
+use App\Services\Workflow\WorkflowService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Carbon;

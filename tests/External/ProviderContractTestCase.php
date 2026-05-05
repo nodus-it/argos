@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\External;
 
-use App\Services\Contracts\GitProviderContract;
-use App\Services\Git\RemoteBranchValidator;
+use App\Services\GitProvider\Contracts\GitProviderContract;
+use App\Services\GitProvider\RemoteBranchValidator;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
 use Symfony\Component\Process\Process;

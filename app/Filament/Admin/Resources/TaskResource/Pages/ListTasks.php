@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\TaskResource\Pages;
 
-use App\Services\StateReader;
 use App\Filament\Admin\Resources\TaskResource;
 use App\Models\Task;
+use App\Services\Workflow\StateReader;
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
 

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\External\Providers\GitLab;
 
-use App\Services\Contracts\GitProviderContract;
-use App\Services\GitLab\GitLabGitService;
+use App\Services\GitProvider\Contracts\GitProviderContract;
+use App\Services\GitProvider\GitLabGitService;
 use Tests\External\ProviderContractTestCase;
 use Tests\External\Support\ProviderTestConfig;
 

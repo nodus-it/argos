@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Services\PhaseRunner;
-use App\Services\StateReader;
 use App\Enums\WorkflowStatus;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTask;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTaskConcept;
@@ -16,6 +14,8 @@ use App\Jobs\RunPhaseJob;
 use App\Models\PhaseRun;
 use App\Models\Task;
 use App\Models\User;
+use App\Services\Workflow\PhaseRunner;
+use App\Services\Workflow\StateReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Process;

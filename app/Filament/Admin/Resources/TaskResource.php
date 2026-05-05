@@ -18,7 +18,7 @@ use App\Filament\Admin\Resources\TaskResource\RelationManagers\PhaseRunsRelation
 use App\Models\PhaseRun;
 use App\Models\RepoProfile;
 use App\Models\Task;
-use App\Services\GitServiceFactory;
+use App\Services\GitProvider\GitServiceFactory;
 use App\Services\WorkerImage;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;

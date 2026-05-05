@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
-use App\Services\Bitbucket\BitbucketGitService;
-use App\Services\CredentialStore;
-use App\Services\GitHub\GitHubGitService;
-use App\Services\GitLab\GitLabGitService;
-use App\Services\GitProviderRegistry;
+use App\Services\Anthropic\CredentialStore;
+use App\Services\GitProvider\BitbucketGitService;
+use App\Services\GitProvider\GitHubGitService;
+use App\Services\GitProvider\GitLabGitService;
+use App\Services\GitProvider\GitProviderRegistry;
 use Illuminate\Support\Env;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Event;

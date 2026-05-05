@@ -7,7 +7,7 @@ namespace App\Filament\Admin\Pages;
 use App\Models\RepoProfile;
 use App\Models\User;
 use App\Services\Anthropic\AnthropicTokenValidator;
-use App\Services\CredentialStore;
+use App\Services\Anthropic\CredentialStore;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Auth;

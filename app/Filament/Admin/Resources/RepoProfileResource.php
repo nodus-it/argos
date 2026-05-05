@@ -14,10 +14,10 @@ use App\Filament\Admin\Resources\RepoProfileResource\RelationManagers\TasksRelat
 use App\Models\ConnectedAccount;
 use App\Models\RepoProfile;
 use App\Models\User;
-use App\Services\Bitbucket\BitbucketGitService;
-use App\Services\GitHub\GitHubGitService;
-use App\Services\GitLab\GitLabGitService;
-use App\Services\GitServiceFactory;
+use App\Services\GitProvider\BitbucketGitService;
+use App\Services\GitProvider\GitHubGitService;
+use App\Services\GitProvider\GitLabGitService;
+use App\Services\GitProvider\GitServiceFactory;
 use App\Services\WorkerImage;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;

@@ -7,7 +7,7 @@ namespace Tests\Feature;
 use App\Filament\Admin\Pages\Onboarding;
 use App\Models\RepoProfile;
 use App\Models\User;
-use App\Services\CredentialStore;
+use App\Services\Anthropic\CredentialStore;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;

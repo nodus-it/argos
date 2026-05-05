@@ -7,7 +7,7 @@ namespace Tests\Feature;
 use App\Enums\PhaseStatus;
 use App\Models\PhaseRun;
 use App\Models\Task;
-use App\Services\StateReader;
+use App\Services\Workflow\StateReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery\MockInterface;
 use Symfony\Component\Process\Process;

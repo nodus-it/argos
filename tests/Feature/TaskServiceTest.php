@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Services\TaskService;
 use App\Models\RepoProfile;
 use App\Models\Task;
+use App\Services\Task\TaskService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
