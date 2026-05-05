@@ -129,6 +129,58 @@ EOF
     [ "$h" = "$(sha256_of "$TEST_DIR/file")" ]
 }
 
+# ── backfill_missing_secrets ────────────────────────────────────────────────
+
+@test "backfill_missing_secrets fills empty secret slots" {
+    ENV_FILE="$TEST_DIR/.env"
+    cat > "$ENV_FILE" <<'EOF'
+APP_KEY=
+ADMIN_PASSWORD=
+ARGOS_DB_PASSWORD=
+ARGOS_DB_ROOT_PASSWORD=
+EOF
+
+    backfill_missing_secrets 2>/dev/null
+
+    [[ "$(get_env_value "$ENV_FILE" APP_KEY)" == base64:* ]]
+    [ -n "$(get_env_value "$ENV_FILE" ADMIN_PASSWORD)" ]
+    [ -n "$(get_env_value "$ENV_FILE" ARGOS_DB_PASSWORD)" ]
+    [ -n "$(get_env_value "$ENV_FILE" ARGOS_DB_ROOT_PASSWORD)" ]
+}
+
+@test "backfill_missing_secrets never overwrites an existing value" {
+    ENV_FILE="$TEST_DIR/.env"
+    cat > "$ENV_FILE" <<'EOF'
+APP_KEY=base64:userset
+ADMIN_PASSWORD=existing-admin
+ARGOS_DB_PASSWORD=
+ARGOS_DB_ROOT_PASSWORD=existing-root
+EOF
+
+    backfill_missing_secrets 2>/dev/null
+
+    [ "$(get_env_value "$ENV_FILE" APP_KEY)"                = "base64:userset" ]
+    [ "$(get_env_value "$ENV_FILE" ADMIN_PASSWORD)"         = "existing-admin" ]
+    [ "$(get_env_value "$ENV_FILE" ARGOS_DB_ROOT_PASSWORD)" = "existing-root" ]
+    # Only the empty one got generated.
+    [ -n "$(get_env_value "$ENV_FILE" ARGOS_DB_PASSWORD)" ]
+}
+
+@test "backfill_missing_secrets is a no-op when nothing is empty" {
+    ENV_FILE="$TEST_DIR/.env"
+    cat > "$ENV_FILE" <<'EOF'
+APP_KEY=base64:x
+ADMIN_PASSWORD=a
+ARGOS_DB_PASSWORD=b
+ARGOS_DB_ROOT_PASSWORD=c
+EOF
+
+    local before
+    before="$(sha256_of "$ENV_FILE")"
+    backfill_missing_secrets 2>/dev/null
+    [ "$(sha256_of "$ENV_FILE")" = "$before" ]
+}
+
 # ── apply_stage_overrides ───────────────────────────────────────────────────
 
 @test "apply_stage_overrides pins both image keys when missing" {
@@ -158,6 +210,44 @@ EOF
     before="$(sha256_of "$ENV_FILE")"
     apply_stage_overrides >/dev/null
     [ "$(sha256_of "$ENV_FILE")" = "$before" ]
+}
+
+# ── reset_stack ─────────────────────────────────────────────────────────────
+
+@test "reset_stack wipes env, state and legacy artefacts (no compose file)" {
+    pushd "$TEST_DIR" >/dev/null
+
+    COMPOSE_FILE="docker-compose.yml"
+    ENV_FILE=".env"
+    ENV_EXAMPLE_FILE=".env.example"
+    STATE_DIR=".argos-state"
+    LEGACY_FILES=("nginx.conf")
+    LEGACY_DIRS=("public")
+
+    # Pre-existing local state (no compose file → compose-down branch is skipped).
+    printf 'APP_KEY=base64:x\n' > "$ENV_FILE"
+    printf 'APP_KEY=\n'         > "$ENV_EXAMPLE_FILE"
+    mkdir -p "$STATE_DIR"
+    printf 'develop\n' > "$STATE_DIR/VERSION"
+    printf 'old\n'     > nginx.conf
+    mkdir -p public/build && printf 'a\n' > public/build/x.css
+
+    run reset_stack
+    [ "$status" -eq 0 ]
+
+    [ ! -e "$ENV_FILE" ]
+    [ ! -e "$ENV_EXAMPLE_FILE" ]
+    [ ! -e "$STATE_DIR" ]
+    [ ! -e nginx.conf ]
+    [ ! -e public ]
+
+    popd >/dev/null
+}
+
+@test "confirm_reset honours --force in non-interactive mode" {
+    FORCE=1
+    run confirm_reset
+    [ "$status" -eq 0 ]
 }
 
 # ── Compose-modification refusal ────────────────────────────────────────────

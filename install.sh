@@ -24,6 +24,10 @@
 #   ARGOS_STAGE=1 curl … | bash
 # Pins ARGOS_APP_IMAGE / ARGOS_WORKER_IMAGE to the :stage tags published
 # from develop and tracks the develop branch for manifests.
+#
+# Reset (DESTRUCTIVE — wipes DB + all named volumes):
+#   bash install.sh --reset            # interactive: prompts for "yes"
+#   curl … | bash -s -- --reset --force # non-interactive: --force is required
 
 set -euo pipefail
 IFS=$'\n\t'
@@ -32,6 +36,7 @@ IFS=$'\n\t'
 ARGOS_REPO="${ARGOS_REPO:-nodus-it/argos}"
 INSTALL_DIR="${ARGOS_INSTALL_DIR:-$PWD}"
 FORCE=0
+RESET=0
 # ARGOS_VERSION is resolved lazily — main() calls resolve_default_version()
 # when the user hasn't pinned it via env or --version. We can't do that at
 # the top level because the source-guard for tests would still trigger the
@@ -63,6 +68,26 @@ warn()    { printf '\033[1;33m!\033[0m %s\n' "$*" >&2; }
 success() { printf '\033[1;32m✓\033[0m %s\n' "$*"; }
 fail()    { printf '\033[1;31m✗\033[0m %s\n' "$*" >&2; exit 1; }
 
+# ASCII banner shown once at the start of each install/update run. Cyan on
+# colour-capable terminals, plain on dumb terms / non-tty stdout.
+print_banner() {
+    local c0="" c1=""
+    if [[ -t 1 && "${TERM:-dumb}" != "dumb" ]]; then
+        c0=$'\033[1;36m'
+        c1=$'\033[0m'
+    fi
+    cat <<BANNER
+${c0}
+       █████╗ ██████╗  ██████╗  ██████╗ ███████╗
+      ██╔══██╗██╔══██╗██╔════╝ ██╔═══██╗██╔════╝
+      ███████║██████╔╝██║  ███╗██║   ██║███████╗
+      ██╔══██║██╔══██╗██║   ██║██║   ██║╚════██║
+      ██║  ██║██║  ██║╚██████╔╝╚██████╔╝███████║
+      ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝  ╚═════╝ ╚══════╝
+${c1}             the hundred-eyed dev agent
+BANNER
+}
+
 usage() {
     cat <<USAGE
 Usage: install.sh [options]
@@ -73,7 +98,12 @@ Options:
   -s, --stage          Use the rolling 'stage' images built from develop
                        (sets ARGOS_APP_IMAGE / ARGOS_WORKER_IMAGE to :stage
                        tags; defaults --version to develop if unpinned)
-  -f, --force          Skip safety prompts (e.g. non-empty install dir)
+  -r, --reset          DESTRUCTIVE: tear down the existing stack, wipe the
+                       compose volumes (DB included!) and the local .env /
+                       state, then run a fresh install. Requires --force when
+                       stdin is not a TTY (e.g. curl | bash).
+  -f, --force          Skip safety prompts (e.g. non-empty install dir,
+                       --reset confirmation)
   -h, --help           Show this help
 
 Environment overrides:
@@ -90,6 +120,7 @@ while [[ $# -gt 0 ]]; do
         -d|--dir)     INSTALL_DIR="$2"; shift 2;;
         -v|--version) ARGOS_VERSION="$2"; shift 2;;
         -s|--stage)   STAGE=1; shift;;
+        -r|--reset)   RESET=1; shift;;
         -f|--force)   FORCE=1; shift;;
         -h|--help)    usage; exit 0;;
         *)            fail "Unknown argument: $1 (try --help)";;
@@ -280,6 +311,37 @@ initialise_env_file() {
     success "Wrote $ENV_FILE with generated secrets (mode 600)."
 }
 
+# backfill_missing_secrets: Generate values for secret-bearing keys that
+# exist in $ENV_FILE but are empty. Catches the case where an update-mode
+# install lands on a .env that was reset (e.g. user copied .env.example over
+# it) — without this the DB container would refuse to initialise because
+# MARIADB_ROOT_PASSWORD is empty. Existing non-empty values are NEVER
+# overwritten, so users who pinned their own secrets keep them.
+# Args: none (reads $ENV_FILE)
+# Returns: 0
+backfill_missing_secrets() {
+    local generated=0
+    if [[ -z "$(get_env_value "$ENV_FILE" APP_KEY)" ]]; then
+        set_env_value "$ENV_FILE" APP_KEY "$(gen_app_key)"
+        warn "APP_KEY was empty in $ENV_FILE — generated a new one."
+        generated=$((generated + 1))
+    fi
+    local key
+    for key in ADMIN_PASSWORD ARGOS_DB_PASSWORD ARGOS_DB_ROOT_PASSWORD; do
+        if [[ -z "$(get_env_value "$ENV_FILE" "$key")" ]]; then
+            set_env_value "$ENV_FILE" "$key" "$(gen_password)"
+            warn "$key was empty in $ENV_FILE — generated a new one."
+            generated=$((generated + 1))
+        fi
+    done
+    if [[ $generated -gt 0 ]]; then
+        chmod 600 "$ENV_FILE"
+        warn "If the DB volume was already initialised with different credentials,"
+        warn "the app will fail to authenticate. Wipe argos-db / argos-data volumes"
+        warn "to start fresh, or restore the previous .env from backup."
+    fi
+}
+
 # apply_stage_overrides: Pin ARGOS_APP_IMAGE and ARGOS_WORKER_IMAGE in $ENV_FILE
 # to the rolling :stage tags published from develop. Idempotent — safe to run
 # on both fresh installs and updates whenever --stage is in effect.
@@ -290,6 +352,59 @@ apply_stage_overrides() {
     set_env_value "$ENV_FILE" ARGOS_WORKER_IMAGE "$STAGE_WORKER_IMAGE"
     log "Stage channel: pinned ARGOS_APP_IMAGE=$STAGE_APP_IMAGE"
     log "Stage channel: pinned ARGOS_WORKER_IMAGE=$STAGE_WORKER_IMAGE"
+}
+
+# reset_stack: Tear down the compose stack (containers + named volumes),
+# remove the local .env and state files, and clean up legacy artefacts so the
+# next install path is "fresh". Idempotent — runs cleanly even when nothing
+# of the stack exists yet (compose down on a missing project is a no-op).
+# Only touches volumes defined in $COMPOSE_FILE (compose's own scope) — never
+# unrelated volumes like a parallel argos-stage stack the user may run.
+# Args: none (acts on cwd = $INSTALL_DIR)
+# Returns: 0 on success
+reset_stack() {
+    if [[ -f "$COMPOSE_FILE" ]]; then
+        log "Tearing down stack and removing its named volumes ..."
+        # --volumes: drop named volumes declared in this compose file (DB!)
+        # --remove-orphans: catch services renamed/dropped between versions
+        docker compose -f "$COMPOSE_FILE" down --volumes --remove-orphans \
+            || warn "compose down reported errors — continuing reset."
+    else
+        log "No $COMPOSE_FILE to tear down — skipping compose down."
+    fi
+
+    # Wipe local install state so the next run takes the fresh-install path
+    # (which regenerates secrets etc.) instead of update.
+    rm -f "$ENV_FILE" "$ENV_EXAMPLE_FILE"
+    rm -rf "$STATE_DIR"
+    remove_legacy_artefacts
+
+    success "Reset complete."
+}
+
+# confirm_reset: Block destructive --reset behind an explicit confirmation.
+# Interactive TTY: prompt for "yes". Non-TTY (curl | bash): require --force,
+# since a piped install can't read user input safely.
+confirm_reset() {
+    if [[ "$FORCE" -eq 1 ]]; then
+        return 0
+    fi
+    if [[ ! -t 0 ]]; then
+        fail "--reset is destructive (DB volumes are wiped). Pass --force to confirm in non-interactive mode."
+    fi
+    cat <<MSG >&2
+
+! --reset will tear down the Argos compose stack at:
+    $INSTALL_DIR
+  and DELETE its named volumes — including all database data.
+  This cannot be undone.
+
+MSG
+    local answer
+    read -r -p "Type 'yes' to proceed, anything else to abort: " answer
+    if [[ "$answer" != "yes" ]]; then
+        fail "Aborted by user."
+    fi
 }
 
 bring_stack_up() {
@@ -303,33 +418,53 @@ bring_stack_up() {
 }
 
 print_summary() {
-    local port admin url
+    local port admin url channel
     port="$(get_env_value "$ENV_FILE" ARGOS_PORT)"
     admin="$(get_env_value "$ENV_FILE" ADMIN_PASSWORD)"
     url="$(get_env_value "$ENV_FILE" APP_URL)"
     [[ -z "$url" ]] && url="http://localhost:${port:-8080}"
+    channel="release"
+    [[ "$STAGE" -eq 1 ]] && channel="stage (rolling develop)"
+
+    local b0="" b1=""
+    if [[ -t 1 && "${TERM:-dumb}" != "dumb" ]]; then
+        b0=$'\033[1;32m'
+        b1=$'\033[0m'
+    fi
 
     cat <<SUMMARY
 
-$(success "Argos is running at $url")
+${b0}╔══════════════════════════════════════════════════════════════════╗
+║                      Argos is up and running                     ║
+╚══════════════════════════════════════════════════════════════════╝${b1}
 
-  Admin password: $admin
-  Install dir:    $INSTALL_DIR
-  Version:        $ARGOS_VERSION
+  URL:       $url
 
-  Useful commands:
+  Login
+    Email:     admin@argos.local
+    Password:  $admin
+
+  Install
+    Directory: $INSTALL_DIR
+    Channel:   $channel
+    Version:   $ARGOS_VERSION
+
+  Useful commands
     docker compose -f $INSTALL_DIR/$COMPOSE_FILE logs -f
     docker compose -f $INSTALL_DIR/$COMPOSE_FILE down
     docker compose -f $INSTALL_DIR/$COMPOSE_FILE restart
 
-  Update:
+  Update
     $0 --dir $INSTALL_DIR
+
+  Change your admin password under Profile after first login.
 
 SUMMARY
 }
 
 # ── Main ────────────────────────────────────────────────────────────────────
 main() {
+    print_banner
     preflight
 
     if [[ -z "$ARGOS_VERSION" ]]; then
@@ -350,6 +485,11 @@ main() {
 
     mkdir -p "$INSTALL_DIR"
     cd "$INSTALL_DIR"
+
+    if [[ "$RESET" -eq 1 ]]; then
+        confirm_reset
+        reset_stack
+    fi
 
     local mode="install"
     if [[ -f "$STATE_DIR/VERSION" ]]; then
@@ -400,6 +540,7 @@ MSG
         log "Updating $INSTALL_DIR (was: $(cat "$STATE_DIR/VERSION"), now: $ARGOS_VERSION)"
         download_install_files
         merge_env_keys "$ENV_EXAMPLE_FILE" "$ENV_FILE"
+        backfill_missing_secrets
     fi
 
     # Stage overrides run after env init/merge so they win against whatever

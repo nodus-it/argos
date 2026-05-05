@@ -40,6 +40,11 @@ class ConnectedAccounts extends Page
         return __('accounts.title');
     }
 
+    public function isGitHubConfigured(): bool
+    {
+        return filled(config('services.github.client_id'));
+    }
+
     public function isGitLabConfigured(): bool
     {
         return filled(config('services.gitlab.client_id'));
@@ -75,7 +80,7 @@ class ConnectedAccounts extends Page
 
         $actions = [];
 
-        if (! $hasGitHub) {
+        if ($this->isGitHubConfigured() && ! $hasGitHub) {
             $actions[] = Action::make('connectGitHub')
                 ->label(__('accounts.actions.connect_github'))
                 ->icon('heroicon-o-arrow-right-circle')

@@ -11,6 +11,18 @@
 
 name: argos
 
+# OAuth client credentials are read by both the app (Connect flow) and the
+# queue worker (TokenRefresher during phase runs). Defined once here, merged
+# into both services' environment via the YAML anchor below.
+x-oauth-env: &oauth-env
+  GITHUB_CLIENT_ID:        "${GITHUB_CLIENT_ID:-}"
+  GITHUB_CLIENT_SECRET:    "${GITHUB_CLIENT_SECRET:-}"
+  GITLAB_CLIENT_ID:        "${GITLAB_CLIENT_ID:-}"
+  GITLAB_CLIENT_SECRET:    "${GITLAB_CLIENT_SECRET:-}"
+  GITLAB_INSTANCE_URL:     "${GITLAB_INSTANCE_URL:-}"
+  BITBUCKET_CLIENT_ID:     "${BITBUCKET_CLIENT_ID:-}"
+  BITBUCKET_CLIENT_SECRET: "${BITBUCKET_CLIENT_SECRET:-}"
+
 services:
 
   db:
@@ -47,6 +59,7 @@ services:
       - argos-public:/srv/argos-public
       - argos-nginx-config:/srv/argos-nginx
     environment:
+      <<: *oauth-env
       ARGOS_ROLE:               "app"
       APP_ENV:                  "${APP_ENV:-production}"
       APP_DEBUG:                "${APP_DEBUG:-false}"
@@ -96,9 +109,11 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - argos-data:/data
     environment:
+      <<: *oauth-env
       ARGOS_ROLE:               "queue"
       APP_ENV:                  "${APP_ENV:-production}"
       APP_DEBUG:                "${APP_DEBUG:-false}"
+      APP_URL:                  "${APP_URL:-http://localhost:${ARGOS_PORT:-8080}}"
       APP_KEY:                  "${APP_KEY}"
       ARGOS_WORKER_IMAGE:       "${ARGOS_WORKER_IMAGE}"
       ARGOS_CONFIG_DIR:         /data/config

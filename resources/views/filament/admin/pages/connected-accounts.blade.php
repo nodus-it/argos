@@ -32,6 +32,18 @@
                         {{ __('accounts.blade.disconnect') }}
                     </x-filament::button>
                 </div>
+            @elseif (!$this->isGitHubConfigured())
+                <div class="flex items-center gap-3">
+                    <x-filament::badge color="gray">{{ __('accounts.blade.badge_not_configured') }}</x-filament::badge>
+                    <span class="text-sm text-gray-500 dark:text-gray-400">
+                        {{ __('accounts.blade.github_not_configured_description') }}
+                    </span>
+                </div>
+                <div class="mt-3">
+                    <a href="{{ config('argos.docs.setup_github') }}" target="_blank" rel="noopener" class="text-xs underline text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200">
+                        {{ __('accounts.blade.setup_link') }} ↗
+                    </a>
+                </div>
             @else
                 <div class="flex items-center gap-3">
                     <x-filament::badge color="gray">{{ __('accounts.blade.badge_not_connected') }}</x-filament::badge>
