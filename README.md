@@ -29,18 +29,22 @@ request you can review.
 ## Quick Start
 
 ```bash
-git clone https://github.com/nodus-it/argos.git
-cd argos
-docker compose -f .tools/docker/docker-compose.yml up -d
+curl -fsSL https://raw.githubusercontent.com/nodus-it/argos/develop/install.sh | bash
 ```
+
+That installs Argos into the **current directory** (set `--dir` or
+`ARGOS_INSTALL_DIR` to install elsewhere) — drops a `docker-compose.yml`,
+generates a fresh `.env` with random secrets, brings up the stack, and prints
+the admin password.
 
 Open <http://localhost:8080/admin> — an in-app onboarding wizard walks you
 through pasting your Claude token and creating your first project.
 
-> A single-line installer (`curl … | bash` that fetches a versioned compose
-> file into `/opt/argos`, manages `.env`, and survives updates) is in
-> development. Until then, the clone-and-compose flow above is the supported
-> path.
+To update later, re-run the same command in the same directory: the
+installer pulls newer images, merges any new keys from the upstream
+`.env.example` into your `.env` without touching existing values, and
+restarts the stack. Customisations belong in `docker-compose.override.yml`
+next to the compose file — the installer never touches that.
 
 ### What this gets you
 
