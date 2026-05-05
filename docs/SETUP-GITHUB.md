@@ -63,10 +63,11 @@ Add to your `.env` (or pass as `-e` flags to `docker run`):
 ```env
 GITHUB_CLIENT_ID=your-client-id
 GITHUB_CLIENT_SECRET=your-client-secret
-GITHUB_REDIRECT_URI="${APP_URL}/auth/github/callback"
 ```
 
-Restart the manager so the new vars are picked up.
+The callback URL is fixed at `${APP_URL}/auth/github/callback` and is what
+you registered with GitHub in step 1 — no extra variable needed. Restart the
+manager so the new vars are picked up.
 
 ### Step 3: Connect your account
 
@@ -85,6 +86,6 @@ Restart the manager so the new vars are picked up.
 |---|---|
 | 401 on push / PR creation | PAT missing the `repo` scope, or token expired. |
 | 403 when pushing to `.github/workflows/*` | PAT missing the `workflow` scope. |
-| OAuth redirect fails with "redirect_uri mismatch" | `GITHUB_REDIRECT_URI` does not match the callback URL registered in the OAuth App. Both must be exact, including scheme and trailing path. |
+| OAuth redirect fails with "redirect_uri mismatch" | The callback URL registered in the OAuth App must exactly match `${APP_URL}/auth/github/callback` — including scheme. Verify `APP_URL`. |
 | OAuth callback returns 500 | `APP_URL` not set or doesn't match the public URL — Laravel can't generate the correct callback. |
 | PR creation returns 422 with "A pull request already exists" | Argos detects this and reports the existing PR URL — no action needed. |

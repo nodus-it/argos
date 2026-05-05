@@ -47,21 +47,20 @@ PAT projects keep working alongside OAuth projects — switching is per-project.
 
 ## Required environment variables
 
-For each provider you enable OAuth on, set the corresponding triple:
+For each provider you enable OAuth on, set client ID and secret. The callback
+URL is fixed at `${APP_URL}/auth/<provider>/callback` — register exactly that
+URL in the provider's OAuth app, no further config needed.
 
 ```env
 GITHUB_CLIENT_ID=...
 GITHUB_CLIENT_SECRET=...
-GITHUB_REDIRECT_URI="${APP_URL}/auth/github/callback"
 
 GITLAB_CLIENT_ID=...
 GITLAB_CLIENT_SECRET=...
-GITLAB_REDIRECT_URI="${APP_URL}/auth/gitlab/callback"
 # GITLAB_INSTANCE_URL=https://gitlab.example.com  # optional, for self-hosted
 
 BITBUCKET_CLIENT_ID=...
 BITBUCKET_CLIENT_SECRET=...
-BITBUCKET_REDIRECT_URI="${APP_URL}/auth/bitbucket/callback"
 ```
 
 See [Configuration Reference](CONFIGURATION.md) for the full list.

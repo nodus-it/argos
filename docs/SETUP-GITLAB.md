@@ -35,9 +35,11 @@ OAuth enables repo and branch selection via dropdown — no manual URL needed.
 ```
 GITLAB_CLIENT_ID=your-app-id
 GITLAB_CLIENT_SECRET=your-app-secret
-GITLAB_REDIRECT_URI=${APP_URL}/auth/gitlab/callback
 # GITLAB_INSTANCE_URL=https://gitlab.com  # Override for Self-Hosted
 ```
+
+The callback URL is fixed at `${APP_URL}/auth/gitlab/callback` — register
+that exact URL when creating the GitLab application.
 
 `GITLAB_INSTANCE_URL` defaults to `https://gitlab.com`. Set it to your Self-Hosted instance URL (no trailing slash) to use Self-Hosted OAuth.
 

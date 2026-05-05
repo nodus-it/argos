@@ -66,9 +66,6 @@ services:
       ARGOS_WORKER_IMAGE:       "${ARGOS_WORKER_IMAGE:-argos-worker:latest}"
       ARGOS_CONFIG_DIR:         /data/config
       DB_CONNECTION:            "mariadb"
-      QUEUE_CONNECTION:         database
-      SESSION_DRIVER:           database
-      CACHE_STORE:              database
       # MariaDB runs in the same container — connect via the Unix socket.
       ARGOS_DB_HOST:            "127.0.0.1"
       ARGOS_DB_PORT:            "3306"

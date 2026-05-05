@@ -2,9 +2,10 @@
 # .tools/bash/start-stage.sh — Stage-Manager lokal hochfahren.
 #
 # Pullt das aktuelle Stage-Image, stoppt einen eventuell laufenden Container
-# und startet neu. Alle relevanten ENV-Variablen sind hier eingetragen.
-# Sensible Werte (Tokens, Secrets) bitte in .tools/bash/.env.stage ablegen —
-# die Datei ist in .gitignore und wird von diesem Script automatisch geladen.
+# und startet neu. Geheime und umgebungsspezifische Werte werden in
+# .tools/bash/.env.stage abgelegt — die Datei ist in .gitignore. Beim ersten
+# Lauf wird sie aus .env.example als komplett auskommentierte Vorlage erzeugt;
+# unkommentierte Einträge überschreiben die Defaults dieses Scripts.
 #
 # Verwendung:
 #   bash .tools/bash/start-stage.sh
@@ -13,26 +14,32 @@ set -euo pipefail
 IFS=$'\n\t'
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 ENV_FILE="$SCRIPT_DIR/.env.stage"
+ENV_EXAMPLE="$REPO_ROOT/.env.example"
+
+# ── .env.stage erstellen falls fehlend ───────────────────────────────────────
+# Kopiert .env.example und kommentiert sicherheitshalber jede Zeile aus,
+# damit die Vorlage nichts versehentlich überschreibt. Wer .env.example
+# bereits durchgängig auskommentiert pflegt, sieht hier keinen Unterschied.
+if [[ ! -f "$ENV_FILE" ]]; then
+    if [[ ! -f "$ENV_EXAMPLE" ]]; then
+        echo "Fehler: weder $ENV_FILE noch $ENV_EXAMPLE vorhanden." >&2
+        exit 1
+    fi
+    sed -E 's/^([A-Z_])/# \1/' "$ENV_EXAMPLE" > "$ENV_FILE"
+    echo ""
+    echo "  $ENV_FILE wurde aus .env.example erzeugt (alles auskommentiert)."
+    echo "  Trage die nötigen Werte ein und starte das Script erneut."
+    echo ""
+    exit 0
+fi
 
 # ── Secrets aus .env.stage laden ─────────────────────────────────────────────
-if [[ -f "$ENV_FILE" ]]; then
-    set -o allexport
-    # shellcheck source=/dev/null
-    source "$ENV_FILE"
-    set +o allexport
-else
-    echo ""
-    echo "  Hinweis: $ENV_FILE nicht gefunden."
-    echo "  Erstelle die Datei mit folgendem Inhalt:"
-    echo ""
-    echo "    APP_KEY=base64:..."
-    echo "    ADMIN_PASSWORD=..."
-    echo "    GITHUB_CLIENT_ID=..."
-    echo "    GITHUB_CLIENT_SECRET=..."
-    echo "    CLAUDE_CODE_OAUTH_TOKEN=..."
-    echo ""
-fi
+set -o allexport
+# shellcheck source=/dev/null
+source "$ENV_FILE"
+set +o allexport
 
 # ── Konfiguration ─────────────────────────────────────────────────────────────
 CONTAINER_NAME="argos-stage"
@@ -58,7 +65,7 @@ echo "Starting $CONTAINER_NAME on port $HOST_PORT ..."
 
 # Pflicht- und Default-Werte werden unbedingt gesetzt.
 DOCKER_ENV_ARGS=(
-    -e APP_ENV=production
+    -e APP_ENV=staging
     -e APP_DEBUG=false
     -e "APP_URL=${APP_URL:-http://localhost:${HOST_PORT}}"
     -e ARGOS_CONFIG_DIR=/data/config
@@ -70,9 +77,6 @@ DOCKER_ENV_ARGS=(
     -e "ARGOS_DB_USERNAME=${ARGOS_DB_USERNAME:-argos}"
     -e "ARGOS_DB_PASSWORD=${ARGOS_DB_PASSWORD:-argos}"
     -e "ARGOS_WORKER_IMAGE=${ARGOS_WORKER_IMAGE:-ghcr.io/nodus-it/argos-worker:stage-php8.4}"
-    -e QUEUE_CONNECTION=database
-    -e SESSION_DRIVER=database
-    -e CACHE_STORE=database
 )
 
 # argos_add_optional_env: Hängt -e NAME=VALUE nur an, wenn VALUE nicht leer ist.
@@ -91,7 +95,11 @@ argos_add_optional_env APP_KEY
 argos_add_optional_env ADMIN_PASSWORD
 argos_add_optional_env GITHUB_CLIENT_ID
 argos_add_optional_env GITHUB_CLIENT_SECRET
-argos_add_optional_env GITHUB_REDIRECT_URI
+argos_add_optional_env GITLAB_CLIENT_ID
+argos_add_optional_env GITLAB_CLIENT_SECRET
+argos_add_optional_env GITLAB_INSTANCE_URL
+argos_add_optional_env BITBUCKET_CLIENT_ID
+argos_add_optional_env BITBUCKET_CLIENT_SECRET
 argos_add_optional_env CLAUDE_CODE_OAUTH_TOKEN
 
 docker run -d \

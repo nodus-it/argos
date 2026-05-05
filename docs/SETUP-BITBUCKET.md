@@ -58,8 +58,11 @@ Add these variables to your `.env` file:
 ```env
 BITBUCKET_CLIENT_ID=<your-oauth-consumer-key>
 BITBUCKET_CLIENT_SECRET=<your-oauth-consumer-secret>
-BITBUCKET_REDIRECT_URI="${APP_URL}/auth/bitbucket/callback"
 ```
+
+The callback URL is fixed at `${APP_URL}/auth/bitbucket/callback` — that is
+what you registered with the OAuth consumer in step 1, no extra variable
+needed.
 
 ### Step 3: Connect Your Account
 
@@ -77,4 +80,4 @@ BITBUCKET_REDIRECT_URI="${APP_URL}/auth/bitbucket/callback"
 | 403 on issues endpoint | Issue tracker is disabled for the repository (issues will be an empty list) |
 | 401 on push | App Password missing Repositories Write scope, or wrong `username:app_password` format |
 | PR creation returns 409 | A PR for this branch already exists — Argos will find and report the existing URL |
-| OAuth redirect fails | `BITBUCKET_REDIRECT_URI` does not match the callback URL registered in the OAuth consumer |
+| OAuth redirect fails | The callback URL registered in the OAuth consumer must exactly match `${APP_URL}/auth/bitbucket/callback` — verify `APP_URL`. |
