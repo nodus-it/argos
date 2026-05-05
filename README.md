@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/logo.svg" alt="Argos" width="640">
+<img src=".github/logo.svg" alt="Argos" width="640">
 
 **A web-first dev agent that turns a task description into a pull request.**
 

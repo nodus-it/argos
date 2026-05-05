@@ -102,7 +102,9 @@ CI führt `shellcheck` über `agent`, `worker/lib/`, `worker/phases/`, `.tools/d
 ## Häufige Befehle
 
 ```bash
-# Compose-Stack hochfahren (db + app + nginx + queue, baut die Worker-Images automatisch mit)
+# Compose-Stack hochfahren (db + app + nginx + queue). Erwartet dass die
+# argos-worker:local-php8.{3,4} Images schon existieren — `composer run dev`
+# baut die vorher; standalone vorher: `composer run dev:build-workers`.
 docker compose -f .tools/docker/docker-compose.yml up -d
 
 # Worker-Images manuell bauen (matrix: php8.3 + php8.4)

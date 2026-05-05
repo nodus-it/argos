@@ -40,7 +40,6 @@ return [
             'database' => env('ARGOS_DB_DATABASE', 'argos'),
             'username' => env('ARGOS_DB_USERNAME', 'argos'),
             'password' => env('ARGOS_DB_PASSWORD', ''),
-            'unix_socket' => env('ARGOS_DB_SOCKET', ''),
             'charset' => 'utf8mb4',
             'collation' => 'utf8mb4_unicode_ci',
             'prefix' => '',

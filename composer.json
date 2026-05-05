@@ -50,7 +50,12 @@
 
         "dev": [
             "Composer\\Config::disableProcessTimeout",
+            "@dev:build-workers",
             "npx concurrently -c \"#93c5fd,#fb7185\" \"docker compose -f .tools/docker/docker-compose.yml up --build --remove-orphans\" \"npm run dev\" --names=compose,vite --kill-others"
+        ],
+        "dev:build-workers": [
+            "docker build -t argos-worker:local-php8.4 -f .tools/docker/worker/Dockerfile --target worker-php84 .",
+            "docker build -t argos-worker:local-php8.3 -f .tools/docker/worker/Dockerfile --target worker ."
         ],
         "dev:stop": "docker compose -f .tools/docker/docker-compose.yml down",
         "dev:logs": "docker compose -f .tools/docker/docker-compose.yml logs -f",

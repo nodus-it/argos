@@ -33,7 +33,9 @@ jobs:
             worker/phases/*.sh \
             worker/tests/integration/*.sh \
             worker/tests/integration/fixtures/mock-claude/claude \
-            worker/tests/integration/fixtures/fake-remote-repo/setup.sh
+            worker/tests/integration/fixtures/fake-remote-repo/setup.sh \
+            install.sh \
+            installer/tests/run-bats.sh
 
   worker-unit:
     runs-on: ubuntu-latest
@@ -41,6 +43,13 @@ jobs:
       - uses: actions/checkout@v6
       - name: bats unit tests (via Docker, includes jq + check-jsonschema)
         run: bash worker/tests/run-bats.sh
+
+  installer-unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: bats unit tests for install.sh (via Docker)
+        run: bash installer/tests/run-bats.sh
 
   worker-integration:
     runs-on: ubuntu-latest
@@ -85,7 +94,7 @@ jobs:
         run: php artisan test --compact
 
   build-app:
-    needs: [shellcheck, worker-unit, worker-integration, app-quality]
+    needs: [shellcheck, worker-unit, worker-integration, app-quality, installer-unit]
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
@@ -133,7 +142,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   build-worker:
-    needs: [shellcheck, worker-unit, worker-integration, app-quality]
+    needs: [shellcheck, worker-unit, worker-integration, app-quality, installer-unit]
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:

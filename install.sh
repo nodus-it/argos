@@ -24,9 +24,13 @@ IFS=$'\n\t'
 
 # ── Configuration ───────────────────────────────────────────────────────────
 ARGOS_REPO="${ARGOS_REPO:-nodus-it/argos}"
-ARGOS_VERSION="${ARGOS_VERSION:-develop}"
 INSTALL_DIR="${ARGOS_INSTALL_DIR:-$PWD}"
 FORCE=0
+# ARGOS_VERSION is resolved lazily — main() calls resolve_default_version()
+# when the user hasn't pinned it via env or --version. We can't do that at
+# the top level because the source-guard for tests would still trigger the
+# API call on every `source install.sh`.
+ARGOS_VERSION="${ARGOS_VERSION:-}"
 
 # Files the installer owns inside INSTALL_DIR.
 COMPOSE_FILE="docker-compose.yml"
@@ -72,7 +76,8 @@ done
 
 # Where the installer manifests live. Defaults to the GitHub raw URL; tests
 # (and air-gapped installs) can point this at a local directory via file://.
-RAW_BASE="${ARGOS_RAW_BASE:-https://raw.githubusercontent.com/${ARGOS_REPO}/${ARGOS_VERSION}/installer}"
+# RAW_BASE is computed in main() after ARGOS_VERSION has been resolved.
+RAW_BASE=""
 
 # ── Pre-flight checks ───────────────────────────────────────────────────────
 require_command() {
@@ -97,6 +102,18 @@ preflight() {
 }
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
+
+# Ask GitHub for the latest published release tag. Returns empty if there's no
+# published release yet (or the API is unreachable) — caller falls back.
+resolve_default_version() {
+    local tag
+    tag="$(curl -fsSL "https://api.github.com/repos/${ARGOS_REPO}/releases/latest" 2>/dev/null \
+        | grep '"tag_name"' \
+        | head -1 \
+        | sed -E 's/.*"tag_name":[[:space:]]*"([^"]+)".*/\1/')" || tag=""
+    printf '%s' "$tag"
+}
+
 download_to() {
     local url="$1" dest="$2"
     curl -fsSL "$url" -o "$dest" \
@@ -284,6 +301,16 @@ SUMMARY
 main() {
     preflight
 
+    if [[ -z "$ARGOS_VERSION" ]]; then
+        ARGOS_VERSION="$(resolve_default_version)"
+        if [[ -z "$ARGOS_VERSION" ]]; then
+            warn "No published release found — falling back to the develop branch."
+            warn "Pin a specific ref with --version <tag|branch> or ARGOS_VERSION=…"
+            ARGOS_VERSION="develop"
+        fi
+    fi
+    RAW_BASE="${ARGOS_RAW_BASE:-https://raw.githubusercontent.com/${ARGOS_REPO}/${ARGOS_VERSION}/installer}"
+
     mkdir -p "$INSTALL_DIR"
     cd "$INSTALL_DIR"
 
@@ -345,4 +372,9 @@ MSG
     success "Done."
 }
 
-main "$@"
+# Run main only when invoked directly. When the script is sourced (e.g. by
+# bats tests calling individual helpers in isolation) this guard prevents
+# main from firing and trying to talk to docker.
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    main "$@"
+fi

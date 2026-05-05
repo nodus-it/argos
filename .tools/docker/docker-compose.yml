@@ -1,11 +1,10 @@
 # Argos — Docker Compose stack
 #
 # Services:
-#   db            — MariaDB 11
-#   app           — Laravel app (PHP-FPM), runs migrations on boot, spawns worker containers via the docker socket
-#   nginx         — reverse proxy in front of app:9000
-#   queue         — Laravel queue worker (same image as app, ARGOS_ROLE=queue)
-#   worker-build  — auto-builds the argos-worker:local-php8.{3,4} images so the app spawn path always finds them
+#   db     — MariaDB 11
+#   app    — Laravel app (PHP-FPM), runs migrations on boot, spawns worker containers via the docker socket
+#   nginx  — reverse proxy in front of app:9000
+#   queue  — Laravel queue worker (same image as app, ARGOS_ROLE=queue)
 #
 # Image source:
 #   By default the `app`/`queue` services build `argos-app:local` from the local
@@ -13,34 +12,17 @@
 #   `ghcr.io/nodus-it/argos-app:stage`) and run `docker compose pull` to use a
 #   prebuilt image instead.
 #
-# Profiles:
-#   (no profile)  — db + app + nginx + queue + auto worker-build (test/dev default)
-#   build-only    — manual rebuild of the worker images on demand
-#
-# To skip the auto worker-build (e.g. when ARGOS_WORKER_IMAGE points at a registry tag):
-#   docker compose up --no-deps db app nginx queue
-# To rebuild only the worker images:
-#   docker compose --profile build-only build
+# Worker images:
+#   The `app` service spawns short-lived worker containers via the host docker
+#   socket and expects `argos-worker:local-php8.{3,4}` (or whatever
+#   ARGOS_WORKER_IMAGE points at) to already exist. `composer run dev` builds
+#   them via `composer run dev:build-workers` before bringing up the stack;
+#   the `worker-php83` / `worker-php84` services below are still here for the
+#   explicit `docker compose --profile build-only build` path.
 
 name: argos
 
 services:
-
-  # Builds argos-worker:local-php8.{3,4} on every `docker compose up`.
-  # Layer cache makes this near-instant when nothing in worker/ changed.
-  # The app service waits for completion via depends_on, so the spawn path
-  # always finds an up-to-date image.
-  worker-build:
-    image: docker:cli
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ../..:/build:ro
-    working_dir: /build
-    command: >
-      sh -c "set -e;
-        docker build -t argos-worker:local-php8.4 -f .tools/docker/worker/Dockerfile --target worker-php84 .;
-        docker build -t argos-worker:local-php8.3 -f .tools/docker/worker/Dockerfile --target worker ."
-    restart: "no"
 
   db:
     image: mariadb:11
@@ -72,9 +54,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      worker-build:
-        condition: service_completed_successfully
-        required: false
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - argos-data:/data
