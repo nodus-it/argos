@@ -16,6 +16,8 @@ use Symfony\Component\Process\Process;
 
 class PhaseRunner
 {
+    public const CACHE_KEY_USAGE_LIMIT = 'usage_limit';
+
     public function __construct(
         private readonly CredentialStore $credentials,
     ) {}
@@ -680,7 +682,7 @@ class PhaseRunner
             ? $resetAt->clone()->addMinutes(5)
             : now()->addHours(2);
 
-        Cache::put('usage_limit', $data, $ttl);
+        Cache::put(self::CACHE_KEY_USAGE_LIMIT, $data, $ttl);
 
         Log::channel('argos')->warning('Usage limit detected and stored', [
             'reset_at' => $data['reset_at'],

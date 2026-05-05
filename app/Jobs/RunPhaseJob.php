@@ -29,7 +29,7 @@ class RunPhaseJob implements ShouldQueue
     public function handle(PhaseRunner $runner, WorkflowService $workflowService): void
     {
         // Hold back while a usage limit is active — release back to the queue.
-        $limit = Cache::get('usage_limit');
+        $limit = Cache::get(PhaseRunner::CACHE_KEY_USAGE_LIMIT);
         if (is_array($limit) && ($limit['active'] ?? false)) {
             $resetAt = isset($limit['reset_at']) ? Carbon::parse($limit['reset_at']) : null;
             $delaySec = ($resetAt !== null && $resetAt->isFuture())
@@ -62,7 +62,7 @@ class RunPhaseJob implements ShouldQueue
 
             // Phase hit the usage limit — re-schedule instead of failing permanently.
             if ($task->current_status === PhaseStatus::RateLimited) {
-                $retryLimit = Cache::get('usage_limit');
+                $retryLimit = Cache::get(PhaseRunner::CACHE_KEY_USAGE_LIMIT);
                 $resetAt = isset($retryLimit['reset_at']) ? Carbon::parse($retryLimit['reset_at']) : null;
                 $delaySec = ($resetAt !== null && $resetAt->isFuture())
                     ? max(60, (int) now()->diffInSeconds($resetAt))
