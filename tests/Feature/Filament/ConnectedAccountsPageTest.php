@@ -33,6 +33,8 @@ class ConnectedAccountsPageTest extends TestCase
 
     public function test_shows_not_connected_state_when_no_github_account(): void
     {
+        config(['services.github.client_id' => 'test-client-id']);
+
         Livewire::test(ConnectedAccounts::class)
             ->assertSee('Not connected');
     }
@@ -52,6 +54,8 @@ class ConnectedAccountsPageTest extends TestCase
 
     public function test_shows_connect_button_when_not_connected(): void
     {
+        config(['services.github.client_id' => 'test-client-id']);
+
         Livewire::test(ConnectedAccounts::class)
             ->assertSee('Connect with GitHub');
     }
@@ -92,6 +96,8 @@ class ConnectedAccountsPageTest extends TestCase
 
     public function test_only_current_users_account_shown(): void
     {
+        config(['services.github.client_id' => 'test-client-id']);
+
         $otherUser = User::factory()->create();
 
         ConnectedAccount::factory()->create([
