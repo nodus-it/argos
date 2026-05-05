@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\AuthMethod;
+use App\Enums\GitProvider;
 use Database\Factories\ConnectedAccountFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -67,5 +69,33 @@ class ConnectedAccount extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Heilt verwaiste OAuth-RepoProfiles, deren `connected_account_id` durch
+     * einen Disconnect (foreign-key `nullOnDelete`) auf NULL fiel: re-attacht
+     * jedes Profil mit gleicher Plattform und `auth_method=oauth` und ohne
+     * Account an diesen frisch wiederverbundenen Account.
+     *
+     * Aufrufer: OAuth-Callbacks nach `updateOrCreate`. Beim ersten Connect ist
+     * die Menge leer (kein Schaden), nach Re-Connect werden die Bindungen
+     * zurückgesetzt — Tasks gegen alte Profile laufen direkt wieder.
+     *
+     * Annahme single-tenant: RepoProfile hat keine eigene `user_id`, daher
+     * lässt sich nicht weiter auf den Owner einschränken. `unique(user_id,
+     * provider)` auf `connected_accounts` garantiert aber, dass es pro Plattform
+     * nur einen aktiven Account gibt — alle Profile mit (platform=X, oauth,
+     * NULL) gehörten also zwangsläufig genau dem Account, der gerade gelöscht
+     * wurde.
+     *
+     * @return int Anzahl re-attachter Profile (für Logging/Telemetrie)
+     */
+    public function relinkOrphanedRepoProfiles(): int
+    {
+        return RepoProfile::query()
+            ->where('platform', GitProvider::from($this->provider))
+            ->where('auth_method', AuthMethod::OAuth)
+            ->whereNull('connected_account_id')
+            ->update(['connected_account_id' => $this->id]);
     }
 }

@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Enums\AuthMethod;
 use App\Enums\GitProvider;
+use App\Services\OAuth\TokenRefresher;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
@@ -80,9 +81,11 @@ class RepoProfile extends Model
     /**
      * Resolve the repository token for this profile.
      * Returns the PAT when auth_method is 'pat', or the OAuth token from the
-     * linked ConnectedAccount when auth_method is 'oauth'.
+     * linked ConnectedAccount when auth_method is 'oauth'. For OAuth, refreshes
+     * the access token via the provider's refresh_token flow if it is at risk
+     * of expiring within the worker's job timeout.
      *
-     * @throws \RuntimeException when no token is configured
+     * @throws \RuntimeException when no token is configured or the refresh fails
      */
     public function resolveToken(): string
     {
@@ -102,6 +105,8 @@ class RepoProfile extends Model
                 'Kein OAuth-Account verknüpft. Bitte GitHub-Account verbinden.'
             );
         }
+
+        $account = app(TokenRefresher::class)->refreshIfNeeded($account);
 
         return $account->token;
     }

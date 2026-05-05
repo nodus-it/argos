@@ -50,11 +50,16 @@
 
         "dev": [
             "Composer\\Config::disableProcessTimeout",
-            "npx concurrently -c \"#93c5fd,#fb7185\" \"docker compose -f .tools/docker/docker-compose.yml up --build --remove-orphans\" \"npm run dev\" --names=compose,vite --kill-others"
+            "@dev:build-workers",
+            "npx concurrently -c \"#93c5fd,#fb7185\" \"docker compose --env-file .env -f .tools/docker/docker-compose.yml up --build --remove-orphans\" \"npm run dev\" --names=compose,vite --kill-others"
         ],
-        "dev:stop": "docker compose -f .tools/docker/docker-compose.yml down",
-        "dev:logs": "docker compose -f .tools/docker/docker-compose.yml logs -f",
-        "dev:exec": "docker compose -f .tools/docker/docker-compose.yml exec app bash",
+        "dev:build-workers": [
+            "docker build -t argos-worker:local-php8.4 -f .tools/docker/worker/Dockerfile --target worker-php84 .",
+            "docker build -t argos-worker:local-php8.3 -f .tools/docker/worker/Dockerfile --target worker ."
+        ],
+        "dev:stop": "docker compose --env-file .env -f .tools/docker/docker-compose.yml down",
+        "dev:logs": "docker compose --env-file .env -f .tools/docker/docker-compose.yml logs -f",
+        "dev:exec": "docker compose --env-file .env -f .tools/docker/docker-compose.yml exec app bash",
 
         "stage": "bash .tools/bash/start-stage.sh",
         "stage:stop": "docker compose -p argos-stage -f .tools/docker/docker-compose.yml down",

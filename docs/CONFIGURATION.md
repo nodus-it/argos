@@ -83,7 +83,6 @@ server.
 | `ARGOS_DB_DATABASE` | `argos` | Database name. |
 | `ARGOS_DB_USERNAME` | `argos` | Database user. |
 | `ARGOS_DB_PASSWORD` | – | Database password. |
-| `ARGOS_DB_SOCKET` | – | Optional Unix socket path (used by the in-container MariaDB). |
 | `ARGOS_DB_SSL_CA` | – | Optional path to a TLS CA bundle. |
 | `ARGOS_DB_URL` | – | Full DSN — overrides the individual fields above. |
 
