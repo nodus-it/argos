@@ -54,12 +54,12 @@
         ],
         "dev:stop": "docker compose -f .tools/docker/docker-compose.yml down",
         "dev:logs": "docker compose -f .tools/docker/docker-compose.yml logs -f",
-        "dev:exec": "docker compose -f .tools/docker/docker-compose.yml exec manager bash",
+        "dev:exec": "docker compose -f .tools/docker/docker-compose.yml exec app bash",
 
         "stage": "bash .tools/bash/start-stage.sh",
-        "stage:stop": "docker rm -f argos-stage",
-        "stage:logs": "docker logs -f argos-stage",
-        "stage:exec": "docker exec -it argos-stage bash",
+        "stage:stop": "docker compose -p argos-stage -f .tools/docker/docker-compose.yml down",
+        "stage:logs": "docker compose -p argos-stage -f .tools/docker/docker-compose.yml logs -f",
+        "stage:exec": "docker compose -p argos-stage -f .tools/docker/docker-compose.yml exec app bash",
 
         "pint": "vendor/bin/pint --format agent",
         "pint:test": "vendor/bin/pint --test --format agent",

@@ -84,7 +84,7 @@ jobs:
       - name: PHPUnit (feature + unit)
         run: php artisan test --compact
 
-  build-manager:
+  build-app:
     needs: [shellcheck, worker-unit, worker-integration, app-quality]
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
@@ -104,11 +104,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Docker metadata (manager)
+      - name: Docker metadata (app)
         id: meta
         uses: docker/metadata-action@v6
         with:
-          images: ${{ env.REGISTRY }}/${{ env.OWNER }}/argos-manager
+          images: ${{ env.REGISTRY }}/${{ env.OWNER }}/argos-app
           # Pre-releases (0.2.0-beta.1) currently also get :latest because we are
           # not live yet — a single floating tag for testers is more useful than
           # the strict "latest = stable only" rule. Tighten this once we cut a
@@ -120,12 +120,12 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=stage,enable=${{ github.ref == 'refs/heads/develop' }}
 
-      - name: Build and push manager image
+      - name: Build and push app image
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: .tools/docker/manager/Dockerfile
-          target: manager
+          file: .tools/docker/app/Dockerfile
+          target: app
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

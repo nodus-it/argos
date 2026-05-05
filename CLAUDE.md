@@ -43,7 +43,14 @@ CI führt `shellcheck` über `agent`, `worker/lib/`, `worker/phases/`, `.tools/d
 
 - Eine Bibliothek pro Datei in `worker/lib/`. Keine Mehrfach-Verantwortung.
 - Phase-Skripte in `worker/phases/<name>.sh` enthalten *nur* die Funktionen `phase_<name>_run`, `phase_<name>_preconditions`, `phase_<name>_help`. Helfer-Funktionen kommen in `worker/lib/`.
-- Docker-Files leben unter `.tools/docker/`: Manager-Image in `.tools/docker/manager/`, Worker-Image in `.tools/docker/worker/`, Compose-File `.tools/docker/docker-compose.yml`. Build-Context ist immer das Repo-Root.
+- Docker-Files leben unter `.tools/docker/` und sind strikt nach Rolle getrennt: `app/` (das Manager-Side App-Image) und `worker/` (das Worker-Image). Keine weiteren Top-Level-Dirs.
+  - `.tools/docker/app/Dockerfile` — multi-target: `base` (System-Pakete + PHP-Extensions), `app` (PHP-FPM Image, das einzige was wir bauen).
+  - `.tools/docker/app/entrypoint.sh` — Entrypoint für die `app`/`queue`-Container (docker.sock GID-Mapping, composer-sync, migrations gated über `ARGOS_ROLE`).
+  - `.tools/docker/app/nginx.conf` — Nginx-Config für den Compose-Stack (proxy zu `app:9000`).
+  - `.tools/docker/app/php-fpm.conf` — PHP-FPM-Pool-Config, listen `0.0.0.0:9000`.
+  - `.tools/docker/worker/Dockerfile` — Worker-Image, unverändert.
+  - `.tools/docker/docker-compose.yml` — Stack (db + app + nginx + queue + worker-build).
+  - Build-Context ist immer das Repo-Root.
 - Die Laravel-Applikation lebt im Repo-Root (artisan, app/, config/, etc.) — `worker/` enthält ausschließlich den Docker-Worker.
 
 ### Dokumentation
@@ -95,8 +102,17 @@ CI führt `shellcheck` über `agent`, `worker/lib/`, `worker/phases/`, `.tools/d
 ## Häufige Befehle
 
 ```bash
-# Worker-Image bauen
+# Compose-Stack hochfahren (db + app + nginx + queue, baut die Worker-Images automatisch mit)
+docker compose -f .tools/docker/docker-compose.yml up -d
+
+# Worker-Images manuell bauen (matrix: php8.3 + php8.4)
+docker compose -f .tools/docker/docker-compose.yml --profile build-only build
+
+# Einzelnes Worker-Image bauen
 docker build -t argos-worker:latest -f .tools/docker/worker/Dockerfile --target worker-php84 .
+
+# App-Image manuell bauen (compose macht das auto)
+docker build -t argos-app:local -f .tools/docker/app/Dockerfile --target app .
 
 # Bash-Tests laufen lassen
 ./worker/tests/run-tests.sh
@@ -104,7 +120,7 @@ docker build -t argos-worker:latest -f .tools/docker/worker/Dockerfile --target 
 # PHP-Tests
 php artisan test
 
-# Lokale Entwicklung (Web-UI)
+# Lokale Entwicklung (Web-UI ohne Docker)
 php artisan serve
 ```
 

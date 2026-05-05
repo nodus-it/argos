@@ -45,24 +45,24 @@ php artisan migrate
 composer run dev
 ```
 
-That spins up the manager via Docker Compose **and** runs the Vite watcher
-locally. Open <http://localhost:8080/admin>.
+That spins up the compose stack (db + app + nginx + queue) **and** runs the
+Vite watcher locally. Open <http://localhost:8080/admin>.
 
 Useful sub-commands:
 
 ```bash
 composer run dev:stop      # tear it down
 composer run dev:logs      # follow compose logs
-composer run dev:exec      # bash into the manager container
+composer run dev:exec      # bash into the app container
 ```
 
 The compose file lives at `.tools/docker/docker-compose.yml`. It builds the
-worker image automatically on first start (`worker-build` service).
+app + worker images automatically on first start.
 
 ### Stage profile
 
-To preview the released `:stage` images (manager + worker built from the
-`dev` branch):
+To preview the released `:stage` images (app + worker built from the
+`develop` branch):
 
 ```bash
 composer run stage          # start

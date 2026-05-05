@@ -1,0 +1,108 @@
+# Argos — production compose stack (self-host install)
+#
+# This file is downloaded into the install directory by `install.sh` and is
+# considered SYSTEM-MANAGED — the installer overwrites it on update. To layer
+# in your own customisation (extra ports, labels, volumes, env), drop a
+# `docker-compose.override.yml` next to this file. Compose merges it
+# automatically and the installer never touches it.
+#
+# All tunables live in `.env` (see .env.example for the full list with
+# defaults). Keys are read by compose via `${VAR:-default}` substitution.
+
+name: argos
+
+services:
+
+  db:
+    image: mariadb:11
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE:      "${ARGOS_DB_DATABASE}"
+      MARIADB_USER:          "${ARGOS_DB_USERNAME}"
+      MARIADB_PASSWORD:      "${ARGOS_DB_PASSWORD}"
+      MARIADB_ROOT_PASSWORD: "${ARGOS_DB_ROOT_PASSWORD}"
+    volumes:
+      - argos-db:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  app:
+    image: "${ARGOS_APP_IMAGE}"
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      # Spawning worker containers needs the host's docker socket.
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Persistent app state (config, app-key).
+      - argos-data:/data
+    environment:
+      ARGOS_ROLE:               "app"
+      APP_ENV:                  "${APP_ENV:-production}"
+      APP_DEBUG:                "${APP_DEBUG:-false}"
+      APP_URL:                  "${APP_URL:-http://localhost:${ARGOS_PORT:-8080}}"
+      APP_KEY:                  "${APP_KEY}"
+      ADMIN_PASSWORD:           "${ADMIN_PASSWORD:-}"
+      CLAUDE_CODE_OAUTH_TOKEN:  "${CLAUDE_CODE_OAUTH_TOKEN:-}"
+      ARGOS_WORKER_IMAGE:       "${ARGOS_WORKER_IMAGE}"
+      ARGOS_CONFIG_DIR:         /data/config
+      DB_CONNECTION:            "mariadb"
+      ARGOS_DB_HOST:            "db"
+      ARGOS_DB_PORT:            "3306"
+      ARGOS_DB_DATABASE:        "${ARGOS_DB_DATABASE}"
+      ARGOS_DB_USERNAME:        "${ARGOS_DB_USERNAME}"
+      ARGOS_DB_PASSWORD:        "${ARGOS_DB_PASSWORD}"
+    healthcheck:
+      # Goes green only when DB is reachable AND the schema is fully migrated,
+      # so dependents (queue) can rely on `service_healthy`.
+      test: ["CMD-SHELL", "php /app/artisan migrate:status >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 60s
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "${ARGOS_PORT:-8080}:80"
+    volumes:
+      # Static assets are extracted from the app image by the installer into
+      # ./public — nginx serves them directly without bouncing through PHP-FPM.
+      - ./public:/app/public:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+
+  queue:
+    image: "${ARGOS_APP_IMAGE}"
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - argos-data:/data
+    environment:
+      ARGOS_ROLE:               "queue"
+      APP_ENV:                  "${APP_ENV:-production}"
+      APP_DEBUG:                "${APP_DEBUG:-false}"
+      APP_KEY:                  "${APP_KEY}"
+      ARGOS_WORKER_IMAGE:       "${ARGOS_WORKER_IMAGE}"
+      ARGOS_CONFIG_DIR:         /data/config
+      DB_CONNECTION:            "mariadb"
+      ARGOS_DB_HOST:            "db"
+      ARGOS_DB_PORT:            "3306"
+      ARGOS_DB_DATABASE:        "${ARGOS_DB_DATABASE}"
+      ARGOS_DB_USERNAME:        "${ARGOS_DB_USERNAME}"
+      ARGOS_DB_PASSWORD:        "${ARGOS_DB_PASSWORD}"
+    command: ["php", "/app/artisan", "queue:work", "database", "--sleep=3", "--tries=3", "--max-time=3600"]
+
+volumes:
+  argos-data:
+  argos-db:

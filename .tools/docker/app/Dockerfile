@@ -7,20 +7,13 @@ FROM php:8.4-fpm-bookworm AS base
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# System packages: nginx, supervisor, mariadb, docker CLI, node 22
 RUN set -eux; \
-    # policy-rc.d prevents apt postinstall scripts from starting services in the container.
-    printf '#!/bin/sh\nexit 101\n' > /usr/local/sbin/policy-rc.d; \
-    chmod +x /usr/local/sbin/policy-rc.d; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
         ca-certificates \
         curl \
         gnupg \
         git \
-        mariadb-server \
-        nginx \
-        supervisor \
         unzip \
         libzip-dev \
         libicu-dev \
@@ -31,8 +24,6 @@ RUN set -eux; \
         libxml2-dev \
         libsqlite3-dev \
         zlib1g-dev; \
-    rm /usr/local/sbin/policy-rc.d; \
-    # Docker CLI (official apt repo)
     install -m 0755 -d /etc/apt/keyrings; \
     curl -fsSL https://download.docker.com/linux/debian/gpg \
         -o /etc/apt/keyrings/docker.asc; \
@@ -40,7 +31,6 @@ RUN set -eux; \
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] \
         https://download.docker.com/linux/debian bookworm stable" \
         > /etc/apt/sources.list.d/docker.list; \
-    # Node 22
     curl -fsSL https://deb.nodesource.com/setup_22.x | bash -; \
     apt-get update; \
     apt-get install -y --no-install-recommends docker-ce-cli nodejs; \
@@ -63,9 +53,11 @@ RUN set -eux; \
 COPY --from=composer:latest /usr/bin/composer /usr/local/bin/composer
 
 # ============================================================
-# manager: Laravel app baked in
+# app: Laravel app on PHP-FPM. Runs migrations + queue work; spawns worker
+# containers via the host docker socket. Designed for the split compose stack
+# (db + app + nginx + queue) — does not bundle nginx/mariadb/supervisor.
 # ============================================================
-FROM base AS manager
+FROM base AS app
 
 WORKDIR /app
 
@@ -93,29 +85,21 @@ RUN composer install --no-dev --optimize-autoloader --no-interaction \
 # PhaseRunner via php-fpm/queue-worker) can manage its own ~/.docker config.
 RUN chown www-data:www-data /var/www
 
-# Nginx: remove default site, add Laravel config
-RUN rm -f /etc/nginx/sites-enabled/default
-COPY .tools/docker/manager/nginx.conf /etc/nginx/sites-enabled/argos.conf
-
-# Supervisor config
-COPY .tools/docker/manager/supervisord.conf /etc/supervisor/conf.d/argos.conf
-
-# PHP-FPM: disable default pool, use our config
+# PHP-FPM: disable default pool, use our config (listens on 0.0.0.0:9000 so
+# the separate nginx container can reach it).
 RUN rm -f /usr/local/etc/php-fpm.d/www.conf
-COPY .tools/docker/manager/php-fpm.conf /usr/local/etc/php-fpm.d/argos.conf
+COPY .tools/docker/app/php-fpm.conf /usr/local/etc/php-fpm.d/argos.conf
 
-# Runtime entrypoint: docker socket group fix + migrations
-COPY .tools/docker/manager/entrypoint.sh /usr/local/bin/entrypoint.sh
+# Runtime entrypoint: docker socket group fix + migrations.
+COPY .tools/docker/app/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
-# Standalone defaults: the entrypoint provisions a local MariaDB with these
-# credentials, so the bare `docker run ...argos-manager` invocation in the
-# README boots without requiring callers to pass them in. docker-compose can
-# still override any of these via its `environment:` block.
+# Compose-stack defaults — the `db` hostname resolves to the mariadb service
+# on the compose network. Callers (compose, k8s, etc.) can still override any
+# of these via their environment block.
 ENV DB_CONNECTION=mariadb \
-    ARGOS_DB_HOST=127.0.0.1 \
+    ARGOS_DB_HOST=db \
     ARGOS_DB_PORT=3306 \
-    ARGOS_DB_SOCKET=/run/mysqld/mysqld.sock \
     ARGOS_DB_DATABASE=argos \
     ARGOS_DB_USERNAME=argos \
     ARGOS_DB_PASSWORD=argos \
@@ -124,7 +108,7 @@ ENV DB_CONNECTION=mariadb \
     SESSION_DRIVER=database \
     CACHE_STORE=database
 
-EXPOSE 80
+EXPOSE 9000
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
-CMD ["/usr/bin/supervisord", "-n", "-c", "/etc/supervisor/conf.d/argos.conf"]
+CMD ["php-fpm", "--nodaemonize"]

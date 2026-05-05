@@ -6,7 +6,7 @@
 
 [![License: MIT](https://img.shields.io/github/license/nodus-it/argos?style=flat-square)](LICENSE)
 [![Version](https://img.shields.io/github/v/tag/nodus-it/argos?style=flat-square&label=version&include_prereleases&sort=semver)](https://github.com/nodus-it/argos/releases)
-[![GHCR](https://img.shields.io/badge/ghcr.io-argos--manager-2496ED?style=flat-square&logo=docker&logoColor=white)](https://github.com/nodus-it/argos/pkgs/container/argos-manager)
+[![GHCR](https://img.shields.io/badge/ghcr.io-argos--app-2496ED?style=flat-square&logo=docker&logoColor=white)](https://github.com/nodus-it/argos/pkgs/container/argos-app)
 [![CI](https://img.shields.io/github/actions/workflow/status/nodus-it/argos/ci.yml?branch=master&style=flat-square&label=tests)](https://github.com/nodus-it/argos/actions/workflows/ci.yml)
 [![Coverage](https://img.shields.io/codecov/c/github/nodus-it/argos?style=flat-square)](https://codecov.io/gh/nodus-it/argos)
 
@@ -29,14 +29,22 @@ request you can review.
 ## Quick Start
 
 ```bash
-docker run -d --name argos -p 8080:80 \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  -v argos-data:/data -v argos-db:/var/lib/mysql \
-  ghcr.io/nodus-it/argos-manager:latest
+curl -fsSL https://raw.githubusercontent.com/nodus-it/argos/develop/install.sh | bash
 ```
+
+That installs Argos into the **current directory** (set `--dir` or
+`ARGOS_INSTALL_DIR` to install elsewhere) — drops a `docker-compose.yml`,
+generates a fresh `.env` with random secrets, brings up the stack, and prints
+the admin password.
 
 Open <http://localhost:8080/admin> — an in-app onboarding wizard walks you
 through pasting your Claude token and creating your first project.
+
+To update later, re-run the same command in the same directory: the
+installer pulls newer images, merges any new keys from the upstream
+`.env.example` into your `.env` without touching existing values, and
+restarts the stack. Customisations belong in `docker-compose.override.yml`
+next to the compose file — the installer never touches that.
 
 ### What this gets you
 

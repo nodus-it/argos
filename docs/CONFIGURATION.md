@@ -1,7 +1,7 @@
 # Configuration Reference
 
 All Argos configuration is controlled via environment variables passed to the
-`argos-manager` container (or your `.env` file when running locally).
+`app` service in the compose stack (or your `.env` file when running locally).
 
 > [!NOTE]
 > Argos generates a Laravel `APP_KEY` on first boot and persists it to
