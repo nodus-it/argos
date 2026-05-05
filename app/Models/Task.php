@@ -7,7 +7,6 @@ namespace App\Models;
 use App\Enums\Phase;
 use App\Enums\PhaseStatus;
 use App\Enums\WorkflowStatus;
-use App\Services\WorkflowService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -113,15 +112,5 @@ class Task extends Model
             ->latest('started_at')
             ->first()
             ?->started_at;
-    }
-
-    /**
-     * Advance workflow_status based on what a completed phase returned.
-     *
-     * @deprecated Use \App\Services\WorkflowService::completePhase() instead.
-     */
-    public function advanceWorkflow(string $phase, string $phaseStatus): void
-    {
-        app(WorkflowService::class)->completePhase($this, $phase, PhaseStatus::from($phaseStatus));
     }
 }

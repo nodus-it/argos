@@ -178,7 +178,7 @@ class WorkflowEndToEndTest extends TestCase
             'workflow_status' => WorkflowStatus::ImplementRunning,
         ]);
 
-        $task->advanceWorkflow('implement', 'completed');
+        app(WorkflowService::class)->completePhase($task, 'implement', PhaseStatus::Completed);
 
         Bus::assertDispatched(RunPhaseJob::class, fn ($job) => $job->phase === 'push' && $job->taskId === $task->id
         );
@@ -193,7 +193,7 @@ class WorkflowEndToEndTest extends TestCase
             'workflow_status' => WorkflowStatus::ImplementRunning,
         ]);
 
-        $task->advanceWorkflow('implement', 'completed');
+        app(WorkflowService::class)->completePhase($task, 'implement', PhaseStatus::Completed);
 
         Bus::assertNotDispatched(RunPhaseJob::class);
     }

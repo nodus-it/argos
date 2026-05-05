@@ -59,7 +59,7 @@ class WorkflowStatusTest extends TestCase
 
     public function test_implement_completed_returns_null(): void
     {
-        // implement completed is handled by Task::advanceWorkflow, not afterPhase
+        // implement completed is handled by WorkflowService::completePhase, not afterPhase
         $this->assertNull(WorkflowStatus::afterPhase('implement', PhaseStatus::Completed));
     }
 
