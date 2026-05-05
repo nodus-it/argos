@@ -90,7 +90,12 @@ RUN chown www-data:www-data /var/www
 RUN rm -f /usr/local/etc/php-fpm.d/www.conf
 COPY .tools/docker/app/php-fpm.conf /usr/local/etc/php-fpm.d/argos.conf
 
-# Runtime entrypoint: docker socket group fix + migrations.
+# Bake the nginx site config into the image. The app entrypoint copies it
+# into a shared volume on boot so the nginx container can mount it RO without
+# the installer having to drop a file into the host install dir.
+COPY .tools/docker/app/nginx.conf /usr/local/share/argos/nginx.conf
+
+# Runtime entrypoint: docker socket group fix + migrations + asset/config sync.
 COPY .tools/docker/app/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 

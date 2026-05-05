@@ -18,6 +18,12 @@
 # To layer in custom config (extra ports, labels, env), drop a
 # docker-compose.override.yml next to docker-compose.yml — the installer
 # never touches that file.
+#
+# Stage channel (rolling develop images, for testers):
+#   curl … | bash -s -- --stage
+#   ARGOS_STAGE=1 curl … | bash
+# Pins ARGOS_APP_IMAGE / ARGOS_WORKER_IMAGE to the :stage tags published
+# from develop and tracks the develop branch for manifests.
 
 set -euo pipefail
 IFS=$'\n\t'
@@ -32,13 +38,24 @@ FORCE=0
 # API call on every `source install.sh`.
 ARGOS_VERSION="${ARGOS_VERSION:-}"
 
+# Stage channel: pulls the rolling develop-branch images (CI publishes
+# :stage / :stage-php8.4 on every push to develop). Off by default — release
+# tags are the supported install path; stage is for testers tracking develop.
+STAGE="${ARGOS_STAGE:-0}"
+STAGE_APP_IMAGE="ghcr.io/nodus-it/argos-app:stage"
+STAGE_WORKER_IMAGE="ghcr.io/nodus-it/argos-worker:stage-php8.4"
+
 # Files the installer owns inside INSTALL_DIR.
 COMPOSE_FILE="docker-compose.yml"
-NGINX_FILE="nginx.conf"
 ENV_EXAMPLE_FILE=".env.example"
 ENV_FILE=".env"
 STATE_DIR=".argos-state"
-PUBLIC_DIR="public"
+# Legacy artefacts from earlier installer versions — wiped on update so they
+# don't sit in the install dir confusing operators. nginx.conf is now baked
+# into the app image; public/ is populated into a shared volume by the app
+# entrypoint instead of bind-mounted from the host.
+LEGACY_FILES=("nginx.conf")
+LEGACY_DIRS=("public")
 
 # ── Output helpers ──────────────────────────────────────────────────────────
 log()     { printf '\033[1;34m▸\033[0m %s\n' "$*"; }
@@ -53,12 +70,16 @@ Usage: install.sh [options]
 Options:
   -d, --dir PATH       Install directory (default: \$PWD = $PWD)
   -v, --version REF    Git ref to install from (default: $ARGOS_VERSION)
+  -s, --stage          Use the rolling 'stage' images built from develop
+                       (sets ARGOS_APP_IMAGE / ARGOS_WORKER_IMAGE to :stage
+                       tags; defaults --version to develop if unpinned)
   -f, --force          Skip safety prompts (e.g. non-empty install dir)
   -h, --help           Show this help
 
 Environment overrides:
   ARGOS_INSTALL_DIR    Same as --dir
   ARGOS_VERSION        Same as --version
+  ARGOS_STAGE=1        Same as --stage
   ARGOS_REPO           GitHub repo (default: nodus-it/argos)
 USAGE
 }
@@ -68,6 +89,7 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         -d|--dir)     INSTALL_DIR="$2"; shift 2;;
         -v|--version) ARGOS_VERSION="$2"; shift 2;;
+        -s|--stage)   STAGE=1; shift;;
         -f|--force)   FORCE=1; shift;;
         -h|--help)    usage; exit 0;;
         *)            fail "Unknown argument: $1 (try --help)";;
@@ -178,37 +200,35 @@ merge_env_keys() {
     fi
 }
 
-# Pull /app/public out of the app image into $INSTALL_DIR/public so nginx
-# can serve static assets without a source bind mount. `docker cp` writes
-# as the calling user, no root-owned files in the install dir.
-extract_public_assets() {
-    local image="$1"
-    log "Extracting static assets from $image ..."
-    if ! docker image inspect "$image" >/dev/null 2>&1; then
-        docker pull "$image" >/dev/null \
-            || fail "Image $image is not available locally and could not be pulled."
-    fi
-    local cid
-    cid="$(docker create "$image")"
-    # shellcheck disable=SC2064  # capture cid now, not at trap-fire time.
-    trap "docker rm '$cid' >/dev/null 2>&1 || true" RETURN
-    rm -rf "$PUBLIC_DIR"
-    mkdir -p "$PUBLIC_DIR"
-    docker cp "$cid:/app/public/." "$PUBLIC_DIR/"
-    docker rm "$cid" >/dev/null
-    trap - RETURN
+# Older installer versions (< stage move-to-volumes) dropped a nginx.conf
+# file and a public/ directory next to docker-compose.yml. They are no longer
+# part of the runtime — nginx.conf is baked into the app image, public/ is
+# populated by the app entrypoint into a shared volume. Wipe them on update.
+remove_legacy_artefacts() {
+    local f
+    for f in "${LEGACY_FILES[@]}"; do
+        if [[ -e "$f" ]]; then
+            rm -f "$f"
+            log "Removed legacy file $f (now lives inside the app image)."
+        fi
+    done
+    local d
+    for d in "${LEGACY_DIRS[@]}"; do
+        if [[ -d "$d" ]]; then
+            rm -rf "$d"
+            log "Removed legacy directory $d (now lives in a shared volume)."
+        fi
+    done
 }
 
 # ── Phases ──────────────────────────────────────────────────────────────────
 download_install_files() {
-    local tmp_compose tmp_nginx tmp_env
+    local tmp_compose tmp_env
     tmp_compose="$(mktemp)"
-    tmp_nginx="$(mktemp)"
     tmp_env="$(mktemp)"
 
     log "Downloading $ARGOS_VERSION manifests from $ARGOS_REPO ..."
     download_to "${RAW_BASE}/docker-compose.yml" "$tmp_compose"
-    download_to "${RAW_BASE}/nginx.conf"         "$tmp_nginx"
     download_to "${RAW_BASE}/.env.example"       "$tmp_env"
 
     # Promote: but for the compose file, refuse to overwrite if the user has
@@ -218,7 +238,7 @@ download_install_files() {
         local_sha="$(sha256_of "$COMPOSE_FILE")"
         recorded_sha="$(cat "$STATE_DIR/compose.sha256")"
         if [[ "$local_sha" != "$recorded_sha" ]]; then
-            rm -f "$tmp_compose" "$tmp_nginx" "$tmp_env"
+            rm -f "$tmp_compose" "$tmp_env"
             cat <<MSG >&2
 
 ✗ $COMPOSE_FILE has been modified locally since the installer wrote it.
@@ -238,13 +258,12 @@ MSG
     fi
 
     mv "$tmp_compose" "$COMPOSE_FILE"
-    mv "$tmp_nginx"   "$NGINX_FILE"
     mv "$tmp_env"     "$ENV_EXAMPLE_FILE"
-    # mktemp creates files mode 600; these three don't carry secrets and need
-    # to be readable by the nginx container's worker process (and friendly to
-    # `cat`/`scp` from a non-owner). .env keeps its 600 — it's set in
-    # initialise_env_file() after the secret values are baked in.
-    chmod 644 "$COMPOSE_FILE" "$NGINX_FILE" "$ENV_EXAMPLE_FILE"
+    # mktemp creates files mode 600; these two don't carry secrets and need
+    # to be readable / friendly to `cat`/`scp` from a non-owner. .env keeps
+    # its 600 — it's set in initialise_env_file() after the secret values
+    # are baked in.
+    chmod 644 "$COMPOSE_FILE" "$ENV_EXAMPLE_FILE"
 
     mkdir -p "$STATE_DIR"
     sha256_of "$COMPOSE_FILE" > "$STATE_DIR/compose.sha256"
@@ -259,6 +278,18 @@ initialise_env_file() {
     set_env_value "$ENV_FILE" ARGOS_DB_ROOT_PASSWORD "$(gen_password)"
     chmod 600 "$ENV_FILE"
     success "Wrote $ENV_FILE with generated secrets (mode 600)."
+}
+
+# apply_stage_overrides: Pin ARGOS_APP_IMAGE and ARGOS_WORKER_IMAGE in $ENV_FILE
+# to the rolling :stage tags published from develop. Idempotent — safe to run
+# on both fresh installs and updates whenever --stage is in effect.
+# Args: none (reads $ENV_FILE, $STAGE_APP_IMAGE, $STAGE_WORKER_IMAGE)
+# Returns: 0
+apply_stage_overrides() {
+    set_env_value "$ENV_FILE" ARGOS_APP_IMAGE    "$STAGE_APP_IMAGE"
+    set_env_value "$ENV_FILE" ARGOS_WORKER_IMAGE "$STAGE_WORKER_IMAGE"
+    log "Stage channel: pinned ARGOS_APP_IMAGE=$STAGE_APP_IMAGE"
+    log "Stage channel: pinned ARGOS_WORKER_IMAGE=$STAGE_WORKER_IMAGE"
 }
 
 bring_stack_up() {
@@ -302,11 +333,17 @@ main() {
     preflight
 
     if [[ -z "$ARGOS_VERSION" ]]; then
-        ARGOS_VERSION="$(resolve_default_version)"
-        if [[ -z "$ARGOS_VERSION" ]]; then
-            warn "No published release found — falling back to the develop branch."
-            warn "Pin a specific ref with --version <tag|branch> or ARGOS_VERSION=…"
+        if [[ "$STAGE" -eq 1 ]]; then
+            # Stage tracks develop end-to-end: the :stage image tags are built
+            # from that branch, so the manifests must come from there too.
             ARGOS_VERSION="develop"
+        else
+            ARGOS_VERSION="$(resolve_default_version)"
+            if [[ -z "$ARGOS_VERSION" ]]; then
+                warn "No published release found — falling back to the develop branch."
+                warn "Pin a specific ref with --version <tag|branch> or ARGOS_VERSION=…"
+                ARGOS_VERSION="develop"
+            fi
         fi
     fi
     RAW_BASE="${ARGOS_RAW_BASE:-https://raw.githubusercontent.com/${ARGOS_REPO}/${ARGOS_VERSION}/installer}"
@@ -317,6 +354,10 @@ main() {
     local mode="install"
     if [[ -f "$STATE_DIR/VERSION" ]]; then
         mode="update"
+    fi
+
+    if [[ "$STAGE" -eq 1 ]]; then
+        log "Stage channel selected (rolling develop images)."
     fi
 
     if [[ "$mode" == "install" ]]; then
@@ -361,11 +402,15 @@ MSG
         merge_env_keys "$ENV_EXAMPLE_FILE" "$ENV_FILE"
     fi
 
-    # Resolve the app image from .env so we can extract assets out of it.
-    local app_image
-    app_image="$(get_env_value "$ENV_FILE" ARGOS_APP_IMAGE)"
-    [[ -n "$app_image" ]] || fail "ARGOS_APP_IMAGE is empty in $ENV_FILE"
-    extract_public_assets "$app_image"
+    # Stage overrides run after env init/merge so they win against whatever
+    # tags the upstream .env.example or a prior install left behind. Without
+    # --stage we don't touch the image tags on update, so users who pinned
+    # their own tag manually keep that pin.
+    if [[ "$STAGE" -eq 1 ]]; then
+        apply_stage_overrides
+    fi
+
+    remove_legacy_artefacts
 
     bring_stack_up
     [[ "$mode" == "install" ]] && print_summary
@@ -375,6 +420,6 @@ MSG
 # Run main only when invoked directly. When the script is sourced (e.g. by
 # bats tests calling individual helpers in isolation) this guard prevents
 # main from firing and trying to talk to docker.
-if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+if [[ "${BASH_SOURCE[0]:-}" == "$0" || -z "${BASH_SOURCE[0]:-}" ]]; then
     main "$@"
 fi

@@ -58,7 +58,7 @@ class CredentialStore
      */
     public function hasClaudeToken(): bool
     {
-        return config('argos.claude_token') !== null || $this->getClaudeToken() !== null;
+        return $this->envToken() !== null || $this->getClaudeToken() !== null;
     }
 
     /**
@@ -66,11 +66,18 @@ class CredentialStore
      */
     public function claudeTokenSource(): string
     {
-        if (config('argos.claude_token') !== null) {
+        if ($this->envToken() !== null) {
             return 'env';
         }
 
         return $this->getClaudeToken() !== null ? 'file' : 'none';
+    }
+
+    private function envToken(): ?string
+    {
+        $value = config('argos.claude_token');
+
+        return is_string($value) && $value !== '' ? $value : null;
     }
 
     private function configDir(): string

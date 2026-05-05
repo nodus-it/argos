@@ -129,6 +129,37 @@ EOF
     [ "$h" = "$(sha256_of "$TEST_DIR/file")" ]
 }
 
+# ── apply_stage_overrides ───────────────────────────────────────────────────
+
+@test "apply_stage_overrides pins both image keys when missing" {
+    ENV_FILE="$TEST_DIR/.env"
+    printf 'APP_KEY=base64:foo\n' > "$ENV_FILE"
+
+    apply_stage_overrides >/dev/null
+
+    [ "$(get_env_value "$ENV_FILE" ARGOS_APP_IMAGE)"    = "$STAGE_APP_IMAGE" ]
+    [ "$(get_env_value "$ENV_FILE" ARGOS_WORKER_IMAGE)" = "$STAGE_WORKER_IMAGE" ]
+}
+
+@test "apply_stage_overrides replaces existing image tags in place" {
+    ENV_FILE="$TEST_DIR/.env"
+    cat > "$ENV_FILE" <<'EOF'
+APP_KEY=base64:foo
+ARGOS_APP_IMAGE=ghcr.io/nodus-it/argos-app:latest
+ARGOS_WORKER_IMAGE=ghcr.io/nodus-it/argos-worker:php8.4
+EOF
+
+    apply_stage_overrides >/dev/null
+
+    [ "$(get_env_value "$ENV_FILE" ARGOS_APP_IMAGE)"    = "$STAGE_APP_IMAGE" ]
+    [ "$(get_env_value "$ENV_FILE" ARGOS_WORKER_IMAGE)" = "$STAGE_WORKER_IMAGE" ]
+    # Idempotency: running twice changes nothing.
+    local before
+    before="$(sha256_of "$ENV_FILE")"
+    apply_stage_overrides >/dev/null
+    [ "$(sha256_of "$ENV_FILE")" = "$before" ]
+}
+
 # ── Compose-modification refusal ────────────────────────────────────────────
 
 @test "download_install_files refuses to clobber a locally-edited compose" {
@@ -136,7 +167,6 @@ EOF
 
     INSTALL_DIR="$TEST_DIR"
     COMPOSE_FILE="docker-compose.yml"
-    NGINX_FILE="nginx.conf"
     ENV_EXAMPLE_FILE=".env.example"
     STATE_DIR=".argos-state"
 
@@ -152,13 +182,44 @@ EOF
     RAW_BASE="file://$TEST_DIR/upstream"
     mkdir -p upstream
     printf 'new upstream content\n' > upstream/docker-compose.yml
-    printf 'nginx upstream\n'       > upstream/nginx.conf
     printf 'KEY=val\n'              > upstream/.env.example
 
     run download_install_files
     [ "$status" -eq 1 ]
     [[ "$output" == *"modified locally"* ]]
     [[ "$output" == *"docker-compose.override.yml"* ]]
+
+    popd >/dev/null
+}
+
+# ── remove_legacy_artefacts ─────────────────────────────────────────────────
+
+@test "remove_legacy_artefacts wipes nginx.conf and public/ if present" {
+    pushd "$TEST_DIR" >/dev/null
+
+    LEGACY_FILES=("nginx.conf")
+    LEGACY_DIRS=("public")
+
+    printf 'old nginx\n' > nginx.conf
+    mkdir -p public/build
+    printf 'asset\n' > public/build/asset.css
+
+    remove_legacy_artefacts >/dev/null
+
+    [ ! -e nginx.conf ]
+    [ ! -e public ]
+
+    popd >/dev/null
+}
+
+@test "remove_legacy_artefacts is a no-op when nothing to clean" {
+    pushd "$TEST_DIR" >/dev/null
+
+    LEGACY_FILES=("nginx.conf")
+    LEGACY_DIRS=("public")
+
+    run remove_legacy_artefacts
+    [ "$status" -eq 0 ]
 
     popd >/dev/null
 }

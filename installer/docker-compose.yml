@@ -41,6 +41,11 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       # Persistent app state (config, app-key).
       - argos-data:/data
+      # Shared with nginx — entrypoint syncs /app/public + the baked
+      # nginx.conf into these on every boot so nginx can serve assets and
+      # site config without bind-mounts in the host install dir.
+      - argos-public:/srv/argos-public
+      - argos-nginx-config:/srv/argos-nginx
     environment:
       ARGOS_ROLE:               "app"
       APP_ENV:                  "${APP_ENV:-production}"
@@ -70,14 +75,16 @@ services:
     image: nginx:1.27-alpine
     restart: unless-stopped
     depends_on:
-      - app
+      app:
+        condition: service_healthy
     ports:
       - "${ARGOS_PORT:-8080}:80"
     volumes:
-      # Static assets are extracted from the app image by the installer into
-      # ./public — nginx serves them directly without bouncing through PHP-FPM.
-      - ./public:/app/public:ro
-      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      # Both volumes are populated by the app container's entrypoint on every
+      # boot. Mounted RO here so nginx can serve static assets directly without
+      # bouncing through PHP-FPM, and pick up the baked site config.
+      - argos-public:/app/public:ro
+      - argos-nginx-config:/etc/nginx/conf.d:ro
 
   queue:
     image: "${ARGOS_APP_IMAGE}"
@@ -106,3 +113,5 @@ services:
 volumes:
   argos-data:
   argos-db:
+  argos-public:
+  argos-nginx-config:

@@ -42,7 +42,10 @@ return [
             "ghcr.io/nodus-it/argos-worker:php8.3{$prodWorkerSuffix}",
         ],
     ],
-    'claude_token' => env('CLAUDE_CODE_OAUTH_TOKEN'),
+    // Empty .env entries (CLAUDE_CODE_OAUTH_TOKEN=) come back as "" from
+    // env(), but readers treat null as "not configured" — normalise here so
+    // hasClaudeToken() / claudeTokenSource() / Settings UI all agree.
+    'claude_token' => env('CLAUDE_CODE_OAUTH_TOKEN') ?: null,
     'admin_password' => env('ADMIN_PASSWORD') ?: '12345',
     'docker' => [
         'memory_limit' => env('ARGOS_MEM_LIMIT', '4g'),

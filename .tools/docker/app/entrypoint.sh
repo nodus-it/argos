@@ -45,6 +45,23 @@ fi
 mkdir -p /data/config
 chown -R www-data:www-data /data
 
+# Sync nginx-served assets and config into shared volumes if they are mounted.
+# The compose stack mounts:
+#   /srv/argos-public      ↔ nginx:/app/public:ro
+#   /srv/argos-nginx       ↔ nginx:/etc/nginx/conf.d:ro
+# Skip silently when the directories aren't mounted (image started outside the
+# split stack — e.g. a one-shot artisan invocation).
+if [[ -d /srv/argos-public ]]; then
+    # Wipe stale entries so files removed from /app/public in a new image are
+    # not served forever. Race window is short and bracketed by the depends_on
+    # service_healthy gate before nginx (re)starts.
+    find /srv/argos-public -mindepth 1 -delete
+    cp -a /app/public/. /srv/argos-public/
+fi
+if [[ -d /srv/argos-nginx ]]; then
+    install -m 0644 /usr/local/share/argos/nginx.conf /srv/argos-nginx/default.conf
+fi
+
 # Generate and persist APP_KEY on first boot if not provided.
 if [[ -z "${APP_KEY:-}" ]]; then
     KEY_FILE=/data/app-key
