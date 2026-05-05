@@ -71,3 +71,16 @@ The **Connected Accounts** page in the Argos navigation shows a "Connect"
 button for each configured provider. Once connected, the **Authentication**
 field in the project form gains an "OAuth" option that pulls repos and
 branches from the connected account.
+
+## Token refresh
+
+Bitbucket and GitLab issue short-lived access tokens (~2h); GitHub OAuth Apps
+with token expiration enabled behave the same way (~8h). Argos refreshes the
+access token via the stored `refresh_token` whenever a worker job is about to
+dispatch and the token has less than 1h of validity left, so a freshly started
+job always begins with a token that survives the worker's job timeout.
+
+If a refresh fails (revoked token, provider 4xx, missing `refresh_token`), the
+phase fails fast with a "bitte Account neu verbinden" message — reconnect the
+account on the **Connected Accounts** page to mint a fresh token + refresh
+token pair, then re-run the task.
