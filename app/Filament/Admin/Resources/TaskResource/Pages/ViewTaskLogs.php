@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\TaskResource\Pages;
 
-use App\Services\StateReader;
 use App\Filament\Admin\Resources\TaskResource;
 use App\Models\Task;
+use App\Services\StateReader;
 use Filament\Actions\Action;
 use Filament\Resources\Pages\Page;
 
@@ -32,7 +32,7 @@ class ViewTaskLogs extends Page
     public function mount(string $record): void
     {
         $this->task = Task::findOrFail($record);
-        $this->phase = request()->query('phase', $this->task->current_phase ?? 'concept');
+        $this->phase = request()->query('phase', $this->task->current_phase?->value ?? 'concept');
         $this->doRefresh();
     }
 
@@ -89,7 +89,7 @@ class ViewTaskLogs extends Page
         }
 
         $this->isRunning = $this->task->current_status === 'running'
-            && $this->task->current_phase === $this->phase;
+            && $this->task->current_phase?->value === $this->phase;
 
         $raw = $this->readLogFile();
         $this->lines = $this->parseLines($raw);

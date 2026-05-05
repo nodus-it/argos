@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Enums\Phase;
 use App\Enums\WorkflowStatus;
 use App\Filament\Admin\Resources\TaskResource\Pages\CreateTask;
 use App\Filament\Admin\Resources\TaskResource\Pages\ListTasks;
@@ -94,7 +95,7 @@ class TaskResourceTest extends TestCase
 
         $task = Task::where('name', 'Auto Task')->first();
         $this->assertEquals(WorkflowStatus::ConceptRunning, $task->workflow_status);
-        $this->assertSame('concept', $task->current_phase);
+        $this->assertSame(Phase::Concept, $task->current_phase);
         $this->assertSame('pending', $task->current_status);
         Bus::assertDispatched(RunPhaseJob::class, fn ($job) => $job->phase === 'concept');
     }

@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Services\WorkflowService;
+use App\Enums\Phase;
 use App\Enums\WorkflowStatus;
+use App\Services\WorkflowService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -22,7 +23,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $base_branch
  * @property string|null $feature_branch
  * @property string|null $pr_url
- * @property string|null $current_phase
+ * @property Phase|null $current_phase
  * @property string|null $current_status
  * @property WorkflowStatus $workflow_status
  * @property bool $auto_concept
@@ -67,6 +68,7 @@ class Task extends Model
     {
         return [
             'workflow_status' => WorkflowStatus::class,
+            'current_phase' => Phase::class,
             'auto_concept' => 'boolean',
             'max_turns' => 'integer',
         ];

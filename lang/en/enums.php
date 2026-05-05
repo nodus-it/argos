@@ -20,6 +20,7 @@ return [
         'diff' => 'Diff',
         'push' => 'Push',
         'respond' => 'Respond',
+        'commit_message' => 'Commit Message',
     ],
 
     'phase_runs' => [

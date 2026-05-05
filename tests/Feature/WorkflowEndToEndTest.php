@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Services\PhaseRunner;
-use App\Services\WorkflowService;
+use App\Enums\Phase;
 use App\Enums\WorkflowStatus;
 use App\Jobs\RunPhaseJob;
 use App\Models\PhaseRun;
 use App\Models\RepoProfile;
 use App\Models\Task;
+use App\Services\PhaseRunner;
+use App\Services\WorkflowService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Mockery\MockInterface;
@@ -56,7 +57,7 @@ class WorkflowEndToEndTest extends TestCase
         $this->runJobWithExitCode($task, 'concept', 0);
 
         $this->assertSame(WorkflowStatus::ConceptReview, $task->fresh()->workflow_status);
-        $this->assertSame('concept', $task->fresh()->current_phase);
+        $this->assertSame(Phase::Concept, $task->fresh()->current_phase);
         $this->assertSame('completed', $task->fresh()->current_status);
     }
 
@@ -85,7 +86,7 @@ class WorkflowEndToEndTest extends TestCase
         $this->runJobWithExitCode($task, 'concept', 0);
         $this->runJobWithExitCode($task, 'implement', 0);
 
-        $this->assertSame('implement', $task->fresh()->current_phase);
+        $this->assertSame(Phase::Implement, $task->fresh()->current_phase);
         $this->assertSame('completed', $task->fresh()->current_status);
         $this->assertDatabaseCount(PhaseRun::class, 2);
     }

@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Domain\Task;
 
-use App\Services\PhaseRunner;
-use App\Services\WorkflowService;
+use App\Enums\Phase;
 use App\Enums\WorkflowStatus;
 use App\Jobs\RunPhaseJob;
 use App\Models\PhaseRun;
 use App\Models\RepoProfile;
 use App\Models\Task;
+use App\Services\PhaseRunner;
+use App\Services\WorkflowService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Tests\TestCase;
@@ -139,7 +140,7 @@ class WorkflowServiceTest extends TestCase
         $this->assertInstanceOf(PhaseRun::class, $phaseRun);
         $this->assertSame(1, $phaseRun->iteration);
         $this->assertSame('running', $phaseRun->status);
-        $this->assertSame('concept', $phaseRun->phase);
+        $this->assertSame(Phase::Concept, $phaseRun->phase);
         $this->assertSame($task->id, $phaseRun->task_id);
     }
 
@@ -160,7 +161,7 @@ class WorkflowServiceTest extends TestCase
         $this->service->startPhase($task, 'implement');
 
         $fresh = $task->fresh();
-        $this->assertSame('implement', $fresh->current_phase);
+        $this->assertSame(Phase::Implement, $fresh->current_phase);
         $this->assertSame('running', $fresh->current_status);
     }
 

@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Services\PhaseRunner;
-use App\Services\StateReader;
-use App\Services\TaskService;
 use App\Jobs\RunPhaseJob;
 use App\Models\RepoProfile;
 use App\Models\Task;
+use App\Services\PhaseRunner;
+use App\Services\StateReader;
+use App\Services\TaskService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Collection;
 use Symfony\Component\Process\Process;
@@ -49,7 +49,7 @@ class ArgosCommand extends Command
 
             $options = [];
             foreach ($tasks as $task) {
-                $phase = $task->current_phase ?? '—';
+                $phase = $task->current_phase?->value ?? '—';
                 $status = $task->current_status ?? '·';
                 $icon = $status === 'running' ? '⟳' : ($status === 'completed' ? '✓' : '·');
                 $options["task:{$task->name}"] = "{$icon} {$task->name}  {$phase}  {$status}";
@@ -102,7 +102,7 @@ class ArgosCommand extends Command
             $options = [];
 
             if ($runningRun !== null) {
-                $options['watch'] = "⟳ Ausgabe beobachten ({$runningRun->phase})";
+                $options['watch'] = "⟳ Ausgabe beobachten ({$runningRun->phase->value})";
                 $options['refresh'] = '↺ Status aktualisieren';
             }
 
@@ -121,7 +121,7 @@ class ArgosCommand extends Command
             }
 
             match ($choice) {
-                'watch' => $this->watchPhase($task, $runningRun->phase),
+                'watch' => $this->watchPhase($task, $runningRun->phase->value),
                 'refresh' => null,
                 'concept' => $this->startPhaseBackground($task, 'concept'),
                 'implement' => $this->startPhaseBackground($task, 'implement'),
@@ -484,7 +484,7 @@ class ArgosCommand extends Command
             $this->line(sprintf(
                 '  %-30s %-12s %-22s %-20s',
                 $task->name,
-                $task->current_phase ?? '—',
+                $task->current_phase?->value ?? '—',
                 "{$icon} {$status}",
                 $task->repoProfile?->name ?? '—',
             ));
@@ -521,7 +521,7 @@ class ArgosCommand extends Command
             $cost = $run->cost_usd !== null ? '$'.number_format((float) $run->cost_usd, 4) : '—';
             $this->line(sprintf(
                 '  %-12s %-6s %-22s %-10s %-20s',
-                $run->phase,
+                $run->phase->value,
                 $run->iteration,
                 $run->status,
                 $cost,
