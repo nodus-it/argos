@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Domain\Phase\PhaseRunner;
-use App\Domain\Phase\StateReader;
+use App\Services\PhaseRunner;
+use App\Services\StateReader;
 use App\Models\Task;
 use Illuminate\Console\Command;
 

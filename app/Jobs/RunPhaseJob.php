@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
-use App\Domain\Phase\PhaseRunner;
-use App\Domain\Task\WorkflowService;
+use App\Services\PhaseRunner;
+use App\Services\WorkflowService;
 use App\Models\Task;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;

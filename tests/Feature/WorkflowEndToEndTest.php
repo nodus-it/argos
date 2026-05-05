@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Domain\Phase\PhaseRunner;
-use App\Domain\Task\WorkflowService;
+use App\Services\PhaseRunner;
+use App\Services\WorkflowService;
 use App\Enums\WorkflowStatus;
 use App\Jobs\RunPhaseJob;
 use App\Models\PhaseRun;

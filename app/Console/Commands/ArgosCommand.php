@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Domain\Phase\PhaseRunner;
-use App\Domain\Phase\StateReader;
-use App\Domain\Task\TaskService;
+use App\Services\PhaseRunner;
+use App\Services\StateReader;
+use App\Services\TaskService;
 use App\Jobs\RunPhaseJob;
 use App\Models\RepoProfile;
 use App\Models\Task;

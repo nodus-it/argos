@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit;
 
-use App\Domain\Credentials\CredentialStore;
+use App\Services\CredentialStore;
 use Tests\TestCase;
 
 class CredentialStoreTest extends TestCase

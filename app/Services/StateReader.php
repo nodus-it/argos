@@ -2,9 +2,8 @@
 
 declare(strict_types=1);
 
-namespace App\Domain\Phase;
+namespace App\Services;
 
-use App\Domain\Task\WorkflowService;
 use App\Models\PhaseRun;
 use App\Models\Task;
 use Symfony\Component\Process\Process;

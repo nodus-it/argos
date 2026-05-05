@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Domain\Phase\PhaseRunner;
-use App\Domain\Phase\StateReader;
+use App\Services\PhaseRunner;
+use App\Services\StateReader;
 use App\Enums\WorkflowStatus;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTask;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTaskConcept;

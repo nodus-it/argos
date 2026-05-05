@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources;
 
-use App\Domain\Worker\WorkerImage;
+use App\Services\WorkerImage;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\CreateRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\EditRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\ListRepoProfiles;

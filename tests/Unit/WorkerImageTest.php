@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit;
 
-use App\Domain\Worker\WorkerImage;
+use App\Services\WorkerImage;
 use Tests\TestCase;
 
 class WorkerImageTest extends TestCase

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Pages;
 
-use App\Domain\Credentials\CredentialStore;
+use App\Services\CredentialStore;
 use App\Services\Anthropic\AnthropicTokenValidator;
 use Filament\Actions\Action;
 use Filament\Forms\Components\TextInput;

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Domain\Credentials\CredentialStore;
-use App\Domain\Phase\PhaseRunner;
+use App\Services\CredentialStore;
+use App\Services\PhaseRunner;
 use App\Models\ConnectedAccount;
 use App\Models\PhaseRun;
 use App\Models\RepoProfile;

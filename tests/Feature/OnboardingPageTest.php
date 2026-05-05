@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Domain\Credentials\CredentialStore;
+use App\Services\CredentialStore;
 use App\Filament\Admin\Pages\Onboarding;
 use App\Models\RepoProfile;
 use App\Models\User;

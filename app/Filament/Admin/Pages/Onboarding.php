@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Pages;
 
-use App\Domain\Credentials\CredentialStore;
+use App\Services\CredentialStore;
 use App\Models\RepoProfile;
 use App\Models\User;
 use App\Services\Anthropic\AnthropicTokenValidator;

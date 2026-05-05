@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\TaskResource\Pages;
 
-use App\Domain\Phase\StateReader;
+use App\Services\StateReader;
 use App\Enums\WorkflowStatus;
 use App\Filament\Admin\Resources\TaskResource;
 use App\Jobs\RunPhaseJob;

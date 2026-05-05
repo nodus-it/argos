@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Domain\Task\WorkflowService;
+use App\Services\WorkflowService;
 use App\Enums\WorkflowStatus;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
@@ -114,7 +114,7 @@ class Task extends Model
     /**
      * Advance workflow_status based on what a completed phase returned.
      *
-     * @deprecated Use \App\Domain\Task\WorkflowService::completePhase() instead.
+     * @deprecated Use \App\Services\WorkflowService::completePhase() instead.
      */
     public function advanceWorkflow(string $phase, string $phaseStatus): void
     {

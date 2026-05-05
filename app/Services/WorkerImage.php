@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Domain\Worker;
+namespace App\Services;
 
 use Illuminate\Contracts\Foundation\Application;
 

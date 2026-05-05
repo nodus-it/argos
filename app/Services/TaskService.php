@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Domain\Task;
+namespace App\Services;
 
 use App\Models\Task;
 use Illuminate\Support\Collection;

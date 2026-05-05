@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\TaskResource\Pages;
 
-use App\Domain\Phase\StateReader;
+use App\Services\StateReader;
 use App\Filament\Admin\Resources\TaskResource;
 use App\Models\Task;
 use Filament\Actions\Action;

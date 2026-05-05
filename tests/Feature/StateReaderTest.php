@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Domain\Phase\StateReader;
+use App\Services\StateReader;
 use App\Models\PhaseRun;
 use App\Models\Task;
 use Illuminate\Foundation\Testing\RefreshDatabase;

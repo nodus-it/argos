@@ -9,7 +9,7 @@ use App\Console\Commands\AgentDiffCommand;
 use App\Console\Commands\AgentImplementCommand;
 use App\Console\Commands\AgentPushCommand;
 use App\Console\Commands\ArgosCommand;
-use App\Domain\Credentials\CredentialStore;
+use App\Services\CredentialStore;
 use App\Services\Bitbucket\BitbucketGitService;
 use App\Services\GitHub\GitHubGitService;
 use App\Services\GitLab\GitLabGitService;

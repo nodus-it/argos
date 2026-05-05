@@ -2,10 +2,8 @@
 
 declare(strict_types=1);
 
-namespace App\Domain\Phase;
+namespace App\Services;
 
-use App\Domain\Credentials\CredentialStore;
-use App\Domain\Task\WorkflowService;
 use App\Jobs\RunPhaseJob;
 use App\Models\PhaseRun;
 use App\Models\RepoProfile;
@@ -225,11 +223,11 @@ class PhaseRunner
         return $output !== '' ? $output : null;
     }
 
-    public function writeFeedbackToVolume(string $taskName, string $feedback): void
+    public function writeFeedbackToVolume(Task $task, string $feedback): void
     {
         $process = $this->newProcess([
             'docker', 'run', '--rm',
-            '-v', 'task_ws_'.Task::slugifyName($taskName).':/workspace',
+            '-v', $task->volumeName().':/workspace',
             '-e', 'FEEDBACK',
             'alpine',
             'sh', '-c',
