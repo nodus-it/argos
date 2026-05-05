@@ -15,11 +15,12 @@
             'paused' => __('tasks.view.labels.status_paused'),
         ];
         $phaseRun = fn(string $phase) => ($phaseRuns[$phase] ?? collect())->last();
-        $phaseStatus = fn(string $phase) => $phaseRun($phase)?->status ?? 'pending';
+        $phaseStatus = fn(string $phase) => $phaseRun($phase)?->status?->value ?? 'pending';
 
         // A phase is open if it is the current one, or if no phase has run yet
         // and we're showing concept.
-        $currentPhase = $record->current_phase;
+        $currentPhase = $record->current_phase?->value;
+        $currentStatus = $record->current_status?->value;
         $isOpen = fn(string $phase) => $currentPhase === $phase
             || ($currentPhase === null && $phase === 'concept');
     @endphp
@@ -106,25 +107,25 @@
                 </div>
             @endif
 
-            @if($record->current_status === 'running')
+            @if($currentStatus === 'running')
                 <div class="flex items-center gap-2 pt-1 border-t border-amber-100 dark:border-amber-900/40">
                     <span class="flex h-2 w-2 relative flex-shrink-0">
                         <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
                         <span class="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
                     </span>
-                    <span class="text-xs text-amber-600 dark:text-amber-400 font-medium">{{ __('tasks.view.labels.phase_running', ['phase' => $record->current_phase]) }}</span>
+                    <span class="text-xs text-amber-600 dark:text-amber-400 font-medium">{{ __('tasks.view.labels.phase_running', ['phase' => $currentPhase]) }}</span>
                     <span x-data="{ sec: {{ max(0, now()->timestamp - ($record->currentPhaseStartedAt()?->timestamp ?? now()->timestamp)) }} }"
                           x-init="setInterval(() => sec++, 1000)"
                           x-text="Math.floor(sec/60) + ':' + String(sec % 60).padStart(2, '0')"
                           class="ml-auto text-xs font-mono tabular-nums text-amber-500 dark:text-amber-400"></span>
                 </div>
-            @elseif($record->current_status === 'pending')
+            @elseif($currentStatus === 'pending')
                 <div class="flex items-center gap-2 pt-1 border-t border-sky-100 dark:border-sky-900/40">
                     <svg class="animate-spin h-3 w-3 text-sky-500 flex-shrink-0" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
                     </svg>
-                    <span class="text-xs text-sky-600 dark:text-sky-400 font-medium">{{ __('tasks.view.labels.phase_waiting', ['phase' => $record->current_phase]) }}</span>
+                    <span class="text-xs text-sky-600 dark:text-sky-400 font-medium">{{ __('tasks.view.labels.phase_waiting', ['phase' => $currentPhase]) }}</span>
                 </div>
             @endif
 
@@ -138,7 +139,7 @@
     {{-- ===================== Paused banner (max-turns) ===================== --}}
     @php
         $lastImplement = ($phaseRuns['implement'] ?? collect())->last();
-        $isPaused = $lastImplement?->status === 'paused';
+        $isPaused = $lastImplement?->status?->value === 'paused';
         $implementIterations = ($phaseRuns['implement'] ?? collect())->count();
         $turnsUsed = data_get($lastImplement?->result_json, 'num_turns');
     @endphp
@@ -331,7 +332,7 @@
                                         <x-heroicon-o-check class="h-3.5 w-3.5" />
                                         {{ __('tasks.view.actions.save') }}
                                     </button>
-                                    @if($record->current_status !== 'running' && $record->workflow_status !== \App\Enums\WorkflowStatus::Completed)
+                                    @if($currentStatus !== 'running' && $record->workflow_status !== \App\Enums\WorkflowStatus::Completed)
                                         <button type="button" wire:click="saveNotesAndRevise"
                                                 class="inline-flex items-center gap-1.5 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold px-4 py-2 transition-colors">
                                             <x-heroicon-o-light-bulb class="h-3.5 w-3.5" />
@@ -349,7 +350,7 @@
                                 <x-heroicon-o-chat-bubble-left-ellipsis class="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
                                 <pre class="whitespace-pre-wrap text-sm text-amber-900 dark:text-amber-200 font-mono leading-relaxed flex-1">{{ $notes }}</pre>
                             </div>
-                            @if($record->current_status !== 'running' && $record->workflow_status !== \App\Enums\WorkflowStatus::Completed)
+                            @if($currentStatus !== 'running' && $record->workflow_status !== \App\Enums\WorkflowStatus::Completed)
                                 <div class="flex items-center justify-between pt-3">
                                     <span class="text-xs text-gray-500 dark:text-gray-400">{{ __('tasks.view.feedback.ready_to_revise') }}</span>
                                     <button type="button" wire:click="reviseConcept"
@@ -791,7 +792,7 @@
                                         <x-heroicon-o-check class="h-3.5 w-3.5" />
                                         {{ __('tasks.view.actions.save') }}
                                     </button>
-                                    @if($record->current_status !== 'running' && $record->workflow_status !== \App\Enums\WorkflowStatus::Completed)
+                                    @if($currentStatus !== 'running' && $record->workflow_status !== \App\Enums\WorkflowStatus::Completed)
                                         <button type="button" wire:click="saveImplementNotesAndRevise"
                                                 class="inline-flex items-center gap-1.5 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold px-4 py-2 transition-colors">
                                             <x-heroicon-o-code-bracket class="h-3.5 w-3.5" />
@@ -1008,7 +1009,7 @@
     </div>
 
     {{-- Poll every 3s while a phase is running OR pending (job queued, worker not yet picked it up). --}}
-    @if(in_array($record->current_status, ['running', 'pending'], true))
+    @if(in_array($currentStatus, ['running', 'pending'], true))
         <div wire:poll.3s="poll" class="hidden"></div>
     @endif
 

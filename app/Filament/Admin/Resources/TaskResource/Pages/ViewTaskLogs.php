@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\TaskResource\Pages;
 
+use App\Enums\PhaseStatus;
 use App\Filament\Admin\Resources\TaskResource;
 use App\Models\Task;
 use App\Services\StateReader;
@@ -83,12 +84,12 @@ class ViewTaskLogs extends Page
     {
         $this->task->refresh();
 
-        if ($this->task->current_status === 'running') {
+        if ($this->task->current_status === PhaseStatus::Running) {
             app(StateReader::class)->syncToDb($this->task);
             $this->task->refresh();
         }
 
-        $this->isRunning = $this->task->current_status === 'running'
+        $this->isRunning = $this->task->current_status === PhaseStatus::Running
             && $this->task->current_phase?->value === $this->phase;
 
         $raw = $this->readLogFile();

@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Enums\PhaseStatus;
+use App\Models\Task;
 use App\Services\PhaseRunner;
 use App\Services\WorkflowService;
-use App\Models\Task;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Carbon;
@@ -60,7 +61,7 @@ class RunPhaseJob implements ShouldQueue
             $task->refresh();
 
             // Phase hit the usage limit — re-schedule instead of failing permanently.
-            if ($task->current_status === 'rate_limited') {
+            if ($task->current_status === PhaseStatus::RateLimited) {
                 $retryLimit = Cache::get('usage_limit');
                 $resetAt = isset($retryLimit['reset_at']) ? Carbon::parse($retryLimit['reset_at']) : null;
                 $delaySec = ($resetAt !== null && $resetAt->isFuture())
@@ -79,7 +80,7 @@ class RunPhaseJob implements ShouldQueue
                 return;
             }
 
-            $workflowService->completePhase($task, $this->phase, $task->current_status ?? 'failed');
+            $workflowService->completePhase($task, $this->phase, $task->current_status ?? PhaseStatus::Failed);
 
             Log::channel('argos')->info('Job completed', [
                 'task' => $this->taskId,

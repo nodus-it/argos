@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources;
 
-use App\Services\WorkerImage;
+use App\Enums\Phase;
+use App\Enums\PhaseStatus;
 use App\Enums\WorkflowStatus;
 use App\Filament\Admin\Resources\TaskResource\Pages\CreateTask;
 use App\Filament\Admin\Resources\TaskResource\Pages\ListTasks;
@@ -14,11 +15,11 @@ use App\Filament\Admin\Resources\TaskResource\Pages\ViewTaskDiff;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTaskLogs;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTaskRespond;
 use App\Filament\Admin\Resources\TaskResource\RelationManagers\PhaseRunsRelationManager;
-use App\Filament\Admin\Widgets\CurrentTasksWidget;
 use App\Models\PhaseRun;
 use App\Models\RepoProfile;
 use App\Models\Task;
 use App\Services\GitServiceFactory;
+use App\Services\WorkerImage;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Forms\Components\Select;
@@ -136,29 +137,15 @@ class TaskResource extends Resource
                 TextColumn::make('current_phase')
                     ->label(__('tasks.columns.phase'))
                     ->badge()
-                    ->icon(fn (?string $state): ?string => CurrentTasksWidget::phaseIcon($state))
-                    ->color(fn (?string $state): string => CurrentTasksWidget::phaseColor($state))
-                    ->formatStateUsing(fn (?string $state): string => CurrentTasksWidget::phaseLabel($state)),
+                    ->icon(fn (?Phase $state): ?string => $state?->icon())
+                    ->color(fn (?Phase $state): string => $state?->color() ?? 'gray')
+                    ->formatStateUsing(fn (?Phase $state): string => $state?->label() ?? '—'),
 
                 TextColumn::make('current_status')
                     ->label(__('tasks.columns.status'))
                     ->badge()
-                    ->color(fn (?string $state): string => match ($state) {
-                        'pending' => 'gray',
-                        'running' => 'warning',
-                        'paused' => 'warning',
-                        'completed' => 'success',
-                        'failed' => 'danger',
-                        'quality_gate_failed' => 'danger',
-                        'lock_blocked' => 'danger',
-                        'no_changes' => 'info',
-                        default => 'gray',
-                    })
-                    ->formatStateUsing(fn (?string $state): string => match ($state) {
-                        'paused' => __('common.status.paused'),
-                        'lock_blocked' => __('common.status.lock_blocked'),
-                        default => (string) $state,
-                    })
+                    ->color(fn (?PhaseStatus $state): string => $state?->color() ?? 'gray')
+                    ->formatStateUsing(fn (?PhaseStatus $state): string => $state?->label() ?? '—')
                     ->placeholder('—'),
 
                 TextColumn::make('workflow_status')

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Enums\PhaseStatus;
 use App\Enums\WorkflowStatus;
 use App\Jobs\RunPhaseJob;
 use App\Models\PhaseRun;
@@ -18,14 +19,14 @@ class WorkflowService
     {
         $task->update([
             'current_phase' => $phase,
-            'current_status' => 'running',
+            'current_status' => PhaseStatus::Running,
         ]);
 
         return PhaseRun::create([
             'task_id' => $task->id,
             'phase' => $phase,
             'iteration' => $task->phaseRuns()->where('phase', $phase)->count() + 1,
-            'status' => 'running',
+            'status' => PhaseStatus::Running,
             'started_at' => now(),
         ]);
     }
@@ -39,7 +40,7 @@ class WorkflowService
         $task->update([
             'workflow_status' => $task->workflow_status->retryingPhase($phase),
             'current_phase' => $phase,
-            'current_status' => 'running',
+            'current_status' => PhaseStatus::Running,
         ]);
     }
 
@@ -47,9 +48,9 @@ class WorkflowService
      * Advance workflow_status after a phase completes.
      * Canonical implementation — Task::advanceWorkflow() delegates here.
      */
-    public function completePhase(Task $task, string $phase, string $phaseStatus): void
+    public function completePhase(Task $task, string $phase, PhaseStatus $phaseStatus): void
     {
-        if ($phase === 'implement' && $phaseStatus === 'completed') {
+        if ($phase === 'implement' && $phaseStatus === PhaseStatus::Completed) {
             if ($task->repoProfile?->auto_pr) {
                 RunPhaseJob::dispatch($task->id, 'push');
 

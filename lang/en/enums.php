@@ -14,6 +14,18 @@ return [
         'failed' => 'Failed',
     ],
 
+    'phase_status' => [
+        'pending' => 'Pending',
+        'running' => 'Running',
+        'completed' => 'Completed',
+        'paused' => 'Paused',
+        'failed' => 'Failed',
+        'quality_gate_failed' => 'Quality Gate Failed',
+        'no_changes' => 'No Changes',
+        'lock_blocked' => 'Lock Blocked',
+        'rate_limited' => 'Rate Limited',
+    ],
+
     'phases' => [
         'concept' => 'Concept',
         'implement' => 'Implement',

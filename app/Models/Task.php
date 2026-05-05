@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\Phase;
+use App\Enums\PhaseStatus;
 use App\Enums\WorkflowStatus;
 use App\Services\WorkflowService;
 use Illuminate\Database\Eloquent\Collection;
@@ -24,7 +25,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $feature_branch
  * @property string|null $pr_url
  * @property Phase|null $current_phase
- * @property string|null $current_status
+ * @property PhaseStatus|null $current_status
  * @property WorkflowStatus $workflow_status
  * @property bool $auto_concept
  * @property int|null $max_turns
@@ -69,6 +70,7 @@ class Task extends Model
         return [
             'workflow_status' => WorkflowStatus::class,
             'current_phase' => Phase::class,
+            'current_status' => PhaseStatus::class,
             'auto_concept' => 'boolean',
             'max_turns' => 'integer',
         ];
@@ -120,6 +122,6 @@ class Task extends Model
      */
     public function advanceWorkflow(string $phase, string $phaseStatus): void
     {
-        app(WorkflowService::class)->completePhase($this, $phase, $phaseStatus);
+        app(WorkflowService::class)->completePhase($this, $phase, PhaseStatus::from($phaseStatus));
     }
 }

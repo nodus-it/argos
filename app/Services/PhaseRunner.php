@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Enums\PhaseStatus;
 use App\Jobs\RunPhaseJob;
 use App\Models\PhaseRun;
 use App\Models\RepoProfile;
@@ -93,7 +94,7 @@ class PhaseRunner
 
             // When concept fails before Claude runs (e.g. git clone), capture
             // logs/clone.err so the user sees the real reason in the UI.
-            if ($phaseRun->status !== 'completed' && $conceptMd === null) {
+            if ($phaseRun->status !== PhaseStatus::Completed && $conceptMd === null) {
                 $cloneErr = $this->readFileFromVolume($task->volumeName(), '/workspace/.agent/logs/clone.err');
                 if ($cloneErr !== null) {
                     $phaseRunUpdate['error_log'] = $cloneErr;
@@ -129,9 +130,9 @@ class PhaseRunner
 
                         // Promote a max-turns hit from "failed" to "paused" so
                         // the UI shows it as resumable, not as an error.
-                        if ($stopReason === 'error_max_turns' && $phaseRun->status === 'failed') {
-                            $phaseRun->update(['status' => 'paused']);
-                            $task->update(['current_status' => 'paused']);
+                        if ($stopReason === 'error_max_turns' && $phaseRun->status === PhaseStatus::Failed) {
+                            $phaseRun->update(['status' => PhaseStatus::Paused]);
+                            $task->update(['current_status' => PhaseStatus::Paused]);
                         }
                     }
                 }
@@ -390,7 +391,7 @@ class PhaseRunner
         $this->postPhaseSync($task, $phaseRun, $phase, $notesBeforeRun);
 
         // After a successful implement run with existing PR: auto-trigger push
-        if ($phase === 'implement' && $status === 'completed' && $task->fresh()->pr_url !== null) {
+        if ($phase === 'implement' && $status === PhaseStatus::Completed && $task->fresh()->pr_url !== null) {
             Log::channel('argos')->info('Auto-triggering push after implement', $this->safeContext($task, 'push'));
             RunPhaseJob::dispatch($task->id, 'push');
         }
@@ -401,15 +402,15 @@ class PhaseRunner
         return new Process($cmd);
     }
 
-    private function exitCodeToStatus(int $exitCode): string
+    private function exitCodeToStatus(int $exitCode): PhaseStatus
     {
         return match ($exitCode) {
-            0 => 'completed',
-            4 => 'quality_gate_failed',
-            5 => 'no_changes',
-            6 => 'lock_blocked',
-            7 => 'rate_limited',
-            default => 'failed',
+            0 => PhaseStatus::Completed,
+            4 => PhaseStatus::QualityGateFailed,
+            5 => PhaseStatus::NoChanges,
+            6 => PhaseStatus::LockBlocked,
+            7 => PhaseStatus::RateLimited,
+            default => PhaseStatus::Failed,
         };
     }
 
@@ -419,7 +420,7 @@ class PhaseRunner
      *
      * @return array<string, mixed>
      */
-    private function phaseRunUpdate(string $status, int $exitCode, string $stdout): array
+    private function phaseRunUpdate(PhaseStatus $status, int $exitCode, string $stdout): array
     {
         $update = [
             'status' => $status,

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Enums\Phase;
+use App\Enums\PhaseStatus;
 use App\Enums\WorkflowStatus;
 use App\Jobs\RunPhaseJob;
 use App\Models\PhaseRun;
@@ -58,7 +59,7 @@ class WorkflowEndToEndTest extends TestCase
 
         $this->assertSame(WorkflowStatus::ConceptReview, $task->fresh()->workflow_status);
         $this->assertSame(Phase::Concept, $task->fresh()->current_phase);
-        $this->assertSame('completed', $task->fresh()->current_status);
+        $this->assertSame(PhaseStatus::Completed, $task->fresh()->current_status);
     }
 
     public function test_concept_phase_creates_phase_run_record(): void
@@ -87,7 +88,7 @@ class WorkflowEndToEndTest extends TestCase
         $this->runJobWithExitCode($task, 'implement', 0);
 
         $this->assertSame(Phase::Implement, $task->fresh()->current_phase);
-        $this->assertSame('completed', $task->fresh()->current_status);
+        $this->assertSame(PhaseStatus::Completed, $task->fresh()->current_status);
         $this->assertDatabaseCount(PhaseRun::class, 2);
     }
 
@@ -116,7 +117,7 @@ class WorkflowEndToEndTest extends TestCase
         $this->runJobWithExitCode($task, 'concept', 1);
 
         $this->assertSame(WorkflowStatus::Failed, $task->fresh()->workflow_status);
-        $this->assertSame('failed', $task->fresh()->current_status);
+        $this->assertSame(PhaseStatus::Failed, $task->fresh()->current_status);
     }
 
     public function test_implement_quality_gate_failure_transitions_to_failed(): void
@@ -127,7 +128,7 @@ class WorkflowEndToEndTest extends TestCase
         $this->runJobWithExitCode($task, 'implement', 4);
 
         $this->assertSame(WorkflowStatus::Failed, $task->fresh()->workflow_status);
-        $this->assertSame('quality_gate_failed', $task->fresh()->current_status);
+        $this->assertSame(PhaseStatus::QualityGateFailed, $task->fresh()->current_status);
     }
 
     // -------------------------------------------------------------------------

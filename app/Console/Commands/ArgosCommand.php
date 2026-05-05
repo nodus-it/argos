@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Enums\PhaseStatus;
 use App\Jobs\RunPhaseJob;
 use App\Models\RepoProfile;
 use App\Models\Task;
@@ -50,9 +51,10 @@ class ArgosCommand extends Command
             $options = [];
             foreach ($tasks as $task) {
                 $phase = $task->current_phase?->value ?? '—';
-                $status = $task->current_status ?? '·';
-                $icon = $status === 'running' ? '⟳' : ($status === 'completed' ? '✓' : '·');
-                $options["task:{$task->name}"] = "{$icon} {$task->name}  {$phase}  {$status}";
+                $phaseStatus = $task->current_status;
+                $statusLabel = $phaseStatus?->value ?? '·';
+                $icon = $phaseStatus === PhaseStatus::Running ? '⟳' : ($phaseStatus === PhaseStatus::Completed ? '✓' : '·');
+                $options["task:{$task->name}"] = "{$icon} {$task->name}  {$phase}  {$statusLabel}";
             }
             $options['---new'] = '+ Neuer Task';
             $options['---refresh'] = '↺ Aktualisieren';
@@ -472,20 +474,21 @@ class ArgosCommand extends Command
         $this->line('  '.str_repeat('─', 86));
 
         foreach ($tasks as $task) {
-            $status = $task->current_status ?? '·';
-            $icon = match ($status) {
-                'running' => '⟳',
-                'completed' => '✓',
-                'failed' => '✗',
-                'quality_gate_failed' => '!',
-                'no_changes' => '=',
+            $phaseStatus = $task->current_status;
+            $statusLabel = $phaseStatus?->value ?? '·';
+            $icon = match ($phaseStatus) {
+                PhaseStatus::Running => '⟳',
+                PhaseStatus::Completed => '✓',
+                PhaseStatus::Failed => '✗',
+                PhaseStatus::QualityGateFailed => '!',
+                PhaseStatus::NoChanges => '=',
                 default => '·',
             };
             $this->line(sprintf(
                 '  %-30s %-12s %-22s %-20s',
                 $task->name,
                 $task->current_phase?->value ?? '—',
-                "{$icon} {$status}",
+                "{$icon} {$statusLabel}",
                 $task->repoProfile?->name ?? '—',
             ));
         }
@@ -523,7 +526,7 @@ class ArgosCommand extends Command
                 '  %-12s %-6s %-22s %-10s %-20s',
                 $run->phase->value,
                 $run->iteration,
-                $run->status,
+                $run->status->value,
                 $cost,
                 $run->started_at?->format('Y-m-d H:i:s') ?? '—',
             ));

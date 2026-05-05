@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Services\StateReader;
+use App\Enums\PhaseStatus;
 use App\Models\PhaseRun;
 use App\Models\Task;
+use App\Services\StateReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery\MockInterface;
 use Symfony\Component\Process\Process;
@@ -263,7 +264,7 @@ class StateReaderTest extends TestCase
 
         $reader->syncToDb($task);
 
-        $this->assertSame('failed', $run->fresh()->status);
+        $this->assertSame(PhaseStatus::Failed, $run->fresh()->status);
         $this->assertNotNull($run->fresh()->finished_at);
     }
 
@@ -280,7 +281,7 @@ class StateReaderTest extends TestCase
 
         $reader->syncToDb($task);
 
-        $this->assertSame('running', $run->fresh()->status);
+        $this->assertSame(PhaseStatus::Running, $run->fresh()->status);
     }
 
     public function test_sync_to_db_syncs_pr_url_from_push_result_json(): void
