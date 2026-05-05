@@ -110,15 +110,20 @@ credentials_task_exists() {
     [[ -f "$(_credentials_task_path "$task_id")/credentials.env" ]]
 }
 
-# git_auth_inject_token: build an HTTPS URL with `oauth2:<token>@` user-info.
-# Args: $1=repo_url, $2=token
-# Output: URL with embedded token, or the original URL for non-https schemes.
+# git_auth_header: build the value for `http.extraheader` so git can authenticate
+# without persisting the token inside the workspace (no token in origin URL,
+# no token written to .git/config).
+# Args: $1=token (plain PAT/OAuth, or "user:pass" form for Bitbucket app passwords)
+# Output: header line on stdout, e.g. "Authorization: Basic <base64>".
+# Usage: git -c "http.extraheader=$(git_auth_header "$REPO_TOKEN")" <command>
 # Note: never log the output — it carries the secret.
-git_auth_inject_token() {
-    local url="$1" token="$2"
-    if [[ "$url" =~ ^https?:// ]]; then
-        printf '%s' "$url" | sed -E "s|^(https?://)|\1oauth2:${token}@|"
+git_auth_header() {
+    local token="$1"
+    local creds
+    if printf '%s' "$token" | grep -q ':'; then
+        creds="$token"
     else
-        printf '%s' "$url"
+        creds="oauth2:$token"
     fi
+    printf 'Authorization: Basic %s' "$(printf '%s' "$creds" | base64 -w 0)"
 }

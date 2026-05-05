@@ -107,3 +107,24 @@ teardown() {
     [ "$REPO_PLATFORM" = "github" ]
     [ "$REPO_URL" = "https://github.com/a/b.git" ]
 }
+
+@test "git_auth_header builds Basic header with oauth2: prefix for plain token" {
+    out="$(git_auth_header "ghp_secrettoken123")"
+    [[ "$out" == "Authorization: Basic "* ]]
+    # Decoding the base64 part should yield "oauth2:<token>"
+    encoded="${out#Authorization: Basic }"
+    decoded="$(printf '%s' "$encoded" | base64 -d)"
+    [ "$decoded" = "oauth2:ghp_secrettoken123" ]
+}
+
+@test "git_auth_header keeps user:pass form for Bitbucket app passwords" {
+    out="$(git_auth_header "alice:apppass-xyz")"
+    encoded="${out#Authorization: Basic }"
+    decoded="$(printf '%s' "$encoded" | base64 -d)"
+    [ "$decoded" = "alice:apppass-xyz" ]
+}
+
+@test "git_auth_header output does not leak the raw token" {
+    out="$(git_auth_header "ghp_LITERAL_TOKEN")"
+    [[ "$out" != *"ghp_LITERAL_TOKEN"* ]]
+}
