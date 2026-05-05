@@ -26,18 +26,18 @@ services:
     image: docker:cli
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./worker:/build:ro
+      - ../..:/build:ro
     working_dir: /build
     command: >
       sh -c "set -e;
-        docker build -t argos-worker:local-php8.4 -f docker/Dockerfile --target worker-php84 .;
-        docker build -t argos-worker:local-php8.3 -f docker/Dockerfile --target worker ."
+        docker build -t argos-worker:local-php8.4 -f .tools/docker/worker/Dockerfile --target worker-php84 .;
+        docker build -t argos-worker:local-php8.3 -f .tools/docker/worker/Dockerfile --target worker ."
     restart: "no"
 
   manager:
     build:
-      context: .
-      dockerfile: docker/Dockerfile
+      context: ../..
+      dockerfile: .tools/docker/manager/Dockerfile
       target: manager
     depends_on:
       worker-build:
@@ -55,7 +55,7 @@ services:
       # composer.lock drifts from vendor/composer/installed.json (e.g. after a fresh
       # clone or git pull). The other anonymous volumes mask host artefacts that
       # would otherwise shadow the image-built ones.
-      - .:/app
+      - ../..:/app
       - /app/node_modules
       - /app/public/build
       - /app/bootstrap/cache   # cache without dev-only providers (no Pail)
@@ -87,8 +87,8 @@ services:
   worker-php83:
     image: argos-worker:local-php8.3
     build:
-      context: ./worker
-      dockerfile: docker/Dockerfile
+      context: ../..
+      dockerfile: .tools/docker/worker/Dockerfile
       target: worker
     profiles:
       - build-only
@@ -99,8 +99,8 @@ services:
   worker-php84:
     image: argos-worker:local-php8.4
     build:
-      context: ./worker
-      dockerfile: docker/Dockerfile
+      context: ../..
+      dockerfile: .tools/docker/worker/Dockerfile
       target: worker-php84
     profiles:
       - build-only

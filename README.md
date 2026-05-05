@@ -96,7 +96,7 @@ php artisan key:generate
 php artisan migrate
 
 # Build the worker image locally
-docker compose --profile build-only build worker
+docker compose -f .tools/docker/docker-compose.yml --profile build-only build worker-php84
 
 # Run everything (manager via compose, vite watcher locally)
 composer run dev

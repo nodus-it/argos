@@ -40,7 +40,7 @@ rc=0
 
 if $run_shellcheck; then
     echo "==> shellcheck (severity=warning)"
-    files=(agent worker/docker/worker-entrypoint.sh worker/tests/run-tests.sh worker/tests/run-bats.sh)
+    files=(agent .tools/docker/worker/worker-entrypoint.sh worker/tests/run-tests.sh worker/tests/run-bats.sh)
     while IFS= read -r f; do files+=("$f"); done < <(find worker/lib worker/phases worker/tests/integration -type f \( -name '*.sh' -o -name 'claude' \))
     docker run --rm -v "$repo_root:/mnt" -w /mnt koalaman/shellcheck:stable \
         --severity=warning "${files[@]}" || rc=$?

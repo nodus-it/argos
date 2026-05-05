@@ -95,17 +95,17 @@ RUN chown www-data:www-data /var/www
 
 # Nginx: remove default site, add Laravel config
 RUN rm -f /etc/nginx/sites-enabled/default
-COPY docker/nginx.conf /etc/nginx/sites-enabled/argos.conf
+COPY .tools/docker/manager/nginx.conf /etc/nginx/sites-enabled/argos.conf
 
 # Supervisor config
-COPY docker/supervisord.conf /etc/supervisor/conf.d/argos.conf
+COPY .tools/docker/manager/supervisord.conf /etc/supervisor/conf.d/argos.conf
 
 # PHP-FPM: disable default pool, use our config
 RUN rm -f /usr/local/etc/php-fpm.d/www.conf
-COPY docker/php-fpm.conf /usr/local/etc/php-fpm.d/argos.conf
+COPY .tools/docker/manager/php-fpm.conf /usr/local/etc/php-fpm.d/argos.conf
 
 # Runtime entrypoint: docker socket group fix + migrations
-COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY .tools/docker/manager/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
 # Standalone defaults: the entrypoint provisions a local MariaDB with these

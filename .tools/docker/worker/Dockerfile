@@ -97,13 +97,13 @@ RUN useradd --create-home --shell /bin/bash --uid 1000 agent
 FROM base AS worker
 
 # App-Files unter /usr/local/share/agent/ ablegen
-COPY lib/      /usr/local/share/agent/lib/
-COPY phases/   /usr/local/share/agent/phases/
-COPY prompts/  /usr/local/share/agent/prompts/
-COPY schemas/  /usr/local/share/agent/schemas/
+COPY worker/lib/      /usr/local/share/agent/lib/
+COPY worker/phases/   /usr/local/share/agent/phases/
+COPY worker/prompts/  /usr/local/share/agent/prompts/
+COPY worker/schemas/  /usr/local/share/agent/schemas/
 
 # Entrypoint
-COPY docker/worker-entrypoint.sh /usr/local/bin/worker-entrypoint.sh
+COPY .tools/docker/worker/worker-entrypoint.sh /usr/local/bin/worker-entrypoint.sh
 RUN chmod +x /usr/local/bin/worker-entrypoint.sh \
     && chown -R agent:agent /usr/local/share/agent \
     && mkdir -p /workspace \
@@ -170,12 +170,12 @@ RUN useradd --create-home --shell /bin/bash --uid 1000 agent
 # ============================================================
 FROM base-php84 AS worker-php84
 
-COPY lib/      /usr/local/share/agent/lib/
-COPY phases/   /usr/local/share/agent/phases/
-COPY prompts/  /usr/local/share/agent/prompts/
-COPY schemas/  /usr/local/share/agent/schemas/
+COPY worker/lib/      /usr/local/share/agent/lib/
+COPY worker/phases/   /usr/local/share/agent/phases/
+COPY worker/prompts/  /usr/local/share/agent/prompts/
+COPY worker/schemas/  /usr/local/share/agent/schemas/
 
-COPY docker/worker-entrypoint.sh /usr/local/bin/worker-entrypoint.sh
+COPY .tools/docker/worker/worker-entrypoint.sh /usr/local/bin/worker-entrypoint.sh
 RUN chmod +x /usr/local/bin/worker-entrypoint.sh \
     && chown -R agent:agent /usr/local/share/agent \
     && mkdir -p /workspace \
