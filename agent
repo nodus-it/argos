@@ -107,7 +107,7 @@ _agent_run_volume_cmd() {
     docker run --rm \
         -v "$volume:/workspace" \
         --entrypoint sh \
-        agent-worker:latest -c "$*"
+        argos-worker:latest -c "$*"
 }
 
 # ============================================================
@@ -133,7 +133,7 @@ cmd_init() {
 
     if [[ "$update_only" != "true" ]]; then
         log_info "init: baue worker-Image (kann ein paar Minuten dauern)"
-        (cd "$AGENT_REPO_ROOT" && docker compose build worker-php84)
+        (cd "$AGENT_REPO_ROOT" && docker compose -f .tools/docker/docker-compose.yml build worker-php84)
     fi
 
     if credentials_has_claude_token && [[ "$update_only" != "true" ]]; then
