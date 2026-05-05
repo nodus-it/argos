@@ -77,7 +77,6 @@ Once the container is up:
 | GitLab setup (incl. self-hosted) | [docs/SETUP-GITLAB.md](docs/SETUP-GITLAB.md) |
 | Bitbucket setup | [docs/SETUP-BITBUCKET.md](docs/SETUP-BITBUCKET.md) |
 | Local development & tests | [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) |
-| Roadmap | [docs/BACKLOG.md](docs/BACKLOG.md) |
 
 ## Contributing
 

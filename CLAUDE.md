@@ -8,7 +8,6 @@ Du baust **Argos** — einen Web-First Dev-Agent mit zwei Docker-Images (Manager
 
 | Frage | Quelle |
 | --- | --- |
-| Was kommt als nächstes? | `docs/BACKLOG.md` |
 | System-Prompts für die Claude-Sessions im Worker | `worker/prompts/*.system.md` |
 | Schemas für State und Outputs | `worker/schemas/*.schema.json` |
 | Architektur und Implementierungsdetails | Der Code selbst |
