@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Domain\Phase\PhaseRunner;
-use App\Domain\Task\WorkflowService;
+use App\Enums\Phase;
+use App\Enums\PhaseStatus;
 use App\Enums\WorkflowStatus;
 use App\Jobs\RunPhaseJob;
 use App\Models\PhaseRun;
 use App\Models\RepoProfile;
 use App\Models\Task;
+use App\Services\Workflow\PhaseRunner;
+use App\Services\Workflow\WorkflowService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Mockery\MockInterface;
@@ -56,8 +58,8 @@ class WorkflowEndToEndTest extends TestCase
         $this->runJobWithExitCode($task, 'concept', 0);
 
         $this->assertSame(WorkflowStatus::ConceptReview, $task->fresh()->workflow_status);
-        $this->assertSame('concept', $task->fresh()->current_phase);
-        $this->assertSame('completed', $task->fresh()->current_status);
+        $this->assertSame(Phase::Concept, $task->fresh()->current_phase);
+        $this->assertSame(PhaseStatus::Completed, $task->fresh()->current_status);
     }
 
     public function test_concept_phase_creates_phase_run_record(): void
@@ -85,8 +87,8 @@ class WorkflowEndToEndTest extends TestCase
         $this->runJobWithExitCode($task, 'concept', 0);
         $this->runJobWithExitCode($task, 'implement', 0);
 
-        $this->assertSame('implement', $task->fresh()->current_phase);
-        $this->assertSame('completed', $task->fresh()->current_status);
+        $this->assertSame(Phase::Implement, $task->fresh()->current_phase);
+        $this->assertSame(PhaseStatus::Completed, $task->fresh()->current_status);
         $this->assertDatabaseCount(PhaseRun::class, 2);
     }
 
@@ -115,7 +117,7 @@ class WorkflowEndToEndTest extends TestCase
         $this->runJobWithExitCode($task, 'concept', 1);
 
         $this->assertSame(WorkflowStatus::Failed, $task->fresh()->workflow_status);
-        $this->assertSame('failed', $task->fresh()->current_status);
+        $this->assertSame(PhaseStatus::Failed, $task->fresh()->current_status);
     }
 
     public function test_implement_quality_gate_failure_transitions_to_failed(): void
@@ -126,7 +128,7 @@ class WorkflowEndToEndTest extends TestCase
         $this->runJobWithExitCode($task, 'implement', 4);
 
         $this->assertSame(WorkflowStatus::Failed, $task->fresh()->workflow_status);
-        $this->assertSame('quality_gate_failed', $task->fresh()->current_status);
+        $this->assertSame(PhaseStatus::QualityGateFailed, $task->fresh()->current_status);
     }
 
     // -------------------------------------------------------------------------
@@ -176,7 +178,7 @@ class WorkflowEndToEndTest extends TestCase
             'workflow_status' => WorkflowStatus::ImplementRunning,
         ]);
 
-        $task->advanceWorkflow('implement', 'completed');
+        app(WorkflowService::class)->completePhase($task, 'implement', PhaseStatus::Completed);
 
         Bus::assertDispatched(RunPhaseJob::class, fn ($job) => $job->phase === 'push' && $job->taskId === $task->id
         );
@@ -191,7 +193,7 @@ class WorkflowEndToEndTest extends TestCase
             'workflow_status' => WorkflowStatus::ImplementRunning,
         ]);
 
-        $task->advanceWorkflow('implement', 'completed');
+        app(WorkflowService::class)->completePhase($task, 'implement', PhaseStatus::Completed);
 
         Bus::assertNotDispatched(RunPhaseJob::class);
     }

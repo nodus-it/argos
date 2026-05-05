@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Services\Workflow\PhaseRunner;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Cache;
@@ -24,7 +25,7 @@ class UsageLimitBanner extends Component
 
     public function refresh(): void
     {
-        $limit = Cache::get('usage_limit');
+        $limit = Cache::get(PhaseRunner::CACHE_KEY_USAGE_LIMIT);
         $this->active = is_array($limit) && ($limit['active'] ?? false);
         $this->resetAt = null;
         $this->resetsIn = null;
@@ -40,7 +41,7 @@ class UsageLimitBanner extends Component
                 } else {
                     // Limit expired but cache not yet cleared — dismiss silently.
                     $this->active = false;
-                    Cache::forget('usage_limit');
+                    Cache::forget(PhaseRunner::CACHE_KEY_USAGE_LIMIT);
                 }
             } catch (\Throwable) {
                 // malformed timestamp — show banner without time info
@@ -50,7 +51,7 @@ class UsageLimitBanner extends Component
 
     public function dismiss(): void
     {
-        Cache::forget('usage_limit');
+        Cache::forget(PhaseRunner::CACHE_KEY_USAGE_LIMIT);
         $this->active = false;
         $this->resetAt = null;
         $this->resetsIn = null;

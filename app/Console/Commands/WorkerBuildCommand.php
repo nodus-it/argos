@@ -23,10 +23,10 @@ class WorkerBuildCommand extends Command
 
     public function handle(): int
     {
-        $context = $this->workerContextPath();
+        $context = $this->repoRootPath();
 
         if ($context === null) {
-            $this->error('Worker source not found. Looked in /app/worker and base_path("worker").');
+            $this->error('Worker source not found. Looked in /app and base_path().');
 
             return self::FAILURE;
         }
@@ -43,7 +43,7 @@ class WorkerBuildCommand extends Command
             $this->line("→ Building {$tag} (target: {$target})");
 
             $process = new Process(
-                ['docker', 'build', '-t', $tag, '-f', 'docker/Dockerfile', '--target', $target, '.'],
+                ['docker', 'build', '-t', $tag, '-f', '.tools/docker/worker/Dockerfile', '--target', $target, '.'],
                 $context,
                 timeout: 600,
             );
@@ -87,10 +87,10 @@ class WorkerBuildCommand extends Command
         return $selected;
     }
 
-    private function workerContextPath(): ?string
+    private function repoRootPath(): ?string
     {
-        foreach (['/app/worker', base_path('worker')] as $candidate) {
-            if (is_dir($candidate.'/docker')) {
+        foreach (['/app', base_path()] as $candidate) {
+            if (is_dir($candidate.'/.tools/docker/worker') && is_dir($candidate.'/worker')) {
                 return $candidate;
             }
         }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Enums\Phase;
 use App\Enums\WorkflowStatus;
 use App\Filament\Admin\Widgets\CurrentTasksWidget;
 use App\Models\Task;
@@ -57,14 +58,12 @@ class CurrentTasksWidgetTest extends TestCase
             ->assertCanSeeTableRecords([$waiting, $running, $idle], inOrder: true);
     }
 
-    public function test_phase_helpers_return_expected_values(): void
+    public function test_phase_enum_returns_expected_values(): void
     {
-        $this->assertSame('Concept', CurrentTasksWidget::phaseLabel('concept'));
-        $this->assertSame('—', CurrentTasksWidget::phaseLabel(null));
-        $this->assertSame('info', CurrentTasksWidget::phaseColor('concept'));
-        $this->assertSame('warning', CurrentTasksWidget::phaseColor('implement'));
-        $this->assertSame('gray', CurrentTasksWidget::phaseColor(null));
-        $this->assertSame('heroicon-m-light-bulb', CurrentTasksWidget::phaseIcon('concept'));
-        $this->assertNull(CurrentTasksWidget::phaseIcon(null));
+        $this->assertSame('Concept', Phase::Concept->label());
+        $this->assertSame('info', Phase::Concept->color());
+        $this->assertSame('warning', Phase::Implement->color());
+        $this->assertSame('heroicon-m-light-bulb', Phase::Concept->icon());
+        $this->assertSame('heroicon-m-arrow-up-tray', Phase::Push->icon());
     }
 }

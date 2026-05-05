@@ -8,7 +8,6 @@ Du baust **Argos** — einen Web-First Dev-Agent mit zwei Docker-Images (Manager
 
 | Frage | Quelle |
 | --- | --- |
-| Was kommt als nächstes? | `docs/BACKLOG.md` |
 | System-Prompts für die Claude-Sessions im Worker | `worker/prompts/*.system.md` |
 | Schemas für State und Outputs | `worker/schemas/*.schema.json` |
 | Architektur und Implementierungsdetails | Der Code selbst |
@@ -38,13 +37,13 @@ Du baust **Argos** — einen Web-First Dev-Agent mit zwei Docker-Images (Manager
 
 Alle Bash-Files müssen `shellcheck`-clean sein (Severity error/warning). `info` und `style` sind optional.
 
-CI führt `shellcheck` über `agent`, `worker/lib/`, `worker/phases/`, `worker/docker/worker-entrypoint.sh` und `worker/tests/integration/*.sh` aus.
+CI führt `shellcheck` über `agent`, `worker/lib/`, `worker/phases/`, `.tools/docker/worker/worker-entrypoint.sh` und `worker/tests/integration/*.sh` aus.
 
 ### File-Layout
 
 - Eine Bibliothek pro Datei in `worker/lib/`. Keine Mehrfach-Verantwortung.
 - Phase-Skripte in `worker/phases/<name>.sh` enthalten *nur* die Funktionen `phase_<name>_run`, `phase_<name>_preconditions`, `phase_<name>_help`. Helfer-Funktionen kommen in `worker/lib/`.
-- `worker/docker/Dockerfile` und `worker/docker/worker-entrypoint.sh` sind die einzigen Files unter `worker/docker/`.
+- Docker-Files leben unter `.tools/docker/`: Manager-Image in `.tools/docker/manager/`, Worker-Image in `.tools/docker/worker/`, Compose-File `.tools/docker/docker-compose.yml`. Build-Context ist immer das Repo-Root.
 - Die Laravel-Applikation lebt im Repo-Root (artisan, app/, config/, etc.) — `worker/` enthält ausschließlich den Docker-Worker.
 
 ### Dokumentation
@@ -79,7 +78,7 @@ CI führt `shellcheck` über `agent`, `worker/lib/`, `worker/phases/`, `worker/d
 
 - Architektur-Entscheidungen aus den Spec-Dokumenten umkehren — insbesondere: kein AI im Manager-Container, Worker ohne Docker-Socket
 - Neue Top-Level-Dependencies (Bash-Tools die nicht in `bookworm` Standard sind, ohne explizite Rechtfertigung)
-- Neue Volumes oder Services in `docker-compose.yml`
+- Neue Volumes oder Services in `.tools/docker/docker-compose.yml`
 - Neue Phasen einführen oder bestehende grundlegend ändern (Phase-Erweiterung über `phases/` ist OK, aber concept→implement→diff→push als Default-Flow ist gesetzt)
 - Auth-Flow ändern (Tokens kommen als Env-Vars aus der DB in den Worker — nie aus Dateien)
 - Branch-Naming-Schema ändern
@@ -97,7 +96,7 @@ CI führt `shellcheck` über `agent`, `worker/lib/`, `worker/phases/`, `worker/d
 
 ```bash
 # Worker-Image bauen
-docker build -t argos-worker:latest worker/
+docker build -t argos-worker:latest -f .tools/docker/worker/Dockerfile --target worker-php84 .
 
 # Bash-Tests laufen lassen
 ./worker/tests/run-tests.sh
@@ -107,9 +106,6 @@ php artisan test
 
 # Lokale Entwicklung (Web-UI)
 php artisan serve
-
-# CLI (im laufenden Manager-Container)
-docker exec -it argos php artisan agent:concept task-001
 ```
 
 ## Rückfragen sind willkommen

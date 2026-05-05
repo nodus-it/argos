@@ -37,3 +37,20 @@ log_warn() {
 log_error() {
     echo "[ERROR] $*" >&2
 }
+
+# log_scrub: redact known token patterns from stdin → stdout.
+# Streaming-fähig (line-buffered via `sed -u`), für stream-json Pipelines geeignet.
+# Patterns: Anthropic OAuth/API keys, GitHub PATs, GitLab PATs, oauth2:<tok>@-URLs,
+# Authorization: Bearer/Basic Header. Defensiv — auch wenn REPO_TOKEN vor dem
+# Claude-Aufruf aus dem Env genommen wird, fängt das versehentlich geleakte
+# Tokens aus anderen Quellen (Logs, Tool-Inputs) noch ab.
+log_scrub() {
+    sed -u -E \
+        -e 's/sk-ant-oat01-[A-Za-z0-9_-]+/[REDACTED:claude-oauth]/g' \
+        -e 's/sk-ant-api03-[A-Za-z0-9_-]+/[REDACTED:claude-api]/g' \
+        -e 's/gh[psour]_[A-Za-z0-9]+/[REDACTED:github-pat]/g' \
+        -e 's/glpat-[A-Za-z0-9_-]+/[REDACTED:gitlab-pat]/g' \
+        -e 's#oauth2:[^@[:space:]"]+@#oauth2:[REDACTED]@#g' \
+        -e 's/([Aa]uthorization:[[:space:]]*[Bb]earer)[[:space:]]+[A-Za-z0-9._\/+=-]+/\1 [REDACTED]/g' \
+        -e 's/([Aa]uthorization:[[:space:]]*[Bb]asic)[[:space:]]+[A-Za-z0-9._\/+=-]+/\1 [REDACTED]/g'
+}

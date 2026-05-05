@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\TaskResource\Pages;
 
-use App\Domain\Phase\StateReader;
+use App\Enums\PhaseStatus;
 use App\Enums\WorkflowStatus;
 use App\Filament\Admin\Resources\TaskResource;
 use App\Jobs\RunPhaseJob;
 use App\Models\PhaseRun;
 use App\Models\Task;
+use App\Services\Workflow\StateReader;
 use Filament\Actions\Action;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
@@ -228,7 +229,7 @@ class ViewTask extends ViewRecord
         return [
             'phaseRuns' => $phaseRuns,
             'conceptHtml' => $task->concept_md ? Str::markdown($task->concept_md) : null,
-            'conceptError' => $lastConceptRun?->status !== 'completed'
+            'conceptError' => $lastConceptRun?->status !== PhaseStatus::Completed
                 ? $lastConceptRun?->error_log
                 : null,
             'conceptLog' => $this->parseLogLines($this->readLogFile('concept')),
@@ -275,7 +276,7 @@ class ViewTask extends ViewRecord
                     && $this->task()->phaseRuns()->where('phase', 'concept')->where('status', 'completed')->exists()),
 
             $this->makeContinueImplementAction()
-                ->visible(fn (): bool => $this->lastImplementRun()?->status === 'paused'),
+                ->visible(fn (): bool => $this->lastImplementRun()?->status === PhaseStatus::Paused),
 
             $this->makePhaseAction('push', __('tasks.view.actions.push_pr'), 'heroicon-o-arrow-up-tray')
                 ->visible(fn (): bool => $this->task()->workflow_status !== WorkflowStatus::Completed
@@ -305,7 +306,7 @@ class ViewTask extends ViewRecord
                     Notification::make()->title(__('tasks.view.actions.lock_released'))->success()->send();
                     $this->redirect(TaskResource::getUrl('view', ['record' => $task]));
                 })
-                ->visible(fn (): bool => $this->task()->current_status === 'lock_blocked'),
+                ->visible(fn (): bool => $this->task()->current_status === PhaseStatus::LockBlocked),
 
             Action::make('markCompleted')
                 ->label(__('tasks.view.actions.mark_completed'))
@@ -352,7 +353,7 @@ class ViewTask extends ViewRecord
         return Action::make($phase)
             ->label($label)
             ->icon($icon)
-            ->disabled(fn (): bool => $this->task()->current_status === 'running')
+            ->disabled(fn (): bool => $this->task()->current_status === PhaseStatus::Running)
             ->action(function () use ($phase): void {
                 $task = $this->task();
                 if ($task->phaseRuns()->where('status', 'running')->exists()) {
@@ -392,7 +393,7 @@ class ViewTask extends ViewRecord
             ->label(__('tasks.view.actions.continue'))
             ->icon('heroicon-o-play-circle')
             ->color('warning')
-            ->disabled(fn (): bool => $this->task()->current_status === 'running')
+            ->disabled(fn (): bool => $this->task()->current_status === PhaseStatus::Running)
             ->modalHeading(__('tasks.view.actions.continue_heading'))
             ->modalDescription(__('tasks.view.actions.continue_description'))
             ->modalSubmitActionLabel(__('tasks.view.actions.continue'))

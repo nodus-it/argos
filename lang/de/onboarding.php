@@ -6,7 +6,7 @@ return [
     'navigation_label' => 'Einrichtung',
     'title' => 'Argos einrichten',
 
-    'intro' => 'In drei Schritten ist Argos einsatzbereit: Claude-Token hinterlegen, optional GitHub verbinden und dann das erste Projekt anlegen.',
+    'intro' => 'In wenigen Schritten ist Argos einsatzbereit: Claude-Token hinterlegen, optional Git-Hosts verbinden und dann das erste Projekt anlegen.',
 
     'notifications' => [
         'env_token' => 'Token kommt aus der Umgebungsvariable',
@@ -16,12 +16,15 @@ return [
         'saved_title' => 'Token gespeichert',
         'saved_unreachable_body' => 'Hinweis: Token konnte nicht gegen die API geprüft werden — Verbindung nicht erreichbar.',
         'github_disconnected' => 'GitHub-Verbindung getrennt',
+        'disconnected' => ':provider getrennt',
     ],
 
     'steps' => [
         'claude_token' => 'Claude Token',
         'github_connect' => 'GitHub verbinden',
         'github_optional' => 'optional',
+        'providers_connect' => 'Git-Host verbinden',
+        'providers_optional' => 'optional',
         'first_project' => 'Erstes Projekt anlegen',
     ],
 
@@ -41,6 +44,15 @@ return [
         'tip' => 'Tipp: Wenn du beim Verbinden keine Auswahlmaske mehr siehst, widerrufe die App zuerst auf',
         'description' => 'Verbinde deinen GitHub-Account per OAuth — danach kannst du Projekte ohne Personal Access Token anlegen.',
         'connect_button' => 'Mit GitHub verbinden',
+    ],
+
+    'providers' => [
+        'github' => 'GitHub',
+        'gitlab' => 'GitLab',
+        'bitbucket' => 'Bitbucket',
+        'description' => 'Verbinde einen oder mehrere Git-Hosts per OAuth — danach kannst du Repos und Branches direkt aus Dropdowns auswählen statt URLs einzugeben.',
+        'connect_button' => 'Mit :provider verbinden',
+        'disconnect' => 'Trennen',
     ],
 
     'project' => [

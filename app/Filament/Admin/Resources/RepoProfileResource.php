@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources;
 
-use App\Domain\Worker\WorkerImage;
+use App\Enums\AuthMethod;
+use App\Enums\GitProvider;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\CreateRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\EditRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\ListRepoProfiles;
@@ -13,10 +14,11 @@ use App\Filament\Admin\Resources\RepoProfileResource\RelationManagers\TasksRelat
 use App\Models\ConnectedAccount;
 use App\Models\RepoProfile;
 use App\Models\User;
-use App\Services\Bitbucket\BitbucketGitService;
-use App\Services\GitHub\GitHubGitService;
-use App\Services\GitLab\GitLabGitService;
-use App\Services\GitServiceFactory;
+use App\Services\GitProvider\BitbucketGitService;
+use App\Services\GitProvider\GitHubGitService;
+use App\Services\GitProvider\GitLabGitService;
+use App\Services\GitProvider\GitServiceFactory;
+use App\Services\WorkerImage;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
@@ -27,6 +29,7 @@ use Filament\Forms\Components\Toggle;
 use Filament\Infolists\Components\IconEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Callout;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
@@ -34,6 +37,7 @@ use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\HtmlString;
 
 class RepoProfileResource extends Resource
 {
@@ -86,6 +90,17 @@ class RepoProfileResource extends Resource
                         ->required()
                         ->live()
                         ->native(false),
+
+                    Callout::make(fn (Get $get): string => __('projects.platform_hints.'.($get('platform') ?: 'github').'.heading'))
+                        ->visible(fn (Get $get): bool => self::platformChosen($get))
+                        ->color('info')
+                        ->icon('heroicon-o-information-circle')
+                        ->description(fn (Get $get): HtmlString => new HtmlString(
+                            (string) __('projects.platform_hints.'.($get('platform') ?: 'github').'.body')
+                            .' <a href="'.e((string) config('argos.docs.setup_'.($get('platform') ?: 'github')))
+                            .'" target="_blank" rel="noopener" class="underline">'
+                            .e((string) __('projects.platform_hints.docs_link')).'</a>'
+                        )),
                 ]),
 
             // ── Block 2 ─ Allgemein ─────────────────────────────────────────
@@ -440,18 +455,33 @@ class RepoProfileResource extends Resource
                         ->maxLength(500)
                         ->required(fn (Get $get): bool => ! self::isConnectedPath($get))
                         ->live(onBlur: true)
-                        ->helperText(function (Get $get): string {
-                            if ($get('platform') === 'bitbucket') {
-                                return self::bitbucketAccount() !== null
-                                    ? __('projects.fields.token_helper_bitbucket_oauth_available')
-                                    : __('projects.fields.token_helper_bitbucket');
+                        ->helperText(function (Get $get): HtmlString {
+                            $platform = $get('platform');
+                            $oauthHint = '';
+
+                            if ($platform === 'github' && self::githubAccount() !== null) {
+                                $oauthHint = (string) __('projects.fields.token_helper_oauth_available');
+                            } elseif ($platform === 'gitlab' && self::gitlabAccount() !== null) {
+                                $oauthHint = (string) __('projects.fields.token_helper_oauth_available');
+                            } elseif ($platform === 'bitbucket' && self::bitbucketAccount() !== null) {
+                                $oauthHint = (string) __('projects.fields.token_helper_bitbucket_oauth_available');
+                            } elseif ($platform === 'bitbucket') {
+                                $oauthHint = (string) __('projects.fields.token_helper_bitbucket');
                             }
 
-                            if ($get('platform') === 'github' && self::githubAccount() !== null) {
-                                return __('projects.fields.token_helper_oauth_available');
-                            }
+                            $linkUrl = match ($platform) {
+                                'github' => (string) config('argos.docs.github_pat'),
+                                'gitlab' => (string) config('argos.docs.gitlab_pat'),
+                                'bitbucket' => (string) config('argos.docs.bitbucket_app_passwords'),
+                                default => '',
+                            };
 
-                            return '';
+                            $link = $linkUrl !== ''
+                                ? ' <a href="'.e($linkUrl).'" target="_blank" rel="noopener" class="underline">'
+                                  .e((string) __('projects.fields.token_create_link')).' ↗</a>'
+                                : '';
+
+                            return new HtmlString(trim($oauthHint.$link));
                         })
                         ->visible(fn (Get $get): bool => ! self::isConnectedPath($get)),
 
@@ -678,24 +708,14 @@ class RepoProfileResource extends Resource
                     TextEntry::make('platform')
                         ->label(__('projects.infolist.platform'))
                         ->badge()
-                        ->color(fn (string $state): string => match ($state) {
-                            'github' => 'gray',
-                            'gitlab' => 'warning',
-                            'bitbucket' => 'info',
-                            default => 'gray',
-                        }),
+                        ->color(fn (GitProvider $state): string => $state->color())
+                        ->formatStateUsing(fn (GitProvider $state): string => $state->label()),
 
                     TextEntry::make('auth_method')
                         ->label(__('projects.infolist.authentication'))
                         ->badge()
-                        ->color(fn (string $state): string => match ($state) {
-                            'oauth' => 'success',
-                            default => 'gray',
-                        })
-                        ->formatStateUsing(fn (string $state): string => match ($state) {
-                            'oauth' => 'OAuth',
-                            default => 'PAT',
-                        }),
+                        ->color(fn (AuthMethod $state): string => $state->color())
+                        ->formatStateUsing(fn (AuthMethod $state): string => $state->label()),
 
                     IconEntry::make('auto_concept')
                         ->label(__('projects.infolist.auto_concept'))
@@ -736,12 +756,8 @@ class RepoProfileResource extends Resource
 
                 TextColumn::make('platform')
                     ->badge()
-                    ->color(fn (string $state): string => match ($state) {
-                        'github' => 'gray',
-                        'gitlab' => 'warning',
-                        'bitbucket' => 'info',
-                        default => 'gray',
-                    }),
+                    ->color(fn (GitProvider $state): string => $state->color())
+                    ->formatStateUsing(fn (GitProvider $state): string => $state->label()),
 
                 TextColumn::make('default_branch')
                     ->label(__('projects.columns.branch')),

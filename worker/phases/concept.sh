@@ -78,8 +78,8 @@ _concept_classify_fetch_err() {
 # _concept_initial_clone: clone the repo into the volume and create the feature branch.
 _concept_initial_clone() {
     set +x
-    local auth_url
-    auth_url="$(git_auth_inject_token "$REPO_URL" "$REPO_TOKEN")"
+    local auth_header
+    auth_header="$(git_auth_header "$REPO_TOKEN")"
 
     local feature_branch slug
     slug="$(printf '%s' "${TASK_ID}" | tr ' /' '-' | tr -cd 'a-zA-Z0-9._-')"
@@ -99,8 +99,9 @@ _concept_initial_clone() {
     mkdir -p /workspace/.git/info
     grep -qxF '.agent/' /workspace/.git/info/exclude 2>/dev/null \
         || echo '.agent/' >> /workspace/.git/info/exclude
-    git remote add origin "$auth_url" 2>/dev/null || git remote set-url origin "$auth_url"
-    if ! git fetch --quiet --depth=1 origin "$BASE_BRANCH" 2>>/workspace/.agent/logs/clone.err; then
+    # Token-less origin URL — auth comes via the per-command http.extraheader.
+    git remote add origin "$REPO_URL" 2>/dev/null || git remote set-url origin "$REPO_URL"
+    if ! git -c "http.extraheader=$auth_header" fetch --quiet --depth=1 origin "$BASE_BRANCH" 2>>/workspace/.agent/logs/clone.err; then
         local kind
         kind="$(_concept_classify_fetch_err)"
         case "$kind" in
@@ -118,7 +119,6 @@ _concept_initial_clone() {
                 ;;
         esac
         _concept_emit_clone_err
-        git remote set-url origin "$REPO_URL"
         # remove .git so the next attempt can retry from scratch
         rm -rf /workspace/.git
         return 1
@@ -126,13 +126,9 @@ _concept_initial_clone() {
     if ! git checkout -B "$feature_branch" "origin/$BASE_BRANCH" 2>>/workspace/.agent/logs/clone.err; then
         echo "concept: git checkout failed" >&2
         _concept_emit_clone_err
-        git remote set-url origin "$REPO_URL"
         rm -rf /workspace/.git
         return 1
     fi
-    # restore the original (token-less) URL so credentials don't persist
-    # inside the workspace.
-    git remote set-url origin "$REPO_URL"
 
     state_set_feature_branch "$feature_branch"
 }
@@ -261,15 +257,17 @@ phase_concept_run() {
     log_info "concept: calling claude (stream-json, max-turns 15)"
 
     set +e
-    claude -p \
+    ( unset REPO_TOKEN
+      claude -p \
         --append-system-prompt "$sysprompt_content" \
         --output-format stream-json \
         --verbose \
         --max-turns 15 \
         --permission-mode bypassPermissions \
-        < "$user_prompt_path" \
-        | tee "$stream_log" \
-        | tee >(jq -rj '
+        < "$user_prompt_path"
+    ) | log_scrub \
+      | tee "$stream_log" \
+      | tee >(jq -rj '
             if .type == "assistant" then
                 (.message.content[]? |
                     if .type == "text" then (.text // "")
@@ -281,8 +279,8 @@ phase_concept_run() {
             elif .type == "result" then "\n"
             else empty end
           ' >&2 2>/dev/null) \
-        | jq -c 'select(.type == "result")' \
-        > "$result_json"
+      | jq -c 'select(.type == "result")' \
+      > "$result_json"
     local claude_exit=${PIPESTATUS[0]}
     set -e
 

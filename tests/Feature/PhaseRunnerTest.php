@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Domain\Credentials\CredentialStore;
-use App\Domain\Phase\PhaseRunner;
+use App\Enums\PhaseStatus;
 use App\Models\ConnectedAccount;
 use App\Models\PhaseRun;
 use App\Models\RepoProfile;
 use App\Models\Task;
 use App\Models\User;
+use App\Services\Anthropic\CredentialStore;
+use App\Services\Workflow\PhaseRunner;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery\MockInterface;
 use Symfony\Component\Process\Process;
@@ -83,28 +84,28 @@ class PhaseRunnerTest extends TestCase
     {
         $task = $this->taskWithProfile();
         $this->runBlockingWithExitCode($task, 'concept', 0);
-        $this->assertSame('completed', PhaseRun::where('task_id', $task->id)->first()->status);
+        $this->assertSame(PhaseStatus::Completed, PhaseRun::where('task_id', $task->id)->first()->status);
     }
 
     public function test_run_blocking_exit_code_4_means_quality_gate_failed(): void
     {
         $task = $this->taskWithProfile();
         $this->runBlockingWithExitCode($task, 'concept', 4);
-        $this->assertSame('quality_gate_failed', PhaseRun::where('task_id', $task->id)->first()->status);
+        $this->assertSame(PhaseStatus::QualityGateFailed, PhaseRun::where('task_id', $task->id)->first()->status);
     }
 
     public function test_run_blocking_exit_code_5_means_no_changes(): void
     {
         $task = $this->taskWithProfile();
         $this->runBlockingWithExitCode($task, 'concept', 5);
-        $this->assertSame('no_changes', PhaseRun::where('task_id', $task->id)->first()->status);
+        $this->assertSame(PhaseStatus::NoChanges, PhaseRun::where('task_id', $task->id)->first()->status);
     }
 
     public function test_run_blocking_nonzero_exit_code_means_failed(): void
     {
         $task = $this->taskWithProfile();
         $this->runBlockingWithExitCode($task, 'concept', 1);
-        $this->assertSame('failed', PhaseRun::where('task_id', $task->id)->first()->status);
+        $this->assertSame(PhaseStatus::Failed, PhaseRun::where('task_id', $task->id)->first()->status);
     }
 
     public function test_run_blocking_increments_iteration_on_second_run(): void

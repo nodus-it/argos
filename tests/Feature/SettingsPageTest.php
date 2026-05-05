@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Domain\Credentials\CredentialStore;
 use App\Filament\Admin\Pages\Settings;
 use App\Models\User;
+use App\Services\Anthropic\CredentialStore;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;

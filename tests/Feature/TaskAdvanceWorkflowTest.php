@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Enums\PhaseStatus;
 use App\Enums\WorkflowStatus;
 use App\Jobs\RunPhaseJob;
 use App\Models\RepoProfile;
 use App\Models\Task;
+use App\Services\Workflow\WorkflowService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Tests\TestCase;
@@ -16,17 +18,20 @@ class TaskAdvanceWorkflowTest extends TestCase
 {
     use RefreshDatabase;
 
+    private WorkflowService $service;
+
     protected function setUp(): void
     {
         parent::setUp();
         Bus::fake();
+        $this->service = app(WorkflowService::class);
     }
 
     public function test_concept_completed_transitions_to_concept_review(): void
     {
         $task = Task::factory()->create(['workflow_status' => WorkflowStatus::ConceptRunning]);
 
-        $task->advanceWorkflow('concept', 'completed');
+        $this->service->completePhase($task, 'concept', PhaseStatus::Completed);
 
         $this->assertSame(WorkflowStatus::ConceptReview, $task->fresh()->workflow_status);
     }
@@ -35,7 +40,7 @@ class TaskAdvanceWorkflowTest extends TestCase
     {
         $task = Task::factory()->create(['workflow_status' => WorkflowStatus::ConceptRunning]);
 
-        $task->advanceWorkflow('concept', 'failed');
+        $this->service->completePhase($task, 'concept', PhaseStatus::Failed);
 
         $this->assertSame(WorkflowStatus::Failed, $task->fresh()->workflow_status);
     }
@@ -44,7 +49,7 @@ class TaskAdvanceWorkflowTest extends TestCase
     {
         $task = Task::factory()->create(['workflow_status' => WorkflowStatus::ConceptRunning]);
 
-        $task->advanceWorkflow('concept', 'quality_gate_failed');
+        $this->service->completePhase($task, 'concept', PhaseStatus::QualityGateFailed);
 
         $this->assertSame(WorkflowStatus::Failed, $task->fresh()->workflow_status);
     }
@@ -57,7 +62,7 @@ class TaskAdvanceWorkflowTest extends TestCase
             'workflow_status' => WorkflowStatus::ImplementRunning,
         ]);
 
-        $task->advanceWorkflow('implement', 'completed');
+        $this->service->completePhase($task, 'implement', PhaseStatus::Completed);
 
         // stays in ImplementRunning — user must trigger push manually
         $this->assertSame(WorkflowStatus::ImplementRunning, $task->fresh()->workflow_status);
@@ -72,7 +77,7 @@ class TaskAdvanceWorkflowTest extends TestCase
             'workflow_status' => WorkflowStatus::ImplementRunning,
         ]);
 
-        $task->advanceWorkflow('implement', 'completed');
+        $this->service->completePhase($task, 'implement', PhaseStatus::Completed);
 
         Bus::assertDispatched(RunPhaseJob::class, fn ($job) => $job->phase === 'push' && $job->taskId === $task->id);
         // status stays ImplementRunning until push finishes
@@ -83,7 +88,7 @@ class TaskAdvanceWorkflowTest extends TestCase
     {
         $task = Task::factory()->create(['workflow_status' => WorkflowStatus::ImplementRunning]);
 
-        $task->advanceWorkflow('implement', 'failed');
+        $this->service->completePhase($task, 'implement', PhaseStatus::Failed);
 
         $this->assertSame(WorkflowStatus::Failed, $task->fresh()->workflow_status);
     }
@@ -92,7 +97,7 @@ class TaskAdvanceWorkflowTest extends TestCase
     {
         $task = Task::factory()->create(['workflow_status' => WorkflowStatus::ImplementRunning]);
 
-        $task->advanceWorkflow('push', 'completed');
+        $this->service->completePhase($task, 'push', PhaseStatus::Completed);
 
         $this->assertSame(WorkflowStatus::InReview, $task->fresh()->workflow_status);
     }
@@ -101,7 +106,7 @@ class TaskAdvanceWorkflowTest extends TestCase
     {
         $task = Task::factory()->create(['workflow_status' => WorkflowStatus::ImplementRunning]);
 
-        $task->advanceWorkflow('push', 'failed');
+        $this->service->completePhase($task, 'push', PhaseStatus::Failed);
 
         $this->assertSame(WorkflowStatus::Failed, $task->fresh()->workflow_status);
     }
@@ -110,7 +115,7 @@ class TaskAdvanceWorkflowTest extends TestCase
     {
         $task = Task::factory()->create(['workflow_status' => WorkflowStatus::InReview]);
 
-        $task->advanceWorkflow('respond', 'completed');
+        $this->service->completePhase($task, 'respond', PhaseStatus::Completed);
 
         $this->assertSame(WorkflowStatus::InReview, $task->fresh()->workflow_status);
     }
@@ -119,7 +124,7 @@ class TaskAdvanceWorkflowTest extends TestCase
     {
         $task = Task::factory()->create(['workflow_status' => WorkflowStatus::InReview]);
 
-        $task->advanceWorkflow('respond', 'failed');
+        $this->service->completePhase($task, 'respond', PhaseStatus::Failed);
 
         $this->assertSame(WorkflowStatus::Failed, $task->fresh()->workflow_status);
     }
@@ -129,7 +134,7 @@ class TaskAdvanceWorkflowTest extends TestCase
         $task = Task::factory()->create(['workflow_status' => WorkflowStatus::ConceptRunning]);
         $originalStatus = $task->workflow_status;
 
-        $task->advanceWorkflow('concept', 'no_changes');
+        $this->service->completePhase($task, 'concept', PhaseStatus::NoChanges);
 
         $this->assertSame($originalStatus, $task->fresh()->workflow_status);
     }

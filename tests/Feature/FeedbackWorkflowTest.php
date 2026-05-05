@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Domain\Phase\PhaseRunner;
-use App\Domain\Task\WorkflowService;
 use App\Enums\WorkflowStatus;
 use App\Jobs\RunPhaseJob;
 use App\Models\PhaseRun;
 use App\Models\RepoProfile;
 use App\Models\Task;
+use App\Services\Workflow\PhaseRunner;
+use App\Services\Workflow\WorkflowService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery\MockInterface;
 use Symfony\Component\Process\Process;
@@ -196,7 +196,7 @@ class FeedbackWorkflowTest extends TestCase
             $mock->shouldReceive('newProcess')->once()->andReturn($processMock);
         });
 
-        app(PhaseRunner::class)->writeFeedbackToVolume($task->name, 'Das ist mein Feedback.');
+        app(PhaseRunner::class)->writeFeedbackToVolume($task, 'Das ist mein Feedback.');
 
         $this->assertSame('Das ist mein Feedback.', $capturedEnv['FEEDBACK'] ?? null);
     }

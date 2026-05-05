@@ -17,7 +17,7 @@ return [
             'connection' => null,
             'table' => 'jobs',
             'queue' => 'default',
-            'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 90),
+            'retry_after' => 90,
             'after_commit' => false,
         ],
 

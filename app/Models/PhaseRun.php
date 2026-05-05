@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\Phase;
+use App\Enums\PhaseStatus;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -13,9 +15,9 @@ use Illuminate\Support\Carbon;
 /**
  * @property string $id
  * @property string $task_id
- * @property string $phase
+ * @property Phase $phase
  * @property int $iteration
- * @property string $status
+ * @property PhaseStatus $status
  * @property Carbon|null $started_at
  * @property Carbon|null $finished_at
  * @property int|null $exit_code
@@ -65,6 +67,8 @@ class PhaseRun extends Model
     protected function casts(): array
     {
         return [
+            'phase' => Phase::class,
+            'status' => PhaseStatus::class,
             'started_at' => 'datetime',
             'finished_at' => 'datetime',
             'result_json' => 'array',

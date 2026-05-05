@@ -3,6 +3,8 @@
 
         @php $accounts = $this->getConnectedAccounts(); @endphp
 
+        <x-help-hint tkey="help.oauth.overview" tone="info" />
+
         <x-filament::section heading="{{ __('accounts.blade.github_section') }}">
             @if ($accounts['github'])
                 <div class="flex items-center justify-between">
@@ -86,6 +88,11 @@
                         {{ __('accounts.blade.gitlab_not_configured_description') }}
                     </span>
                 </div>
+                <div class="mt-3">
+                    <a href="{{ config('argos.docs.setup_gitlab') }}" target="_blank" rel="noopener" class="text-xs underline text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200">
+                        {{ __('accounts.blade.setup_link') }} ↗
+                    </a>
+                </div>
             @else
                 <div class="flex items-center gap-3">
                     <x-filament::badge color="gray">{{ __('accounts.blade.badge_not_connected') }}</x-filament::badge>
@@ -138,6 +145,11 @@
                     <span class="text-sm text-gray-500 dark:text-gray-400">
                         {{ __('accounts.blade.bitbucket_not_configured_description') }}
                     </span>
+                </div>
+                <div class="mt-3">
+                    <a href="{{ config('argos.docs.setup_bitbucket') }}" target="_blank" rel="noopener" class="text-xs underline text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200">
+                        {{ __('accounts.blade.setup_link') }} ↗
+                    </a>
                 </div>
             @else
                 <div class="flex items-center gap-3">

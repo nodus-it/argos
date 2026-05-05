@@ -124,14 +124,19 @@ phase_commit_message_run() {
     local output_json="/workspace/.agent/logs/commit-message.${ITERATION}.json"
 
     log_info "commit-message: calling claude (json + json-schema)"
-    if ! claude -p \
-            --append-system-prompt "$sysprompt_content" \
-            --output-format json \
-            --json-schema "$schema_content" \
-            --max-turns 8 \
-            --permission-mode bypassPermissions \
-            < "$user_prompt_path" \
-            > "$output_json"; then
+    set +e
+    ( unset REPO_TOKEN
+      claude -p \
+        --append-system-prompt "$sysprompt_content" \
+        --output-format json \
+        --json-schema "$schema_content" \
+        --max-turns 8 \
+        --permission-mode bypassPermissions \
+        < "$user_prompt_path"
+    ) | log_scrub > "$output_json"
+    local claude_exit=${PIPESTATUS[0]}
+    set -e
+    if (( claude_exit != 0 )); then
         echo "commit-message: claude call failed (exit non-zero)" >&2
         local cli_err_text=""
         if [[ -f "$output_json" ]]; then

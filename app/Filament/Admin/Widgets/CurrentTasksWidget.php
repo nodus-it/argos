@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Widgets;
 
+use App\Enums\Phase;
 use App\Enums\WorkflowStatus;
 use App\Filament\Admin\Resources\TaskResource;
 use App\Models\Task;
@@ -50,9 +51,9 @@ class CurrentTasksWidget extends BaseWidget
                 TextColumn::make('current_phase')
                     ->label(__('widgets.current_tasks.columns.phase'))
                     ->badge()
-                    ->icon(fn (?string $state): ?string => self::phaseIcon($state))
-                    ->color(fn (?string $state): string => self::phaseColor($state))
-                    ->formatStateUsing(fn (?string $state): string => self::phaseLabel($state)),
+                    ->icon(fn (?Phase $state): ?string => $state?->icon())
+                    ->color(fn (?Phase $state): string => $state?->color() ?? 'gray')
+                    ->formatStateUsing(fn (?Phase $state): string => $state?->label() ?? '—'),
 
                 TextColumn::make('workflow_status')
                     ->label(__('widgets.current_tasks.columns.workflow'))
@@ -102,42 +103,5 @@ class CurrentTasksWidget extends BaseWidget
         return collect($values)
             ->map(fn (string $value): string => "'".addslashes($value)."'")
             ->implode(', ');
-    }
-
-    public static function phaseColor(?string $state): string
-    {
-        return match ($state) {
-            'concept' => 'info',
-            'implement' => 'warning',
-            'diff' => 'gray',
-            'push' => 'primary',
-            'respond' => 'success',
-            default => 'gray',
-        };
-    }
-
-    public static function phaseIcon(?string $state): ?string
-    {
-        return match ($state) {
-            'concept' => 'heroicon-m-light-bulb',
-            'implement' => 'heroicon-m-code-bracket',
-            'diff' => 'heroicon-m-document-text',
-            'push' => 'heroicon-m-arrow-up-tray',
-            'respond' => 'heroicon-m-chat-bubble-left-right',
-            default => null,
-        };
-    }
-
-    public static function phaseLabel(?string $state): string
-    {
-        return match ($state) {
-            'concept' => __('enums.phases.concept'),
-            'implement' => __('enums.phases.implement'),
-            'diff' => __('enums.phases.diff'),
-            'push' => __('enums.phases.push'),
-            'respond' => __('enums.phases.respond'),
-            null, '' => '—',
-            default => ucfirst($state),
-        };
     }
 }

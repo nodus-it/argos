@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\TaskResource\Pages;
 
-use App\Domain\Phase\PhaseRunner;
 use App\Filament\Admin\Resources\TaskResource;
 use App\Jobs\RunPhaseJob;
 use App\Models\Task;
+use App\Services\Workflow\PhaseRunner;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Page;
@@ -68,7 +68,7 @@ class ViewTaskRespond extends Page
         }
 
         try {
-            app(PhaseRunner::class)->writeFeedbackToVolume($this->task->name, $feedback);
+            app(PhaseRunner::class)->writeFeedbackToVolume($this->task, $feedback);
         } catch (\Throwable $e) {
             Notification::make()
                 ->title(__('tasks.view.actions.feedback_write_error'))

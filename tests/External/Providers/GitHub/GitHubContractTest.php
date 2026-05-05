@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\External\Providers\GitHub;
 
-use App\Services\Contracts\GitProviderContract;
-use App\Services\GitHub\GitHubGitService;
+use App\Services\GitProvider\Contracts\GitProviderContract;
+use App\Services\GitProvider\GitHubGitService;
 use Tests\External\ProviderContractTestCase;
 use Tests\External\Support\ProviderTestConfig;
 

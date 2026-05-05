@@ -49,11 +49,9 @@ phase_diff_run() {
         log_warn "diff: $base_ref not known locally, attempting fetch"
         set +x
         if [[ -n "${REPO_URL:-}" && -n "${REPO_TOKEN:-}" ]]; then
-            local auth_url
-            auth_url="$(git_auth_inject_token "$REPO_URL" "$REPO_TOKEN")"
-            git remote set-url origin "$auth_url"
-            git fetch --quiet origin "$BASE_BRANCH" || true
-            git remote set-url origin "$REPO_URL"
+            local auth_header
+            auth_header="$(git_auth_header "$REPO_TOKEN")"
+            git -c "http.extraheader=$auth_header" fetch --quiet origin "$BASE_BRANCH" || true
         fi
     fi
 

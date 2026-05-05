@@ -1,6 +1,8 @@
 <?php
 
-// Closed-deployment app — driver choices are fixed, only credentials are ENV-driven.
+// Closed-deployment app — Argos does not send mail. The 'log' default is here
+// only so framework features that depend on the Mail manager (notifications,
+// queued jobs that touch Mailables) don't crash if ever invoked.
 
 return [
 
@@ -10,7 +12,7 @@ return [
 
         'log' => [
             'transport' => 'log',
-            'channel' => env('MAIL_LOG_CHANNEL'),
+            'channel' => null,
         ],
 
         'array' => [
@@ -20,8 +22,8 @@ return [
     ],
 
     'from' => [
-        'address' => env('MAIL_FROM_ADDRESS', 'hello@example.com'),
-        'name' => env('MAIL_FROM_NAME', env('APP_NAME', 'Laravel')),
+        'address' => 'noreply@argos.local',
+        'name' => 'Argos',
     ],
 
 ];

@@ -38,18 +38,15 @@ phase_implement_preconditions() {
 _implement_reset_branch() {
     log_info "implement: git fetch + reset --hard origin/${BASE_BRANCH}"
     set +x
-    local auth_url
-    auth_url="$(git_auth_inject_token "$REPO_URL" "$REPO_TOKEN")"
-    git -C /workspace remote set-url origin "$auth_url"
-    if ! git -C /workspace fetch --quiet origin "$BASE_BRANCH"; then
+    local auth_header
+    auth_header="$(git_auth_header "$REPO_TOKEN")"
+    if ! git -C /workspace -c "http.extraheader=$auth_header" fetch --quiet origin "$BASE_BRANCH"; then
         echo "implement: git fetch failed" >&2
-        git -C /workspace remote set-url origin "$REPO_URL"
         return 1
     fi
     git -C /workspace reset --hard "origin/$BASE_BRANCH"
     # -fd without -x: keep vendor/ and node_modules/ (which are gitignored).
     git -C /workspace clean -fd
-    git -C /workspace remote set-url origin "$REPO_URL"
 }
 
 # _implement_setup_toolchain: composer install / npm ci if a manifest exists.
@@ -182,7 +179,8 @@ phase_implement_run() {
     log_info "implement: calling claude (stream-json, max-turns $max_turns${resume_args[*]:+, resume})"
 
     set +e
-    claude -p \
+    ( unset REPO_TOKEN
+      claude -p \
         --append-system-prompt "$sysprompt_content" \
         --output-format stream-json \
         --verbose \
@@ -190,9 +188,10 @@ phase_implement_run() {
         --permission-mode bypassPermissions \
         --max-turns "$max_turns" \
         "${resume_args[@]}" \
-        < "$resume_input" \
-        | tee "$stream_log" \
-        | tee >(jq -rj '
+        < "$resume_input"
+    ) | log_scrub \
+      | tee "$stream_log" \
+      | tee >(jq -rj '
             if .type == "assistant" then
                 (.message.content[]? |
                     if .type == "text" then (.text // "")
@@ -204,8 +203,8 @@ phase_implement_run() {
             elif .type == "result" then "\n"
             else empty end
           ' >&2 2>/dev/null) \
-        | jq -c 'select(.type == "result")' \
-        > "$result_json"
+      | jq -c 'select(.type == "result")' \
+      > "$result_json"
     local claude_exit=${PIPESTATUS[0]}
     set -e
 
@@ -298,16 +297,18 @@ phase_implement_run() {
         local fix_result_json="/workspace/.agent/logs/implement.${ITERATION}.fix${gate_retry}.result.json"
 
         set +e
-        claude -p \
+        ( unset REPO_TOKEN
+          claude -p \
             --append-system-prompt "$sysprompt_content" \
             --output-format stream-json \
             --verbose \
             --include-partial-messages \
             --permission-mode bypassPermissions \
             --max-turns "${GATE_FIX_MAX_TURNS:-30}" \
-            < "$fix_prompt_path" \
-            | tee "$fix_stream_log" \
-            | tee >(jq -rj '
+            < "$fix_prompt_path"
+        ) | log_scrub \
+          | tee "$fix_stream_log" \
+          | tee >(jq -rj '
                 if .type == "assistant" then
                     (.message.content[]? |
                         if .type == "text" then (.text // "")
@@ -319,8 +320,8 @@ phase_implement_run() {
                 elif .type == "result" then "\n"
                 else empty end
               ' >&2 2>/dev/null) \
-            | jq -c 'select(.type == "result")' \
-            > "$fix_result_json"
+          | jq -c 'select(.type == "result")' \
+          > "$fix_result_json"
         local fix_exit=${PIPESTATUS[0]}
         set -e
 

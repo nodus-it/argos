@@ -2,8 +2,6 @@
 
 // Closed-deployment app — driver choices are fixed, only credentials are ENV-driven.
 
-use Illuminate\Support\Str;
-
 return [
 
     'default' => 'database',
@@ -25,7 +23,7 @@ return [
 
     ],
 
-    'prefix' => env('CACHE_PREFIX', Str::slug((string) env('APP_NAME', 'laravel')).'-cache-'),
+    'prefix' => 'argos-cache-',
 
     'serializable_classes' => false,
 

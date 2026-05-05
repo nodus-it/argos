@@ -1,0 +1,112 @@
+# Argos — Docker Compose (local development)
+#
+# Two images:
+#   manager  — Laravel app, web UI, queue worker, MariaDB (all in one)
+#   worker   — Claude Code + phase runner (started by the manager via `docker run`)
+#
+# The `worker` service below exists only to build the image locally.
+# PhaseRunner launches worker containers via `docker run`, not via compose.
+#
+# Profiles:
+#   (no profile)  — manager + auto worker-build (test/dev default)
+#   build-only    — manual rebuild of the worker images on demand
+#
+# To skip the auto-build (e.g. when worker_image points at a registry tag),
+# bring the manager up with `docker compose up --no-deps manager`.
+# To rebuild the worker without restarting the manager:
+#   docker exec -it argos php artisan worker:build
+
+services:
+
+  # Builds argos-worker:local-php8.{3,4} on every `docker compose up`.
+  # Layer cache makes this near-instant when nothing in worker/ changed.
+  # The manager waits for completion via depends_on, so the spawn path
+  # always finds an up-to-date image.
+  worker-build:
+    image: docker:cli
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ../..:/build:ro
+    working_dir: /build
+    command: >
+      sh -c "set -e;
+        docker build -t argos-worker:local-php8.4 -f .tools/docker/worker/Dockerfile --target worker-php84 .;
+        docker build -t argos-worker:local-php8.3 -f .tools/docker/worker/Dockerfile --target worker ."
+    restart: "no"
+
+  manager:
+    build:
+      context: ../..
+      dockerfile: .tools/docker/manager/Dockerfile
+      target: manager
+    depends_on:
+      worker-build:
+        condition: service_completed_successfully
+        required: false
+    ports:
+      - "${ARGOS_PORT:-8080}:80"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - argos-data:/data
+      - argos-db:/var/lib/mysql
+      # Bind mount for local development (hot reload without rebuilding the image).
+      # vendor/ is intentionally shared with the host — composer require on the host
+      # propagates immediately, and the entrypoint runs `composer install` whenever
+      # composer.lock drifts from vendor/composer/installed.json (e.g. after a fresh
+      # clone or git pull). The other anonymous volumes mask host artefacts that
+      # would otherwise shadow the image-built ones.
+      - ../..:/app
+      - /app/node_modules
+      - /app/public/build
+      - /app/bootstrap/cache   # cache without dev-only providers (no Pail)
+    environment:
+      APP_ENV:                  "${APP_ENV:-local}"
+      APP_DEBUG:                "${APP_DEBUG:-true}"
+      APP_KEY:                  "${APP_KEY:-}"
+      ARGOS_WORKER_IMAGE:       "${ARGOS_WORKER_IMAGE:-argos-worker:latest}"
+      ARGOS_CONFIG_DIR:         /data/config
+      DB_CONNECTION:            "mariadb"
+      # MariaDB runs in the same container — connect via the Unix socket.
+      ARGOS_DB_HOST:            "127.0.0.1"
+      ARGOS_DB_PORT:            "3306"
+      ARGOS_DB_SOCKET:          "/run/mysqld/mysqld.sock"
+      ARGOS_DB_DATABASE:        "${ARGOS_DB_DATABASE:-argos}"
+      ARGOS_DB_USERNAME:        "${ARGOS_DB_USERNAME:-argos}"
+      ARGOS_DB_PASSWORD:        "${ARGOS_DB_PASSWORD:-argos}"
+
+  # Local worker images mirror the CI matrix: one per supported PHP version.
+  # Tag scheme is symmetric with stage/prod:
+  #   local: argos-worker:local-php8.3 / :local-php8.4
+  #   stage: ghcr.io/.../argos-worker:stage-php8.3 / :stage-php8.4
+  #   prod:  ghcr.io/.../argos-worker:php8.3 / :php8.4
+  # Workers are not started by compose; the manager spawns them via `docker run`.
+  # `docker compose --profile build-only build` builds both variants at once.
+  worker-php83:
+    image: argos-worker:local-php8.3
+    build:
+      context: ../..
+      dockerfile: .tools/docker/worker/Dockerfile
+      target: worker
+    profiles:
+      - build-only
+    volumes:
+      - composer_cache:/home/agent/.composer/cache
+      - npm_cache:/home/agent/.npm
+
+  worker-php84:
+    image: argos-worker:local-php8.4
+    build:
+      context: ../..
+      dockerfile: .tools/docker/worker/Dockerfile
+      target: worker-php84
+    profiles:
+      - build-only
+    volumes:
+      - composer_cache:/home/agent/.composer/cache
+      - npm_cache:/home/agent/.npm
+
+volumes:
+  argos-data:
+  argos-db:
+  composer_cache:
+  npm_cache:

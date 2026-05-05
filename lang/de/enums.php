@@ -14,12 +14,25 @@ return [
         'failed' => 'Fehlgeschlagen',
     ],
 
+    'phase_status' => [
+        'pending' => 'Ausstehend',
+        'running' => 'Läuft',
+        'completed' => 'Abgeschlossen',
+        'paused' => 'Pausiert',
+        'failed' => 'Fehlgeschlagen',
+        'quality_gate_failed' => 'Quality Gate fehlgeschlagen',
+        'no_changes' => 'Keine Änderungen',
+        'lock_blocked' => 'Lock blockiert',
+        'rate_limited' => 'Rate-Limit erreicht',
+    ],
+
     'phases' => [
         'concept' => 'Concept',
         'implement' => 'Implement',
         'diff' => 'Diff',
         'push' => 'Push',
         'respond' => 'Respond',
+        'commit_message' => 'Commit-Message',
     ],
 
     'phase_runs' => [

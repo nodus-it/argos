@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Domain\Task;
 
-use App\Domain\Phase\PhaseRunner;
-use App\Domain\Task\WorkflowService;
+use App\Enums\Phase;
+use App\Enums\PhaseStatus;
 use App\Enums\WorkflowStatus;
 use App\Jobs\RunPhaseJob;
 use App\Models\PhaseRun;
 use App\Models\RepoProfile;
 use App\Models\Task;
+use App\Services\Workflow\PhaseRunner;
+use App\Services\Workflow\WorkflowService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Tests\TestCase;
@@ -99,7 +101,7 @@ class WorkflowServiceTest extends TestCase
 
         $fresh = $task->fresh();
         $this->assertSame(WorkflowStatus::ImplementRunning, $fresh->workflow_status);
-        $this->assertSame('running', $fresh->current_status);
+        $this->assertSame(PhaseStatus::Running, $fresh->current_status);
     }
 
     public function test_retry_concept_from_failed_sets_concept_running(): void
@@ -138,8 +140,8 @@ class WorkflowServiceTest extends TestCase
 
         $this->assertInstanceOf(PhaseRun::class, $phaseRun);
         $this->assertSame(1, $phaseRun->iteration);
-        $this->assertSame('running', $phaseRun->status);
-        $this->assertSame('concept', $phaseRun->phase);
+        $this->assertSame(PhaseStatus::Running, $phaseRun->status);
+        $this->assertSame(Phase::Concept, $phaseRun->phase);
         $this->assertSame($task->id, $phaseRun->task_id);
     }
 
@@ -160,8 +162,8 @@ class WorkflowServiceTest extends TestCase
         $this->service->startPhase($task, 'implement');
 
         $fresh = $task->fresh();
-        $this->assertSame('implement', $fresh->current_phase);
-        $this->assertSame('running', $fresh->current_status);
+        $this->assertSame(Phase::Implement, $fresh->current_phase);
+        $this->assertSame(PhaseStatus::Running, $fresh->current_status);
     }
 
     // --- completePhase ---
@@ -170,7 +172,7 @@ class WorkflowServiceTest extends TestCase
     {
         $task = Task::factory()->create(['workflow_status' => WorkflowStatus::ConceptRunning]);
 
-        $this->service->completePhase($task, 'concept', 'completed');
+        $this->service->completePhase($task, 'concept', PhaseStatus::Completed);
 
         $this->assertSame(WorkflowStatus::ConceptReview, $task->fresh()->workflow_status);
     }
@@ -179,7 +181,7 @@ class WorkflowServiceTest extends TestCase
     {
         $task = Task::factory()->create(['workflow_status' => WorkflowStatus::ConceptRunning]);
 
-        $this->service->completePhase($task, 'concept', 'failed');
+        $this->service->completePhase($task, 'concept', PhaseStatus::Failed);
 
         $this->assertSame(WorkflowStatus::Failed, $task->fresh()->workflow_status);
     }
@@ -188,7 +190,7 @@ class WorkflowServiceTest extends TestCase
     {
         $task = Task::factory()->create(['workflow_status' => WorkflowStatus::ImplementRunning]);
 
-        $this->service->completePhase($task, 'implement', 'failed');
+        $this->service->completePhase($task, 'implement', PhaseStatus::Failed);
 
         $this->assertSame(WorkflowStatus::Failed, $task->fresh()->workflow_status);
     }
@@ -197,7 +199,7 @@ class WorkflowServiceTest extends TestCase
     {
         $task = Task::factory()->create(['workflow_status' => WorkflowStatus::ImplementRunning]);
 
-        $this->service->completePhase($task, 'implement', 'paused');
+        $this->service->completePhase($task, 'implement', PhaseStatus::Paused);
 
         $this->assertSame(WorkflowStatus::ImplementPaused, $task->fresh()->workflow_status);
     }
@@ -210,7 +212,7 @@ class WorkflowServiceTest extends TestCase
             'workflow_status' => WorkflowStatus::ImplementRunning,
         ]);
 
-        $this->service->completePhase($task, 'implement', 'completed');
+        $this->service->completePhase($task, 'implement', PhaseStatus::Completed);
 
         $this->assertSame(WorkflowStatus::ImplementRunning, $task->fresh()->workflow_status);
         Bus::assertNothingDispatched();
@@ -226,7 +228,7 @@ class WorkflowServiceTest extends TestCase
             'workflow_status' => WorkflowStatus::Failed,
         ]);
 
-        $this->service->completePhase($task, 'implement', 'completed');
+        $this->service->completePhase($task, 'implement', PhaseStatus::Completed);
 
         $this->assertSame(WorkflowStatus::ImplementRunning, $task->fresh()->workflow_status);
     }
@@ -239,7 +241,7 @@ class WorkflowServiceTest extends TestCase
             'workflow_status' => WorkflowStatus::ImplementRunning,
         ]);
 
-        $this->service->completePhase($task, 'implement', 'completed');
+        $this->service->completePhase($task, 'implement', PhaseStatus::Completed);
 
         Bus::assertDispatched(RunPhaseJob::class, fn ($j) => $j->phase === 'push' && $j->taskId === $task->id);
         // Status stays ImplementRunning while push runs
@@ -250,7 +252,7 @@ class WorkflowServiceTest extends TestCase
     {
         $task = Task::factory()->create(['workflow_status' => WorkflowStatus::ImplementRunning]);
 
-        $this->service->completePhase($task, 'push', 'completed');
+        $this->service->completePhase($task, 'push', PhaseStatus::Completed);
 
         $this->assertSame(WorkflowStatus::InReview, $task->fresh()->workflow_status);
     }
@@ -259,7 +261,7 @@ class WorkflowServiceTest extends TestCase
     {
         $task = Task::factory()->create(['workflow_status' => WorkflowStatus::ImplementRunning]);
 
-        $this->service->completePhase($task, 'push', 'failed');
+        $this->service->completePhase($task, 'push', PhaseStatus::Failed);
 
         $this->assertSame(WorkflowStatus::Failed, $task->fresh()->workflow_status);
     }
@@ -268,7 +270,7 @@ class WorkflowServiceTest extends TestCase
     {
         $task = Task::factory()->create(['workflow_status' => WorkflowStatus::InReview]);
 
-        $this->service->completePhase($task, 'respond', 'completed');
+        $this->service->completePhase($task, 'respond', PhaseStatus::Completed);
 
         $this->assertSame(WorkflowStatus::InReview, $task->fresh()->workflow_status);
     }
@@ -288,7 +290,7 @@ class WorkflowServiceTest extends TestCase
 
         $this->service->markStaleRunsAsFailed($task);
 
-        $this->assertSame('failed', $stale->fresh()->status);
+        $this->assertSame(PhaseStatus::Failed, $stale->fresh()->status);
         $this->assertNotNull($stale->fresh()->finished_at);
     }
 
@@ -305,7 +307,7 @@ class WorkflowServiceTest extends TestCase
 
         $this->service->markStaleRunsAsFailed($task);
 
-        $this->assertSame('running', $recent->fresh()->status);
+        $this->assertSame(PhaseStatus::Running, $recent->fresh()->status);
     }
 
     public function test_mark_stale_runs_as_failed_leaves_completed_runs_intact(): void
@@ -321,7 +323,7 @@ class WorkflowServiceTest extends TestCase
 
         $this->service->markStaleRunsAsFailed($task);
 
-        $this->assertSame('completed', $completed->fresh()->status);
+        $this->assertSame(PhaseStatus::Completed, $completed->fresh()->status);
     }
 
     // --- RunPhaseJob integration: retry from Failed ---

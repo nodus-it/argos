@@ -4,16 +4,11 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
-use App\Console\Commands\AgentConceptCommand;
-use App\Console\Commands\AgentDiffCommand;
-use App\Console\Commands\AgentImplementCommand;
-use App\Console\Commands\AgentPushCommand;
-use App\Console\Commands\ArgosCommand;
-use App\Domain\Credentials\CredentialStore;
-use App\Services\Bitbucket\BitbucketGitService;
-use App\Services\GitHub\GitHubGitService;
-use App\Services\GitLab\GitLabGitService;
-use App\Services\GitProviderRegistry;
+use App\Services\Anthropic\CredentialStore;
+use App\Services\GitProvider\BitbucketGitService;
+use App\Services\GitProvider\GitHubGitService;
+use App\Services\GitProvider\GitLabGitService;
+use App\Services\GitProvider\GitProviderRegistry;
 use Illuminate\Support\Env;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Event;
@@ -59,14 +54,6 @@ class AppServiceProvider extends ServiceProvider
     {
         Event::listen(SocialiteWasCalled::class, GitLabExtendSocialite::class.'@handle');
         Event::listen(SocialiteWasCalled::class, BitbucketExtendSocialite::class.'@handle');
-
-        $this->commands([
-            ArgosCommand::class,
-            AgentConceptCommand::class,
-            AgentImplementCommand::class,
-            AgentDiffCommand::class,
-            AgentPushCommand::class,
-        ]);
 
         $this->configureDatabase();
     }

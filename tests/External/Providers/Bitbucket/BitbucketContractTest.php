@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\External\Providers\Bitbucket;
 
-use App\Services\Bitbucket\BitbucketGitService;
-use App\Services\Contracts\GitProviderContract;
+use App\Services\GitProvider\BitbucketGitService;
+use App\Services\GitProvider\Contracts\GitProviderContract;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
 use Tests\External\ProviderContractTestCase;

@@ -351,11 +351,11 @@ phase_push_run() {
         fi
     fi
 
-    # Push with the token embedded in the URL (defensive: never log it).
+    # Push with auth via http.extraheader — token never lands in origin URL
+    # nor in /workspace/.git/config.
     set +x
-    local auth_url
-    auth_url="$(git_auth_inject_token "$REPO_URL" "$REPO_TOKEN")"
-    git -C /workspace remote set-url origin "$auth_url"
+    local auth_header
+    auth_header="$(git_auth_header "$REPO_TOKEN")"
 
     local feature_branch
     feature_branch="$(state_get_feature_branch)"
@@ -364,9 +364,7 @@ phase_push_run() {
     fi
 
     local push_log="/workspace/.agent/logs/git-push.${ITERATION}.log"
-    if ! git -C /workspace push -u --force-with-lease origin "$feature_branch" "${push_opts[@]}" > "$push_log" 2>&1; then
-        # Restore the token-less URL before returning.
-        git -C /workspace remote set-url origin "$REPO_URL"
+    if ! git -C /workspace -c "http.extraheader=$auth_header" push -u --force-with-lease origin "$feature_branch" "${push_opts[@]}" > "$push_log" 2>&1; then
         local push_exit=1
         if grep -qE "401|403|denied|[Aa]uthentication" "$push_log"; then
             echo "push: auth error on git push (see $push_log)" >&2
@@ -385,7 +383,6 @@ phase_push_run() {
             error_message "git push failed (see ${push_log})"
         return "$push_exit"
     fi
-    git -C /workspace remote set-url origin "$REPO_URL"
 
     local commit_sha
     commit_sha="$(git -C /workspace rev-parse HEAD)"

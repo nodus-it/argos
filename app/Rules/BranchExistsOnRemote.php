@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Rules;
 
 use App\Models\ConnectedAccount;
-use App\Services\Git\RemoteBranchValidator;
+use App\Services\GitProvider\RemoteBranchValidator;
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 

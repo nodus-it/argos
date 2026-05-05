@@ -4,16 +4,23 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Pages;
 
-use App\Domain\Credentials\CredentialStore;
 use App\Models\RepoProfile;
 use App\Models\User;
 use App\Services\Anthropic\AnthropicTokenValidator;
+use App\Services\Anthropic\CredentialStore;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Auth;
 
 class Onboarding extends Page
 {
+    /** Provider key → config()-path for OAuth client_id (used to detect "configured"). */
+    private const OAUTH_PROVIDERS = [
+        'github' => 'services.github.client_id',
+        'gitlab' => 'services.gitlab.client_id',
+        'bitbucket' => 'services.bitbucket.client_id',
+    ];
+
     protected string $view = 'filament.admin.pages.onboarding';
 
     public string $tokenSource = 'none';
@@ -22,9 +29,8 @@ class Onboarding extends Page
 
     public string $workerImage = '';
 
-    public bool $githubOAuthAvailable = false;
-
-    public bool $githubConnected = false;
+    /** @var array<string, array{configured: bool, connected: bool}> */
+    public array $oauthState = [];
 
     public static function getNavigationIcon(): string
     {
@@ -60,27 +66,38 @@ class Onboarding extends Page
     {
         $this->tokenSource = app(CredentialStore::class)->claudeTokenSource();
         $this->workerImage = (string) config('argos.worker_image', '');
-        $this->githubOAuthAvailable = (bool) config('services.github.client_id')
-            && (bool) config('services.github.client_secret');
 
         /** @var User|null $user */
         $user = Auth::user();
-        $this->githubConnected = $user !== null && $user->connectedAccount('github') !== null;
+
+        $this->oauthState = [];
+        foreach (self::OAUTH_PROVIDERS as $provider => $configKey) {
+            $this->oauthState[$provider] = [
+                'configured' => filled(config($configKey)),
+                'connected' => $user !== null && $user->connectedAccount($provider) !== null,
+            ];
+        }
     }
 
-    public function disconnectGitHub(): void
+    public function disconnectProvider(string $provider): void
     {
+        if (! array_key_exists($provider, self::OAUTH_PROVIDERS)) {
+            return;
+        }
+
         /** @var User|null $user */
         $user = Auth::user();
-
         if ($user === null) {
             return;
         }
 
-        $user->connectedAccounts()->where('provider', 'github')->delete();
+        $user->connectedAccounts()->where('provider', $provider)->delete();
         $this->refreshState();
 
-        Notification::make()->title(__('onboarding.notifications.github_disconnected'))->success()->send();
+        Notification::make()
+            ->title(__('onboarding.notifications.disconnected', ['provider' => __('onboarding.providers.'.$provider)]))
+            ->success()
+            ->send();
     }
 
     public function saveClaudeToken(): void
@@ -127,5 +144,31 @@ class Onboarding extends Page
         } else {
             Notification::make()->title(__('onboarding.notifications.saved_title'))->success()->send();
         }
+    }
+
+    /**
+     * Did at least one OAuth provider have credentials configured?
+     * Drives whether the "Connect provider" step is shown at all.
+     */
+    public function hasAnyOAuthConfigured(): bool
+    {
+        foreach ($this->oauthState as $state) {
+            if ($state['configured']) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public function isAnyProviderConnected(): bool
+    {
+        foreach ($this->oauthState as $state) {
+            if ($state['connected']) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

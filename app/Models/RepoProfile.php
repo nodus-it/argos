@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\AuthMethod;
+use App\Enums\GitProvider;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
@@ -19,8 +21,8 @@ use Illuminate\Support\Carbon;
  * @property string $url
  * @property string|null $token
  * @property string $default_branch
- * @property string $platform
- * @property string $auth_method
+ * @property GitProvider $platform
+ * @property AuthMethod $auth_method
  * @property int|null $connected_account_id
  * @property string|null $worker_image
  * @property bool $auto_concept
@@ -52,6 +54,8 @@ class RepoProfile extends Model
     {
         return [
             'token' => 'encrypted',
+            'platform' => GitProvider::class,
+            'auth_method' => AuthMethod::class,
             'auto_concept' => 'boolean',
             'auto_pr' => 'boolean',
         ];
@@ -82,7 +86,7 @@ class RepoProfile extends Model
      */
     public function resolveToken(): string
     {
-        if ($this->auth_method !== 'oauth') {
+        if ($this->auth_method !== AuthMethod::OAuth) {
             if ($this->token !== null && $this->token !== '') {
                 return $this->token;
             }

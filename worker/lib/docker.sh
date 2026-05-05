@@ -3,11 +3,13 @@
 #
 # Expects lib/credentials.sh and lib/tasks.sh to be sourced first, and the
 # `worker-php84` compose service to exist. AGENT_REPO_ROOT points at the repo
-# directory containing docker-compose.yml (defaults to $PWD).
+# root; the compose file lives at .tools/docker/docker-compose.yml relative
+# to it.
 
 # shellcheck shell=bash
 
 AGENT_REPO_ROOT="${AGENT_REPO_ROOT:-}"
+AGENT_COMPOSE_FILE_REL=".tools/docker/docker-compose.yml"
 
 # docker_run_phase: run a phase in a fresh worker container.
 # Args: $1=phase, $2=task_id
@@ -51,7 +53,7 @@ docker_run_phase() {
         done
     fi
 
-    docker compose -f "$repo/docker-compose.yml" "${extra_compose[@]}" run --rm \
+    docker compose -f "$repo/$AGENT_COMPOSE_FILE_REL" "${extra_compose[@]}" run --rm \
         -v "$volume:/workspace" \
         "${desc_mount[@]}" \
         -e "PHASE=$phase" \
@@ -74,7 +76,7 @@ docker_run_shell() {
     volume="$(task_volume_name "$task_id")"
     local repo="${AGENT_REPO_ROOT:-$PWD}"
 
-    docker compose -f "$repo/docker-compose.yml" run --rm \
+    docker compose -f "$repo/$AGENT_COMPOSE_FILE_REL" run --rm \
         -v "$volume:/workspace" \
         -e "TASK_ID=$task_id" \
         --entrypoint bash \
@@ -93,7 +95,7 @@ docker_copy_from_volume() {
     docker run --rm \
         -v "$volume:/workspace:ro" \
         --entrypoint sh \
-        agent-worker:latest -c "cat /workspace/$in_volume_path" \
+        argos-worker:latest -c "cat /workspace/$in_volume_path" \
         > "$host_path"
 }
 
@@ -109,6 +111,6 @@ docker_copy_to_volume() {
     docker run --rm -i \
         -v "$volume:/workspace" \
         --entrypoint sh \
-        agent-worker:latest -c "cat > /workspace/$in_volume_path" \
+        argos-worker:latest -c "cat > /workspace/$in_volume_path" \
         < "$host_path"
 }

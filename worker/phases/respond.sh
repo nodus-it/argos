@@ -82,23 +82,25 @@ phase_respond_run() {
     log_info "respond: calling claude (stream-json, max-turns $max_turns)"
 
     set +e
-    claude -p \
+    ( unset REPO_TOKEN
+      claude -p \
         --append-system-prompt "$sysprompt_content" \
         --output-format stream-json \
         --verbose \
         --include-partial-messages \
         --permission-mode bypassPermissions \
         --max-turns "$max_turns" \
-        < "$user_prompt_path" \
-        | tee "$stream_log" \
-        | tee >(jq -rj '
+        < "$user_prompt_path"
+    ) | log_scrub \
+      | tee "$stream_log" \
+      | tee >(jq -rj '
             if .type == "assistant" then
                 (.message.content[]? | select(.type == "text") | .text // "")
             elif .type == "result" then "\n"
             else empty end
           ' 2>/dev/null >&2) \
-        | jq -c 'select(.type == "result")' \
-        > "$result_json"
+      | jq -c 'select(.type == "result")' \
+      > "$result_json"
     local claude_exit=${PIPESTATUS[0]}
     set -e
 
@@ -183,16 +185,18 @@ phase_respond_run() {
         local fix_result_json="/workspace/.agent/logs/respond.${ITERATION}.fix${gate_retry}.result.json"
 
         set +e
-        claude -p \
+        ( unset REPO_TOKEN
+          claude -p \
             --append-system-prompt "$sysprompt_content" \
             --output-format stream-json \
             --verbose \
             --include-partial-messages \
             --permission-mode bypassPermissions \
             --max-turns "${GATE_FIX_MAX_TURNS:-30}" \
-            < "$fix_prompt_path" \
-            | tee "$fix_stream_log" \
-            | tee >(jq -rj '
+            < "$fix_prompt_path"
+        ) | log_scrub \
+          | tee "$fix_stream_log" \
+          | tee >(jq -rj '
                 if .type == "assistant" then
                     (.message.content[]? |
                         if .type == "text" then (.text // "")
@@ -204,8 +208,8 @@ phase_respond_run() {
                 elif .type == "result" then "\n"
                 else empty end
               ' >&2 2>/dev/null) \
-            | jq -c 'select(.type == "result")' \
-            > "$fix_result_json"
+          | jq -c 'select(.type == "result")' \
+          > "$fix_result_json"
         local fix_exit=${PIPESTATUS[0]}
         set -e
 

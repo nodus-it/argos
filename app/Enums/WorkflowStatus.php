@@ -72,19 +72,19 @@ enum WorkflowStatus: string
      * Advance the workflow after a phase completes.
      * Returns the next status or null if no change is needed.
      */
-    public static function afterPhase(string $phase, string $phaseStatus): ?self
+    public static function afterPhase(string $phase, PhaseStatus $phaseStatus): ?self
     {
         return match ([$phase, $phaseStatus]) {
-            ['concept', 'completed'] => self::ConceptReview,
-            ['concept', 'failed'] => self::Failed,
-            ['concept', 'quality_gate_failed'] => self::Failed,
-            ['implement', 'failed'] => self::Failed,
-            ['implement', 'quality_gate_failed'] => self::Failed,
-            ['implement', 'paused'] => self::ImplementPaused,
-            ['push', 'completed'] => self::InReview,
-            ['push', 'failed'] => self::Failed,
-            ['respond', 'completed'] => self::InReview,
-            ['respond', 'failed'] => self::Failed,
+            ['concept', PhaseStatus::Completed] => self::ConceptReview,
+            ['concept', PhaseStatus::Failed] => self::Failed,
+            ['concept', PhaseStatus::QualityGateFailed] => self::Failed,
+            ['implement', PhaseStatus::Failed] => self::Failed,
+            ['implement', PhaseStatus::QualityGateFailed] => self::Failed,
+            ['implement', PhaseStatus::Paused] => self::ImplementPaused,
+            ['push', PhaseStatus::Completed] => self::InReview,
+            ['push', PhaseStatus::Failed] => self::Failed,
+            ['respond', PhaseStatus::Completed] => self::InReview,
+            ['respond', PhaseStatus::Failed] => self::Failed,
             default => null,
         };
     }
