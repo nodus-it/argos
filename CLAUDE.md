@@ -107,9 +107,6 @@ php artisan test
 
 # Lokale Entwicklung (Web-UI)
 php artisan serve
-
-# CLI (im laufenden Manager-Container)
-docker exec -it argos php artisan agent:concept task-001
 ```
 
 ## Rückfragen sind willkommen
