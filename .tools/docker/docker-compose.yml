@@ -72,7 +72,7 @@ services:
       APP_ENV:                  "${APP_ENV:-local}"
       APP_DEBUG:                "${APP_DEBUG:-true}"
       APP_KEY:                  "${APP_KEY:-}"
-      ARGOS_WORKER_IMAGE:       "${ARGOS_WORKER_IMAGE:-argos-worker:latest}"
+      ARGOS_WORKER_IMAGE:       "${ARGOS_WORKER_IMAGE:-argos-worker:local-php8.4}"
       ARGOS_CONFIG_DIR:         /data/config
       DB_CONNECTION:            "mariadb"
       ARGOS_DB_HOST:            "db"
@@ -123,7 +123,7 @@ services:
       APP_ENV:                  "${APP_ENV:-local}"
       APP_DEBUG:                "${APP_DEBUG:-true}"
       APP_KEY:                  "${APP_KEY:-}"
-      ARGOS_WORKER_IMAGE:       "${ARGOS_WORKER_IMAGE:-argos-worker:latest}"
+      ARGOS_WORKER_IMAGE:       "${ARGOS_WORKER_IMAGE:-argos-worker:local-php8.4}"
       ARGOS_CONFIG_DIR:         /data/config
       DB_CONNECTION:            "mariadb"
       ARGOS_DB_HOST:            "db"
