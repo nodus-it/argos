@@ -6,6 +6,11 @@
             {{ __('onboarding.intro') }}
         </p>
 
+        @php
+            $stepNumber = 1;
+            $hasAnyOauth = $this->hasAnyOAuthConfigured();
+        @endphp
+
         {{-- Step 1: Claude Token --}}
         <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden">
             <div class="flex items-center gap-3 px-5 py-3 border-b border-gray-100 dark:border-gray-800">
@@ -13,7 +18,7 @@
                     @if($tokenSource !== 'none')
                         <x-heroicon-s-check class="h-4 w-4" />
                     @else
-                        1
+                        {{ $stepNumber }}
                     @endif
                 </span>
                 <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">{{ __('onboarding.steps.claude_token') }}</span>
@@ -57,62 +62,81 @@
 
             </div>
         </div>
+        @php $stepNumber++; @endphp
 
-        {{-- Step 2: GitHub verbinden (only if OAuth credentials configured) --}}
-        @if($githubOAuthAvailable)
+        {{-- Step 2: Connect provider(s) — only if at least one OAuth provider is configured --}}
+        @if ($hasAnyOauth)
             <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden">
                 <div class="flex items-center gap-3 px-5 py-3 border-b border-gray-100 dark:border-gray-800">
-                    <span class="flex h-6 w-6 items-center justify-center rounded-full {{ $githubConnected ? 'bg-emerald-100 dark:bg-emerald-900 text-emerald-600 dark:text-emerald-400' : 'bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400' }} text-xs font-bold">
-                        @if($githubConnected)
+                    <span class="flex h-6 w-6 items-center justify-center rounded-full {{ $this->isAnyProviderConnected() ? 'bg-emerald-100 dark:bg-emerald-900 text-emerald-600 dark:text-emerald-400' : 'bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400' }} text-xs font-bold">
+                        @if($this->isAnyProviderConnected())
                             <x-heroicon-s-check class="h-4 w-4" />
                         @else
-                            2
+                            {{ $stepNumber }}
                         @endif
                     </span>
-                    <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">{{ __('onboarding.steps.github_connect') }}</span>
-                    <span class="ml-auto text-xs text-gray-400 dark:text-gray-500">{{ __('onboarding.steps.github_optional') }}</span>
+                    <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">{{ __('onboarding.steps.providers_connect') }}</span>
+                    <span class="ml-auto text-xs text-gray-400 dark:text-gray-500">{{ __('onboarding.steps.providers_optional') }}</span>
                 </div>
-                <div class="px-5 py-4 space-y-3">
-                    @if($githubConnected)
-                        <div class="flex items-center justify-between gap-3">
-                            <div class="flex items-center gap-3">
-                                <x-heroicon-o-check-circle class="h-5 w-5 text-emerald-500 flex-shrink-0" />
-                                <span class="text-sm text-gray-700 dark:text-gray-300">{{ __('onboarding.github.connected') }}</span>
+                <div class="px-5 py-4 space-y-4">
+                    <p class="text-sm text-gray-500 dark:text-gray-400">
+                        {{ __('onboarding.providers.description') }}
+                    </p>
+
+                    <div class="space-y-3">
+                        @foreach ($oauthState as $provider => $state)
+                            @if (! $state['configured'])
+                                @continue
+                            @endif
+
+                            <div class="flex items-center justify-between gap-3 rounded-lg border border-gray-200 dark:border-gray-700 px-4 py-3">
+                                <div class="flex items-center gap-3 min-w-0">
+                                    @if ($state['connected'])
+                                        <x-heroicon-o-check-circle class="h-5 w-5 text-emerald-500 flex-shrink-0" />
+                                    @else
+                                        <x-heroicon-o-link class="h-5 w-5 text-gray-400 flex-shrink-0" />
+                                    @endif
+                                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                        {{ __('onboarding.providers.'.$provider) }}
+                                    </span>
+                                </div>
+                                @if ($state['connected'])
+                                    <x-filament::button
+                                        wire:click="disconnectProvider('{{ $provider }}')"
+                                        wire:confirm="{{ __('onboarding.providers.disconnect') }}?"
+                                        color="gray"
+                                        size="sm"
+                                    >
+                                        {{ __('onboarding.providers.disconnect') }}
+                                    </x-filament::button>
+                                @else
+                                    <x-filament::button
+                                        tag="a"
+                                        href="{{ route('auth.'.$provider.'.redirect', ['return' => 'onboarding']) }}"
+                                        icon="heroicon-o-arrow-right-circle"
+                                        size="sm"
+                                    >
+                                        {{ __('onboarding.providers.connect_button', ['provider' => __('onboarding.providers.'.$provider)]) }}
+                                    </x-filament::button>
+                                @endif
                             </div>
-                            <x-filament::button
-                                wire:click="disconnectGitHub"
-                                wire:confirm="{{ __('onboarding.github.disconnect') }}?"
-                                color="gray"
-                                size="sm"
-                            >
-                                {{ __('onboarding.github.disconnect') }}
-                            </x-filament::button>
-                        </div>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">
-                            {{ __('onboarding.github.tip') }}
-                            <a href="https://github.com/settings/applications" target="_blank" rel="noopener" class="underline hover:text-gray-700 dark:hover:text-gray-300">github.com/settings/applications</a>.
-                        </p>
-                    @else
-                        <p class="text-sm text-gray-500 dark:text-gray-400">
-                            {{ __('onboarding.github.description') }}
-                        </p>
-                        <x-filament::button
-                            tag="a"
-                            href="{{ route('auth.github.redirect', ['return' => 'onboarding']) }}"
-                            icon="heroicon-o-arrow-right-circle"
-                        >
-                            {{ __('onboarding.github.connect_button') }}
-                        </x-filament::button>
-                    @endif
+                        @endforeach
+                    </div>
+
+                    <x-help-hint tkey="help.oauth.available" tone="info" />
                 </div>
             </div>
+            @php $stepNumber++; @endphp
+        @else
+            {{-- No OAuth provider configured at all — show a hint instead of a step --}}
+            <x-help-hint tkey="help.oauth.not_configured" tone="info" />
         @endif
 
         {{-- Step 3: First project --}}
         <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden">
             <div class="flex items-center gap-3 px-5 py-3 border-b border-gray-100 dark:border-gray-800">
                 <span class="flex h-6 w-6 items-center justify-center rounded-full bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400 text-xs font-bold">
-                    {{ $githubOAuthAvailable ? '3' : '2' }}
+                    {{ $stepNumber }}
                 </span>
                 <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">{{ __('onboarding.steps.first_project') }}</span>
             </div>

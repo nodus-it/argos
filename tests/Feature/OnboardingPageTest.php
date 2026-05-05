@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Services\CredentialStore;
 use App\Filament\Admin\Pages\Onboarding;
 use App\Models\RepoProfile;
 use App\Models\User;
+use App\Services\CredentialStore;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
@@ -85,17 +85,37 @@ class OnboardingPageTest extends TestCase
         config(['services.github.client_id' => null, 'services.github.client_secret' => null]);
 
         Livewire::test(Onboarding::class)
-            ->assertSet('githubOAuthAvailable', false)
             ->assertDontSee('Connect with GitHub');
 
         config(['services.github.client_id' => 'cid', 'services.github.client_secret' => 'cs']);
 
         Livewire::test(Onboarding::class)
-            ->assertSet('githubOAuthAvailable', true)
             ->assertSee('Connect with GitHub');
     }
 
-    public function test_disconnect_github_removes_connected_account(): void
+    public function test_gitlab_connect_button_visible_when_gitlab_oauth_configured(): void
+    {
+        config([
+            'services.gitlab.client_id' => 'gl-cid',
+            'services.gitlab.client_secret' => 'gl-cs',
+        ]);
+
+        Livewire::test(Onboarding::class)
+            ->assertSee('Connect with GitLab');
+    }
+
+    public function test_bitbucket_connect_button_visible_when_bitbucket_oauth_configured(): void
+    {
+        config([
+            'services.bitbucket.client_id' => 'bb-cid',
+            'services.bitbucket.client_secret' => 'bb-cs',
+        ]);
+
+        Livewire::test(Onboarding::class)
+            ->assertSee('Connect with Bitbucket');
+    }
+
+    public function test_disconnect_provider_removes_connected_account(): void
     {
         $user = User::factory()->create();
         $this->actingAs($user);
@@ -107,10 +127,10 @@ class OnboardingPageTest extends TestCase
             'nickname' => 'tester',
         ]);
 
+        config(['services.github.client_id' => 'cid', 'services.github.client_secret' => 'cs']);
+
         Livewire::test(Onboarding::class)
-            ->assertSet('githubConnected', true)
-            ->call('disconnectGitHub')
-            ->assertSet('githubConnected', false);
+            ->call('disconnectProvider', 'github');
 
         $this->assertSame(0, $user->connectedAccounts()->where('provider', 'github')->count());
     }
