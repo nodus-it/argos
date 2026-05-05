@@ -43,6 +43,10 @@ logs/
 coverage/
 .bats-tmp/
 
+# Build/dev tool caches
+.vite/
+.mcp.json
+
 # Agent runtime artifacts (worker workspace)
 .agent/
 :memory:
