@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
-# .tools/bash/start-stage.sh — Stage-Manager lokal hochfahren.
+# .tools/bash/start-stage.sh — Stage-Compose-Stack lokal hochfahren.
 #
-# Pullt das aktuelle Stage-Image, stoppt einen eventuell laufenden Container
-# und startet neu. Geheime und umgebungsspezifische Werte werden in
-# .tools/bash/.env.stage abgelegt — die Datei ist in .gitignore. Beim ersten
-# Lauf wird sie aus .env.example als komplett auskommentierte Vorlage erzeugt;
-# unkommentierte Einträge überschreiben die Defaults dieses Scripts.
+# Pullt das aktuelle Stage-Image für `argos-app` und bringt den Compose-Stack
+# (db + app + nginx + queue) unter dem Projekt-Namen `argos-stage` hoch — so
+# bleiben Stage-Container und -Volumes von einer parallelen lokalen Dev-
+# Instanz (`name: argos`) sauber getrennt.
+#
+# Geheime und umgebungsspezifische Werte werden in .tools/bash/.env.stage
+# abgelegt — die Datei ist in .gitignore. Beim ersten Lauf wird sie aus
+# .env.example als komplett auskommentierte Vorlage erzeugt; unkommentierte
+# Einträge überschreiben die Defaults dieses Scripts.
 #
 # Verwendung:
 #   bash .tools/bash/start-stage.sh
@@ -17,6 +21,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 ENV_FILE="$SCRIPT_DIR/.env.stage"
 ENV_EXAMPLE="$REPO_ROOT/.env.example"
+COMPOSE_FILE="$REPO_ROOT/.tools/docker/docker-compose.yml"
+PROJECT_NAME="argos-stage"
 
 # ── .env.stage erstellen falls fehlend ───────────────────────────────────────
 # Kopiert .env.example und kommentiert sicherheitshalber jede Zeile aus,
@@ -41,77 +47,33 @@ set -o allexport
 source "$ENV_FILE"
 set +o allexport
 
-# ── Konfiguration ─────────────────────────────────────────────────────────────
-CONTAINER_NAME="argos-stage"
-IMAGE="ghcr.io/nodus-it/argos-manager:stage"
-HOST_PORT="${ARGOS_PORT:-80}"
+# ── Compose-Defaults für Stage ───────────────────────────────────────────────
+# Image-Tags zeigen auf die GHCR-Stage-Builds; ARGOS_PORT bleibt überschreibbar
+# über .env.stage. Composer-eigene Variablen (APP_KEY etc.) werden weitergegeben,
+# wenn sie im env-File gesetzt sind — das compose-File nutzt sie via ${VAR:-…}.
+export APP_ENV="${APP_ENV:-staging}"
+export APP_DEBUG="${APP_DEBUG:-false}"
+export ARGOS_PORT="${ARGOS_PORT:-80}"
+export ARGOS_APP_IMAGE="${ARGOS_APP_IMAGE:-ghcr.io/nodus-it/argos-app:stage}"
+export ARGOS_WORKER_IMAGE="${ARGOS_WORKER_IMAGE:-ghcr.io/nodus-it/argos-worker:stage-php8.4}"
+export ARGOS_DB_DATABASE="${ARGOS_DB_DATABASE:-argos}"
+export ARGOS_DB_USERNAME="${ARGOS_DB_USERNAME:-argos}"
+export ARGOS_DB_PASSWORD="${ARGOS_DB_PASSWORD:-argos}"
+
+DOCKER_COMPOSE=(docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE")
 
 # ── Image aktualisieren ───────────────────────────────────────────────────────
-echo "Pulling $IMAGE ..."
-docker pull "$IMAGE"
+# Nur das `app`-Image pullen — die queue teilt es sich, db/nginx haben eigene
+# Image-Tags die compose ohnehin pullt, und worker-build wollen wir hier
+# explizit *nicht* triggern (das baut nur lokal, brauchen wir auf Stage nicht).
+echo "Pulling $ARGOS_APP_IMAGE ..."
+docker pull "$ARGOS_APP_IMAGE"
 
-# ── Laufenden Container stoppen ───────────────────────────────────────────────
-if docker inspect "$CONTAINER_NAME" &>/dev/null; then
-    echo "Stopping existing container $CONTAINER_NAME ..."
-    docker rm -f "$CONTAINER_NAME"
-fi
-
-# ── Volumes sicherstellen ─────────────────────────────────────────────────────
-docker volume create argos-stage-data  &>/dev/null || true
-docker volume create argos-stage-db    &>/dev/null || true
-
-# ── Container starten ────────────────────────────────────────────────────────
-echo "Starting $CONTAINER_NAME on port $HOST_PORT ..."
-
-# Pflicht- und Default-Werte werden unbedingt gesetzt.
-DOCKER_ENV_ARGS=(
-    -e APP_ENV=staging
-    -e APP_DEBUG=false
-    -e "APP_URL=${APP_URL:-http://localhost:${HOST_PORT}}"
-    -e ARGOS_CONFIG_DIR=/data/config
-    -e DB_CONNECTION=mariadb
-    -e ARGOS_DB_HOST=127.0.0.1
-    -e ARGOS_DB_PORT=3306
-    -e ARGOS_DB_SOCKET=/run/mysqld/mysqld.sock
-    -e "ARGOS_DB_DATABASE=${ARGOS_DB_DATABASE:-argos}"
-    -e "ARGOS_DB_USERNAME=${ARGOS_DB_USERNAME:-argos}"
-    -e "ARGOS_DB_PASSWORD=${ARGOS_DB_PASSWORD:-argos}"
-    -e "ARGOS_WORKER_IMAGE=${ARGOS_WORKER_IMAGE:-ghcr.io/nodus-it/argos-worker:stage-php8.4}"
-)
-
-# argos_add_optional_env: Hängt -e NAME=VALUE nur an, wenn VALUE nicht leer ist.
-# Ein leerer Wert würde sonst Laravels env('NAME', 'default') überschreiben
-# (env() betrachtet "" als gesetzt und liefert "" statt des Defaults zurück).
-# Args: $1=Variablen-Name; gelesen wird der Wert aus der aktuellen Shell.
-argos_add_optional_env() {
-    local name="$1"
-    local value="${!name:-}"
-    if [[ -n "$value" ]]; then
-        DOCKER_ENV_ARGS+=(-e "${name}=${value}")
-    fi
-}
-
-argos_add_optional_env APP_KEY
-argos_add_optional_env ADMIN_PASSWORD
-argos_add_optional_env GITHUB_CLIENT_ID
-argos_add_optional_env GITHUB_CLIENT_SECRET
-argos_add_optional_env GITLAB_CLIENT_ID
-argos_add_optional_env GITLAB_CLIENT_SECRET
-argos_add_optional_env GITLAB_INSTANCE_URL
-argos_add_optional_env BITBUCKET_CLIENT_ID
-argos_add_optional_env BITBUCKET_CLIENT_SECRET
-argos_add_optional_env CLAUDE_CODE_OAUTH_TOKEN
-
-docker run -d \
-    --name "$CONTAINER_NAME" \
-    --restart unless-stopped \
-    -p "${HOST_PORT}:80" \
-    -v /var/run/docker.sock:/var/run/docker.sock \
-    -v argos-stage-data:/data \
-    -v argos-stage-db:/var/lib/mysql \
-    "${DOCKER_ENV_ARGS[@]}" \
-    "$IMAGE"
+# ── Stack neu starten ────────────────────────────────────────────────────────
+echo "Bringing up $PROJECT_NAME stack ..."
+"${DOCKER_COMPOSE[@]}" up -d --no-deps --remove-orphans db app nginx queue
 
 echo ""
-echo "  Argos Stage läuft unter http://localhost:${HOST_PORT}"
-echo "  Logs: docker logs -f $CONTAINER_NAME"
+echo "  Argos Stage läuft unter http://localhost:${ARGOS_PORT}"
+echo "  Logs: ${DOCKER_COMPOSE[*]} logs -f app"
+echo "  Stoppen: ${DOCKER_COMPOSE[*]} down"

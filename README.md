@@ -6,7 +6,7 @@
 
 [![License: MIT](https://img.shields.io/github/license/nodus-it/argos?style=flat-square)](LICENSE)
 [![Version](https://img.shields.io/github/v/tag/nodus-it/argos?style=flat-square&label=version&include_prereleases&sort=semver)](https://github.com/nodus-it/argos/releases)
-[![GHCR](https://img.shields.io/badge/ghcr.io-argos--manager-2496ED?style=flat-square&logo=docker&logoColor=white)](https://github.com/nodus-it/argos/pkgs/container/argos-manager)
+[![GHCR](https://img.shields.io/badge/ghcr.io-argos--app-2496ED?style=flat-square&logo=docker&logoColor=white)](https://github.com/nodus-it/argos/pkgs/container/argos-app)
 [![CI](https://img.shields.io/github/actions/workflow/status/nodus-it/argos/ci.yml?branch=master&style=flat-square&label=tests)](https://github.com/nodus-it/argos/actions/workflows/ci.yml)
 [![Coverage](https://img.shields.io/codecov/c/github/nodus-it/argos?style=flat-square)](https://codecov.io/gh/nodus-it/argos)
 
@@ -29,14 +29,18 @@ request you can review.
 ## Quick Start
 
 ```bash
-docker run -d --name argos -p 8080:80 \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  -v argos-data:/data -v argos-db:/var/lib/mysql \
-  ghcr.io/nodus-it/argos-manager:latest
+git clone https://github.com/nodus-it/argos.git
+cd argos
+docker compose -f .tools/docker/docker-compose.yml up -d
 ```
 
 Open <http://localhost:8080/admin> — an in-app onboarding wizard walks you
 through pasting your Claude token and creating your first project.
+
+> A single-line installer (`curl … | bash` that fetches a versioned compose
+> file into `/opt/argos`, manages `.env`, and survives updates) is in
+> development. Until then, the clone-and-compose flow above is the supported
+> path.
 
 ### What this gets you
 
