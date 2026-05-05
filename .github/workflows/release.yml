@@ -175,11 +175,32 @@ jobs:
           git commit -m "chore(release): ${{ steps.tag.outputs.name }}"
           git push origin develop
 
-      - name: Fast-forward master and tag
+      - name: Fast-forward master, pin installer image tags, and tag
         run: |
           git fetch origin master:master
           git checkout master
           git merge --no-ff develop -m "Release ${{ steps.tag.outputs.name }}"
+
+          # Pin installer/.env.example to the version-suffixed image tags on
+          # master only. develop keeps the floating :latest / :php8.4 defaults
+          # so testers running `install.sh --version develop` track the rolling
+          # tags. Self-host installs from this release tag get an immutable
+          # image:tag pair that can't drift mid-release.
+          if ! grep -qE '^ARGOS_APP_IMAGE=ghcr\.io/nodus-it/argos-app:' installer/.env.example; then
+            echo "::error::installer/.env.example fehlt die erwartete ARGOS_APP_IMAGE-Zeile"
+            exit 1
+          fi
+          if ! grep -qE '^ARGOS_WORKER_IMAGE=ghcr\.io/nodus-it/argos-worker:' installer/.env.example; then
+            echo "::error::installer/.env.example fehlt die erwartete ARGOS_WORKER_IMAGE-Zeile"
+            exit 1
+          fi
+          sed -i -E "s|^(ARGOS_APP_IMAGE=ghcr\.io/nodus-it/argos-app):.*$|\1:${{ steps.tag.outputs.name }}|" installer/.env.example
+          sed -i -E "s|^(ARGOS_WORKER_IMAGE=ghcr\.io/nodus-it/argos-worker):.*$|\1:php8.4-${{ steps.tag.outputs.name }}|" installer/.env.example
+          echo "── Diff installer/.env.example ──"
+          git --no-pager diff installer/.env.example
+          git add installer/.env.example
+          git commit -m "chore(release): pin installer image tags to ${{ steps.tag.outputs.name }}"
+
           git tag -a "${{ steps.tag.outputs.name }}" -m "Release ${{ steps.tag.outputs.name }}"
           # Atomic push: master + tag in einem Schritt — entweder beide oder keiner.
           git push --atomic origin master "${{ steps.tag.outputs.name }}"
