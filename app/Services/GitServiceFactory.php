@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Enums\GitProvider;
 use App\Models\RepoProfile;
 use App\Services\Contracts\GitServiceContract;
 
@@ -14,11 +15,11 @@ class GitServiceFactory
     public function fromRepoProfile(RepoProfile $profile): GitServiceContract
     {
         $token = $profile->resolveToken();
-        $instanceUrl = $profile->platform === 'gitlab'
+        $instanceUrl = $profile->platform === GitProvider::GitLab
             ? $this->extractInstanceUrl($profile->url)
             : '';
 
-        return $this->registry->make($profile->platform, $token, $instanceUrl);
+        return $this->registry->make($profile->platform->value, $token, $instanceUrl);
     }
 
     /**

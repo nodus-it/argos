@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources;
 
-use App\Services\WorkerImage;
+use App\Enums\GitProvider;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\CreateRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\EditRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\ListRepoProfiles;
@@ -17,6 +17,7 @@ use App\Services\Bitbucket\BitbucketGitService;
 use App\Services\GitHub\GitHubGitService;
 use App\Services\GitLab\GitLabGitService;
 use App\Services\GitServiceFactory;
+use App\Services\WorkerImage;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
@@ -678,12 +679,8 @@ class RepoProfileResource extends Resource
                     TextEntry::make('platform')
                         ->label(__('projects.infolist.platform'))
                         ->badge()
-                        ->color(fn (string $state): string => match ($state) {
-                            'github' => 'gray',
-                            'gitlab' => 'warning',
-                            'bitbucket' => 'info',
-                            default => 'gray',
-                        }),
+                        ->color(fn (GitProvider $state): string => $state->color())
+                        ->formatStateUsing(fn (GitProvider $state): string => $state->label()),
 
                     TextEntry::make('auth_method')
                         ->label(__('projects.infolist.authentication'))
@@ -736,12 +733,8 @@ class RepoProfileResource extends Resource
 
                 TextColumn::make('platform')
                     ->badge()
-                    ->color(fn (string $state): string => match ($state) {
-                        'github' => 'gray',
-                        'gitlab' => 'warning',
-                        'bitbucket' => 'info',
-                        default => 'gray',
-                    }),
+                    ->color(fn (GitProvider $state): string => $state->color())
+                    ->formatStateUsing(fn (GitProvider $state): string => $state->label()),
 
                 TextColumn::make('default_branch')
                     ->label(__('projects.columns.branch')),
