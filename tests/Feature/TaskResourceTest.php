@@ -127,6 +127,18 @@ class TaskResourceTest extends TestCase
         $task = Task::where('name', 'User Task')->first();
         $this->assertNotNull($task);
         $this->assertSame($this->user->id, $task->user_id);
+    public function test_create_with_duplicate_name_shows_validation_error(): void
+    {
+        $profile = RepoProfile::factory()->create();
+        Task::factory()->create(['name' => 'Existing Task']);
+
+        Livewire::test(CreateTask::class)
+            ->fillForm([
+                'name' => 'Existing Task',
+                'repo_profile_id' => $profile->id,
+            ])
+            ->call('create')
+            ->assertHasFormErrors(['name']);
     }
 
     public function test_list_shows_aggregated_cost_per_task(): void

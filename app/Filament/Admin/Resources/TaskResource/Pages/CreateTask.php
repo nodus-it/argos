@@ -10,6 +10,8 @@ use App\Jobs\RunPhaseJob;
 use App\Models\Task;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\Process\Process;
 
 class CreateTask extends CreateRecord
@@ -22,6 +24,14 @@ class CreateTask extends CreateRecord
 
         /** @var Task $record */
         $record = parent::handleRecordCreation($data);
+        try {
+            /** @var Task $record */
+            $record = parent::handleRecordCreation($data);
+        } catch (UniqueConstraintViolationException) {
+            throw ValidationException::withMessages([
+                'data.name' => [__('validation.unique', ['attribute' => 'name'])],
+            ]);
+        }
 
         Process::fromShellCommandline('docker volume create '.escapeshellarg($record->volumeName()))->run();
 

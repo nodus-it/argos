@@ -115,6 +115,7 @@ services:
       APP_DEBUG:                "${APP_DEBUG:-false}"
       APP_URL:                  "${APP_URL:-http://localhost:${ARGOS_PORT:-8080}}"
       APP_KEY:                  "${APP_KEY}"
+      CLAUDE_CODE_OAUTH_TOKEN:  "${CLAUDE_CODE_OAUTH_TOKEN:-}"
       ARGOS_WORKER_IMAGE:       "${ARGOS_WORKER_IMAGE}"
       ARGOS_CONFIG_DIR:         /data/config
       DB_CONNECTION:            "mariadb"

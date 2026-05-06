@@ -18,19 +18,7 @@
         </include>
     </source>
     <php>
-        <!--
-            php-fpm copies container env vars into $_SERVER, and Laravel's Env
-            reads $_SERVER before getenv()/$_ENV. Without <server> entries (in
-            addition to the matching <env> ones), docker-compose values like
-            DB_CONNECTION=mariadb would override the test SQLite database —
-            RefreshDatabase would then run against the dev MariaDB and drop
-            all production data.
-
-            Driver choices (SESSION_DRIVER, CACHE_STORE, QUEUE_CONNECTION,
-            MAIL_MAILER) are hardcoded in config files and no longer need
-            ENV overrides here.
-        -->
-        <ini name="memory_limit" value="256M"/>
+        <ini name="memory_limit" value="512M"/>
         <env name="APP_ENV" value="testing" force="true"/>
         <env name="APP_KEY" value="base64:zTobRxr7TepBXVjM/E3kjKGAwnxWQ7QWMMXaInQYKKg=" force="true"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file" force="true"/>

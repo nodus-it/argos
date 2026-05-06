@@ -11,7 +11,9 @@ use App\Models\Task;
 use App\Services\Workflow\PhaseRunner;
 use App\Services\Workflow\WorkflowService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Log;
 use Tests\TestCase;
 
 class RunPhaseJobTest extends TestCase
@@ -86,6 +88,27 @@ class RunPhaseJobTest extends TestCase
         $job = new RunPhaseJob('task-id', 'concept');
 
         $this->assertSame(3600, $job->timeout);
+    }
+
+    public function test_failed_logs_exhausted_error_entry(): void
+    {
+        $logged = null;
+        Log::listen(function (MessageLogged $event) use (&$logged): void {
+            if ($event->level === 'error' && isset($event->context['exhausted'])) {
+                $logged = $event->context;
+            }
+        });
+
+        $exception = new \RuntimeException('timeout kill');
+        $job = new RunPhaseJob('task-42', 'implement');
+        $job->failed($exception);
+
+        $this->assertNotNull($logged, 'Expected an error log entry with exhausted context');
+        $this->assertTrue($logged['exhausted']);
+        $this->assertSame('task-42', $logged['task']);
+        $this->assertSame('implement', $logged['phase']);
+        $this->assertSame('timeout kill', $logged['error']);
+        $this->assertSame(\RuntimeException::class, $logged['class']);
     }
 
     public function test_handle_dispatches_push_job_when_implement_completes_with_auto_pr(): void
