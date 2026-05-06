@@ -254,6 +254,8 @@ phase_concept_run() {
     local sysprompt_content
     sysprompt_content="$(cat "$sysprompt")"
 
+    mcp_setup
+
     log_info "concept: calling claude (stream-json, max-turns 15)"
 
     set +e
