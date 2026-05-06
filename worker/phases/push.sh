@@ -317,11 +317,12 @@ phase_push_run() {
     subject="$(cat "$subject_file")"
     body="$(cat "$body_file" 2>/dev/null || echo "")"
 
-    # Set git identity if not already configured.
-    if [[ -z "$(git -C /workspace config --get user.email || true)" ]]; then
-        git -C /workspace config user.email "agent@worker.local"
-        git -C /workspace config user.name "Claude Worker Agent"
-    fi
+    # Set git identity from COMMIT_USER_* env vars (set by manager from task creator),
+    # falling back to defaults. " via Argos" is always appended to the name.
+    local commit_name="${COMMIT_USER_NAME:-Claude Worker Agent}"
+    local commit_email="${COMMIT_USER_EMAIL:-agent@worker.local}"
+    git -C /workspace config user.name "${commit_name} via Argos"
+    git -C /workspace config user.email "${commit_email}"
 
     # Stage + commit (only if there are staged changes).
     git -C /workspace add -A

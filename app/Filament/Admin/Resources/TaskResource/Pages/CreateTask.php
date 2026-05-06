@@ -20,6 +20,8 @@ class CreateTask extends CreateRecord
 
     protected function handleRecordCreation(array $data): Model
     {
+        $data['user_id'] = auth()->id();
+
         try {
             /** @var Task $record */
             $record = parent::handleRecordCreation($data);
