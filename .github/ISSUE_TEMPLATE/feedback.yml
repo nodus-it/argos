@@ -1,0 +1,47 @@
+name: "💬 Feedback / feature request"
+description: Suggest an improvement, share feedback, or request a new feature
+title: "[Feedback]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for sharing your thoughts! Concrete examples and the *why* behind a request
+        help us prioritise much faster than abstract wishes.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: What would you like to see?
+      description: A clear and concise description of the feedback or feature request.
+      placeholder: e.g. Allow tagging tasks so I can group related work in the dashboard.
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Why does this matter?
+      description: What problem does this solve? What does your current workflow look like without it?
+      placeholder: e.g. I run ~30 tasks per week across 4 repos and the list view becomes hard to scan.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Have you tried a workaround? Are there other tools that solve this well?
+
+  - type: input
+    id: version
+    attributes:
+      label: Argos version
+      description: Visible in the Settings page, or run `php artisan config:show argos.version`.
+      placeholder: e.g. 0.1.0-beta.1
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Screenshots, mock-ups, links to similar features in other tools — all welcome.

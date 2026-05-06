@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Enums\WorkflowStatus;
+use App\Filament\Admin\Resources\TaskResource;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTask;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTaskConcept;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTaskDiff;
@@ -152,6 +153,17 @@ class TaskPagesTest extends TestCase
 
         Livewire::test(ViewTask::class, ['record' => $complete->getKey()])
             ->assertActionHidden('markCompleted');
+    }
+
+    public function test_logs_download_action_links_to_logs_page(): void
+    {
+        $task = Task::factory()->create();
+
+        $expectedUrl = TaskResource::getUrl('logs', ['record' => $task]);
+
+        Livewire::test(ViewTask::class, ['record' => $task->getKey()])
+            ->assertActionVisible('logsDownload')
+            ->assertActionHasUrl('logsDownload', $expectedUrl);
     }
 
     public function test_continue_action_visible_only_when_implement_paused(): void

@@ -169,6 +169,7 @@ return [
             'force_unlock_heading' => 'Lock erzwungen freigeben',
             'force_unlock_description' => 'Der Worker-Lock ist noch gesetzt (vermutlich durch einen abgestürzten Container). Den Lock freigeben und Implement neu starten?',
             'force_unlock_submit' => 'Freigeben & neu starten',
+            'logs_download' => 'Logs Download',
             'mark_completed' => 'Abschließen',
             'mark_completed_description' => 'Task abschließen und Docker-Workspace löschen? Beide Aktionen sind nicht rückgängig zu machen.',
             'run_concept' => 'Konzept neu ausführen',

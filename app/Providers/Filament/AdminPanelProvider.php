@@ -93,6 +93,10 @@ class AdminPanelProvider extends PanelProvider
             ->renderHook(
                 PanelsRenderHook::FOOTER,
                 fn (): string => view('components.argos-source-footer')->render()
+            )
+            ->renderHook(
+                PanelsRenderHook::USER_MENU_BEFORE,
+                fn (): string => view('components.argos-feedback-button')->render()
             );
     }
 }

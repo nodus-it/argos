@@ -169,6 +169,7 @@ return [
             'force_unlock_heading' => 'Force Release Lock',
             'force_unlock_description' => 'The worker lock is still set (likely due to a crashed container). Release the lock and restart Implement?',
             'force_unlock_submit' => 'Release & restart',
+            'logs_download' => 'Logs Download',
             'mark_completed' => 'Complete',
             'mark_completed_description' => 'Complete the task and delete the Docker workspace? Both actions cannot be undone.',
             'run_concept' => 'Re-run Concept',
