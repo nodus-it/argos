@@ -28,10 +28,6 @@ class Settings extends Page implements HasForms
 
     public string $tokenSource = 'none';
 
-    public string $dbConnection = '';
-
-    public string $workerImage = '';
-
     public static function getNavigationIcon(): string
     {
         return 'heroicon-o-cog-6-tooth';
@@ -49,7 +45,7 @@ class Settings extends Page implements HasForms
 
     public static function getNavigationSort(): ?int
     {
-        return 2;
+        return 999;
     }
 
     public function getTitle(): string
@@ -61,8 +57,6 @@ class Settings extends Page implements HasForms
     {
         $store = app(CredentialStore::class);
         $this->tokenSource = $store->claudeTokenSource();
-        $this->dbConnection = config('database.default', 'sqlite');
-        $this->workerImage = config('argos.worker_image', '—');
 
         $this->form->fill(['claude_token' => '']);
     }

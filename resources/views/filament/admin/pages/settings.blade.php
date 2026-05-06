@@ -34,24 +34,6 @@
             @include('filament.admin.partials.claude-token-help')
         @endif
 
-        <x-filament::section heading="{{ __('settings.blade.db_section') }}">
-            <p class="text-sm text-gray-700 dark:text-gray-300">
-                {!! __('settings.blade.db_connection', ['connection' => $dbConnection]) !!}
-            </p>
-            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                {!! __('settings.blade.db_config_hint') !!}
-            </p>
-        </x-filament::section>
-
-        <x-filament::section heading="{{ __('settings.blade.worker_section') }}">
-            <p class="text-sm text-gray-700 dark:text-gray-300">
-                <code>{{ $workerImage }}</code>
-            </p>
-            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                {!! __('settings.blade.worker_config_hint') !!}
-            </p>
-        </x-filament::section>
-
         <x-filament::section heading="{{ __('settings.blade.logs_section') }}">
             <p class="text-sm text-gray-700 dark:text-gray-300">
                 {{ __('settings.blade.logs_description') }}
