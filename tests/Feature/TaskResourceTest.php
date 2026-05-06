@@ -127,6 +127,8 @@ class TaskResourceTest extends TestCase
         $task = Task::where('name', 'User Task')->first();
         $this->assertNotNull($task);
         $this->assertSame($this->user->id, $task->user_id);
+    }
+
     public function test_create_with_duplicate_name_shows_validation_error(): void
     {
         $profile = RepoProfile::factory()->create();
