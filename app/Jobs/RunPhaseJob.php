@@ -97,4 +97,15 @@ class RunPhaseJob implements ShouldQueue
             throw $e;
         }
     }
+
+    public function failed(\Throwable $exception): void
+    {
+        Log::channel('argos')->error('Job exhausted', [
+            'task' => $this->taskId,
+            'phase' => $this->phase,
+            'error' => $exception->getMessage(),
+            'class' => $exception::class,
+            'exhausted' => true,
+        ]);
+    }
 }

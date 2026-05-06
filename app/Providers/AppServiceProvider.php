@@ -4,14 +4,18 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Jobs\RunPhaseJob;
 use App\Services\Anthropic\CredentialStore;
 use App\Services\GitProvider\BitbucketGitService;
 use App\Services\GitProvider\GitHubGitService;
 use App\Services\GitProvider\GitLabGitService;
 use App\Services\GitProvider\GitProviderRegistry;
+use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Support\Env;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\ServiceProvider;
 use PDO;
 use PDOException;
@@ -54,6 +58,18 @@ class AppServiceProvider extends ServiceProvider
     {
         Event::listen(SocialiteWasCalled::class, GitLabExtendSocialite::class.'@handle');
         Event::listen(SocialiteWasCalled::class, BitbucketExtendSocialite::class.'@handle');
+
+        Queue::failing(function (JobFailed $event): void {
+            if ($event->job->resolveName() === RunPhaseJob::class) {
+                return;
+            }
+
+            Log::channel('argos')->error('Job failed', [
+                'job' => $event->job->resolveName(),
+                'error' => $event->exception->getMessage(),
+                'class' => $event->exception::class,
+            ]);
+        });
 
         $this->configureDatabase();
     }
