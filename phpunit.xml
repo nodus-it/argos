@@ -30,7 +30,11 @@
             MAIL_MAILER) are hardcoded in config files and no longer need
             ENV overrides here.
         -->
+<<<<<<< feat/Settings-Anpassung
         <ini name="memory_limit" value="512M"/>
+=======
+        <ini name="memory_limit" value="256M"/>
+>>>>>>> develop
         <env name="APP_ENV" value="testing" force="true"/>
         <env name="APP_KEY" value="base64:zTobRxr7TepBXVjM/E3kjKGAwnxWQ7QWMMXaInQYKKg=" force="true"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file" force="true"/>
