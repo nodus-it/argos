@@ -22,8 +22,6 @@ class CreateTask extends CreateRecord
     {
         $data['user_id'] = auth()->id();
 
-        /** @var Task $record */
-        $record = parent::handleRecordCreation($data);
         try {
             /** @var Task $record */
             $record = parent::handleRecordCreation($data);
