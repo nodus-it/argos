@@ -308,6 +308,12 @@ class ViewTask extends ViewRecord
                 })
                 ->visible(fn (): bool => $this->task()->current_status === PhaseStatus::LockBlocked),
 
+            Action::make('logsDownload')
+                ->label(__('tasks.view.actions.logs_download'))
+                ->icon('heroicon-o-arrow-down-tray')
+                ->color('gray')
+                ->url(fn (): string => TaskResource::getUrl('logs', ['record' => $this->task()])),
+
             Action::make('markCompleted')
                 ->label(__('tasks.view.actions.mark_completed'))
                 ->icon('heroicon-o-check-circle')

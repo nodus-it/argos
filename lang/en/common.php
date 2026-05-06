@@ -16,4 +16,9 @@ return [
 
     'source_footer' => 'Argos is free software, licensed under :license. :source.',
     'source_link_label' => 'View source code',
+
+    'feedback_button' => [
+        'label' => 'Feedback',
+        'tooltip' => 'Report a bug or send feedback',
+    ],
 ];
