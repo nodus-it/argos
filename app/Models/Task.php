@@ -17,6 +17,7 @@ use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
+ * @property int|null $user_id
  * @property string $name
  * @property string|null $repo_profile_id
  * @property string $description
@@ -36,6 +37,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $implement_notes
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
+ * @property-read User|null $user
  * @property-read RepoProfile|null $repoProfile
  * @property-read Collection<int, PhaseRun> $phaseRuns
  */
@@ -45,6 +47,7 @@ class Task extends Model
     use HasUlids;
 
     protected $fillable = [
+        'user_id',
         'name',
         'repo_profile_id',
         'description',
@@ -83,6 +86,14 @@ class Task extends Model
     public static function slugifyName(string $name): string
     {
         return preg_replace('/[^a-zA-Z0-9_.-]/', '_', $name) ?? $name;
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
 
     /**

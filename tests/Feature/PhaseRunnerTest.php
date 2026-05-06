@@ -321,6 +321,31 @@ class PhaseRunnerTest extends TestCase
         $this->assertNotContains('argos-worker:profile', $cmd);
     }
 
+    // --- commit user env vars ---
+
+    public function test_build_command_includes_commit_user_env_vars_when_task_has_user(): void
+    {
+        $user = User::factory()->create(['name' => 'Jane Doe', 'email' => 'jane@example.com']);
+        $task = $this->taskWithProfile();
+        $task->update(['user_id' => $user->id]);
+
+        $cmd = $this->captureCommand($task, 'concept');
+
+        $this->assertContains('COMMIT_USER_NAME=Jane Doe', $cmd);
+        $this->assertContains('COMMIT_USER_EMAIL=jane@example.com', $cmd);
+    }
+
+    public function test_build_command_omits_commit_user_env_vars_when_task_has_no_user(): void
+    {
+        $task = $this->taskWithProfile();
+        $task->update(['user_id' => null]);
+
+        $cmd = $this->captureCommand($task, 'concept');
+
+        $this->assertEmpty(array_filter($cmd, fn ($v) => str_starts_with($v, 'COMMIT_USER_NAME=')));
+        $this->assertEmpty(array_filter($cmd, fn ($v) => str_starts_with($v, 'COMMIT_USER_EMAIL=')));
+    }
+
     // --- base_branch override ---
 
     public function test_build_command_uses_profile_default_branch_when_task_base_branch_is_null(): void

@@ -109,6 +109,26 @@ class TaskResourceTest extends TestCase
             ->assertHasFormErrors(['name' => 'required', 'repo_profile_id' => 'required']);
     }
 
+    public function test_create_task_sets_user_id_to_authenticated_user(): void
+    {
+        $profile = RepoProfile::factory()->create();
+
+        Livewire::test(CreateTask::class)
+            ->fillForm([
+                'name' => 'User Task',
+                'repo_profile_id' => $profile->id,
+                'description' => 'Test',
+                'auto_concept' => false,
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors()
+            ->assertRedirect();
+
+        $task = Task::where('name', 'User Task')->first();
+        $this->assertNotNull($task);
+        $this->assertSame($this->user->id, $task->user_id);
+    }
+
     public function test_list_shows_aggregated_cost_per_task(): void
     {
         $task = Task::factory()->create();

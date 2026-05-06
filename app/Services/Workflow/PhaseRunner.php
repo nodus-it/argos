@@ -546,6 +546,14 @@ class PhaseRunner
             $cmd[] = "RESUME_SESSION_ID={$resumeSessionId}";
         }
 
+        $commitUser = $task->user;
+        if ($commitUser !== null) {
+            $cmd[] = '-e';
+            $cmd[] = "COMMIT_USER_NAME={$commitUser->name}";
+            $cmd[] = '-e';
+            $cmd[] = "COMMIT_USER_EMAIL={$commitUser->email}";
+        }
+
         if (! empty($flags['force_unlock'])) {
             $cmd[] = '-e';
             $cmd[] = 'FORCE_UNLOCK=1';
