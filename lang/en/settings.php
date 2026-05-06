@@ -47,13 +47,6 @@ return [
         'token_from_file' => 'Token is stored in the config directory.',
         'token_missing' => 'Phases cannot run until a token is provided.',
 
-        'db_section' => 'Database',
-        'db_connection' => 'Active connection: <strong>:connection</strong>',
-        'db_config_hint' => 'Configurable via <code>DB_CONNECTION</code> and <code>DB_DATABASE</code>.',
-
-        'worker_section' => 'Worker Image',
-        'worker_config_hint' => 'Configurable via <code>ARGOS_WORKER_IMAGE</code>.',
-
         'logs_section' => 'Logs',
         'logs_description' => 'Manager log (PHP side): phase starts, errors, job dispatches.',
         'logs_hint' => 'Worker logs per phase are accessible in the task view under "Logs".',

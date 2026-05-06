@@ -63,20 +63,6 @@ class SettingsPageTest extends TestCase
             ->assertSee('set');
     }
 
-    public function test_settings_shows_db_connection(): void
-    {
-        Livewire::test(Settings::class)
-            ->assertSee(config('database.default'));
-    }
-
-    public function test_settings_shows_worker_image(): void
-    {
-        config(['argos.worker_image' => 'argos-worker:local']);
-
-        Livewire::test(Settings::class)
-            ->assertSee('argos-worker:local');
-    }
-
     public function test_save_persists_token_to_credential_store(): void
     {
         Http::fake(['https://api.anthropic.com/v1/models' => Http::response([], 200)]);
