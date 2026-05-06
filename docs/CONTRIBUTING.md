@@ -177,3 +177,14 @@ Open an issue on <https://github.com/nodus-it/argos/issues>. Include:
 - Reproduction steps and any logs from the affected task
 
 Logs are visible per-task in the UI under **Task → Logs**.
+
+## License of contributions
+
+Argos is licensed under the
+[GNU Affero General Public License v3.0 or later](../LICENSE). By submitting
+a pull request you agree that your contribution is licensed under the same
+terms and may be redistributed under AGPL-3.0-or-later.
+
+If you need different licensing terms — for example to integrate Argos into
+a closed-source product — contact Nodus IT at
+[argos@nodus-it.de](mailto:argos@nodus-it.de).

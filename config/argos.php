@@ -16,6 +16,13 @@ $prodWorkerSuffix = $isDev ? '' : "-{$argosVersion}";
 return [
     'version' => env('ARGOS_VERSION', $argosVersion),
     'repo_root' => env('ARGOS_REPO_ROOT', dirname(__DIR__)),
+    /*
+     * AGPL-3.0 §13 source-offer URL. Every running instance must point users
+     * to the corresponding source. For unmodified deployments this is the
+     * upstream repo; forks must override this with their own source URL via
+     * ARGOS_SOURCE_URL.
+     */
+    'source_url' => env('ARGOS_SOURCE_URL', 'https://github.com/nodus-it/argos'),
     'config_dir' => env('ARGOS_CONFIG_DIR', (getenv('HOME') ?: ($_SERVER['HOME'] ?? posix_getpwuid(posix_getuid())['dir'])).'/.config/argos'),
     'worker_image' => env('ARGOS_WORKER_IMAGE', "ghcr.io/nodus-it/argos-worker:php8.4{$prodWorkerSuffix}"),
     /*

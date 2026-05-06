@@ -13,4 +13,7 @@ return [
         'locale_en' => 'English',
         'locale_de' => 'Deutsch',
     ],
+
+    'source_footer' => 'Argos is free software, licensed under :license. :source.',
+    'source_link_label' => 'View source code',
 ];

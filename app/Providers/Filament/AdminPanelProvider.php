@@ -89,6 +89,10 @@ class AdminPanelProvider extends PanelProvider
             ->renderHook(
                 PanelsRenderHook::SIDEBAR_FOOTER,
                 fn (): string => Blade::render('@livewire(\'anthropic-usage-sidebar\')')
+            )
+            ->renderHook(
+                PanelsRenderHook::FOOTER,
+                fn (): string => view('components.argos-source-footer')->render()
             );
     }
 }

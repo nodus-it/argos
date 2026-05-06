@@ -4,7 +4,7 @@
 
 **A web-first dev agent that turns a task description into a pull request.**
 
-[![License: MIT](https://img.shields.io/github/license/nodus-it/argos?style=flat-square)](LICENSE)
+[![License: AGPL-3.0](https://img.shields.io/github/license/nodus-it/argos?style=flat-square)](LICENSE)
 [![Version](https://img.shields.io/github/v/tag/nodus-it/argos?style=flat-square&label=version&include_prereleases&sort=semver)](https://github.com/nodus-it/argos/releases)
 [![GHCR](https://img.shields.io/badge/ghcr.io-argos--app-2496ED?style=flat-square&logo=docker&logoColor=white)](https://github.com/nodus-it/argos/pkgs/container/argos-app)
 [![CI](https://img.shields.io/github/actions/workflow/status/nodus-it/argos/ci.yml?branch=master&style=flat-square&label=tests)](https://github.com/nodus-it/argos/actions/workflows/ci.yml)
@@ -93,4 +93,7 @@ local setup, the test suite, and code conventions.
 
 ## License
 
-Released under the [MIT License](LICENSE).
+Released under the [GNU Affero General Public License v3.0 or later](LICENSE).
+
+For commercial use or alternative licensing terms, contact Nodus IT at
+[argos@nodus-it.de](mailto:argos@nodus-it.de).
