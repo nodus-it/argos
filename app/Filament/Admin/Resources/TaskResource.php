@@ -33,6 +33,7 @@ use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Validation\Rule;
 
 class TaskResource extends Resource
 {
@@ -58,7 +59,8 @@ class TaskResource extends Resource
         return $schema->components([
             TextInput::make('name')
                 ->required()
-                ->maxLength(255),
+                ->maxLength(255)
+                ->rules([Rule::unique('tasks', 'name')]),
 
             Select::make('repo_profile_id')
                 ->label(__('tasks.fields.project'))
