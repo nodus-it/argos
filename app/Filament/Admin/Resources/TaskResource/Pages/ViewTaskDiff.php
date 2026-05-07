@@ -8,7 +8,7 @@ use App\Filament\Admin\Resources\TaskResource;
 use App\Models\Task;
 use Filament\Actions\Action;
 use Filament\Resources\Pages\Page;
-use Symfony\Component\Process\Process;
+use Illuminate\Support\Facades\Process;
 
 class ViewTaskDiff extends Page
 {
@@ -74,7 +74,7 @@ class ViewTaskDiff extends Page
         $image = config('argos.worker_image');
         $taskName = $this->task->name;
 
-        $statProcess = new Process([
+        $statResult = Process::timeout(15)->run([
             'docker', 'run', '--rm',
             '-v', 'task_ws_'.Task::slugifyName($taskName).':/workspace:ro',
             '--entrypoint', 'sh',
@@ -85,11 +85,9 @@ class ViewTaskDiff extends Page
             ."echo ''; "
             .'git -C /workspace status --short 2>/dev/null',
         ]);
-        $statProcess->setTimeout(15);
-        $statProcess->run();
-        $this->stat = trim($statProcess->getOutput());
+        $this->stat = trim($statResult->output());
 
-        $diffProcess = new Process([
+        $diffResult = Process::timeout(15)->run([
             'docker', 'run', '--rm',
             '-v', 'task_ws_'.Task::slugifyName($taskName).':/workspace:ro',
             '--entrypoint', 'sh',
@@ -100,10 +98,8 @@ class ViewTaskDiff extends Page
             .'git -C /workspace diff --no-index -- /dev/null "$f" 2>/dev/null || true; '
             .'done; } | head -c 131072',
         ]);
-        $diffProcess->setTimeout(15);
-        $diffProcess->run();
 
-        $raw = $diffProcess->getOutput();
+        $raw = $diffResult->output();
         $this->diffFiles = $this->parseDiffStructured($raw);
         $this->isEmpty = empty($this->diffFiles);
         $this->updatedAt = now()->format('H:i:s');
