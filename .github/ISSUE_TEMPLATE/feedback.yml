@@ -37,7 +37,7 @@ body:
     id: version
     attributes:
       label: Argos version
-      description: Visible in the Settings page, or run `php artisan config:show argos.version`.
+      description: Visible in the footer of every page, or run `php artisan config:show argos.version`.
       placeholder: e.g. 0.1.0-beta.1
 
   - type: textarea
