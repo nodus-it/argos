@@ -25,6 +25,13 @@
 # Pins ARGOS_APP_IMAGE / ARGOS_WORKER_IMAGE to the :stage tags published
 # from develop and tracks the develop branch for manifests.
 #
+# Beta channel (latest release including pre-releases):
+#   curl … | bash -s -- --beta
+#   ARGOS_BETA=1 curl … | bash
+# Selects the newest release tag from GitHub (including pre-releases) instead
+# of the latest stable release. Also used automatically as fallback when no
+# stable release exists yet.
+#
 # Reset (DESTRUCTIVE — wipes DB + all named volumes):
 #   bash install.sh --reset            # interactive: prompts for "yes"
 #   curl … | bash -s -- --reset --force # non-interactive: --force is required
@@ -47,6 +54,11 @@ ARGOS_VERSION="${ARGOS_VERSION:-}"
 # :stage / :stage-php8.4 on every push to develop). Off by default — release
 # tags are the supported install path; stage is for testers tracking develop.
 STAGE="${ARGOS_STAGE:-0}"
+
+# Beta channel: resolves the newest release tag including pre-releases instead
+# of the latest stable-only tag. Off by default; also activates automatically
+# when no stable release exists yet (transparent fallback, with a warning).
+BETA="${ARGOS_BETA:-0}"
 STAGE_APP_IMAGE="ghcr.io/nodus-it/argos-app:stage"
 STAGE_WORKER_IMAGE="ghcr.io/nodus-it/argos-worker:stage-php8.4"
 
@@ -98,6 +110,10 @@ Options:
   -s, --stage          Use the rolling 'stage' images built from develop
                        (sets ARGOS_APP_IMAGE / ARGOS_WORKER_IMAGE to :stage
                        tags; defaults --version to develop if unpinned)
+  -b, --beta           Install the latest release including pre-releases.
+                       Useful before the first stable release ships or to
+                       track RC builds. Also activates automatically as a
+                       transparent fallback when no stable release exists yet.
   -r, --reset          DESTRUCTIVE: tear down the existing stack, wipe the
                        compose volumes (DB included!) and the local .env /
                        state, then run a fresh install. Requires --force when
@@ -110,6 +126,7 @@ Environment overrides:
   ARGOS_INSTALL_DIR    Same as --dir
   ARGOS_VERSION        Same as --version
   ARGOS_STAGE=1        Same as --stage
+  ARGOS_BETA=1         Same as --beta
   ARGOS_REPO           GitHub repo (default: nodus-it/argos)
 USAGE
 }
@@ -120,6 +137,7 @@ while [[ $# -gt 0 ]]; do
         -d|--dir)     INSTALL_DIR="$2"; shift 2;;
         -v|--version) ARGOS_VERSION="$2"; shift 2;;
         -s|--stage)   STAGE=1; shift;;
+        -b|--beta)    BETA=1; shift;;
         -r|--reset)   RESET=1; shift;;
         -f|--force)   FORCE=1; shift;;
         -h|--help)    usage; exit 0;;
@@ -156,14 +174,42 @@ preflight() {
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
 
-# Ask GitHub for the latest published release tag. Returns empty if there's no
-# published release yet (or the API is unreachable) — caller falls back.
+# resolve_beta_version: Returns the most recent release tag from GitHub,
+# including pre-releases. Fetches /releases (array, newest-first by GitHub's
+# default sort) and takes the first entry's tag_name.
+# Args: none
+# Returns: tag_name on stdout, empty string when the repo has no releases or
+#          the API is unreachable.
+resolve_beta_version() {
+    local tag
+    tag="$(curl -fsSL "https://api.github.com/repos/${ARGOS_REPO}/releases" 2>/dev/null \
+        | grep '"tag_name"' \
+        | head -1 \
+        | sed -E 's/.*"tag_name":[[:space:]]*"([^"]+)".*/\1/')" || tag=""
+    printf '%s' "$tag"
+}
+
+# resolve_default_version: Returns the latest *stable* release tag from GitHub.
+# Falls back to resolve_beta_version when no stable release exists yet (prints
+# a warning). Returns empty only when neither endpoint yields a tag — caller
+# then falls back to the develop branch.
+# Args: none
+# Returns: tag_name on stdout
 resolve_default_version() {
     local tag
     tag="$(curl -fsSL "https://api.github.com/repos/${ARGOS_REPO}/releases/latest" 2>/dev/null \
         | grep '"tag_name"' \
         | head -1 \
         | sed -E 's/.*"tag_name":[[:space:]]*"([^"]+)".*/\1/')" || tag=""
+    if [[ -z "$tag" ]]; then
+        local pre_tag
+        pre_tag="$(resolve_beta_version)"
+        if [[ -n "$pre_tag" ]]; then
+            warn "No stable release found — using latest pre-release ($pre_tag)."
+            warn "Pass --beta to select pre-releases explicitly in the future."
+            tag="$pre_tag"
+        fi
+    fi
     printf '%s' "$tag"
 }
 
@@ -424,6 +470,7 @@ print_summary() {
     url="$(get_env_value "$ENV_FILE" APP_URL)"
     [[ -z "$url" ]] && url="http://localhost:${port:-8080}"
     channel="release"
+    [[ "$BETA"  -eq 1 ]] && channel="beta (pre-release)"
     [[ "$STAGE" -eq 1 ]] && channel="stage (rolling develop)"
 
     local b0="" b1=""
@@ -472,6 +519,16 @@ main() {
             # Stage tracks develop end-to-end: the :stage image tags are built
             # from that branch, so the manifests must come from there too.
             ARGOS_VERSION="develop"
+        elif [[ "$BETA" -eq 1 ]]; then
+            log "Beta channel: resolving latest release including pre-releases …"
+            ARGOS_VERSION="$(resolve_beta_version)"
+            if [[ -z "$ARGOS_VERSION" ]]; then
+                warn "No release found (including pre-releases) — falling back to the develop branch."
+                warn "Pin a specific ref with --version <tag|branch> or ARGOS_VERSION=…"
+                ARGOS_VERSION="develop"
+            else
+                log "Beta channel: selected $ARGOS_VERSION"
+            fi
         else
             ARGOS_VERSION="$(resolve_default_version)"
             if [[ -z "$ARGOS_VERSION" ]]; then
@@ -496,6 +553,9 @@ main() {
         mode="update"
     fi
 
+    if [[ "$BETA" -eq 1 ]]; then
+        log "Beta channel selected (latest release including pre-releases)."
+    fi
     if [[ "$STAGE" -eq 1 ]]; then
         log "Stage channel selected (rolling develop images)."
     fi

@@ -31,10 +31,21 @@ request you can review.
 curl -fsSL https://raw.githubusercontent.com/nodus-it/argos/master/install.sh | bash
 ```
 
-That installs Argos into the **current directory** (set `--dir` or
-`ARGOS_INSTALL_DIR` to install elsewhere) — drops a `docker-compose.yml`,
+That installs Argos into the **current directory** — drops a `docker-compose.yml`,
 generates a fresh `.env` with random secrets, brings up the stack, and prints
 the admin password.
+
+**Installer flags** (append after `bash -s --` or pass as env vars):
+
+| Flag | Env var | Effect |
+|---|---|---|
+| `--dir PATH` | `ARGOS_INSTALL_DIR` | Install into `PATH` instead of `$PWD` |
+| `--version REF` | `ARGOS_VERSION` | Pin a specific Git tag or branch |
+| `--stage` | `ARGOS_STAGE=1` | Use rolling `:stage` images from `develop` |
+| `--beta` | `ARGOS_BETA=1` | Use the latest release including pre-releases |
+| `--reset` | — | Tear down the stack and wipe all data (destructive) |
+| `--force` | — | Skip safety prompts (required for `--reset` in non-interactive shells) |
+| `--help` | — | Show all options |
 
 Open <http://localhost:8080/admin> — an in-app onboarding wizard walks you
 through pasting your Claude token and creating your first project.
