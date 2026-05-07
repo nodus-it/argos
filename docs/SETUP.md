@@ -153,11 +153,22 @@ See provider-specific guides:
 
 Argos serves plain HTTP on the host port set by `ARGOS_PORT` (default `8080`,
 mapped to nginx:80 in the compose stack). Terminate TLS at your reverse proxy
-(Caddy, nginx, Traefik) and forward there. Make sure to:
+(Caddy, nginx, Traefik, HAProxy) and forward there. Make sure to:
 
 - set `APP_URL` to the public URL (`https://argos.example.com`)
-- forward the `X-Forwarded-Proto: https` header
+- forward `X-Forwarded-Proto: https` (and `X-Forwarded-For` / `X-Forwarded-Host`)
 - use that same URL when registering OAuth apps (the redirect URI must match)
+
+Argos trusts the forwarded headers from any upstream proxy, so the app sees
+`https` once the proxy sets `X-Forwarded-Proto`. Without that header asset
+URLs render as `http://` and the browser flags mixed content.
+
+HAProxy snippet (paste into the Argos backend's *Advanced pass thru*):
+
+```
+option forwardfor
+http-request set-header X-Forwarded-Proto https if { ssl_fc }
+```
 
 ## Environment variables
 
