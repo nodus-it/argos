@@ -1,0 +1,87 @@
+<?php
+
+declare(strict_types=1);
+
+/*
+ * Single source of truth for the running app version. The release workflow
+ * (.github/workflows/release.yml) rewrites the literal below with `sed` and
+ * commits it together with the CHANGELOG entry, so the value here always
+ * matches the git tag that ships the same commit. Local/develop builds keep
+ * '0.0.0-dev' and use floating worker tags (no version pinning).
+ */
+$argosVersion = '0.1.0-beta.1';
+$isDev = $argosVersion === '0.0.0-dev';
+$prodWorkerSuffix = $isDev ? '' : "-{$argosVersion}";
+
+return [
+    'version' => env('ARGOS_VERSION', $argosVersion),
+    'repo_root' => env('ARGOS_REPO_ROOT', dirname(__DIR__)),
+    /*
+     * AGPL-3.0 §13 source-offer URL. Every running instance must point users
+     * to the corresponding source. For unmodified deployments this is the
+     * upstream repo; forks must override this with their own source URL via
+     * ARGOS_SOURCE_URL.
+     */
+    'source_url' => env('ARGOS_SOURCE_URL', 'https://github.com/nodus-it/argos'),
+    'config_dir' => env('ARGOS_CONFIG_DIR', (getenv('HOME') ?: ($_SERVER['HOME'] ?? posix_getpwuid(posix_getuid())['dir'])).'/.config/argos'),
+    'worker_image' => env('ARGOS_WORKER_IMAGE', "ghcr.io/nodus-it/argos-worker:php8.4{$prodWorkerSuffix}"),
+    /*
+     * Available worker images per environment, used to populate the dropdown
+     * in RepoProfile and Task forms. Symmetric tag scheme:
+     *   local: argos-worker:local-php8.3 / :local-php8.4 (built by `compose --profile build-only build`)
+     *   stage: ghcr.io/.../argos-worker:stage-php8.3 / :stage-php8.4 (built by CI on develop)
+     *   prod:  ghcr.io/.../argos-worker:php8.3-X.Y.Z / :php8.4-X.Y.Z (built by CI on tags;
+     *          version-pinned so a manager release ships with a matching worker)
+     * Custom values stored on a profile/task that are not in this list are
+     * preserved and shown with a "(custom)" suffix.
+     */
+    'worker_images' => [
+        'local' => [
+            'argos-worker:local-php8.4',
+            'argos-worker:local-php8.3',
+        ],
+        'staging' => [
+            'ghcr.io/nodus-it/argos-worker:stage-php8.4',
+            'ghcr.io/nodus-it/argos-worker:stage-php8.3',
+        ],
+        'production' => [
+            "ghcr.io/nodus-it/argos-worker:php8.4{$prodWorkerSuffix}",
+            "ghcr.io/nodus-it/argos-worker:php8.3{$prodWorkerSuffix}",
+        ],
+    ],
+    // Empty .env entries (CLAUDE_CODE_OAUTH_TOKEN=) come back as "" from
+    // env(), but readers treat null as "not configured" — normalise here so
+    // hasClaudeToken() / claudeTokenSource() / Settings UI all agree.
+    'claude_token' => env('CLAUDE_CODE_OAUTH_TOKEN') ?: null,
+    'admin_password' => env('ADMIN_PASSWORD') ?: '12345',
+    'docker' => [
+        'memory_limit' => env('ARGOS_MEM_LIMIT', '4g'),
+        'cpu_limit' => env('ARGOS_CPU_LIMIT', '2'),
+    ],
+    'implement' => [
+        'max_turns_default' => (int) env('ARGOS_MAX_TURNS_DEFAULT', 200),
+    ],
+    'factories' => [
+        'github_token' => env('GITHUB_TOKEN', 'test-token'),
+    ],
+
+    /*
+     * Public documentation URLs surfaced from in-app help hints. Centralising
+     * them here keeps every "Learn more" link in a single place — when the
+     * docs move or get a versioned URL, change it once.
+     */
+    'docs' => [
+        'base' => 'https://github.com/nodus-it/argos/blob/master/docs',
+        'setup' => 'https://github.com/nodus-it/argos/blob/master/docs/SETUP.md',
+        'configuration' => 'https://github.com/nodus-it/argos/blob/master/docs/CONFIGURATION.md',
+        'oauth' => 'https://github.com/nodus-it/argos/blob/master/docs/OAUTH.md',
+        'setup_github' => 'https://github.com/nodus-it/argos/blob/master/docs/SETUP-GITHUB.md',
+        'setup_gitlab' => 'https://github.com/nodus-it/argos/blob/master/docs/SETUP-GITLAB.md',
+        'setup_bitbucket' => 'https://github.com/nodus-it/argos/blob/master/docs/SETUP-BITBUCKET.md',
+        'contributing' => 'https://github.com/nodus-it/argos/blob/master/docs/CONTRIBUTING.md',
+        'github_pat' => 'https://github.com/settings/tokens',
+        'gitlab_pat' => 'https://gitlab.com/-/user_settings/personal_access_tokens',
+        'bitbucket_app_passwords' => 'https://bitbucket.org/account/settings/app-passwords/',
+        'claude_setup_token' => 'https://docs.claude.com/en/docs/claude-code/quickstart',
+    ],
+];

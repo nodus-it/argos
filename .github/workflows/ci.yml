@@ -1,0 +1,201 @@
+name: CI
+
+on:
+  push:
+    branches: [develop]
+    # SemVer-style tags without v-prefix (e.g. 0.2.0, 0.2.0-beta.1).
+    tags: ['[0-9]+.[0-9]+.[0-9]+*']
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  OWNER: ${{ github.repository_owner }}
+
+jobs:
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: shellcheck (severity=warning)
+        run: |
+          docker run --rm -v "$PWD:/mnt" -w /mnt koalaman/shellcheck:stable \
+            --severity=warning \
+            agent \
+            .tools/docker/worker/worker-entrypoint.sh \
+            worker/tests/run-tests.sh \
+            worker/tests/run-bats.sh \
+            worker/lib/*.sh \
+            worker/phases/*.sh \
+            worker/tests/integration/*.sh \
+            worker/tests/integration/fixtures/mock-claude/claude \
+            worker/tests/integration/fixtures/fake-remote-repo/setup.sh \
+            install.sh \
+            installer/tests/run-bats.sh
+
+  worker-unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: bats unit tests (via Docker, includes jq + check-jsonschema)
+        run: bash worker/tests/run-bats.sh
+
+  installer-unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: bats unit tests for install.sh (via Docker)
+        run: bash installer/tests/run-bats.sh
+
+  worker-integration:
+    runs-on: ubuntu-latest
+    env:
+      APP_KEY: "base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+    steps:
+      - uses: actions/checkout@v6
+      - name: build worker image
+        run: |
+          docker compose -f .tools/docker/docker-compose.yml build worker-php84
+          docker tag argos-worker:local-php8.4 argos-worker:latest
+      - name: phase lifecycle integration test
+        run: bash worker/tests/run-tests.sh --integration
+
+  app-quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up PHP 8.4
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, pdo_sqlite, sqlite3
+          coverage: none
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Pint (code style)
+        run: vendor/bin/pint --test --format agent
+
+      - name: PHPStan / Larastan (level 2 via baseline)
+        run: vendor/bin/phpstan analyse --no-progress --memory-limit=1G
+
+      - name: PHPUnit (feature + unit)
+        run: php artisan test --compact
+
+  build-app:
+    needs: [shellcheck, worker-unit, worker-integration, app-quality, installer-unit]
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata (app)
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.OWNER }}/argos-app
+          # Pre-releases (0.2.0-beta.1) currently also get :latest because we are
+          # not live yet — a single floating tag for testers is more useful than
+          # the strict "latest = stable only" rule. Tighten this once we cut a
+          # real stable: drop :latest from prereleases by gating on
+          # `!contains(github.ref, '-')`.
+          tags: |
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') }}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=stage,enable=${{ github.ref == 'refs/heads/develop' }}
+
+      - name: Build and push app image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: .tools/docker/app/Dockerfile
+          target: app
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  build-worker:
+    needs: [shellcheck, worker-unit, worker-integration, app-quality, installer-unit]
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - target: worker
+            tag: php8.3
+            stage_tag: stage-php8.3
+            is_default: 'false'
+          - target: worker-php84
+            tag: php8.4
+            stage_tag: stage-php8.4
+            is_default: 'true'
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata (worker ${{ matrix.tag }})
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.OWNER }}/argos-worker
+          # On a release tag we publish two tag families per PHP variant:
+          #   :php8.4              — floating, points to the latest tagged build
+          #   :php8.4-X.Y.Z        — version-pinned, what config/argos.php uses
+          # The PHP 8.4 variant additionally aliases :latest so a bare
+          # `docker pull argos-worker` works.
+          tags: |
+            type=raw,value=${{ matrix.tag }},enable=${{ startsWith(github.ref, 'refs/tags/') }}
+            type=raw,value=${{ matrix.tag }}-${{ github.ref_name }},enable=${{ startsWith(github.ref, 'refs/tags/') }}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') && matrix.is_default == 'true' }}
+            type=raw,value=${{ matrix.stage_tag }},enable=${{ github.ref == 'refs/heads/develop' }}
+
+      - name: Build and push worker image (${{ matrix.tag }})
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: .tools/docker/worker/Dockerfile
+          target: ${{ matrix.target }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

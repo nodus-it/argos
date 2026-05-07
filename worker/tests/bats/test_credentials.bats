@@ -1,0 +1,172 @@
+#!/usr/bin/env bats
+
+bats_require_minimum_version 1.5.0
+
+setup() {
+    TEST_DIR="$(mktemp -d)"
+    export AGENT_HOME="$TEST_DIR/.agent"
+    export CLAUDE_TOKEN_FILE="$AGENT_HOME/claude_oauth_token"
+    # shellcheck source=../../worker/lib/credentials.sh
+    source worker/lib/credentials.sh
+}
+
+teardown() {
+    rm -rf "$TEST_DIR"
+}
+
+@test "credentials_save_claude_token persistiert Token mit Mode 600" {
+    echo "sk-ant-oat01-secrettoken" | credentials_save_claude_token
+    [ -f "$CLAUDE_TOKEN_FILE" ]
+    perms="$(stat -c '%a' "$CLAUDE_TOKEN_FILE")"
+    [ "$perms" = "600" ]
+}
+
+@test "credentials_save_claude_token lehnt leeren Token ab" {
+    run --separate-stderr bash -c "
+        export AGENT_HOME='$AGENT_HOME'
+        export CLAUDE_TOKEN_FILE='$CLAUDE_TOKEN_FILE'
+        source worker/lib/credentials.sh
+        echo '' | credentials_save_claude_token
+    "
+    [ "$status" -ne 0 ]
+    [[ "$stderr" == *"empty token refused"* ]]
+}
+
+@test "credentials_load_claude_token gibt Token auf stdout" {
+    echo "sk-ant-oat01-foo" | credentials_save_claude_token
+    out="$(credentials_load_claude_token)"
+    [ "$out" = "sk-ant-oat01-foo" ]
+}
+
+@test "credentials_has_claude_token reflects file presence" {
+    run credentials_has_claude_token
+    [ "$status" -eq 1 ]
+    echo "tok" | credentials_save_claude_token
+    run credentials_has_claude_token
+    [ "$status" -eq 0 ]
+}
+
+@test "credentials_save_task persistiert credentials.env Mode 600" {
+    credentials_save_task task-001 "https://example.com/r.git" "ghp_abc" "main"
+    file="$AGENT_HOME/tasks/task-001/credentials.env"
+    [ -f "$file" ]
+    perms="$(stat -c '%a' "$file")"
+    [ "$perms" = "600" ]
+}
+
+@test "credentials_load_task setzt REPO_URL/REPO_TOKEN/BASE_BRANCH" {
+    credentials_save_task task-001 "https://example.com/r.git" "ghp_abc" "main"
+    credentials_load_task task-001
+    [ "$REPO_URL" = "https://example.com/r.git" ]
+    [ "$REPO_TOKEN" = "ghp_abc" ]
+    [ "$BASE_BRANCH" = "main" ]
+}
+
+@test "credentials_load_task funktioniert mit Sonderzeichen im Token" {
+    credentials_save_task task-001 "https://example.com/r.git" 'ghp_abc$with"weird&chars' "main"
+    credentials_load_task task-001
+    [ "$REPO_TOKEN" = 'ghp_abc$with"weird&chars' ]
+}
+
+@test "credentials_task_exists / credentials_delete_task" {
+    run credentials_task_exists task-x
+    [ "$status" -eq 1 ]
+    credentials_save_task task-x url tok main
+    run credentials_task_exists task-x
+    [ "$status" -eq 0 ]
+    credentials_delete_task task-x
+    run credentials_task_exists task-x
+    [ "$status" -eq 1 ]
+}
+
+@test "credentials_save_task persists REPO_PLATFORM when provided" {
+    credentials_save_task task-plat "https://gitlab.com/a/b.git" "gloo_tok" "main" "gitlab"
+    file="$AGENT_HOME/tasks/task-plat/credentials.env"
+    [ -f "$file" ]
+    grep -q "REPO_PLATFORM" "$file"
+}
+
+@test "credentials_load_task sets REPO_PLATFORM" {
+    credentials_save_task task-plat2 "https://gitlab.com/a/b.git" "gloo_tok" "main" "gitlab"
+    credentials_load_task task-plat2
+    [ "$REPO_PLATFORM" = "gitlab" ]
+}
+
+@test "credentials_save_task omits REPO_PLATFORM when not provided" {
+    credentials_save_task task-noplatform "https://github.com/a/b.git" "ghp_tok" "main"
+    file="$AGENT_HOME/tasks/task-noplatform/credentials.env"
+    [ -f "$file" ]
+    # REPO_PLATFORM line should NOT be present
+    run grep "REPO_PLATFORM" "$file"
+    [ "$status" -ne 0 ]
+}
+
+@test "credentials_save_task REPO_PLATFORM round-trip with github" {
+    credentials_save_task task-gh "https://github.com/a/b.git" "ghp_tok" "main" "github"
+    credentials_load_task task-gh
+    [ "$REPO_PLATFORM" = "github" ]
+    [ "$REPO_URL" = "https://github.com/a/b.git" ]
+}
+
+@test "git_auth_header builds Basic header with oauth2: prefix for plain token" {
+    out="$(git_auth_header "ghp_secrettoken123")"
+    [[ "$out" == "Authorization: Basic "* ]]
+    # Decoding the base64 part should yield "oauth2:<token>"
+    encoded="${out#Authorization: Basic }"
+    decoded="$(printf '%s' "$encoded" | base64 -d)"
+    [ "$decoded" = "oauth2:ghp_secrettoken123" ]
+}
+
+@test "git_auth_header keeps user:pass form for Bitbucket app passwords" {
+    out="$(git_auth_header "alice:apppass-xyz")"
+    encoded="${out#Authorization: Basic }"
+    decoded="$(printf '%s' "$encoded" | base64 -d)"
+    [ "$decoded" = "alice:apppass-xyz" ]
+}
+
+@test "git_auth_header output does not leak the raw token" {
+    out="$(git_auth_header "ghp_LITERAL_TOKEN")"
+    [[ "$out" != *"ghp_LITERAL_TOKEN"* ]]
+}
+
+@test "git_auth_header uses x-token-auth: prefix when REPO_PLATFORM=bitbucket" {
+    export REPO_PLATFORM="bitbucket"
+    out="$(git_auth_header "atlassian_oauth_token")"
+    encoded="${out#Authorization: Basic }"
+    decoded="$(printf '%s' "$encoded" | base64 -d)"
+    [ "$decoded" = "x-token-auth:atlassian_oauth_token" ]
+}
+
+@test "git_auth_header detects bitbucket via REPO_URL when REPO_PLATFORM unset" {
+    unset REPO_PLATFORM
+    export REPO_URL="https://bitbucket.org/ws/repo.git"
+    out="$(git_auth_header "atlassian_oauth_token")"
+    encoded="${out#Authorization: Basic }"
+    decoded="$(printf '%s' "$encoded" | base64 -d)"
+    [ "$decoded" = "x-token-auth:atlassian_oauth_token" ]
+}
+
+@test "git_auth_header keeps user:pass form for Bitbucket Atlassian API tokens" {
+    export REPO_PLATFORM="bitbucket"
+    out="$(git_auth_header "user@example.com:atlassian_api_token")"
+    encoded="${out#Authorization: Basic }"
+    decoded="$(printf '%s' "$encoded" | base64 -d)"
+    [ "$decoded" = "user@example.com:atlassian_api_token" ]
+}
+
+@test "git_auth_header explicit platform arg overrides env" {
+    export REPO_PLATFORM="github"
+    out="$(git_auth_header "tok" "bitbucket")"
+    encoded="${out#Authorization: Basic }"
+    decoded="$(printf '%s' "$encoded" | base64 -d)"
+    [ "$decoded" = "x-token-auth:tok" ]
+}
+
+@test "git_auth_header keeps oauth2: prefix for github even with bitbucket-shaped tokens" {
+    unset REPO_PLATFORM
+    export REPO_URL="https://github.com/foo/bar.git"
+    out="$(git_auth_header "ghp_token")"
+    encoded="${out#Authorization: Basic }"
+    decoded="$(printf '%s' "$encoded" | base64 -d)"
+    [ "$decoded" = "oauth2:ghp_token" ]
+}

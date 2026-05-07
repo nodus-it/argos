@@ -23,20 +23,20 @@ AGENT_REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export AGENT_REPO_ROOT
 
 # Lib-Files sourcen
-# shellcheck source=lib/logging.sh
-source "$AGENT_REPO_ROOT/lib/logging.sh"
-# shellcheck source=lib/error.sh
-source "$AGENT_REPO_ROOT/lib/error.sh"
-# shellcheck source=lib/credentials.sh
-source "$AGENT_REPO_ROOT/lib/credentials.sh"
-# shellcheck source=lib/tasks.sh
-source "$AGENT_REPO_ROOT/lib/tasks.sh"
-# shellcheck source=lib/docker.sh
-source "$AGENT_REPO_ROOT/lib/docker.sh"
-# shellcheck source=lib/parse_args.sh
-source "$AGENT_REPO_ROOT/lib/parse_args.sh"
-# shellcheck source=lib/help.sh
-source "$AGENT_REPO_ROOT/lib/help.sh"
+# shellcheck source=worker/lib/logging.sh
+source "$AGENT_REPO_ROOT/worker/lib/logging.sh"
+# shellcheck source=worker/lib/error.sh
+source "$AGENT_REPO_ROOT/worker/lib/error.sh"
+# shellcheck source=worker/lib/credentials.sh
+source "$AGENT_REPO_ROOT/worker/lib/credentials.sh"
+# shellcheck source=worker/lib/tasks.sh
+source "$AGENT_REPO_ROOT/worker/lib/tasks.sh"
+# shellcheck source=worker/lib/docker.sh
+source "$AGENT_REPO_ROOT/worker/lib/docker.sh"
+# shellcheck source=worker/lib/parse_args.sh
+source "$AGENT_REPO_ROOT/worker/lib/parse_args.sh"
+# shellcheck source=worker/lib/help.sh
+source "$AGENT_REPO_ROOT/worker/lib/help.sh"
 
 # ============================================================
 # Helper
@@ -107,7 +107,7 @@ _agent_run_volume_cmd() {
     docker run --rm \
         -v "$volume:/workspace" \
         --entrypoint sh \
-        agent-worker:latest -c "$*"
+        argos-worker:latest -c "$*"
 }
 
 # ============================================================
@@ -133,7 +133,7 @@ cmd_init() {
 
     if [[ "$update_only" != "true" ]]; then
         log_info "init: baue worker-Image (kann ein paar Minuten dauern)"
-        (cd "$AGENT_REPO_ROOT" && docker compose build worker)
+        (cd "$AGENT_REPO_ROOT" && docker compose -f .tools/docker/docker-compose.yml build worker-php84)
     fi
 
     if credentials_has_claude_token && [[ "$update_only" != "true" ]]; then
@@ -305,6 +305,12 @@ cmd_phase() {
         push)
             flags_json="$(_agent_phase_flags_json auto-cleanup keep force-unlock)"
             ;;
+        respond)
+            flags_json='{}'
+            ;;
+        *)
+            flags_json='{}'
+            ;;
     esac
     PHASE_FLAGS="$flags_json"
     export PHASE_FLAGS
@@ -432,7 +438,60 @@ cmd_status() {
         return
     fi
     _agent_require_known_task
-    _agent_run_volume_cmd "$ARG_TASK_ID" 'jq . /workspace/.agent/state.json 2>/dev/null || echo "(noch keine state.json — concept zuerst)"'
+
+    local state_json
+    state_json="$(_agent_run_volume_cmd "$ARG_TASK_ID" \
+        'jq -c . /workspace/.agent/state.json 2>/dev/null')" || true
+
+    if [[ -z "$state_json" ]]; then
+        printf 'Task:   %s\n' "$ARG_TASK_ID"
+        printf 'Status: (noch keine state.json — erst concept ausfuehren)\n'
+        return 0
+    fi
+
+    local repo_url base_branch feature_branch created_at
+    repo_url="$(jq -r '.repo.url // "?"' <<< "$state_json")"
+    base_branch="$(jq -r '.repo.base_branch // "?"' <<< "$state_json")"
+    feature_branch="$(jq -r '.repo.feature_branch // "-"' <<< "$state_json")"
+    created_at="$(jq -r '.created_at // "?"' <<< "$state_json")"
+
+    printf '\033[1mTask:          %s\033[0m\n' "$ARG_TASK_ID"
+    printf 'Repo:          %s\n' "$repo_url"
+    printf 'Base-Branch:   %s\n' "$base_branch"
+    printf 'Feature-Branch:%s\n' "$feature_branch"
+    printf 'Erstellt:      %s\n' "$created_at"
+    printf '\n'
+
+    local status_icon
+    for phase in concept implement diff push; do
+        local current_status iter_count
+        current_status="$(jq -r --arg p "$phase" '.phases[$p].current_status // "pending"' <<< "$state_json")"
+        iter_count="$(jq -r --arg p "$phase" '(.phases[$p].iterations // []) | length' <<< "$state_json")"
+
+        case "$current_status" in
+            completed)           status_icon='✓' ;;
+            running)             status_icon='⟳' ;;
+            failed)              status_icon='✗' ;;
+            quality_gate_failed) status_icon='✗' ;;
+            no_changes)          status_icon='—' ;;
+            *)                   status_icon='·' ;;
+        esac
+
+        printf '  %s %-12s  %s' "$status_icon" "$phase" "$current_status"
+        if [[ "$iter_count" -gt 0 ]]; then
+            printf '  (%s Iteration(en))' "$iter_count"
+        fi
+        printf '\n'
+
+        # Iterationen ausgeben wenn vorhanden
+        if [[ "$iter_count" -gt 0 ]]; then
+            local iter_list
+            iter_list="$(jq -r --arg p "$phase" \
+                '.phases[$p].iterations[] | "     #\(.n)  \(.status)  \(.started_at[0:16] // "?")  \(if .finished_at then .finished_at[0:16] else "-" end)\(if .failed_gate then "  gate:\(.failed_gate)" else "" end)\(if .error_message then "  err:\(.error_message[0:60])" else "" end)"' \
+                <<< "$state_json" 2>/dev/null)"
+            [[ -n "$iter_list" ]] && printf '%s\n' "$iter_list"
+        fi
+    done
 }
 
 # cmd_abort_silent: Loescht Volume + Host-State ohne Frage. Helper fuer push --auto-cleanup.
@@ -507,7 +566,7 @@ main() {
                 *)      die "$EXIT_GENERAL" "Unbekanntes task-Subcommand '$ARG_SUBCOMMAND' (siehe agent help task)" ;;
             esac
             ;;
-        concept|implement|diff|push)
+        concept|implement|diff|push|respond)
             cmd_phase "$ARG_COMMAND"
             ;;
         show-concept)  cmd_show_concept ;;

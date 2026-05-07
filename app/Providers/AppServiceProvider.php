@@ -1,0 +1,140 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Providers;
+
+use App\Jobs\RunPhaseJob;
+use App\Services\Anthropic\CredentialStore;
+use App\Services\GitProvider\BitbucketGitService;
+use App\Services\GitProvider\GitHubGitService;
+use App\Services\GitProvider\GitLabGitService;
+use App\Services\GitProvider\GitProviderRegistry;
+use Illuminate\Queue\Events\JobFailed;
+use Illuminate\Support\Env;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\ServiceProvider;
+use PDO;
+use PDOException;
+use SocialiteProviders\Bitbucket\BitbucketExtendSocialite;
+use SocialiteProviders\GitLab\GitLabExtendSocialite;
+use SocialiteProviders\Manager\SocialiteWasCalled;
+
+class AppServiceProvider extends ServiceProvider
+{
+    public function register(): void
+    {
+        $this->app->singleton(CredentialStore::class);
+
+        $this->app->singleton(GitProviderRegistry::class, function (): GitProviderRegistry {
+            $registry = new GitProviderRegistry;
+
+            $registry->register(
+                'github',
+                fn (string $token, string $instanceUrl): GitHubGitService => new GitHubGitService($token),
+            );
+
+            $registry->register(
+                'gitlab',
+                fn (string $token, string $instanceUrl): GitLabGitService => new GitLabGitService(
+                    $token,
+                    $instanceUrl ?: 'https://gitlab.com',
+                ),
+            );
+
+            $registry->register(
+                'bitbucket',
+                fn (string $token, string $instanceUrl): BitbucketGitService => new BitbucketGitService($token),
+            );
+
+            return $registry;
+        });
+    }
+
+    public function boot(): void
+    {
+        Event::listen(SocialiteWasCalled::class, GitLabExtendSocialite::class.'@handle');
+        Event::listen(SocialiteWasCalled::class, BitbucketExtendSocialite::class.'@handle');
+
+        Queue::failing(function (JobFailed $event): void {
+            if ($event->job->resolveName() === RunPhaseJob::class) {
+                return;
+            }
+
+            Log::channel('argos')->error('Job failed', [
+                'job' => $event->job->resolveName(),
+                'error' => $event->exception->getMessage(),
+                'class' => $event->exception::class,
+            ]);
+        });
+
+        $this->configureDatabase();
+    }
+
+    private function configureDatabase(): void
+    {
+        // If the caller (env, phpunit.xml, .env, …) explicitly chose a connection,
+        // honor it without probing or auto-migrating. Auto-detect only when nothing
+        // is set — otherwise we burn a 1 s TCP timeout per phpunit boot and risk
+        // overriding test config with the SQLite fallback. Env::get() (not env())
+        // is used here because we genuinely need to know whether the variable
+        // was set rather than the resolved config value.
+        if (Env::get('DB_CONNECTION') !== null) {
+            return;
+        }
+
+        if ($this->canConnectToMariadb()) {
+            config(['database.default' => 'mariadb']);
+
+            return;
+        }
+
+        $sqlitePath = config('argos.config_dir').'/argos.db';
+        config([
+            'database.default' => 'sqlite',
+            'database.connections.sqlite.database' => $sqlitePath,
+        ]);
+
+        $this->ensureSqliteExists($sqlitePath);
+        Artisan::call('migrate', ['--force' => true]);
+    }
+
+    private function canConnectToMariadb(): bool
+    {
+        $c = config('database.connections.mariadb');
+        $dsn = "mysql:host={$c['host']};port={$c['port']};dbname={$c['database']};charset=utf8mb4";
+
+        try {
+            $pdo = new PDO($dsn, $c['username'], $c['password'], [
+                PDO::ATTR_TIMEOUT => 1,
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            ]);
+            unset($pdo);
+
+            return true;
+        } catch (PDOException) {
+            return false;
+        }
+    }
+
+    private function ensureSqliteExists(string $path): void
+    {
+        // Laravel convention: an in-memory database. Don't materialise it on disk.
+        if ($path === ':memory:') {
+            return;
+        }
+
+        $dir = dirname($path);
+
+        if (! is_dir($dir)) {
+            mkdir($dir, 0700, true);
+        }
+
+        if (! is_file($path)) {
+            touch($path);
+        }
+    }
+}

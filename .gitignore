@@ -1,9 +1,18 @@
 # OS / Editor
 .DS_Store
+Thumbs.db
 *.swp
 *.swo
 .idea/
 .vscode/
+/.codex
+/.cursor/
+/.nova
+/.zed
+.phpactor.json
+_ide_helper.php
+Homestead.json
+Homestead.yaml
 
 # Logs
 *.log
@@ -12,12 +21,39 @@ logs/
 # Local env / secrets
 .env
 .env.local
+.env.backup
+.env.production
+.env.testing.external
 *.local
+/auth.json
 
-# Local tmp
-/tmp/
-tmp/
+# Laravel
+/vendor
+/node_modules
+/public/build
+/public/hot
+/public/storage
+/storage/*.key
+/storage/pail
+/bootstrap/cache/*.php
+.phpunit.result.cache
+/.phpunit.cache
 
 # Test artifacts
 coverage/
 .bats-tmp/
+
+# Build/dev tool caches
+.vite/
+.mcp.json
+
+# Agent runtime artifacts (worker workspace)
+.agent/
+:memory:
+
+# Local scratch notes
+todo.md
+docs/BACKLOG.md
+
+# Stage secrets (never commit)
+.tools/bash/.env.stage

@@ -1,0 +1,115 @@
+{
+    "$schema": "https://getcomposer.org/schema.json",
+    "name": "laravel/laravel",
+    "type": "project",
+    "description": "The skeleton application for the Laravel framework.",
+    "keywords": ["laravel", "framework"],
+    "license": "AGPL-3.0-or-later",
+    "require": {
+        "php": "^8.3",
+        "filament/filament": "^5.0",
+        "laravel/boost": "^2.4",
+        "laravel/framework": "^13.0",
+        "laravel/socialite": "^5.27",
+        "laravel/tinker": "^3.0",
+        "socialiteproviders/gitlab": "^4.1",
+        "socialiteproviders/bitbucket": "^4.1",
+        "symfony/process": "^8.0"
+    },
+    "require-dev": {
+        "fakerphp/faker": "^1.23",
+        "larastan/larastan": "^3.0",
+        "laravel/pail": "^1.2.5",
+        "laravel/pao": "^1.0.6",
+        "laravel/pint": "^1.27",
+        "mockery/mockery": "^1.6",
+        "nunomaduro/collision": "^8.6",
+        "phpunit/phpunit": "^12.5.12"
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "app/",
+            "Database\\Factories\\": "database/factories/",
+            "Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "setup": [
+            "composer install",
+            "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
+            "@php artisan key:generate",
+            "@php artisan migrate --force",
+            "npm install --ignore-scripts",
+            "npm run build"
+        ],
+
+        "dev": [
+            "Composer\\Config::disableProcessTimeout",
+            "@dev:build-workers",
+            "npx concurrently -c \"#93c5fd,#fb7185\" \"docker compose --env-file .env -f .tools/docker/docker-compose.yml up --build --remove-orphans\" \"npm run dev\" --names=compose,vite --kill-others"
+        ],
+        "dev:build-workers": [
+            "docker build -t argos-worker:local-php8.4 -f .tools/docker/worker/Dockerfile --target worker-php84 .",
+            "docker build -t argos-worker:local-php8.3 -f .tools/docker/worker/Dockerfile --target worker ."
+        ],
+        "dev:stop": "docker compose --env-file .env -f .tools/docker/docker-compose.yml down",
+        "dev:logs": "docker compose --env-file .env -f .tools/docker/docker-compose.yml logs -f",
+        "dev:exec": "docker compose --env-file .env -f .tools/docker/docker-compose.yml exec app bash",
+
+        "stage": "bash .tools/bash/start-stage.sh",
+        "stage:stop": "docker compose -p argos-stage -f .tools/docker/docker-compose.yml down",
+        "stage:logs": "docker compose -p argos-stage -f .tools/docker/docker-compose.yml logs -f",
+        "stage:exec": "docker compose -p argos-stage -f .tools/docker/docker-compose.yml exec app bash",
+
+        "pint": "vendor/bin/pint --format agent",
+        "pint:test": "vendor/bin/pint --test --format agent",
+        "phpstan": "vendor/bin/phpstan analyse --no-progress --memory-limit=1G",
+        "test": [
+            "@php artisan config:clear --ansi",
+            "@php artisan test --compact"
+        ],
+        "test:external": "@php artisan test --compact --configuration=phpunit.external.xml",
+
+        "qa": [
+            "@pint:test",
+            "@phpstan",
+            "@test"
+        ],
+        "qa:full": [
+            "@pint:test",
+            "@phpstan",
+            "@test",
+            "@test:external"
+        ],
+
+        "post-autoload-dump": [
+            "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
+            "@php artisan package:discover --ansi",
+            "@php artisan filament:upgrade"
+        ],
+        "post-update-cmd": [
+            "@php artisan vendor:publish --tag=laravel-assets --ansi --force"
+        ]
+    },
+    "extra": {
+        "laravel": {
+            "dont-discover": []
+        }
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "preferred-install": "dist",
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true,
+            "php-http/discovery": true
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📚 Documentation
+    url: https://github.com/nodus-it/argos#readme
+    about: Check the README and the docs/ directory before opening a ticket.
+  - name: 🔒 Security report
+    url: https://github.com/nodus-it/argos/security/advisories/new
+    about: Please report security vulnerabilities privately via a GitHub security advisory.

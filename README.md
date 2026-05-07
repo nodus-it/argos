@@ -1,94 +1,99 @@
-# Claude Worker — v1
+<div align="center">
 
-Dockerisierter Worker, der eine einzelne Dev-Aufgabe phasenweise und isoliert vom Host ausführt, gesteuert über die `agent`-CLI.
+<img src=".github/logo.svg" alt="Argos" width="640">
 
-Vier Phasen pro Task: **`concept`** (Plan formulieren) → **`implement`** (Code schreiben + Quality-Gates) → **`diff`** (Änderungen sichten) → **`push`** (Branch zur Remote pushen). Zwischen jeder Phase: menschliche Approval möglich. Pro Task ein eigenes Docker-Volume — Worker sieht nichts vom Host-Filesystem außerhalb seines eigenen Workspace.
+**A web-first dev agent that turns a task description into a pull request.**
 
-## Setup (in unter 10 Minuten)
+[![License: AGPL-3.0](https://img.shields.io/github/license/nodus-it/argos?style=flat-square)](LICENSE)
+[![Version](https://img.shields.io/github/v/tag/nodus-it/argos?style=flat-square&label=version&include_prereleases&sort=semver)](https://github.com/nodus-it/argos/releases)
+[![GHCR](https://img.shields.io/badge/ghcr.io-argos--app-2496ED?style=flat-square&logo=docker&logoColor=white)](https://github.com/nodus-it/argos/pkgs/container/argos-app)
+[![CI](https://img.shields.io/github/actions/workflow/status/nodus-it/argos/ci.yml?branch=master&style=flat-square&label=tests)](https://github.com/nodus-it/argos/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/codecov/c/github/nodus-it/argos?style=flat-square)](https://codecov.io/gh/nodus-it/argos)
 
-**Voraussetzungen auf dem Host:**
+</div>
 
-- Docker & Docker Compose v2
-- `claude` CLI ([Anthropic Claude Code](https://docs.claude.com/en/docs/claude-code/cli-reference))
-- `git`, `bash`
-- `jq` (JSON-Verarbeitung der Phase-Flags) — `sudo apt-get install -y jq` auf Debian/Ubuntu/WSL
+---
 
-```bash
-# 1. Claude Code installieren und Subscription-Token erzeugen
-npm install -g @anthropic-ai/claude-code
-claude setup-token   # Browser-OAuth, am Ende kopierst du den sk-ant-oat01-... Token
+Argos accepts a task description, runs it through isolated worker containers
+in phases (`concept` → `implement` → `diff` → `push`), and opens a pull
+request you can review.
 
-# 2. Repo clonen und Worker initialisieren
-git clone <agent-repo-url> agent
-cd agent
-./agent init   # baut Worker-Image, fragt nach dem Token, fragt nach Symlink in ~/.local/bin
-```
+> [!IMPORTANT]
+> - **Runs on your Claude subscription, not the API.** Argos uses the Claude
+>   Code OAuth token from `claude setup-token` — your existing Pro / Max /
+>   Team plan covers it. No per-token API billing.
+> - **Currently optimised for PHP / Laravel projects.** The implement phase
+>   wires up Composer, npm, Pint, and Pest/PHPUnit as quality gates. Other
+>   stacks work, but the gates and prompts are tuned for Laravel today.
 
-`agent init` macht im Detail:
-- `docker compose build worker` (~5 min beim ersten Mal)
-- legt persistente Caches an (`composer_cache`, `npm_cache`)
-- speichert den Claude-Token unter `~/.agent/claude_oauth_token` (mode 600)
-- bietet optional einen Symlink `~/.local/bin/agent → ./agent` an
-
-**Token nur erneuern (kein Image-Rebuild):**
+## Quick Start
 
 ```bash
-./agent init --update-token
+curl -fsSL https://raw.githubusercontent.com/nodus-it/argos/develop/install.sh | bash
 ```
 
-## Erste Task
+That installs Argos into the **current directory** (set `--dir` or
+`ARGOS_INSTALL_DIR` to install elsewhere) — drops a `docker-compose.yml`,
+generates a fresh `.env` with random secrets, brings up the stack, and prints
+the admin password.
 
-```bash
-./agent task new demo-helloworld
-# Interaktiv: REPO_URL, REPO_TOKEN (versteckt), BASE_BRANCH (default main),
-# Task-Description in $EDITOR. credentials.env + description.md landen unter
-# ~/.agent/tasks/demo-helloworld/, Volume `task_ws_demo-helloworld` wird erstellt.
+Open <http://localhost:8080/admin> — an in-app onboarding wizard walks you
+through pasting your Claude token and creating your first project.
 
-./agent concept demo-helloworld           # Plan formulieren (claude-Session)
-./agent show-concept demo-helloworld      # Plan lesen
-./agent edit-concept demo-helloworld      # Plan editieren ($EDITOR), oder
-./agent edit-notes demo-helloworld        # Anmerkungen anhaengen, dann
-./agent concept demo-helloworld           # erneut, inkrementell
+To update later, re-run the same command in the same directory: the
+installer pulls newer images, merges any new keys from the upstream
+`.env.example` into your `.env` without touching existing values, and
+restarts the stack. Customisations belong in `docker-compose.override.yml`
+next to the compose file — the installer never touches that.
 
-./agent implement demo-helloworld         # Claude schreibt Code + faehrt Pint/Pest aus
-./agent diff demo-helloworld              # Aenderungen reviewen
-./agent push demo-helloworld              # Commit-Message via Sub-Phase, dann git push
-```
+### What this gets you
 
-Voller End-to-End-Walkthrough: [`docs/EXAMPLE.md`](docs/EXAMPLE.md).
+- ✓ Tasks → automated pull requests on GitHub, GitLab, or Bitbucket
+- ✓ Authentication via Personal Access Token (paste a token per project)
+- ✓ Optimised for PHP / Laravel projects out of the box
+- ✓ Runs on your Claude Pro / Max / Team subscription
 
-## Weiterführende Doku
+### What this does **not** get you
 
-| Datei | Zweck |
-| --- | --- |
-| [`WORKER-CONCEPT.md`](WORKER-CONCEPT.md) | Architektur und Verhalten — was wird gebaut |
-| [`IMPLEMENTATION.md`](IMPLEMENTATION.md) | Konkrete Implementierungs-Entscheidungen — wie wird es gebaut |
-| [`CLAUDE.md`](CLAUDE.md) | Konventionen für die Erweiterung des Codes |
-| [`V1-DONE.md`](V1-DONE.md) | Akzeptanzkriterien für „v1 ist fertig" |
-| [`BACKLOG.md`](BACKLOG.md) | Was nach v1 kommt, sortiert |
-| [`docs/EXAMPLE.md`](docs/EXAMPLE.md) | Vollständiger Demo-Walkthrough |
-| [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) | Häufige Probleme und Fixes |
-| [`docs/EXTENDING.md`](docs/EXTENDING.md) | Neue Phase oder Lib-Funktion hinzufügen |
-| [`prompts/*.system.md`](prompts/) | System-Prompt-Templates für Claude-Sessions im Worker |
-| [`schemas/*.schema.json`](schemas/) | JSON-Schemas für State und strukturierte Outputs |
+- ✗ Repository / branch dropdowns when creating a project (needs OAuth)
+- ✗ Per-user account binding (needs OAuth)
+- ✗ Self-hosted GitLab support (needs `GITLAB_INSTANCE_URL`)
+- ✗ Custom domain / TLS (terminate at your reverse proxy)
 
-## Tests laufen lassen
+For any of those: see **[Extended Setup](docs/SETUP.md)**.
 
-```bash
-./tests/run-tests.sh                 # alles: shellcheck + bats + integration
-./tests/run-tests.sh --bats          # nur Bash-Unit-Tests
-./tests/run-tests.sh --integration   # nur Phase-Lifecycle-Test (gegen Mock-Claude)
-./tests/run-tests.sh --shellcheck    # nur Lint
-```
+## Usage
 
-Alle Tests laufen über Docker, kein Host-Install nötig (außer Docker selbst).
+Once the container is up:
 
-## Geltungsbereich v1
+1. **Sign in** — the first visit auto-creates an admin user. Set a real
+   password under *Profile* before exposing the instance.
+2. **Onboarding** — paste your Claude token (`claude setup-token`).
+3. **Create a project** — pick a Git host, paste a PAT, set the default
+   branch.
+4. **Create a task** — describe what you want done. Argos drafts a concept,
+   implements it, opens a pull request.
 
-- Manuelle Bedienung über `./agent`-CLI
-- Ein Task pro CLI-Aufruf, beliebig viele parallele Tasks (eigenes Volume pro Task)
-- VCS: GitHub (PAT-basiert)
-- Toolchain: PHP/Laravel (Pint, Pest/PHPUnit, optional PHPStan)
-- KI-Provider: Anthropic Claude (Subscription-OAuth, kein API-Key)
+## Documentation
 
-Spätere Iterationen (PR-Erstellung, Feedback-Loop, Orchestrator, UI) bekommen eigene Spec-Updates — Hooks dafür sind im v1-Design schon angelegt (siehe `BACKLOG.md`).
+| Topic | Where |
+|---|---|
+| Extended setup (production, custom workers, reverse proxy) | [docs/SETUP.md](docs/SETUP.md) |
+| All environment variables with defaults | [docs/CONFIGURATION.md](docs/CONFIGURATION.md) |
+| OAuth — when and why | [docs/OAUTH.md](docs/OAUTH.md) |
+| GitHub setup (PAT + OAuth) | [docs/SETUP-GITHUB.md](docs/SETUP-GITHUB.md) |
+| GitLab setup (incl. self-hosted) | [docs/SETUP-GITLAB.md](docs/SETUP-GITLAB.md) |
+| Bitbucket setup | [docs/SETUP-BITBUCKET.md](docs/SETUP-BITBUCKET.md) |
+| Local development & tests | [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) |
+
+## Contributing
+
+Pull requests welcome. See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for
+local setup, the test suite, and code conventions.
+
+## License
+
+Released under the [GNU Affero General Public License v3.0 or later](LICENSE).
+
+For commercial use or alternative licensing terms, contact Nodus IT at
+[argos@nodus-it.de](mailto:argos@nodus-it.de).
