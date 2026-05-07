@@ -40,7 +40,7 @@ return [
         'repo_url_label' => 'Repo URL',
         'token_label' => 'Token (PAT)',
         'token_helper_oauth_available' => 'Account connected — switch to "Authentication" for OAuth.',
-        'token_helper_bitbucket' => 'Format: username:app_password (not your account password).',
+        'token_helper_bitbucket' => 'Repository Access Token — paste the token directly, no username prefix.',
         'token_helper_bitbucket_oauth_available' => 'Bitbucket account connected — switch to "Authentication" for OAuth.',
         'token_create_link' => 'Create a token',
         'default_branch_label' => 'Default Branch',
@@ -76,7 +76,7 @@ return [
         ],
         'bitbucket' => [
             'heading' => 'Bitbucket Setup',
-            'body' => 'Bitbucket uses App Passwords. Token format: <code>username:app_password</code> (not your account password).',
+            'body' => 'Bitbucket uses Repository Access Tokens (scoped per repo). Paste the token directly — no username prefix needed.',
         ],
         'docs_link' => 'Step-by-step guide →',
     ],
