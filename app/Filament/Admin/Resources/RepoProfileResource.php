@@ -472,7 +472,7 @@ class RepoProfileResource extends Resource
                             $linkUrl = match ($platform) {
                                 'github' => (string) config('argos.docs.github_pat'),
                                 'gitlab' => (string) config('argos.docs.gitlab_pat'),
-                                'bitbucket' => (string) config('argos.docs.bitbucket_app_passwords'),
+                                'bitbucket' => (string) config('argos.docs.bitbucket_pat'),
                                 default => '',
                             };
 

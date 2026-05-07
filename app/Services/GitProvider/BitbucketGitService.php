@@ -20,7 +20,8 @@ class BitbucketGitService implements GitProviderContract
 
     public function __construct(private readonly string $token)
     {
-        // PAT format: "username:app_password" — OAuth tokens contain no colon.
+        // Colon = Basic auth (Atlassian API Token "email:api_token" or legacy App Password).
+        // No colon = Repository Access Token (Bearer) or OAuth token.
         if (str_contains($token, ':')) {
             [$this->username, $this->appPassword] = explode(':', $token, 2);
             $this->isOAuth = false;

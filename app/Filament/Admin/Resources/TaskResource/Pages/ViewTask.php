@@ -15,8 +15,8 @@ use Filament\Actions\Action;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Str;
-use Symfony\Component\Process\Process;
 
 class ViewTask extends ViewRecord
 {
@@ -162,7 +162,7 @@ class ViewTask extends ViewRecord
         $image = config('argos.worker_image');
         $vol = $task->volumeName();
 
-        $statProcess = new Process([
+        $statResult = Process::timeout(15)->run([
             'docker', 'run', '--rm',
             '-v', "{$vol}:/workspace:ro",
             '--entrypoint', 'sh', $image,
@@ -171,20 +171,16 @@ class ViewTask extends ViewRecord
             ."echo ''; "
             .'git -C /workspace status --short 2>/dev/null',
         ]);
-        $statProcess->setTimeout(15);
-        $statProcess->run();
-        $this->diffStat = trim($statProcess->getOutput());
+        $this->diffStat = trim($statResult->output());
 
-        $diffProcess = new Process([
+        $diffResult = Process::timeout(15)->run([
             'docker', 'run', '--rm',
             '-v', "{$vol}:/workspace:ro",
             '--entrypoint', 'sh', $image,
             '-c',
             "git -C /workspace diff origin/{$branch} 2>/dev/null | head -c 131072",
         ]);
-        $diffProcess->setTimeout(15);
-        $diffProcess->run();
-        $this->diffFiles = $this->parseDiffStructured($diffProcess->getOutput());
+        $this->diffFiles = $this->parseDiffStructured($diffResult->output());
         $this->diffLoaded = true;
     }
 
@@ -323,9 +319,7 @@ class ViewTask extends ViewRecord
                 ->action(function (): void {
                     $task = $this->task();
                     $task->update(['workflow_status' => WorkflowStatus::Completed]);
-                    Process::fromShellCommandline(
-                        'docker volume rm '.escapeshellarg($task->volumeName())
-                    )->run();
+                    Process::run(['docker', 'volume', 'rm', $task->volumeName()]);
                     Notification::make()->title(__('tasks.view.actions.task_completed'))->success()->send();
                     $this->redirect(TaskResource::getUrl('view', ['record' => $task]));
                 })

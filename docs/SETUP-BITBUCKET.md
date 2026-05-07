@@ -1,33 +1,42 @@
 # Bitbucket Setup Guide
 
-This guide covers how to connect Argos to Bitbucket Cloud repositories using either an App Password (PAT) or OAuth.
+This guide covers how to connect Argos to Bitbucket Cloud repositories using either a Repository Access Token or OAuth.
 
 ---
 
-## Option 1: App Password (PAT)
+## Option 1: Repository Access Token
 
-App Passwords are Bitbucket's equivalent of Personal Access Tokens. They are the simpler option and require no server-side OAuth configuration.
+Repository Access Tokens are scoped to a single repository and use Bearer authentication. They are the recommended option and require no server-side OAuth configuration.
 
-### Step 1: Create an App Password
+> **Note:** Bitbucket App Passwords are deprecated and will be disabled on **2026-06-09**. Use Repository Access Tokens instead.
+
+### Step 1: Create a Repository Access Token
 
 1. Log in to Bitbucket Cloud.
-2. Click your avatar → **Personal Settings** → **App passwords** (under "Access Management").
-3. Click **Create app password**.
-4. Give it a descriptive name (e.g. `argos`).
-5. Select the following scopes:
+2. Navigate to your repository.
+3. Go to **Repository Settings** → **Access tokens** (under "Security").
+4. Click **Create Repository Access Token**.
+5. Give it a descriptive name (e.g. `argos`) and select the following permissions:
    - **Repositories**: Read, Write
    - **Pull requests**: Read, Write
    - **Issues**: Read, Write
-6. Click **Create** and copy the generated password — it will only be shown once.
+6. Click **Create** and copy the generated token — it will only be shown once.
 
 ### Step 2: Configure in Argos
 
 In **Projects → New Project**:
 - **Platform**: Bitbucket
 - **Repo URL**: `https://bitbucket.org/<workspace>/<repository>`
-- **Token**: `<your-bitbucket-username>:<your-app-password>`
+- **Token**: paste the token directly (no username prefix)
 
-> **Important**: The token must be in `username:app_password` format. Do not use your Bitbucket account password here.
+> **Important**: Do **not** prepend your username. Repository Access Tokens are used as Bearer tokens — just paste the token as-is.
+
+### Alternative: Atlassian API Token (workspace-wide access)
+
+If you need access across multiple repositories, you can use an Atlassian API Token with Basic authentication:
+
+- **Token format**: `your-email@example.com:your-api-token`
+- Create an API Token at [id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens)
 
 ---
 
@@ -78,6 +87,6 @@ needed.
 | Symptom | Likely cause |
 |---|---|
 | 403 on issues endpoint | Issue tracker is disabled for the repository (issues will be an empty list) |
-| 401 on push | App Password missing Repositories Write scope, or wrong `username:app_password` format |
+| 401 on push | Token missing Repositories Write permission, or token pasted with an accidental username prefix |
 | PR creation returns 409 | A PR for this branch already exists — Argos will find and report the existing URL |
 | OAuth redirect fails | The callback URL registered in the OAuth consumer must exactly match `${APP_URL}/auth/bitbucket/callback` — verify `APP_URL`. |

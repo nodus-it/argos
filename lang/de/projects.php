@@ -40,7 +40,7 @@ return [
         'repo_url_label' => 'Repo-URL',
         'token_label' => 'Token (PAT)',
         'token_helper_oauth_available' => 'Account verbunden — wechsle zu "Authentifizierung" für OAuth.',
-        'token_helper_bitbucket' => 'Format: username:app_password (nicht dein Account-Passwort).',
+        'token_helper_bitbucket' => 'Repository Access Token — Token direkt eintragen, kein Username-Prefix.',
         'token_helper_bitbucket_oauth_available' => 'Bitbucket-Account verbunden — wechsle zu "Authentifizierung" für OAuth.',
         'token_create_link' => 'Token erstellen',
         'default_branch_label' => 'Default Branch',
@@ -76,7 +76,7 @@ return [
         ],
         'bitbucket' => [
             'heading' => 'Bitbucket-Setup',
-            'body' => 'Bitbucket nutzt App Passwords. Token-Format: <code>username:app_password</code> (nicht dein Account-Passwort).',
+            'body' => 'Bitbucket nutzt Repository Access Tokens (repo-spezifisch). Token direkt eintragen — kein Username-Prefix nötig.',
         ],
         'docs_link' => 'Schritt-für-Schritt-Anleitung →',
     ],

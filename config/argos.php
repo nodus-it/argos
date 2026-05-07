@@ -81,7 +81,7 @@ return [
         'contributing' => 'https://github.com/nodus-it/argos/blob/master/docs/CONTRIBUTING.md',
         'github_pat' => 'https://github.com/settings/tokens',
         'gitlab_pat' => 'https://gitlab.com/-/user_settings/personal_access_tokens',
-        'bitbucket_app_passwords' => 'https://bitbucket.org/account/settings/app-passwords/',
+        'bitbucket_pat' => 'https://support.atlassian.com/bitbucket-cloud/docs/repository-access-tokens/',
         'claude_setup_token' => 'https://docs.claude.com/en/docs/claude-code/quickstart',
     ],
 ];
