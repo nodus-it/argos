@@ -6,6 +6,7 @@ return [
     'groups' => [
         'tasks' => 'Tasks',
         'configuration' => 'Configuration',
+        'worker' => 'Worker',
     ],
     'pages' => [
         'settings' => 'Settings',
