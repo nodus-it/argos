@@ -84,6 +84,7 @@ phase_respond_run() {
     set +e
     ( unset REPO_TOKEN
       claude -p \
+        ${CLAUDE_MODEL:+--model "$CLAUDE_MODEL"} \
         --append-system-prompt "$sysprompt_content" \
         --output-format stream-json \
         --verbose \
@@ -187,6 +188,7 @@ phase_respond_run() {
         set +e
         ( unset REPO_TOKEN
           claude -p \
+            ${CLAUDE_MODEL:+--model "$CLAUDE_MODEL"} \
             --append-system-prompt "$sysprompt_content" \
             --output-format stream-json \
             --verbose \

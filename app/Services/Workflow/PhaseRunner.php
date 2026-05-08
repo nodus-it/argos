@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Services\Workflow;
 
+use App\Enums\ClaudeModel;
 use App\Enums\PhaseStatus;
+use App\Enums\WorkflowStatus;
 use App\Jobs\RunPhaseJob;
 use App\Models\PhaseRun;
 use App\Models\RepoProfile;
@@ -529,6 +531,7 @@ class PhaseRunner
 
         $maxTurns = $this->resolveMaxTurns($task, $flags);
         $resumeSessionId = $this->resolveResumeSessionId($task, $phase, $flags);
+        $claudeModel = $this->resolveClaudeModel($task, $phase);
 
         $cmd = [
             'docker', 'run', '--rm',
@@ -549,6 +552,7 @@ class PhaseRunner
             '-e', "MAX_TURNS={$maxTurns}",
             '-e', 'CLAUDE_CONFIG_DIR=/workspace/.agent/claude-state',
             '-e', 'LOG_LEVEL=info',
+            '-e', "CLAUDE_MODEL={$claudeModel}",
         ];
 
         if ($resumeSessionId !== null) {
@@ -625,6 +629,26 @@ class PhaseRunner
         }
 
         return is_string($sessionId) && $sessionId !== '' ? $sessionId : null;
+    }
+
+    /**
+     * Resolve the Claude model ID for a phase.
+     * For `respond`: concept-review context uses the concept model; otherwise the implement model.
+     * For `commit-message`: always Haiku (hardcoded in the worker script; we pass it here for consistency).
+     */
+    private function resolveClaudeModel(Task $task, string $phase): string
+    {
+        $effectivePhase = match ($phase) {
+            'respond' => $task->workflow_status === WorkflowStatus::ConceptReview ? 'concept' : 'implement',
+            'commit-message' => 'commit-message',
+            default => $phase,
+        };
+
+        if ($effectivePhase === 'commit-message') {
+            return ClaudeModel::Haiku45->value;
+        }
+
+        return $task->modelForPhase($effectivePhase);
     }
 
     private function extractSessionIdFromStreamLog(?string $streamLog): ?string

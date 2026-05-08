@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Admin\Resources;
 
 use App\Enums\AuthMethod;
+use App\Enums\ClaudeModel;
 use App\Enums\GitProvider;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\CreateRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\EditRepoProfile;
@@ -127,6 +128,30 @@ class RepoProfileResource extends Resource
                         ->helperText(__('projects.fields.worker_image_helper'))
                         ->searchable()
                         ->native(false),
+                ]),
+
+            // ── Block 2b ─ Modelle ──────────────────────────────────────────────
+            Section::make(__('projects.sections.models'))
+                ->visible(fn (Get $get): bool => self::platformChosen($get))
+                ->collapsed()
+                ->schema([
+                    Select::make('model_concept')
+                        ->label(__('projects.fields.model_concept_label'))
+                        ->options(fn (): array => collect(ClaudeModel::cases())
+                            ->mapWithKeys(fn (ClaudeModel $m): array => [$m->value => $m->label()])
+                            ->all())
+                        ->placeholder(__('projects.fields.model_concept_placeholder', ['model' => ClaudeModel::default('concept')->label()]))
+                        ->native(false)
+                        ->helperText(__('projects.fields.model_concept_helper')),
+
+                    Select::make('model_implement')
+                        ->label(__('projects.fields.model_implement_label'))
+                        ->options(fn (): array => collect(ClaudeModel::cases())
+                            ->mapWithKeys(fn (ClaudeModel $m): array => [$m->value => $m->label()])
+                            ->all())
+                        ->placeholder(__('projects.fields.model_implement_placeholder', ['model' => ClaudeModel::default('implement')->label()]))
+                        ->native(false)
+                        ->helperText(__('projects.fields.model_implement_helper')),
                 ]),
 
             // ── Block 3a ─ Authentifizierung (GitHub/GitLab mit OAuth-Account) ─

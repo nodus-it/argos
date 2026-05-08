@@ -12,6 +12,7 @@ return [
         'platform' => 'Plattform',
         'platform_description' => 'Wähle die Plattform — danach werden die weiteren Felder freigeschaltet.',
         'general' => 'Allgemein',
+        'models' => 'Modelle',
         'authentication' => 'Authentifizierung',
         'repository' => 'Repository',
     ],
@@ -45,6 +46,12 @@ return [
         'token_create_link' => 'Token erstellen',
         'default_branch_label' => 'Default Branch',
         'global_default' => 'Globaler Default',
+        'model_concept_label' => 'Konzept-Modell',
+        'model_concept_placeholder' => 'Standard: :model',
+        'model_concept_helper' => 'Claude-Modell für die Konzept-Phase. Leer lassen für den hardcodierten Standard.',
+        'model_implement_label' => 'Implement-Modell',
+        'model_implement_placeholder' => 'Standard: :model',
+        'model_implement_helper' => 'Claude-Modell für die Implement-Phase. Leer lassen für den hardcodierten Standard.',
     ],
 
     'infolist' => [

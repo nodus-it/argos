@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources;
 
+use App\Enums\ClaudeModel;
 use App\Enums\Phase;
 use App\Enums\PhaseStatus;
 use App\Enums\WorkflowStatus;
@@ -119,6 +120,30 @@ class TaskResource extends Resource
                     .(RepoProfile::find($get('repo_profile_id'))?->worker_image ?: config('argos.worker_image')).')')
                 ->helperText(__('tasks.fields.worker_image_helper'))
                 ->searchable()
+                ->native(false),
+
+            Select::make('model_concept')
+                ->label(__('tasks.fields.model_concept_label'))
+                ->options(fn (): array => collect(ClaudeModel::cases())
+                    ->mapWithKeys(fn (ClaudeModel $m): array => [$m->value => $m->label()])
+                    ->all())
+                ->placeholder(fn (Get $get): string => __('tasks.fields.model_concept_placeholder', [
+                    'model' => (RepoProfile::find($get('repo_profile_id'))?->model_concept
+                        ?? ClaudeModel::default('concept'))->label(),
+                ]))
+                ->helperText(__('tasks.fields.model_concept_helper'))
+                ->native(false),
+
+            Select::make('model_implement')
+                ->label(__('tasks.fields.model_implement_label'))
+                ->options(fn (): array => collect(ClaudeModel::cases())
+                    ->mapWithKeys(fn (ClaudeModel $m): array => [$m->value => $m->label()])
+                    ->all())
+                ->placeholder(fn (Get $get): string => __('tasks.fields.model_implement_placeholder', [
+                    'model' => (RepoProfile::find($get('repo_profile_id'))?->model_implement
+                        ?? ClaudeModel::default('implement'))->label(),
+                ]))
+                ->helperText(__('tasks.fields.model_implement_helper'))
                 ->native(false),
         ]);
     }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\AuthMethod;
+use App\Enums\ClaudeModel;
 use App\Enums\GitProvider;
 use App\Services\OAuth\TokenRefresher;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -26,6 +27,8 @@ use Illuminate\Support\Carbon;
  * @property AuthMethod $auth_method
  * @property int|null $connected_account_id
  * @property string|null $worker_image
+ * @property ClaudeModel|null $model_concept
+ * @property ClaudeModel|null $model_implement
  * @property bool $auto_concept
  * @property bool $auto_pr
  * @property Carbon|null $created_at
@@ -47,6 +50,8 @@ class RepoProfile extends Model
         'auth_method',
         'connected_account_id',
         'worker_image',
+        'model_concept',
+        'model_implement',
         'auto_concept',
         'auto_pr',
     ];
@@ -57,6 +62,8 @@ class RepoProfile extends Model
             'token' => 'encrypted',
             'platform' => GitProvider::class,
             'auth_method' => AuthMethod::class,
+            'model_concept' => ClaudeModel::class,
+            'model_implement' => ClaudeModel::class,
             'auto_concept' => 'boolean',
             'auto_pr' => 'boolean',
         ];
@@ -76,6 +83,21 @@ class RepoProfile extends Model
     public function connectedAccount(): BelongsTo
     {
         return $this->belongsTo(ConnectedAccount::class);
+    }
+
+    /**
+     * Returns the configured model ID string for the given phase,
+     * falling back to the hardcoded default when null.
+     */
+    public function modelForPhase(string $phase): string
+    {
+        $configured = match ($phase) {
+            'concept' => $this->model_concept,
+            'implement' => $this->model_implement,
+            default => null,
+        };
+
+        return $configured?->value ?? ClaudeModel::default($phase)->value;
     }
 
     /**
