@@ -26,6 +26,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $installed_version
  * @property string|null $upstream_version
  * @property bool $has_update
+ * @property string|null $last_builtin_hash
  * @property Carbon|null $last_checked_at
  * @property Carbon|null $last_built_at
  * @property int|null $created_by_user_id
@@ -51,6 +52,7 @@ class WorkerStack extends Model
         'installed_version',
         'upstream_version',
         'has_update',
+        'last_builtin_hash',
         'last_checked_at',
         'last_built_at',
         'created_by_user_id',

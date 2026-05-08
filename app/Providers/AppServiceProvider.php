@@ -12,6 +12,8 @@ use App\Services\GitProvider\GitLabGitService;
 use App\Services\GitProvider\GitProviderRegistry;
 use App\Workers\Agents\AgentRegistry;
 use App\Workers\Agents\ClaudeCodeRunner;
+use App\Workers\Builtin\BuiltinSync;
+use Illuminate\Database\Events\MigrationsEnded;
 use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Support\Env;
 use Illuminate\Support\Facades\Artisan;
@@ -81,6 +83,17 @@ class AppServiceProvider extends ServiceProvider
                 'error' => $event->exception->getMessage(),
                 'class' => $event->exception::class,
             ]);
+        });
+
+        // After every `migrate` run, mirror the built-in worker stack manifest
+        // into worker_stacks. Skipped during unit tests so RefreshDatabase
+        // tests stay fast and free of seed data they didn't ask for; tests
+        // that need built-ins call BuiltinSync directly.
+        Event::listen(MigrationsEnded::class, function (): void {
+            if (app()->runningUnitTests()) {
+                return;
+            }
+            BuiltinSync::default()->sync();
         });
 
         $this->configureDatabase();
