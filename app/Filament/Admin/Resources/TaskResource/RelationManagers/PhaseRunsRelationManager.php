@@ -27,6 +27,7 @@ class PhaseRunsRelationManager extends RelationManager
     public function table(Table $table): Table
     {
         return $table
+            ->poll('5s')
             ->columns([
                 TextColumn::make('phase')
                     ->label(__('enums.phase_runs.columns.phase'))

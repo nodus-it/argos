@@ -390,6 +390,62 @@ class PhaseRunnerTest extends TestCase
         $this->assertNull($stopReason);
     }
 
+    // --- runBlocking ordering (race-condition fix) ---
+
+    public function test_run_blocking_calls_post_phase_sync_before_setting_final_status(): void
+    {
+        $task = $this->taskWithProfile();
+        $statusDuringPostPhaseSync = 'not-captured';
+
+        $processMock = $this->makeProcessMock(exitCode: 0);
+
+        $runner = $this->partialMock(PhaseRunner::class, function (MockInterface $mock) use ($processMock, $task, &$statusDuringPostPhaseSync): void {
+            $mock->shouldAllowMockingProtectedMethods();
+            $mock->shouldReceive('newProcess')->andReturn($processMock);
+            $mock->shouldReceive('writeNotesToVolume')->andReturn(null);
+            $mock->shouldReceive('postPhaseSync')
+                ->once()
+                ->andReturnUsing(function () use ($task, &$statusDuringPostPhaseSync): void {
+                    // Capture task's current_status in the DB at the moment postPhaseSync runs.
+                    $statusDuringPostPhaseSync = $task->fresh()->current_status?->value;
+                });
+        });
+
+        $runner->runBlocking($task, 'concept');
+
+        // postPhaseSync must be called before current_status is set to 'completed',
+        // so content is always in the DB before the UI poll can detect completion.
+        $this->assertNotSame('completed', $statusDuringPostPhaseSync,
+            'postPhaseSync was called after current_status was already set to completed — race condition still present');
+
+        // After runBlocking returns, current_status must be 'completed'.
+        $this->assertSame('completed', $task->fresh()->current_status?->value);
+    }
+
+    public function test_run_blocking_uses_phase_run_status_after_paused_promotion(): void
+    {
+        $task = $this->taskWithProfile();
+        $processMock = $this->makeProcessMock(exitCode: 1); // non-zero → Failed initially
+
+        $runner = $this->partialMock(PhaseRunner::class, function (MockInterface $mock) use ($processMock): void {
+            $mock->shouldAllowMockingProtectedMethods();
+            $mock->shouldReceive('newProcess')->andReturn($processMock);
+            $mock->shouldReceive('writeImplementNotesToVolume')->andReturn(null);
+            // Simulate postPhaseSync promoting Failed → Paused (as it does for error_max_turns)
+            $mock->shouldReceive('postPhaseSync')
+                ->once()
+                ->andReturnUsing(function (Task $t, PhaseRun $pr): void {
+                    $pr->update(['status' => PhaseStatus::Paused]);
+                    $t->update(['current_status' => PhaseStatus::Paused]);
+                });
+        });
+
+        $runner->runBlocking($task, 'implement');
+
+        // Final task status must be Paused (promoted by postPhaseSync), not Failed.
+        $this->assertSame('paused', $task->fresh()->current_status?->value);
+    }
+
     // --- postPhaseSync error_log capture ---
 
     public function test_post_phase_sync_captures_clone_err_when_concept_failed(): void
