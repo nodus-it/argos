@@ -9,6 +9,7 @@ use App\Jobs\RunPhaseJob;
 use App\Models\PhaseRun;
 use App\Models\RepoProfile;
 use App\Models\Task;
+use App\Services\Task\TaskService;
 use App\Services\Workflow\PhaseRunner;
 use App\Services\Workflow\WorkflowService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -240,7 +241,7 @@ class FeedbackWorkflowTest extends TestCase
             $mock->shouldReceive('postPhaseSync')->andReturn(null);
         });
 
-        (new RunPhaseJob($task->id, $phase))->handle(app(PhaseRunner::class), app(WorkflowService::class));
+        (new RunPhaseJob($task->id, $phase))->handle(app(PhaseRunner::class), app(WorkflowService::class), app(TaskService::class));
     }
 
     /**
@@ -256,7 +257,7 @@ class FeedbackWorkflowTest extends TestCase
             $mock->shouldReceive('newProcess')->andReturn($processMock);
         });
 
-        (new RunPhaseJob($task->id, $phase))->handle(app(PhaseRunner::class), app(WorkflowService::class));
+        (new RunPhaseJob($task->id, $phase))->handle(app(PhaseRunner::class), app(WorkflowService::class), app(TaskService::class));
     }
 
     private function makeProcessMock(int $exitCode): Process

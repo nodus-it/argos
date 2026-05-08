@@ -4,15 +4,19 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Enums\Phase;
 use App\Enums\WorkflowStatus;
+use App\Events\Task\PhaseCompleted;
 use App\Jobs\RunPhaseJob;
 use App\Models\RepoProfile;
 use App\Models\Task;
+use App\Services\Task\TaskService;
 use App\Services\Workflow\PhaseRunner;
 use App\Services\Workflow\WorkflowService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
 use Tests\TestCase;
 
@@ -36,7 +40,7 @@ class RunPhaseJobTest extends TestCase
             ->with(\Mockery::on(fn ($t) => $t->id === $task->id), 'concept', []);
 
         $job = new RunPhaseJob($task->id, 'concept');
-        $job->handle(app(PhaseRunner::class), app(WorkflowService::class));
+        $job->handle(app(PhaseRunner::class), app(WorkflowService::class), app(TaskService::class));
     }
 
     public function test_handle_passes_flags_to_run_blocking(): void
@@ -50,7 +54,7 @@ class RunPhaseJobTest extends TestCase
             ->with(\Mockery::any(), 'implement', $flags);
 
         $job = new RunPhaseJob($task->id, 'implement', $flags);
-        $job->handle(app(PhaseRunner::class), app(WorkflowService::class));
+        $job->handle(app(PhaseRunner::class), app(WorkflowService::class), app(TaskService::class));
     }
 
     public function test_handle_advances_workflow_after_run(): void
@@ -63,7 +67,7 @@ class RunPhaseJobTest extends TestCase
         $this->mock(PhaseRunner::class)->shouldReceive('runBlocking');
 
         $job = new RunPhaseJob($task->id, 'concept');
-        $job->handle(app(PhaseRunner::class), app(WorkflowService::class));
+        $job->handle(app(PhaseRunner::class), app(WorkflowService::class), app(TaskService::class));
 
         $this->assertSame(WorkflowStatus::ConceptReview, $task->fresh()->workflow_status);
     }
@@ -78,7 +82,7 @@ class RunPhaseJobTest extends TestCase
         $this->mock(PhaseRunner::class)->shouldReceive('runBlocking');
 
         $job = new RunPhaseJob($task->id, 'concept');
-        $job->handle(app(PhaseRunner::class), app(WorkflowService::class));
+        $job->handle(app(PhaseRunner::class), app(WorkflowService::class), app(TaskService::class));
 
         $this->assertSame(WorkflowStatus::Failed, $task->fresh()->workflow_status);
     }
@@ -123,8 +127,26 @@ class RunPhaseJobTest extends TestCase
         $this->mock(PhaseRunner::class)->shouldReceive('runBlocking');
 
         $job = new RunPhaseJob($task->id, 'implement');
-        $job->handle(app(PhaseRunner::class), app(WorkflowService::class));
+        $job->handle(app(PhaseRunner::class), app(WorkflowService::class), app(TaskService::class));
 
         Bus::assertDispatched(RunPhaseJob::class, fn ($j) => $j->phase === 'push');
+    }
+
+    public function test_handle_fires_phase_completed_event(): void
+    {
+        Event::fake();
+
+        $task = Task::factory()->create([
+            'workflow_status' => WorkflowStatus::ConceptRunning,
+            'current_status' => 'completed',
+        ]);
+
+        $this->mock(PhaseRunner::class)->shouldReceive('runBlocking');
+
+        $job = new RunPhaseJob($task->id, 'concept');
+        $job->handle(app(PhaseRunner::class), app(WorkflowService::class), app(TaskService::class));
+
+        Event::assertDispatched(PhaseCompleted::class, fn ($e) => $e->task->id === $task->id
+            && $e->phase === Phase::Concept);
     }
 }

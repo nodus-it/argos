@@ -11,6 +11,7 @@ use App\Jobs\RunPhaseJob;
 use App\Models\PhaseRun;
 use App\Models\RepoProfile;
 use App\Models\Task;
+use App\Services\Task\TaskService;
 use App\Services\Workflow\PhaseRunner;
 use App\Services\Workflow\WorkflowService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -348,7 +349,7 @@ class WorkflowServiceTest extends TestCase
             });
 
         $job = new RunPhaseJob($task->id, 'implement');
-        $job->handle(app(PhaseRunner::class), app(WorkflowService::class));
+        $job->handle(app(PhaseRunner::class), app(WorkflowService::class), app(TaskService::class));
 
         $this->assertNotSame(WorkflowStatus::Failed, $task->fresh()->workflow_status);
         $this->assertSame(WorkflowStatus::ImplementRunning, $task->fresh()->workflow_status);
@@ -367,7 +368,7 @@ class WorkflowServiceTest extends TestCase
         $runner->shouldReceive('runBlocking')->andReturnNull();
 
         $job = new RunPhaseJob($task->id, 'implement');
-        $job->handle(app(PhaseRunner::class), app(WorkflowService::class));
+        $job->handle(app(PhaseRunner::class), app(WorkflowService::class), app(TaskService::class));
 
         // Status should still be ImplementRunning (not changed by retryPhase)
         $this->assertSame(WorkflowStatus::ImplementRunning, $task->fresh()->workflow_status);
