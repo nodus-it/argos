@@ -33,6 +33,11 @@ use Illuminate\Support\Carbon;
  * @property string|null $worker_image
  * @property ClaudeModel|null $model_concept
  * @property ClaudeModel|null $model_implement
+ * @property string|null $worker_stack_id_override
+ * @property string|null $worker_agent_id_override
+ * @property array<string, mixed>|null $worker_config_override
+ * @property string|null $agent_credential_id
+ * @property array<string, mixed>|null $agent_config
  * @property string|null $concept_md
  * @property string|null $concept_notes
  * @property string|null $implement_summary_nontechnical
@@ -43,6 +48,9 @@ use Illuminate\Support\Carbon;
  * @property-read User|null $user
  * @property-read RepoProfile|null $repoProfile
  * @property-read Collection<int, PhaseRun> $phaseRuns
+ * @property-read WorkerStack|null $workerStackOverride
+ * @property-read WorkerAgent|null $workerAgentOverride
+ * @property-read AgentCredential|null $agentCredential
  */
 class Task extends Model
 {
@@ -70,6 +78,11 @@ class Task extends Model
         'worker_image',
         'model_concept',
         'model_implement',
+        'worker_stack_id_override',
+        'worker_agent_id_override',
+        'worker_config_override',
+        'agent_credential_id',
+        'agent_config',
     ];
 
     protected function casts(): array
@@ -82,6 +95,8 @@ class Task extends Model
             'model_implement' => ClaudeModel::class,
             'auto_concept' => 'boolean',
             'max_turns' => 'integer',
+            'worker_config_override' => 'array',
+            'agent_config' => 'array',
         ];
     }
 
@@ -148,6 +163,30 @@ class Task extends Model
     public function phaseRuns(): HasMany
     {
         return $this->hasMany(PhaseRun::class);
+    }
+
+    /**
+     * @return BelongsTo<WorkerStack, $this>
+     */
+    public function workerStackOverride(): BelongsTo
+    {
+        return $this->belongsTo(WorkerStack::class, 'worker_stack_id_override');
+    }
+
+    /**
+     * @return BelongsTo<WorkerAgent, $this>
+     */
+    public function workerAgentOverride(): BelongsTo
+    {
+        return $this->belongsTo(WorkerAgent::class, 'worker_agent_id_override');
+    }
+
+    /**
+     * @return BelongsTo<AgentCredential, $this>
+     */
+    public function agentCredential(): BelongsTo
+    {
+        return $this->belongsTo(AgentCredential::class);
     }
 
     /**
