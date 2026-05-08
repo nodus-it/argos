@@ -12,6 +12,7 @@ use App\Services\GitProvider\GitLabGitService;
 use App\Services\GitProvider\GitProviderRegistry;
 use App\Workers\Agents\AgentRegistry;
 use App\Workers\Agents\ClaudeCodeRunner;
+use App\Workers\Agents\CodexRunner;
 use App\Workers\Builtin\BuiltinSync;
 use Illuminate\Database\Events\MigrationsEnded;
 use Illuminate\Queue\Events\JobFailed;
@@ -63,6 +64,7 @@ class AppServiceProvider extends ServiceProvider
             // Adding a new agent: write the runner class, add a case to
             // App\Enums\AgentName, register here. No DB seeding required.
             $registry->register(ClaudeCodeRunner::class);
+            $registry->register(CodexRunner::class);
 
             return $registry;
         });

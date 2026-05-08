@@ -24,7 +24,6 @@ class PhaseRunner
 
     public function __construct(
         private readonly CredentialStore $credentials,
-        private readonly WorkerImageResolver $imageResolver,
     ) {}
 
     public function getPhaseLogPath(string $taskName, string $phase): string
@@ -596,7 +595,11 @@ class PhaseRunner
     private function resolveWorkerImage(Task $task, RepoProfile $profile): string
     {
         if (config('argos.compose.pipeline') === 'compose') {
-            return $this->imageResolver->resolveOrBuild($task);
+            // Resolved lazily via the container instead of through the
+            // constructor: phpunit's partialMock(PhaseRunner::class, …)
+            // skips the constructor, so any readonly resolver property
+            // would land in an "accessed before initialization" error.
+            return app(WorkerImageResolver::class)->resolveOrBuild($task);
         }
 
         return $task->worker_image

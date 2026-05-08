@@ -20,6 +20,7 @@ use App\Workers\Agents\AgentSpec;
 enum AgentName: string
 {
     case ClaudeCode = 'claude-code';
+    case Codex = 'codex';
 
     public function label(): string
     {

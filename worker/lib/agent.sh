@@ -26,8 +26,11 @@
 agent_run() {
     local agent="${AGENT_NAME:-claude_code}"
     case "$agent" in
-        claude_code)
+        claude_code|claude-code)
             agent_claude_code_run "$@"
+            ;;
+        codex)
+            agent_codex_run "$@"
             ;;
         *)
             echo "agent: unknown AGENT_NAME='$agent' — no runner registered" >&2
@@ -41,7 +44,8 @@ agent_run() {
 agent_check() {
     local agent="${AGENT_NAME:-claude_code}"
     case "$agent" in
-        claude_code) agent_claude_code_check ;;
+        claude_code|claude-code) agent_claude_code_check ;;
+        codex) agent_codex_check ;;
         *)
             echo "agent: unknown AGENT_NAME='$agent'" >&2
             return 30
@@ -56,7 +60,8 @@ agent_check() {
 agent_check_usage_limit() {
     local agent="${AGENT_NAME:-claude_code}"
     case "$agent" in
-        claude_code) agent_claude_code_check_usage_limit "$@" ;;
+        claude_code|claude-code) agent_claude_code_check_usage_limit "$@" ;;
+        codex) agent_codex_check_usage_limit "$@" ;;
         *) return 1 ;;
     esac
 }
@@ -67,7 +72,8 @@ agent_check_usage_limit() {
 agent_check_auth_error() {
     local agent="${AGENT_NAME:-claude_code}"
     case "$agent" in
-        claude_code) agent_claude_code_check_auth_error "$@" ;;
+        claude_code|claude-code) agent_claude_code_check_auth_error "$@" ;;
+        codex) agent_codex_check_auth_error "$@" ;;
         *) return 1 ;;
     esac
 }
