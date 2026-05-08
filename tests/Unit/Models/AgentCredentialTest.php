@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Tests\Unit\Models;
 
 use App\Enums\AgentCredentialStatus;
+use App\Enums\AgentName;
 use App\Models\AgentCredential;
 use App\Models\Task;
-use App\Models\WorkerAgent;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -21,6 +21,7 @@ class AgentCredentialTest extends TestCase
         $credential = AgentCredential::factory()->create();
 
         $this->assertSame(AgentCredentialStatus::Active, $credential->status);
+        $this->assertSame(AgentName::ClaudeCode, $credential->agent_name);
         $this->assertIsArray($credential->credentials);
         $this->assertArrayHasKey('token', $credential->credentials);
     }
@@ -49,12 +50,11 @@ class AgentCredentialTest extends TestCase
         $this->assertStringNotContainsString('oat-supersecret', $raw);
     }
 
-    public function test_agent_relation_loads(): void
+    public function test_agent_name_is_enum_cast(): void
     {
-        $agent = WorkerAgent::factory()->create();
-        $credential = AgentCredential::factory()->create(['worker_agent_id' => $agent->id]);
+        $credential = AgentCredential::factory()->create(['agent_name' => 'claude-code']);
 
-        $this->assertSame($agent->id, $credential->agent->id);
+        $this->assertSame(AgentName::ClaudeCode, $credential->fresh()->agent_name);
     }
 
     public function test_tasks_relation_loads(): void

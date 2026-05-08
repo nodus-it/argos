@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Database\Factories;
 
 use App\Enums\AgentCredentialStatus;
+use App\Enums\AgentName;
 use App\Models\AgentCredential;
-use App\Models\WorkerAgent;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -17,7 +17,7 @@ class AgentCredentialFactory extends Factory
     public function definition(): array
     {
         return [
-            'worker_agent_id' => WorkerAgent::factory(),
+            'agent_name' => AgentName::ClaudeCode,
             'name' => fake()->words(2, true),
             'credentials' => [
                 'token' => 'oat-'.fake()->lexify('????????????'),

@@ -17,21 +17,19 @@ return new class extends Migration
                 ->after('worker_source')
                 ->constrained('worker_stacks')
                 ->nullOnDelete();
-            $table->foreignUlid('worker_agent_id')
+            // worker_agent_name is a slug validated against App\Enums\AgentName.
+            $table->string('worker_agent_name', 64)
                 ->nullable()
-                ->after('worker_stack_id')
-                ->constrained('worker_agents')
-                ->nullOnDelete();
-            $table->json('worker_config')->nullable()->after('worker_agent_id');
+                ->after('worker_stack_id');
+            $table->json('worker_config')->nullable()->after('worker_agent_name');
         });
     }
 
     public function down(): void
     {
         Schema::table('repo_profiles', function (Blueprint $table): void {
-            $table->dropConstrainedForeignId('worker_agent_id');
             $table->dropConstrainedForeignId('worker_stack_id');
-            $table->dropColumn(['worker_source', 'worker_config']);
+            $table->dropColumn(['worker_source', 'worker_agent_name', 'worker_config']);
         });
     }
 };

@@ -10,6 +10,8 @@ use App\Services\GitProvider\BitbucketGitService;
 use App\Services\GitProvider\GitHubGitService;
 use App\Services\GitProvider\GitLabGitService;
 use App\Services\GitProvider\GitProviderRegistry;
+use App\Workers\Agents\AgentRegistry;
+use App\Workers\Agents\ClaudeCodeRunner;
 use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Support\Env;
 use Illuminate\Support\Facades\Artisan;
@@ -49,6 +51,16 @@ class AppServiceProvider extends ServiceProvider
                 'bitbucket',
                 fn (string $token, string $instanceUrl): BitbucketGitService => new BitbucketGitService($token),
             );
+
+            return $registry;
+        });
+
+        $this->app->singleton(AgentRegistry::class, function (): AgentRegistry {
+            $registry = new AgentRegistry;
+
+            // Adding a new agent: write the runner class, add a case to
+            // App\Enums\AgentName, register here. No DB seeding required.
+            $registry->register(ClaudeCodeRunner::class);
 
             return $registry;
         });

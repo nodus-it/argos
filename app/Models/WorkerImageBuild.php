@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\AgentName;
 use App\Enums\WorkerImageBuildStatus;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -14,7 +15,7 @@ use Illuminate\Support\Carbon;
 /**
  * @property string $id
  * @property string $worker_stack_id
- * @property string $worker_agent_id
+ * @property AgentName $agent_name
  * @property string $tag
  * @property WorkerImageBuildStatus $status
  * @property string|null $build_log
@@ -23,7 +24,6 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read WorkerStack $stack
- * @property-read WorkerAgent $agent
  */
 class WorkerImageBuild extends Model
 {
@@ -32,7 +32,7 @@ class WorkerImageBuild extends Model
 
     protected $fillable = [
         'worker_stack_id',
-        'worker_agent_id',
+        'agent_name',
         'tag',
         'status',
         'build_log',
@@ -43,6 +43,7 @@ class WorkerImageBuild extends Model
     protected function casts(): array
     {
         return [
+            'agent_name' => AgentName::class,
             'status' => WorkerImageBuildStatus::class,
             'built_at' => 'datetime',
             'size_bytes' => 'integer',
@@ -55,13 +56,5 @@ class WorkerImageBuild extends Model
     public function stack(): BelongsTo
     {
         return $this->belongsTo(WorkerStack::class, 'worker_stack_id');
-    }
-
-    /**
-     * @return BelongsTo<WorkerAgent, $this>
-     */
-    public function agent(): BelongsTo
-    {
-        return $this->belongsTo(WorkerAgent::class, 'worker_agent_id');
     }
 }

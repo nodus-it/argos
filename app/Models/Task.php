@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\AgentName;
 use App\Enums\ClaudeModel;
 use App\Enums\Phase;
 use App\Enums\PhaseStatus;
@@ -34,7 +35,7 @@ use Illuminate\Support\Carbon;
  * @property ClaudeModel|null $model_concept
  * @property ClaudeModel|null $model_implement
  * @property string|null $worker_stack_id_override
- * @property string|null $worker_agent_id_override
+ * @property AgentName|null $worker_agent_name_override
  * @property array<string, mixed>|null $worker_config_override
  * @property string|null $agent_credential_id
  * @property array<string, mixed>|null $agent_config
@@ -49,7 +50,6 @@ use Illuminate\Support\Carbon;
  * @property-read RepoProfile|null $repoProfile
  * @property-read Collection<int, PhaseRun> $phaseRuns
  * @property-read WorkerStack|null $workerStackOverride
- * @property-read WorkerAgent|null $workerAgentOverride
  * @property-read AgentCredential|null $agentCredential
  */
 class Task extends Model
@@ -79,7 +79,7 @@ class Task extends Model
         'model_concept',
         'model_implement',
         'worker_stack_id_override',
-        'worker_agent_id_override',
+        'worker_agent_name_override',
         'worker_config_override',
         'agent_credential_id',
         'agent_config',
@@ -95,6 +95,7 @@ class Task extends Model
             'model_implement' => ClaudeModel::class,
             'auto_concept' => 'boolean',
             'max_turns' => 'integer',
+            'worker_agent_name_override' => AgentName::class,
             'worker_config_override' => 'array',
             'agent_config' => 'array',
         ];
@@ -171,14 +172,6 @@ class Task extends Model
     public function workerStackOverride(): BelongsTo
     {
         return $this->belongsTo(WorkerStack::class, 'worker_stack_id_override');
-    }
-
-    /**
-     * @return BelongsTo<WorkerAgent, $this>
-     */
-    public function workerAgentOverride(): BelongsTo
-    {
-        return $this->belongsTo(WorkerAgent::class, 'worker_agent_id_override');
     }
 
     /**

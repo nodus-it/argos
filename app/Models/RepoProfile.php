@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\AgentName;
 use App\Enums\AuthMethod;
 use App\Enums\ClaudeModel;
 use App\Enums\GitProvider;
@@ -30,7 +31,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $worker_image
  * @property WorkerSource $worker_source
  * @property string|null $worker_stack_id
- * @property string|null $worker_agent_id
+ * @property AgentName|null $worker_agent_name
  * @property array<string, mixed>|null $worker_config
  * @property ClaudeModel|null $model_concept
  * @property ClaudeModel|null $model_implement
@@ -41,7 +42,6 @@ use Illuminate\Support\Carbon;
  * @property-read Collection<int, Task> $tasks
  * @property-read ConnectedAccount|null $connectedAccount
  * @property-read WorkerStack|null $workerStack
- * @property-read WorkerAgent|null $workerAgent
  */
 class RepoProfile extends Model
 {
@@ -59,7 +59,7 @@ class RepoProfile extends Model
         'worker_image',
         'worker_source',
         'worker_stack_id',
-        'worker_agent_id',
+        'worker_agent_name',
         'worker_config',
         'model_concept',
         'model_implement',
@@ -74,6 +74,7 @@ class RepoProfile extends Model
             'platform' => GitProvider::class,
             'auth_method' => AuthMethod::class,
             'worker_source' => WorkerSource::class,
+            'worker_agent_name' => AgentName::class,
             'worker_config' => 'array',
             'model_concept' => ClaudeModel::class,
             'model_implement' => ClaudeModel::class,
@@ -104,14 +105,6 @@ class RepoProfile extends Model
     public function workerStack(): BelongsTo
     {
         return $this->belongsTo(WorkerStack::class);
-    }
-
-    /**
-     * @return BelongsTo<WorkerAgent, $this>
-     */
-    public function workerAgent(): BelongsTo
-    {
-        return $this->belongsTo(WorkerAgent::class);
     }
 
     /**

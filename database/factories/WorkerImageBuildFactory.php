@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
+use App\Enums\AgentName;
 use App\Enums\WorkerImageBuildStatus;
-use App\Models\WorkerAgent;
 use App\Models\WorkerImageBuild;
 use App\Models\WorkerStack;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -19,7 +19,7 @@ class WorkerImageBuildFactory extends Factory
     {
         return [
             'worker_stack_id' => WorkerStack::factory(),
-            'worker_agent_id' => WorkerAgent::factory(),
+            'agent_name' => AgentName::ClaudeCode,
             'tag' => 'argos-worker:'.fake()->unique()->lexify('?????'),
             'status' => WorkerImageBuildStatus::Queued,
             'build_log' => null,

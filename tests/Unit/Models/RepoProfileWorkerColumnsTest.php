@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Models;
 
+use App\Enums\AgentName;
 use App\Enums\WorkerSource;
 use App\Models\RepoProfile;
-use App\Models\WorkerAgent;
 use App\Models\WorkerStack;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -49,12 +49,18 @@ class RepoProfileWorkerColumnsTest extends TestCase
         $this->assertSame($stack->id, $profile->workerStack->id);
     }
 
-    public function test_worker_agent_relation_loads(): void
+    public function test_worker_agent_name_is_enum_cast(): void
     {
-        $agent = WorkerAgent::factory()->create();
-        $profile = RepoProfile::factory()->create(['worker_agent_id' => $agent->id]);
+        $profile = RepoProfile::factory()->create(['worker_agent_name' => 'claude-code']);
 
-        $this->assertSame($agent->id, $profile->workerAgent->id);
+        $this->assertSame(AgentName::ClaudeCode, $profile->fresh()->worker_agent_name);
+    }
+
+    public function test_worker_agent_name_defaults_to_null(): void
+    {
+        $profile = RepoProfile::factory()->create();
+
+        $this->assertNull($profile->fresh()->worker_agent_name);
     }
 
     public function test_legacy_worker_image_column_remains_writable(): void

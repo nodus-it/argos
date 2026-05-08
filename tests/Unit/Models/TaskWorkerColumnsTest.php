@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Models;
 
+use App\Enums\AgentName;
 use App\Models\AgentCredential;
 use App\Models\Task;
-use App\Models\WorkerAgent;
 use App\Models\WorkerStack;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -23,12 +23,11 @@ class TaskWorkerColumnsTest extends TestCase
         $this->assertSame($stack->id, $task->workerStackOverride->id);
     }
 
-    public function test_worker_agent_override_relation(): void
+    public function test_worker_agent_name_override_is_enum_cast(): void
     {
-        $agent = WorkerAgent::factory()->create();
-        $task = Task::factory()->create(['worker_agent_id_override' => $agent->id]);
+        $task = Task::factory()->create(['worker_agent_name_override' => 'claude-code']);
 
-        $this->assertSame($agent->id, $task->workerAgentOverride->id);
+        $this->assertSame(AgentName::ClaudeCode, $task->fresh()->worker_agent_name_override);
     }
 
     public function test_agent_credential_relation(): void
@@ -68,7 +67,7 @@ class TaskWorkerColumnsTest extends TestCase
         $task = Task::factory()->create();
 
         $this->assertNull($task->fresh()->worker_stack_id_override);
-        $this->assertNull($task->fresh()->worker_agent_id_override);
+        $this->assertNull($task->fresh()->worker_agent_name_override);
         $this->assertNull($task->fresh()->agent_credential_id);
         $this->assertNull($task->fresh()->worker_config_override);
         $this->assertNull($task->fresh()->agent_config);

@@ -15,9 +15,10 @@ return new class extends Migration
             $table->foreignUlid('worker_stack_id')
                 ->constrained('worker_stacks')
                 ->cascadeOnDelete();
-            $table->foreignUlid('worker_agent_id')
-                ->constrained('worker_agents')
-                ->cascadeOnDelete();
+            // agent_name is a stable slug; the runner class lives in code,
+            // so a foreign key would only point at duplicated metadata.
+            // Validation happens at the App\Enums\AgentName cast layer.
+            $table->string('agent_name', 64);
             $table->string('tag');
             $table->string('status', 16)->default('queued');
             $table->longText('build_log')->nullable();
@@ -25,8 +26,9 @@ return new class extends Migration
             $table->unsignedBigInteger('size_bytes')->nullable();
             $table->timestamps();
 
-            $table->unique(['worker_stack_id', 'worker_agent_id', 'tag']);
+            $table->unique(['worker_stack_id', 'agent_name', 'tag']);
             $table->index(['status', 'updated_at']);
+            $table->index('agent_name');
         });
     }
 

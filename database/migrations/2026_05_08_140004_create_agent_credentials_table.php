@@ -12,16 +12,16 @@ return new class extends Migration
     {
         Schema::create('agent_credentials', function (Blueprint $table): void {
             $table->ulid('id')->primary();
-            $table->foreignUlid('worker_agent_id')
-                ->constrained('worker_agents')
-                ->cascadeOnDelete();
+            // agent_name is a stable slug — see worker_image_builds migration.
+            $table->string('agent_name', 64);
             $table->string('name');
             $table->text('credentials');
             $table->string('status', 16)->default('active');
             $table->timestamp('last_validated_at')->nullable();
             $table->timestamps();
 
-            $table->unique(['worker_agent_id', 'name']);
+            $table->unique(['agent_name', 'name']);
+            $table->index('agent_name');
         });
     }
 
