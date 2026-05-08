@@ -59,6 +59,10 @@ _ep_load_libs() {
     # shellcheck disable=SC1091
     source "$LIB_DIR/claude.sh"
     # shellcheck disable=SC1091
+    source "$LIB_DIR/agents/claude_code.sh"
+    # shellcheck disable=SC1091
+    source "$LIB_DIR/agent.sh"
+    # shellcheck disable=SC1091
     source "$LIB_DIR/quality.sh"
     # shellcheck disable=SC1091
     source "$LIB_DIR/pr.sh"

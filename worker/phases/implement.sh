@@ -154,12 +154,10 @@ phase_implement_run() {
 
     local stream_log="/workspace/.agent/logs/implement.${ITERATION}.stream.log"
     local result_json="/workspace/.agent/logs/implement.${ITERATION}.result.json"
-    local sysprompt_content
-    sysprompt_content="$(cat "$sysprompt")"
     local max_turns="${MAX_TURNS:-200}"
 
     # Resume mode: if continue=true AND a previous session_id is provided AND
-    # its session file is still on disk, ask Claude to continue that session
+    # its session file is still on disk, ask the agent to continue that session
     # instead of starting fresh.
     local resume_args=() resume_input="$user_prompt_path"
     if [[ "$continue_run" == "true" && -n "${RESUME_SESSION_ID:-}" ]]; then
@@ -176,21 +174,16 @@ phase_implement_run() {
         fi
     fi
 
-    log_info "implement: calling claude (stream-json, max-turns $max_turns${resume_args[*]:+, resume})"
+    log_info "implement: calling agent (stream-json, max-turns $max_turns${resume_args[*]:+, resume})"
 
     set +e
-    ( unset REPO_TOKEN
-      claude -p \
-        ${CLAUDE_MODEL:+--model "$CLAUDE_MODEL"} \
-        --append-system-prompt "$sysprompt_content" \
-        --output-format stream-json \
-        --verbose \
-        --include-partial-messages \
-        --permission-mode bypassPermissions \
+    agent_run \
+        --system-prompt-file "$sysprompt" \
+        --user-prompt-file "$resume_input" \
         --max-turns "$max_turns" \
+        --include-partial \
         "${resume_args[@]}" \
-        < "$resume_input"
-    ) | log_scrub \
+      | log_scrub \
       | tee "$stream_log" \
       | tee >(jq -rj '
             if .type == "assistant" then
@@ -206,19 +199,19 @@ phase_implement_run() {
           ' >&2 2>/dev/null) \
       | jq -c 'select(.type == "result")' \
       > "$result_json"
-    local claude_exit=${PIPESTATUS[0]}
+    local agent_exit=${PIPESTATUS[0]}
     set -e
 
-    if (( claude_exit != 0 )); then
-        log_warn "implement: claude exited with code $claude_exit"
-        if claude_check_usage_limit "$stream_log"; then
+    if (( agent_exit != 0 )); then
+        log_warn "implement: agent exited with code $agent_exit"
+        if agent_check_usage_limit "$stream_log"; then
             echo "  → usage/rate limit — backing off" >&2
             rm -f /workspace/.agent/implement.notes.md
             return "$EXIT_USAGE_LIMIT"
         fi
     fi
 
-    # Drop the notes file after the Claude call — it was written from the DB
+    # Drop the notes file after the agent call — it was written from the DB
     # by writeImplementNotesToVolume before the run and is no longer needed.
     rm -f /workspace/.agent/implement.notes.md
 
@@ -232,13 +225,13 @@ phase_implement_run() {
     if [[ "$is_error" != "false" ]]; then
         local err_msg
         err_msg="$(jq -r '.result // "(no result field)"' "$result_json" 2>/dev/null)"
-        echo "implement: claude returned is_error=true: $err_msg" >&2
-        if claude_check_usage_limit "" "$err_msg"; then
+        echo "implement: agent returned is_error=true: $err_msg" >&2
+        if agent_check_usage_limit "" "$err_msg"; then
             echo "  → usage/rate limit — backing off" >&2
             return "$EXIT_USAGE_LIMIT"
         fi
-        if echo "$err_msg" | grep -qiE "invalid api key|authentication|oauth|unauthorized|401|token.*expired|invalid_api_key"; then
-            echo "  → Claude-OAuth-Token ungültig oder abgelaufen." >&2
+        if agent_check_auth_error "$err_msg"; then
+            echo "  → Agent-Token ungültig oder abgelaufen." >&2
             echo "    Token erneuern: claude setup-token" >&2
             echo "    Dann: ./agent init --update-token" >&2
         fi
@@ -298,17 +291,12 @@ phase_implement_run() {
         local fix_result_json="/workspace/.agent/logs/implement.${ITERATION}.fix${gate_retry}.result.json"
 
         set +e
-        ( unset REPO_TOKEN
-          claude -p \
-            ${CLAUDE_MODEL:+--model "$CLAUDE_MODEL"} \
-            --append-system-prompt "$sysprompt_content" \
-            --output-format stream-json \
-            --verbose \
-            --include-partial-messages \
-            --permission-mode bypassPermissions \
+        agent_run \
+            --system-prompt-file "$sysprompt" \
+            --user-prompt-file "$fix_prompt_path" \
             --max-turns "${GATE_FIX_MAX_TURNS:-30}" \
-            < "$fix_prompt_path"
-        ) | log_scrub \
+            --include-partial \
+          | log_scrub \
           | tee "$fix_stream_log" \
           | tee >(jq -rj '
                 if .type == "assistant" then
@@ -331,7 +319,7 @@ phase_implement_run() {
 
         if (( fix_exit != 0 )); then
             log_warn "implement: fix session exited with code $fix_exit"
-            if claude_check_usage_limit "$fix_stream_log"; then
+            if agent_check_usage_limit "$fix_stream_log"; then
                 echo "  → usage/rate limit during fix — backing off" >&2
                 return "$EXIT_USAGE_LIMIT"
             fi
