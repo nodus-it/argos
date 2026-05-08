@@ -33,6 +33,7 @@ class TasksRelationManager extends RelationManager
     {
         return $table
             ->defaultSort('created_at', 'desc')
+            ->poll('5s')
             ->columns([
                 TextColumn::make('name')
                     ->label(__('widgets.current_tasks.columns.task'))

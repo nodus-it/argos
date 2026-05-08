@@ -1008,8 +1008,12 @@
         </div>
     </div>
 
-    {{-- Poll every 3s while a phase is running OR pending (job queued, worker not yet picked it up). --}}
-    @if(in_array($currentStatus, ['running', 'pending'], true))
+    {{-- Poll every 3s while running/pending, or if content is missing after 'completed' (race-condition safety net). --}}
+    @php
+        $needsContentPoll = ($cStatus === 'completed' && $conceptHtml === null)
+            || ($iStatus === 'completed' && $implementSummaryNontechnicalHtml === null && $implementSummaryTechnicalHtml === null);
+    @endphp
+    @if(in_array($currentStatus, ['running', 'pending'], true) || $needsContentPoll)
         <div wire:poll.3s="poll" class="hidden"></div>
     @endif
 

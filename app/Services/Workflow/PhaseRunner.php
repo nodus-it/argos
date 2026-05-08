@@ -307,13 +307,18 @@ class PhaseRunner
 
         $phaseRun->update($this->phaseRunUpdate($status, $exitCode, $stdout));
 
-        $task->update([
-            'current_phase' => $phase,
-            'current_status' => $status,
-        ]);
-
+        // postPhaseSync writes content (concept_md, implement_summary, …) to the DB.
+        // It must run BEFORE the status update so the UI poll cannot stop on 'completed'
+        // before the content is available.
         $task->refresh();
         $this->postPhaseSync($task, $phaseRun, $phase, $notesBeforeRun);
+
+        // postPhaseSync may have promoted the phase run (e.g. Failed → Paused for max-turns);
+        // use the current phaseRun status as the authoritative final value.
+        $task->update([
+            'current_phase' => $phase,
+            'current_status' => $phaseRun->status,
+        ]);
 
         return $exitCode;
     }
@@ -385,16 +390,21 @@ class PhaseRunner
             $this->storeUsageLimit($resetAt);
         }
 
-        $task->update([
-            'current_phase' => $phase,
-            'current_status' => $status,
-        ]);
-
+        // postPhaseSync writes content (concept_md, implement_summary, …) to the DB.
+        // It must run BEFORE the status update so the UI poll cannot stop on 'completed'
+        // before the content is available.
         $task->refresh();
         $this->postPhaseSync($task, $phaseRun, $phase, $notesBeforeRun);
 
+        // postPhaseSync may have promoted the phase run (e.g. Failed → Paused for max-turns);
+        // use the current phaseRun status as the authoritative final value.
+        $task->update([
+            'current_phase' => $phase,
+            'current_status' => $phaseRun->status,
+        ]);
+
         // After a successful implement run with existing PR: auto-trigger push
-        if ($phase === 'implement' && $status === PhaseStatus::Completed && $task->fresh()->pr_url !== null) {
+        if ($phase === 'implement' && $phaseRun->status === PhaseStatus::Completed && $task->fresh()->pr_url !== null) {
             Log::channel('argos')->info('Auto-triggering push after implement', $this->safeContext($task, 'push'));
             RunPhaseJob::dispatch($task->id, 'push');
         }
