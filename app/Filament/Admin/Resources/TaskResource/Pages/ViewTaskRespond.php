@@ -5,9 +5,8 @@ declare(strict_types=1);
 namespace App\Filament\Admin\Resources\TaskResource\Pages;
 
 use App\Filament\Admin\Resources\TaskResource;
-use App\Jobs\RunPhaseJob;
 use App\Models\Task;
-use App\Services\Workflow\PhaseRunner;
+use App\Services\Task\TaskService;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Page;
@@ -61,14 +60,20 @@ class ViewTaskRespond extends Page
             return;
         }
 
-        if ($this->task->phaseRuns()->where('status', 'running')->exists()) {
-            Notification::make()->title(__('tasks.view.actions.phase_already_running'))->warning()->send();
+        try {
+            app(TaskService::class)->submitFeedback($this->task, $feedback);
+        } catch (\RuntimeException $e) {
+            if (str_contains($e->getMessage(), 'already running')) {
+                Notification::make()->title(__('tasks.view.actions.phase_already_running'))->warning()->send();
+            } else {
+                Notification::make()
+                    ->title(__('tasks.view.actions.feedback_write_error'))
+                    ->body($e->getMessage())
+                    ->danger()
+                    ->send();
+            }
 
             return;
-        }
-
-        try {
-            app(PhaseRunner::class)->writeFeedbackToVolume($this->task, $feedback);
         } catch (\Throwable $e) {
             Notification::make()
                 ->title(__('tasks.view.actions.feedback_write_error'))
@@ -78,8 +83,6 @@ class ViewTaskRespond extends Page
 
             return;
         }
-
-        RunPhaseJob::dispatch($this->task->id, 'respond');
 
         Notification::make()->title(__('tasks.view.actions.respond_started'))->success()->send();
 

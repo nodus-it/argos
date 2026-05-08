@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\TaskResource\Pages;
 
+use App\Enums\Phase;
 use App\Enums\PhaseStatus;
-use App\Enums\WorkflowStatus;
 use App\Filament\Admin\Resources\TaskResource;
-use App\Jobs\RunPhaseJob;
 use App\Models\PhaseRun;
 use App\Models\Task;
+use App\Services\Task\TaskService;
 use App\Services\Workflow\StateReader;
 use Filament\Actions\Action;
 use Filament\Forms\Components\TextInput;
@@ -67,7 +67,7 @@ class ViewTask extends ViewRecord
     {
         /** @var Task $task */
         $task = $this->getRecord();
-        $task->update(['concept_notes' => $this->notes ?: null]);
+        app(TaskService::class)->saveConceptNotes($task, $this->notes);
 
         $this->editingNotes = false;
         Notification::make()->title(__('tasks.view.actions.feedback_saved'))->success()->send();
@@ -77,9 +77,18 @@ class ViewTask extends ViewRecord
     {
         /** @var Task $task */
         $task = $this->getRecord();
-        $task->update(['concept_notes' => $this->notes ?: null]);
+
+        try {
+            app(TaskService::class)->saveConceptNotesAndRevise($task, $this->notes);
+        } catch (\RuntimeException) {
+            Notification::make()->title(__('tasks.view.actions.phase_already_running'))->warning()->send();
+
+            return;
+        }
+
         $this->editingNotes = false;
-        $this->reviseConcept();
+        Notification::make()->title(__('tasks.view.actions.concept_started'))->success()->send();
+        $this->redirect(TaskResource::getUrl('view', ['record' => $task]));
     }
 
     public function cancelEditingNotes(): void
@@ -99,7 +108,7 @@ class ViewTask extends ViewRecord
     {
         /** @var Task $task */
         $task = $this->getRecord();
-        $task->update(['implement_notes' => $this->implementNotes ?: null]);
+        app(TaskService::class)->saveImplementNotes($task, $this->implementNotes);
 
         $this->editingImplementNotes = false;
         Notification::make()->title(__('tasks.view.actions.feedback_saved'))->success()->send();
@@ -109,26 +118,16 @@ class ViewTask extends ViewRecord
     {
         /** @var Task $task */
         $task = $this->getRecord();
-        $task->update(['implement_notes' => $this->implementNotes ?: null]);
-        $this->editingImplementNotes = false;
-        $this->reviseImplement();
-    }
 
-    public function reviseImplement(): void
-    {
-        /** @var Task $task */
-        $task = $this->getRecord();
-        if ($task->phaseRuns()->where('status', 'running')->exists()) {
+        try {
+            app(TaskService::class)->saveImplementNotesAndRevise($task, $this->implementNotes);
+        } catch (\RuntimeException) {
             Notification::make()->title(__('tasks.view.actions.phase_already_running'))->warning()->send();
 
             return;
         }
-        $task->update([
-            'workflow_status' => WorkflowStatus::ImplementRunning,
-            'current_phase' => 'implement',
-            'current_status' => 'running',
-        ]);
-        RunPhaseJob::dispatch($task->id, 'implement');
+
+        $this->editingImplementNotes = false;
         Notification::make()->title(__('tasks.view.actions.implement_started'))->success()->send();
         $this->redirect(TaskResource::getUrl('view', ['record' => $task]));
     }
@@ -269,17 +268,17 @@ class ViewTask extends ViewRecord
                 ->label(fn (): string => $this->task()->phaseRuns()->where('phase', 'concept')->where('status', 'completed')->exists()
                     ? __('tasks.view.actions.concept_update')
                     : __('tasks.view.actions.concept_create'))
-                ->visible(fn (): bool => $this->task()->workflow_status !== WorkflowStatus::Completed),
+                ->visible(fn (): bool => $this->task()->workflow_status->value !== 'completed'),
 
             $this->makePhaseAction('implement', __('tasks.view.actions.implement'), 'heroicon-o-code-bracket')
-                ->visible(fn (): bool => $this->task()->workflow_status !== WorkflowStatus::Completed
+                ->visible(fn (): bool => $this->task()->workflow_status->value !== 'completed'
                     && $this->task()->phaseRuns()->where('phase', 'concept')->where('status', 'completed')->exists()),
 
             $this->makeContinueImplementAction()
                 ->visible(fn (): bool => $this->lastImplementRun()?->status === PhaseStatus::Paused),
 
             $this->makePhaseAction('push', __('tasks.view.actions.push_pr'), 'heroicon-o-arrow-up-tray')
-                ->visible(fn (): bool => $this->task()->workflow_status !== WorkflowStatus::Completed
+                ->visible(fn (): bool => $this->task()->workflow_status->value !== 'completed'
                     && $this->task()->phaseRuns()->where('phase', 'implement')->where('status', 'completed')->exists()),
 
             Action::make('forceUnlockImplement')
@@ -292,17 +291,13 @@ class ViewTask extends ViewRecord
                 ->modalSubmitActionLabel(__('tasks.view.actions.force_unlock_submit'))
                 ->action(function (): void {
                     $task = $this->task();
-                    if ($task->phaseRuns()->where('status', 'running')->exists()) {
+                    try {
+                        app(TaskService::class)->forceUnlockImplement($task);
+                    } catch (\RuntimeException) {
                         Notification::make()->title(__('tasks.view.actions.phase_already_running'))->warning()->send();
 
                         return;
                     }
-                    $task->update([
-                        'workflow_status' => WorkflowStatus::ImplementRunning,
-                        'current_phase' => 'implement',
-                        'current_status' => 'running',
-                    ]);
-                    RunPhaseJob::dispatch($task->id, 'implement', ['force_unlock' => true]);
                     Notification::make()->title(__('tasks.view.actions.lock_released'))->success()->send();
                     $this->redirect(TaskResource::getUrl('view', ['record' => $task]));
                 })
@@ -322,12 +317,11 @@ class ViewTask extends ViewRecord
                 ->modalDescription(__('tasks.view.actions.mark_completed_description'))
                 ->action(function (): void {
                     $task = $this->task();
-                    $task->update(['workflow_status' => WorkflowStatus::Completed]);
-                    Process::run(['docker', 'volume', 'rm', $task->volumeName()]);
+                    app(TaskService::class)->markCompleted($task);
                     Notification::make()->title(__('tasks.view.actions.task_completed'))->success()->send();
                     $this->redirect(TaskResource::getUrl('view', ['record' => $task]));
                 })
-                ->visible(fn (): bool => $this->task()->workflow_status !== WorkflowStatus::Completed),
+                ->visible(fn (): bool => $this->task()->workflow_status->value !== 'completed'),
         ];
     }
 
@@ -341,13 +335,15 @@ class ViewTask extends ViewRecord
     {
         /** @var Task $task */
         $task = $this->getRecord();
-        if ($task->phaseRuns()->where('status', 'running')->exists()) {
+
+        try {
+            app(TaskService::class)->startPhase($task, Phase::Concept);
+        } catch (\RuntimeException) {
             Notification::make()->title(__('tasks.view.actions.phase_already_running'))->warning()->send();
 
             return;
         }
-        $task->update(['current_phase' => 'concept', 'current_status' => 'running']);
-        RunPhaseJob::dispatch($task->id, 'concept');
+
         Notification::make()->title(__('tasks.view.actions.concept_started'))->success()->send();
         $this->redirect(TaskResource::getUrl('view', ['record' => $task]));
     }
@@ -360,17 +356,13 @@ class ViewTask extends ViewRecord
             ->disabled(fn (): bool => $this->task()->current_status === PhaseStatus::Running)
             ->action(function () use ($phase): void {
                 $task = $this->task();
-                if ($task->phaseRuns()->where('status', 'running')->exists()) {
+                try {
+                    app(TaskService::class)->startPhase($task, Phase::from($phase));
+                } catch (\RuntimeException) {
                     Notification::make()->title(__('tasks.view.actions.phase_already_running'))->warning()->send();
 
                     return;
                 }
-                $updates = ['current_phase' => $phase, 'current_status' => 'running'];
-                if ($phase === 'implement') {
-                    $updates['workflow_status'] = WorkflowStatus::ImplementRunning;
-                }
-                $task->update($updates);
-                RunPhaseJob::dispatch($task->id, $phase);
                 $notificationTitle = match ($phase) {
                     'concept' => __('tasks.view.actions.concept_started'),
                     'implement' => __('tasks.view.actions.implement_started'),
@@ -414,22 +406,14 @@ class ViewTask extends ViewRecord
             ])
             ->action(function (array $data): void {
                 $task = $this->task();
-                if ($task->phaseRuns()->where('status', 'running')->exists()) {
+                $maxTurns = (int) $data['max_turns'];
+                try {
+                    app(TaskService::class)->continueImplement($task, $maxTurns);
+                } catch (\RuntimeException) {
                     Notification::make()->title(__('tasks.view.actions.phase_already_running'))->warning()->send();
 
                     return;
                 }
-
-                $maxTurns = (int) $data['max_turns'];
-                $task->update([
-                    'workflow_status' => WorkflowStatus::ImplementRunning,
-                    'current_phase' => 'implement',
-                    'current_status' => 'running',
-                ]);
-                RunPhaseJob::dispatch($task->id, 'implement', [
-                    'continue' => true,
-                    'max_turns' => $maxTurns,
-                ]);
                 Notification::make()
                     ->title(__('tasks.view.actions.implement_continued'))
                     ->body(__('tasks.view.actions.implement_continued_body', ['max_turns' => $maxTurns]))
