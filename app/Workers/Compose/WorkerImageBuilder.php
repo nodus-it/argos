@@ -109,6 +109,13 @@ class WorkerImageBuilder
         }
     }
 
+    /**
+     * AgentSpec::installScript carries a path relative to the manifest
+     * directory (.tools/docker/worker/), but `docker build` here uses
+     * the repo root as context — so we prefix the worker subtree.
+     */
+    private const WORKER_REPO_PREFIX = '.tools/docker/worker/';
+
     private function buildWorkerImage(ResolvedWorkerImage $resolved): string
     {
         $composeFile = base_path('.tools/docker/worker/Dockerfile.compose');
@@ -116,12 +123,17 @@ class WorkerImageBuilder
             throw new RuntimeException("Compose dockerfile not found: {$composeFile}");
         }
 
+        $installScriptForBuild = self::WORKER_REPO_PREFIX.$resolved->agent->installScript;
+        if (! is_file(base_path($installScriptForBuild))) {
+            throw new RuntimeException("Agent install script not found in build context: {$installScriptForBuild}");
+        }
+
         $process = $this->newProcess([
             'docker', 'build',
             '-t', $resolved->workerTag,
             '-f', $composeFile,
             '--build-arg', 'STACK_IMAGE='.$resolved->stackTag,
-            '--build-arg', 'AGENT_INSTALL_SCRIPT='.$resolved->agent->installScript,
+            '--build-arg', 'AGENT_INSTALL_SCRIPT='.$installScriptForBuild,
             '--build-arg', 'AGENT_VERSION='.$resolved->agent->pinnedVersion,
             base_path(),
         ]);
