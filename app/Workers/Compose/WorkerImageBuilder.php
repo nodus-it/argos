@@ -1,0 +1,169 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Workers\Compose;
+
+use App\Enums\WorkerImageBuildStatus;
+use App\Models\WorkerImageBuild;
+use RuntimeException;
+use Symfony\Component\Process\Process;
+use Throwable;
+
+/**
+ * Performs the actual `docker build` calls behind the compose pipeline.
+ *
+ * Two stages, in order:
+ *   1. Stack image — written from WorkerStack.dockerfile_body to a temp
+ *      file, built with repo root as context.
+ *   2. Worker image — built from .tools/docker/worker/Dockerfile.compose
+ *      with STACK_IMAGE / AGENT_INSTALL_SCRIPT / AGENT_VERSION as args.
+ *
+ * Stack images are cached by content hash, so repeated builds with
+ * unchanged dockerfile_body skip stage 1.
+ */
+class WorkerImageBuilder
+{
+    /**
+     * Default per-build timeout (seconds). 10 minutes covers a cold
+     * `apt-get install + composer install + npm install -g` run.
+     */
+    public int $buildTimeoutSeconds = 600;
+
+    /**
+     * Build the worker image for the given resolved (stack, agent) pair.
+     * Persists progress to worker_image_builds; returns the row.
+     */
+    public function build(ResolvedWorkerImage $resolved): WorkerImageBuild
+    {
+        $record = WorkerImageBuild::query()->updateOrCreate(
+            [
+                'worker_stack_id' => $resolved->stack->id,
+                'agent_name' => $resolved->agent->name,
+                'tag' => $resolved->workerTag,
+            ],
+            [
+                'status' => WorkerImageBuildStatus::Building,
+                'build_log' => null,
+                'built_at' => null,
+                'size_bytes' => null,
+            ],
+        );
+
+        $log = '';
+        try {
+            $log .= $this->ensureStackImage($resolved);
+            $log .= $this->buildWorkerImage($resolved);
+
+            $record->forceFill([
+                'status' => WorkerImageBuildStatus::Ready,
+                'build_log' => $log,
+                'built_at' => now(),
+                'size_bytes' => $this->imageSize($resolved->workerTag),
+            ])->save();
+        } catch (Throwable $e) {
+            $record->forceFill([
+                'status' => WorkerImageBuildStatus::Failed,
+                'build_log' => $log."\n\n".$e->getMessage(),
+            ])->save();
+
+            throw $e;
+        }
+
+        return $record->refresh();
+    }
+
+    public function workerImageExists(string $tag): bool
+    {
+        return $this->imageExists($tag);
+    }
+
+    private function ensureStackImage(ResolvedWorkerImage $resolved): string
+    {
+        if ($this->imageExists($resolved->stackTag)) {
+            return "stack {$resolved->stackTag} already present, skipping build\n";
+        }
+
+        $tmp = tempnam(sys_get_temp_dir(), 'argos-stack-').'.dockerfile';
+        file_put_contents($tmp, $resolved->stack->dockerfile_body);
+
+        try {
+            $process = $this->newProcess([
+                'docker', 'build',
+                '-t', $resolved->stackTag,
+                '-f', $tmp,
+                base_path(),
+            ]);
+            $process->setTimeout($this->buildTimeoutSeconds);
+            $process->run();
+
+            if (! $process->isSuccessful()) {
+                throw new RuntimeException(
+                    "Stack image build failed (exit {$process->getExitCode()}):\n".$process->getErrorOutput()
+                );
+            }
+
+            return "[stack build]\n".$process->getOutput()."\n";
+        } finally {
+            @unlink($tmp);
+        }
+    }
+
+    private function buildWorkerImage(ResolvedWorkerImage $resolved): string
+    {
+        $composeFile = base_path('.tools/docker/worker/Dockerfile.compose');
+        if (! is_file($composeFile)) {
+            throw new RuntimeException("Compose dockerfile not found: {$composeFile}");
+        }
+
+        $process = $this->newProcess([
+            'docker', 'build',
+            '-t', $resolved->workerTag,
+            '-f', $composeFile,
+            '--build-arg', 'STACK_IMAGE='.$resolved->stackTag,
+            '--build-arg', 'AGENT_INSTALL_SCRIPT='.$resolved->agent->installScript,
+            '--build-arg', 'AGENT_VERSION='.$resolved->agent->pinnedVersion,
+            base_path(),
+        ]);
+        $process->setTimeout($this->buildTimeoutSeconds);
+        $process->run();
+
+        if (! $process->isSuccessful()) {
+            throw new RuntimeException(
+                "Worker image build failed (exit {$process->getExitCode()}):\n".$process->getErrorOutput()
+            );
+        }
+
+        return "[worker build]\n".$process->getOutput()."\n";
+    }
+
+    private function imageExists(string $tag): bool
+    {
+        $process = $this->newProcess(['docker', 'image', 'inspect', $tag, '--format={{.Id}}']);
+        $process->setTimeout(15);
+        $process->run();
+
+        return $process->isSuccessful();
+    }
+
+    private function imageSize(string $tag): ?int
+    {
+        $process = $this->newProcess(['docker', 'image', 'inspect', $tag, '--format={{.Size}}']);
+        $process->setTimeout(15);
+        $process->run();
+
+        if (! $process->isSuccessful()) {
+            return null;
+        }
+
+        return (int) trim($process->getOutput());
+    }
+
+    /**
+     * @param  list<string>  $cmd
+     */
+    protected function newProcess(array $cmd): Process
+    {
+        return new Process($cmd);
+    }
+}

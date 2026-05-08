@@ -12,6 +12,7 @@ use App\Models\PhaseRun;
 use App\Models\RepoProfile;
 use App\Models\Task;
 use App\Services\Anthropic\CredentialStore;
+use App\Workers\Compose\WorkerImageResolver;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -23,6 +24,7 @@ class PhaseRunner
 
     public function __construct(
         private readonly CredentialStore $credentials,
+        private readonly WorkerImageResolver $imageResolver,
     ) {}
 
     public function getPhaseLogPath(string $taskName, string $phase): string
@@ -524,9 +526,7 @@ class PhaseRunner
             );
         }
 
-        $workerImage = $task->worker_image
-            ?: $profile->worker_image
-            ?: config('argos.worker_image', 'ghcr.io/nodus-it/argos-worker:php8.4');
+        $workerImage = $this->resolveWorkerImage($task, $profile);
         $phaseFlags = $flags !== [] ? json_encode($flags) : '{}';
 
         $maxTurns = $this->resolveMaxTurns($task, $flags);
@@ -583,6 +583,25 @@ class PhaseRunner
     private function resolveRepoToken(RepoProfile $profile): string
     {
         return $profile->resolveToken();
+    }
+
+    /**
+     * Picks the worker image for this task. Two paths:
+     *   - 'legacy' (default): the pre-wave-1 string-based resolution
+     *     (task.worker_image → profile.worker_image → config default)
+     *   - 'compose': route through WorkerImageResolver, which reads
+     *     stack/agent from the DB and builds the image on demand from
+     *     .tools/docker/worker/. Switched via ARGOS_WORKER_PIPELINE.
+     */
+    private function resolveWorkerImage(Task $task, RepoProfile $profile): string
+    {
+        if (config('argos.compose.pipeline') === 'compose') {
+            return $this->imageResolver->resolveOrBuild($task);
+        }
+
+        return $task->worker_image
+            ?: $profile->worker_image
+            ?: config('argos.worker_image', 'ghcr.io/nodus-it/argos-worker:php8.4');
     }
 
     /**

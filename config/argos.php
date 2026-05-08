@@ -58,6 +58,18 @@ return [
         'memory_limit' => env('ARGOS_MEM_LIMIT', '4g'),
         'cpu_limit' => env('ARGOS_CPU_LIMIT', '2'),
     ],
+    /*
+     * Worker image pipeline. 'legacy' keeps the pre-wave-1 behaviour
+     * (worker_image string from task/profile/config). 'compose' routes
+     * through the WorkerImageResolver, reading stack/agent from the DB
+     * and building the image on demand from .tools/docker/worker/.
+     * Default stays on 'legacy' until step 4 has been smoke-tested in
+     * a real run; flip via ARGOS_WORKER_PIPELINE=compose.
+     */
+    'compose' => [
+        'pipeline' => env('ARGOS_WORKER_PIPELINE', 'legacy'),
+        'default_stack' => env('ARGOS_DEFAULT_STACK', 'php-8.4'),
+    ],
     'implement' => [
         'max_turns_default' => (int) env('ARGOS_MAX_TURNS_DEFAULT', 200),
     ],
