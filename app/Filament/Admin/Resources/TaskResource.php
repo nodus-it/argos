@@ -5,9 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Admin\Resources;
 
 use App\Enums\ClaudeModel;
-use App\Enums\Phase;
-use App\Enums\PhaseStatus;
-use App\Enums\WorkflowStatus;
+use App\Filament\Admin\Concerns\TaskTableConcern;
 use App\Filament\Admin\Resources\TaskResource\Pages\CreateTask;
 use App\Filament\Admin\Resources\TaskResource\Pages\ListTasks;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTask;
@@ -16,7 +14,6 @@ use App\Filament\Admin\Resources\TaskResource\Pages\ViewTaskDiff;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTaskLogs;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTaskRespond;
 use App\Filament\Admin\Resources\TaskResource\RelationManagers\PhaseRunsRelationManager;
-use App\Models\PhaseRun;
 use App\Models\RepoProfile;
 use App\Models\Task;
 use App\Services\GitProvider\GitServiceFactory;
@@ -31,13 +28,13 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
-use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\Rule;
 
 class TaskResource extends Resource
 {
+    use TaskTableConcern;
+
     protected static ?string $model = Task::class;
 
     public static function getNavigationIcon(): string
@@ -151,60 +148,10 @@ class TaskResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->defaultSort('created_at', 'desc')
+            ->defaultSort('updated_at', 'desc')
             ->poll('5s')
-            ->columns([
-                TextColumn::make('name')
-                    ->searchable()
-                    ->sortable(),
-
-                TextColumn::make('repoProfile.name')
-                    ->label(__('tasks.columns.project'))
-                    ->sortable(),
-
-                TextColumn::make('current_phase')
-                    ->label(__('tasks.columns.phase'))
-                    ->badge()
-                    ->icon(fn (?Phase $state): ?string => $state?->icon())
-                    ->color(fn (?Phase $state): string => $state?->color() ?? 'gray')
-                    ->formatStateUsing(fn (?Phase $state): string => $state?->label() ?? '—'),
-
-                TextColumn::make('current_status')
-                    ->label(__('tasks.columns.status'))
-                    ->badge()
-                    ->color(fn (?PhaseStatus $state): string => $state?->color() ?? 'gray')
-                    ->formatStateUsing(fn (?PhaseStatus $state): string => $state?->label() ?? '—')
-                    ->placeholder('—'),
-
-                TextColumn::make('workflow_status')
-                    ->label(__('tasks.columns.workflow'))
-                    ->badge()
-                    ->color(fn (?WorkflowStatus $state): string => $state?->color() ?? 'gray')
-                    ->formatStateUsing(fn (?WorkflowStatus $state): string => $state?->label() ?? '—'),
-
-                TextColumn::make('cost_total')
-                    ->label(__('tasks.columns.cost'))
-                    ->sortable()
-                    ->formatStateUsing(fn ($state): string => $state !== null && (float) $state > 0
-                        ? '$'.number_format((float) $state, 4)
-                        : '—'
-                    ),
-
-                TextColumn::make('tokens_total')
-                    ->label(__('tasks.columns.tokens'))
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true)
-                    ->formatStateUsing(fn ($state): string => $state !== null && (int) $state > 0
-                        ? number_format((int) $state)
-                        : '—'
-                    ),
-
-                TextColumn::make('created_at')
-                    ->label(__('tasks.columns.created'))
-                    ->since()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-            ])
+            ->columns(static::taskTableColumns())
+            ->filters(static::taskTableFilters())
             ->recordUrl(fn (Task $record): string => static::getUrl('view', ['record' => $record]))
             ->bulkActions([
                 BulkActionGroup::make([
@@ -218,17 +165,6 @@ class TaskResource extends Resource
         return [
             PhaseRunsRelationManager::class,
         ];
-    }
-
-    public static function getEloquentQuery(): Builder
-    {
-        return parent::getEloquentQuery()
-            ->withSum('phaseRuns as cost_total', 'cost_usd')
-            ->addSelect([
-                'tokens_total' => PhaseRun::query()
-                    ->selectRaw('COALESCE(SUM(input_tokens), 0) + COALESCE(SUM(output_tokens), 0)')
-                    ->whereColumn('phase_runs.task_id', 'tasks.id'),
-            ]);
     }
 
     public static function getPages(): array

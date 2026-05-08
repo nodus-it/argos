@@ -33,6 +33,13 @@ return [
         'cost' => 'Cost',
         'tokens' => 'Tokens',
         'created' => 'Created',
+        'last_activity' => 'Last Activity',
+    ],
+
+    'tabs' => [
+        'current' => 'Current',
+        'completed' => 'Completed',
+        'all' => 'All',
     ],
 
     'view' => [
