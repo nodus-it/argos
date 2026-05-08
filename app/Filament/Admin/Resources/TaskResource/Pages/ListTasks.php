@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\TaskResource\Pages;
 
+use App\Filament\Admin\Concerns\TaskTableConcern;
 use App\Filament\Admin\Resources\TaskResource;
 use App\Models\Task;
 use App\Services\Workflow\StateReader;
@@ -19,6 +20,11 @@ class ListTasks extends ListRecords
         return [
             CreateAction::make(),
         ];
+    }
+
+    public function getTabs(): array
+    {
+        return TaskTableConcern::taskTableTabs();
     }
 
     public function mount(): void

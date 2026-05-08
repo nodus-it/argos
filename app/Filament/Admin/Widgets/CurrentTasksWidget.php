@@ -4,17 +4,18 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Widgets;
 
-use App\Enums\Phase;
 use App\Enums\WorkflowStatus;
+use App\Filament\Admin\Concerns\TaskTableConcern;
 use App\Filament\Admin\Resources\TaskResource;
 use App\Models\Task;
-use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget as BaseWidget;
 use Illuminate\Contracts\Support\Htmlable;
 
 class CurrentTasksWidget extends BaseWidget
 {
+    use TaskTableConcern;
+
     protected int|string|array $columnSpan = 'full';
 
     protected static ?int $sort = 2;
@@ -38,34 +39,8 @@ class CurrentTasksWidget extends BaseWidget
             )
             ->recordUrl(fn (Task $record): string => TaskResource::getUrl('view', ['record' => $record]))
             ->paginated(false)
-            ->columns([
-                TextColumn::make('name')
-                    ->label(__('widgets.current_tasks.columns.task'))
-                    ->weight('medium')
-                    ->searchable(),
-
-                TextColumn::make('repoProfile.name')
-                    ->label(__('widgets.current_tasks.columns.project'))
-                    ->color('gray'),
-
-                TextColumn::make('current_phase')
-                    ->label(__('widgets.current_tasks.columns.phase'))
-                    ->badge()
-                    ->icon(fn (?Phase $state): ?string => $state?->icon())
-                    ->color(fn (?Phase $state): string => $state?->color() ?? 'gray')
-                    ->formatStateUsing(fn (?Phase $state): string => $state?->label() ?? '—'),
-
-                TextColumn::make('workflow_status')
-                    ->label(__('widgets.current_tasks.columns.workflow'))
-                    ->badge()
-                    ->color(fn (?WorkflowStatus $state): string => $state?->color() ?? 'gray')
-                    ->formatStateUsing(fn (?WorkflowStatus $state): string => $state?->label() ?? '—'),
-
-                TextColumn::make('updated_at')
-                    ->label(__('widgets.current_tasks.columns.last_updated'))
-                    ->since()
-                    ->color('gray'),
-            ])
+            ->columns(static::taskTableColumns())
+            ->filters(static::taskTableFilters())
             ->emptyStateHeading(__('widgets.current_tasks.empty_heading'))
             ->emptyStateDescription(__('widgets.current_tasks.empty_description'))
             ->emptyStateIcon('heroicon-o-queue-list');
