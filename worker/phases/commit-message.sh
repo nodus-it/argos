@@ -21,8 +21,8 @@ phase_commit_message_preconditions() {
         echo "commit-message: /workspace nicht initialisiert." >&2
         return 2
     fi
-    if [[ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]]; then
-        echo "commit-message: CLAUDE_CODE_OAUTH_TOKEN fehlt." >&2
+    if ! agent_auth_present; then
+        echo "commit-message: keine Authentifizierung für Agent '${AGENT_NAME:-claude_code}' verfügbar." >&2
         return 3
     fi
     return 0

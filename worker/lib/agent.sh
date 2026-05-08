@@ -66,6 +66,27 @@ agent_check_usage_limit() {
     esac
 }
 
+# agent_auth_present: Pre-check used by phase preconditions. Verifies
+# that the active agent has *some* form of credential available — the
+# concrete shape depends on the agent (env-var for claude, file or
+# env-var for codex). Replaces the pre-multi-agent hard-coded
+# CLAUDE_CODE_OAUTH_TOKEN check.
+# Returns: 0 if auth is in place, non-zero otherwise.
+agent_auth_present() {
+    local agent="${AGENT_NAME:-claude_code}"
+    case "$agent" in
+        claude_code|claude-code)
+            [[ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" || -n "${AGENT_TOKEN:-}" ]]
+            ;;
+        codex)
+            [[ -f "${HOME:-/home/agent}/.codex/auth.json" || -n "${OPENAI_API_KEY:-}" || -n "${AGENT_TOKEN:-}" ]]
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
 # agent_check_auth_error: Decide whether an error message indicates an auth issue.
 # Args: $1=err_message
 # Returns: 0 if auth error, 1 otherwise.

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Workflow;
 
+use App\Enums\AgentName;
 use App\Enums\ClaudeModel;
 use App\Enums\PhaseStatus;
 use App\Enums\WorkflowStatus;
@@ -12,6 +13,7 @@ use App\Models\PhaseRun;
 use App\Models\RepoProfile;
 use App\Models\Task;
 use App\Services\Anthropic\CredentialStore;
+use App\Workers\Agents\MaterializedAgentCredential;
 use App\Workers\Compose\WorkerImageResolver;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -514,16 +516,8 @@ class PhaseRunner
             );
         }
 
-        // Token: env var takes precedence (containerised manager), file-based fallback for local dev.
-        // Use ?: instead of ?? so an empty string from the env also falls through to the file.
-        $claudeToken = config('argos.claude_token') ?: $this->credentials->getClaudeToken();
-
-        if ($claudeToken === null || $claudeToken === '') {
-            Log::channel('argos')->error('Phase cannot start: no Claude token configured', ['task' => $task->name, 'phase' => $phase]);
-            throw new \RuntimeException(
-                'Kein Claude OAuth Token konfiguriert. Bitte CLAUDE_CODE_OAUTH_TOKEN setzen.'
-            );
-        }
+        $agentName = $this->resolveAgentName($task);
+        $materializedCredential = $this->materializeCredential($task, $agentName);
 
         $workerImage = $this->resolveWorkerImage($task, $profile);
         $phaseFlags = $flags !== [] ? json_encode($flags) : '{}';
@@ -545,7 +539,7 @@ class PhaseRunner
             '-e', "REPO_TOKEN={$this->resolveRepoToken($profile)}",
             '-e', "REPO_PLATFORM={$profile->platform->value}",
             '-e', 'BASE_BRANCH='.($task->base_branch ?: $profile->default_branch),
-            '-e', "CLAUDE_CODE_OAUTH_TOKEN={$claudeToken}",
+            '-e', "AGENT_NAME={$agentName->value}",
             '-e', "TASK_DESCRIPTION={$task->description}",
             '-e', "PHASE_FLAGS={$phaseFlags}",
             '-e', "MAX_TURNS={$maxTurns}",
@@ -553,6 +547,11 @@ class PhaseRunner
             '-e', 'LOG_LEVEL=info',
             '-e', "CLAUDE_MODEL={$claudeModel}",
         ];
+
+        foreach ($materializedCredential->envVars as $key => $value) {
+            $cmd[] = '-e';
+            $cmd[] = "{$key}={$value}";
+        }
 
         if ($resumeSessionId !== null) {
             $cmd[] = '-e';
@@ -582,6 +581,32 @@ class PhaseRunner
     private function resolveRepoToken(RepoProfile $profile): string
     {
         return $profile->resolveToken();
+    }
+
+    /**
+     * Resolution order: task override → repo_profile setting → default
+     * (claude-code). Mirrors what WorkerImageResolver does for the
+     * compose pipeline, but stays local so the legacy pipeline can use
+     * it too — both pipelines need AGENT_NAME injected into the worker.
+     */
+    private function resolveAgentName(Task $task): AgentName
+    {
+        return $task->worker_agent_name_override
+            ?? $task->repoProfile?->worker_agent_name
+            ?? AgentName::ClaudeCode;
+    }
+
+    /**
+     * Materialise the agent's credential into env-vars for `docker run`.
+     * Prefers the AgentCredential FK on the task; if absent, a runner
+     * may fall back to legacy single-token config (claude_code does so
+     * for backwards compatibility, codex throws).
+     */
+    private function materializeCredential(Task $task, AgentName $agentName): MaterializedAgentCredential
+    {
+        $runner = $agentName->runner();
+
+        return $runner->materializeCredential($task->agentCredential);
     }
 
     /**

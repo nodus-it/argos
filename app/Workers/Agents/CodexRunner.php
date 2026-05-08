@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Workers\Agents;
 
 use App\Enums\AgentName;
+use App\Models\AgentCredential;
+use RuntimeException;
 
 /**
  * OpenAI Codex CLI runner.
@@ -16,6 +18,12 @@ use App\Enums\AgentName;
  * delimited event stream which differs from Claude's. The Bash-side
  * runner (worker/lib/agents/codex.sh) is responsible for translating
  * the trailing event into the result-event shape phase scripts expect.
+ *
+ * Credential delivery: Codex needs ~/.codex/auth.json on the worker
+ * filesystem. Rather than dealing with cross-container file mounts,
+ * we pass the JSON-encoded contents of the file as
+ * CODEX_AUTH_JSON_CONTENT env-var; the worker-entrypoint writes the
+ * file and unsets the env before any phase script runs.
  */
 final class CodexRunner implements AgentRunner
 {
@@ -38,5 +46,25 @@ final class CodexRunner implements AgentRunner
                 ],
             ],
         );
+    }
+
+    public function materializeCredential(?AgentCredential $credential): MaterializedAgentCredential
+    {
+        if ($credential === null || $credential->credentials === []) {
+            throw new RuntimeException(
+                'No Codex credential configured. Add an AgentCredential for codex (paste your ~/.codex/auth.json contents).'
+            );
+        }
+
+        // The encrypted-array cast already gives us an associative array.
+        // We re-encode it so the entrypoint can drop it on disk byte-for-byte.
+        $authJson = json_encode(
+            $credential->credentials,
+            JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES,
+        );
+
+        return new MaterializedAgentCredential([
+            'CODEX_AUTH_JSON_CONTENT' => $authJson,
+        ]);
     }
 }

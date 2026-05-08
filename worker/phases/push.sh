@@ -24,8 +24,8 @@ phase_push_preconditions() {
         echo "push: REPO_URL/REPO_TOKEN/BASE_BRANCH muessen gesetzt sein." >&2
         return 2
     fi
-    if [[ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]]; then
-        echo "push: CLAUDE_CODE_OAUTH_TOKEN fehlt (commit-message braucht Claude)." >&2
+    if ! agent_auth_present; then
+        echo "push: keine Authentifizierung für Agent '${AGENT_NAME:-claude_code}' verfügbar (commit-message braucht den Agent)." >&2
         return 3
     fi
     return 0

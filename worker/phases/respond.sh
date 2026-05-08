@@ -29,8 +29,8 @@ phase_respond_preconditions() {
         echo "respond: REPO_URL/REPO_TOKEN/BASE_BRANCH muessen gesetzt sein." >&2
         return 2
     fi
-    if [[ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]]; then
-        echo "respond: CLAUDE_CODE_OAUTH_TOKEN fehlt." >&2
+    if ! agent_auth_present; then
+        echo "respond: keine Authentifizierung für Agent '${AGENT_NAME:-claude_code}' verfügbar." >&2
         return 3
     fi
     return 0

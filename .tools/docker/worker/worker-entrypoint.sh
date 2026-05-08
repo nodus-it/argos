@@ -21,6 +21,24 @@ LOCK_FILE="${LOCK_FILE:-/workspace/.agent/.lock}"
 
 export PHASES_DIR PROMPTS_DIR SCHEMAS_DIR RUNTIME_DIR STATE_FILE LOCK_FILE
 
+# _ep_materialize_agent_credential: Some agents (codex) need their auth
+# data on the filesystem (~/.codex/auth.json) instead of as a single
+# token env-var. The manager passes the file content via env-var so we
+# avoid cross-container file mounts; we materialise the file here and
+# unset the env immediately so it doesn't appear in /proc/<pid>/environ
+# of the long-running phase script.
+_ep_materialize_agent_credential() {
+    if [[ -n "${CODEX_AUTH_JSON_CONTENT:-}" ]]; then
+        mkdir -p "$HOME/.codex"
+        chmod 700 "$HOME/.codex"
+        printf '%s' "$CODEX_AUTH_JSON_CONTENT" > "$HOME/.codex/auth.json"
+        chmod 600 "$HOME/.codex/auth.json"
+        unset CODEX_AUTH_JSON_CONTENT
+    fi
+}
+
+_ep_materialize_agent_credential
+
 usage() {
     cat <<'USAGE' >&2
 Usage:
@@ -83,15 +101,15 @@ _ep_validate_env() {
             [[ -n "${REPO_URL:-}" ]]    || { echo "Error: REPO_URL not set" >&2; return 2; }
             [[ -n "${REPO_TOKEN:-}" ]]  || { echo "Error: REPO_TOKEN not set" >&2; return 2; }
             [[ -n "${BASE_BRANCH:-}" ]] || { echo "Error: BASE_BRANCH not set" >&2; return 2; }
-            [[ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]] \
-                || { echo "Error: CLAUDE_CODE_OAUTH_TOKEN not set" >&2; return 3; }
+            agent_auth_present \
+                || { echo "Error: no auth available for agent '${AGENT_NAME:-claude_code}'" >&2; return 3; }
             ;;
         diff)
             [[ -n "${BASE_BRANCH:-}" ]] || { echo "Error: BASE_BRANCH not set" >&2; return 2; }
             ;;
         commit-message)
-            [[ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]] \
-                || { echo "Error: CLAUDE_CODE_OAUTH_TOKEN not set" >&2; return 3; }
+            agent_auth_present \
+                || { echo "Error: no auth available for agent '${AGENT_NAME:-claude_code}'" >&2; return 3; }
             ;;
     esac
     [[ -d /workspace ]] || { echo "Error: /workspace not mounted" >&2; return 1; }
