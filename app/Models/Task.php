@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\ClaudeModel;
 use App\Enums\Phase;
 use App\Enums\PhaseStatus;
 use App\Enums\WorkflowStatus;
@@ -30,6 +31,8 @@ use Illuminate\Support\Carbon;
  * @property bool $auto_concept
  * @property int|null $max_turns
  * @property string|null $worker_image
+ * @property ClaudeModel|null $model_concept
+ * @property ClaudeModel|null $model_implement
  * @property string|null $concept_md
  * @property string|null $concept_notes
  * @property string|null $implement_summary_nontechnical
@@ -65,6 +68,8 @@ class Task extends Model
         'auto_concept',
         'max_turns',
         'worker_image',
+        'model_concept',
+        'model_implement',
     ];
 
     protected function casts(): array
@@ -73,9 +78,42 @@ class Task extends Model
             'workflow_status' => WorkflowStatus::class,
             'current_phase' => Phase::class,
             'current_status' => PhaseStatus::class,
+            'model_concept' => ClaudeModel::class,
+            'model_implement' => ClaudeModel::class,
             'auto_concept' => 'boolean',
             'max_turns' => 'integer',
         ];
+    }
+
+    /**
+     * Resolves the Claude model ID for a given phase using three-level priority:
+     * task-level override → RepoProfile default → hardcoded Argos default.
+     */
+    public function modelForPhase(string $phase): string
+    {
+        $taskModel = match ($phase) {
+            'concept' => $this->model_concept,
+            'implement' => $this->model_implement,
+            default => null,
+        };
+
+        if ($taskModel !== null) {
+            return $taskModel->value;
+        }
+
+        $profile = $this->repoProfile;
+        if ($profile !== null) {
+            $profileModel = match ($phase) {
+                'concept' => $profile->model_concept,
+                'implement' => $profile->model_implement,
+                default => null,
+            };
+            if ($profileModel !== null) {
+                return $profileModel->value;
+            }
+        }
+
+        return ClaudeModel::default($phase)->value;
     }
 
     public function volumeName(): string

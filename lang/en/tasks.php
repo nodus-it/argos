@@ -17,6 +17,12 @@ return [
         'base_branch_helper' => 'Overrides the base branch for this specific task. Empty = project default.',
         'worker_image_label' => 'Worker Image (Override)',
         'worker_image_helper' => 'Overrides the image for this specific task. Empty = project default.',
+        'model_concept_label' => 'Concept Model (Override)',
+        'model_concept_placeholder' => 'Project default: :model',
+        'model_concept_helper' => 'Overrides the concept model for this specific task. Empty = project default.',
+        'model_implement_label' => 'Implement Model (Override)',
+        'model_implement_placeholder' => 'Project default: :model',
+        'model_implement_helper' => 'Overrides the implement model for this specific task. Empty = project default.',
     ],
 
     'columns' => [

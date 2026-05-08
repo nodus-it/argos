@@ -12,6 +12,7 @@ return [
         'platform' => 'Platform',
         'platform_description' => 'Choose a platform — the remaining fields will be unlocked afterwards.',
         'general' => 'General',
+        'models' => 'Models',
         'authentication' => 'Authentication',
         'repository' => 'Repository',
     ],
@@ -45,6 +46,12 @@ return [
         'token_create_link' => 'Create a token',
         'default_branch_label' => 'Default Branch',
         'global_default' => 'Global default',
+        'model_concept_label' => 'Concept Model',
+        'model_concept_placeholder' => 'Default: :model',
+        'model_concept_helper' => 'Claude model for the concept phase. Leave empty for the hardcoded default.',
+        'model_implement_label' => 'Implement Model',
+        'model_implement_placeholder' => 'Default: :model',
+        'model_implement_helper' => 'Claude model for the implement phase. Leave empty for the hardcoded default.',
     ],
 
     'infolist' => [

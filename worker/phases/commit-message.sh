@@ -127,6 +127,7 @@ phase_commit_message_run() {
     set +e
     ( unset REPO_TOKEN
       claude -p \
+        --model "claude-haiku-4-5-20251001" \
         --append-system-prompt "$sysprompt_content" \
         --output-format json \
         --json-schema "$schema_content" \

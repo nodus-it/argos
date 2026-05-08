@@ -17,6 +17,12 @@ return [
         'base_branch_helper' => 'Überschreibt den Start-Branch für genau diesen Task. Leer = Projekt-Default.',
         'worker_image_label' => 'Worker-Image (Override)',
         'worker_image_helper' => 'Überschreibt das Image für genau diesen Task. Leer = Projekt-Default.',
+        'model_concept_label' => 'Konzept-Modell (Override)',
+        'model_concept_placeholder' => 'Projekt-Default: :model',
+        'model_concept_helper' => 'Überschreibt das Konzept-Modell für genau diesen Task. Leer = Projekt-Default.',
+        'model_implement_label' => 'Implement-Modell (Override)',
+        'model_implement_placeholder' => 'Projekt-Default: :model',
+        'model_implement_helper' => 'Überschreibt das Implement-Modell für genau diesen Task. Leer = Projekt-Default.',
     ],
 
     'columns' => [
