@@ -147,7 +147,7 @@ Conventional Commits style:
 feat: add concept replay button
 fix: handle 422 from GitHub PR creation
 docs: split README into landing + extended setup
-refactor: extract WorkerImage::optionsFor
+refactor: extract StackAgentCompatibility
 test: cover OAuth callback redirect
 chore: bump bats-core to 1.11
 ```
