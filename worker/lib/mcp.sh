@@ -1,57 +1,67 @@
 #!/usr/bin/env bash
-# lib/mcp.sh — helpers for configuring the target project's MCP server.
+# lib/mcp.sh — helpers for wiring the target project's MCP server into the
+# active agent CLI before each session.
 #
-# When ARGOS_MCP_ENABLED=true and the target project's boost.json has "mcp": true,
-# mcp_setup writes a laravel-boost stdio entry into the Claude settings file so that
-# the Claude CLI starts the project's MCP server as a local subprocess.
-# No network access required — everything runs inside the worker container.
+# Activation gate (mcp_should_enable):
+#   ARGOS_MCP_ENABLED=true  AND  ${MCP_WORKSPACE_DIR:-/workspace}/boost.json
+#                                contains "mcp": true.
+# When the gate fires, agent runners (lib/agents/*.sh) emit the correct
+# CLI flags so the agent spawns `php artisan boost:mcp` as a local stdio
+# subprocess inside the worker container — no network access required.
 #
 # shellcheck shell=bash
 
-# mcp_setup: configure the target project's laravel-boost MCP server for Claude.
-# Reads ${MCP_WORKSPACE_DIR:-/workspace}/boost.json to decide whether MCP is
-# requested by the project. Writes the stdio server entry into
-# ${CLAUDE_CONFIG_DIR}/settings.json.
-# No-op when ARGOS_MCP_ENABLED != "true" or boost.json is absent/mcp=false.
-# Args: none
-# Returns: 0 always
-mcp_setup() {
+# mcp_should_enable: check if the target project's MCP server should be
+# activated for this run.
+# Args: none. Reads ARGOS_MCP_ENABLED and ${MCP_WORKSPACE_DIR:-/workspace}/boost.json.
+# Returns: 0 if MCP should be enabled, 1 otherwise.
+mcp_should_enable() {
     if [[ "${ARGOS_MCP_ENABLED:-}" != "true" ]]; then
-        return 0
+        return 1
     fi
 
-    local workspace_dir="${MCP_WORKSPACE_DIR:-/workspace}"
-    local boost_json="${workspace_dir}/boost.json"
+    local boost_json="${MCP_WORKSPACE_DIR:-/workspace}/boost.json"
     if [[ ! -f "$boost_json" ]]; then
-        log_info "mcp: ARGOS_MCP_ENABLED=true but boost.json not found — skipping"
-        return 0
+        return 1
     fi
 
     local mcp_enabled
     mcp_enabled="$(jq -r '.mcp // false' "$boost_json" 2>/dev/null || echo false)"
-    if [[ "$mcp_enabled" != "true" ]]; then
-        log_info "mcp: boost.json mcp=false — skipping"
-        return 0
+    [[ "$mcp_enabled" == "true" ]]
+}
+
+# mcp_write_claude_config: write a JSON config for `claude --mcp-config <file>`
+# describing the laravel-boost stdio server.
+# Args: $1=destination_path
+# Returns: 0 on success, non-zero on bad input or jq failure.
+mcp_write_claude_config() {
+    local dest="$1"
+    if [[ -z "$dest" ]]; then
+        echo "mcp_write_claude_config: destination path required" >&2
+        return 2
     fi
+    mkdir -p "$(dirname "$dest")"
+    jq -n '{
+        mcpServers: {
+            "laravel-boost": {
+                type: "stdio",
+                command: "php",
+                args: ["artisan", "boost:mcp"],
+                cwd: "/workspace"
+            }
+        }
+    }' > "$dest"
+}
 
-    local config_dir="${CLAUDE_CONFIG_DIR:-/workspace/.agent/claude-state}"
-    mkdir -p "$config_dir"
-
-    local settings_file="${config_dir}/settings.json"
-    local mcp_entry
-    mcp_entry='{"type":"stdio","command":"php","args":["artisan","boost:mcp"],"cwd":"/workspace"}'
-
-    if [[ -f "$settings_file" ]]; then
-        jq --argjson entry "$mcp_entry" \
-             '.mcpServers["laravel-boost"] = $entry' \
-             "$settings_file" \
-        > "${settings_file}.tmp"
-    else
-        jq -n --argjson entry "$mcp_entry" \
-             '{mcpServers: {"laravel-boost": $entry}}' \
-        > "${settings_file}.tmp"
-    fi
-    mv "${settings_file}.tmp" "$settings_file"
-
-    log_info "mcp: configured laravel-boost MCP server (stdio, boost:mcp in /workspace)"
+# mcp_codex_config_args: emit `-c key=value` tokens for the codex CLI,
+# one token per line. Consumers should read with
+# `mapfile -t arr < <(mcp_codex_config_args)` and splice into their args.
+# Codex's MCP config lives in $CODEX_HOME/config.toml under [mcp_servers.<name>];
+# `-c` overrides parse the value as TOML, so arrays/strings need TOML quoting.
+# Args: none.
+mcp_codex_config_args() {
+    printf '%s\n' '-c'
+    printf '%s\n' 'mcp_servers.laravel-boost.command="php"'
+    printf '%s\n' '-c'
+    printf '%s\n' 'mcp_servers.laravel-boost.args=["artisan", "boost:mcp"]'
 }

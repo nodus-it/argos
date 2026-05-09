@@ -252,8 +252,6 @@ phase_concept_run() {
     local stream_log="/workspace/.agent/logs/concept.${ITERATION}.stream.log"
     local result_json="/workspace/.agent/logs/concept.${ITERATION}.result.json"
 
-    mcp_setup
-
     log_info "concept: calling agent (stream-json, max-turns 15)"
 
     set +e

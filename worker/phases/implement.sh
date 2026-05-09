@@ -174,8 +174,6 @@ phase_implement_run() {
         fi
     fi
 
-    mcp_setup
-
     log_info "implement: calling agent (stream-json, max-turns $max_turns${resume_args[*]:+, resume})"
 
     set +e

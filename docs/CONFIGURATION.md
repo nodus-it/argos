@@ -38,23 +38,28 @@ All Argos configuration is controlled via environment variables passed to the
 | `ARGOS_CPU_LIMIT` | `2` | CPU limit per worker container. |
 | `ARGOS_MAX_TURNS_DEFAULT` | `200` | Default max-turns for the implement phase (overridable per task). |
 | `ARGOS_CONFIG_DIR` | `~/.config/argos` | Persisted config / SQLite path inside the manager. |
-| `ARGOS_MCP_ENABLED` | – | Set to `true` to enable the target project's Laravel Boost MCP server for Claude sessions. See [MCP Setup](#mcp-laravel-boost) below. |
+| `ARGOS_MCP_ENABLED` | – | Set to `true` to enable the target project's Laravel Boost MCP server for the agent session. Works with both Claude Code and Codex. See [MCP Setup](#mcp-laravel-boost) below. |
 
 ## MCP — Laravel Boost
 
 When `ARGOS_MCP_ENABLED=true`, the worker checks the target project's `boost.json`
-for `"mcp": true`. If present, it configures the Claude CLI to start the project's
-MCP server as a `stdio` subprocess via `php artisan boost:mcp` inside the worker
-container before each Claude session.
+for `"mcp": true`. If present, the active agent runner attaches the project's
+MCP server as a local `stdio` subprocess (`php artisan boost:mcp`) before each
+session — no network access, no Argos database connection.
 
 **Requirements on the target project:**
 - `laravel/boost ^2.4` in `composer.json`
 - `boost.json` with `"mcp": true`
 - `composer install` has run (vendor directory present)
 
-The MCP server runs entirely inside the worker container — no external network
-access, no Argos database connection. It gives Claude access to Boost tools
-(e.g. `search-docs`, `database-schema`) scoped to the target project.
+**Wiring per agent (handled automatically):**
+- Claude Code: `claude --mcp-config <file>` with a generated config file.
+- Codex: `-c mcp_servers.laravel-boost.{command,args}=…` overrides spliced
+  into the `codex exec` invocation.
+
+The MCP server runs entirely inside the worker container. It gives the agent
+access to Boost tools (e.g. `search-docs`, `database-schema`) scoped to the
+target project.
 
 **Setup:**
 1. Set `ARGOS_MCP_ENABLED=true` in `.env`.
