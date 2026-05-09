@@ -96,7 +96,16 @@ agent_codex_run() {
     # Default to --skip-git-repo-check: codex refuses to run outside a
     # git-tracked directory otherwise, and the worker's /workspace
     # only becomes a git repo *during* the concept phase (after clone).
-    local args=(exec --json --skip-git-repo-check)
+    #
+    # --dangerously-bypass-approvals-and-sandbox: codex defaults to a
+    # read-only sandbox in `exec` mode plus an approval-on-write step
+    # that has no human in the loop here, so every patch ends up
+    # rejected. The flag is explicitly meant for "environments that
+    # are externally sandboxed" — the worker container is exactly that
+    # (Docker isolates /workspace; codex' bwrap layer is redundant and
+    # also can't acquire user namespaces in unprivileged containers).
+    # Same trust model we already extend to Claude Code.
+    local args=(exec --json --skip-git-repo-check --dangerously-bypass-approvals-and-sandbox)
     [[ -n "$model" ]] && args+=(--model "$model")
     [[ -n "$resume_session" ]] && args+=(--resume "$resume_session")
     if [[ -n "$json_schema_file" ]]; then
@@ -110,17 +119,29 @@ agent_codex_run() {
     args+=(-)   # read prompt from stdin
 
     # Capture codex's raw output to a temp file so we can synthesise
-    # the result-event after the run completes. Phase scripts consume
-    # this function's stdout via a pipe — we emit intermediate events
-    # live and append the synthetic result-event last.
+    # the result-event after the run completes. The phase script's
+    # expectation depends on output-format:
+    #   stream-json: stream every event through stdout AND keep them in
+    #                raw_out (used by concept/implement to follow tool
+    #                calls live).
+    #   json:        only the single synthesized result-event reaches
+    #                stdout (claude's `--output-format json` semantics
+    #                — `jq` against stdout reads exactly one object).
     local raw_out
     raw_out="$(mktemp /tmp/argos-codex-out-XXXXXX.jsonl)"
 
     set +e
-    ( unset REPO_TOKEN
-      codex "${args[@]}" < "$combined_prompt_file"
-    ) | tee "$raw_out"
-    local rc=${PIPESTATUS[0]}
+    if [[ "$output_format" == "stream-json" ]]; then
+        ( unset REPO_TOKEN
+          codex "${args[@]}" < "$combined_prompt_file"
+        ) | tee "$raw_out"
+        local rc=${PIPESTATUS[0]}
+    else
+        ( unset REPO_TOKEN
+          codex "${args[@]}" < "$combined_prompt_file"
+        ) > "$raw_out"
+        local rc=$?
+    fi
     set -e
 
     # Emit a synthetic result-event so the phase scripts can read

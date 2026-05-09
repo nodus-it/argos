@@ -119,13 +119,30 @@ phase_commit_message_run() {
 
     local output_json="/workspace/.agent/logs/commit-message.${ITERATION}.json"
 
+    # commit-message is a 1-shot subroutine. For Claude we want the
+    # cheapest available model (Haiku) explicitly — saves tokens on
+    # the cheapest possible task. For Codex we DON'T pin a model:
+    # Codex with a ChatGPT account refuses any explicit model name
+    # and picks the right one based on the user's plan, so the only
+    # safe path is to omit --model and let Codex default itself.
+    # When a new agent lands, extend this case-switch (empty value
+    # means "let the agent runner pick").
+    local commit_model
+    case "${AGENT_NAME:-claude-code}" in
+        codex)         commit_model="" ;;
+        claude-code|*) commit_model="claude-haiku-4-5-20251001" ;;
+    esac
+
+    local model_args=()
+    [[ -n "$commit_model" ]] && model_args=(--model "$commit_model")
+
     log_info "commit-message: calling agent (json + json-schema)"
     set +e
     agent_run \
         --system-prompt-file "$sysprompt" \
         --user-prompt-file "$user_prompt_path" \
         --max-turns 8 \
-        --model "claude-haiku-4-5-20251001" \
+        "${model_args[@]}" \
         --output-format json \
         --no-verbose \
         --json-schema "$schema_path" \

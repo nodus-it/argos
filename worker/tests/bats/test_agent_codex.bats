@@ -94,6 +94,15 @@ teardown() {
     [[ "$args" == *"--json"* ]]
 }
 
+@test "agent_codex_run bypasses codex own sandbox/approvals (we are already in a worker container)" {
+    agent_codex_run \
+        --system-prompt-file "$SYS_PROMPT" \
+        --user-prompt-file "$USER_PROMPT" \
+        --max-turns 5 > /dev/null
+    args="$(cat "$CODEX_STUB_ARGS_FILE")"
+    [[ "$args" == *"--dangerously-bypass-approvals-and-sandbox"* ]]
+}
+
 @test "agent_codex_run prepends system prompt to user prompt on stdin" {
     agent_codex_run \
         --system-prompt-file "$SYS_PROMPT" \
@@ -147,6 +156,53 @@ teardown() {
     type="$(echo "$last" | jq -r '.type')"
     [ "$type" = "result" ]
     [ "$is_error" = "false" ]
+}
+
+@test "agent_codex_run output-format json emits exactly one stdout line (no intermediate events)" {
+    # Mock codex emitting four events on its own stdout — same shape we see
+    # from the real CLI. With --output-format json the wrapper must NOT
+    # forward those to its own stdout, only the synthesized result-event.
+    # Otherwise phase scripts that `jq` against stdout get a multi-document
+    # stream and misread is_error.
+    cat > "$BIN_DIR/codex" <<'EOF'
+#!/usr/bin/env bash
+echo '{"type":"thread.started","thread_id":"abc"}'
+echo '{"type":"turn.started"}'
+echo '{"type":"item.completed","item":{"type":"agent_message","text":"hi"}}'
+echo '{"type":"turn.completed","usage":{"input_tokens":10,"output_tokens":2}}'
+EOF
+    chmod +x "$BIN_DIR/codex"
+
+    out="$(agent_codex_run \
+        --system-prompt-file "$SYS_PROMPT" \
+        --user-prompt-file "$USER_PROMPT" \
+        --max-turns 5 \
+        --output-format json)"
+
+    # Exactly one line — the synthesized result-event
+    line_count="$(echo "$out" | wc -l)"
+    [ "$line_count" -eq 1 ]
+    type="$(echo "$out" | jq -r '.type')"
+    [ "$type" = "result" ]
+}
+
+@test "agent_codex_run output-format stream-json forwards intermediate events plus result" {
+    cat > "$BIN_DIR/codex" <<'EOF'
+#!/usr/bin/env bash
+echo '{"type":"thread.started","thread_id":"abc"}'
+echo '{"type":"item.completed","item":{"type":"agent_message","text":"hi"}}'
+EOF
+    chmod +x "$BIN_DIR/codex"
+
+    out="$(agent_codex_run \
+        --system-prompt-file "$SYS_PROMPT" \
+        --user-prompt-file "$USER_PROMPT" \
+        --max-turns 5 \
+        --output-format stream-json)"
+
+    # All intermediate events plus one synthesized result event
+    line_count="$(echo "$out" | wc -l)"
+    [ "$line_count" -eq 3 ]
 }
 
 @test "agent_codex_run emits is_error=true and non-zero exit on codex failure" {
