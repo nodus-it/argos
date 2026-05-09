@@ -78,7 +78,13 @@ jobs:
 
   build-app:
     needs: [shellcheck, worker-unit, app-quality, installer-unit]
-    if: github.event_name != 'pull_request'
+    # The metadata-action only emits tags for develop and release tags;
+    # on a feature branch (push or workflow_dispatch) the tag list is
+    # empty and `docker buildx push` errors with "tag is needed when
+    # pushing to registry". Limit the job accordingly.
+    if: |
+      github.event_name != 'pull_request' &&
+      (github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/tags/'))
     runs-on: ubuntu-latest
     permissions:
       contents: read
