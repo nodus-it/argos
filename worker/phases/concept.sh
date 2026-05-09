@@ -7,7 +7,7 @@
 #          PHASE_FLAGS (JSON), CLAUDE_CODE_OAUTH_TOKEN
 #   - /workspace is the task volume (mounted)
 #   - /workspace/.agent/description.md is bind-mounted read-only
-#     from the host (see lib/docker.sh)
+#     from the host (PhaseRunner manages the docker run invocation)
 
 # shellcheck shell=bash
 
