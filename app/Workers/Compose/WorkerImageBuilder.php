@@ -111,12 +111,28 @@ class WorkerImageBuilder
         $output = $process->getOutput();
 
         if (! $process->isSuccessful()) {
+            // Untag the broken image: workerImageExists() is the only gate
+            // resolveOrBuild() consults, so an image that's tagged but
+            // invalid would silently get reused on the next phase run —
+            // exactly the failure mode this validator is meant to catch.
+            // Best-effort; if the rmi itself fails the build is still
+            // recorded as failed and the next save bumps the dockerfile
+            // hash anyway.
+            $this->untagImage($resolved->workerTag);
+
             throw new RuntimeException(
                 "Worker image validation failed (exit {$process->getExitCode()}):\n".$output.$process->getErrorOutput()
             );
         }
 
         return "[validate]\n".$output."\n";
+    }
+
+    private function untagImage(string $tag): void
+    {
+        $process = $this->newProcess(['docker', 'rmi', '-f', $tag]);
+        $process->setTimeout(15);
+        $process->run();
     }
 
     public function workerImageExists(string $tag): bool

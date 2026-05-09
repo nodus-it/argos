@@ -101,7 +101,8 @@ class WorkerImageBuilderTest extends TestCase
         $builder = new FakeWorkerImageBuilder([
             ['cmd' => 'docker image inspect', 'exit' => 0, 'stdout' => 'sha:exists'],   // stack present
             ['cmd' => 'docker build',         'exit' => 0, 'stdout' => "Successfully built worker\n"],
-            ['cmd' => 'docker run', 'exit' => 1, 'stdout' => "ok bash\nMISSING jq\nok git\n"],   // validation fails
+            ['cmd' => 'docker run',           'exit' => 1, 'stdout' => "ok bash\nMISSING jq\nok git\n"],   // validation fails
+            ['cmd' => 'docker rmi',           'exit' => 0, 'stdout' => 'Untagged'],   // cleanup
         ]);
 
         try {
@@ -117,6 +118,32 @@ class WorkerImageBuilderTest extends TestCase
             ->first();
         $this->assertNotNull($record);
         $this->assertSame(WorkerImageBuildStatus::Failed, $record->status);
+    }
+
+    public function test_validation_failure_untags_the_invalid_image(): void
+    {
+        $stack = WorkerStack::factory()->create(['capabilities' => ['node']]);
+        $resolved = $this->resolved($stack);
+
+        $builder = new FakeWorkerImageBuilder([
+            ['cmd' => 'docker image inspect', 'exit' => 0, 'stdout' => 'sha:exists'],
+            ['cmd' => 'docker build',         'exit' => 0, 'stdout' => 'Successfully built worker'],
+            ['cmd' => 'docker run',           'exit' => 1, 'stdout' => "MISSING jq\n"],
+            ['cmd' => 'docker rmi',           'exit' => 0, 'stdout' => 'Untagged'],
+        ]);
+
+        try {
+            $builder->build($resolved);
+            $this->fail('Expected RuntimeException');
+        } catch (RuntimeException) {
+            // expected
+        }
+
+        // Last command must be the rmi for the validation-failed tag —
+        // otherwise resolveOrBuild() would re-use the broken image on
+        // the next phase run.
+        $rmiCmd = end($builder->invokedCommands);
+        $this->assertSame(['docker', 'rmi', '-f', $resolved->workerTag], $rmiCmd);
     }
 
     public function test_validation_checks_agent_cli_binary(): void
