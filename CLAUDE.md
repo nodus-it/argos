@@ -56,8 +56,8 @@ CI führt `shellcheck` über `agent`, `worker/lib/`, `worker/phases/`, `.tools/d
 ### Dokumentation
 
 - Jede neue Funktion in `worker/lib/` braucht einen Docstring.
-- Bei Architektur-relevanten Änderungen: `docs/WORKER-CONCEPT.md` oder `docs/IMPLEMENTATION.md` mit aktualisieren.
-- Beispiel-Walkthrough in `docs/EXAMPLE.md` mit jedem neuen Feature aktuell halten.
+- User-facing Doku (Setup, Konfiguration, Provider-Anleitungen) in `docs/`.
+- Architektur-Notizen leben inline am Code (Klassen-/Methoden-PHPDoc, README im Modul-Ordner falls nötig); kein paralleles Konzept-Dokument pflegen.
 
 ### Tests
 
