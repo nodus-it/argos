@@ -19,9 +19,12 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class WorkerImageBuildResource extends Resource
 {
@@ -93,6 +96,15 @@ class WorkerImageBuildResource extends Resource
     {
         return $table
             ->columns([
+                IconColumn::make('outdated')
+                    ->label(__('worker.image_builds.fields.outdated'))
+                    ->state(fn (WorkerImageBuild $r): bool => $r->isOutdated())
+                    ->boolean()
+                    ->trueIcon('heroicon-o-arrow-up-circle')
+                    ->trueColor('warning')
+                    ->falseIcon('heroicon-o-check-circle')
+                    ->falseColor('success'),
+
                 TextColumn::make('tag')
                     ->label(__('worker.image_builds.fields.tag'))
                     ->searchable()
@@ -126,11 +138,55 @@ class WorkerImageBuildResource extends Resource
                     ->sortable(),
             ])
             ->filters([
+                TernaryFilter::make('outdated')
+                    ->label(__('worker.image_builds.fields.outdated'))
+                    ->placeholder(__('worker.image_builds.filters.outdated_all'))
+                    ->trueLabel(__('worker.image_builds.filters.outdated_only'))
+                    ->falseLabel(__('worker.image_builds.filters.outdated_current'))
+                    ->queries(
+                        true: fn (Builder $q) => $q->outdated(),
+                        false: fn (Builder $q) => $q->whereNotIn('id', WorkerImageBuild::query()->outdated()->select('id')),
+                        blank: fn (Builder $q) => $q,
+                    ),
                 SelectFilter::make('status')
                     ->options(WorkerImageBuildStatus::class),
                 SelectFilter::make('worker_stack_id')
                     ->relationship('stack', 'name')
                     ->label(__('worker.image_builds.fields.stack')),
+            ])
+            ->headerActions([
+                Action::make('rebuildAllOutdated')
+                    ->label(__('worker.image_builds.actions.rebuild_all_outdated'))
+                    ->icon('heroicon-o-arrow-up-circle')
+                    ->color('warning')
+                    ->visible(fn (): bool => WorkerImageBuild::query()->outdated()->exists())
+                    ->requiresConfirmation()
+                    ->modalDescription(fn (): string => __(
+                        'worker.image_builds.actions.rebuild_all_outdated_confirm',
+                        ['count' => WorkerImageBuild::query()->outdated()->count()],
+                    ))
+                    ->action(function (): void {
+                        $count = 0;
+                        // Eindeutige (stack × agent)-Tupel — eine Stack-Update-
+                        // Welle könnte fünf Builds für denselben Stack erfasst
+                        // haben (alte Hashes); ein einzelner Job pro Tupel
+                        // genügt, weil der Resolver eh nur den aktuellen
+                        // dockerfile_body hashed.
+                        $pairs = WorkerImageBuild::query()
+                            ->outdated()
+                            ->get(['worker_stack_id', 'agent_name'])
+                            ->unique(fn ($b) => $b->worker_stack_id.'|'.$b->agent_name->value);
+
+                        foreach ($pairs as $b) {
+                            BuildWorkerImageJob::dispatch($b->worker_stack_id, $b->agent_name);
+                            $count++;
+                        }
+
+                        Notification::make()
+                            ->success()
+                            ->title(__('worker.image_builds.actions.rebuild_all_outdated_dispatched', ['count' => $count]))
+                            ->send();
+                    }),
             ])
             ->recordActions([
                 ViewAction::make(),

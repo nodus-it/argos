@@ -36,6 +36,14 @@ class WorkerImageBuilder
      */
     public function build(ResolvedWorkerImage $resolved): WorkerImageBuild
     {
+        // Stack-Hash zur Build-Zeit persistieren — der ResolvedWorkerImage
+        // hält den Tag, und der enthält den Hash; wir extrahieren ihn aus
+        // dem stack-tag (`argos-stack:{name}-{8hex}`) statt nochmal selbst
+        // zu hashen, damit Resolver und Builder garantiert übereinstimmen.
+        $stackHash = preg_match('/-([a-f0-9]{8})$/', $resolved->stackTag, $m) === 1
+            ? $m[1]
+            : null;
+
         $record = WorkerImageBuild::query()->updateOrCreate(
             [
                 'worker_stack_id' => $resolved->stack->id,
@@ -43,6 +51,7 @@ class WorkerImageBuilder
                 'tag' => $resolved->workerTag,
             ],
             [
+                'stack_hash' => $stackHash,
                 'status' => WorkerImageBuildStatus::Building,
                 'build_log' => null,
                 'built_at' => null,

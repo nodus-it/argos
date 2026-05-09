@@ -86,10 +86,19 @@ return [
             'size_bytes' => 'Size',
             'built_at' => 'Built at',
             'build_log' => 'Build log',
+            'outdated' => 'Update available',
+        ],
+        'filters' => [
+            'outdated_all' => 'All',
+            'outdated_only' => 'Outdated only',
+            'outdated_current' => 'Current only',
         ],
         'actions' => [
             'rebuild' => 'Rebuild',
             'rebuild_dispatched' => 'Build job queued.',
+            'rebuild_all_outdated' => 'Rebuild all outdated',
+            'rebuild_all_outdated_confirm' => 'Rebuild :count outdated images?',
+            'rebuild_all_outdated_dispatched' => ':count build job(s) queued.',
         ],
     ],
 

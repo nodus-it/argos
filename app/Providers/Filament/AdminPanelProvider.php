@@ -7,7 +7,6 @@ namespace App\Providers\Filament;
 use App\Filament\Admin\Pages\Profile;
 use App\Filament\Admin\Widgets\CurrentTasksWidget;
 use App\Filament\Admin\Widgets\StatsOverviewWidget;
-use App\Filament\Admin\Widgets\WorkerUpdatesWidget;
 use App\Http\Middleware\RedirectToOnboarding;
 use App\Http\Middleware\SetUserLocale;
 use Filament\Http\Middleware\Authenticate;
@@ -53,7 +52,6 @@ class AdminPanelProvider extends PanelProvider
             ->discoverWidgets(in: app_path('Filament/Admin/Widgets'), for: 'App\Filament\Admin\Widgets')
             ->widgets([
                 StatsOverviewWidget::class,
-                WorkerUpdatesWidget::class,
                 CurrentTasksWidget::class,
             ])
             ->navigationGroups([

@@ -86,10 +86,19 @@ return [
             'size_bytes' => 'Größe',
             'built_at' => 'Gebaut am',
             'build_log' => 'Build-Log',
+            'outdated' => 'Update verfügbar',
+        ],
+        'filters' => [
+            'outdated_all' => 'Alle',
+            'outdated_only' => 'Nur veraltete',
+            'outdated_current' => 'Nur aktuelle',
         ],
         'actions' => [
             'rebuild' => 'Neu bauen',
             'rebuild_dispatched' => 'Build-Job in der Queue.',
+            'rebuild_all_outdated' => 'Alle veralteten neu bauen',
+            'rebuild_all_outdated_confirm' => ':count Builds neu anstoßen?',
+            'rebuild_all_outdated_dispatched' => ':count Build-Job(s) in der Queue.',
         ],
     ],
 
