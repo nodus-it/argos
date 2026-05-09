@@ -142,7 +142,11 @@ class WorkerImageBuildResource extends Resource
                     ->trueLabel(__('worker.image_builds.filters.outdated_only'))
                     ->falseLabel(__('worker.image_builds.filters.outdated_current'))
                     ->queries(
-                        true: fn (Builder $q) => $q->outdated(),
+                        // PHPStan can't see local scope methods through Filament's
+                        // Builder param type (which lacks the generic parameter),
+                        // so resolve the outdated query against WorkerImageBuild
+                        // directly and feed the id list into the filter's builder.
+                        true: fn (Builder $q) => $q->whereIn('id', WorkerImageBuild::query()->outdated()->select('id')),
                         false: fn (Builder $q) => $q->whereNotIn('id', WorkerImageBuild::query()->outdated()->select('id')),
                         blank: fn (Builder $q) => $q,
                     ),

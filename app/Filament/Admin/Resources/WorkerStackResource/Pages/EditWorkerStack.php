@@ -11,6 +11,9 @@ use Filament\Actions\DeleteAction;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 
+/**
+ * @property-read WorkerStack $record
+ */
 class EditWorkerStack extends EditRecord
 {
     protected static string $resource = WorkerStackResource::class;

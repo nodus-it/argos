@@ -27,6 +27,8 @@ use Illuminate\Support\Facades\DB;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read WorkerStack $stack
+ *
+ * @method static Builder<static> outdated() PHPDoc for the local scope so PHPStan/IDE can resolve it.
  */
 class WorkerImageBuild extends Model
 {

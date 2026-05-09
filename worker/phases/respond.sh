@@ -30,7 +30,7 @@ phase_respond_preconditions() {
         return 2
     fi
     if ! agent_auth_present; then
-        echo "respond: keine Authentifizierung für Agent '${AGENT_NAME:-claude_code}' verfügbar." >&2
+        echo "respond: keine Authentifizierung für Agent '${AGENT_NAME:-claude_code}' — bitte CLAUDE_CODE_OAUTH_TOKEN (claude_code) oder ~/.codex/auth.json / OPENAI_API_KEY (codex) setzen." >&2
         return 3
     fi
     return 0
