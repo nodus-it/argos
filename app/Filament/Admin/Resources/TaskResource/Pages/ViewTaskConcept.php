@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\TaskResource\Pages;
 
-use App\Enums\WorkflowStatus;
+use App\Enums\Phase;
 use App\Filament\Admin\Resources\TaskResource;
-use App\Jobs\RunPhaseJob;
 use App\Models\Task;
+use App\Services\Task\TaskService;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Page;
@@ -49,12 +49,13 @@ class ViewTaskConcept extends Page
                 ->requiresConfirmation()
                 ->modalDescription(__('tasks.view.actions.run_concept_description'))
                 ->action(function (): void {
-                    if ($this->task->phaseRuns()->where('status', 'running')->exists()) {
+                    try {
+                        app(TaskService::class)->startPhase($this->task, Phase::Concept);
+                    } catch (\RuntimeException) {
                         Notification::make()->title(__('tasks.view.actions.phase_already_running'))->warning()->send();
 
                         return;
                     }
-                    RunPhaseJob::dispatch($this->task->id, 'concept');
                     Notification::make()->title(__('tasks.view.actions.concept_started'))->success()->send();
                     $this->redirect(TaskResource::getUrl('logs', ['record' => $this->task]));
                 }),
@@ -82,7 +83,7 @@ class ViewTaskConcept extends Page
 
     public function saveNotes(): void
     {
-        $this->task->update(['concept_notes' => $this->notes ?: null]);
+        app(TaskService::class)->saveConceptNotes($this->task, $this->notes);
 
         $this->editingNotes = false;
         Notification::make()->title(__('tasks.view.actions.notes_saved'))->success()->send();
@@ -96,13 +97,13 @@ class ViewTaskConcept extends Page
 
     public function startImplement(): void
     {
-        if ($this->task->phaseRuns()->where('status', 'running')->exists()) {
+        try {
+            app(TaskService::class)->startPhase($this->task, Phase::Implement);
+        } catch (\RuntimeException) {
             Notification::make()->title(__('tasks.view.actions.phase_already_running'))->warning()->send();
 
             return;
         }
-        $this->task->update(['workflow_status' => WorkflowStatus::ImplementRunning]);
-        RunPhaseJob::dispatch($this->task->id, 'implement');
         Notification::make()->title(__('tasks.view.actions.implement_started'))->success()->send();
         $this->redirect(TaskResource::getUrl('logs', ['record' => $this->task]));
     }

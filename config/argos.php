@@ -10,8 +10,6 @@ declare(strict_types=1);
  * '0.0.0-dev' and use floating worker tags (no version pinning).
  */
 $argosVersion = '0.1.0-beta.1';
-$isDev = $argosVersion === '0.0.0-dev';
-$prodWorkerSuffix = $isDev ? '' : "-{$argosVersion}";
 
 return [
     'version' => env('ARGOS_VERSION', $argosVersion),
@@ -24,31 +22,6 @@ return [
      */
     'source_url' => env('ARGOS_SOURCE_URL', 'https://github.com/nodus-it/argos'),
     'config_dir' => env('ARGOS_CONFIG_DIR', (getenv('HOME') ?: ($_SERVER['HOME'] ?? posix_getpwuid(posix_getuid())['dir'])).'/.config/argos'),
-    'worker_image' => env('ARGOS_WORKER_IMAGE', "ghcr.io/nodus-it/argos-worker:php8.4{$prodWorkerSuffix}"),
-    /*
-     * Available worker images per environment, used to populate the dropdown
-     * in RepoProfile and Task forms. Symmetric tag scheme:
-     *   local: argos-worker:local-php8.3 / :local-php8.4 (built by `compose --profile build-only build`)
-     *   stage: ghcr.io/.../argos-worker:stage-php8.3 / :stage-php8.4 (built by CI on develop)
-     *   prod:  ghcr.io/.../argos-worker:php8.3-X.Y.Z / :php8.4-X.Y.Z (built by CI on tags;
-     *          version-pinned so a manager release ships with a matching worker)
-     * Custom values stored on a profile/task that are not in this list are
-     * preserved and shown with a "(custom)" suffix.
-     */
-    'worker_images' => [
-        'local' => [
-            'argos-worker:local-php8.4',
-            'argos-worker:local-php8.3',
-        ],
-        'staging' => [
-            'ghcr.io/nodus-it/argos-worker:stage-php8.4',
-            'ghcr.io/nodus-it/argos-worker:stage-php8.3',
-        ],
-        'production' => [
-            "ghcr.io/nodus-it/argos-worker:php8.4{$prodWorkerSuffix}",
-            "ghcr.io/nodus-it/argos-worker:php8.3{$prodWorkerSuffix}",
-        ],
-    ],
     // Empty .env entries (CLAUDE_CODE_OAUTH_TOKEN=) come back as "" from
     // env(), but readers treat null as "not configured" — normalise here so
     // hasClaudeToken() / claudeTokenSource() / Settings UI all agree.
@@ -57,6 +30,15 @@ return [
     'docker' => [
         'memory_limit' => env('ARGOS_MEM_LIMIT', '4g'),
         'cpu_limit' => env('ARGOS_CPU_LIMIT', '2'),
+    ],
+    /*
+     * Compose-pipeline settings. The WorkerImageResolver consults
+     * `compose.default_stack` when neither the task nor the repo profile
+     * pins a stack; this is the slug of a row in `worker_stacks`, populated
+     * from the built-in manifest by BuiltinSync on every `migrate`.
+     */
+    'compose' => [
+        'default_stack' => env('ARGOS_DEFAULT_STACK', 'php-8.4'),
     ],
     'implement' => [
         'max_turns_default' => (int) env('ARGOS_MAX_TURNS_DEFAULT', 200),
@@ -81,7 +63,7 @@ return [
         'contributing' => 'https://github.com/nodus-it/argos/blob/master/docs/CONTRIBUTING.md',
         'github_pat' => 'https://github.com/settings/tokens',
         'gitlab_pat' => 'https://gitlab.com/-/user_settings/personal_access_tokens',
-        'bitbucket_app_passwords' => 'https://bitbucket.org/account/settings/app-passwords/',
+        'bitbucket_pat' => 'https://support.atlassian.com/bitbucket-cloud/docs/repository-access-tokens/',
         'claude_setup_token' => 'https://docs.claude.com/en/docs/claude-code/quickstart',
     ],
 ];

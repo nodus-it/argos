@@ -29,8 +29,8 @@ phase_respond_preconditions() {
         echo "respond: REPO_URL/REPO_TOKEN/BASE_BRANCH muessen gesetzt sein." >&2
         return 2
     fi
-    if [[ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]]; then
-        echo "respond: CLAUDE_CODE_OAUTH_TOKEN fehlt." >&2
+    if ! agent_auth_present; then
+        echo "respond: keine Authentifizierung für Agent '${AGENT_NAME:-claude_code}' — bitte CLAUDE_CODE_OAUTH_TOKEN (claude_code) oder ~/.codex/auth.json / OPENAI_API_KEY (codex) setzen." >&2
         return 3
     fi
     return 0
@@ -69,8 +69,6 @@ phase_respond_run() {
 
     local sysprompt
     sysprompt="$(build_system_prompt respond)" || return 1
-    local sysprompt_content
-    sysprompt_content="$(cat "$sysprompt")"
 
     local user_prompt_path
     user_prompt_path="$(_respond_build_user_prompt | render_user_prompt respond user-prompt)"
@@ -79,19 +77,15 @@ phase_respond_run() {
     local result_json="/workspace/.agent/logs/respond.${ITERATION}.result.json"
     local max_turns="${MAX_TURNS:-200}"
 
-    log_info "respond: calling claude (stream-json, max-turns $max_turns)"
+    log_info "respond: calling agent (stream-json, max-turns $max_turns)"
 
     set +e
-    ( unset REPO_TOKEN
-      claude -p \
-        --append-system-prompt "$sysprompt_content" \
-        --output-format stream-json \
-        --verbose \
-        --include-partial-messages \
-        --permission-mode bypassPermissions \
+    agent_run \
+        --system-prompt-file "$sysprompt" \
+        --user-prompt-file "$user_prompt_path" \
         --max-turns "$max_turns" \
-        < "$user_prompt_path"
-    ) | log_scrub \
+        --include-partial \
+      | log_scrub \
       | tee "$stream_log" \
       | tee >(jq -rj '
             if .type == "assistant" then
@@ -101,12 +95,12 @@ phase_respond_run() {
           ' 2>/dev/null >&2) \
       | jq -c 'select(.type == "result")' \
       > "$result_json"
-    local claude_exit=${PIPESTATUS[0]}
+    local agent_exit=${PIPESTATUS[0]}
     set -e
 
     if [[ ! -s "$result_json" ]]; then
         echo "respond: stream-json produced no result event" >&2
-        if claude_check_usage_limit "$stream_log"; then
+        if agent_check_usage_limit "$stream_log"; then
             echo "  → usage/rate limit — backing off" >&2
             return "$EXIT_USAGE_LIMIT"
         fi
@@ -118,21 +112,21 @@ phase_respond_run() {
     if [[ "$is_error" != "false" ]]; then
         local err_msg
         err_msg="$(jq -r '.result // "(no result field)"' "$result_json" 2>/dev/null)"
-        echo "respond: claude returned is_error=true: $err_msg" >&2
-        if claude_check_usage_limit "" "$err_msg"; then
+        echo "respond: agent returned is_error=true: $err_msg" >&2
+        if agent_check_usage_limit "" "$err_msg"; then
             echo "  → usage/rate limit — backing off" >&2
             return "$EXIT_USAGE_LIMIT"
         fi
-        if echo "$err_msg" | grep -qiE "invalid api key|authentication|oauth|unauthorized|401|token.*expired|invalid_api_key"; then
-            echo "  → Claude-OAuth-Token ungültig oder abgelaufen." >&2
+        if agent_check_auth_error "$err_msg"; then
+            echo "  → Agent-Token ungültig oder abgelaufen." >&2
             echo "    Token erneuern: claude setup-token" >&2
             echo "    Dann: ./agent init --update-token" >&2
         fi
         return 3
     fi
 
-    if (( claude_exit != 0 )); then
-        log_warn "respond: claude exited with code $claude_exit"
+    if (( agent_exit != 0 )); then
+        log_warn "respond: agent exited with code $agent_exit"
     fi
 
     # Quality gate verification with remediation loop — same logic as implement.
@@ -185,16 +179,12 @@ phase_respond_run() {
         local fix_result_json="/workspace/.agent/logs/respond.${ITERATION}.fix${gate_retry}.result.json"
 
         set +e
-        ( unset REPO_TOKEN
-          claude -p \
-            --append-system-prompt "$sysprompt_content" \
-            --output-format stream-json \
-            --verbose \
-            --include-partial-messages \
-            --permission-mode bypassPermissions \
+        agent_run \
+            --system-prompt-file "$sysprompt" \
+            --user-prompt-file "$fix_prompt_path" \
             --max-turns "${GATE_FIX_MAX_TURNS:-30}" \
-            < "$fix_prompt_path"
-        ) | log_scrub \
+            --include-partial \
+          | log_scrub \
           | tee "$fix_stream_log" \
           | tee >(jq -rj '
                 if .type == "assistant" then
@@ -217,7 +207,7 @@ phase_respond_run() {
 
         if (( fix_exit != 0 )); then
             log_warn "respond: fix session exited with code $fix_exit"
-            if claude_check_usage_limit "$fix_stream_log"; then
+            if agent_check_usage_limit "$fix_stream_log"; then
                 echo "  → usage/rate limit during fix — backing off" >&2
                 return "$EXIT_USAGE_LIMIT"
             fi

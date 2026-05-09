@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Enums\AgentCredentialStatus;
+use App\Enums\AgentName;
 use App\Filament\Admin\Pages\Onboarding;
+use App\Models\AgentCredential;
 use App\Models\RepoProfile;
 use App\Models\User;
-use App\Services\Anthropic\CredentialStore;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
@@ -54,10 +56,15 @@ class OnboardingPageTest extends TestCase
         Livewire::test(Onboarding::class)
             ->set('claudeToken', 'sk-ant-oat01-fake')
             ->call('saveClaudeToken')
-            ->assertSet('tokenSource', 'file')
+            ->assertSet('tokenSource', 'agent_credential')
             ->assertSet('claudeToken', '');
 
-        $this->assertSame('sk-ant-oat01-fake', app(CredentialStore::class)->getClaudeToken());
+        $cred = AgentCredential::query()
+            ->where('agent_name', AgentName::ClaudeCode->value)
+            ->where('status', AgentCredentialStatus::Active->value)
+            ->first();
+        $this->assertNotNull($cred);
+        $this->assertSame('sk-ant-oat01-fake', $cred->credentials['token']);
     }
 
     public function test_save_claude_token_rejects_invalid_token(): void
@@ -69,7 +76,11 @@ class OnboardingPageTest extends TestCase
             ->call('saveClaudeToken')
             ->assertSet('tokenSource', 'none');
 
-        $this->assertNull(app(CredentialStore::class)->getClaudeToken());
+        $this->assertFalse(
+            AgentCredential::query()
+                ->where('agent_name', AgentName::ClaudeCode->value)
+                ->exists(),
+        );
     }
 
     public function test_save_claude_token_rejects_empty_input(): void

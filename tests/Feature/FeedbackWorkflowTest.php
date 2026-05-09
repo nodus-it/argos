@@ -9,9 +9,12 @@ use App\Jobs\RunPhaseJob;
 use App\Models\PhaseRun;
 use App\Models\RepoProfile;
 use App\Models\Task;
+use App\Services\Task\TaskService;
 use App\Services\Workflow\PhaseRunner;
 use App\Services\Workflow\WorkflowService;
+use App\Workers\Compose\WorkerImageResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Mockery;
 use Mockery\MockInterface;
 use Symfony\Component\Process\Process;
 use Tests\TestCase;
@@ -38,8 +41,11 @@ class FeedbackWorkflowTest extends TestCase
         config([
             'argos.config_dir' => $this->tmpDir,
             'argos.claude_token' => 'test-token',
-            'argos.worker_image' => 'argos-worker:test',
         ]);
+
+        $resolver = Mockery::mock(WorkerImageResolver::class);
+        $resolver->shouldReceive('resolveOrBuild')->andReturn('argos-worker:test');
+        $this->app->instance(WorkerImageResolver::class, $resolver);
     }
 
     protected function tearDown(): void
@@ -182,7 +188,7 @@ class FeedbackWorkflowTest extends TestCase
         $task = $this->taskWithProfile();
         $capturedEnv = null;
 
-        $processMock = \Mockery::mock(Process::class);
+        $processMock = Mockery::mock(Process::class);
         $processMock->shouldReceive('setEnv')->andReturnUsing(function (array $env) use (&$capturedEnv, $processMock) {
             $capturedEnv = $env;
 
@@ -240,7 +246,7 @@ class FeedbackWorkflowTest extends TestCase
             $mock->shouldReceive('postPhaseSync')->andReturn(null);
         });
 
-        (new RunPhaseJob($task->id, $phase))->handle(app(PhaseRunner::class), app(WorkflowService::class));
+        (new RunPhaseJob($task->id, $phase))->handle(app(PhaseRunner::class), app(WorkflowService::class), app(TaskService::class));
     }
 
     /**
@@ -256,12 +262,12 @@ class FeedbackWorkflowTest extends TestCase
             $mock->shouldReceive('newProcess')->andReturn($processMock);
         });
 
-        (new RunPhaseJob($task->id, $phase))->handle(app(PhaseRunner::class), app(WorkflowService::class));
+        (new RunPhaseJob($task->id, $phase))->handle(app(PhaseRunner::class), app(WorkflowService::class), app(TaskService::class));
     }
 
     private function makeProcessMock(int $exitCode): Process
     {
-        $mock = \Mockery::mock(Process::class);
+        $mock = Mockery::mock(Process::class);
         $mock->shouldReceive('setTimeout')->andReturnSelf();
         $mock->shouldReceive('setIdleTimeout')->andReturnSelf();
         $mock->shouldReceive('setInput')->andReturnSelf();

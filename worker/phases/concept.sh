@@ -7,7 +7,7 @@
 #          PHASE_FLAGS (JSON), CLAUDE_CODE_OAUTH_TOKEN
 #   - /workspace is the task volume (mounted)
 #   - /workspace/.agent/description.md is bind-mounted read-only
-#     from the host (see lib/docker.sh)
+#     from the host (PhaseRunner manages the docker run invocation)
 
 # shellcheck shell=bash
 
@@ -31,8 +31,8 @@ phase_concept_preconditions() {
         echo "concept: REPO_URL/REPO_TOKEN/BASE_BRANCH muessen gesetzt sein." >&2
         return 2
     fi
-    if [[ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]]; then
-        echo "concept: CLAUDE_CODE_OAUTH_TOKEN fehlt." >&2
+    if ! agent_auth_present; then
+        echo "concept: keine Authentifizierung für Agent '${AGENT_NAME:-claude_code}' — bitte CLAUDE_CODE_OAUTH_TOKEN (claude_code) oder ~/.codex/auth.json / OPENAI_API_KEY (codex) setzen." >&2
         return 3
     fi
     return 0
@@ -251,23 +251,17 @@ phase_concept_run() {
 
     local stream_log="/workspace/.agent/logs/concept.${ITERATION}.stream.log"
     local result_json="/workspace/.agent/logs/concept.${ITERATION}.result.json"
-    local sysprompt_content
-    sysprompt_content="$(cat "$sysprompt")"
 
     mcp_setup
 
-    log_info "concept: calling claude (stream-json, max-turns 15)"
+    log_info "concept: calling agent (stream-json, max-turns 15)"
 
     set +e
-    ( unset REPO_TOKEN
-      claude -p \
-        --append-system-prompt "$sysprompt_content" \
-        --output-format stream-json \
-        --verbose \
+    agent_run \
+        --system-prompt-file "$sysprompt" \
+        --user-prompt-file "$user_prompt_path" \
         --max-turns 15 \
-        --permission-mode bypassPermissions \
-        < "$user_prompt_path"
-    ) | log_scrub \
+      | log_scrub \
       | tee "$stream_log" \
       | tee >(jq -rj '
             if .type == "assistant" then
@@ -283,12 +277,12 @@ phase_concept_run() {
           ' >&2 2>/dev/null) \
       | jq -c 'select(.type == "result")' \
       > "$result_json"
-    local claude_exit=${PIPESTATUS[0]}
+    local agent_exit=${PIPESTATUS[0]}
     set -e
 
-    if (( claude_exit != 0 )); then
-        echo "concept: claude call failed (exit $claude_exit)" >&2
-        if claude_check_usage_limit "$stream_log"; then
+    if (( agent_exit != 0 )); then
+        echo "concept: agent call failed (exit $agent_exit)" >&2
+        if agent_check_usage_limit "$stream_log"; then
             echo "  → usage/rate limit — backing off" >&2
             return "$EXIT_USAGE_LIMIT"
         fi
@@ -300,13 +294,13 @@ phase_concept_run() {
     if [[ "$is_error" != "false" ]]; then
         local err_msg
         err_msg="$(jq -r '.result // "(no result field)"' "$result_json" 2>/dev/null)"
-        echo "concept: claude returned is_error=true: $err_msg" >&2
-        if claude_check_usage_limit "" "$err_msg"; then
+        echo "concept: agent returned is_error=true: $err_msg" >&2
+        if agent_check_usage_limit "" "$err_msg"; then
             echo "  → usage/rate limit — backing off" >&2
             return "$EXIT_USAGE_LIMIT"
         fi
-        if echo "$err_msg" | grep -qiE "invalid api key|authentication|oauth|unauthorized|401|token.*expired|invalid_api_key"; then
-            echo "  → Claude-OAuth-Token ungültig oder abgelaufen." >&2
+        if agent_check_auth_error "$err_msg"; then
+            echo "  → Agent-Token ungültig oder abgelaufen." >&2
             echo "    Token erneuern: claude setup-token" >&2
             echo "    Dann: ./agent init --update-token" >&2
         fi
@@ -316,7 +310,7 @@ phase_concept_run() {
     local concept_text
     concept_text="$(jq -r '.result' "$result_json")"
     if [[ -z "$concept_text" || "$concept_text" == "null" ]]; then
-        echo "concept: claude returned empty .result" >&2
+        echo "concept: agent returned empty .result" >&2
         return 1
     fi
     printf '%s\n' "$concept_text" > "${concept_file}.tmp"

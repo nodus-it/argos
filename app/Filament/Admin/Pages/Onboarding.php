@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Pages;
 
+use App\Enums\AgentCredentialStatus;
+use App\Enums\AgentName;
+use App\Models\AgentCredential;
 use App\Models\RepoProfile;
 use App\Models\User;
 use App\Services\Anthropic\AnthropicTokenValidator;
-use App\Services\Anthropic\CredentialStore;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Auth;
@@ -21,13 +23,19 @@ class Onboarding extends Page
         'bitbucket' => 'services.bitbucket.client_id',
     ];
 
+    /**
+     * Onboarding-managed credential row name. Used to update-or-create the
+     * single Default Claude credential when the user pastes a token here,
+     * so repeat onboarding does not litter the DB with extra rows.
+     */
+    private const ONBOARDING_CREDENTIAL_NAME = 'Default';
+
     protected string $view = 'filament.admin.pages.onboarding';
 
+    /** 'env' | 'agent_credential' | 'none' — drives which UI step is shown. */
     public string $tokenSource = 'none';
 
     public string $claudeToken = '';
-
-    public string $workerImage = '';
 
     /** @var array<string, array{configured: bool, connected: bool}> */
     public array $oauthState = [];
@@ -64,8 +72,7 @@ class Onboarding extends Page
 
     private function refreshState(): void
     {
-        $this->tokenSource = app(CredentialStore::class)->claudeTokenSource();
-        $this->workerImage = (string) config('argos.worker_image', '');
+        $this->tokenSource = $this->detectTokenSource();
 
         /** @var User|null $user */
         $user = Auth::user();
@@ -77,6 +84,21 @@ class Onboarding extends Page
                 'connected' => $user !== null && $user->connectedAccount($provider) !== null,
             ];
         }
+    }
+
+    private function detectTokenSource(): string
+    {
+        $envToken = config('argos.claude_token');
+        if (is_string($envToken) && $envToken !== '') {
+            return 'env';
+        }
+
+        $hasCredential = AgentCredential::query()
+            ->where('agent_name', AgentName::ClaudeCode->value)
+            ->where('status', AgentCredentialStatus::Active->value)
+            ->exists();
+
+        return $hasCredential ? 'agent_credential' : 'none';
     }
 
     public function disconnectProvider(string $provider): void
@@ -131,7 +153,18 @@ class Onboarding extends Page
             return;
         }
 
-        app(CredentialStore::class)->setClaudeToken($token);
+        AgentCredential::updateOrCreate(
+            [
+                'agent_name' => AgentName::ClaudeCode->value,
+                'name' => self::ONBOARDING_CREDENTIAL_NAME,
+            ],
+            [
+                'credentials' => ['token' => $token],
+                'status' => AgentCredentialStatus::Active->value,
+                'last_validated_at' => $valid === true ? now() : null,
+            ],
+        );
+
         $this->claudeToken = '';
         $this->refreshState();
 

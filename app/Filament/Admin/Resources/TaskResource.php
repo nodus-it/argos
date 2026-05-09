@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources;
 
-use App\Enums\Phase;
-use App\Enums\PhaseStatus;
-use App\Enums\WorkflowStatus;
+use App\Enums\AgentCredentialStatus;
+use App\Enums\AgentName;
+use App\Enums\WorkerImageEntityStatus;
+use App\Filament\Admin\Concerns\TaskTableConcern;
 use App\Filament\Admin\Resources\TaskResource\Pages\CreateTask;
 use App\Filament\Admin\Resources\TaskResource\Pages\ListTasks;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTask;
@@ -15,11 +16,12 @@ use App\Filament\Admin\Resources\TaskResource\Pages\ViewTaskDiff;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTaskLogs;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTaskRespond;
 use App\Filament\Admin\Resources\TaskResource\RelationManagers\PhaseRunsRelationManager;
-use App\Models\PhaseRun;
+use App\Models\AgentCredential;
 use App\Models\RepoProfile;
 use App\Models\Task;
+use App\Models\WorkerStack;
 use App\Services\GitProvider\GitServiceFactory;
-use App\Services\WorkerImage;
+use App\Workers\Agents\AgentRegistry;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Forms\Components\Select;
@@ -27,16 +29,18 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Tabs;
+use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
-use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\Rule;
 
 class TaskResource extends Resource
 {
+    use TaskTableConcern;
+
     protected static ?string $model = Task::class;
 
     public static function getNavigationIcon(): string
@@ -57,129 +61,258 @@ class TaskResource extends Resource
     public static function form(Schema $schema): Schema
     {
         return $schema->components([
-            TextInput::make('name')
-                ->required()
-                ->maxLength(255)
-                ->rules([Rule::unique('tasks', 'name')]),
+            Tabs::make()
+                ->tabs([
+                    Tab::make(__('tasks.tabs.basics'))
+                        ->icon('heroicon-o-document-text')
+                        ->schema([
+                            TextInput::make('name')
+                                ->label(__('tasks.fields.name_label'))
+                                ->helperText(__('tasks.fields.name_helper'))
+                                ->required()
+                                ->maxLength(255)
+                                ->rules([Rule::unique('tasks', 'name')]),
 
-            Select::make('repo_profile_id')
-                ->label(__('tasks.fields.project'))
-                ->options(RepoProfile::all()->pluck('name', 'id'))
-                ->required()
-                ->live()
-                ->afterStateUpdated(function (Set $set, ?string $state): void {
-                    $set('auto_concept', RepoProfile::find($state)?->auto_concept ?? false);
-                }),
+                            Select::make('repo_profile_id')
+                                ->label(__('tasks.fields.project'))
+                                ->helperText(__('tasks.fields.project_helper'))
+                                ->options(RepoProfile::all()->pluck('name', 'id'))
+                                ->required()
+                                ->live()
+                                ->afterStateUpdated(function (Set $set, ?string $state): void {
+                                    $set('auto_concept', RepoProfile::find($state)?->auto_concept ?? false);
+                                }),
 
-            Textarea::make('description')
-                ->rows(8)
-                ->helperText(__('tasks.fields.description_helper'))
+                            Textarea::make('description')
+                                ->label(__('tasks.fields.description_label'))
+                                ->rows(8)
+                                ->helperText(__('tasks.fields.description_helper'))
+                                ->columnSpanFull(),
+
+                            Select::make('base_branch')
+                                ->label(__('tasks.fields.base_branch_label'))
+                                ->helperText(__('tasks.fields.base_branch_helper'))
+                                ->options(function (Get $get): array {
+                                    $profileId = $get('repo_profile_id');
+                                    if (! is_string($profileId) || $profileId === '') {
+                                        return [];
+                                    }
+                                    $profile = RepoProfile::find($profileId);
+                                    if ($profile === null) {
+                                        return [];
+                                    }
+                                    try {
+                                        return app(GitServiceFactory::class)->fromRepoProfile($profile)->getBranchOptions($profile->getOwnerRepo());
+                                    } catch (\Throwable) {
+                                        return [];
+                                    }
+                                })
+                                ->placeholder(fn (Get $get): string => RepoProfile::find($get('repo_profile_id'))?->default_branch ?? 'main')
+                                ->searchable()
+                                ->native(false),
+
+                            Toggle::make('auto_concept')
+                                ->label(__('tasks.fields.auto_concept_label'))
+                                ->helperText(__('tasks.fields.auto_concept_helper'))
+                                ->default(fn (Get $get): bool => RepoProfile::find($get('repo_profile_id'))?->auto_concept ?? false)
+                                ->columnSpanFull(),
+                        ]),
+
+                    Tab::make(__('tasks.tabs.worker'))
+                        ->icon('heroicon-o-cpu-chip')
+                        ->schema([
+                            Select::make('worker_stack_id_override')
+                                ->label(__('tasks.fields.worker_stack_label'))
+                                ->options(fn (): array => self::stackOptions())
+                                ->placeholder(fn (Get $get): string => __(
+                                    'tasks.fields.worker_stack_placeholder',
+                                    ['stack' => self::projectStackLabel($get) ?? (string) config('argos.compose.default_stack', 'php-8.4')],
+                                ))
+                                ->helperText(__('tasks.fields.worker_stack_helper'))
+                                ->searchable()
+                                ->native(false),
+
+                            Select::make('worker_agent_name_override')
+                                ->label(__('tasks.fields.worker_agent_label'))
+                                ->options(fn (): array => self::agentOptions())
+                                ->placeholder(fn (Get $get): string => __(
+                                    'tasks.fields.worker_agent_placeholder',
+                                    ['agent' => self::projectAgent($get)->value],
+                                ))
+                                ->helperText(__('tasks.fields.worker_agent_helper'))
+                                ->live()
+                                ->afterStateUpdated(function (Set $set): void {
+                                    // Different agent → previously-chosen credential
+                                    // and pinned models belong to the old agent, so
+                                    // clear them. Placeholders + option lists then
+                                    // recompute against the new agent's spec.
+                                    $set('agent_credential_id', null);
+                                    $set('model_concept', null);
+                                    $set('model_implement', null);
+                                })
+                                ->native(false),
+
+                            Select::make('agent_credential_id')
+                                ->label(__('tasks.fields.agent_credential_label'))
+                                ->options(fn (Get $get): array => self::credentialOptionsForAgent(self::effectiveAgent($get)))
+                                ->placeholder(__('tasks.fields.agent_credential_placeholder'))
+                                ->helperText(__('tasks.fields.agent_credential_helper'))
+                                ->native(false),
+
+                            TextInput::make('max_turns')
+                                ->label(__('tasks.fields.max_turns_label'))
+                                ->helperText(__('tasks.fields.max_turns_helper', ['default' => config('argos.implement.max_turns_default', 200)]))
+                                ->numeric()
+                                ->minValue(10)
+                                ->maxValue(1000)
+                                ->placeholder((string) config('argos.implement.max_turns_default', 200)),
+
+                            Select::make('model_concept')
+                                ->label(__('tasks.fields.model_concept_label'))
+                                ->options(fn (Get $get): array => self::effectiveAgent($get)->spec()->availableModels)
+                                ->placeholder(fn (Get $get): string => __(
+                                    'tasks.fields.model_concept_placeholder',
+                                    ['model' => self::effectiveModelLabel($get, 'concept')],
+                                ))
+                                ->helperText(__('tasks.fields.model_concept_helper'))
+                                ->native(false),
+
+                            Select::make('model_implement')
+                                ->label(__('tasks.fields.model_implement_label'))
+                                ->options(fn (Get $get): array => self::effectiveAgent($get)->spec()->availableModels)
+                                ->placeholder(fn (Get $get): string => __(
+                                    'tasks.fields.model_implement_placeholder',
+                                    ['model' => self::effectiveModelLabel($get, 'implement')],
+                                ))
+                                ->helperText(__('tasks.fields.model_implement_helper'))
+                                ->native(false),
+                        ]),
+                ])
                 ->columnSpanFull(),
-
-            Toggle::make('auto_concept')
-                ->label(__('tasks.fields.auto_concept_label'))
-                ->helperText(__('tasks.fields.auto_concept_helper'))
-                ->default(fn (Get $get): bool => RepoProfile::find($get('repo_profile_id'))?->auto_concept ?? false)
-                ->columnSpanFull(),
-
-            TextInput::make('max_turns')
-                ->label(__('tasks.fields.max_turns_label'))
-                ->helperText(__('tasks.fields.max_turns_helper', ['default' => config('argos.implement.max_turns_default', 200)]))
-                ->numeric()
-                ->minValue(10)
-                ->maxValue(1000)
-                ->placeholder((string) config('argos.implement.max_turns_default', 200)),
-
-            Select::make('base_branch')
-                ->label(__('tasks.fields.base_branch_label'))
-                ->helperText(__('tasks.fields.base_branch_helper'))
-                ->options(function (Get $get): array {
-                    $profileId = $get('repo_profile_id');
-                    if (! is_string($profileId) || $profileId === '') {
-                        return [];
-                    }
-                    $profile = RepoProfile::find($profileId);
-                    if ($profile === null) {
-                        return [];
-                    }
-                    try {
-                        return app(GitServiceFactory::class)->fromRepoProfile($profile)->getBranchOptions($profile->getOwnerRepo());
-                    } catch (\Throwable) {
-                        return [];
-                    }
-                })
-                ->placeholder(fn (Get $get): string => RepoProfile::find($get('repo_profile_id'))?->default_branch ?? 'main')
-                ->searchable()
-                ->native(false),
-
-            Select::make('worker_image')
-                ->label(__('tasks.fields.worker_image_label'))
-                ->options(fn (Get $get): array => WorkerImage::optionsFor($get('worker_image')))
-                ->placeholder(fn (Get $get): string => 'Default vom Projekt ('
-                    .(RepoProfile::find($get('repo_profile_id'))?->worker_image ?: config('argos.worker_image')).')')
-                ->helperText(__('tasks.fields.worker_image_helper'))
-                ->searchable()
-                ->native(false),
         ]);
+    }
+
+    /**
+     * Active worker stacks as a [id => label] map for the override select.
+     *
+     * @return array<string, string>
+     */
+    private static function stackOptions(): array
+    {
+        return WorkerStack::query()
+            ->where('status', '!=', WorkerImageEntityStatus::Disabled)
+            ->orderBy('name')
+            ->get()
+            ->mapWithKeys(fn (WorkerStack $stack): array => [
+                $stack->id => $stack->label !== '' ? "{$stack->label} ({$stack->name})" : $stack->name,
+            ])
+            ->all();
+    }
+
+    /**
+     * Registered agents as a [name => label] map for the override select.
+     *
+     * @return array<string, string>
+     */
+    private static function agentOptions(): array
+    {
+        return collect(app(AgentRegistry::class)->specs())
+            ->mapWithKeys(fn ($spec): array => [$spec->name->value => $spec->label])
+            ->all();
+    }
+
+    /**
+     * Active credentials for the given agent as a [id => name] map.
+     *
+     * @return array<string, string>
+     */
+    private static function credentialOptionsForAgent(AgentName $agent): array
+    {
+        return AgentCredential::query()
+            ->where('agent_name', $agent->value)
+            ->where('status', AgentCredentialStatus::Active->value)
+            ->orderBy('name')
+            ->get()
+            ->mapWithKeys(fn (AgentCredential $cred): array => [$cred->id => $cred->name])
+            ->all();
+    }
+
+    /**
+     * The agent that will run for this task: explicit override on the form
+     * if set, otherwise the project default, otherwise Claude Code.
+     */
+    private static function effectiveAgent(Get $get): AgentName
+    {
+        $override = $get('worker_agent_name_override');
+        if (is_string($override) && $override !== '') {
+            $agent = AgentName::tryFrom($override);
+            if ($agent !== null) {
+                return $agent;
+            }
+        }
+
+        return self::projectAgent($get);
+    }
+
+    /**
+     * The agent configured at the project level — the placeholder value
+     * that hint-text and "what runs if you leave the override blank?"
+     * messages reach for.
+     */
+    private static function projectAgent(Get $get): AgentName
+    {
+        $profile = RepoProfile::find($get('repo_profile_id'));
+
+        return $profile?->worker_agent_name ?? AgentName::ClaudeCode;
+    }
+
+    /**
+     * The label of the project's default stack, or null if the project has
+     * none configured (placeholder will then fall back to the global default).
+     */
+    private static function projectStackLabel(Get $get): ?string
+    {
+        $profile = RepoProfile::find($get('repo_profile_id'));
+        $stack = $profile?->workerStack;
+
+        if ($stack === null) {
+            return null;
+        }
+
+        return $stack->label !== '' ? $stack->label : $stack->name;
+    }
+
+    /**
+     * Display label for the model that will be used for a phase when the
+     * task-level override is blank — task model → project model → agent
+     * default. Returns the model id if no human label is registered.
+     */
+    private static function effectiveModelLabel(Get $get, string $phase): string
+    {
+        $profile = RepoProfile::find($get('repo_profile_id'));
+        $profileModel = match ($phase) {
+            'concept' => $profile?->model_concept?->value,
+            'implement' => $profile?->model_implement?->value,
+            default => null,
+        };
+
+        $agent = self::effectiveAgent($get);
+        $spec = $agent->spec();
+
+        $modelId = $profileModel !== null && $profileModel !== ''
+            ? $profileModel
+            : ($spec->defaultModel($phase) ?? '');
+
+        return $spec->availableModels[$modelId] ?? $modelId;
     }
 
     public static function table(Table $table): Table
     {
         return $table
-            ->defaultSort('created_at', 'desc')
+            ->defaultSort('updated_at', 'desc')
             ->poll('5s')
-            ->columns([
-                TextColumn::make('name')
-                    ->searchable()
-                    ->sortable(),
-
-                TextColumn::make('repoProfile.name')
-                    ->label(__('tasks.columns.project'))
-                    ->sortable(),
-
-                TextColumn::make('current_phase')
-                    ->label(__('tasks.columns.phase'))
-                    ->badge()
-                    ->icon(fn (?Phase $state): ?string => $state?->icon())
-                    ->color(fn (?Phase $state): string => $state?->color() ?? 'gray')
-                    ->formatStateUsing(fn (?Phase $state): string => $state?->label() ?? '—'),
-
-                TextColumn::make('current_status')
-                    ->label(__('tasks.columns.status'))
-                    ->badge()
-                    ->color(fn (?PhaseStatus $state): string => $state?->color() ?? 'gray')
-                    ->formatStateUsing(fn (?PhaseStatus $state): string => $state?->label() ?? '—')
-                    ->placeholder('—'),
-
-                TextColumn::make('workflow_status')
-                    ->label(__('tasks.columns.workflow'))
-                    ->badge()
-                    ->color(fn (?WorkflowStatus $state): string => $state?->color() ?? 'gray')
-                    ->formatStateUsing(fn (?WorkflowStatus $state): string => $state?->label() ?? '—'),
-
-                TextColumn::make('cost_total')
-                    ->label(__('tasks.columns.cost'))
-                    ->sortable()
-                    ->formatStateUsing(fn ($state): string => $state !== null && (float) $state > 0
-                        ? '$'.number_format((float) $state, 4)
-                        : '—'
-                    ),
-
-                TextColumn::make('tokens_total')
-                    ->label(__('tasks.columns.tokens'))
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true)
-                    ->formatStateUsing(fn ($state): string => $state !== null && (int) $state > 0
-                        ? number_format((int) $state)
-                        : '—'
-                    ),
-
-                TextColumn::make('created_at')
-                    ->label(__('tasks.columns.created'))
-                    ->since()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-            ])
+            ->columns(static::taskTableColumns())
+            ->filters(static::taskTableFilters())
             ->recordUrl(fn (Task $record): string => static::getUrl('view', ['record' => $record]))
             ->bulkActions([
                 BulkActionGroup::make([
@@ -193,17 +326,6 @@ class TaskResource extends Resource
         return [
             PhaseRunsRelationManager::class,
         ];
-    }
-
-    public static function getEloquentQuery(): Builder
-    {
-        return parent::getEloquentQuery()
-            ->withSum('phaseRuns as cost_total', 'cost_usd')
-            ->addSelect([
-                'tokens_total' => PhaseRun::query()
-                    ->selectRaw('COALESCE(SUM(input_tokens), 0) + COALESCE(SUM(output_tokens), 0)')
-                    ->whereColumn('phase_runs.task_id', 'tasks.id'),
-            ]);
     }
 
     public static function getPages(): array

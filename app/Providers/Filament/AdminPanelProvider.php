@@ -56,6 +56,7 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->navigationGroups([
                 __('navigation.groups.tasks'),
+                __('navigation.groups.worker'),
                 __('navigation.groups.configuration'),
             ])
             ->login()
@@ -93,6 +94,10 @@ class AdminPanelProvider extends PanelProvider
             ->renderHook(
                 PanelsRenderHook::FOOTER,
                 fn (): string => view('components.argos-source-footer')->render()
+            )
+            ->renderHook(
+                PanelsRenderHook::USER_MENU_BEFORE,
+                fn (): string => view('components.argos-feedback-button')->render()
             );
     }
 }

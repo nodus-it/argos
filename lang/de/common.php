@@ -14,6 +14,11 @@ return [
         'locale_de' => 'Deutsch',
     ],
 
-    'source_footer' => 'Argos ist freie Software unter der :license-Lizenz. :source.',
+    'source_footer' => 'Argos :version ist freie Software unter der :license-Lizenz. :source.',
     'source_link_label' => 'Quellcode ansehen',
+
+    'feedback_button' => [
+        'label' => 'Feedback',
+        'tooltip' => 'Bug melden oder Feedback geben',
+    ],
 ];

@@ -12,14 +12,13 @@ Argos runs as a Docker Compose stack: an **app** container (Laravel + PHP-FPM)
 fronted by **nginx**, backed by **MariaDB**, with a separate **queue** worker.
 The app container spawns short-lived **worker** containers via the host
 Docker socket — all AI runs inside the worker, the app process never touches
-Claude directly. The compose file is the deployment unit; you only need the
-worker image tag, the app pulls workers on demand.
+Claude directly. The compose file is the deployment unit; only the manager
+image is pulled, worker images are built on demand from the local repo.
 
 | Image | Purpose |
 |---|---|
 | `ghcr.io/nodus-it/argos-app` | Web UI + queue. Needs the Docker socket to spawn workers. |
-| `ghcr.io/nodus-it/argos-worker:php8.4` | Claude Code, Git, PHP 8.4, Node, Composer. Spawned per task. |
-| `ghcr.io/nodus-it/argos-worker:php8.3` | Same, with PHP 8.3 for older projects. |
+| `argos-worker:<stack>-<hash>-<agent>-<version>` | Built on demand by the manager from `worker_stacks` rows × the chosen agent. |
 
 The compose stack also runs `mariadb:11` and `nginx:1.27-alpine` — these are
 stock upstream images, no Argos build.
@@ -63,12 +62,17 @@ The installer already generated a strong `ADMIN_PASSWORD` and DB passwords in
 `/srv/argos/.env` — don't override those in the compose file (you'd be
 hard-coding secrets in plaintext); edit `.env` if you need to change them.
 
-The app container will pull `ghcr.io/nodus-it/argos-worker:php8.4` the first
-time a task runs. To pre-pull:
+The app container builds the worker image the first time a task runs (1-3
+minutes cold, instant after). To pre-warm the default `php-8.4 × claude-code`
+image manually:
 
 ```bash
 docker compose -f /srv/argos/docker-compose.yml exec app \
-    docker pull ghcr.io/nodus-it/argos-worker:php8.4
+    php artisan tinker --execute='app(App\Workers\Compose\WorkerImageBuilder::class)
+        ->build(app(App\Workers\Compose\WorkerImageResolver::class)->resolveFor(
+            App\Models\WorkerStack::where("name", "php-8.4")->firstOrFail(),
+            App\Enums\AgentName::ClaudeCode,
+        ));'
 ```
 
 ## Pre-seeding the Claude token
@@ -90,38 +94,33 @@ The token is read on every boot and takes precedence over what the UI shows.
 Tokens expire after a few weeks — re-run `claude setup-token` and update the
 env var (or paste the new token in the UI).
 
-## Choosing a worker image
+## Choosing a worker stack and agent
 
-| Use case | `ARGOS_WORKER_IMAGE` |
-|---|---|
-| Standard Laravel projects (default) | `ghcr.io/nodus-it/argos-worker:php8.4` |
-| Legacy PHP 8.3 projects | `ghcr.io/nodus-it/argos-worker:php8.3` |
-| Pre-release (auto-built from `dev`) | `ghcr.io/nodus-it/argos-worker:stage-php8.4` |
-| Locally built (compose) | `argos-worker:local-php8.4` |
-| Custom image | `your-registry/your-worker:tag` |
+Worker images are no longer pulled from GHCR — they are built on demand by
+the manager from the `worker_stacks` table the first time a task with that
+combination of (stack × agent × version) runs. The first run takes 1-3
+minutes; subsequent runs use the cached image.
 
-The image is also overridable per project and per task in the UI.
+Pick the stack and agent in **Worker → Stacks** and **Worker → Agent
+Credentials** in the admin UI, then assign defaults per project and (if you
+want) overrides per task. Built-in stacks (`php-8.3`, `php-8.4`, …) are
+mirrored from the repo manifest into the DB on every `migrate`; you can add
+your own user stack in the same UI.
 
 ## Pre-release / stage builds
 
-Every push to the `develop` branch publishes:
+Every push to the `develop` branch publishes the manager image:
 
 - `ghcr.io/nodus-it/argos-app:stage`
-- `ghcr.io/nodus-it/argos-worker:stage-php8.3`
-- `ghcr.io/nodus-it/argos-worker:stage-php8.4`
 
-These tags track unreleased work and may break — useful for previewing fixes,
-**not** for production. To install the stage stack, point the installer at
-the develop branch and edit `.env` afterwards to pin the worker tag:
+This tag tracks unreleased work and may break — useful for previewing
+fixes, **not** for production. To install the stage stack, point the
+installer at the develop branch:
 
 ```bash
 ARGOS_VERSION=develop \
     curl -fsSL https://raw.githubusercontent.com/nodus-it/argos/develop/install.sh \
-    | bash -s -- --dir ./argos-stage
-
-# Edit ./argos-stage/.env:
-#   ARGOS_APP_IMAGE=ghcr.io/nodus-it/argos-app:stage
-#   ARGOS_WORKER_IMAGE=ghcr.io/nodus-it/argos-worker:stage-php8.4
+    | bash -s -- --dir ./argos-stage --stage
 
 docker compose -f ./argos-stage/docker-compose.yml pull
 docker compose -f ./argos-stage/docker-compose.yml up -d
@@ -153,11 +152,22 @@ See provider-specific guides:
 
 Argos serves plain HTTP on the host port set by `ARGOS_PORT` (default `8080`,
 mapped to nginx:80 in the compose stack). Terminate TLS at your reverse proxy
-(Caddy, nginx, Traefik) and forward there. Make sure to:
+(Caddy, nginx, Traefik, HAProxy) and forward there. Make sure to:
 
 - set `APP_URL` to the public URL (`https://argos.example.com`)
-- forward the `X-Forwarded-Proto: https` header
+- forward `X-Forwarded-Proto: https` (and `X-Forwarded-For` / `X-Forwarded-Host`)
 - use that same URL when registering OAuth apps (the redirect URI must match)
+
+Argos trusts the forwarded headers from any upstream proxy, so the app sees
+`https` once the proxy sets `X-Forwarded-Proto`. Without that header asset
+URLs render as `http://` and the browser flags mixed content.
+
+HAProxy snippet (paste into the Argos backend's *Advanced pass thru*):
+
+```
+option forwardfor
+http-request set-header X-Forwarded-Proto https if { ssl_fc }
+```
 
 ## Environment variables
 

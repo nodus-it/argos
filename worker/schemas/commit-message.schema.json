@@ -13,5 +13,6 @@
       "description": "Optional body explaining what and why"
     }
   },
-  "required": ["subject", "body"]
+  "required": ["subject", "body"],
+  "additionalProperties": false
 }

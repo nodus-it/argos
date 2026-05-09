@@ -6,6 +6,7 @@ namespace App\Jobs;
 
 use App\Enums\PhaseStatus;
 use App\Models\Task;
+use App\Services\Task\TaskService;
 use App\Services\Workflow\PhaseRunner;
 use App\Services\Workflow\WorkflowService;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -26,7 +27,7 @@ class RunPhaseJob implements ShouldQueue
         public readonly array $flags = [],
     ) {}
 
-    public function handle(PhaseRunner $runner, WorkflowService $workflowService): void
+    public function handle(PhaseRunner $runner, WorkflowService $workflowService, TaskService $taskService): void
     {
         // Hold back while a usage limit is active — release back to the queue.
         $limit = Cache::get(PhaseRunner::CACHE_KEY_USAGE_LIMIT);
@@ -80,7 +81,7 @@ class RunPhaseJob implements ShouldQueue
                 return;
             }
 
-            $workflowService->completePhase($task, $this->phase, $task->current_status ?? PhaseStatus::Failed);
+            $taskService->completePhase($task, $this->phase, $task->current_status ?? PhaseStatus::Failed);
 
             Log::channel('argos')->info('Job completed', [
                 'task' => $this->taskId,

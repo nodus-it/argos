@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\AgentName;
+use App\Enums\ClaudeModel;
 use App\Enums\Phase;
 use App\Enums\PhaseStatus;
 use App\Enums\WorkflowStatus;
@@ -29,7 +31,13 @@ use Illuminate\Support\Carbon;
  * @property WorkflowStatus $workflow_status
  * @property bool $auto_concept
  * @property int|null $max_turns
- * @property string|null $worker_image
+ * @property ClaudeModel|null $model_concept
+ * @property ClaudeModel|null $model_implement
+ * @property string|null $worker_stack_id_override
+ * @property AgentName|null $worker_agent_name_override
+ * @property array<string, mixed>|null $worker_config_override
+ * @property string|null $agent_credential_id
+ * @property array<string, mixed>|null $agent_config
  * @property string|null $concept_md
  * @property string|null $concept_notes
  * @property string|null $implement_summary_nontechnical
@@ -40,6 +48,8 @@ use Illuminate\Support\Carbon;
  * @property-read User|null $user
  * @property-read RepoProfile|null $repoProfile
  * @property-read Collection<int, PhaseRun> $phaseRuns
+ * @property-read WorkerStack|null $workerStackOverride
+ * @property-read AgentCredential|null $agentCredential
  */
 class Task extends Model
 {
@@ -64,7 +74,13 @@ class Task extends Model
         'workflow_status',
         'auto_concept',
         'max_turns',
-        'worker_image',
+        'model_concept',
+        'model_implement',
+        'worker_stack_id_override',
+        'worker_agent_name_override',
+        'worker_config_override',
+        'agent_credential_id',
+        'agent_config',
     ];
 
     protected function casts(): array
@@ -73,9 +89,45 @@ class Task extends Model
             'workflow_status' => WorkflowStatus::class,
             'current_phase' => Phase::class,
             'current_status' => PhaseStatus::class,
+            'model_concept' => ClaudeModel::class,
+            'model_implement' => ClaudeModel::class,
             'auto_concept' => 'boolean',
             'max_turns' => 'integer',
+            'worker_agent_name_override' => AgentName::class,
+            'worker_config_override' => 'array',
+            'agent_config' => 'array',
         ];
+    }
+
+    /**
+     * Resolves the Claude model ID for a given phase using three-level priority:
+     * task-level override → RepoProfile default → hardcoded Argos default.
+     */
+    public function modelForPhase(string $phase): string
+    {
+        $taskModel = match ($phase) {
+            'concept' => $this->model_concept,
+            'implement' => $this->model_implement,
+            default => null,
+        };
+
+        if ($taskModel !== null) {
+            return $taskModel->value;
+        }
+
+        $profile = $this->repoProfile;
+        if ($profile !== null) {
+            $profileModel = match ($phase) {
+                'concept' => $profile->model_concept,
+                'implement' => $profile->model_implement,
+                default => null,
+            };
+            if ($profileModel !== null) {
+                return $profileModel->value;
+            }
+        }
+
+        return ClaudeModel::default($phase)->value;
     }
 
     public function volumeName(): string
@@ -110,6 +162,22 @@ class Task extends Model
     public function phaseRuns(): HasMany
     {
         return $this->hasMany(PhaseRun::class);
+    }
+
+    /**
+     * @return BelongsTo<WorkerStack, $this>
+     */
+    public function workerStackOverride(): BelongsTo
+    {
+        return $this->belongsTo(WorkerStack::class, 'worker_stack_id_override');
+    }
+
+    /**
+     * @return BelongsTo<AgentCredential, $this>
+     */
+    public function agentCredential(): BelongsTo
+    {
+        return $this->belongsTo(AgentCredential::class);
     }
 
     /**

@@ -95,6 +95,12 @@ case "${ARGOS_ROLE:-app}" in
     app)
         php /app/artisan migrate --force --no-interaction
         php /app/artisan db:seed --class=AdminUserSeeder --force --no-interaction
+        # Pre-warm the default worker image: dispatches a queued build for
+        # the configured stack × claude-code so the first phase a fresh
+        # install kicks off does not pay the 1-3 min cold-build cost. The
+        # queue worker picks the job up once the app reports healthy.
+        # Failure here is non-fatal — the resolver still builds on demand.
+        php /app/artisan argos:warm-builtin-images --default-only --no-interaction || true
         ;;
     worker|queue|scheduler)
         echo "ARGOS_ROLE=${ARGOS_ROLE} — skipping migrations (app service owns the schema)."
