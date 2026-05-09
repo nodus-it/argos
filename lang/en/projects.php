@@ -8,6 +8,12 @@ return [
     'model_label' => 'Project',
     'model_label_plural' => 'Projects',
 
+    'tabs' => [
+        'basics' => 'General',
+        'worker' => 'Worker & models',
+        'repository' => 'Repository',
+    ],
+
     'sections' => [
         'platform' => 'Platform',
         'platform_description' => 'Choose a platform — the remaining fields will be unlocked afterwards.',

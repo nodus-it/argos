@@ -8,6 +8,12 @@ return [
     'model_label' => 'Projekt',
     'model_label_plural' => 'Projekte',
 
+    'tabs' => [
+        'basics' => 'Allgemein',
+        'worker' => 'Worker & Modelle',
+        'repository' => 'Repository',
+    ],
+
     'sections' => [
         'platform' => 'Plattform',
         'platform_description' => 'Wähle die Plattform — danach werden die weiteren Felder freigeschaltet.',

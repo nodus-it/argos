@@ -65,6 +65,7 @@ class WorkerStackResource extends Resource
     {
         return $schema->components([
             Section::make(__('worker.stacks.sections.definition'))
+                ->description(__('worker.stacks.sections.definition_description'))
                 ->schema([
                     TextInput::make('name')
                         ->label(__('worker.stacks.fields.name'))
@@ -75,6 +76,7 @@ class WorkerStackResource extends Resource
 
                     TextInput::make('label')
                         ->label(__('worker.stacks.fields.label'))
+                        ->helperText(__('worker.stacks.fields.label_help'))
                         ->required()
                         ->maxLength(255),
 
@@ -91,45 +93,57 @@ class WorkerStackResource extends Resource
 
                     TagsInput::make('common_tools')
                         ->label(__('worker.stacks.fields.common_tools'))
+                        ->helperText(__('worker.stacks.fields.common_tools_help'))
                         ->reorderable(),
 
                     Select::make('status')
                         ->label(__('worker.stacks.fields.status'))
+                        ->helperText(__('worker.stacks.fields.status_help'))
                         ->options(WorkerImageEntityStatus::class)
                         ->default(WorkerImageEntityStatus::Active->value)
                         ->required()
                         ->native(false),
+
+                    Toggle::make('is_builtin')
+                        ->label(__('worker.stacks.fields.is_builtin'))
+                        ->helperText(__('worker.stacks.fields.is_builtin_help'))
+                        ->disabled()
+                        ->dehydrated(false),
                 ]),
 
             Section::make(__('worker.stacks.sections.dockerfile'))
+                ->description(__('worker.stacks.sections.dockerfile_description'))
                 ->schema([
+                    // Code-editor-style textarea, matched to the task-log
+                    // pane (slate-950 surface, slate-100 text, mono).
+                    // Filament's input wrapper carries its own bg-white
+                    // classes — Tailwind's `!` prefix forces the rule
+                    // past those. Tab inserts 4 spaces via Alpine, no
+                    // syntax highlighting (zero new deps for wave 1).
                     Textarea::make('dockerfile_body')
-                        ->label(__('worker.stacks.fields.dockerfile_body'))
+                        ->hiddenLabel()
                         ->required()
-                        ->rows(18)
+                        ->rows(22)
+                        ->extraAttributes([
+                            'class' => 'rounded-xl overflow-hidden border border-slate-800 shadow-2xl shadow-black/50 !bg-slate-950',
+                        ])
                         ->extraInputAttributes([
-                            'style' => 'font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px;',
                             'spellcheck' => 'false',
+                            'wrap' => 'off',
+                            'autocorrect' => 'off',
+                            'autocapitalize' => 'off',
+                            'class' => 'font-mono text-xs leading-5 !bg-slate-950 !text-slate-100 !border-0 !shadow-none focus:!ring-0',
+                            'style' => 'tab-size: 4; -moz-tab-size: 4; padding: 1rem;',
+                            'x-data' => '{}',
+                            // Tab inserts four spaces in place of the focus jump.
+                            'x-on:keydown.tab.prevent' => "(\$el => {
+                                const start = \$el.selectionStart;
+                                const end = \$el.selectionEnd;
+                                \$el.value = \$el.value.substring(0, start) + '    ' + \$el.value.substring(end);
+                                \$el.selectionStart = \$el.selectionEnd = start + 4;
+                                \$el.dispatchEvent(new Event('input'));
+                            })(\$event.target)",
                         ]),
-                ]),
-
-            Section::make(__('worker.stacks.sections.metadata'))
-                ->collapsed()
-                ->schema([
-                    Toggle::make('is_builtin')
-                        ->label(__('worker.stacks.fields.is_builtin'))
-                        ->disabled()
-                        ->dehydrated(false),
-
-                    TextInput::make('installed_version')
-                        ->label(__('worker.stacks.fields.installed_version'))
-                        ->disabled()
-                        ->dehydrated(false),
-
-                    TextInput::make('upstream_version')
-                        ->label(__('worker.stacks.fields.upstream_version'))
-                        ->disabled()
-                        ->dehydrated(false),
                 ]),
         ]);
     }

@@ -18,6 +18,7 @@ use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -80,14 +81,11 @@ class WorkerImageBuildResource extends Resource
                     ->placeholder('—'),
             ]),
             Section::make(__('worker.image_builds.fields.build_log'))
+                ->description(__('worker.image_builds.build_log_description'))
                 ->collapsed()
                 ->schema([
-                    TextEntry::make('build_log')
-                        ->hiddenLabel()
-                        ->placeholder('—')
-                        ->columnSpanFull()
-                        ->fontFamily('mono')
-                        ->extraAttributes(['style' => 'white-space: pre-wrap; font-size: 12px;']),
+                    View::make('filament.admin.resources.image-build.build-log')
+                        ->columnSpanFull(),
                 ]),
         ]);
     }

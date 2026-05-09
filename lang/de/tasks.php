@@ -7,7 +7,11 @@ return [
     'navigation_label' => 'Tasks',
 
     'fields' => [
+        'name_label' => 'Name',
+        'name_helper' => 'Eindeutiger Slug für diesen Task — taucht in URLs, Volume-Namen und Branch-Präfix auf.',
         'project' => 'Projekt',
+        'project_helper' => 'Welches Repo-Profil. Stack/Agent/Modelle erben den Default vom Projekt; im Worker-Tab kannst du sie pro Task überschreiben.',
+        'description_label' => 'Beschreibung',
         'description_helper' => 'Konkrete Akzeptanzkriterien führen zu besseren PRs. Was soll passieren, *warum*, und woran erkennst du das Ergebnis?',
         'auto_concept_label' => 'Konzept direkt starten',
         'auto_concept_helper' => 'Startet die Konzept-Phase sofort nach dem Anlegen.',
@@ -44,6 +48,10 @@ return [
     ],
 
     'tabs' => [
+        // form tabs (Create/Edit task)
+        'basics' => 'Allgemein',
+        'worker' => 'Worker & Modelle',
+        // table filter tabs (List tasks)
         'current' => 'Aktuell',
         'completed' => 'Abgeschlossen',
         'all' => 'Alle',

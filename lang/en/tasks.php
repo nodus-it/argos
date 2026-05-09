@@ -7,7 +7,11 @@ return [
     'navigation_label' => 'Tasks',
 
     'fields' => [
+        'name_label' => 'Name',
+        'name_helper' => 'Unique slug for this task — surfaces in URLs, volume names, and the branch prefix.',
         'project' => 'Project',
+        'project_helper' => 'Which repo profile. Stack/agent/models inherit the project default; you can override per task in the Worker tab.',
+        'description_label' => 'Description',
         'description_helper' => 'Concrete acceptance criteria lead to better PRs. What should happen, *why*, and how will you know it worked?',
         'auto_concept_label' => 'Start concept immediately',
         'auto_concept_helper' => 'Starts the concept phase immediately after creation.',
@@ -44,6 +48,10 @@ return [
     ],
 
     'tabs' => [
+        // form tabs (Create/Edit task)
+        'basics' => 'General',
+        'worker' => 'Worker & models',
+        // table filter tabs (List tasks)
         'current' => 'Current',
         'completed' => 'Completed',
         'all' => 'All',

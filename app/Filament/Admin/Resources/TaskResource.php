@@ -29,6 +29,8 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Tabs;
+use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
@@ -59,114 +61,134 @@ class TaskResource extends Resource
     public static function form(Schema $schema): Schema
     {
         return $schema->components([
-            TextInput::make('name')
-                ->required()
-                ->maxLength(255)
-                ->rules([Rule::unique('tasks', 'name')]),
+            Tabs::make()
+                ->tabs([
+                    Tab::make(__('tasks.tabs.basics'))
+                        ->icon('heroicon-o-document-text')
+                        ->schema([
+                            TextInput::make('name')
+                                ->label(__('tasks.fields.name_label'))
+                                ->helperText(__('tasks.fields.name_helper'))
+                                ->required()
+                                ->maxLength(255)
+                                ->rules([Rule::unique('tasks', 'name')]),
 
-            Select::make('repo_profile_id')
-                ->label(__('tasks.fields.project'))
-                ->options(RepoProfile::all()->pluck('name', 'id'))
-                ->required()
-                ->live()
-                ->afterStateUpdated(function (Set $set, ?string $state): void {
-                    $set('auto_concept', RepoProfile::find($state)?->auto_concept ?? false);
-                }),
+                            Select::make('repo_profile_id')
+                                ->label(__('tasks.fields.project'))
+                                ->helperText(__('tasks.fields.project_helper'))
+                                ->options(RepoProfile::all()->pluck('name', 'id'))
+                                ->required()
+                                ->live()
+                                ->afterStateUpdated(function (Set $set, ?string $state): void {
+                                    $set('auto_concept', RepoProfile::find($state)?->auto_concept ?? false);
+                                }),
 
-            Textarea::make('description')
-                ->rows(8)
-                ->helperText(__('tasks.fields.description_helper'))
+                            Textarea::make('description')
+                                ->label(__('tasks.fields.description_label'))
+                                ->rows(8)
+                                ->helperText(__('tasks.fields.description_helper'))
+                                ->columnSpanFull(),
+
+                            Select::make('base_branch')
+                                ->label(__('tasks.fields.base_branch_label'))
+                                ->helperText(__('tasks.fields.base_branch_helper'))
+                                ->options(function (Get $get): array {
+                                    $profileId = $get('repo_profile_id');
+                                    if (! is_string($profileId) || $profileId === '') {
+                                        return [];
+                                    }
+                                    $profile = RepoProfile::find($profileId);
+                                    if ($profile === null) {
+                                        return [];
+                                    }
+                                    try {
+                                        return app(GitServiceFactory::class)->fromRepoProfile($profile)->getBranchOptions($profile->getOwnerRepo());
+                                    } catch (\Throwable) {
+                                        return [];
+                                    }
+                                })
+                                ->placeholder(fn (Get $get): string => RepoProfile::find($get('repo_profile_id'))?->default_branch ?? 'main')
+                                ->searchable()
+                                ->native(false),
+
+                            Toggle::make('auto_concept')
+                                ->label(__('tasks.fields.auto_concept_label'))
+                                ->helperText(__('tasks.fields.auto_concept_helper'))
+                                ->default(fn (Get $get): bool => RepoProfile::find($get('repo_profile_id'))?->auto_concept ?? false)
+                                ->columnSpanFull(),
+                        ]),
+
+                    Tab::make(__('tasks.tabs.worker'))
+                        ->icon('heroicon-o-cpu-chip')
+                        ->schema([
+                            Select::make('worker_stack_id_override')
+                                ->label(__('tasks.fields.worker_stack_label'))
+                                ->options(fn (): array => self::stackOptions())
+                                ->placeholder(fn (Get $get): string => __(
+                                    'tasks.fields.worker_stack_placeholder',
+                                    ['stack' => self::projectStackLabel($get) ?? (string) config('argos.compose.default_stack', 'php-8.4')],
+                                ))
+                                ->helperText(__('tasks.fields.worker_stack_helper'))
+                                ->searchable()
+                                ->native(false),
+
+                            Select::make('worker_agent_name_override')
+                                ->label(__('tasks.fields.worker_agent_label'))
+                                ->options(fn (): array => self::agentOptions())
+                                ->placeholder(fn (Get $get): string => __(
+                                    'tasks.fields.worker_agent_placeholder',
+                                    ['agent' => self::projectAgent($get)->value],
+                                ))
+                                ->helperText(__('tasks.fields.worker_agent_helper'))
+                                ->live()
+                                ->afterStateUpdated(function (Set $set): void {
+                                    // Different agent → previously-chosen credential
+                                    // and pinned models belong to the old agent, so
+                                    // clear them. Placeholders + option lists then
+                                    // recompute against the new agent's spec.
+                                    $set('agent_credential_id', null);
+                                    $set('model_concept', null);
+                                    $set('model_implement', null);
+                                })
+                                ->native(false),
+
+                            Select::make('agent_credential_id')
+                                ->label(__('tasks.fields.agent_credential_label'))
+                                ->options(fn (Get $get): array => self::credentialOptionsForAgent(self::effectiveAgent($get)))
+                                ->placeholder(__('tasks.fields.agent_credential_placeholder'))
+                                ->helperText(__('tasks.fields.agent_credential_helper'))
+                                ->native(false),
+
+                            TextInput::make('max_turns')
+                                ->label(__('tasks.fields.max_turns_label'))
+                                ->helperText(__('tasks.fields.max_turns_helper', ['default' => config('argos.implement.max_turns_default', 200)]))
+                                ->numeric()
+                                ->minValue(10)
+                                ->maxValue(1000)
+                                ->placeholder((string) config('argos.implement.max_turns_default', 200)),
+
+                            Select::make('model_concept')
+                                ->label(__('tasks.fields.model_concept_label'))
+                                ->options(fn (Get $get): array => self::effectiveAgent($get)->spec()->availableModels)
+                                ->placeholder(fn (Get $get): string => __(
+                                    'tasks.fields.model_concept_placeholder',
+                                    ['model' => self::effectiveModelLabel($get, 'concept')],
+                                ))
+                                ->helperText(__('tasks.fields.model_concept_helper'))
+                                ->native(false),
+
+                            Select::make('model_implement')
+                                ->label(__('tasks.fields.model_implement_label'))
+                                ->options(fn (Get $get): array => self::effectiveAgent($get)->spec()->availableModels)
+                                ->placeholder(fn (Get $get): string => __(
+                                    'tasks.fields.model_implement_placeholder',
+                                    ['model' => self::effectiveModelLabel($get, 'implement')],
+                                ))
+                                ->helperText(__('tasks.fields.model_implement_helper'))
+                                ->native(false),
+                        ]),
+                ])
                 ->columnSpanFull(),
-
-            Toggle::make('auto_concept')
-                ->label(__('tasks.fields.auto_concept_label'))
-                ->helperText(__('tasks.fields.auto_concept_helper'))
-                ->default(fn (Get $get): bool => RepoProfile::find($get('repo_profile_id'))?->auto_concept ?? false)
-                ->columnSpanFull(),
-
-            TextInput::make('max_turns')
-                ->label(__('tasks.fields.max_turns_label'))
-                ->helperText(__('tasks.fields.max_turns_helper', ['default' => config('argos.implement.max_turns_default', 200)]))
-                ->numeric()
-                ->minValue(10)
-                ->maxValue(1000)
-                ->placeholder((string) config('argos.implement.max_turns_default', 200)),
-
-            Select::make('base_branch')
-                ->label(__('tasks.fields.base_branch_label'))
-                ->helperText(__('tasks.fields.base_branch_helper'))
-                ->options(function (Get $get): array {
-                    $profileId = $get('repo_profile_id');
-                    if (! is_string($profileId) || $profileId === '') {
-                        return [];
-                    }
-                    $profile = RepoProfile::find($profileId);
-                    if ($profile === null) {
-                        return [];
-                    }
-                    try {
-                        return app(GitServiceFactory::class)->fromRepoProfile($profile)->getBranchOptions($profile->getOwnerRepo());
-                    } catch (\Throwable) {
-                        return [];
-                    }
-                })
-                ->placeholder(fn (Get $get): string => RepoProfile::find($get('repo_profile_id'))?->default_branch ?? 'main')
-                ->searchable()
-                ->native(false),
-
-            Select::make('worker_stack_id_override')
-                ->label(__('tasks.fields.worker_stack_label'))
-                ->options(fn (): array => self::stackOptions())
-                ->placeholder(fn (Get $get): string => __(
-                    'tasks.fields.worker_stack_placeholder',
-                    ['stack' => self::projectStackLabel($get) ?? (string) config('argos.compose.default_stack', 'php-8.4')],
-                ))
-                ->helperText(__('tasks.fields.worker_stack_helper'))
-                ->searchable()
-                ->native(false),
-
-            Select::make('worker_agent_name_override')
-                ->label(__('tasks.fields.worker_agent_label'))
-                ->options(fn (): array => self::agentOptions())
-                ->placeholder(fn (Get $get): string => __(
-                    'tasks.fields.worker_agent_placeholder',
-                    ['agent' => self::projectAgent($get)->value],
-                ))
-                ->helperText(__('tasks.fields.worker_agent_helper'))
-                ->live()
-                ->afterStateUpdated(function (Set $set): void {
-                    // Different agent → previously-chosen credential almost
-                    // certainly belongs to the old agent, so clear it.
-                    $set('agent_credential_id', null);
-                })
-                ->native(false),
-
-            Select::make('agent_credential_id')
-                ->label(__('tasks.fields.agent_credential_label'))
-                ->options(fn (Get $get): array => self::credentialOptionsForAgent(self::effectiveAgent($get)))
-                ->placeholder(__('tasks.fields.agent_credential_placeholder'))
-                ->helperText(__('tasks.fields.agent_credential_helper'))
-                ->native(false),
-
-            Select::make('model_concept')
-                ->label(__('tasks.fields.model_concept_label'))
-                ->options(fn (Get $get): array => self::effectiveAgent($get)->spec()->availableModels)
-                ->placeholder(fn (Get $get): string => __(
-                    'tasks.fields.model_concept_placeholder',
-                    ['model' => self::effectiveModelLabel($get, 'concept')],
-                ))
-                ->helperText(__('tasks.fields.model_concept_helper'))
-                ->native(false),
-
-            Select::make('model_implement')
-                ->label(__('tasks.fields.model_implement_label'))
-                ->options(fn (Get $get): array => self::effectiveAgent($get)->spec()->availableModels)
-                ->placeholder(fn (Get $get): string => __(
-                    'tasks.fields.model_implement_placeholder',
-                    ['model' => self::effectiveModelLabel($get, 'implement')],
-                ))
-                ->helperText(__('tasks.fields.model_implement_helper'))
-                ->native(false),
         ]);
     }
 

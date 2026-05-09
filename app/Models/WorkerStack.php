@@ -23,8 +23,6 @@ use Illuminate\Support\Carbon;
  * @property array<int, string>|null $common_tools
  * @property array<int, string>|null $capabilities
  * @property WorkerImageEntityStatus $status
- * @property string|null $installed_version
- * @property string|null $upstream_version
  * @property bool $has_update
  * @property string|null $last_builtin_hash
  * @property Carbon|null $last_checked_at
@@ -49,8 +47,6 @@ class WorkerStack extends Model
         'common_tools',
         'capabilities',
         'status',
-        'installed_version',
-        'upstream_version',
         'has_update',
         'last_builtin_hash',
         'last_checked_at',
