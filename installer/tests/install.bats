@@ -183,28 +183,25 @@ EOF
 
 # ── apply_stage_overrides ───────────────────────────────────────────────────
 
-@test "apply_stage_overrides pins both image keys when missing" {
+@test "apply_stage_overrides pins app image when missing" {
     ENV_FILE="$TEST_DIR/.env"
     printf 'APP_KEY=base64:foo\n' > "$ENV_FILE"
 
     apply_stage_overrides >/dev/null
 
-    [ "$(get_env_value "$ENV_FILE" ARGOS_APP_IMAGE)"    = "$STAGE_APP_IMAGE" ]
-    [ "$(get_env_value "$ENV_FILE" ARGOS_WORKER_IMAGE)" = "$STAGE_WORKER_IMAGE" ]
+    [ "$(get_env_value "$ENV_FILE" ARGOS_APP_IMAGE)" = "$STAGE_APP_IMAGE" ]
 }
 
-@test "apply_stage_overrides replaces existing image tags in place" {
+@test "apply_stage_overrides replaces existing app image tag in place" {
     ENV_FILE="$TEST_DIR/.env"
     cat > "$ENV_FILE" <<'EOF'
 APP_KEY=base64:foo
 ARGOS_APP_IMAGE=ghcr.io/nodus-it/argos-app:latest
-ARGOS_WORKER_IMAGE=ghcr.io/nodus-it/argos-worker:php8.4
 EOF
 
     apply_stage_overrides >/dev/null
 
-    [ "$(get_env_value "$ENV_FILE" ARGOS_APP_IMAGE)"    = "$STAGE_APP_IMAGE" ]
-    [ "$(get_env_value "$ENV_FILE" ARGOS_WORKER_IMAGE)" = "$STAGE_WORKER_IMAGE" ]
+    [ "$(get_env_value "$ENV_FILE" ARGOS_APP_IMAGE)" = "$STAGE_APP_IMAGE" ]
     # Idempotency: running twice changes nothing.
     local before
     before="$(sha256_of "$ENV_FILE")"

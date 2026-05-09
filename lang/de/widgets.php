@@ -13,6 +13,9 @@ return [
         'waiting' => 'Wartet auf dich',
         'review_open' => 'Review oder Antwort offen',
         'nothing_todo' => 'Nichts zu tun',
+        'worker_updates' => 'Worker-Updates',
+        'worker_updates_pending' => 'Image-Rebuilds verfügbar',
+        'worker_updates_clean' => 'Alles aktuell',
     ],
 
     'current_tasks' => [

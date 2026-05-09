@@ -158,18 +158,26 @@ class ViewTask extends ViewRecord
         /** @var Task $task */
         $task = $this->getRecord();
         $branch = $task->repoProfile?->default_branch ?? 'main';
-        $image = config('argos.worker_image');
+        // alpine/git is the smallest image with `git` + `sh` available; keeps
+        // the diff view agent-/stack-agnostic so it works the same regardless
+        // of which worker image the task ran on. The container runs as root
+        // while the volume is owned by the worker uid (1000) — without
+        // `-c safe.directory='*'` git refuses every read with "dubious
+        // ownership", which silently fell through to a useless --no-index
+        // path until 2026-05.
+        $image = 'alpine/git';
         $vol = $task->volumeName();
+        $g = "git -c safe.directory='*' -C /workspace";
 
         $statResult = Process::timeout(15)->run([
             'docker', 'run', '--rm',
             '-v', "{$vol}:/workspace:ro",
             '--entrypoint', 'sh', $image,
             '-c',
-            "git -C /workspace diff --stat origin/{$branch} 2>/dev/null; "
-            .'git -C /workspace ls-files --others --exclude-standard 2>/dev/null | while IFS= read -r f; do echo " (neu) $f"; done; '
+            "{$g} diff --stat origin/{$branch} 2>/dev/null; "
+            .$g.' ls-files --others --exclude-standard 2>/dev/null | while IFS= read -r f; do echo " (neu) $f"; done; '
             ."echo ''; "
-            .'git -C /workspace status --short 2>/dev/null',
+            .$g.' status --short 2>/dev/null',
         ]);
         $this->diffStat = trim($statResult->output());
 
@@ -178,9 +186,9 @@ class ViewTask extends ViewRecord
             '-v', "{$vol}:/workspace:ro",
             '--entrypoint', 'sh', $image,
             '-c',
-            "{ git -C /workspace diff origin/{$branch} 2>/dev/null; "
-            .'git -C /workspace ls-files --others --exclude-standard 2>/dev/null | while IFS= read -r f; do '
-            .'git -C /workspace diff --no-index -- /dev/null "$f" 2>/dev/null || true; '
+            "{ {$g} diff origin/{$branch} 2>/dev/null; "
+            .$g.' ls-files --others --exclude-standard 2>/dev/null | while IFS= read -r f; do '
+            .$g.' diff --no-index -- /dev/null "$f" 2>/dev/null || true; '
             .'done; } | head -c 131072',
         ]);
         $this->diffFiles = $this->parseDiffStructured($diffResult->output());

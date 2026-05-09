@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Enums\AgentCredentialStatus;
+use App\Enums\AgentName;
 use App\Enums\PhaseStatus;
+use App\Models\AgentCredential;
 use App\Models\ConnectedAccount;
 use App\Models\PhaseRun;
 use App\Models\RepoProfile;
@@ -12,7 +15,9 @@ use App\Models\Task;
 use App\Models\User;
 use App\Services\Anthropic\CredentialStore;
 use App\Services\Workflow\PhaseRunner;
+use App\Workers\Compose\WorkerImageResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Mockery;
 use Mockery\MockInterface;
 use Symfony\Component\Process\Process;
 use Tests\TestCase;
@@ -31,8 +36,14 @@ class PhaseRunnerTest extends TestCase
         config([
             'argos.config_dir' => $this->tmpDir,
             'argos.claude_token' => 'test-claude-token',
-            'argos.worker_image' => 'argos-worker:test',
         ]);
+
+        // PhaseRunner asks the resolver for the worker image tag — bypass the
+        // compose pipeline (no docker build, no stack seeding) by binding a
+        // stub resolver that returns a fixed tag every test can assert on.
+        $resolver = Mockery::mock(WorkerImageResolver::class);
+        $resolver->shouldReceive('resolveOrBuild')->andReturn('argos-worker:test');
+        $this->app->instance(WorkerImageResolver::class, $resolver);
     }
 
     protected function tearDown(): void
@@ -163,6 +174,85 @@ class PhaseRunnerTest extends TestCase
         app(PhaseRunner::class)->runBlocking($task, 'concept');
     }
 
+    public function test_falls_back_to_first_active_credential_when_task_has_none(): void
+    {
+        config(['argos.claude_token' => null]);
+        $this->mock(CredentialStore::class)->shouldReceive('getClaudeToken')->andReturn(null);
+
+        // Two creds, the older active one is what the resolver should pick.
+        AgentCredential::factory()->create([
+            'agent_name' => AgentName::ClaudeCode,
+            'name' => 'older active',
+            'credentials' => ['token' => 'sk-default-token'],
+            'status' => AgentCredentialStatus::Active,
+            'created_at' => now()->subHour(),
+        ]);
+        AgentCredential::factory()->create([
+            'agent_name' => AgentName::ClaudeCode,
+            'name' => 'newer active',
+            'credentials' => ['token' => 'sk-newer-token'],
+            'status' => AgentCredentialStatus::Active,
+            'created_at' => now(),
+        ]);
+
+        $task = $this->taskWithProfile();
+        $task->update(['agent_credential_id' => null]);
+
+        $cmd = $this->captureCommand($task, 'concept');
+
+        $this->assertContains('CLAUDE_CODE_OAUTH_TOKEN=sk-default-token', $cmd);
+    }
+
+    public function test_explicit_task_credential_overrides_default_active_credential(): void
+    {
+        config(['argos.claude_token' => null]);
+        $this->mock(CredentialStore::class)->shouldReceive('getClaudeToken')->andReturn(null);
+
+        AgentCredential::factory()->create([
+            'agent_name' => AgentName::ClaudeCode,
+            'name' => 'older active',
+            'credentials' => ['token' => 'sk-older-but-default'],
+            'status' => AgentCredentialStatus::Active,
+            'created_at' => now()->subDay(),
+        ]);
+        $explicit = AgentCredential::factory()->create([
+            'agent_name' => AgentName::ClaudeCode,
+            'name' => 'explicitly chosen',
+            'credentials' => ['token' => 'sk-explicit-token'],
+            'status' => AgentCredentialStatus::Active,
+            'created_at' => now(),
+        ]);
+
+        $task = $this->taskWithProfile();
+        $task->update(['agent_credential_id' => $explicit->id]);
+
+        $cmd = $this->captureCommand($task, 'concept');
+
+        $this->assertContains('CLAUDE_CODE_OAUTH_TOKEN=sk-explicit-token', $cmd);
+    }
+
+    public function test_inactive_credentials_are_not_used_as_default(): void
+    {
+        config(['argos.claude_token' => null]);
+        $this->mock(CredentialStore::class)->shouldReceive('getClaudeToken')->andReturn(null);
+
+        // Revoked rows must be skipped — only active ones count.
+        AgentCredential::factory()->create([
+            'agent_name' => AgentName::ClaudeCode,
+            'credentials' => ['token' => 'sk-revoked'],
+            'status' => AgentCredentialStatus::Revoked,
+            'created_at' => now()->subDay(),
+        ]);
+
+        $task = $this->taskWithProfile();
+        $task->update(['agent_credential_id' => null]);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageMatches('/Claude OAuth Token/');
+
+        app(PhaseRunner::class)->runBlocking($task, 'concept');
+    }
+
     // --- buildCommand (tested indirectly) ---
 
     public function test_build_command_includes_required_docker_flags(): void
@@ -286,39 +376,14 @@ class PhaseRunnerTest extends TestCase
         $this->assertSame('error_max_turns', $stopReason);
     }
 
-    public function test_build_command_uses_config_default_worker_image_when_unset(): void
+    public function test_build_command_uses_image_tag_from_resolver(): void
     {
         $task = $this->taskWithProfile();
-        $task->repoProfile->update(['worker_image' => null]);
-        config(['argos.worker_image' => 'argos-worker:test']);
 
         $cmd = $this->captureCommand($task, 'concept');
 
+        // Resolver is stubbed in setUp() to always return 'argos-worker:test'.
         $this->assertContains('argos-worker:test', $cmd);
-    }
-
-    public function test_build_command_prefers_repo_profile_worker_image_over_config(): void
-    {
-        $task = $this->taskWithProfile();
-        $task->repoProfile->update(['worker_image' => 'argos-worker:profile']);
-        config(['argos.worker_image' => 'argos-worker:test']);
-
-        $cmd = $this->captureCommand($task, 'concept');
-
-        $this->assertContains('argos-worker:profile', $cmd);
-        $this->assertNotContains('argos-worker:test', $cmd);
-    }
-
-    public function test_build_command_prefers_task_worker_image_over_profile(): void
-    {
-        $task = $this->taskWithProfile();
-        $task->repoProfile->update(['worker_image' => 'argos-worker:profile']);
-        $task->update(['worker_image' => 'argos-worker:task']);
-
-        $cmd = $this->captureCommand($task, 'concept');
-
-        $this->assertContains('argos-worker:task', $cmd);
-        $this->assertNotContains('argos-worker:profile', $cmd);
     }
 
     // --- commit user env vars ---
@@ -638,7 +703,7 @@ class PhaseRunnerTest extends TestCase
 
     private function makeProcessMock(int $exitCode, string $stdout = ''): Process
     {
-        $mock = \Mockery::mock(Process::class);
+        $mock = Mockery::mock(Process::class);
         $mock->shouldReceive('setTimeout')->andReturnSelf();
         $mock->shouldReceive('setIdleTimeout')->andReturnSelf();
         $mock->shouldReceive('run')

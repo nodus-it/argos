@@ -49,4 +49,29 @@ return [
             'cost' => 'Cost',
         ],
     ],
+
+    'worker_source' => [
+        'standard' => 'Standard',
+        'byoi' => 'Bring Your Own Image (BYOI)',
+        'devcontainer' => 'Devcontainer',
+    ],
+
+    'worker_image_entity_status' => [
+        'active' => 'Active',
+        'deprecated' => 'Deprecated',
+        'disabled' => 'Disabled',
+    ],
+
+    'worker_image_build_status' => [
+        'queued' => 'Queued',
+        'building' => 'Building',
+        'ready' => 'Ready',
+        'failed' => 'Failed',
+    ],
+
+    'agent_credential_status' => [
+        'active' => 'Active',
+        'expired' => 'Expired',
+        'revoked' => 'Revoked',
+    ],
 ];

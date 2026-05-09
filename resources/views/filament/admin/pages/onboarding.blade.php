@@ -30,7 +30,7 @@
                         <x-heroicon-o-check-circle class="h-5 w-5 text-emerald-500 flex-shrink-0" />
                         <span class="text-sm text-gray-700 dark:text-gray-300">{!! __('onboarding.token.from_env') !!}</span>
                     </div>
-                @elseif($tokenSource === 'file')
+                @elseif($tokenSource === 'agent_credential')
                     <div class="flex items-center gap-3">
                         <x-heroicon-o-check-circle class="h-5 w-5 text-emerald-500 flex-shrink-0" />
                         <span class="text-sm text-gray-700 dark:text-gray-300">{{ __('onboarding.token.is_saved') }}</span>

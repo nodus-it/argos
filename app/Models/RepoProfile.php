@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\AgentName;
 use App\Enums\AuthMethod;
 use App\Enums\ClaudeModel;
 use App\Enums\GitProvider;
+use App\Enums\WorkerSource;
 use App\Services\OAuth\TokenRefresher;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Collection;
@@ -26,7 +28,10 @@ use Illuminate\Support\Carbon;
  * @property GitProvider $platform
  * @property AuthMethod $auth_method
  * @property int|null $connected_account_id
- * @property string|null $worker_image
+ * @property WorkerSource $worker_source
+ * @property string|null $worker_stack_id
+ * @property AgentName|null $worker_agent_name
+ * @property array<string, mixed>|null $worker_config
  * @property ClaudeModel|null $model_concept
  * @property ClaudeModel|null $model_implement
  * @property bool $auto_concept
@@ -35,6 +40,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $updated_at
  * @property-read Collection<int, Task> $tasks
  * @property-read ConnectedAccount|null $connectedAccount
+ * @property-read WorkerStack|null $workerStack
  */
 class RepoProfile extends Model
 {
@@ -49,7 +55,10 @@ class RepoProfile extends Model
         'platform',
         'auth_method',
         'connected_account_id',
-        'worker_image',
+        'worker_source',
+        'worker_stack_id',
+        'worker_agent_name',
+        'worker_config',
         'model_concept',
         'model_implement',
         'auto_concept',
@@ -62,6 +71,9 @@ class RepoProfile extends Model
             'token' => 'encrypted',
             'platform' => GitProvider::class,
             'auth_method' => AuthMethod::class,
+            'worker_source' => WorkerSource::class,
+            'worker_agent_name' => AgentName::class,
+            'worker_config' => 'array',
             'model_concept' => ClaudeModel::class,
             'model_implement' => ClaudeModel::class,
             'auto_concept' => 'boolean',
@@ -83,6 +95,14 @@ class RepoProfile extends Model
     public function connectedAccount(): BelongsTo
     {
         return $this->belongsTo(ConnectedAccount::class);
+    }
+
+    /**
+     * @return BelongsTo<WorkerStack, $this>
+     */
+    public function workerStack(): BelongsTo
+    {
+        return $this->belongsTo(WorkerStack::class);
     }
 
     /**

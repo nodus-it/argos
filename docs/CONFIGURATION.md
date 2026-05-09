@@ -33,7 +33,7 @@ All Argos configuration is controlled via environment variables passed to the
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `ARGOS_WORKER_IMAGE` | `ghcr.io/nodus-it/argos-worker:php8.4` | Worker image used to spawn task containers. |
+| `ARGOS_DEFAULT_STACK` | `php-8.4` | Slug of the worker stack used when neither the task nor the project pins one. Must match a row in `worker_stacks` (built-ins are mirrored on `migrate`). |
 | `ARGOS_MEM_LIMIT` | `4g` | Memory limit per worker container. |
 | `ARGOS_CPU_LIMIT` | `2` | CPU limit per worker container. |
 | `ARGOS_MAX_TURNS_DEFAULT` | `200` | Default max-turns for the implement phase (overridable per task). |

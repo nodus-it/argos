@@ -22,8 +22,8 @@
 # Stage channel (rolling develop images, for testers):
 #   curl … | bash -s -- --stage
 #   ARGOS_STAGE=1 curl … | bash
-# Pins ARGOS_APP_IMAGE / ARGOS_WORKER_IMAGE to the :stage tags published
-# from develop and tracks the develop branch for manifests.
+# Pins ARGOS_APP_IMAGE to the :stage tag published from develop and tracks
+# the develop branch for manifests.
 #
 # Beta channel (latest release including pre-releases):
 #   curl … | bash -s -- --beta
@@ -60,7 +60,6 @@ STAGE="${ARGOS_STAGE:-0}"
 # when no stable release exists yet (transparent fallback, with a warning).
 BETA="${ARGOS_BETA:-0}"
 STAGE_APP_IMAGE="ghcr.io/nodus-it/argos-app:stage"
-STAGE_WORKER_IMAGE="ghcr.io/nodus-it/argos-worker:stage-php8.4"
 
 # Files the installer owns inside INSTALL_DIR.
 COMPOSE_FILE="docker-compose.yml"
@@ -107,9 +106,9 @@ Usage: install.sh [options]
 Options:
   -d, --dir PATH       Install directory (default: \$PWD = $PWD)
   -v, --version REF    Git ref to install from (default: $ARGOS_VERSION)
-  -s, --stage          Use the rolling 'stage' images built from develop
-                       (sets ARGOS_APP_IMAGE / ARGOS_WORKER_IMAGE to :stage
-                       tags; defaults --version to develop if unpinned)
+  -s, --stage          Use the rolling 'stage' image built from develop
+                       (sets ARGOS_APP_IMAGE to the :stage tag; defaults
+                       --version to develop if unpinned)
   -b, --beta           Install the latest release including pre-releases.
                        Useful before the first stable release ships or to
                        track RC builds. Also activates automatically as a
@@ -388,16 +387,14 @@ backfill_missing_secrets() {
     fi
 }
 
-# apply_stage_overrides: Pin ARGOS_APP_IMAGE and ARGOS_WORKER_IMAGE in $ENV_FILE
-# to the rolling :stage tags published from develop. Idempotent — safe to run
-# on both fresh installs and updates whenever --stage is in effect.
-# Args: none (reads $ENV_FILE, $STAGE_APP_IMAGE, $STAGE_WORKER_IMAGE)
+# apply_stage_overrides: Pin ARGOS_APP_IMAGE in $ENV_FILE to the rolling
+# :stage tag published from develop. Idempotent — safe to run on both fresh
+# installs and updates whenever --stage is in effect.
+# Args: none (reads $ENV_FILE, $STAGE_APP_IMAGE)
 # Returns: 0
 apply_stage_overrides() {
-    set_env_value "$ENV_FILE" ARGOS_APP_IMAGE    "$STAGE_APP_IMAGE"
-    set_env_value "$ENV_FILE" ARGOS_WORKER_IMAGE "$STAGE_WORKER_IMAGE"
+    set_env_value "$ENV_FILE" ARGOS_APP_IMAGE "$STAGE_APP_IMAGE"
     log "Stage channel: pinned ARGOS_APP_IMAGE=$STAGE_APP_IMAGE"
-    log "Stage channel: pinned ARGOS_WORKER_IMAGE=$STAGE_WORKER_IMAGE"
 }
 
 # reset_stack: Tear down the compose stack (containers + named volumes),

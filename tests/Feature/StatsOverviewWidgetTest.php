@@ -4,11 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Enums\AgentName;
 use App\Enums\WorkflowStatus;
 use App\Filament\Admin\Widgets\StatsOverviewWidget;
 use App\Jobs\RunPhaseJob;
+use App\Models\AgentVersion;
 use App\Models\Task;
 use App\Models\User;
+use App\Models\WorkerImageBuild;
+use App\Models\WorkerStack;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
@@ -30,7 +34,52 @@ class StatsOverviewWidgetTest extends TestCase
             ->assertSuccessful()
             ->assertSee('Running Workers')
             ->assertSee('In Progress')
-            ->assertSee('Waiting for you');
+            ->assertSee('Waiting for you')
+            ->assertSee('Worker Updates');
+    }
+
+    public function test_worker_updates_stat_counts_unique_outdated_pairs(): void
+    {
+        // Two builds for the same (stack × agent) — both stale (stack drift)
+        $stack = WorkerStack::factory()->create();
+        WorkerImageBuild::factory()->ready()->create([
+            'worker_stack_id' => $stack->id,
+            'agent_name' => AgentName::ClaudeCode,
+            'stack_hash' => 'aaaaaaaa',
+            'built_at' => now(),
+        ]);
+        WorkerImageBuild::factory()->ready()->create([
+            'worker_stack_id' => $stack->id,
+            'agent_name' => AgentName::ClaudeCode,
+            'stack_hash' => 'bbbbbbbb',
+            'built_at' => now(),
+        ]);
+
+        // Plus one agent-drift on a different agent
+        $currentHash = substr(hash('sha256', $stack->dockerfile_body), 0, 8);
+        AgentVersion::factory()->withUpdate()->create([
+            'agent_name' => AgentName::Codex,
+            'last_checked_at' => now(),
+        ]);
+        WorkerImageBuild::factory()->ready()->create([
+            'worker_stack_id' => $stack->id,
+            'agent_name' => AgentName::Codex,
+            'stack_hash' => $currentHash,
+            'built_at' => now()->subHour(),
+        ]);
+
+        // 3 outdated rows but only 2 unique (stack × agent) pairs
+        Livewire::test(StatsOverviewWidget::class)
+            ->assertSee('Worker Updates')
+            ->assertSee('Image rebuilds available')
+            ->assertSee('2');
+    }
+
+    public function test_worker_updates_stat_calm_when_nothing_to_update(): void
+    {
+        Livewire::test(StatsOverviewWidget::class)
+            ->assertSee('Worker Updates')
+            ->assertSee('All up to date');
     }
 
     public function test_running_workers_counts_only_reserved_phase_jobs(): void

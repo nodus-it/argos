@@ -181,25 +181,21 @@ jobs:
           git checkout master
           git merge --no-ff develop -m "Release ${{ steps.tag.outputs.name }}"
 
-          # Pin installer/.env.example to the version-suffixed image tags on
-          # master only. develop keeps the floating :latest / :php8.4 defaults
-          # so testers running `install.sh --version develop` track the rolling
-          # tags. Self-host installs from this release tag get an immutable
-          # image:tag pair that can't drift mid-release.
+          # Pin installer/.env.example to the version-suffixed app image tag
+          # on master only. develop keeps the floating :latest default so
+          # testers running `install.sh --version develop` track the rolling
+          # tag. Self-host installs from this release tag get an immutable
+          # image:tag pair that can't drift mid-release. Worker images are
+          # built on demand by the manager and don't need pinning here.
           if ! grep -qE '^ARGOS_APP_IMAGE=ghcr\.io/nodus-it/argos-app:' installer/.env.example; then
             echo "::error::installer/.env.example fehlt die erwartete ARGOS_APP_IMAGE-Zeile"
             exit 1
           fi
-          if ! grep -qE '^ARGOS_WORKER_IMAGE=ghcr\.io/nodus-it/argos-worker:' installer/.env.example; then
-            echo "::error::installer/.env.example fehlt die erwartete ARGOS_WORKER_IMAGE-Zeile"
-            exit 1
-          fi
           sed -i -E "s|^(ARGOS_APP_IMAGE=ghcr\.io/nodus-it/argos-app):.*$|\1:${{ steps.tag.outputs.name }}|" installer/.env.example
-          sed -i -E "s|^(ARGOS_WORKER_IMAGE=ghcr\.io/nodus-it/argos-worker):.*$|\1:php8.4-${{ steps.tag.outputs.name }}|" installer/.env.example
           echo "── Diff installer/.env.example ──"
           git --no-pager diff installer/.env.example
           git add installer/.env.example
-          git commit -m "chore(release): pin installer image tags to ${{ steps.tag.outputs.name }}"
+          git commit -m "chore(release): pin installer app image tag to ${{ steps.tag.outputs.name }}"
 
           git tag -a "${{ steps.tag.outputs.name }}" -m "Release ${{ steps.tag.outputs.name }}"
           # Atomic push: master + tag in einem Schritt — entweder beide oder keiner.

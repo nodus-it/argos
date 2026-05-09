@@ -34,7 +34,7 @@ body:
       label: Steps to reproduce
       description: How can we trigger the bug? Include task config, repo profile settings, or relevant UI clicks.
       placeholder: |
-        1. Create a task targeting repo X with worker image `argos-worker:local-php8.4`
+        1. Create a task targeting repo X (PHP 8.4 stack, Claude Code agent)
         2. Click "Run concept"
         3. ...
     validations:
@@ -50,11 +50,11 @@ body:
       required: true
 
   - type: input
-    id: worker_image
+    id: worker_stack_agent
     attributes:
-      label: Worker image
-      description: The worker image tag the task uses (Settings → Worker image, or the task / repo profile).
-      placeholder: e.g. argos-worker:local-php8.4
+      label: Worker stack & agent
+      description: The stack and agent the task uses (visible on the task page, or in the project's worker section).
+      placeholder: e.g. php-8.4 / claude-code
 
   - type: markdown
     attributes:

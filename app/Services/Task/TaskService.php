@@ -46,9 +46,11 @@ class TaskService
             'base_branch' => $data['base_branch'] ?? null,
             'auto_concept' => $data['auto_concept'] ?? false,
             'max_turns' => $data['max_turns'] ?? null,
-            'worker_image' => $data['worker_image'] ?? null,
             'model_concept' => $data['model_concept'] ?? null,
             'model_implement' => $data['model_implement'] ?? null,
+            'worker_stack_id_override' => $data['worker_stack_id_override'] ?? null,
+            'worker_agent_name_override' => $data['worker_agent_name_override'] ?? null,
+            'agent_credential_id' => $data['agent_credential_id'] ?? null,
         ]);
 
         Process::run(['docker', 'volume', 'create', $task->volumeName()]);

@@ -26,8 +26,11 @@
 agent_run() {
     local agent="${AGENT_NAME:-claude_code}"
     case "$agent" in
-        claude_code)
+        claude_code|claude-code)
             agent_claude_code_run "$@"
+            ;;
+        codex)
+            agent_codex_run "$@"
             ;;
         *)
             echo "agent: unknown AGENT_NAME='$agent' — no runner registered" >&2
@@ -41,7 +44,8 @@ agent_run() {
 agent_check() {
     local agent="${AGENT_NAME:-claude_code}"
     case "$agent" in
-        claude_code) agent_claude_code_check ;;
+        claude_code|claude-code) agent_claude_code_check ;;
+        codex) agent_codex_check ;;
         *)
             echo "agent: unknown AGENT_NAME='$agent'" >&2
             return 30
@@ -56,8 +60,30 @@ agent_check() {
 agent_check_usage_limit() {
     local agent="${AGENT_NAME:-claude_code}"
     case "$agent" in
-        claude_code) agent_claude_code_check_usage_limit "$@" ;;
+        claude_code|claude-code) agent_claude_code_check_usage_limit "$@" ;;
+        codex) agent_codex_check_usage_limit "$@" ;;
         *) return 1 ;;
+    esac
+}
+
+# agent_auth_present: Pre-check used by phase preconditions. Verifies
+# that the active agent has *some* form of credential available — the
+# concrete shape depends on the agent (env-var for claude, file or
+# env-var for codex). Replaces the pre-multi-agent hard-coded
+# CLAUDE_CODE_OAUTH_TOKEN check.
+# Returns: 0 if auth is in place, non-zero otherwise.
+agent_auth_present() {
+    local agent="${AGENT_NAME:-claude_code}"
+    case "$agent" in
+        claude_code|claude-code)
+            [[ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" || -n "${AGENT_TOKEN:-}" ]]
+            ;;
+        codex)
+            [[ -f "${HOME:-/home/agent}/.codex/auth.json" || -n "${OPENAI_API_KEY:-}" || -n "${AGENT_TOKEN:-}" ]]
+            ;;
+        *)
+            return 1
+            ;;
     esac
 }
 
@@ -67,7 +93,8 @@ agent_check_usage_limit() {
 agent_check_auth_error() {
     local agent="${AGENT_NAME:-claude_code}"
     case "$agent" in
-        claude_code) agent_claude_code_check_auth_error "$@" ;;
+        claude_code|claude-code) agent_claude_code_check_auth_error "$@" ;;
+        codex) agent_codex_check_auth_error "$@" ;;
         *) return 1 ;;
     esac
 }

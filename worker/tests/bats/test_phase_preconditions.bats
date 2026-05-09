@@ -7,6 +7,10 @@ setup() {
     mkdir -p /workspace/.agent
     unset REPO_URL REPO_TOKEN BASE_BRANCH CLAUDE_CODE_OAUTH_TOKEN ITERATION PHASE_FLAGS
 
+    # phase preconditions delegate the credential check to agent_auth_present
+    # which lives in lib/agent.sh — must be sourced before the phase scripts.
+    # shellcheck source=../../lib/agent.sh
+    source worker/lib/agent.sh
     # shellcheck source=../../phases/concept.sh
     source worker/phases/concept.sh
     # shellcheck source=../../phases/implement.sh

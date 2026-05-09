@@ -10,6 +10,11 @@ use App\Services\GitProvider\BitbucketGitService;
 use App\Services\GitProvider\GitHubGitService;
 use App\Services\GitProvider\GitLabGitService;
 use App\Services\GitProvider\GitProviderRegistry;
+use App\Workers\Agents\AgentRegistry;
+use App\Workers\Agents\ClaudeCodeRunner;
+use App\Workers\Agents\CodexRunner;
+use App\Workers\Builtin\BuiltinSync;
+use Illuminate\Database\Events\MigrationsEnded;
 use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Support\Env;
 use Illuminate\Support\Facades\Artisan;
@@ -52,6 +57,17 @@ class AppServiceProvider extends ServiceProvider
 
             return $registry;
         });
+
+        $this->app->singleton(AgentRegistry::class, function (): AgentRegistry {
+            $registry = new AgentRegistry;
+
+            // Adding a new agent: write the runner class, add a case to
+            // App\Enums\AgentName, register here. No DB seeding required.
+            $registry->register(ClaudeCodeRunner::class);
+            $registry->register(CodexRunner::class);
+
+            return $registry;
+        });
     }
 
     public function boot(): void
@@ -69,6 +85,17 @@ class AppServiceProvider extends ServiceProvider
                 'error' => $event->exception->getMessage(),
                 'class' => $event->exception::class,
             ]);
+        });
+
+        // After every `migrate` run, mirror the built-in worker stack manifest
+        // into worker_stacks. Skipped during unit tests so RefreshDatabase
+        // tests stay fast and free of seed data they didn't ask for; tests
+        // that need built-ins call BuiltinSync directly.
+        Event::listen(MigrationsEnded::class, function (): void {
+            if (app()->runningUnitTests()) {
+                return;
+            }
+            BuiltinSync::default()->sync();
         });
 
         $this->configureDatabase();

@@ -22,7 +22,6 @@ class RepoProfileFactory extends Factory
             'auth_method' => 'pat',
             'connected_account_id' => null,
             'default_branch' => 'main',
-            'worker_image' => null,
             'auto_concept' => false,
             'auto_pr' => false,
         ];

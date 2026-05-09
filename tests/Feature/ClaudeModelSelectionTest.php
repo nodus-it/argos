@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Enums\AgentName;
 use App\Enums\ClaudeModel;
 use App\Enums\WorkflowStatus;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\EditRepoProfile;
@@ -144,7 +145,7 @@ class ClaudeModelSelectionTest extends TestCase
         ]);
 
         $runner = app(PhaseRunner::class);
-        $model = $this->callPrivateMethod($runner, 'resolveClaudeModel', [$task, 'respond']);
+        $model = $this->callPrivateMethod($runner, 'resolveModel', [$task, AgentName::ClaudeCode, 'respond']);
 
         $this->assertSame(ClaudeModel::Sonnet46->value, $model);
     }
@@ -161,7 +162,7 @@ class ClaudeModelSelectionTest extends TestCase
         ]);
 
         $runner = app(PhaseRunner::class);
-        $model = $this->callPrivateMethod($runner, 'resolveClaudeModel', [$task, 'respond']);
+        $model = $this->callPrivateMethod($runner, 'resolveModel', [$task, AgentName::ClaudeCode, 'respond']);
 
         $this->assertSame(ClaudeModel::Haiku45->value, $model);
     }
@@ -170,7 +171,7 @@ class ClaudeModelSelectionTest extends TestCase
     {
         $task = Task::factory()->create();
         $runner = app(PhaseRunner::class);
-        $model = $this->callPrivateMethod($runner, 'resolveClaudeModel', [$task, 'commit-message']);
+        $model = $this->callPrivateMethod($runner, 'resolveModel', [$task, AgentName::ClaudeCode, 'commit-message']);
 
         $this->assertSame(ClaudeModel::Haiku45->value, $model);
     }
