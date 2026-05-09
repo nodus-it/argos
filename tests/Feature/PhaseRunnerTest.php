@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Enums\AgentCredentialStatus;
+use App\Enums\AgentName;
 use App\Enums\PhaseStatus;
+use App\Models\AgentCredential;
 use App\Models\ConnectedAccount;
 use App\Models\PhaseRun;
 use App\Models\RepoProfile;
@@ -164,6 +167,85 @@ class PhaseRunnerTest extends TestCase
         $this->mock(CredentialStore::class)
             ->shouldReceive('getClaudeToken')
             ->andReturn(null);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageMatches('/Claude OAuth Token/');
+
+        app(PhaseRunner::class)->runBlocking($task, 'concept');
+    }
+
+    public function test_falls_back_to_first_active_credential_when_task_has_none(): void
+    {
+        config(['argos.claude_token' => null]);
+        $this->mock(CredentialStore::class)->shouldReceive('getClaudeToken')->andReturn(null);
+
+        // Two creds, the older active one is what the resolver should pick.
+        AgentCredential::factory()->create([
+            'agent_name' => AgentName::ClaudeCode,
+            'name' => 'older active',
+            'credentials' => ['token' => 'sk-default-token'],
+            'status' => AgentCredentialStatus::Active,
+            'created_at' => now()->subHour(),
+        ]);
+        AgentCredential::factory()->create([
+            'agent_name' => AgentName::ClaudeCode,
+            'name' => 'newer active',
+            'credentials' => ['token' => 'sk-newer-token'],
+            'status' => AgentCredentialStatus::Active,
+            'created_at' => now(),
+        ]);
+
+        $task = $this->taskWithProfile();
+        $task->update(['agent_credential_id' => null]);
+
+        $cmd = $this->captureCommand($task, 'concept');
+
+        $this->assertContains('CLAUDE_CODE_OAUTH_TOKEN=sk-default-token', $cmd);
+    }
+
+    public function test_explicit_task_credential_overrides_default_active_credential(): void
+    {
+        config(['argos.claude_token' => null]);
+        $this->mock(CredentialStore::class)->shouldReceive('getClaudeToken')->andReturn(null);
+
+        AgentCredential::factory()->create([
+            'agent_name' => AgentName::ClaudeCode,
+            'name' => 'older active',
+            'credentials' => ['token' => 'sk-older-but-default'],
+            'status' => AgentCredentialStatus::Active,
+            'created_at' => now()->subDay(),
+        ]);
+        $explicit = AgentCredential::factory()->create([
+            'agent_name' => AgentName::ClaudeCode,
+            'name' => 'explicitly chosen',
+            'credentials' => ['token' => 'sk-explicit-token'],
+            'status' => AgentCredentialStatus::Active,
+            'created_at' => now(),
+        ]);
+
+        $task = $this->taskWithProfile();
+        $task->update(['agent_credential_id' => $explicit->id]);
+
+        $cmd = $this->captureCommand($task, 'concept');
+
+        $this->assertContains('CLAUDE_CODE_OAUTH_TOKEN=sk-explicit-token', $cmd);
+    }
+
+    public function test_inactive_credentials_are_not_used_as_default(): void
+    {
+        config(['argos.claude_token' => null]);
+        $this->mock(CredentialStore::class)->shouldReceive('getClaudeToken')->andReturn(null);
+
+        // Revoked rows must be skipped — only active ones count.
+        AgentCredential::factory()->create([
+            'agent_name' => AgentName::ClaudeCode,
+            'credentials' => ['token' => 'sk-revoked'],
+            'status' => AgentCredentialStatus::Revoked,
+            'created_at' => now()->subDay(),
+        ]);
+
+        $task = $this->taskWithProfile();
+        $task->update(['agent_credential_id' => null]);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessageMatches('/Claude OAuth Token/');

@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Services\Workflow;
 
+use App\Enums\AgentCredentialStatus;
 use App\Enums\AgentName;
 use App\Enums\PhaseStatus;
 use App\Enums\WorkflowStatus;
 use App\Jobs\RunPhaseJob;
+use App\Models\AgentCredential;
 use App\Models\PhaseRun;
 use App\Models\RepoProfile;
 use App\Models\Task;
@@ -597,15 +599,37 @@ class PhaseRunner
 
     /**
      * Materialise the agent's credential into env-vars for `docker run`.
-     * Prefers the AgentCredential FK on the task; if absent, a runner
-     * may fall back to legacy single-token config (claude_code does so
-     * for backwards compatibility, codex throws).
+     *
+     * Resolution order:
+     *   1. Explicit `task.agent_credential_id` if set
+     *   2. First active AgentCredential for the resolved agent (matches
+     *      what TaskResource's helper text promises)
+     *   3. Whatever the runner falls back to when handed null — claude
+     *      reads the legacy env/file token, codex throws because it has
+     *      no shared-secret fallback
      */
     private function materializeCredential(Task $task, AgentName $agentName): MaterializedAgentCredential
     {
         $runner = $agentName->runner();
 
-        return $runner->materializeCredential($task->agentCredential);
+        $credential = $task->agentCredential
+            ?? $this->resolveDefaultCredential($agentName);
+
+        return $runner->materializeCredential($credential);
+    }
+
+    /**
+     * First active credential for the agent, ordered by created_at so the
+     * "first one I made" intuition matches what the form's "Leer = erste
+     * aktive Credential" helper text claims.
+     */
+    private function resolveDefaultCredential(AgentName $agentName): ?AgentCredential
+    {
+        return AgentCredential::query()
+            ->where('agent_name', $agentName->value)
+            ->where('status', AgentCredentialStatus::Active->value)
+            ->orderBy('created_at')
+            ->first();
     }
 
     /**
