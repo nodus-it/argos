@@ -6,7 +6,6 @@ namespace App\Workers\Compose;
 
 use App\Enums\AgentName;
 use App\Enums\WorkerImageEntityStatus;
-use App\Models\RepoProfile;
 use App\Models\Task;
 use App\Models\WorkerStack;
 use App\Workers\Agents\AgentSpec;
@@ -14,12 +13,10 @@ use RuntimeException;
 
 /**
  * Resolves the (stack × agent) pair that should run for a task and
- * computes deterministic image tags. Used by PhaseRunner once the
- * compose pipeline is enabled.
+ * computes deterministic image tags. Used by PhaseRunner.
  *
  * Resolution order for stack and agent: task-level override →
- * RepoProfile setting → legacy fallback (parsed from
- * repo_profiles.worker_image) → config default.
+ * RepoProfile setting → config default.
  */
 class WorkerImageResolver
 {
@@ -82,11 +79,8 @@ class WorkerImageResolver
 
     private function resolveStack(Task $task): WorkerStack
     {
-        $profile = $task->repoProfile;
-
         return $task->workerStackOverride
-            ?? $profile?->workerStack
-            ?? $this->legacyStackFromImageString($profile)
+            ?? $task->repoProfile?->workerStack
             ?? $this->defaultStack();
     }
 
@@ -95,30 +89,6 @@ class WorkerImageResolver
         return $task->worker_agent_name_override
             ?? $task->repoProfile?->worker_agent_name
             ?? AgentName::ClaudeCode;
-    }
-
-    /**
-     * Heuristic match for legacy RepoProfiles that have only a
-     * worker_image string set. Looks for "php8.X" / "php-8.X" markers
-     * and finds an active built-in stack with that name. Returns null
-     * if nothing matches; the caller falls through to the config default.
-     */
-    private function legacyStackFromImageString(?RepoProfile $profile): ?WorkerStack
-    {
-        if ($profile === null || $profile->worker_image === null) {
-            return null;
-        }
-
-        if (preg_match('/php[ -]?(\d+\.\d+)/i', $profile->worker_image, $m) !== 1) {
-            return null;
-        }
-
-        $name = 'php-'.$m[1];
-
-        return WorkerStack::query()
-            ->where('name', $name)
-            ->where('status', '!=', WorkerImageEntityStatus::Disabled)
-            ->first();
     }
 
     private function defaultStack(): WorkerStack

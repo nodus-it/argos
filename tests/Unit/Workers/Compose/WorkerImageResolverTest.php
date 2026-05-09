@@ -61,7 +61,7 @@ class WorkerImageResolverTest extends TestCase
     public function test_falls_back_to_default_stack_when_profile_has_none(): void
     {
         $defaultStack = WorkerStack::factory()->create(['name' => 'php-8.4', 'capabilities' => ['node']]);
-        $profile = RepoProfile::factory()->create(['worker_stack_id' => null, 'worker_image' => null]);
+        $profile = RepoProfile::factory()->create(['worker_stack_id' => null]);
         $task = Task::factory()->create(['repo_profile_id' => $profile->id]);
 
         config(['argos.compose.default_stack' => 'php-8.4']);
@@ -69,21 +69,6 @@ class WorkerImageResolverTest extends TestCase
         $resolved = $this->resolver->resolve($task);
 
         $this->assertSame($defaultStack->id, $resolved->stack->id);
-    }
-
-    public function test_legacy_fallback_parses_php83_from_worker_image_string(): void
-    {
-        $php83 = WorkerStack::factory()->create(['name' => 'php-8.3', 'capabilities' => ['node']]);
-        WorkerStack::factory()->create(['name' => 'php-8.4', 'capabilities' => ['node']]);
-        $profile = RepoProfile::factory()->create([
-            'worker_stack_id' => null,
-            'worker_image' => 'argos-worker:local-php8.3',
-        ]);
-        $task = Task::factory()->create(['repo_profile_id' => $profile->id]);
-
-        $resolved = $this->resolver->resolve($task);
-
-        $this->assertSame($php83->id, $resolved->stack->id);
     }
 
     public function test_default_agent_is_claude_code(): void

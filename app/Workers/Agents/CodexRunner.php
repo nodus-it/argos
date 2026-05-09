@@ -45,6 +45,14 @@ final class CodexRunner implements AgentRunner
                     ],
                 ],
             ],
+            availableModels: [
+                'gpt-5-codex' => 'GPT-5 Codex',
+            ],
+            defaultModelByPhase: [
+                'concept' => 'gpt-5-codex',
+                'implement' => 'gpt-5-codex',
+                'commit-message' => 'gpt-5-codex',
+            ],
         );
     }
 

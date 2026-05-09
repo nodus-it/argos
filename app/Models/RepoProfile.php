@@ -28,7 +28,6 @@ use Illuminate\Support\Carbon;
  * @property GitProvider $platform
  * @property AuthMethod $auth_method
  * @property int|null $connected_account_id
- * @property string|null $worker_image
  * @property WorkerSource $worker_source
  * @property string|null $worker_stack_id
  * @property AgentName|null $worker_agent_name
@@ -56,7 +55,6 @@ class RepoProfile extends Model
         'platform',
         'auth_method',
         'connected_account_id',
-        'worker_image',
         'worker_source',
         'worker_stack_id',
         'worker_agent_name',

@@ -158,7 +158,10 @@ class ViewTask extends ViewRecord
         /** @var Task $task */
         $task = $this->getRecord();
         $branch = $task->repoProfile?->default_branch ?? 'main';
-        $image = config('argos.worker_image');
+        // alpine/git is the smallest image with `git` + `sh` available; keeps
+        // the diff view agent-/stack-agnostic so it works the same regardless
+        // of which worker image the task ran on.
+        $image = 'alpine/git';
         $vol = $task->volumeName();
 
         $statResult = Process::timeout(15)->run([

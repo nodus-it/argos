@@ -71,7 +71,10 @@ class ViewTaskDiff extends Page
     private function loadDiff(): void
     {
         $branch = $this->task->repoProfile?->default_branch ?? 'main';
-        $image = config('argos.worker_image');
+        // alpine/git is the smallest image with `git` + `sh` available; keeps
+        // the diff view agent-/stack-agnostic so it works the same regardless
+        // of which worker image the task ran on.
+        $image = 'alpine/git';
         $taskName = $this->task->name;
 
         $statResult = Process::timeout(15)->run([

@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources;
 
-use App\Enums\ClaudeModel;
+use App\Enums\AgentCredentialStatus;
+use App\Enums\AgentName;
+use App\Enums\WorkerImageEntityStatus;
 use App\Filament\Admin\Concerns\TaskTableConcern;
 use App\Filament\Admin\Resources\TaskResource\Pages\CreateTask;
 use App\Filament\Admin\Resources\TaskResource\Pages\ListTasks;
@@ -14,10 +16,12 @@ use App\Filament\Admin\Resources\TaskResource\Pages\ViewTaskDiff;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTaskLogs;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTaskRespond;
 use App\Filament\Admin\Resources\TaskResource\RelationManagers\PhaseRunsRelationManager;
+use App\Models\AgentCredential;
 use App\Models\RepoProfile;
 use App\Models\Task;
+use App\Models\WorkerStack;
 use App\Services\GitProvider\GitServiceFactory;
-use App\Services\WorkerImage;
+use App\Workers\Agents\AgentRegistry;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Forms\Components\Select;
@@ -110,39 +114,174 @@ class TaskResource extends Resource
                 ->searchable()
                 ->native(false),
 
-            Select::make('worker_image')
-                ->label(__('tasks.fields.worker_image_label'))
-                ->options(fn (Get $get): array => WorkerImage::optionsFor($get('worker_image')))
-                ->placeholder(fn (Get $get): string => 'Default vom Projekt ('
-                    .(RepoProfile::find($get('repo_profile_id'))?->worker_image ?: config('argos.worker_image')).')')
-                ->helperText(__('tasks.fields.worker_image_helper'))
+            Select::make('worker_stack_id_override')
+                ->label(__('tasks.fields.worker_stack_label'))
+                ->options(fn (): array => self::stackOptions())
+                ->placeholder(fn (Get $get): string => __(
+                    'tasks.fields.worker_stack_placeholder',
+                    ['stack' => self::projectStackLabel($get) ?? (string) config('argos.compose.default_stack', 'php-8.4')],
+                ))
+                ->helperText(__('tasks.fields.worker_stack_helper'))
                 ->searchable()
+                ->native(false),
+
+            Select::make('worker_agent_name_override')
+                ->label(__('tasks.fields.worker_agent_label'))
+                ->options(fn (): array => self::agentOptions())
+                ->placeholder(fn (Get $get): string => __(
+                    'tasks.fields.worker_agent_placeholder',
+                    ['agent' => self::projectAgent($get)->value],
+                ))
+                ->helperText(__('tasks.fields.worker_agent_helper'))
+                ->live()
+                ->afterStateUpdated(function (Set $set): void {
+                    // Different agent → previously-chosen credential almost
+                    // certainly belongs to the old agent, so clear it.
+                    $set('agent_credential_id', null);
+                })
+                ->native(false),
+
+            Select::make('agent_credential_id')
+                ->label(__('tasks.fields.agent_credential_label'))
+                ->options(fn (Get $get): array => self::credentialOptionsForAgent(self::effectiveAgent($get)))
+                ->placeholder(__('tasks.fields.agent_credential_placeholder'))
+                ->helperText(__('tasks.fields.agent_credential_helper'))
                 ->native(false),
 
             Select::make('model_concept')
                 ->label(__('tasks.fields.model_concept_label'))
-                ->options(fn (): array => collect(ClaudeModel::cases())
-                    ->mapWithKeys(fn (ClaudeModel $m): array => [$m->value => $m->label()])
-                    ->all())
-                ->placeholder(fn (Get $get): string => __('tasks.fields.model_concept_placeholder', [
-                    'model' => (RepoProfile::find($get('repo_profile_id'))?->model_concept
-                        ?? ClaudeModel::default('concept'))->label(),
-                ]))
+                ->options(fn (Get $get): array => self::effectiveAgent($get)->spec()->availableModels)
+                ->placeholder(fn (Get $get): string => __(
+                    'tasks.fields.model_concept_placeholder',
+                    ['model' => self::effectiveModelLabel($get, 'concept')],
+                ))
                 ->helperText(__('tasks.fields.model_concept_helper'))
                 ->native(false),
 
             Select::make('model_implement')
                 ->label(__('tasks.fields.model_implement_label'))
-                ->options(fn (): array => collect(ClaudeModel::cases())
-                    ->mapWithKeys(fn (ClaudeModel $m): array => [$m->value => $m->label()])
-                    ->all())
-                ->placeholder(fn (Get $get): string => __('tasks.fields.model_implement_placeholder', [
-                    'model' => (RepoProfile::find($get('repo_profile_id'))?->model_implement
-                        ?? ClaudeModel::default('implement'))->label(),
-                ]))
+                ->options(fn (Get $get): array => self::effectiveAgent($get)->spec()->availableModels)
+                ->placeholder(fn (Get $get): string => __(
+                    'tasks.fields.model_implement_placeholder',
+                    ['model' => self::effectiveModelLabel($get, 'implement')],
+                ))
                 ->helperText(__('tasks.fields.model_implement_helper'))
                 ->native(false),
         ]);
+    }
+
+    /**
+     * Active worker stacks as a [id => label] map for the override select.
+     *
+     * @return array<string, string>
+     */
+    private static function stackOptions(): array
+    {
+        return WorkerStack::query()
+            ->where('status', '!=', WorkerImageEntityStatus::Disabled)
+            ->orderBy('name')
+            ->get()
+            ->mapWithKeys(fn (WorkerStack $stack): array => [
+                $stack->id => $stack->label !== '' ? "{$stack->label} ({$stack->name})" : $stack->name,
+            ])
+            ->all();
+    }
+
+    /**
+     * Registered agents as a [name => label] map for the override select.
+     *
+     * @return array<string, string>
+     */
+    private static function agentOptions(): array
+    {
+        return collect(app(AgentRegistry::class)->specs())
+            ->mapWithKeys(fn ($spec): array => [$spec->name->value => $spec->label])
+            ->all();
+    }
+
+    /**
+     * Active credentials for the given agent as a [id => name] map.
+     *
+     * @return array<string, string>
+     */
+    private static function credentialOptionsForAgent(AgentName $agent): array
+    {
+        return AgentCredential::query()
+            ->where('agent_name', $agent->value)
+            ->where('status', AgentCredentialStatus::Active->value)
+            ->orderBy('name')
+            ->get()
+            ->mapWithKeys(fn (AgentCredential $cred): array => [$cred->id => $cred->name])
+            ->all();
+    }
+
+    /**
+     * The agent that will run for this task: explicit override on the form
+     * if set, otherwise the project default, otherwise Claude Code.
+     */
+    private static function effectiveAgent(Get $get): AgentName
+    {
+        $override = $get('worker_agent_name_override');
+        if (is_string($override) && $override !== '') {
+            $agent = AgentName::tryFrom($override);
+            if ($agent !== null) {
+                return $agent;
+            }
+        }
+
+        return self::projectAgent($get);
+    }
+
+    /**
+     * The agent configured at the project level — the placeholder value
+     * that hint-text and "what runs if you leave the override blank?"
+     * messages reach for.
+     */
+    private static function projectAgent(Get $get): AgentName
+    {
+        $profile = RepoProfile::find($get('repo_profile_id'));
+
+        return $profile?->worker_agent_name ?? AgentName::ClaudeCode;
+    }
+
+    /**
+     * The label of the project's default stack, or null if the project has
+     * none configured (placeholder will then fall back to the global default).
+     */
+    private static function projectStackLabel(Get $get): ?string
+    {
+        $profile = RepoProfile::find($get('repo_profile_id'));
+        $stack = $profile?->workerStack;
+
+        if ($stack === null) {
+            return null;
+        }
+
+        return $stack->label !== '' ? $stack->label : $stack->name;
+    }
+
+    /**
+     * Display label for the model that will be used for a phase when the
+     * task-level override is blank — task model → project model → agent
+     * default. Returns the model id if no human label is registered.
+     */
+    private static function effectiveModelLabel(Get $get, string $phase): string
+    {
+        $profile = RepoProfile::find($get('repo_profile_id'));
+        $profileModel = match ($phase) {
+            'concept' => $profile?->model_concept?->value,
+            'implement' => $profile?->model_implement?->value,
+            default => null,
+        };
+
+        $agent = self::effectiveAgent($get);
+        $spec = $agent->spec();
+
+        $modelId = $profileModel !== null && $profileModel !== ''
+            ? $profileModel
+            : ($spec->defaultModel($phase) ?? '');
+
+        return $spec->availableModels[$modelId] ?? $modelId;
     }
 
     public static function table(Table $table): Table

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Services\Workflow;
 
 use App\Enums\AgentName;
-use App\Enums\ClaudeModel;
 use App\Enums\PhaseStatus;
 use App\Enums\WorkflowStatus;
 use App\Jobs\RunPhaseJob;
@@ -519,12 +518,12 @@ class PhaseRunner
         $agentName = $this->resolveAgentName($task);
         $materializedCredential = $this->materializeCredential($task, $agentName);
 
-        $workerImage = $this->resolveWorkerImage($task, $profile);
+        $workerImage = $this->resolveWorkerImage($task);
         $phaseFlags = $flags !== [] ? json_encode($flags) : '{}';
 
         $maxTurns = $this->resolveMaxTurns($task, $flags);
         $resumeSessionId = $this->resolveResumeSessionId($task, $phase, $flags);
-        $claudeModel = $this->resolveClaudeModel($task, $phase);
+        $modelId = $this->resolveModel($task, $agentName, $phase);
 
         $cmd = [
             'docker', 'run', '--rm',
@@ -545,7 +544,7 @@ class PhaseRunner
             '-e', "MAX_TURNS={$maxTurns}",
             '-e', 'CLAUDE_CONFIG_DIR=/workspace/.agent/claude-state',
             '-e', 'LOG_LEVEL=info',
-            '-e', "CLAUDE_MODEL={$claudeModel}",
+            '-e', "CLAUDE_MODEL={$modelId}",
         ];
 
         foreach ($materializedCredential->envVars as $key => $value) {
@@ -586,8 +585,8 @@ class PhaseRunner
     /**
      * Resolution order: task override → repo_profile setting → default
      * (claude-code). Mirrors what WorkerImageResolver does for the
-     * compose pipeline, but stays local so the legacy pipeline can use
-     * it too — both pipelines need AGENT_NAME injected into the worker.
+     * stack/agent pair so AGENT_NAME stays consistent with the chosen
+     * worker image.
      */
     private function resolveAgentName(Task $task): AgentName
     {
@@ -610,26 +609,16 @@ class PhaseRunner
     }
 
     /**
-     * Picks the worker image for this task. Two paths:
-     *   - 'legacy' (default): the pre-wave-1 string-based resolution
-     *     (task.worker_image → profile.worker_image → config default)
-     *   - 'compose': route through WorkerImageResolver, which reads
-     *     stack/agent from the DB and builds the image on demand from
-     *     .tools/docker/worker/. Switched via ARGOS_WORKER_PIPELINE.
+     * Resolves the worker image tag via the compose pipeline, building
+     * the image on demand if the (stack × agent × version) tuple does
+     * not yet exist locally. The resolver is fetched lazily via the
+     * container because phpunit's partialMock skips the constructor and
+     * any readonly resolver property would land in an
+     * "accessed before initialization" error.
      */
-    private function resolveWorkerImage(Task $task, RepoProfile $profile): string
+    private function resolveWorkerImage(Task $task): string
     {
-        if (config('argos.compose.pipeline') === 'compose') {
-            // Resolved lazily via the container instead of through the
-            // constructor: phpunit's partialMock(PhaseRunner::class, …)
-            // skips the constructor, so any readonly resolver property
-            // would land in an "accessed before initialization" error.
-            return app(WorkerImageResolver::class)->resolveOrBuild($task);
-        }
-
-        return $task->worker_image
-            ?: $profile->worker_image
-            ?: config('argos.worker_image', 'ghcr.io/nodus-it/argos-worker:php8.4');
+        return app(WorkerImageResolver::class)->resolveOrBuild($task);
     }
 
     /**
@@ -679,23 +668,49 @@ class PhaseRunner
     }
 
     /**
-     * Resolve the Claude model ID for a phase.
-     * For `respond`: concept-review context uses the concept model; otherwise the implement model.
-     * For `commit-message`: always Haiku (hardcoded in the worker script; we pass it here for consistency).
+     * Resolve the model id to send to the worker for this phase, agent-aware.
+     *
+     * Phase mapping:
+     *  - respond: concept-review uses the concept model, code-review the implement model
+     *  - commit-message: a dedicated cheap-model slot
+     *  - everything else: takes its own slot (concept/implement)
+     *
+     * Resolution order per slot: task override → repo profile default →
+     * agent-spec default for the phase. The env var stays named
+     * CLAUDE_MODEL for now because the worker scripts and Claude runner
+     * read it as such; the Codex runner ignores it (Codex picks via its
+     * own --model arg if needed).
      */
-    private function resolveClaudeModel(Task $task, string $phase): string
+    private function resolveModel(Task $task, AgentName $agentName, string $phase): string
     {
         $effectivePhase = match ($phase) {
             'respond' => $task->workflow_status === WorkflowStatus::ConceptReview ? 'concept' : 'implement',
-            'commit-message' => 'commit-message',
             default => $phase,
         };
 
-        if ($effectivePhase === 'commit-message') {
-            return ClaudeModel::Haiku45->value;
+        $taskModel = match ($effectivePhase) {
+            'concept' => $task->model_concept?->value,
+            'implement' => $task->model_implement?->value,
+            default => null,
+        };
+        if ($taskModel !== null && $taskModel !== '') {
+            return $taskModel;
         }
 
-        return $task->modelForPhase($effectivePhase);
+        $profile = $task->repoProfile;
+        $profileModel = match ($effectivePhase) {
+            'concept' => $profile?->model_concept?->value,
+            'implement' => $profile?->model_implement?->value,
+            default => null,
+        };
+        if ($profileModel !== null && $profileModel !== '') {
+            return $profileModel;
+        }
+
+        $spec = $agentName->spec();
+        $default = $spec->defaultModel($effectivePhase);
+
+        return $default ?? '';
     }
 
     private function extractSessionIdFromStreamLog(?string $streamLog): ?string

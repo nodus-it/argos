@@ -12,7 +12,9 @@ use App\Models\Task;
 use App\Models\User;
 use App\Services\Anthropic\CredentialStore;
 use App\Services\Workflow\PhaseRunner;
+use App\Workers\Compose\WorkerImageResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Mockery;
 use Mockery\MockInterface;
 use Symfony\Component\Process\Process;
 use Tests\TestCase;
@@ -31,8 +33,14 @@ class PhaseRunnerTest extends TestCase
         config([
             'argos.config_dir' => $this->tmpDir,
             'argos.claude_token' => 'test-claude-token',
-            'argos.worker_image' => 'argos-worker:test',
         ]);
+
+        // PhaseRunner asks the resolver for the worker image tag — bypass the
+        // compose pipeline (no docker build, no stack seeding) by binding a
+        // stub resolver that returns a fixed tag every test can assert on.
+        $resolver = Mockery::mock(WorkerImageResolver::class);
+        $resolver->shouldReceive('resolveOrBuild')->andReturn('argos-worker:test');
+        $this->app->instance(WorkerImageResolver::class, $resolver);
     }
 
     protected function tearDown(): void
@@ -286,39 +294,14 @@ class PhaseRunnerTest extends TestCase
         $this->assertSame('error_max_turns', $stopReason);
     }
 
-    public function test_build_command_uses_config_default_worker_image_when_unset(): void
+    public function test_build_command_uses_image_tag_from_resolver(): void
     {
         $task = $this->taskWithProfile();
-        $task->repoProfile->update(['worker_image' => null]);
-        config(['argos.worker_image' => 'argos-worker:test']);
 
         $cmd = $this->captureCommand($task, 'concept');
 
+        // Resolver is stubbed in setUp() to always return 'argos-worker:test'.
         $this->assertContains('argos-worker:test', $cmd);
-    }
-
-    public function test_build_command_prefers_repo_profile_worker_image_over_config(): void
-    {
-        $task = $this->taskWithProfile();
-        $task->repoProfile->update(['worker_image' => 'argos-worker:profile']);
-        config(['argos.worker_image' => 'argos-worker:test']);
-
-        $cmd = $this->captureCommand($task, 'concept');
-
-        $this->assertContains('argos-worker:profile', $cmd);
-        $this->assertNotContains('argos-worker:test', $cmd);
-    }
-
-    public function test_build_command_prefers_task_worker_image_over_profile(): void
-    {
-        $task = $this->taskWithProfile();
-        $task->repoProfile->update(['worker_image' => 'argos-worker:profile']);
-        $task->update(['worker_image' => 'argos-worker:task']);
-
-        $cmd = $this->captureCommand($task, 'concept');
-
-        $this->assertContains('argos-worker:task', $cmd);
-        $this->assertNotContains('argos-worker:profile', $cmd);
     }
 
     // --- commit user env vars ---
@@ -638,7 +621,7 @@ class PhaseRunnerTest extends TestCase
 
     private function makeProcessMock(int $exitCode, string $stdout = ''): Process
     {
-        $mock = \Mockery::mock(Process::class);
+        $mock = Mockery::mock(Process::class);
         $mock->shouldReceive('setTimeout')->andReturnSelf();
         $mock->shouldReceive('setIdleTimeout')->andReturnSelf();
         $mock->shouldReceive('run')

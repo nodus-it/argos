@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources;
 
+use App\Enums\AgentName;
 use App\Enums\AuthMethod;
-use App\Enums\ClaudeModel;
 use App\Enums\GitProvider;
+use App\Enums\WorkerImageEntityStatus;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\CreateRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\EditRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\ListRepoProfiles;
@@ -15,11 +16,12 @@ use App\Filament\Admin\Resources\RepoProfileResource\RelationManagers\TasksRelat
 use App\Models\ConnectedAccount;
 use App\Models\RepoProfile;
 use App\Models\User;
+use App\Models\WorkerStack;
 use App\Services\GitProvider\BitbucketGitService;
 use App\Services\GitProvider\GitHubGitService;
 use App\Services\GitProvider\GitLabGitService;
 use App\Services\GitProvider\GitServiceFactory;
-use App\Services\WorkerImage;
+use App\Workers\Agents\AgentRegistry;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
@@ -120,13 +122,28 @@ class RepoProfileResource extends Resource
                     Toggle::make('auto_pr')
                         ->label(__('projects.fields.auto_pr_label'))
                         ->helperText(__('projects.fields.auto_pr_helper')),
+                ]),
 
-                    Select::make('worker_image')
-                        ->label(__('projects.fields.worker_image_label'))
-                        ->options(fn (Get $get): array => WorkerImage::optionsFor($get('worker_image')))
-                        ->placeholder(__('projects.fields.worker_image_placeholder', ['image' => config('argos.worker_image')]))
-                        ->helperText(__('projects.fields.worker_image_helper'))
+            // ── Block 2a ─ Worker (Stack & Agent) ───────────────────────────────
+            Section::make(__('projects.sections.worker'))
+                ->description(__('projects.sections.worker_description'))
+                ->visible(fn (Get $get): bool => self::platformChosen($get))
+                ->collapsed()
+                ->schema([
+                    Select::make('worker_stack_id')
+                        ->label(__('projects.fields.worker_stack_label'))
+                        ->helperText(__('projects.fields.worker_stack_helper'))
+                        ->options(fn (): array => self::stackOptions())
+                        ->placeholder(__('projects.fields.worker_stack_placeholder', ['stack' => (string) config('argos.compose.default_stack', 'php-8.4')]))
                         ->searchable()
+                        ->native(false),
+
+                    Select::make('worker_agent_name')
+                        ->label(__('projects.fields.worker_agent_label'))
+                        ->helperText(__('projects.fields.worker_agent_helper'))
+                        ->options(fn (): array => self::agentOptions())
+                        ->placeholder(__('projects.fields.worker_agent_placeholder', ['agent' => AgentName::ClaudeCode->value]))
+                        ->live()
                         ->native(false),
                 ]),
 
@@ -137,19 +154,21 @@ class RepoProfileResource extends Resource
                 ->schema([
                     Select::make('model_concept')
                         ->label(__('projects.fields.model_concept_label'))
-                        ->options(fn (): array => collect(ClaudeModel::cases())
-                            ->mapWithKeys(fn (ClaudeModel $m): array => [$m->value => $m->label()])
-                            ->all())
-                        ->placeholder(__('projects.fields.model_concept_placeholder', ['model' => ClaudeModel::default('concept')->label()]))
+                        ->options(fn (Get $get): array => self::modelOptions($get))
+                        ->placeholder(fn (Get $get): string => __(
+                            'projects.fields.model_concept_placeholder',
+                            ['model' => self::defaultModelLabel($get, 'concept')],
+                        ))
                         ->native(false)
                         ->helperText(__('projects.fields.model_concept_helper')),
 
                     Select::make('model_implement')
                         ->label(__('projects.fields.model_implement_label'))
-                        ->options(fn (): array => collect(ClaudeModel::cases())
-                            ->mapWithKeys(fn (ClaudeModel $m): array => [$m->value => $m->label()])
-                            ->all())
-                        ->placeholder(__('projects.fields.model_implement_placeholder', ['model' => ClaudeModel::default('implement')->label()]))
+                        ->options(fn (Get $get): array => self::modelOptions($get))
+                        ->placeholder(fn (Get $get): string => __(
+                            'projects.fields.model_implement_placeholder',
+                            ['model' => self::defaultModelLabel($get, 'implement')],
+                        ))
                         ->native(false)
                         ->helperText(__('projects.fields.model_implement_helper')),
                 ]),
@@ -655,6 +674,70 @@ class RepoProfileResource extends Resource
     }
 
     /**
+     * Active worker stacks as a [id => label] map for the stack select.
+     *
+     * @return array<string, string>
+     */
+    private static function stackOptions(): array
+    {
+        return WorkerStack::query()
+            ->where('status', '!=', WorkerImageEntityStatus::Disabled)
+            ->orderBy('name')
+            ->get()
+            ->mapWithKeys(fn (WorkerStack $stack): array => [
+                $stack->id => $stack->label !== '' ? "{$stack->label} ({$stack->name})" : $stack->name,
+            ])
+            ->all();
+    }
+
+    /**
+     * Registered agents as a [name => label] map for the agent select.
+     *
+     * @return array<string, string>
+     */
+    private static function agentOptions(): array
+    {
+        return collect(app(AgentRegistry::class)->specs())
+            ->mapWithKeys(fn ($spec): array => [$spec->name->value => $spec->label])
+            ->all();
+    }
+
+    /**
+     * Models offered by the currently-selected agent (or by Claude Code as
+     * fallback when nothing is chosen yet) as a [id => label] map.
+     *
+     * @return array<string, string>
+     */
+    private static function modelOptions(Get $get): array
+    {
+        $agentValue = $get('worker_agent_name');
+        $agent = is_string($agentValue) && $agentValue !== ''
+            ? AgentName::tryFrom($agentValue)
+            : null;
+        $agent ??= AgentName::ClaudeCode;
+
+        return $agent->spec()->availableModels;
+    }
+
+    /**
+     * Default model label for the selected agent + phase, used as Select
+     * placeholder. Returns the model id when no human label is registered.
+     */
+    private static function defaultModelLabel(Get $get, string $phase): string
+    {
+        $agentValue = $get('worker_agent_name');
+        $agent = is_string($agentValue) && $agentValue !== ''
+            ? AgentName::tryFrom($agentValue)
+            : null;
+        $agent ??= AgentName::ClaudeCode;
+
+        $spec = $agent->spec();
+        $modelId = $spec->defaultModel($phase) ?? '';
+
+        return $spec->availableModels[$modelId] ?? $modelId;
+    }
+
+    /**
      * Im OAuth-Pfad schreiben die sichtbaren Picker in `github_repo` /
      * `github_branch` (GitHub) oder `gitlab_repo` / `gitlab_branch` (GitLab);
      * die DB-Spalten heißen aber `url` und `default_branch`.
@@ -750,9 +833,14 @@ class RepoProfileResource extends Resource
                         ->label(__('projects.infolist.auto_pr'))
                         ->boolean(),
 
-                    TextEntry::make('worker_image')
-                        ->label(__('projects.infolist.worker_image'))
-                        ->placeholder(__('projects.infolist.worker_image_placeholder')),
+                    TextEntry::make('workerStack.label')
+                        ->label(__('projects.infolist.worker_stack'))
+                        ->placeholder(__('projects.infolist.worker_stack_placeholder', ['stack' => (string) config('argos.compose.default_stack', 'php-8.4')])),
+
+                    TextEntry::make('worker_agent_name')
+                        ->label(__('projects.infolist.worker_agent'))
+                        ->formatStateUsing(fn (?AgentName $state): string => $state?->value ?? AgentName::ClaudeCode->value)
+                        ->placeholder(AgentName::ClaudeCode->value),
                 ]),
 
             Section::make(__('projects.sections.repository'))

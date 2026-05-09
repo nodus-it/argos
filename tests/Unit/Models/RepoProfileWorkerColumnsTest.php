@@ -62,13 +62,4 @@ class RepoProfileWorkerColumnsTest extends TestCase
 
         $this->assertNull($profile->fresh()->worker_agent_name);
     }
-
-    public function test_legacy_worker_image_column_remains_writable(): void
-    {
-        $profile = RepoProfile::factory()->create([
-            'worker_image' => 'argos-worker:local-php8.4',
-        ]);
-
-        $this->assertSame('argos-worker:local-php8.4', $profile->fresh()->worker_image);
-    }
 }

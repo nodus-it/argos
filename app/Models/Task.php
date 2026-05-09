@@ -31,7 +31,6 @@ use Illuminate\Support\Carbon;
  * @property WorkflowStatus $workflow_status
  * @property bool $auto_concept
  * @property int|null $max_turns
- * @property string|null $worker_image
  * @property ClaudeModel|null $model_concept
  * @property ClaudeModel|null $model_implement
  * @property string|null $worker_stack_id_override
@@ -75,7 +74,6 @@ class Task extends Model
         'workflow_status',
         'auto_concept',
         'max_turns',
-        'worker_image',
         'model_concept',
         'model_implement',
         'worker_stack_id_override',

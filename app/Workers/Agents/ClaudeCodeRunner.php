@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Workers\Agents;
 
 use App\Enums\AgentName;
+use App\Enums\ClaudeModel;
 use App\Models\AgentCredential;
 use App\Services\Anthropic\CredentialStore;
 use RuntimeException;
@@ -28,6 +29,16 @@ final class ClaudeCodeRunner implements AgentRunner
                         'description' => 'Override CLAUDE_CONFIG_DIR (default: /workspace/.agent/claude-state)',
                     ],
                 ],
+            ],
+            availableModels: [
+                ClaudeModel::Opus47->value => ClaudeModel::Opus47->label(),
+                ClaudeModel::Sonnet46->value => ClaudeModel::Sonnet46->label(),
+                ClaudeModel::Haiku45->value => ClaudeModel::Haiku45->label(),
+            ],
+            defaultModelByPhase: [
+                'concept' => ClaudeModel::Opus47->value,
+                'implement' => ClaudeModel::Sonnet46->value,
+                'commit-message' => ClaudeModel::Haiku45->value,
             ],
         );
     }

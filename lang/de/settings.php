@@ -51,9 +51,6 @@ return [
         'db_connection' => 'Aktive Verbindung: <strong>:connection</strong>',
         'db_config_hint' => 'Konfigurierbar über <code>DB_CONNECTION</code> und <code>DB_DATABASE</code>.',
 
-        'worker_section' => 'Worker Image',
-        'worker_config_hint' => 'Konfigurierbar über <code>ARGOS_WORKER_IMAGE</code>.',
-
         'logs_section' => 'Logs',
         'logs_description' => 'Manager-Log (PHP-Seite): Phase-Starts, Fehler, Job-Dispatches.',
         'logs_hint' => 'Worker-Logs pro Phase sind im Task-View unter „Logs" abrufbar.',

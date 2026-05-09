@@ -29,7 +29,6 @@
         <env name="PULSE_ENABLED" value="false" force="true"/>
         <env name="TELESCOPE_ENABLED" value="false" force="true"/>
         <env name="NIGHTWATCH_ENABLED" value="false" force="true"/>
-        <env name="ARGOS_WORKER_PIPELINE" value="legacy" force="true"/>
 
         <server name="APP_ENV" value="testing" force="true"/>
         <server name="APP_KEY" value="base64:zTobRxr7TepBXVjM/E3kjKGAwnxWQ7QWMMXaInQYKKg=" force="true"/>
@@ -41,6 +40,5 @@
         <server name="PULSE_ENABLED" value="false" force="true"/>
         <server name="TELESCOPE_ENABLED" value="false" force="true"/>
         <server name="NIGHTWATCH_ENABLED" value="false" force="true"/>
-        <server name="ARGOS_WORKER_PIPELINE" value="legacy" force="true"/>
     </php>
 </phpunit>
