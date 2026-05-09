@@ -28,12 +28,15 @@ return [
         'agent_credential_label' => 'Agent Credential',
         'agent_credential_helper' => 'Which credential the agent will use. Empty = first active credential.',
         'agent_credential_placeholder' => 'First active credential',
+        'model_placeholder_neutral' => 'Agent default',
         'model_concept_label' => 'Concept Model (Override)',
         'model_concept_placeholder' => 'Default: :model',
         'model_concept_helper' => 'Overrides the concept model for this specific task. Empty = project or agent default.',
+        'model_concept_helper_with_default' => 'Overrides the concept model for this task. Empty = project or agent default (:model).',
         'model_implement_label' => 'Implement Model (Override)',
         'model_implement_placeholder' => 'Default: :model',
         'model_implement_helper' => 'Overrides the implement model for this specific task. Empty = project or agent default.',
+        'model_implement_helper_with_default' => 'Overrides the implement model for this task. Empty = project or agent default (:model).',
     ],
 
     'columns' => [

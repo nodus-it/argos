@@ -578,27 +578,32 @@ class RepoProfileResource extends Resource
                             Section::make(__('projects.sections.models'))
                                 ->visible(fn (Get $get): bool => self::platformChosen($get))
                                 ->schema([
+                                    // The default-model hint lives in helperText (text inside a
+                                    // span) instead of placeholder (an HTML attribute). Livewire
+                                    // diffs reliably update text nodes; placeholder attributes
+                                    // get frozen on first render and won't change when the agent
+                                    // switches even though the server re-evaluates the closure.
                                     Select::make('model_concept')
                                         ->label(__('projects.fields.model_concept_label'))
                                         ->options(fn (Get $get): array => self::modelOptions($get))
-                                        ->placeholder(fn (Get $get): string => __(
-                                            'projects.fields.model_concept_placeholder',
+                                        ->placeholder(__('projects.fields.model_placeholder_neutral'))
+                                        ->helperText(fn (Get $get): string => __(
+                                            'projects.fields.model_concept_helper_with_default',
                                             ['model' => self::defaultModelLabel($get, 'concept')],
                                         ))
                                         ->live()
-                                        ->native(false)
-                                        ->helperText(__('projects.fields.model_concept_helper')),
+                                        ->native(false),
 
                                     Select::make('model_implement')
                                         ->label(__('projects.fields.model_implement_label'))
                                         ->options(fn (Get $get): array => self::modelOptions($get))
-                                        ->placeholder(fn (Get $get): string => __(
-                                            'projects.fields.model_implement_placeholder',
+                                        ->placeholder(__('projects.fields.model_placeholder_neutral'))
+                                        ->helperText(fn (Get $get): string => __(
+                                            'projects.fields.model_implement_helper_with_default',
                                             ['model' => self::defaultModelLabel($get, 'implement')],
                                         ))
                                         ->live()
-                                        ->native(false)
-                                        ->helperText(__('projects.fields.model_implement_helper')),
+                                        ->native(false),
                                 ]),
                         ]),  // ↑ end of "Worker" tab
                 ]),  // ↑ end of Tabs::make()
@@ -738,13 +743,7 @@ class RepoProfileResource extends Resource
      */
     private static function modelOptions(Get $get): array
     {
-        $agentValue = $get('worker_agent_name');
-        $agent = is_string($agentValue) && $agentValue !== ''
-            ? AgentName::tryFrom($agentValue)
-            : null;
-        $agent ??= AgentName::ClaudeCode;
-
-        return $agent->spec()->availableModels;
+        return self::agentFromState($get)->spec()->availableModels;
     }
 
     /**
@@ -753,16 +752,30 @@ class RepoProfileResource extends Resource
      */
     private static function defaultModelLabel(Get $get, string $phase): string
     {
-        $agentValue = $get('worker_agent_name');
-        $agent = is_string($agentValue) && $agentValue !== ''
-            ? AgentName::tryFrom($agentValue)
-            : null;
-        $agent ??= AgentName::ClaudeCode;
-
-        $spec = $agent->spec();
+        $spec = self::agentFromState($get)->spec();
         $modelId = $spec->defaultModel($phase) ?? '';
 
         return $spec->availableModels[$modelId] ?? $modelId;
+    }
+
+    /**
+     * Resolve the agent currently selected in the form, falling back to
+     * Claude Code when nothing is set yet. Accepts both string state
+     * (Filament Select default) and AgentName enum instances (in case the
+     * model cast leaks through into the form state).
+     */
+    private static function agentFromState(Get $get): AgentName
+    {
+        $value = $get('worker_agent_name');
+
+        if ($value instanceof AgentName) {
+            return $value;
+        }
+        if (is_string($value) && $value !== '') {
+            return AgentName::tryFrom($value) ?? AgentName::ClaudeCode;
+        }
+
+        return AgentName::ClaudeCode;
     }
 
     /**

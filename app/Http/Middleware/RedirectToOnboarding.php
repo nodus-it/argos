@@ -16,6 +16,10 @@ class RedirectToOnboarding
         if ($request->routeIs(
             'filament.admin.pages.onboarding',
             'filament.admin.resources.repo-profiles.create',
+            // Onboarding links into agent-credentials/create for the Codex
+            // setup flow — both create and the post-save edit route must be
+            // reachable while no RepoProfile exists yet.
+            'filament.admin.resources.agent-credentials.*',
             'filament.admin.auth.logout',
         )) {
             return $next($request);

@@ -6,7 +6,7 @@ return [
     'navigation_label' => 'Setup',
     'title' => 'Set up Argos',
 
-    'intro' => 'Argos is ready in a few steps: store a Claude token, optionally connect Git hosts, then create your first project.',
+    'intro' => 'Argos is ready in a few steps: authenticate at least one agent, optionally connect Git hosts, then create your first project.',
 
     'notifications' => [
         'env_token' => 'Token comes from the environment variable',
@@ -21,11 +21,21 @@ return [
 
     'steps' => [
         'claude_token' => 'Claude Token',
+        'agents' => 'Authenticate agent',
+        'agents_hint' => 'at least one',
         'github_connect' => 'Connect GitHub',
         'github_optional' => 'optional',
         'providers_connect' => 'Connect Git host',
         'providers_optional' => 'optional',
         'first_project' => 'Create first project',
+    ],
+
+    'agents' => [
+        'claude_label' => 'Claude Code',
+        'codex_label' => 'OpenAI Codex',
+        'codex_help' => 'Codex authenticates with the contents of your <code class="text-xs">~/.codex/auth.json</code>. Add it as an Agent Credential from the main menu.',
+        'codex_button' => 'Add Codex credential',
+        'codex_saved' => 'Codex credential is saved.',
     ],
 
     'token' => [

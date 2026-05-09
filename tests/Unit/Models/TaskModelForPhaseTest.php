@@ -85,4 +85,28 @@ class TaskModelForPhaseTest extends TestCase
         $this->assertSame(ClaudeModel::Opus47->value, $task->modelForPhase('concept'));
         $this->assertSame(ClaudeModel::Sonnet46->value, $task->modelForPhase('implement'));
     }
+
+    /**
+     * Regression: model_concept/model_implement are agent-agnostic strings
+     * (e.g. 'gpt-5-codex' for the Codex agent). Casting them through the
+     * Claude-specific enum used to throw ValueError on save/load.
+     */
+    public function test_codex_model_value_can_be_persisted_and_resolved(): void
+    {
+        $profile = RepoProfile::factory()->create([
+            'model_concept' => 'gpt-5-codex',
+            'model_implement' => 'gpt-5-codex',
+        ]);
+
+        $task = Task::factory()->create([
+            'repo_profile_id' => $profile->id,
+            'model_concept' => 'gpt-5-codex',
+            'model_implement' => null,
+        ]);
+
+        $this->assertSame('gpt-5-codex', $task->fresh()->model_concept);
+        $this->assertSame('gpt-5-codex', $profile->fresh()->model_concept);
+        $this->assertSame('gpt-5-codex', $task->modelForPhase('concept'));
+        $this->assertSame('gpt-5-codex', $task->modelForPhase('implement'));
+    }
 }

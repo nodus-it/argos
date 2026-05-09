@@ -31,8 +31,8 @@ use Illuminate\Support\Carbon;
  * @property WorkflowStatus $workflow_status
  * @property bool $auto_concept
  * @property int|null $max_turns
- * @property ClaudeModel|null $model_concept
- * @property ClaudeModel|null $model_implement
+ * @property string|null $model_concept
+ * @property string|null $model_implement
  * @property string|null $worker_stack_id_override
  * @property AgentName|null $worker_agent_name_override
  * @property array<string, mixed>|null $worker_config_override
@@ -89,8 +89,6 @@ class Task extends Model
             'workflow_status' => WorkflowStatus::class,
             'current_phase' => Phase::class,
             'current_status' => PhaseStatus::class,
-            'model_concept' => ClaudeModel::class,
-            'model_implement' => ClaudeModel::class,
             'auto_concept' => 'boolean',
             'max_turns' => 'integer',
             'worker_agent_name_override' => AgentName::class,
@@ -112,7 +110,7 @@ class Task extends Model
         };
 
         if ($taskModel !== null) {
-            return $taskModel->value;
+            return $taskModel;
         }
 
         $profile = $this->repoProfile;
@@ -123,7 +121,7 @@ class Task extends Model
                 default => null,
             };
             if ($profileModel !== null) {
-                return $profileModel->value;
+                return $profileModel;
             }
         }
 

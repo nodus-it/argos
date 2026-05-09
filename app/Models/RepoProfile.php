@@ -32,8 +32,8 @@ use Illuminate\Support\Carbon;
  * @property string|null $worker_stack_id
  * @property AgentName|null $worker_agent_name
  * @property array<string, mixed>|null $worker_config
- * @property ClaudeModel|null $model_concept
- * @property ClaudeModel|null $model_implement
+ * @property string|null $model_concept
+ * @property string|null $model_implement
  * @property bool $auto_concept
  * @property bool $auto_pr
  * @property Carbon|null $created_at
@@ -74,8 +74,6 @@ class RepoProfile extends Model
             'worker_source' => WorkerSource::class,
             'worker_agent_name' => AgentName::class,
             'worker_config' => 'array',
-            'model_concept' => ClaudeModel::class,
-            'model_implement' => ClaudeModel::class,
             'auto_concept' => 'boolean',
             'auto_pr' => 'boolean',
         ];
@@ -117,7 +115,7 @@ class RepoProfile extends Model
             default => null,
         };
 
-        return $configured?->value ?? ClaudeModel::default($phase)->value;
+        return $configured ?? ClaudeModel::default($phase)->value;
     }
 
     /**

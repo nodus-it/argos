@@ -57,12 +57,15 @@ return [
         'token_create_link' => 'Token erstellen',
         'default_branch_label' => 'Default Branch',
         'global_default' => 'Globaler Default',
+        'model_placeholder_neutral' => 'Agent-Default',
         'model_concept_label' => 'Konzept-Modell',
         'model_concept_placeholder' => 'Standard: :model',
         'model_concept_helper' => 'Modell für die Konzept-Phase. Auswahl hängt vom gewählten Agent ab. Leer lassen für den Agent-Default.',
+        'model_concept_helper_with_default' => 'Modell für die Konzept-Phase. Leer lassen für den Agent-Default (:model).',
         'model_implement_label' => 'Implement-Modell',
         'model_implement_placeholder' => 'Standard: :model',
         'model_implement_helper' => 'Modell für die Implement-Phase. Auswahl hängt vom gewählten Agent ab. Leer lassen für den Agent-Default.',
+        'model_implement_helper_with_default' => 'Modell für die Implement-Phase. Leer lassen für den Agent-Default (:model).',
     ],
 
     'infolist' => [

@@ -35,6 +35,8 @@ class Onboarding extends Page
     /** 'env' | 'agent_credential' | 'none' — drives which UI step is shown. */
     public string $tokenSource = 'none';
 
+    public bool $codexConfigured = false;
+
     public string $claudeToken = '';
 
     /** @var array<string, array{configured: bool, connected: bool}> */
@@ -73,6 +75,10 @@ class Onboarding extends Page
     private function refreshState(): void
     {
         $this->tokenSource = $this->detectTokenSource();
+        $this->codexConfigured = AgentCredential::query()
+            ->where('agent_name', AgentName::Codex->value)
+            ->where('status', AgentCredentialStatus::Active->value)
+            ->exists();
 
         /** @var User|null $user */
         $user = Auth::user();
@@ -203,5 +209,15 @@ class Onboarding extends Page
         }
 
         return false;
+    }
+
+    /**
+     * At least one agent (Claude Code or Codex) has usable credentials —
+     * drives the green checkmark on the agent step. The user can ship a
+     * project with either, so we don't require both.
+     */
+    public function isAnyAgentConfigured(): bool
+    {
+        return $this->tokenSource !== 'none' || $this->codexConfigured;
     }
 }

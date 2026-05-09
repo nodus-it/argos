@@ -78,6 +78,7 @@ services:
       ARGOS_DB_DATABASE:        "${ARGOS_DB_DATABASE:-argos}"
       ARGOS_DB_USERNAME:        "${ARGOS_DB_USERNAME:-argos}"
       ARGOS_DB_PASSWORD:        "${ARGOS_DB_PASSWORD:-argos}"
+      ARGOS_MCP_ENABLED:        "${ARGOS_MCP_ENABLED:-}"
     healthcheck:
       # Goes green only when DB is reachable AND the schema is fully migrated,
       # so dependents like `queue` can rely on `service_healthy` to mean
@@ -144,6 +145,7 @@ services:
       ARGOS_DB_DATABASE:        "${ARGOS_DB_DATABASE:-argos}"
       ARGOS_DB_USERNAME:        "${ARGOS_DB_USERNAME:-argos}"
       ARGOS_DB_PASSWORD:        "${ARGOS_DB_PASSWORD:-argos}"
+      ARGOS_MCP_ENABLED:        "${ARGOS_MCP_ENABLED:-}"
     command: ["php", "/app/artisan", "queue:work", "database", "--sleep=3", "--tries=3", "--max-time=3600"]
 
 volumes:

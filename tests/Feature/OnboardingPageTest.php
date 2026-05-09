@@ -169,4 +169,36 @@ class OnboardingPageTest extends TestCase
     {
         $this->assertTrue(Onboarding::shouldRegisterNavigation());
     }
+
+    public function test_onboarding_shows_codex_setup_box_when_no_codex_credential(): void
+    {
+        Livewire::test(Onboarding::class)
+            ->assertSet('codexConfigured', false)
+            ->assertSee('OpenAI Codex')
+            ->assertSee(__('onboarding.agents.codex_button', [], 'en'));
+    }
+
+    public function test_onboarding_marks_agents_done_when_only_codex_credential_present(): void
+    {
+        AgentCredential::create([
+            'agent_name' => AgentName::Codex->value,
+            'name' => 'Default',
+            'credentials' => ['tokens' => ['access_token' => 'sk-codex-test']],
+            'status' => AgentCredentialStatus::Active->value,
+        ]);
+
+        Livewire::test(Onboarding::class)
+            ->assertSet('codexConfigured', true)
+            ->assertSet('tokenSource', 'none')
+            // Step header gets a checkmark when at least one agent is configured.
+            ->assertSeeHtml('text-emerald-500');
+    }
+
+    public function test_codex_button_links_to_agent_credential_create_with_preselected_agent(): void
+    {
+        $expected = route('filament.admin.resources.agent-credentials.create', ['agent_name' => 'codex']);
+
+        Livewire::test(Onboarding::class)
+            ->assertSee($expected);
+    }
 }
