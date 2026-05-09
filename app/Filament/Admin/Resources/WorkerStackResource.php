@@ -10,6 +10,7 @@ use App\Filament\Admin\Resources\WorkerStackResource\Pages\EditWorkerStack;
 use App\Filament\Admin\Resources\WorkerStackResource\Pages\ListWorkerStacks;
 use App\Filament\Admin\Resources\WorkerStackResource\Pages\ViewWorkerStack;
 use App\Models\WorkerStack;
+use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
@@ -20,6 +21,7 @@ use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
@@ -182,6 +184,7 @@ class WorkerStackResource extends Resource
             ->recordActions([
                 ViewAction::make(),
                 EditAction::make()->visible(fn (WorkerStack $r): bool => ! $r->is_builtin),
+                self::duplicateAction(),
                 DeleteAction::make()->visible(fn (WorkerStack $r): bool => ! $r->is_builtin),
             ])
             ->toolbarActions([
@@ -190,6 +193,63 @@ class WorkerStackResource extends Resource
                 ]),
             ])
             ->defaultSort('name');
+    }
+
+    /**
+     * Clone a stack into a fresh user stack as a starting point. Works for
+     * built-ins (the documented use case — "I want to tweak php-8.4")
+     * AND for user stacks (handy for variants of an in-house base image).
+     * The replica is forced to is_builtin=false and gets a unique name so
+     * BuiltinSync can never accidentally overwrite it.
+     */
+    public static function duplicateAction(): Action
+    {
+        return Action::make('duplicate')
+            ->label(__('worker.stacks.actions.duplicate'))
+            ->icon('heroicon-o-document-duplicate')
+            ->color('gray')
+            ->action(function (WorkerStack $record): void {
+                $copy = $record->replicate([
+                    'is_builtin',
+                    'last_builtin_hash',
+                    'last_built_at',
+                    'last_checked_at',
+                    'installed_version',
+                    'upstream_version',
+                    'has_update',
+                ]);
+                $copy->name = self::uniqueStackName($record->name.'-copy');
+                $copy->label = $record->label.' (Kopie)';
+                $copy->is_builtin = false;
+                $copy->save();
+
+                Notification::make()
+                    ->title(__('worker.stacks.notifications.duplicated', ['name' => $copy->name]))
+                    ->success()
+                    ->send();
+
+                redirect(static::getUrl('edit', ['record' => $copy]));
+            });
+    }
+
+    /**
+     * Append a numeric suffix to keep the slug unique against the
+     * existing rows. Stops at -copy-99 to avoid runaway collisions.
+     */
+    private static function uniqueStackName(string $candidate): string
+    {
+        if (! WorkerStack::query()->where('name', $candidate)->exists()) {
+            return $candidate;
+        }
+
+        for ($i = 2; $i <= 99; $i++) {
+            $next = $candidate.'-'.$i;
+            if (! WorkerStack::query()->where('name', $next)->exists()) {
+                return $next;
+            }
+        }
+
+        return $candidate.'-'.uniqid();
     }
 
     public static function canEdit(Model $record): bool

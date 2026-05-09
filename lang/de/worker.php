@@ -36,6 +36,10 @@ return [
         'notices' => [
             'builtin_readonly' => 'Built-in-Stacks sind read-only. Zum Anpassen erst duplizieren.',
         ],
+        'notifications' => [
+            'duplicated' => 'Stack als „:name" dupliziert.',
+            'build_dispatched' => ':count Image-Build(s) in der Queue.',
+        ],
     ],
 
     'agents' => [

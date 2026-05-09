@@ -33,6 +33,8 @@ class WorkerImageBuilderTest extends TestCase
             ['cmd' => 'docker image inspect '.$resolved->stackTag, 'exit' => 0, 'stdout' => 'sha256:stack'],
             // worker build
             ['cmd' => 'docker build', 'exit' => 0, 'stdout' => "Successfully built worker\n"],
+            // post-build validation
+            ['cmd' => 'docker run', 'exit' => 0, 'stdout' => "ok bash\nok sh\nok jq\nok git\nok sed\nok grep\nok awk\nok curl\nok claude\n"],
             // image inspect for size
             ['cmd' => 'docker image inspect', 'exit' => 0, 'stdout' => '1234567890'],
         ]);
@@ -43,6 +45,7 @@ class WorkerImageBuilderTest extends TestCase
         $this->assertSame(1234567890, $build->size_bytes);
         $this->assertNotNull($build->built_at);
         $this->assertStringContainsString('already present', $build->build_log);
+        $this->assertStringContainsString('[validate]', $build->build_log);
     }
 
     public function test_builds_stack_then_worker_when_stack_missing(): void
@@ -54,6 +57,7 @@ class WorkerImageBuilderTest extends TestCase
             ['cmd' => 'docker image inspect', 'exit' => 1, 'stdout' => ''],   // stack missing
             ['cmd' => 'docker build',         'exit' => 0, 'stdout' => "Successfully built stack\n"],
             ['cmd' => 'docker build',         'exit' => 0, 'stdout' => "Successfully built worker\n"],
+            ['cmd' => 'docker run',           'exit' => 0, 'stdout' => "ok claude\n"],   // validation
             ['cmd' => 'docker image inspect', 'exit' => 0, 'stdout' => '999'],
         ]);
 
@@ -87,6 +91,52 @@ class WorkerImageBuilderTest extends TestCase
         $this->assertNotNull($record);
         $this->assertSame(WorkerImageBuildStatus::Failed, $record->status);
         $this->assertStringContainsString('Worker image build failed', $record->build_log);
+    }
+
+    public function test_validation_failure_marks_build_failed(): void
+    {
+        $stack = WorkerStack::factory()->create(['capabilities' => ['node']]);
+        $resolved = $this->resolved($stack);
+
+        $builder = new FakeWorkerImageBuilder([
+            ['cmd' => 'docker image inspect', 'exit' => 0, 'stdout' => 'sha:exists'],   // stack present
+            ['cmd' => 'docker build',         'exit' => 0, 'stdout' => "Successfully built worker\n"],
+            ['cmd' => 'docker run', 'exit' => 1, 'stdout' => "ok bash\nMISSING jq\nok git\n"],   // validation fails
+        ]);
+
+        try {
+            $builder->build($resolved);
+            $this->fail('Expected RuntimeException');
+        } catch (RuntimeException $e) {
+            $this->assertStringContainsString('validation failed', $e->getMessage());
+            $this->assertStringContainsString('MISSING jq', $e->getMessage());
+        }
+
+        $record = WorkerImageBuild::query()
+            ->where('worker_stack_id', $stack->id)
+            ->first();
+        $this->assertNotNull($record);
+        $this->assertSame(WorkerImageBuildStatus::Failed, $record->status);
+    }
+
+    public function test_validation_checks_agent_cli_binary(): void
+    {
+        $stack = WorkerStack::factory()->create(['capabilities' => ['node']]);
+        $resolved = $this->resolved($stack);
+
+        $builder = new FakeWorkerImageBuilder([
+            ['cmd' => 'docker image inspect', 'exit' => 0, 'stdout' => 'sha:exists'],
+            ['cmd' => 'docker build',         'exit' => 0, 'stdout' => 'ok'],
+            ['cmd' => 'docker run',           'exit' => 0, 'stdout' => "ok claude\n"],
+            ['cmd' => 'docker image inspect', 'exit' => 0, 'stdout' => '1'],
+        ]);
+
+        $builder->build($resolved);
+
+        // The validation command (3rd invocation, index 2) should mention
+        // the claude binary check derived from AgentSpec::cliBinary.
+        $validationCmd = implode(' ', $builder->invokedCommands[2]);
+        $this->assertStringContainsString('claude', $validationCmd);
     }
 
     public function test_worker_image_exists_returns_inspect_status(): void

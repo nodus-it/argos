@@ -18,6 +18,7 @@ final readonly class AgentSpec
      * @param  array<string, mixed>  $configSchema  shape that `tasks.agent_config` may carry
      * @param  array<string, string>  $availableModels  model-id => display label, shown in TaskResource/RepoProfileResource selects
      * @param  array<string, string>  $defaultModelByPhase  phase ('concept'|'implement'|'commit-message') => model-id
+     * @param  string  $cliBinary  Name of the CLI executable installed by the npm package (used by the post-build validator to verify the image actually has it on PATH).
      */
     public function __construct(
         public AgentName $name,
@@ -25,6 +26,7 @@ final readonly class AgentSpec
         public string $npmPackage,
         public string $pinnedVersion,
         public string $installScript,
+        public string $cliBinary,
         public array $requiresStackCapabilities,
         public array $configSchema = [],
         public array $availableModels = [],

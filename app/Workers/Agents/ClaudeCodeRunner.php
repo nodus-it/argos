@@ -20,6 +20,7 @@ final class ClaudeCodeRunner implements AgentRunner
             npmPackage: '@anthropic-ai/claude-code',
             pinnedVersion: 'latest',
             installScript: 'agents/install-claude-code.sh',
+            cliBinary: 'claude',
             requiresStackCapabilities: ['node'],
             configSchema: [
                 'fields' => [

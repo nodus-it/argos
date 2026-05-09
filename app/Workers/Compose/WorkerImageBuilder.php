@@ -54,6 +54,7 @@ class WorkerImageBuilder
         try {
             $log .= $this->ensureStackImage($resolved);
             $log .= $this->buildWorkerImage($resolved);
+            $log .= $this->validateWorkerImage($resolved);
 
             $record->forceFill([
                 'status' => WorkerImageBuildStatus::Ready,
@@ -71,6 +72,51 @@ class WorkerImageBuilder
         }
 
         return $record->refresh();
+    }
+
+    /**
+     * Smoke-test the freshly built worker image: every command we list
+     * must exist on PATH inside the container, otherwise PhaseRunner
+     * would crash mid-phase with a less-actionable error. This catches
+     * dockerfile drift (apt package missing, agent install script
+     * silently failing, etc.) at build time.
+     *
+     * Required tools (Argos baseline): bash, sh, jq, git, sed, grep, awk, curl
+     * Plus the agent's CLI binary as declared by AgentSpec::cliBinary.
+     *
+     * The check uses `command -v`; failures propagate via Throwable so
+     * build() flips the status to Failed with the missing tool list.
+     */
+    private function validateWorkerImage(ResolvedWorkerImage $resolved): string
+    {
+        $required = ['bash', 'sh', 'jq', 'git', 'sed', 'grep', 'awk', 'curl', $resolved->agent->cliBinary];
+
+        // Build one shell script that prints "ok <name>" for present tools
+        // and "MISSING <name>" otherwise, then exits non-zero if any are
+        // missing — single docker invocation, full report in one log block.
+        $checks = [];
+        foreach ($required as $tool) {
+            $escaped = escapeshellarg($tool);
+            $checks[] = "if command -v {$escaped} >/dev/null 2>&1; then echo \"ok {$tool}\"; else echo \"MISSING {$tool}\"; rc=1; fi";
+        }
+        $script = "rc=0\n".implode("\n", $checks)."\nexit \$rc";
+
+        $process = $this->newProcess([
+            'docker', 'run', '--rm', '--entrypoint', 'sh',
+            $resolved->workerTag, '-c', $script,
+        ]);
+        $process->setTimeout(30);
+        $process->run();
+
+        $output = $process->getOutput();
+
+        if (! $process->isSuccessful()) {
+            throw new RuntimeException(
+                "Worker image validation failed (exit {$process->getExitCode()}):\n".$output.$process->getErrorOutput()
+            );
+        }
+
+        return "[validate]\n".$output."\n";
     }
 
     public function workerImageExists(string $tag): bool

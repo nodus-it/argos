@@ -36,6 +36,10 @@ return [
         'notices' => [
             'builtin_readonly' => 'Built-in stacks are read-only. Duplicate first to customise.',
         ],
+        'notifications' => [
+            'duplicated' => 'Stack duplicated as ":name".',
+            'build_dispatched' => ':count image build(s) queued.',
+        ],
     ],
 
     'agents' => [

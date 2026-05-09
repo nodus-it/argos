@@ -35,6 +35,7 @@ final class CodexRunner implements AgentRunner
             npmPackage: '@openai/codex',
             pinnedVersion: 'latest',
             installScript: 'agents/install-codex.sh',
+            cliBinary: 'codex',
             requiresStackCapabilities: ['node'],
             configSchema: [
                 'fields' => [

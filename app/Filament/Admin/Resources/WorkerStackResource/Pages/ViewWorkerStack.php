@@ -16,6 +16,7 @@ class ViewWorkerStack extends ViewRecord
     {
         return [
             EditAction::make()->visible(fn (): bool => ! $this->record->is_builtin),
+            WorkerStackResource::duplicateAction(),
         ];
     }
 }
