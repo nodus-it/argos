@@ -57,10 +57,12 @@ class WorkflowStatusTest extends TestCase
         $this->assertSame(WorkflowStatus::Failed, WorkflowStatus::afterPhase('respond', PhaseStatus::Failed));
     }
 
-    public function test_implement_completed_returns_null(): void
+    public function test_implement_completed_yields_implement_completed(): void
     {
-        // implement completed is handled by WorkflowService::completePhase, not afterPhase
-        $this->assertNull(WorkflowStatus::afterPhase('implement', PhaseStatus::Completed));
+        $this->assertSame(
+            WorkflowStatus::ImplementCompleted,
+            WorkflowStatus::afterPhase('implement', PhaseStatus::Completed),
+        );
     }
 
     public function test_unknown_combination_returns_null(): void
