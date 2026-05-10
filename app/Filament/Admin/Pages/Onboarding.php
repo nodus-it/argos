@@ -39,6 +39,8 @@ class Onboarding extends Page
 
     public string $claudeToken = '';
 
+    public string $codexAuthJson = '';
+
     /** @var array<string, array{configured: bool, connected: bool}> */
     public array $oauthState = [];
 
@@ -183,6 +185,44 @@ class Onboarding extends Page
         } else {
             Notification::make()->title(__('onboarding.notifications.saved_title'))->success()->send();
         }
+    }
+
+    public function saveCodexAuthJson(): void
+    {
+        $raw = trim($this->codexAuthJson);
+
+        if ($raw === '') {
+            Notification::make()->title(__('onboarding.notifications.empty_codex'))->warning()->send();
+
+            return;
+        }
+
+        $decoded = json_decode($raw, true);
+        if (! is_array($decoded)) {
+            Notification::make()
+                ->title(__('onboarding.notifications.invalid_codex_title'))
+                ->body(__('onboarding.notifications.invalid_codex_body'))
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        AgentCredential::updateOrCreate(
+            [
+                'agent_name' => AgentName::Codex->value,
+                'name' => self::ONBOARDING_CREDENTIAL_NAME,
+            ],
+            [
+                'credentials' => $decoded,
+                'status' => AgentCredentialStatus::Active->value,
+            ],
+        );
+
+        $this->codexAuthJson = '';
+        $this->refreshState();
+
+        Notification::make()->title(__('onboarding.notifications.codex_saved'))->success()->send();
     }
 
     /**

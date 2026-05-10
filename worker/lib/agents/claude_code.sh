@@ -118,7 +118,7 @@ agent_claude_code_run() {
         args+=(--resume "$resume_session")
     fi
 
-    # MCP: when the target project opted in via boost.json + ARGOS_MCP_ENABLED,
+    # MCP: when the target project opted in via boost.json (mcp: true),
     # write a per-session config and hand it to claude via --mcp-config. The
     # CLI does NOT read mcpServers from settings.json — only from .mcp.json,
     # ~/.claude.json, or this flag.

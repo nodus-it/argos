@@ -44,6 +44,7 @@ return [
         'phase' => 'Phase',
         'status' => 'Status',
         'workflow' => 'Workflow',
+        'agent' => 'Agent',
         'cost' => 'Kosten',
         'tokens' => 'Tokens',
         'created' => 'Erstellt',
@@ -64,6 +65,8 @@ return [
         'labels' => [
             'status' => 'Status',
             'repository' => 'Repository',
+            'agent' => 'Agent',
+            'stack' => 'Stack',
             'base_branch' => 'Base Branch',
             'branch' => 'Branch',
             'pull_request' => 'Pull Request',

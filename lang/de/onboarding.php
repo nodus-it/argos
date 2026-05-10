@@ -15,6 +15,10 @@ return [
         'invalid_token_body' => 'Der eingegebene Token wurde von der API abgelehnt.',
         'saved_title' => 'Token gespeichert',
         'saved_unreachable_body' => 'Hinweis: Token konnte nicht gegen die API geprüft werden — Verbindung nicht erreichbar.',
+        'empty_codex' => 'Bitte den Inhalt von auth.json einfügen',
+        'invalid_codex_title' => 'auth.json ungültig',
+        'invalid_codex_body' => 'Der eingefügte Inhalt ist kein gültiges JSON.',
+        'codex_saved' => 'Codex-Credential gespeichert',
         'github_disconnected' => 'GitHub-Verbindung getrennt',
         'disconnected' => ':provider getrennt',
     ],
@@ -32,20 +36,18 @@ return [
 
     'agents' => [
         'claude_label' => 'Claude Code',
+        'claude_hint' => 'Token via <code class="text-xs">claude setup-token</code> erzeugen und unten einfügen.',
         'codex_label' => 'OpenAI Codex',
-        'codex_help' => 'Codex authentifiziert sich über den Inhalt deiner <code class="text-xs">~/.codex/auth.json</code>. Diese legst du als Agent-Credential im Hauptmenü an.',
-        'codex_button' => 'Codex-Credential anlegen',
-        'codex_saved' => 'Codex-Credential ist gespeichert.',
+        'codex_hint' => '<code class="text-xs">codex login</code> ausführen, dann Inhalt von <code class="text-xs">~/.codex/auth.json</code> unten einfügen.',
+        'codex_placeholder' => '{"OPENAI_API_KEY": null, "tokens": {…}, …}',
+        'codex_saved_short' => 'Gespeichert — neuen Inhalt einfügen, um zu überschreiben.',
     ],
 
     'token' => [
         'from_env' => 'Token kommt aus der Umgebungsvariable <code class="text-xs">CLAUDE_CODE_OAUTH_TOKEN</code> — nichts zu tun.',
-        'is_saved' => 'Token ist gespeichert.',
-        'override_label' => 'Token überschreiben',
-        'label' => 'Token',
+        'is_saved_short' => 'Gespeichert — neuen Token einfügen, um zu überschreiben.',
         'placeholder' => 'sk-ant-oat01-…',
         'save_button' => 'Speichern',
-        'help' => 'Wird im Config-Verzeichnis abgelegt (mode 0600).',
     ],
 
     'github' => [

@@ -572,11 +572,6 @@ class PhaseRunner
             $cmd[] = 'FORCE_UNLOCK=1';
         }
 
-        if (config('argos.mcp_enabled') === true) {
-            $cmd[] = '-e';
-            $cmd[] = 'ARGOS_MCP_ENABLED=true';
-        }
-
         $cmd[] = $workerImage;
         $cmd[] = $phase;
         $cmd[] = $task->name;

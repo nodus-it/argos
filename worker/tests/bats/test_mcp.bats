@@ -4,7 +4,6 @@ bats_require_minimum_version 1.5.0
 
 setup() {
     TEST_DIR="$(mktemp -d)"
-    export ARGOS_MCP_ENABLED=""
     export MCP_WORKSPACE_DIR="$TEST_DIR/workspace"
     mkdir -p "$MCP_WORKSPACE_DIR"
     # shellcheck source=../../lib/logging.sh
@@ -26,41 +25,24 @@ _write_boost_json() {
 
 # ─── mcp_should_enable ────────────────────────────────────────────────────────
 
-@test "mcp_should_enable: false wenn ARGOS_MCP_ENABLED nicht gesetzt" {
-    _write_boost_json true
-    run mcp_should_enable
-    [ "$status" -ne 0 ]
-}
-
-@test "mcp_should_enable: false wenn ARGOS_MCP_ENABLED!='true'" {
-    export ARGOS_MCP_ENABLED="false"
-    _write_boost_json true
-    run mcp_should_enable
-    [ "$status" -ne 0 ]
-}
-
 @test "mcp_should_enable: false wenn boost.json fehlt" {
-    export ARGOS_MCP_ENABLED="true"
     run mcp_should_enable
     [ "$status" -ne 0 ]
 }
 
 @test "mcp_should_enable: false wenn boost.json mcp=false" {
-    export ARGOS_MCP_ENABLED="true"
     _write_boost_json false
     run mcp_should_enable
     [ "$status" -ne 0 ]
 }
 
 @test "mcp_should_enable: false bei kaputtem boost.json" {
-    export ARGOS_MCP_ENABLED="true"
     printf 'this is not json' > "$MCP_WORKSPACE_DIR/boost.json"
     run mcp_should_enable
     [ "$status" -ne 0 ]
 }
 
-@test "mcp_should_enable: true bei ARGOS_MCP_ENABLED=true und mcp=true" {
-    export ARGOS_MCP_ENABLED="true"
+@test "mcp_should_enable: true wenn boost.json mcp=true" {
     _write_boost_json true
     run mcp_should_enable
     [ "$status" -eq 0 ]
@@ -93,6 +75,15 @@ _write_boost_json() {
     [ "$(jq -r '.mcpServers["laravel-boost"].cwd' "$dest")" = "/workspace" ]
 }
 
+@test "mcp_write_claude_config: setzt APP_ENV=local fuer den Subprozess" {
+    # BoostServiceProvider only registers commands when env=local or
+    # debug=true. Without this, the subprocess dies with "no commands
+    # defined in the boost namespace" and the agent never reaches Boost.
+    local dest="$TEST_DIR/mcp.json"
+    mcp_write_claude_config "$dest"
+    [ "$(jq -r '.mcpServers["laravel-boost"].env.APP_ENV' "$dest")" = "local" ]
+}
+
 @test "mcp_write_claude_config: Fehler wenn dest fehlt" {
     run mcp_write_claude_config ""
     [ "$status" -ne 0 ]
@@ -112,11 +103,21 @@ _write_boost_json() {
     [[ "$out" == *'mcp_servers.laravel-boost.args=["artisan", "boost:mcp"]'* ]]
 }
 
+@test "mcp_codex_config_args: emittiert env-Override mit APP_ENV=local" {
+    # Same gate as the claude variant: without APP_ENV=local,
+    # BoostServiceProvider skips command registration and the subprocess
+    # dies on first init.
+    local out
+    out="$(mcp_codex_config_args)"
+    [[ "$out" == *'mcp_servers.laravel-boost.env={ APP_ENV = "local" }'* ]]
+}
+
 @test "mcp_codex_config_args: ein Token pro Zeile (mapfile-friendly)" {
     local arr=()
     mapfile -t arr < <(mcp_codex_config_args)
-    # Two -c flags = 4 tokens (-c, key=val, -c, key=val)
-    [ "${#arr[@]}" -eq 4 ]
+    # Three -c flags = 6 tokens (-c, key=val, -c, key=val, -c, key=val)
+    [ "${#arr[@]}" -eq 6 ]
     [ "${arr[0]}" = "-c" ]
     [ "${arr[2]}" = "-c" ]
+    [ "${arr[4]}" = "-c" ]
 }

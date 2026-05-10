@@ -40,31 +40,18 @@
 
                     @if($tokenSource === 'env')
                         <p class="text-sm text-gray-700 dark:text-gray-300">{!! __('onboarding.token.from_env') !!}</p>
-                    @elseif($tokenSource === 'agent_credential')
-                        <p class="text-sm text-gray-700 dark:text-gray-300">{{ __('onboarding.token.is_saved') }}</p>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('onboarding.token.override_label') }}</label>
-                            <div class="flex gap-2">
-                                <input wire:model="claudeToken" type="password" placeholder="{{ __('onboarding.token.placeholder') }}" autocomplete="off"
-                                    class="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-500" />
-                                <x-filament::button wire:click="saveClaudeToken" type="button">
-                                    {{ __('onboarding.token.save_button') }}
-                                </x-filament::button>
-                            </div>
-                        </div>
                     @else
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('onboarding.token.label') }}</label>
-                            <div class="flex gap-2">
-                                <input wire:model="claudeToken" type="password" placeholder="{{ __('onboarding.token.placeholder') }}" autocomplete="off"
-                                    class="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-500" />
-                                <x-filament::button wire:click="saveClaudeToken" type="button">
-                                    {{ __('onboarding.token.save_button') }}
-                                </x-filament::button>
-                            </div>
-                            <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">{{ __('onboarding.token.help') }}</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">{!! __('onboarding.agents.claude_hint') !!}</p>
+                        @if($tokenSource === 'agent_credential')
+                            <p class="text-xs text-emerald-600 dark:text-emerald-400">{{ __('onboarding.token.is_saved_short') }}</p>
+                        @endif
+                        <div class="flex gap-2">
+                            <input wire:model="claudeToken" type="password" placeholder="{{ __('onboarding.token.placeholder') }}" autocomplete="off"
+                                class="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-500" />
+                            <x-filament::button wire:click="saveClaudeToken" type="button">
+                                {{ __('onboarding.token.save_button') }}
+                            </x-filament::button>
                         </div>
-                        @include('filament.admin.partials.claude-token-help')
                     @endif
                 </div>
 
@@ -79,20 +66,17 @@
                         <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">{{ __('onboarding.agents.codex_label') }}</span>
                     </div>
 
+                    <p class="text-xs text-gray-500 dark:text-gray-400">{!! __('onboarding.agents.codex_hint') !!}</p>
                     @if($codexConfigured)
-                        <p class="text-sm text-gray-700 dark:text-gray-300">{{ __('onboarding.agents.codex_saved') }}</p>
-                    @else
-                        <p class="text-sm text-gray-500 dark:text-gray-400">{!! __('onboarding.agents.codex_help') !!}</p>
-                        <x-filament::button
-                            tag="a"
-                            href="{{ route('filament.admin.resources.agent-credentials.create', ['agent_name' => 'codex']) }}"
-                            icon="heroicon-o-plus-circle"
-                            color="gray"
-                            size="sm"
-                        >
-                            {{ __('onboarding.agents.codex_button') }}
-                        </x-filament::button>
+                        <p class="text-xs text-emerald-600 dark:text-emerald-400">{{ __('onboarding.agents.codex_saved_short') }}</p>
                     @endif
+                    <div class="flex gap-2 items-start">
+                        <textarea wire:model="codexAuthJson" rows="3" placeholder="{{ __('onboarding.agents.codex_placeholder') }}" autocomplete="off" spellcheck="false"
+                            class="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-xs font-mono text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-500"></textarea>
+                        <x-filament::button wire:click="saveCodexAuthJson" type="button">
+                            {{ __('onboarding.token.save_button') }}
+                        </x-filament::button>
+                    </div>
                 </div>
 
             </div>

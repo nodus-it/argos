@@ -15,6 +15,10 @@ return [
         'invalid_token_body' => 'The entered token was rejected by the API.',
         'saved_title' => 'Token saved',
         'saved_unreachable_body' => 'Note: Token could not be verified against the API — connection not reachable.',
+        'empty_codex' => 'Please paste the auth.json content',
+        'invalid_codex_title' => 'auth.json invalid',
+        'invalid_codex_body' => 'The pasted content is not valid JSON.',
+        'codex_saved' => 'Codex credential saved',
         'github_disconnected' => 'GitHub connection disconnected',
         'disconnected' => ':provider disconnected',
     ],
@@ -32,20 +36,18 @@ return [
 
     'agents' => [
         'claude_label' => 'Claude Code',
+        'claude_hint' => 'Generate a token with <code class="text-xs">claude setup-token</code> and paste it below.',
         'codex_label' => 'OpenAI Codex',
-        'codex_help' => 'Codex authenticates with the contents of your <code class="text-xs">~/.codex/auth.json</code>. Add it as an Agent Credential from the main menu.',
-        'codex_button' => 'Add Codex credential',
-        'codex_saved' => 'Codex credential is saved.',
+        'codex_hint' => 'Run <code class="text-xs">codex login</code>, then paste the contents of <code class="text-xs">~/.codex/auth.json</code> below.',
+        'codex_placeholder' => '{"OPENAI_API_KEY": null, "tokens": {…}, …}',
+        'codex_saved_short' => 'Saved — paste new content to overwrite.',
     ],
 
     'token' => [
         'from_env' => 'Token comes from the environment variable <code class="text-xs">CLAUDE_CODE_OAUTH_TOKEN</code> — nothing to do.',
-        'is_saved' => 'Token is saved.',
-        'override_label' => 'Override token',
-        'label' => 'Token',
+        'is_saved_short' => 'Saved — paste a new token to overwrite.',
         'placeholder' => 'sk-ant-oat01-…',
         'save_button' => 'Save',
-        'help' => 'Stored in the config directory (mode 0600).',
     ],
 
     'github' => [

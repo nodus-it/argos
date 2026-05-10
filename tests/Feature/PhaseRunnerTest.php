@@ -326,25 +326,6 @@ class PhaseRunnerTest extends TestCase
         $this->assertContains('CLAUDE_CONFIG_DIR=/workspace/.agent/claude-state', $cmd);
     }
 
-    public function test_build_command_omits_argos_mcp_enabled_by_default(): void
-    {
-        $task = $this->taskWithProfile();
-
-        $cmd = $this->captureCommand($task, 'concept');
-
-        $this->assertNotContains('ARGOS_MCP_ENABLED=true', $cmd);
-    }
-
-    public function test_build_command_forwards_argos_mcp_enabled_when_config_true(): void
-    {
-        config(['argos.mcp_enabled' => true]);
-        $task = $this->taskWithProfile();
-
-        $cmd = $this->captureCommand($task, 'concept');
-
-        $this->assertContains('ARGOS_MCP_ENABLED=true', $cmd);
-    }
-
     public function test_build_command_passes_resume_session_id_on_continue(): void
     {
         $task = $this->taskWithProfile();

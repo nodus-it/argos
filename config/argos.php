@@ -40,13 +40,6 @@ return [
     'compose' => [
         'default_stack' => env('ARGOS_DEFAULT_STACK', 'php-8.4'),
     ],
-    /*
-     * When true, PhaseRunner forwards ARGOS_MCP_ENABLED=true to the worker
-     * container. The worker then activates the target project's Laravel Boost
-     * MCP server (php artisan boost:mcp) for the agent session, provided the
-     * project's boost.json has "mcp": true. See worker/lib/mcp.sh.
-     */
-    'mcp_enabled' => filter_var(env('ARGOS_MCP_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
     'implement' => [
         'max_turns_default' => (int) env('ARGOS_MAX_TURNS_DEFAULT', 200),
     ],
