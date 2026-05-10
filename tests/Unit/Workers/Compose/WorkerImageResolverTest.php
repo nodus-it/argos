@@ -143,7 +143,8 @@ class WorkerImageResolverTest extends TestCase
         $this->assertSame($a->stackTag, $b->stackTag);
         $this->assertSame($a->workerTag, $b->workerTag);
         $this->assertMatchesRegularExpression('/^argos-stack:php-8\.4-[a-f0-9]{8}$/', $a->stackTag);
-        $this->assertMatchesRegularExpression('/^argos-worker:php-8\.4-[a-f0-9]{8}-claude-code-latest$/', $a->workerTag);
+        // Tag now embeds two 8-hex hashes: stack-dockerfile-body, worker-lib-tree.
+        $this->assertMatchesRegularExpression('/^argos-worker:php-8\.4-[a-f0-9]{8}-[a-f0-9]{8}-claude-code-latest$/', $a->workerTag);
     }
 
     public function test_dockerfile_body_change_changes_tag(): void
@@ -163,6 +164,81 @@ class WorkerImageResolverTest extends TestCase
         $tagAfter = $this->resolver->resolve($task->fresh())->workerTag;
 
         $this->assertNotSame($tagBefore, $tagAfter);
+    }
+
+    public function test_worker_lib_change_changes_tag(): void
+    {
+        // Synthetic tree under storage/framework/testing/ — Laravel's
+        // base_path() resolves the lib paths relative to repo root, so the
+        // tree must live there. .gitignore covers storage/.
+        $rel = 'storage/framework/testing/wir-'.bin2hex(random_bytes(4));
+        $abs = base_path($rel);
+        mkdir($abs.'/lib', 0o755, true);
+        file_put_contents($abs.'/lib/mcp.sh', "v1\n");
+
+        $resolver = $this->makeResolverWithLibPaths([$rel.'/lib']);
+
+        $stack = WorkerStack::factory()->create(['capabilities' => ['node']]);
+        $profile = RepoProfile::factory()->create(['worker_stack_id' => $stack->id]);
+        $task = Task::factory()->create(['repo_profile_id' => $profile->id]);
+
+        try {
+            $tagBefore = $resolver->resolve($task)->workerTag;
+            file_put_contents($abs.'/lib/mcp.sh', "v2 with new line\n");
+            $tagAfter = $resolver->resolve($task)->workerTag;
+
+            $this->assertNotSame($tagBefore, $tagAfter, 'worker lib change must invalidate the image tag');
+        } finally {
+            @unlink($abs.'/lib/mcp.sh');
+            @rmdir($abs.'/lib');
+            @rmdir($abs);
+        }
+    }
+
+    public function test_worker_lib_fingerprint_is_deterministic(): void
+    {
+        $rel = 'storage/framework/testing/wir-'.bin2hex(random_bytes(4));
+        $abs = base_path($rel);
+        mkdir($abs.'/lib', 0o755, true);
+        file_put_contents($abs.'/lib/a.sh', "alpha\n");
+        file_put_contents($abs.'/lib/b.sh', "beta\n");
+
+        $resolver = $this->makeResolverWithLibPaths([$rel.'/lib']);
+
+        $stack = WorkerStack::factory()->create(['capabilities' => ['node']]);
+        $profile = RepoProfile::factory()->create(['worker_stack_id' => $stack->id]);
+        $task = Task::factory()->create(['repo_profile_id' => $profile->id]);
+
+        try {
+            $a = $resolver->resolve($task)->workerTag;
+            $b = $resolver->resolve($task)->workerTag;
+            $this->assertSame($a, $b);
+        } finally {
+            @unlink($abs.'/lib/a.sh');
+            @unlink($abs.'/lib/b.sh');
+            @rmdir($abs.'/lib');
+            @rmdir($abs);
+        }
+    }
+
+    /**
+     * @param  list<string>  $paths
+     */
+    private function makeResolverWithLibPaths(array $paths): WorkerImageResolver
+    {
+        return new class($this->builder, $paths) extends WorkerImageResolver
+        {
+            /** @param list<string> $paths */
+            public function __construct(WorkerImageBuilder $builder, private readonly array $paths)
+            {
+                parent::__construct($builder);
+            }
+
+            protected function workerLibPaths(): array
+            {
+                return $this->paths;
+            }
+        };
     }
 
     public function test_resolve_or_build_skips_build_when_image_present(): void

@@ -119,9 +119,82 @@ class WorkerImageResolver
     private function workerTag(WorkerStack $stack, AgentSpec $agent): string
     {
         $stackHash = substr(hash('sha256', $stack->dockerfile_body), 0, 8);
+        $libHash = $this->workerLibFingerprint();
         // pinnedVersion can be 'latest' or '1.x.y'; sanitise for tag rules
         $version = preg_replace('/[^a-zA-Z0-9._-]/', '_', $agent->pinnedVersion) ?? 'unknown';
 
-        return "argos-worker:{$stack->name}-{$stackHash}-{$agent->name->value}-{$version}";
+        return "argos-worker:{$stack->name}-{$stackHash}-{$libHash}-{$agent->name->value}-{$version}";
+    }
+
+    /**
+     * Source paths whose content gets baked into the worker image — must
+     * mirror the COPY directives in .tools/docker/worker/Dockerfile. Override
+     * in tests that need to feed a synthetic tree.
+     *
+     * @return list<string> repo-relative paths (file or directory)
+     */
+    protected function workerLibPaths(): array
+    {
+        return [
+            'worker/lib',
+            'worker/phases',
+            'worker/prompts',
+            'worker/schemas',
+            '.tools/docker/worker/worker-entrypoint.sh',
+            '.tools/docker/worker/Dockerfile',
+        ];
+    }
+
+    /**
+     * Hash of every file the worker Dockerfile copies into the image. Without
+     * it the image tag would only react to the *stack* dockerfile, leaving
+     * worker/lib/, worker/phases/, prompts/, schemas/ and the worker
+     * Dockerfile/entrypoint changes silently cached behind the same tag.
+     */
+    private function workerLibFingerprint(): string
+    {
+        $ctx = hash_init('sha256');
+        foreach ($this->workerLibPaths() as $rel) {
+            $this->hashSourcePath($ctx, $rel);
+        }
+
+        return substr(hash_final($ctx), 0, 8);
+    }
+
+    /**
+     * @param  \HashContext  $ctx
+     */
+    private function hashSourcePath($ctx, string $rel): void
+    {
+        $abs = base_path($rel);
+
+        if (is_file($abs)) {
+            hash_update($ctx, $rel."\0".(string) file_get_contents($abs)."\0");
+
+            return;
+        }
+
+        if (! is_dir($abs)) {
+            // Missing path contributes nothing — surfaces the gap cleanly
+            // when a Dockerfile COPY references a path the resolver lost.
+            return;
+        }
+
+        $iter = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($abs, \FilesystemIterator::SKIP_DOTS),
+        );
+        $files = [];
+        foreach ($iter as $entry) {
+            if ($entry->isFile()) {
+                $files[] = (string) $entry;
+            }
+        }
+        sort($files); // determinism: filesystem iteration order is undefined
+
+        $base = base_path().DIRECTORY_SEPARATOR;
+        foreach ($files as $file) {
+            $relFile = str_starts_with($file, $base) ? substr($file, strlen($base)) : $file;
+            hash_update($ctx, $relFile."\0".(string) file_get_contents($file)."\0");
+        }
     }
 }
