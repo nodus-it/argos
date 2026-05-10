@@ -9,6 +9,7 @@ return [
         'concept_review' => 'Konzept bereit',
         'implement_running' => 'Implementierung läuft',
         'implement_paused' => 'Pausiert (Turn-Limit)',
+        'implement_completed' => 'Implementierung abgeschlossen',
         'in_review' => 'In Review',
         'completed' => 'Abgeschlossen',
         'failed' => 'Fehlgeschlagen',
@@ -48,5 +49,30 @@ return [
             'output' => 'Output',
             'cost' => 'Kosten',
         ],
+    ],
+
+    'worker_source' => [
+        'standard' => 'Standard',
+        'byoi' => 'Eigenes Image (BYOI)',
+        'devcontainer' => 'Devcontainer',
+    ],
+
+    'worker_image_entity_status' => [
+        'active' => 'Aktiv',
+        'deprecated' => 'Veraltet',
+        'disabled' => 'Deaktiviert',
+    ],
+
+    'worker_image_build_status' => [
+        'queued' => 'Wartet',
+        'building' => 'Build läuft',
+        'ready' => 'Bereit',
+        'failed' => 'Fehlgeschlagen',
+    ],
+
+    'agent_credential_status' => [
+        'active' => 'Aktiv',
+        'expired' => 'Abgelaufen',
+        'revoked' => 'Widerrufen',
     ],
 ];

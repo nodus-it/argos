@@ -21,8 +21,8 @@ phase_commit_message_preconditions() {
         echo "commit-message: /workspace nicht initialisiert." >&2
         return 2
     fi
-    if [[ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]]; then
-        echo "commit-message: CLAUDE_CODE_OAUTH_TOKEN fehlt." >&2
+    if ! agent_auth_present; then
+        echo "commit-message: keine Authentifizierung für Agent '${AGENT_NAME:-claude_code}' — bitte CLAUDE_CODE_OAUTH_TOKEN (claude_code) oder ~/.codex/auth.json / OPENAI_API_KEY (codex) setzen." >&2
         return 3
     fi
     return 0
@@ -117,32 +117,45 @@ phase_commit_message_run() {
         return 1
     fi
 
-    local schema_content sysprompt_content
-    schema_content="$(cat "$schema_path")"
-    sysprompt_content="$(cat "$sysprompt")"
-
     local output_json="/workspace/.agent/logs/commit-message.${ITERATION}.json"
 
-    log_info "commit-message: calling claude (json + json-schema)"
+    # commit-message is a 1-shot subroutine. For Claude we want the
+    # cheapest available model (Haiku) explicitly — saves tokens on
+    # the cheapest possible task. For Codex we DON'T pin a model:
+    # Codex with a ChatGPT account refuses any explicit model name
+    # and picks the right one based on the user's plan, so the only
+    # safe path is to omit --model and let Codex default itself.
+    # When a new agent lands, extend this case-switch (empty value
+    # means "let the agent runner pick").
+    local commit_model
+    case "${AGENT_NAME:-claude-code}" in
+        codex)         commit_model="" ;;
+        claude-code|*) commit_model="claude-haiku-4-5-20251001" ;;
+    esac
+
+    local model_args=()
+    [[ -n "$commit_model" ]] && model_args=(--model "$commit_model")
+
+    log_info "commit-message: calling agent (json + json-schema)"
     set +e
-    ( unset REPO_TOKEN
-      claude -p \
-        --append-system-prompt "$sysprompt_content" \
-        --output-format json \
-        --json-schema "$schema_content" \
+    agent_run \
+        --system-prompt-file "$sysprompt" \
+        --user-prompt-file "$user_prompt_path" \
         --max-turns 8 \
-        --permission-mode bypassPermissions \
-        < "$user_prompt_path"
-    ) | log_scrub > "$output_json"
-    local claude_exit=${PIPESTATUS[0]}
+        "${model_args[@]}" \
+        --output-format json \
+        --no-verbose \
+        --json-schema "$schema_path" \
+      | log_scrub > "$output_json"
+    local agent_exit=${PIPESTATUS[0]}
     set -e
-    if (( claude_exit != 0 )); then
-        echo "commit-message: claude call failed (exit non-zero)" >&2
+    if (( agent_exit != 0 )); then
+        echo "commit-message: agent call failed (exit non-zero)" >&2
         local cli_err_text=""
         if [[ -f "$output_json" ]]; then
             cli_err_text="$(jq -r '.error.message // .message // ""' "$output_json" 2>/dev/null || true)"
         fi
-        if claude_check_usage_limit "" "$cli_err_text"; then
+        if agent_check_usage_limit "" "$cli_err_text"; then
             echo "  → usage/rate limit — backing off" >&2
             return "$EXIT_USAGE_LIMIT"
         fi
@@ -154,13 +167,13 @@ phase_commit_message_run() {
     if [[ "$is_error" != "false" ]]; then
         local err_msg
         err_msg="$(jq -r '.result // "(no result field)"' "$output_json" 2>/dev/null)"
-        echo "commit-message: claude returned is_error=true: $err_msg" >&2
-        if claude_check_usage_limit "" "$err_msg"; then
+        echo "commit-message: agent returned is_error=true: $err_msg" >&2
+        if agent_check_usage_limit "" "$err_msg"; then
             echo "  → usage/rate limit — backing off" >&2
             return "$EXIT_USAGE_LIMIT"
         fi
-        if echo "$err_msg" | grep -qiE "invalid api key|authentication|oauth|unauthorized|401|token.*expired|invalid_api_key"; then
-            echo "  → Claude-OAuth-Token ungültig oder abgelaufen." >&2
+        if agent_check_auth_error "$err_msg"; then
+            echo "  → Agent-Token ungültig oder abgelaufen." >&2
             echo "    Token erneuern: claude setup-token" >&2
             echo "    Dann: ./agent init --update-token" >&2
         fi

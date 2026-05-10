@@ -50,25 +50,19 @@ class WorkflowService
      */
     public function completePhase(Task $task, string $phase, PhaseStatus $phaseStatus): void
     {
-        if ($phase === 'implement' && $phaseStatus === PhaseStatus::Completed) {
-            if ($task->repoProfile?->auto_pr) {
-                RunPhaseJob::dispatch($task->id, 'push');
-
-                // workflow_status stays as-is until push finishes
-                return;
-            }
-
-            // No auto_pr: ensure the status reflects implement finished, not that it failed.
-            if ($task->workflow_status !== WorkflowStatus::ImplementRunning) {
-                $task->update(['workflow_status' => WorkflowStatus::ImplementRunning]);
-            }
-
-            return;
-        }
-
         $next = WorkflowStatus::afterPhase($phase, $phaseStatus);
         if ($next !== null) {
             $task->update(['workflow_status' => $next]);
+        }
+
+        // After a successful implement, optionally chain into push. The
+        // workflow_status above already reflects ImplementCompleted; while
+        // push runs, current_phase/current_status carry the live progress
+        // and push completion will advance workflow_status to InReview.
+        if ($phase === 'implement'
+            && $phaseStatus === PhaseStatus::Completed
+            && $task->repoProfile?->auto_pr) {
+            RunPhaseJob::dispatch($task->id, 'push');
         }
     }
 

@@ -55,4 +55,20 @@ class RedirectToOnboardingTest extends TestCase
 
         $response->assertOk();
     }
+
+    public function test_agent_credential_create_page_is_not_redirected(): void
+    {
+        // Onboarding's Codex setup links to this route — the middleware must
+        // let it through even though no RepoProfile exists yet.
+        $response = $this->get(route('filament.admin.resources.agent-credentials.create'));
+
+        $response->assertOk();
+    }
+
+    public function test_agent_credential_list_page_is_not_redirected(): void
+    {
+        $response = $this->get(route('filament.admin.resources.agent-credentials.index'));
+
+        $response->assertOk();
+    }
 }

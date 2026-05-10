@@ -4,12 +4,18 @@ declare(strict_types=1);
 
 namespace App\Services\Workflow;
 
+use App\Enums\AgentCredentialStatus;
+use App\Enums\AgentName;
 use App\Enums\PhaseStatus;
+use App\Enums\WorkflowStatus;
 use App\Jobs\RunPhaseJob;
+use App\Models\AgentCredential;
 use App\Models\PhaseRun;
 use App\Models\RepoProfile;
 use App\Models\Task;
 use App\Services\Anthropic\CredentialStore;
+use App\Workers\Agents\MaterializedAgentCredential;
+use App\Workers\Compose\WorkerImageResolver;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -307,13 +313,18 @@ class PhaseRunner
 
         $phaseRun->update($this->phaseRunUpdate($status, $exitCode, $stdout));
 
-        $task->update([
-            'current_phase' => $phase,
-            'current_status' => $status,
-        ]);
-
+        // postPhaseSync writes content (concept_md, implement_summary, …) to the DB.
+        // It must run BEFORE the status update so the UI poll cannot stop on 'completed'
+        // before the content is available.
         $task->refresh();
         $this->postPhaseSync($task, $phaseRun, $phase, $notesBeforeRun);
+
+        // postPhaseSync may have promoted the phase run (e.g. Failed → Paused for max-turns);
+        // use the current phaseRun status as the authoritative final value.
+        $task->update([
+            'current_phase' => $phase,
+            'current_status' => $phaseRun->status,
+        ]);
 
         return $exitCode;
     }
@@ -385,16 +396,21 @@ class PhaseRunner
             $this->storeUsageLimit($resetAt);
         }
 
-        $task->update([
-            'current_phase' => $phase,
-            'current_status' => $status,
-        ]);
-
+        // postPhaseSync writes content (concept_md, implement_summary, …) to the DB.
+        // It must run BEFORE the status update so the UI poll cannot stop on 'completed'
+        // before the content is available.
         $task->refresh();
         $this->postPhaseSync($task, $phaseRun, $phase, $notesBeforeRun);
 
+        // postPhaseSync may have promoted the phase run (e.g. Failed → Paused for max-turns);
+        // use the current phaseRun status as the authoritative final value.
+        $task->update([
+            'current_phase' => $phase,
+            'current_status' => $phaseRun->status,
+        ]);
+
         // After a successful implement run with existing PR: auto-trigger push
-        if ($phase === 'implement' && $status === PhaseStatus::Completed && $task->fresh()->pr_url !== null) {
+        if ($phase === 'implement' && $phaseRun->status === PhaseStatus::Completed && $task->fresh()->pr_url !== null) {
             Log::channel('argos')->info('Auto-triggering push after implement', $this->safeContext($task, 'push'));
             RunPhaseJob::dispatch($task->id, 'push');
         }
@@ -501,24 +517,15 @@ class PhaseRunner
             );
         }
 
-        // Token: env var takes precedence (containerised manager), file-based fallback for local dev.
-        // Use ?: instead of ?? so an empty string from the env also falls through to the file.
-        $claudeToken = config('argos.claude_token') ?: $this->credentials->getClaudeToken();
+        $agentName = $this->resolveAgentName($task);
+        $materializedCredential = $this->materializeCredential($task, $agentName);
 
-        if ($claudeToken === null || $claudeToken === '') {
-            Log::channel('argos')->error('Phase cannot start: no Claude token configured', ['task' => $task->name, 'phase' => $phase]);
-            throw new \RuntimeException(
-                'Kein Claude OAuth Token konfiguriert. Bitte CLAUDE_CODE_OAUTH_TOKEN setzen.'
-            );
-        }
-
-        $workerImage = $task->worker_image
-            ?: $profile->worker_image
-            ?: config('argos.worker_image', 'ghcr.io/nodus-it/argos-worker:php8.4');
+        $workerImage = $this->resolveWorkerImage($task);
         $phaseFlags = $flags !== [] ? json_encode($flags) : '{}';
 
         $maxTurns = $this->resolveMaxTurns($task, $flags);
         $resumeSessionId = $this->resolveResumeSessionId($task, $phase, $flags);
+        $modelId = $this->resolveModel($task, $agentName, $phase);
 
         $cmd = [
             'docker', 'run', '--rm',
@@ -533,13 +540,19 @@ class PhaseRunner
             '-e', "REPO_TOKEN={$this->resolveRepoToken($profile)}",
             '-e', "REPO_PLATFORM={$profile->platform->value}",
             '-e', 'BASE_BRANCH='.($task->base_branch ?: $profile->default_branch),
-            '-e', "CLAUDE_CODE_OAUTH_TOKEN={$claudeToken}",
+            '-e', "AGENT_NAME={$agentName->value}",
             '-e', "TASK_DESCRIPTION={$task->description}",
             '-e', "PHASE_FLAGS={$phaseFlags}",
             '-e', "MAX_TURNS={$maxTurns}",
             '-e', 'CLAUDE_CONFIG_DIR=/workspace/.agent/claude-state',
             '-e', 'LOG_LEVEL=info',
+            '-e', "CLAUDE_MODEL={$modelId}",
         ];
+
+        foreach ($materializedCredential->envVars as $key => $value) {
+            $cmd[] = '-e';
+            $cmd[] = "{$key}={$value}";
+        }
 
         if ($resumeSessionId !== null) {
             $cmd[] = '-e';
@@ -569,6 +582,67 @@ class PhaseRunner
     private function resolveRepoToken(RepoProfile $profile): string
     {
         return $profile->resolveToken();
+    }
+
+    /**
+     * Resolution order: task override → repo_profile setting → default
+     * (claude-code). Mirrors what WorkerImageResolver does for the
+     * stack/agent pair so AGENT_NAME stays consistent with the chosen
+     * worker image.
+     */
+    private function resolveAgentName(Task $task): AgentName
+    {
+        return $task->worker_agent_name_override
+            ?? $task->repoProfile?->worker_agent_name
+            ?? AgentName::ClaudeCode;
+    }
+
+    /**
+     * Materialise the agent's credential into env-vars for `docker run`.
+     *
+     * Resolution order:
+     *   1. Explicit `task.agent_credential_id` if set
+     *   2. First active AgentCredential for the resolved agent (matches
+     *      what TaskResource's helper text promises)
+     *   3. Whatever the runner falls back to when handed null — claude
+     *      reads the legacy env/file token, codex throws because it has
+     *      no shared-secret fallback
+     */
+    private function materializeCredential(Task $task, AgentName $agentName): MaterializedAgentCredential
+    {
+        $runner = $agentName->runner();
+
+        $credential = $task->agentCredential
+            ?? $this->resolveDefaultCredential($agentName);
+
+        return $runner->materializeCredential($credential);
+    }
+
+    /**
+     * First active credential for the agent, ordered by created_at so the
+     * "first one I made" intuition matches what the form's "Leer = erste
+     * aktive Credential" helper text claims.
+     */
+    private function resolveDefaultCredential(AgentName $agentName): ?AgentCredential
+    {
+        return AgentCredential::query()
+            ->where('agent_name', $agentName->value)
+            ->where('status', AgentCredentialStatus::Active->value)
+            ->orderBy('created_at')
+            ->first();
+    }
+
+    /**
+     * Resolves the worker image tag via the compose pipeline, building
+     * the image on demand if the (stack × agent × version) tuple does
+     * not yet exist locally. The resolver is fetched lazily via the
+     * container because phpunit's partialMock skips the constructor and
+     * any readonly resolver property would land in an
+     * "accessed before initialization" error.
+     */
+    private function resolveWorkerImage(Task $task): string
+    {
+        return app(WorkerImageResolver::class)->resolveOrBuild($task);
     }
 
     /**
@@ -615,6 +689,52 @@ class PhaseRunner
         }
 
         return is_string($sessionId) && $sessionId !== '' ? $sessionId : null;
+    }
+
+    /**
+     * Resolve the model id to send to the worker for this phase, agent-aware.
+     *
+     * Phase mapping:
+     *  - respond: concept-review uses the concept model, code-review the implement model
+     *  - commit-message: a dedicated cheap-model slot
+     *  - everything else: takes its own slot (concept/implement)
+     *
+     * Resolution order per slot: task override → repo profile default →
+     * agent-spec default for the phase. The env var stays named
+     * CLAUDE_MODEL for now because the worker scripts and Claude runner
+     * read it as such; the Codex runner ignores it (Codex picks via its
+     * own --model arg if needed).
+     */
+    private function resolveModel(Task $task, AgentName $agentName, string $phase): string
+    {
+        $effectivePhase = match ($phase) {
+            'respond' => $task->workflow_status === WorkflowStatus::ConceptReview ? 'concept' : 'implement',
+            default => $phase,
+        };
+
+        $taskModel = match ($effectivePhase) {
+            'concept' => $task->model_concept,
+            'implement' => $task->model_implement,
+            default => null,
+        };
+        if ($taskModel !== null && $taskModel !== '') {
+            return $taskModel;
+        }
+
+        $profile = $task->repoProfile;
+        $profileModel = match ($effectivePhase) {
+            'concept' => $profile?->model_concept,
+            'implement' => $profile?->model_implement,
+            default => null,
+        };
+        if ($profileModel !== null && $profileModel !== '') {
+            return $profileModel;
+        }
+
+        $spec = $agentName->spec();
+        $default = $spec->defaultModel($effectivePhase);
+
+        return $default ?? '';
     }
 
     private function extractSessionIdFromStreamLog(?string $streamLog): ?string

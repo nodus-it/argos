@@ -7,8 +7,7 @@
 [![License: AGPL-3.0](https://img.shields.io/github/license/nodus-it/argos?style=flat-square)](LICENSE)
 [![Version](https://img.shields.io/github/v/tag/nodus-it/argos?style=flat-square&label=version&include_prereleases&sort=semver)](https://github.com/nodus-it/argos/releases)
 [![GHCR](https://img.shields.io/badge/ghcr.io-argos--app-2496ED?style=flat-square&logo=docker&logoColor=white)](https://github.com/nodus-it/argos/pkgs/container/argos-app)
-[![CI](https://img.shields.io/github/actions/workflow/status/nodus-it/argos/ci.yml?branch=master&style=flat-square&label=tests)](https://github.com/nodus-it/argos/actions/workflows/ci.yml)
-[![Coverage](https://img.shields.io/codecov/c/github/nodus-it/argos?style=flat-square)](https://codecov.io/gh/nodus-it/argos)
+[![CI](https://img.shields.io/github/actions/workflow/status/nodus-it/argos/ci.yml?branch=develop&style=flat-square&label=tests)](https://github.com/nodus-it/argos/actions/workflows/ci.yml)
 
 </div>
 
@@ -29,13 +28,24 @@ request you can review.
 ## Quick Start
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/nodus-it/argos/develop/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/nodus-it/argos/master/install.sh | bash
 ```
 
-That installs Argos into the **current directory** (set `--dir` or
-`ARGOS_INSTALL_DIR` to install elsewhere) — drops a `docker-compose.yml`,
+That installs Argos into the **current directory** — drops a `docker-compose.yml`,
 generates a fresh `.env` with random secrets, brings up the stack, and prints
 the admin password.
+
+**Installer flags** (append after `bash -s --` or pass as env vars):
+
+| Flag | Env var | Effect |
+|---|---|---|
+| `--dir PATH` | `ARGOS_INSTALL_DIR` | Install into `PATH` instead of `$PWD` |
+| `--version REF` | `ARGOS_VERSION` | Pin a specific Git tag or branch |
+| `--stage` | `ARGOS_STAGE=1` | Use rolling `:stage` images from `develop` |
+| `--beta` | `ARGOS_BETA=1` | Use the latest release including pre-releases |
+| `--reset` | — | Tear down the stack and wipe all data (destructive) |
+| `--force` | — | Skip safety prompts (required for `--reset` in non-interactive shells) |
+| `--help` | — | Show all options |
 
 Open <http://localhost:8080/admin> — an in-app onboarding wizard walks you
 through pasting your Claude token and creating your first project.

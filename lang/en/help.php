@@ -25,9 +25,9 @@ return [
         ],
         'bitbucket' => [
             'title' => 'Bitbucket Setup',
-            'body' => 'Bitbucket uses App Passwords instead of PATs. Token format: <code>username:app_password</code> (not your account password).',
-            'link_label' => 'Create an App Password',
-            'link_url' => ':bitbucket_app_passwords',
+            'body' => 'Bitbucket uses Repository Access Tokens (scoped per repo). Paste the token directly — no username prefix needed.',
+            'link_label' => 'Create a Repository Access Token',
+            'link_url' => ':bitbucket_pat',
             'doc_label' => 'Full guide',
             'doc_url' => ':setup_bitbucket',
         ],

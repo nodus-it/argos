@@ -33,11 +33,34 @@ All Argos configuration is controlled via environment variables passed to the
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `ARGOS_WORKER_IMAGE` | `ghcr.io/nodus-it/argos-worker:php8.4` | Worker image used to spawn task containers. |
+| `ARGOS_DEFAULT_STACK` | `php-8.4` | Slug of the worker stack used when neither the task nor the project pins one. Must match a row in `worker_stacks` (built-ins are mirrored on `migrate`). |
 | `ARGOS_MEM_LIMIT` | `4g` | Memory limit per worker container. |
 | `ARGOS_CPU_LIMIT` | `2` | CPU limit per worker container. |
 | `ARGOS_MAX_TURNS_DEFAULT` | `200` | Default max-turns for the implement phase (overridable per task). |
 | `ARGOS_CONFIG_DIR` | `~/.config/argos` | Persisted config / SQLite path inside the manager. |
+
+## MCP — Laravel Boost
+
+The worker checks the cloned target project's `boost.json` for `"mcp": true`.
+If present, the active agent runner attaches the project's MCP server as a
+local `stdio` subprocess (`php artisan boost:mcp`) before each session — no
+network access, no Argos database connection. The target repo decides; no
+manager-side flag.
+
+**Requirements on the target project:**
+- `laravel/boost ^2.4` in `composer.json`
+- `boost.json` with `"mcp": true`
+- `composer install` has run (vendor directory present)
+
+**Wiring per agent (handled automatically):**
+- Claude Code: `claude --mcp-config <file>` with a generated config file.
+- Codex: `-c mcp_servers.laravel-boost.{command,args}=…` overrides spliced
+  into the `codex exec` invocation.
+
+The MCP server runs entirely inside the worker container. It gives the agent
+access to Boost tools (e.g. `search-docs`, `database-schema`) scoped to the
+target project. To opt out, set `"mcp": false` in `boost.json` or remove the
+file.
 
 ## OAuth (optional)
 

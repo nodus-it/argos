@@ -7,7 +7,11 @@ return [
     'navigation_label' => 'Tasks',
 
     'fields' => [
+        'name_label' => 'Name',
+        'name_helper' => 'Unique slug for this task — surfaces in URLs, volume names, and the branch prefix.',
         'project' => 'Project',
+        'project_helper' => 'Which repo profile. Stack/agent/models inherit the project default; you can override per task in the Worker tab.',
+        'description_label' => 'Description',
         'description_helper' => 'Concrete acceptance criteria lead to better PRs. What should happen, *why*, and how will you know it worked?',
         'auto_concept_label' => 'Start concept immediately',
         'auto_concept_helper' => 'Starts the concept phase immediately after creation.',
@@ -15,8 +19,24 @@ return [
         'max_turns_helper' => 'Upper limit for tool calls per implement run. Empty = default :default.',
         'base_branch_label' => 'Base Branch (Override)',
         'base_branch_helper' => 'Overrides the base branch for this specific task. Empty = project default.',
-        'worker_image_label' => 'Worker Image (Override)',
-        'worker_image_helper' => 'Overrides the image for this specific task. Empty = project default.',
+        'worker_stack_label' => 'Worker Stack (Override)',
+        'worker_stack_helper' => 'Overrides the worker stack for this specific task. Empty = project default.',
+        'worker_stack_placeholder' => 'Project default: :stack',
+        'worker_agent_label' => 'Agent (Override)',
+        'worker_agent_helper' => 'Overrides the agent for this specific task. Empty = project default.',
+        'worker_agent_placeholder' => 'Project default: :agent',
+        'agent_credential_label' => 'Agent Credential',
+        'agent_credential_helper' => 'Which credential the agent will use. Empty = first active credential.',
+        'agent_credential_placeholder' => 'First active credential',
+        'model_placeholder_neutral' => 'Agent default',
+        'model_concept_label' => 'Concept Model (Override)',
+        'model_concept_placeholder' => 'Default: :model',
+        'model_concept_helper' => 'Overrides the concept model for this specific task. Empty = project or agent default.',
+        'model_concept_helper_with_default' => 'Overrides the concept model for this task. Empty = project or agent default (:model).',
+        'model_implement_label' => 'Implement Model (Override)',
+        'model_implement_placeholder' => 'Default: :model',
+        'model_implement_helper' => 'Overrides the implement model for this specific task. Empty = project or agent default.',
+        'model_implement_helper_with_default' => 'Overrides the implement model for this task. Empty = project or agent default (:model).',
     ],
 
     'columns' => [
@@ -24,15 +44,29 @@ return [
         'phase' => 'Phase',
         'status' => 'Status',
         'workflow' => 'Workflow',
+        'agent' => 'Agent',
         'cost' => 'Cost',
         'tokens' => 'Tokens',
         'created' => 'Created',
+        'last_activity' => 'Last Activity',
+    ],
+
+    'tabs' => [
+        // form tabs (Create/Edit task)
+        'basics' => 'General',
+        'worker' => 'Worker & models',
+        // table filter tabs (List tasks)
+        'current' => 'Current',
+        'completed' => 'Completed',
+        'all' => 'All',
     ],
 
     'view' => [
         'labels' => [
             'status' => 'Status',
             'repository' => 'Repository',
+            'agent' => 'Agent',
+            'stack' => 'Stack',
             'base_branch' => 'Base Branch',
             'branch' => 'Branch',
             'pull_request' => 'Pull Request',

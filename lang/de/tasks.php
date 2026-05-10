@@ -7,7 +7,11 @@ return [
     'navigation_label' => 'Tasks',
 
     'fields' => [
+        'name_label' => 'Name',
+        'name_helper' => 'Eindeutiger Slug für diesen Task — taucht in URLs, Volume-Namen und Branch-Präfix auf.',
         'project' => 'Projekt',
+        'project_helper' => 'Welches Repo-Profil. Stack/Agent/Modelle erben den Default vom Projekt; im Worker-Tab kannst du sie pro Task überschreiben.',
+        'description_label' => 'Beschreibung',
         'description_helper' => 'Konkrete Akzeptanzkriterien führen zu besseren PRs. Was soll passieren, *warum*, und woran erkennst du das Ergebnis?',
         'auto_concept_label' => 'Konzept direkt starten',
         'auto_concept_helper' => 'Startet die Konzept-Phase sofort nach dem Anlegen.',
@@ -15,8 +19,24 @@ return [
         'max_turns_helper' => 'Obergrenze für Tool-Calls pro Implement-Lauf. Leer = Default :default.',
         'base_branch_label' => 'Base Branch (Override)',
         'base_branch_helper' => 'Überschreibt den Start-Branch für genau diesen Task. Leer = Projekt-Default.',
-        'worker_image_label' => 'Worker-Image (Override)',
-        'worker_image_helper' => 'Überschreibt das Image für genau diesen Task. Leer = Projekt-Default.',
+        'worker_stack_label' => 'Worker-Stack (Override)',
+        'worker_stack_helper' => 'Überschreibt den Worker-Stack für genau diesen Task. Leer = Projekt-Default.',
+        'worker_stack_placeholder' => 'Projekt-Default: :stack',
+        'worker_agent_label' => 'Agent (Override)',
+        'worker_agent_helper' => 'Überschreibt den Agent für genau diesen Task. Leer = Projekt-Default.',
+        'worker_agent_placeholder' => 'Projekt-Default: :agent',
+        'agent_credential_label' => 'Agent-Credential',
+        'agent_credential_helper' => 'Welche Credential für den Agent benutzt wird. Leer = erste aktive Credential.',
+        'agent_credential_placeholder' => 'Erste aktive Credential',
+        'model_placeholder_neutral' => 'Agent-Default',
+        'model_concept_label' => 'Konzept-Modell (Override)',
+        'model_concept_placeholder' => 'Default: :model',
+        'model_concept_helper' => 'Überschreibt das Konzept-Modell für genau diesen Task. Leer = Projekt- oder Agent-Default.',
+        'model_concept_helper_with_default' => 'Überschreibt das Konzept-Modell für diesen Task. Leer = Projekt- oder Agent-Default (:model).',
+        'model_implement_label' => 'Implement-Modell (Override)',
+        'model_implement_placeholder' => 'Default: :model',
+        'model_implement_helper' => 'Überschreibt das Implement-Modell für genau diesen Task. Leer = Projekt- oder Agent-Default.',
+        'model_implement_helper_with_default' => 'Überschreibt das Implement-Modell für diesen Task. Leer = Projekt- oder Agent-Default (:model).',
     ],
 
     'columns' => [
@@ -24,15 +44,29 @@ return [
         'phase' => 'Phase',
         'status' => 'Status',
         'workflow' => 'Workflow',
+        'agent' => 'Agent',
         'cost' => 'Kosten',
         'tokens' => 'Tokens',
         'created' => 'Erstellt',
+        'last_activity' => 'Letzte Aktivität',
+    ],
+
+    'tabs' => [
+        // form tabs (Create/Edit task)
+        'basics' => 'Allgemein',
+        'worker' => 'Worker & Modelle',
+        // table filter tabs (List tasks)
+        'current' => 'Aktuell',
+        'completed' => 'Abgeschlossen',
+        'all' => 'Alle',
     ],
 
     'view' => [
         'labels' => [
             'status' => 'Status',
             'repository' => 'Repository',
+            'agent' => 'Agent',
+            'stack' => 'Stack',
             'base_branch' => 'Base Branch',
             'branch' => 'Branch',
             'pull_request' => 'Pull Request',

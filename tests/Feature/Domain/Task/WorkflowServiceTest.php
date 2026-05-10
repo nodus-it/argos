@@ -11,6 +11,7 @@ use App\Jobs\RunPhaseJob;
 use App\Models\PhaseRun;
 use App\Models\RepoProfile;
 use App\Models\Task;
+use App\Services\Task\TaskService;
 use App\Services\Workflow\PhaseRunner;
 use App\Services\Workflow\WorkflowService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -204,7 +205,7 @@ class WorkflowServiceTest extends TestCase
         $this->assertSame(WorkflowStatus::ImplementPaused, $task->fresh()->workflow_status);
     }
 
-    public function test_complete_phase_implement_completed_without_auto_pr_stays_implement_running(): void
+    public function test_complete_phase_implement_completed_without_auto_pr_advances_to_implement_completed(): void
     {
         $profile = RepoProfile::factory()->create(['auto_pr' => false]);
         $task = Task::factory()->create([
@@ -214,14 +215,15 @@ class WorkflowServiceTest extends TestCase
 
         $this->service->completePhase($task, 'implement', PhaseStatus::Completed);
 
-        $this->assertSame(WorkflowStatus::ImplementRunning, $task->fresh()->workflow_status);
+        $this->assertSame(WorkflowStatus::ImplementCompleted, $task->fresh()->workflow_status);
         Bus::assertNothingDispatched();
     }
 
-    public function test_complete_phase_implement_completed_without_auto_pr_corrects_failed_status(): void
+    public function test_complete_phase_implement_completed_overrides_prior_failed_status(): void
     {
-        // Core bug regression: if workflow_status was Failed before the retry,
-        // completePhase must correct it to ImplementRunning after a successful run.
+        // Regression: when a prior implement attempt failed (workflow_status=Failed),
+        // a successful retry must advance through afterPhase to ImplementCompleted,
+        // not stay stuck on Failed.
         $profile = RepoProfile::factory()->create(['auto_pr' => false]);
         $task = Task::factory()->create([
             'repo_profile_id' => $profile->id,
@@ -230,10 +232,10 @@ class WorkflowServiceTest extends TestCase
 
         $this->service->completePhase($task, 'implement', PhaseStatus::Completed);
 
-        $this->assertSame(WorkflowStatus::ImplementRunning, $task->fresh()->workflow_status);
+        $this->assertSame(WorkflowStatus::ImplementCompleted, $task->fresh()->workflow_status);
     }
 
-    public function test_complete_phase_implement_completed_with_auto_pr_dispatches_push_job(): void
+    public function test_complete_phase_implement_completed_with_auto_pr_dispatches_push_and_advances_status(): void
     {
         $profile = RepoProfile::factory()->create(['auto_pr' => true]);
         $task = Task::factory()->create([
@@ -244,8 +246,7 @@ class WorkflowServiceTest extends TestCase
         $this->service->completePhase($task, 'implement', PhaseStatus::Completed);
 
         Bus::assertDispatched(RunPhaseJob::class, fn ($j) => $j->phase === 'push' && $j->taskId === $task->id);
-        // Status stays ImplementRunning while push runs
-        $this->assertSame(WorkflowStatus::ImplementRunning, $task->fresh()->workflow_status);
+        $this->assertSame(WorkflowStatus::ImplementCompleted, $task->fresh()->workflow_status);
     }
 
     public function test_complete_phase_push_completed_advances_to_in_review(): void
@@ -330,8 +331,8 @@ class WorkflowServiceTest extends TestCase
 
     public function test_run_phase_job_resets_failed_status_before_running_implement(): void
     {
-        // Core bug regression: implement succeeds after a previous failure,
-        // but workflow_status should not remain Failed.
+        // Regression: implement succeeds after a previous failure — workflow_status
+        // must advance through afterPhase to ImplementCompleted, not stay on Failed.
         $profile = RepoProfile::factory()->create(['auto_pr' => false]);
         $task = Task::factory()->create([
             'repo_profile_id' => $profile->id,
@@ -348,13 +349,13 @@ class WorkflowServiceTest extends TestCase
             });
 
         $job = new RunPhaseJob($task->id, 'implement');
-        $job->handle(app(PhaseRunner::class), app(WorkflowService::class));
+        $job->handle(app(PhaseRunner::class), app(WorkflowService::class), app(TaskService::class));
 
         $this->assertNotSame(WorkflowStatus::Failed, $task->fresh()->workflow_status);
-        $this->assertSame(WorkflowStatus::ImplementRunning, $task->fresh()->workflow_status);
+        $this->assertSame(WorkflowStatus::ImplementCompleted, $task->fresh()->workflow_status);
     }
 
-    public function test_run_phase_job_does_not_change_status_when_task_is_already_running(): void
+    public function test_run_phase_job_advances_to_implement_completed_when_implement_finishes(): void
     {
         $profile = RepoProfile::factory()->create(['auto_pr' => false]);
         $task = Task::factory()->create([
@@ -367,9 +368,11 @@ class WorkflowServiceTest extends TestCase
         $runner->shouldReceive('runBlocking')->andReturnNull();
 
         $job = new RunPhaseJob($task->id, 'implement');
-        $job->handle(app(PhaseRunner::class), app(WorkflowService::class));
+        $job->handle(app(PhaseRunner::class), app(WorkflowService::class), app(TaskService::class));
 
-        // Status should still be ImplementRunning (not changed by retryPhase)
-        $this->assertSame(WorkflowStatus::ImplementRunning, $task->fresh()->workflow_status);
+        // current_status=completed feeds completePhase, which advances to
+        // ImplementCompleted via afterPhase. The old behaviour kept this
+        // stuck at ImplementRunning, hiding implement completion in the UI.
+        $this->assertSame(WorkflowStatus::ImplementCompleted, $task->fresh()->workflow_status);
     }
 }

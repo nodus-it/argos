@@ -19,7 +19,7 @@ class TaskServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = new TaskService;
+        $this->service = app(TaskService::class);
     }
 
     public function test_create_saves_task_to_database(): void

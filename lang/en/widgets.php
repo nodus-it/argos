@@ -13,6 +13,9 @@ return [
         'waiting' => 'Waiting for you',
         'review_open' => 'Review or response pending',
         'nothing_todo' => 'Nothing to do',
+        'worker_updates' => 'Worker Updates',
+        'worker_updates_pending' => 'Image rebuilds available',
+        'worker_updates_clean' => 'All up to date',
     ],
 
     'current_tasks' => [

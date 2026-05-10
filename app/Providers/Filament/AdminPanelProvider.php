@@ -56,6 +56,7 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->navigationGroups([
                 __('navigation.groups.tasks'),
+                __('navigation.groups.worker'),
                 __('navigation.groups.configuration'),
             ])
             ->login()

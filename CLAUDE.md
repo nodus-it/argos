@@ -56,8 +56,8 @@ CI führt `shellcheck` über `agent`, `worker/lib/`, `worker/phases/`, `.tools/d
 ### Dokumentation
 
 - Jede neue Funktion in `worker/lib/` braucht einen Docstring.
-- Bei Architektur-relevanten Änderungen: `docs/WORKER-CONCEPT.md` oder `docs/IMPLEMENTATION.md` mit aktualisieren.
-- Beispiel-Walkthrough in `docs/EXAMPLE.md` mit jedem neuen Feature aktuell halten.
+- User-facing Doku (Setup, Konfiguration, Provider-Anleitungen) in `docs/`.
+- Architektur-Notizen leben inline am Code (Klassen-/Methoden-PHPDoc, README im Modul-Ordner falls nötig); kein paralleles Konzept-Dokument pflegen.
 
 ### Tests
 
@@ -102,22 +102,16 @@ CI führt `shellcheck` über `agent`, `worker/lib/`, `worker/phases/`, `.tools/d
 ## Häufige Befehle
 
 ```bash
-# Compose-Stack hochfahren (db + app + nginx + queue). Erwartet dass die
-# argos-worker:local-php8.{3,4} Images schon existieren — `composer run dev`
-# baut die vorher; standalone vorher: `composer run dev:build-workers`.
+# Compose-Stack hochfahren (db + app + nginx + queue). Worker-Images
+# werden vom WorkerImageResolver beim ersten Phase-Run on demand aus
+# .tools/docker/worker/Dockerfile + dem aktiven worker_stacks-Eintrag
+# gebaut — kein manueller Pre-Build mehr nötig.
 docker compose -f .tools/docker/docker-compose.yml up -d
-
-# Worker-Images manuell bauen (matrix: php8.3 + php8.4)
-docker compose -f .tools/docker/docker-compose.yml --profile build-only build
-
-# Einzelnes Worker-Image bauen (Tag muss zu ARGOS_WORKER_IMAGE bzw.
-# zum compose-Default `argos-worker:local-php8.4` passen)
-docker build -t argos-worker:local-php8.4 -f .tools/docker/worker/Dockerfile --target worker-php84 .
 
 # App-Image manuell bauen (compose macht das auto)
 docker build -t argos-app:local -f .tools/docker/app/Dockerfile --target app .
 
-# Bash-Tests laufen lassen
+# Bash-Tests laufen lassen (shellcheck + bats)
 ./worker/tests/run-tests.sh
 
 # PHP-Tests
