@@ -167,24 +167,27 @@ class TaskResource extends Resource
                                 ->maxValue(1000)
                                 ->placeholder((string) config('argos.implement.max_turns_default', 200)),
 
+                            // See RepoProfileResource for why default lives in helperText.
                             Select::make('model_concept')
                                 ->label(__('tasks.fields.model_concept_label'))
                                 ->options(fn (Get $get): array => self::effectiveAgent($get)->spec()->availableModels)
-                                ->placeholder(fn (Get $get): string => __(
-                                    'tasks.fields.model_concept_placeholder',
+                                ->placeholder(__('tasks.fields.model_placeholder_neutral'))
+                                ->helperText(fn (Get $get): string => __(
+                                    'tasks.fields.model_concept_helper_with_default',
                                     ['model' => self::effectiveModelLabel($get, 'concept')],
                                 ))
-                                ->helperText(__('tasks.fields.model_concept_helper'))
+                                ->live()
                                 ->native(false),
 
                             Select::make('model_implement')
                                 ->label(__('tasks.fields.model_implement_label'))
                                 ->options(fn (Get $get): array => self::effectiveAgent($get)->spec()->availableModels)
-                                ->placeholder(fn (Get $get): string => __(
-                                    'tasks.fields.model_implement_placeholder',
+                                ->placeholder(__('tasks.fields.model_placeholder_neutral'))
+                                ->helperText(fn (Get $get): string => __(
+                                    'tasks.fields.model_implement_helper_with_default',
                                     ['model' => self::effectiveModelLabel($get, 'implement')],
                                 ))
-                                ->helperText(__('tasks.fields.model_implement_helper'))
+                                ->live()
                                 ->native(false),
                         ]),
                 ])
@@ -244,6 +247,9 @@ class TaskResource extends Resource
     private static function effectiveAgent(Get $get): AgentName
     {
         $override = $get('worker_agent_name_override');
+        if ($override instanceof AgentName) {
+            return $override;
+        }
         if (is_string($override) && $override !== '') {
             $agent = AgentName::tryFrom($override);
             if ($agent !== null) {
@@ -291,8 +297,8 @@ class TaskResource extends Resource
     {
         $profile = RepoProfile::find($get('repo_profile_id'));
         $profileModel = match ($phase) {
-            'concept' => $profile?->model_concept?->value,
-            'implement' => $profile?->model_implement?->value,
+            'concept' => $profile?->model_concept,
+            'implement' => $profile?->model_implement,
             default => null,
         };
 

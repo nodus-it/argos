@@ -713,8 +713,8 @@ class PhaseRunner
         };
 
         $taskModel = match ($effectivePhase) {
-            'concept' => $task->model_concept?->value,
-            'implement' => $task->model_implement?->value,
+            'concept' => $task->model_concept,
+            'implement' => $task->model_implement,
             default => null,
         };
         if ($taskModel !== null && $taskModel !== '') {
@@ -723,8 +723,8 @@ class PhaseRunner
 
         $profile = $task->repoProfile;
         $profileModel = match ($effectivePhase) {
-            'concept' => $profile?->model_concept?->value,
-            'implement' => $profile?->model_implement?->value,
+            'concept' => $profile?->model_concept,
+            'implement' => $profile?->model_implement,
             default => null,
         };
         if ($profileModel !== null && $profileModel !== '') {

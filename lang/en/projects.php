@@ -57,12 +57,15 @@ return [
         'token_create_link' => 'Create a token',
         'default_branch_label' => 'Default Branch',
         'global_default' => 'Global default',
+        'model_placeholder_neutral' => 'Agent default',
         'model_concept_label' => 'Concept Model',
         'model_concept_placeholder' => 'Default: :model',
         'model_concept_helper' => 'Model for the concept phase. Options depend on the chosen agent. Leave empty for the agent default.',
+        'model_concept_helper_with_default' => 'Model for the concept phase. Leave empty to use the agent default (:model).',
         'model_implement_label' => 'Implement Model',
         'model_implement_placeholder' => 'Default: :model',
         'model_implement_helper' => 'Model for the implement phase. Options depend on the chosen agent. Leave empty for the agent default.',
+        'model_implement_helper_with_default' => 'Model for the implement phase. Leave empty to use the agent default (:model).',
     ],
 
     'infolist' => [

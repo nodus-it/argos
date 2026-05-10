@@ -9,34 +9,42 @@
         @php
             $stepNumber = 1;
             $hasAnyOauth = $this->hasAnyOAuthConfigured();
+            $anyAgentConfigured = $this->isAnyAgentConfigured();
         @endphp
 
-        {{-- Step 1: Claude Token --}}
+        {{-- Step 1: Agent authentication (Claude Code and/or Codex) --}}
         <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden">
             <div class="flex items-center gap-3 px-5 py-3 border-b border-gray-100 dark:border-gray-800">
-                <span class="flex h-6 w-6 items-center justify-center rounded-full {{ $tokenSource !== 'none' ? 'bg-emerald-100 dark:bg-emerald-900 text-emerald-600 dark:text-emerald-400' : 'bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400' }} text-xs font-bold">
-                    @if($tokenSource !== 'none')
+                <span class="flex h-6 w-6 items-center justify-center rounded-full {{ $anyAgentConfigured ? 'bg-emerald-100 dark:bg-emerald-900 text-emerald-600 dark:text-emerald-400' : 'bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400' }} text-xs font-bold">
+                    @if($anyAgentConfigured)
                         <x-heroicon-s-check class="h-4 w-4" />
                     @else
                         {{ $stepNumber }}
                     @endif
                 </span>
-                <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">{{ __('onboarding.steps.claude_token') }}</span>
+                <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">{{ __('onboarding.steps.agents') }}</span>
+                <span class="ml-auto text-xs text-gray-400 dark:text-gray-500">{{ __('onboarding.steps.agents_hint') }}</span>
             </div>
             <div class="px-5 py-4 space-y-4">
 
-                @if($tokenSource === 'env')
-                    <div class="flex items-center gap-3">
-                        <x-heroicon-o-check-circle class="h-5 w-5 text-emerald-500 flex-shrink-0" />
-                        <span class="text-sm text-gray-700 dark:text-gray-300">{!! __('onboarding.token.from_env') !!}</span>
+                {{-- Claude Code --}}
+                <div class="rounded-lg border border-gray-200 dark:border-gray-700 px-4 py-3 space-y-3">
+                    <div class="flex items-center gap-2">
+                        @if($tokenSource !== 'none')
+                            <x-heroicon-o-check-circle class="h-5 w-5 text-emerald-500 flex-shrink-0" />
+                        @else
+                            <x-heroicon-o-key class="h-5 w-5 text-gray-400 flex-shrink-0" />
+                        @endif
+                        <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">{{ __('onboarding.agents.claude_label') }}</span>
                     </div>
-                @elseif($tokenSource === 'agent_credential')
-                    <div class="flex items-center gap-3">
-                        <x-heroicon-o-check-circle class="h-5 w-5 text-emerald-500 flex-shrink-0" />
-                        <span class="text-sm text-gray-700 dark:text-gray-300">{{ __('onboarding.token.is_saved') }}</span>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('onboarding.token.override_label') }}</label>
+
+                    @if($tokenSource === 'env')
+                        <p class="text-sm text-gray-700 dark:text-gray-300">{!! __('onboarding.token.from_env') !!}</p>
+                    @else
+                        <p class="text-xs text-gray-500 dark:text-gray-400">{!! __('onboarding.agents.claude_hint') !!}</p>
+                        @if($tokenSource === 'agent_credential')
+                            <p class="text-xs text-emerald-600 dark:text-emerald-400">{{ __('onboarding.token.is_saved_short') }}</p>
+                        @endif
                         <div class="flex gap-2">
                             <input wire:model="claudeToken" type="password" placeholder="{{ __('onboarding.token.placeholder') }}" autocomplete="off"
                                 class="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-500" />
@@ -44,21 +52,32 @@
                                 {{ __('onboarding.token.save_button') }}
                             </x-filament::button>
                         </div>
+                    @endif
+                </div>
+
+                {{-- Codex --}}
+                <div class="rounded-lg border border-gray-200 dark:border-gray-700 px-4 py-3 space-y-3">
+                    <div class="flex items-center gap-2">
+                        @if($codexConfigured)
+                            <x-heroicon-o-check-circle class="h-5 w-5 text-emerald-500 flex-shrink-0" />
+                        @else
+                            <x-heroicon-o-key class="h-5 w-5 text-gray-400 flex-shrink-0" />
+                        @endif
+                        <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">{{ __('onboarding.agents.codex_label') }}</span>
                     </div>
-                @else
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('onboarding.token.label') }} <span class="text-red-500">*</span></label>
-                        <div class="flex gap-2">
-                            <input wire:model="claudeToken" type="password" placeholder="{{ __('onboarding.token.placeholder') }}" autocomplete="off"
-                                class="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-500" />
-                            <x-filament::button wire:click="saveClaudeToken" type="button">
-                                {{ __('onboarding.token.save_button') }}
-                            </x-filament::button>
-                        </div>
-                        <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">{{ __('onboarding.token.help') }}</p>
+
+                    <p class="text-xs text-gray-500 dark:text-gray-400">{!! __('onboarding.agents.codex_hint') !!}</p>
+                    @if($codexConfigured)
+                        <p class="text-xs text-emerald-600 dark:text-emerald-400">{{ __('onboarding.agents.codex_saved_short') }}</p>
+                    @endif
+                    <div class="flex gap-2 items-start">
+                        <textarea wire:model="codexAuthJson" rows="3" placeholder="{{ __('onboarding.agents.codex_placeholder') }}" autocomplete="off" spellcheck="false"
+                            class="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-xs font-mono text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-500"></textarea>
+                        <x-filament::button wire:click="saveCodexAuthJson" type="button">
+                            {{ __('onboarding.token.save_button') }}
+                        </x-filament::button>
                     </div>
-                    @include('filament.admin.partials.claude-token-help')
-                @endif
+                </div>
 
             </div>
         </div>

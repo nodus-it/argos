@@ -201,6 +201,23 @@ _concept_build_user_prompt() {
     }
 }
 
+# _concept_setup_toolchain: composer install if a manifest exists. Concept is
+# read-only by design but still benefits from a populated vendor/ — Boost's
+# MCP server (php artisan boost:mcp) and tools like `php artisan route:list`
+# need it. Failure is non-fatal: concept can still produce a plan from the
+# description and source tree alone, just without Boost discovery.
+_concept_setup_toolchain() {
+    if [[ ! -f /workspace/composer.json ]]; then
+        return 0
+    fi
+    log_info "concept: composer install"
+    if ! (cd /workspace && composer install --no-interaction --prefer-dist --no-progress 2>&1 \
+            | tee "/workspace/.agent/logs/composer-install.${ITERATION}.log") ; then
+        log_warn "concept: composer install failed — Boost MCP and vendor-based artisan commands will be unavailable for this run"
+    fi
+    return 0
+}
+
 # phase_concept_run: main phase logic.
 # Returns: exit code (0 ok, 1 general, 2 precondition, 3 auth).
 phase_concept_run() {
@@ -219,6 +236,8 @@ phase_concept_run() {
         _concept_initial_clone || return 1
     fi
     cd /workspace || return 1
+
+    _concept_setup_toolchain
 
     # On --fresh move the prior concept aside; otherwise just copy it.
     local concept_file=/workspace/.agent/concept.md

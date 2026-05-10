@@ -77,6 +77,8 @@ _ep_load_libs() {
     # shellcheck disable=SC1091
     source "$LIB_DIR/claude.sh"
     # shellcheck disable=SC1091
+    source "$LIB_DIR/mcp.sh"
+    # shellcheck disable=SC1091
     source "$LIB_DIR/agents/claude_code.sh"
     # shellcheck disable=SC1091
     source "$LIB_DIR/agents/codex.sh"

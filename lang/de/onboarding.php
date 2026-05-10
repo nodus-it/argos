@@ -6,7 +6,7 @@ return [
     'navigation_label' => 'Einrichtung',
     'title' => 'Argos einrichten',
 
-    'intro' => 'In wenigen Schritten ist Argos einsatzbereit: Claude-Token hinterlegen, optional Git-Hosts verbinden und dann das erste Projekt anlegen.',
+    'intro' => 'In wenigen Schritten ist Argos einsatzbereit: Mindestens einen Agenten authentifizieren, optional Git-Hosts verbinden und dann das erste Projekt anlegen.',
 
     'notifications' => [
         'env_token' => 'Token kommt aus der Umgebungsvariable',
@@ -15,12 +15,18 @@ return [
         'invalid_token_body' => 'Der eingegebene Token wurde von der API abgelehnt.',
         'saved_title' => 'Token gespeichert',
         'saved_unreachable_body' => 'Hinweis: Token konnte nicht gegen die API geprüft werden — Verbindung nicht erreichbar.',
+        'empty_codex' => 'Bitte den Inhalt von auth.json einfügen',
+        'invalid_codex_title' => 'auth.json ungültig',
+        'invalid_codex_body' => 'Der eingefügte Inhalt ist kein gültiges JSON.',
+        'codex_saved' => 'Codex-Credential gespeichert',
         'github_disconnected' => 'GitHub-Verbindung getrennt',
         'disconnected' => ':provider getrennt',
     ],
 
     'steps' => [
         'claude_token' => 'Claude Token',
+        'agents' => 'Agent authentifizieren',
+        'agents_hint' => 'mindestens einer',
         'github_connect' => 'GitHub verbinden',
         'github_optional' => 'optional',
         'providers_connect' => 'Git-Host verbinden',
@@ -28,14 +34,20 @@ return [
         'first_project' => 'Erstes Projekt anlegen',
     ],
 
+    'agents' => [
+        'claude_label' => 'Claude Code',
+        'claude_hint' => 'Token via <code class="text-xs">claude setup-token</code> erzeugen und unten einfügen.',
+        'codex_label' => 'OpenAI Codex',
+        'codex_hint' => '<code class="text-xs">codex login</code> ausführen, dann Inhalt von <code class="text-xs">~/.codex/auth.json</code> unten einfügen.',
+        'codex_placeholder' => '{"OPENAI_API_KEY": null, "tokens": {…}, …}',
+        'codex_saved_short' => 'Gespeichert — neuen Inhalt einfügen, um zu überschreiben.',
+    ],
+
     'token' => [
         'from_env' => 'Token kommt aus der Umgebungsvariable <code class="text-xs">CLAUDE_CODE_OAUTH_TOKEN</code> — nichts zu tun.',
-        'is_saved' => 'Token ist gespeichert.',
-        'override_label' => 'Token überschreiben',
-        'label' => 'Token',
+        'is_saved_short' => 'Gespeichert — neuen Token einfügen, um zu überschreiben.',
         'placeholder' => 'sk-ant-oat01-…',
         'save_button' => 'Speichern',
-        'help' => 'Wird im Config-Verzeichnis abgelegt (mode 0600).',
     ],
 
     'github' => [

@@ -118,6 +118,21 @@ agent_claude_code_run() {
         args+=(--resume "$resume_session")
     fi
 
+    # MCP: when the target project opted in via boost.json (mcp: true),
+    # write a per-session config and hand it to claude via --mcp-config. The
+    # CLI does NOT read mcpServers from settings.json — only from .mcp.json,
+    # ~/.claude.json, or this flag.
+    if mcp_should_enable; then
+        local mcp_config_dir="${CLAUDE_CONFIG_DIR:-/workspace/.agent/claude-state}"
+        local mcp_config_file="${mcp_config_dir}/mcp-laravel-boost.json"
+        if mcp_write_claude_config "$mcp_config_file"; then
+            args+=(--mcp-config "$mcp_config_file")
+            log_info "mcp: claude --mcp-config $mcp_config_file (laravel-boost stdio)"
+        else
+            log_warn "mcp: failed to write $mcp_config_file — running without MCP"
+        fi
+    fi
+
     # REPO_TOKEN is in the env for git, but it must never leak into the
     # claude process — the CLI logs its env at debug levels. Sub-shell + unset
     # ensures the var is gone in the child.

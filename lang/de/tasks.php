@@ -28,12 +28,15 @@ return [
         'agent_credential_label' => 'Agent-Credential',
         'agent_credential_helper' => 'Welche Credential für den Agent benutzt wird. Leer = erste aktive Credential.',
         'agent_credential_placeholder' => 'Erste aktive Credential',
+        'model_placeholder_neutral' => 'Agent-Default',
         'model_concept_label' => 'Konzept-Modell (Override)',
         'model_concept_placeholder' => 'Default: :model',
         'model_concept_helper' => 'Überschreibt das Konzept-Modell für genau diesen Task. Leer = Projekt- oder Agent-Default.',
+        'model_concept_helper_with_default' => 'Überschreibt das Konzept-Modell für diesen Task. Leer = Projekt- oder Agent-Default (:model).',
         'model_implement_label' => 'Implement-Modell (Override)',
         'model_implement_placeholder' => 'Default: :model',
         'model_implement_helper' => 'Überschreibt das Implement-Modell für genau diesen Task. Leer = Projekt- oder Agent-Default.',
+        'model_implement_helper_with_default' => 'Überschreibt das Implement-Modell für diesen Task. Leer = Projekt- oder Agent-Default (:model).',
     ],
 
     'columns' => [
@@ -41,6 +44,7 @@ return [
         'phase' => 'Phase',
         'status' => 'Status',
         'workflow' => 'Workflow',
+        'agent' => 'Agent',
         'cost' => 'Kosten',
         'tokens' => 'Tokens',
         'created' => 'Erstellt',
@@ -61,6 +65,8 @@ return [
         'labels' => [
             'status' => 'Status',
             'repository' => 'Repository',
+            'agent' => 'Agent',
+            'stack' => 'Stack',
             'base_branch' => 'Base Branch',
             'branch' => 'Branch',
             'pull_request' => 'Pull Request',

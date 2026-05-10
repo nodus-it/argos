@@ -11,6 +11,7 @@ enum WorkflowStatus: string
     case ConceptReview = 'concept_review';
     case ImplementRunning = 'implement_running';
     case ImplementPaused = 'implement_paused';
+    case ImplementCompleted = 'implement_completed';
     case InReview = 'in_review';
     case Completed = 'completed';
     case Failed = 'failed';
@@ -23,6 +24,7 @@ enum WorkflowStatus: string
             self::ConceptReview => __('enums.workflow_status.concept_review'),
             self::ImplementRunning => __('enums.workflow_status.implement_running'),
             self::ImplementPaused => __('enums.workflow_status.implement_paused'),
+            self::ImplementCompleted => __('enums.workflow_status.implement_completed'),
             self::InReview => __('enums.workflow_status.in_review'),
             self::Completed => __('enums.workflow_status.completed'),
             self::Failed => __('enums.workflow_status.failed'),
@@ -37,6 +39,7 @@ enum WorkflowStatus: string
             self::ConceptReview => 'info',
             self::ImplementRunning => 'warning',
             self::ImplementPaused => 'warning',
+            self::ImplementCompleted => 'success',
             self::InReview => 'primary',
             self::Completed => 'success',
             self::Failed => 'danger',
@@ -78,6 +81,7 @@ enum WorkflowStatus: string
             ['concept', PhaseStatus::Completed] => self::ConceptReview,
             ['concept', PhaseStatus::Failed] => self::Failed,
             ['concept', PhaseStatus::QualityGateFailed] => self::Failed,
+            ['implement', PhaseStatus::Completed] => self::ImplementCompleted,
             ['implement', PhaseStatus::Failed] => self::Failed,
             ['implement', PhaseStatus::QualityGateFailed] => self::Failed,
             ['implement', PhaseStatus::Paused] => self::ImplementPaused,

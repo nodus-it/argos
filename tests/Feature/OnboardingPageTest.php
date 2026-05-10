@@ -169,4 +169,72 @@ class OnboardingPageTest extends TestCase
     {
         $this->assertTrue(Onboarding::shouldRegisterNavigation());
     }
+
+    public function test_onboarding_shows_codex_setup_box_when_no_codex_credential(): void
+    {
+        Livewire::test(Onboarding::class)
+            ->assertSet('codexConfigured', false)
+            ->assertSee('OpenAI Codex')
+            ->assertSee('codex login')
+            ->assertSeeHtml('wire:click="saveCodexAuthJson"');
+    }
+
+    public function test_onboarding_marks_agents_done_when_only_codex_credential_present(): void
+    {
+        AgentCredential::create([
+            'agent_name' => AgentName::Codex->value,
+            'name' => 'Default',
+            'credentials' => ['tokens' => ['access_token' => 'sk-codex-test']],
+            'status' => AgentCredentialStatus::Active->value,
+        ]);
+
+        Livewire::test(Onboarding::class)
+            ->assertSet('codexConfigured', true)
+            ->assertSet('tokenSource', 'none')
+            // Step header gets a checkmark when at least one agent is configured.
+            ->assertSeeHtml('text-emerald-500');
+    }
+
+    public function test_save_codex_auth_json_persists_and_clears_input(): void
+    {
+        $authJson = json_encode([
+            'OPENAI_API_KEY' => null,
+            'tokens' => ['access_token' => 'sk-codex-test', 'id_token' => 'id-test'],
+        ]);
+
+        Livewire::test(Onboarding::class)
+            ->set('codexAuthJson', $authJson)
+            ->call('saveCodexAuthJson')
+            ->assertSet('codexConfigured', true)
+            ->assertSet('codexAuthJson', '');
+
+        $cred = AgentCredential::query()
+            ->where('agent_name', AgentName::Codex->value)
+            ->where('status', AgentCredentialStatus::Active->value)
+            ->first();
+        $this->assertNotNull($cred);
+        $this->assertSame('sk-codex-test', $cred->credentials['tokens']['access_token']);
+    }
+
+    public function test_save_codex_auth_json_rejects_invalid_json(): void
+    {
+        Livewire::test(Onboarding::class)
+            ->set('codexAuthJson', 'not-json {')
+            ->call('saveCodexAuthJson')
+            ->assertSet('codexConfigured', false);
+
+        $this->assertFalse(
+            AgentCredential::query()
+                ->where('agent_name', AgentName::Codex->value)
+                ->exists(),
+        );
+    }
+
+    public function test_save_codex_auth_json_rejects_empty_input(): void
+    {
+        Livewire::test(Onboarding::class)
+            ->set('codexAuthJson', '   ')
+            ->call('saveCodexAuthJson')
+            ->assertSet('codexConfigured', false);
+    }
 }

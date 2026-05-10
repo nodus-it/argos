@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Concerns;
 
+use App\Enums\AgentName;
 use App\Enums\Phase;
 use App\Enums\WorkflowStatus;
+use App\Models\Task;
 use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
@@ -41,6 +43,17 @@ trait TaskTableConcern
             ->icon(fn (?Phase $state): ?string => $state?->icon())
             ->color(fn (?Phase $state): string => $state?->color() ?? 'gray')
             ->formatStateUsing(fn (?Phase $state): string => $state?->label() ?? '—');
+
+        $columns[] = TextColumn::make('agent')
+            ->label(__('tasks.columns.agent'))
+            ->badge()
+            ->color('gray')
+            ->state(fn (Task $record): string => (
+                $record->worker_agent_name_override
+                ?? $record->repoProfile?->worker_agent_name
+                ?? AgentName::ClaudeCode
+            )->label())
+            ->toggleable();
 
         $columns[] = TextColumn::make('updated_at')
             ->label(__('tasks.columns.last_activity'))

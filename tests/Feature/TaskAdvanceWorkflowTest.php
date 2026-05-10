@@ -54,7 +54,7 @@ class TaskAdvanceWorkflowTest extends TestCase
         $this->assertSame(WorkflowStatus::Failed, $task->fresh()->workflow_status);
     }
 
-    public function test_implement_completed_without_auto_pr_does_not_change_status(): void
+    public function test_implement_completed_without_auto_pr_advances_to_implement_completed(): void
     {
         $profile = RepoProfile::factory()->create(['auto_pr' => false]);
         $task = Task::factory()->create([
@@ -64,12 +64,14 @@ class TaskAdvanceWorkflowTest extends TestCase
 
         $this->service->completePhase($task, 'implement', PhaseStatus::Completed);
 
-        // stays in ImplementRunning — user must trigger push manually
-        $this->assertSame(WorkflowStatus::ImplementRunning, $task->fresh()->workflow_status);
+        // ImplementCompleted: implement is done, push hasn't started — the
+        // user can trigger it manually. Avoids the old lie where the status
+        // stayed "running" while the run had finished.
+        $this->assertSame(WorkflowStatus::ImplementCompleted, $task->fresh()->workflow_status);
         Bus::assertNothingDispatched();
     }
 
-    public function test_implement_completed_with_auto_pr_dispatches_push_job(): void
+    public function test_implement_completed_with_auto_pr_dispatches_push_job_and_advances_status(): void
     {
         $profile = RepoProfile::factory()->create(['auto_pr' => true]);
         $task = Task::factory()->create([
@@ -80,8 +82,9 @@ class TaskAdvanceWorkflowTest extends TestCase
         $this->service->completePhase($task, 'implement', PhaseStatus::Completed);
 
         Bus::assertDispatched(RunPhaseJob::class, fn ($job) => $job->phase === 'push' && $job->taskId === $task->id);
-        // status stays ImplementRunning until push finishes
-        $this->assertSame(WorkflowStatus::ImplementRunning, $task->fresh()->workflow_status);
+        // workflow_status reflects implement done; current_phase/current_status
+        // carry the live push progress and push completion advances to InReview.
+        $this->assertSame(WorkflowStatus::ImplementCompleted, $task->fresh()->workflow_status);
     }
 
     public function test_implement_failed_transitions_to_failed(): void

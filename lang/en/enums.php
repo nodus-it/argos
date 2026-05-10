@@ -9,6 +9,7 @@ return [
         'concept_review' => 'Concept ready',
         'implement_running' => 'Implementation running',
         'implement_paused' => 'Paused (turn limit)',
+        'implement_completed' => 'Implementation completed',
         'in_review' => 'In Review',
         'completed' => 'Completed',
         'failed' => 'Failed',

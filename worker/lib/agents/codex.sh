@@ -116,6 +116,18 @@ agent_codex_run() {
         fi
         args+=(--output-schema "$json_schema_file")
     fi
+
+    # MCP: when the target project opted in via boost.json (mcp: true),
+    # splice `-c mcp_servers.<name>.<key>=<toml-value>` overrides into the
+    # codex args. Codex parses each value as TOML, so the values from
+    # mcp_codex_config_args are pre-quoted accordingly.
+    if mcp_should_enable; then
+        local mcp_args=()
+        mapfile -t mcp_args < <(mcp_codex_config_args)
+        args+=("${mcp_args[@]}")
+        log_info "mcp: codex -c mcp_servers.laravel-boost.* (stdio php artisan boost:mcp)"
+    fi
+
     args+=(-)   # read prompt from stdin
 
     # Capture codex's raw output to a temp file so we can synthesise

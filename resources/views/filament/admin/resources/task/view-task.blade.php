@@ -61,6 +61,26 @@
                 </div>
             @endif
 
+            @php
+                $effectiveAgent = $record->worker_agent_name_override
+                    ?? $record->repoProfile?->worker_agent_name
+                    ?? \App\Enums\AgentName::ClaudeCode;
+                $effectiveStack = $record->workerStackOverride ?? $record->repoProfile?->workerStack;
+                $effectiveStackLabel = $effectiveStack
+                    ? ($effectiveStack->label !== '' ? $effectiveStack->label : $effectiveStack->name)
+                    : (string) config('argos.compose.default_stack', 'php-8.4');
+            @endphp
+
+            <div class="flex items-center justify-between gap-2">
+                <span class="text-xs font-medium text-gray-500 dark:text-gray-400 flex-shrink-0">{{ __('tasks.view.labels.agent') }}</span>
+                <span class="text-xs text-gray-700 dark:text-gray-300 truncate text-right">{{ $effectiveAgent->label() }}</span>
+            </div>
+
+            <div class="flex items-center justify-between gap-2">
+                <span class="text-xs font-medium text-gray-500 dark:text-gray-400 flex-shrink-0">{{ __('tasks.view.labels.stack') }}</span>
+                <span class="text-xs text-gray-700 dark:text-gray-300 truncate text-right">{{ $effectiveStackLabel }}</span>
+            </div>
+
             @if($record->base_branch || $record->repoProfile?->default_branch)
                 <div class="flex items-center justify-between gap-2">
                     <span class="text-xs font-medium text-gray-500 dark:text-gray-400 flex-shrink-0">{{ __('tasks.view.labels.base_branch') }}</span>
