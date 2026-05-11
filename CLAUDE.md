@@ -119,6 +119,17 @@ php artisan test
 
 # Lokale Entwicklung (Web-UI ohne Docker)
 php artisan serve
+
+# Kompletter Dev-Reset (DB + task_ws_*-Volumes + argos-worker/stack-Images +
+# optimize:clear + queue restart). Seedet DemoSeeder mit 1 Admin, 1 RepoProfile
+# (gegen nodus-it/argos) und 1 Draft-Task. Credentials werden nur angelegt,
+# wenn SEED_CLAUDE_OAUTH_TOKEN / SEED_CODEX_AUTH_JSON_B64 im env gesetzt sind
+# (siehe .env.example).
+bash .tools/bin/dev-reset.sh
+
+# Schneller Reload nach Manager-PHP-Änderungen (optimize:clear + queue restart,
+# ohne DB-/Volume-/Image-Cleanup). Adressiert OPCache- und Queue-Worker-Stale.
+bash .tools/bin/dev-reload.sh
 ```
 
 ## Rückfragen sind willkommen
