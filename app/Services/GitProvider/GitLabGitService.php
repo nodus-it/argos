@@ -7,6 +7,7 @@ namespace App\Services\GitProvider;
 use App\Services\GitProvider\Contracts\GitProviderContract;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class GitLabGitService implements GitProviderContract
 {
@@ -62,7 +63,13 @@ class GitLabGitService implements GitProviderContract
                 ->get("/projects/{$projectPath}")
                 ->throw()
                 ->json();
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            Log::channel('argos')->warning('GitLab getDefaultBranch failed', [
+                'owner_repo' => "{$owner}/{$repo}",
+                'error' => $e->getMessage(),
+                'class' => $e::class,
+            ]);
+
             return null;
         }
 

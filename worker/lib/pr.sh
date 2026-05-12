@@ -88,7 +88,8 @@ _pr_comment_github() {
         -H "X-GitHub-Api-Version: 2022-11-28" \
         "https://api.github.com/repos/${owner_repo}/issues/${pr_number}/comments" \
         -d "$(jq -cn --arg body "$body" '{body:$body}')" \
-        >> "/workspace/.agent/logs/pr-comment.${ITERATION:-0}.log" 2>&1 || true
+        >> "/workspace/.agent/logs/pr-comment.${ITERATION:-0}.log" 2>&1 \
+        || log_warn "pr_comment(github): curl exit non-zero — see pr-comment.${ITERATION:-0}.log"
 }
 
 # _pr_comment_gitlab: POST {instance}/api/v4/projects/{enc}/merge_requests/{iid}/notes {body}.
@@ -114,7 +115,8 @@ _pr_comment_gitlab() {
         -H "Content-Type: application/json" \
         "${instance}/api/v4/projects/${project_enc}/merge_requests/${iid}/notes" \
         -d "$(jq -cn --arg body "$body" '{body:$body}')" \
-        >> "/workspace/.agent/logs/pr-comment.${ITERATION:-0}.log" 2>&1 || true
+        >> "/workspace/.agent/logs/pr-comment.${ITERATION:-0}.log" 2>&1 \
+        || log_warn "pr_comment(gitlab): curl exit non-zero — see pr-comment.${ITERATION:-0}.log"
 }
 
 # _pr_update_github: PATCH /repos/{owner}/{repo}/pulls/{n} {title, body}.
@@ -136,7 +138,8 @@ _pr_update_github() {
         -H "X-GitHub-Api-Version: 2022-11-28" \
         "https://api.github.com/repos/${owner_repo}/pulls/${pr_number}" \
         -d "$(jq -cn --arg title "$title" --arg body "$body" '{title:$title,body:$body}')" \
-        >> "/workspace/.agent/logs/pr-update.${ITERATION:-0}.log" 2>&1 || true
+        >> "/workspace/.agent/logs/pr-update.${ITERATION:-0}.log" 2>&1 \
+        || log_warn "pr_update(github): curl exit non-zero — see pr-update.${ITERATION:-0}.log"
 }
 
 # _pr_update_gitlab: PUT {instance}/api/v4/projects/{enc}/merge_requests/{iid} {title, description}.
@@ -159,7 +162,8 @@ _pr_update_gitlab() {
         -H "Content-Type: application/json" \
         "${instance}/api/v4/projects/${project_enc}/merge_requests/${iid}" \
         -d "$(jq -cn --arg title "$title" --arg body "$body" '{title:$title,description:$body}')" \
-        >> "/workspace/.agent/logs/pr-update.${ITERATION:-0}.log" 2>&1 || true
+        >> "/workspace/.agent/logs/pr-update.${ITERATION:-0}.log" 2>&1 \
+        || log_warn "pr_update(gitlab): curl exit non-zero — see pr-update.${ITERATION:-0}.log"
 }
 
 # _pr_update_bitbucket: PUT /repositories/{ws}/{repo}/pullrequests/{id} {title, description}.
@@ -192,7 +196,8 @@ _pr_update_bitbucket() {
         -H "Content-Type: application/json" \
         "https://api.bitbucket.org/2.0/repositories/${workspace}/${slug}/pullrequests/${pr_id}" \
         -d "$(jq -cn --arg title "$title" --arg body "$body" '{title:$title,description:$body}')" \
-        >> "/workspace/.agent/logs/pr-update.${ITERATION:-0}.log" 2>&1 || true
+        >> "/workspace/.agent/logs/pr-update.${ITERATION:-0}.log" 2>&1 \
+        || log_warn "pr_update(bitbucket): curl exit non-zero — see pr-update.${ITERATION:-0}.log"
 }
 
 # _pr_comment_bitbucket: POST /repositories/{ws}/{repo}/pullrequests/{id}/comments
@@ -226,5 +231,6 @@ _pr_comment_bitbucket() {
         -H "Content-Type: application/json" \
         "https://api.bitbucket.org/2.0/repositories/${workspace}/${slug}/pullrequests/${pr_id}/comments" \
         -d "$(jq -cn --arg body "$body" '{content:{raw:$body}}')" \
-        >> "/workspace/.agent/logs/pr-comment.${ITERATION:-0}.log" 2>&1 || true
+        >> "/workspace/.agent/logs/pr-comment.${ITERATION:-0}.log" 2>&1 \
+        || log_warn "pr_comment(bitbucket): curl exit non-zero — see pr-comment.${ITERATION:-0}.log"
 }

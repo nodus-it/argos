@@ -17,8 +17,7 @@ Du baust **Argos** — einen Web-First Dev-Agent mit zwei Docker-Images (Manager
 ### Bash-Stil
 
 - `#!/usr/bin/env bash` als Shebang in jeder ausführbaren Datei
-- `set -euo pipefail` am Anfang jedes Skripts (außer wenn explizit anders nötig)
-- `IFS=$'\n\t'` für sichere Wort-Trennung
+- `set -euo pipefail` und `IFS=$'\n\t'` setzt **nur der Top-Level-Executor** (z.B. `.tools/docker/worker/worker-entrypoint.sh`, `.tools/bin/*.sh`, `worker/tests/run-*.sh`). Eine source-only-Library (`worker/lib/*.sh`, `worker/phases/*.sh`, `worker/lib/agents/*.sh`) setzt diese Flags **nicht** im Top-Level — sie würden in den Caller-Scope leaken und z.B. `bats`-Tests brechen (die intern `$BATS_TEST_NAME` o.ä. ohne Default referenzieren). Source-Libs verlassen sich auf den Entrypoint und schreiben sich `set -u`-resistent (`${VAR:-default}` für optionale Vars).
 - Funktions-Namen: `<modul>_<aktion>` (z.B. `state_init`, `lock_acquire`)
 - Alle Funktionen in `worker/lib/` haben Docstring-Kommentar oben:
   ```bash

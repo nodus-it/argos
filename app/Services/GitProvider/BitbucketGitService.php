@@ -7,6 +7,7 @@ namespace App\Services\GitProvider;
 use App\Services\GitProvider\Contracts\GitProviderContract;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class BitbucketGitService implements GitProviderContract
 {
@@ -197,7 +198,13 @@ class BitbucketGitService implements GitProviderContract
                 ->get("/repositories/{$owner}/{$repo}")
                 ->throw()
                 ->json();
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            Log::channel('argos')->warning('Bitbucket getDefaultBranch failed', [
+                'owner_repo' => "{$owner}/{$repo}",
+                'error' => $e->getMessage(),
+                'class' => $e::class,
+            ]);
+
             return null;
         }
 
