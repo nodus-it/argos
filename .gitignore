@@ -42,6 +42,9 @@ logs/
 # Test artifacts
 coverage/
 .bats-tmp/
+/playwright-report/
+/test-results/
+/.playwright/
 
 # Build/dev tool caches
 .vite/

@@ -92,6 +92,20 @@ Diese Tabelle ist die Antwort auf eine wiederkehrende Reibung aus Welle 1: ein P
 | neuer Phase-Helper | `worker/lib/<modul>.sh` mit Docstring; `bats`-Test in `worker/tests/bats/`; `shellcheck` clean; vom `agent`-Entrypoint sourcen; in welchem Phase-Skript wird der Helper aufgerufen |
 | UI-Hint behauptet Verhalten | Backend implementiert das **für alle relevanten Pfade** — alle Agents, alle Provider, alle Status. Helper-Text der nur für den Default-Pfad stimmt ist eine Lüge. |
 
+## Test-Ebenen
+
+Wir fahren fünf Test-Ebenen — jede mit klarem Geltungsbereich, damit nicht jeder Test alles wissen muss und Reibungen früh gefangen werden. Eine neue Test-Datei ordnet sich in eine dieser Ebenen ein; im Zweifel die enger gefasste wählen.
+
+| Ebene | Werkzeug | Was wird abgedeckt | Heute |
+| --- | --- | --- | --- |
+| Unit | PHPUnit (SQLite + Mocks) | Service-/Klassenlogik isoliert, ohne DB-Schema-Abhängigkeit | ✅ |
+| Integration | PHPUnit + MariaDB-Sidecar (CI) | DB-Schema, Migrations, Enum-Persistence, Queue-Lifecycle | ✅ (retro M2) |
+| Backend-E2E | PHPUnit + `FakeWorkerProcess` (`tests/Support/`) | Workflow-Phasen-Durchlauf inkl. Recovery-Pfade — RunPhaseJob → PhaseRunner → DB-State | ✅ (retro M7) |
+| UI-Smoke | `Livewire::test(ViewTask::class, ['record' => …])` | UI rendert korrekten Status-String pro Phase, Action-Wiring | ✅ (retro M10) |
+| Browser-E2E | Playwright lokal über `php artisan serve` | Realer Browser-Render, JS-/Alpine-Reaktivität, Login-Flow, Multi-Page-Navigation. Aufruf: `npx playwright test` (siehe „Häufige Befehle"). | ✅ (retro M11) |
+
+CI-Integration des Browser-E2E (Playwright als CI-Job) ist bewusst offen — siehe Retro M11c.
+
 ## Caches & Resets
 
 **Antizipations-Pflicht**: Bei einer Änderung an einer der Schichten unten **proaktiv** die Reset-Aktion durchführen oder ankündigen — nicht warten bis der User fragt „muss ich neu builden oder sowas?".
@@ -164,6 +178,12 @@ bash .tools/bin/dev-reset.sh
 # Schneller Reload nach Manager-PHP-Änderungen (optimize:clear + queue restart,
 # ohne DB-/Volume-/Image-Cleanup). Adressiert OPCache- und Queue-Worker-Stale.
 bash .tools/bin/dev-reload.sh
+
+# Browser-E2E (Playwright) — lokaler Self-Check, dass die UI noch lädt.
+# Voraussetzung einmalig: `npm install` + `npx playwright install chromium`.
+# Datenvoraussetzung: DemoSeeder gelaufen (z.B. via dev-reset.sh).
+# Playwright bootet `php artisan serve` selbst — kein laufender Stack nötig.
+npx playwright test
 ```
 
 ## Rückfragen sind willkommen
