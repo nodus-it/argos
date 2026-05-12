@@ -15,7 +15,7 @@ class RepoProfileFactory extends Factory
     public function definition(): array
     {
         return [
-            'name' => fake()->words(2, true),
+            'name' => fake()->unique()->words(2, true),
             'url' => 'https://github.com/test-org/test-repo',
             'token' => config('argos.factories.github_token'),
             'platform' => 'github',
