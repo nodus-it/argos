@@ -121,11 +121,18 @@ Diese Tabelle ist die Antwort auf eine wiederkehrende Reibung aus Welle 1: ein P
 
 ## Wenn du fertig bist mit einem Schritt
 
+**Bash-Änderungen:**
 1. `shellcheck` über alle geänderten Bash-Files
-2. `bash worker/tests/run-bats.sh` falls Bash-Änderungen
-3. `php artisan test` für PHP-Änderungen
-4. Commit nach Conventional-Commits-Style
-5. Falls eine Annahme aus der Spec sich beim Bauen als falsch erwiesen hat: betroffenes Spec-Dokument anpassen *im selben Commit oder im Folge-Commit*
+2. `bash worker/tests/run-bats.sh`
+
+**PHP-Änderungen:**
+1. **Während der Arbeit**: nach jedem `Edit` / `Write` an einer PHP-Datei *sofort* `vendor/bin/pint --dirty --format agent`. Nicht erst am Schritt-Ende. Style-Issues früh fixen kostet Sekunden — am Commit-Ende durch User-Reklamation kostet Minuten.
+2. **Schritt-Ende**: relevanten Test-Filter laufen lassen — `php artisan test --compact --filter=<TestName>`. Erst wenn der grün ist, ganze Suite (`php artisan test --compact`).
+3. **Vor Commit**: `vendor/bin/phpstan analyse --no-progress --memory-limit=1G`. PHPStan fängt z.B. Larastan-spezifische Smells (`env()` außerhalb von config, falsche Cast-Targets), die PHPUnit nicht sieht — Wave-1-Hit: M1-DemoSeeder hat 4 PHPStan-Fehler erst in M2 produziert weil M1-Validierung nur Tests lief.
+
+**Beide:**
+- Commit nach Conventional-Commits-Style
+- Falls eine Annahme aus der Spec sich beim Bauen als falsch erwiesen hat: betroffenes Spec-Dokument anpassen *im selben Commit oder im Folge-Commit*
 
 ## Häufige Befehle
 
