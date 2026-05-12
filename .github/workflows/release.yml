@@ -80,30 +80,54 @@ jobs:
             exit 1
           fi
 
-      - name: Verify latest CI run on develop is green
+      - name: Wait for CI to succeed on develop@HEAD
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
-          # Wir wollen nicht versehentlich einen Release schneiden, wenn der
-          # letzte CI-Lauf auf develop rot ist. Wir prüfen den jüngsten
-          # *abgeschlossenen* Run des CI-Workflows auf dem aktuellen develop-HEAD.
+          # Poll for the CI run on develop's current HEAD. After a squash-merge
+          # into develop the CI is often still running when this workflow
+          # triggers — abort vs. wait. We wait up to 15 min, then bail.
+          # Catches both "CI not started yet" and "CI still in progress",
+          # so the previous abort-if-no-completed-run race goes away.
           DEVELOP_SHA=$(git rev-parse HEAD)
-          STATUS=$(gh run list \
-            --workflow=ci.yml \
-            --branch=develop \
-            --limit=1 \
-            --json databaseId,headSha,status,conclusion \
-            --jq ".[] | select(.headSha==\"$DEVELOP_SHA\") | .conclusion")
+          TIMEOUT_MIN=15
+          POLL_SEC=30
+          DEADLINE=$(( $(date +%s) + TIMEOUT_MIN * 60 ))
 
-          if [ -z "$STATUS" ]; then
-            echo "::error::Für develop@$DEVELOP_SHA gibt es keinen abgeschlossenen CI-Run. Erst CI laufen lassen, dann releasen."
-            exit 1
-          fi
-          if [ "$STATUS" != "success" ]; then
-            echo "::error::Letzter CI-Run auf develop ist '$STATUS', nicht 'success'. Release abgebrochen."
-            exit 1
-          fi
-          echo "CI auf develop@$DEVELOP_SHA: success"
+          while true; do
+            RUN_INFO=$(gh run list \
+              --workflow=ci.yml \
+              --branch=develop \
+              --limit=20 \
+              --json headSha,status,conclusion \
+              --jq "[.[] | select(.headSha==\"$DEVELOP_SHA\")] | first")
+
+            if [ -z "$RUN_INFO" ] || [ "$RUN_INFO" = "null" ]; then
+              STATUS="not_yet_queued"
+              CONCLUSION=""
+            else
+              STATUS=$(echo "$RUN_INFO" | jq -r '.status')
+              CONCLUSION=$(echo "$RUN_INFO" | jq -r '.conclusion // ""')
+            fi
+
+            if [ "$STATUS" = "completed" ]; then
+              if [ "$CONCLUSION" = "success" ]; then
+                echo "CI auf develop@$DEVELOP_SHA: success"
+                exit 0
+              fi
+              echo "::error::CI auf develop@$DEVELOP_SHA: $CONCLUSION (nicht success). Release abgebrochen."
+              exit 1
+            fi
+
+            NOW=$(date +%s)
+            if [ "$NOW" -ge "$DEADLINE" ]; then
+              echo "::error::Timeout nach ${TIMEOUT_MIN} min: CI auf develop@$DEVELOP_SHA noch nicht success (last status=$STATUS)"
+              exit 1
+            fi
+
+            echo "Waiting for CI on develop@$DEVELOP_SHA (status=$STATUS, polling ${POLL_SEC}s)..."
+            sleep "$POLL_SEC"
+          done
 
       - name: Determine commit range for changelog
         id: range
@@ -175,11 +199,29 @@ jobs:
           git commit -m "chore(release): ${{ steps.tag.outputs.name }}"
           git push origin develop
 
-      - name: Fast-forward master, pin installer image tags, and tag
+      - name: Merge develop into master, pin installer app image tag, and tag
         run: |
           git fetch origin master:master
           git checkout master
-          git merge --no-ff develop -m "Release ${{ steps.tag.outputs.name }}"
+
+          # Merge develop into master without committing. installer/.env.example
+          # has a known conflict: master pins :prev-tag, develop carries
+          # :latest as the rolling default. Resolve in favour of develop
+          # (:latest) and immediately overwrite with the new release tag —
+          # the resulting merge commit carries both develop's changes and
+          # the new pin in one step (previously needed a separate "pin"
+          # commit on top, polluting master history).
+          if ! git merge --no-ff develop --no-commit -m "Release ${{ steps.tag.outputs.name }}"; then
+            git checkout --theirs installer/.env.example
+            git add installer/.env.example
+
+            UNRESOLVED=$(git diff --name-only --diff-filter=U)
+            if [ -n "$UNRESOLVED" ]; then
+              echo "::error::Unerwartete Merge-Konflikte über installer/.env.example hinaus:"
+              echo "$UNRESOLVED"
+              exit 1
+            fi
+          fi
 
           # Pin installer/.env.example to the version-suffixed app image tag
           # on master only. develop keeps the floating :latest default so
@@ -195,7 +237,8 @@ jobs:
           echo "── Diff installer/.env.example ──"
           git --no-pager diff installer/.env.example
           git add installer/.env.example
-          git commit -m "chore(release): pin installer app image tag to ${{ steps.tag.outputs.name }}"
+
+          git commit -m "Release ${{ steps.tag.outputs.name }}"
 
           git tag -a "${{ steps.tag.outputs.name }}" -m "Release ${{ steps.tag.outputs.name }}"
           # Atomic push: master + tag in einem Schritt — entweder beide oder keiner.
