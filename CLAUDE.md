@@ -93,6 +93,22 @@ Diese Tabelle ist die Antwort auf eine wiederkehrende Reibung aus Welle 1: ein P
 | neuer Phase-Helper | `worker/lib/<modul>.sh` mit Docstring; `bats`-Test in `worker/tests/bats/`; `shellcheck` clean; vom `agent`-Entrypoint sourcen; in welchem Phase-Skript wird der Helper aufgerufen |
 | UI-Hint behauptet Verhalten | Backend implementiert das **für alle relevanten Pfade** — alle Agents, alle Provider, alle Status. Helper-Text der nur für den Default-Pfad stimmt ist eine Lüge. |
 
+## Caches & Resets
+
+**Antizipations-Pflicht**: Bei einer Änderung an einer der Schichten unten **proaktiv** die Reset-Aktion durchführen oder ankündigen — nicht warten bis der User fragt „muss ich neu builden oder sowas?".
+
+- Lokale, schnelle Reset-Aktionen (`dev-reload.sh`) führst du **direkt selbst aus**, kein Nachfragen.
+- Disruptive Resets (`dev-reset.sh` löscht Volumes + Worker-Images) kurz ankündigen und auf OK warten.
+
+| Geändert | Cache | Reset-Aktion |
+| --- | --- | --- |
+| Manager-PHP (`app/`, `config/`, `resources/`) | OPCache + Queue-Worker hält alte Klassen | `.tools/bin/dev-reload.sh` — automatisch |
+| neue Migration | DB-Schema veraltet | `.tools/bin/dev-reset.sh` (frisches Schema + Demo-Daten) — ankündigen |
+| `composer.json` | `vendor/` im Workspace + im app-Container | `composer install` im app-Container |
+| `worker/lib/*.sh` oder `worker/phases/*.sh` | Worker-Image | nichts — `libHash` triggert Rebuild beim nächsten Phase-Run |
+| `.tools/docker/app/Dockerfile` | App-Image | `docker compose -f .tools/docker/docker-compose.yml build app` + restart |
+| `.tools/docker/worker/Dockerfile` | Worker-Image (alle Varianten) | `.tools/bin/dev-reset.sh` löscht Tags, nächster Phase-Run rebuilt |
+
 ## Was du NICHT tust ohne Rücksprache
 
 - Architektur-Entscheidungen aus den Spec-Dokumenten umkehren — insbesondere: kein AI im Manager-Container, Worker ohne Docker-Socket
