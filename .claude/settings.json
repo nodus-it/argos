@@ -1,0 +1,25 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/scripts/boost-freshness-check.sh"
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(.claude/scripts/*)",
+      "Bash(./vendor/bin/pest*)",
+      "Bash(./vendor/bin/phpstan*)",
+      "Bash(./vendor/bin/pint*)",
+      "Bash(composer*)",
+      "Bash(php artisan*)",
+      "Bash(php artisan boost:install*)"
+    ]
+  }
+}

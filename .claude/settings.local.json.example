@@ -1,0 +1,8 @@
+{
+  "// PURPOSE": "Machine-specific Claude Code settings — git-ignored.",
+  "// USAGE": "Copy to .claude/settings.local.json and customize.",
+  "// EXAMPLE": "Add Bash permissions specific to your local toolchain.",
+  "permissions": {
+    "allow": []
+  }
+}
