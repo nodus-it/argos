@@ -192,7 +192,7 @@ bash .tools/bin/dev-reload.sh
 # Voraussetzung einmalig: `npm install` + `npx playwright install chromium`.
 # Datenvoraussetzung: DemoSeeder gelaufen (z.B. via dev-reset.sh).
 # Playwright bootet `php artisan serve` selbst — kein laufender Stack nötig.
-npx playwright test
+composer test:browser
 ```
 
 ## Rückfragen sind willkommen
