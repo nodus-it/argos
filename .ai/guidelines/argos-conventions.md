@@ -163,6 +163,18 @@ Browser-E2E runs locally only today — the discipline of running
 `npx playwright test` before a commit is the first line of defense. CI
 integration deliberately not built (effort vs. value not justified yet).
 
+## Architecture tests
+
+Pest architecture tests live in `tests/Arch/`. They enforce structural
+rules verified on every test run. Current rules:
+
+- No debug calls in `app/` (`dd`, `dump`, `ray`, `var_dump`, `print_r`).
+- All `app/` files declare `strict_types=1`.
+- `app/Workers/` may not depend on `app/Filament/`.
+
+To propose new architecture rules: surface via `/retro`, do not add
+inline during feature work.
+
 ## Caches & resets
 
 **Anticipation duty**: when changing any of the layers below, **proactively**
