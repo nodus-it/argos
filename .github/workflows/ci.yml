@@ -31,7 +31,11 @@ jobs:
             worker/lib/*.sh \
             worker/phases/*.sh \
             install.sh \
-            installer/tests/run-bats.sh
+            installer/tests/run-bats.sh \
+            .tools/bin/dev-reload.sh \
+            .tools/bin/dev-reset.sh \
+            .claude/scripts/boost-freshness-check.sh \
+            .claude/scripts/retro-reminder.sh
 
   worker-unit:
     runs-on: ubuntu-latest
