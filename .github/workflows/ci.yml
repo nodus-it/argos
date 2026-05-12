@@ -47,6 +47,24 @@ jobs:
       - name: bats unit tests for install.sh (via Docker)
         run: bash installer/tests/run-bats.sh
 
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Scan tracked files for live API tokens
+        # Patterns cover only the four token classes we actually carry
+        # (Anthropic OAuth, GitHub PAT, GitHub OAuth, GitLab PAT). Test
+        # fixtures under worker/tests/ are allow-listed because some specs
+        # exercise scrubbing/logging by feeding fake tokens through helpers.
+        run: |
+          PATTERN='sk-ant-[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9]{20,}|gho_[A-Za-z0-9]{20,}|glpat-[A-Za-z0-9_-]{20,}'
+          if git grep --line-number -E "$PATTERN" -- ':!worker/tests/'; then
+            echo
+            echo "::error::Live token pattern matched in a tracked file. Rotate the token immediately and rewrite history if needed."
+            exit 1
+          fi
+          echo "Secret scan clean."
+
   app-quality:
     runs-on: ubuntu-latest
     # Tests run against MariaDB (matching production) so DB-only constraints
@@ -101,7 +119,7 @@ jobs:
         run: php artisan test --compact
 
   build-app:
-    needs: [shellcheck, worker-unit, app-quality, installer-unit]
+    needs: [shellcheck, worker-unit, app-quality, installer-unit, secret-scan]
     # The metadata-action only emits tags for develop and release tags;
     # on a feature branch (push or workflow_dispatch) the tag list is
     # empty and `docker buildx push` errors with "tag is needed when
