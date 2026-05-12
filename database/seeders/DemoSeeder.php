@@ -14,6 +14,7 @@ use App\Models\RepoProfile;
 use App\Models\Task;
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Env;
 use Illuminate\Support\Facades\Hash;
 
 /**
@@ -31,7 +32,7 @@ final class DemoSeeder extends Seeder
     public function run(): void
     {
         $user = User::firstOrCreate(
-            ['email' => (string) env('SEED_USER_EMAIL', 'admin@argos.local')],
+            ['email' => (string) Env::get('SEED_USER_EMAIL', 'admin@argos.local')],
             [
                 'name' => 'Argos Admin',
                 'password' => Hash::make((string) config('argos.admin_password')),
@@ -42,7 +43,7 @@ final class DemoSeeder extends Seeder
         $this->seedCodexCredential();
 
         $repo = RepoProfile::firstOrCreate(
-            ['url' => (string) env('SEED_REPO_URL', 'https://github.com/nodus-it/argos.git')],
+            ['url' => (string) Env::get('SEED_REPO_URL', 'https://github.com/nodus-it/argos.git')],
             [
                 'name' => 'argos (demo)',
                 'platform' => GitProvider::GitHub->value,
@@ -66,7 +67,7 @@ final class DemoSeeder extends Seeder
 
     private function seedClaudeCredential(): void
     {
-        $token = env('SEED_CLAUDE_OAUTH_TOKEN');
+        $token = Env::get('SEED_CLAUDE_OAUTH_TOKEN');
 
         if (! is_string($token) || trim($token) === '') {
             return;
@@ -86,7 +87,7 @@ final class DemoSeeder extends Seeder
 
     private function seedCodexCredential(): void
     {
-        $b64 = env('SEED_CODEX_AUTH_JSON_B64');
+        $b64 = Env::get('SEED_CODEX_AUTH_JSON_B64');
 
         if (! is_string($b64) || trim($b64) === '') {
             return;

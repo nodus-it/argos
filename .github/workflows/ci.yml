@@ -49,6 +49,30 @@ jobs:
 
   app-quality:
     runs-on: ubuntu-latest
+    # Tests run against MariaDB (matching production) so DB-only constraints
+    # like ENUM columns are exercised — see retro wave-1 C11 for context.
+    services:
+      mariadb:
+        image: mariadb:11
+        env:
+          MARIADB_DATABASE: argos
+          MARIADB_USER: argos
+          MARIADB_PASSWORD: argos
+          MARIADB_ROOT_PASSWORD: argos-root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    env:
+      DB_CONNECTION: mariadb
+      ARGOS_DB_HOST: 127.0.0.1
+      ARGOS_DB_PORT: '3306'
+      ARGOS_DB_DATABASE: argos
+      ARGOS_DB_USERNAME: argos
+      ARGOS_DB_PASSWORD: argos
     steps:
       - uses: actions/checkout@v6
 
@@ -56,7 +80,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
-          extensions: mbstring, pdo_sqlite, sqlite3
+          extensions: mbstring, pdo_mysql
           coverage: none
 
       - name: Install Composer dependencies
