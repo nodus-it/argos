@@ -81,6 +81,18 @@ CI führt `shellcheck` über `agent`, `worker/lib/`, `worker/phases/`, `.tools/d
 - credentials.env immer mode 600 schreiben (`umask 077` ODER `chmod 600` direkt nach create).
 - `set -u` würde unset-Variablen detecten — wir nutzen es; wenn eine env-Var optional ist, mit `${VAR:-default}` zugreifen.
 
+## Schicht-Sync — Wenn du X änderst, prüfe auch Y
+
+Diese Tabelle ist die Antwort auf eine wiederkehrende Reibung aus Welle 1: ein Patch greift sauber an einer Schicht, aber die parallel betroffenen Stellen (Migration, Locale-Strings, Worker-Schema, Tests, …) werden vergessen. Die Tabelle darf wachsen — wenn dir bei einem Patch auffällt, dass eine Zeile fehlt, ergänze sie.
+
+| Wenn du änderst… | …prüfe auch |
+| --- | --- |
+| neuen Enum-Case | DB-Migration (`enum()`-Werte) — `EnumPersistenceTest` greift, aber Migration musst du selbst schreiben; `lang/{de,en}/enums.php`; `color()` / `label()` / sonstige `match`-Pfade auf dem Enum; Filament-Filter-Optionen / `SelectFilter::options()` |
+| neue DB-Spalte | Model `$fillable` / `$casts`; **Factory** (sonst kippt `factory()->create()` lautlos bei NOT-NULL); ggf. Filament-Form-Field + Table-Column; ggf. JSON-Schema in `worker/schemas/` falls Worker das Feld liest/schreibt |
+| neue Filament-Page (Resource oder Page) | `RedirectToOnboarding`-Whitelist falls vor Onboarding erreichbar; `getNavigationGroup` / Heroicon; **Wiring-Test via einbettende Page** (`Livewire::test(ViewFooPage::class, [...])->assertSeeLivewire(FooRelationManager::class)`) — isolierter RM-Test alleine ist nicht ausreichend; Locale-Strings `de` + `en` |
+| neuer Phase-Helper | `worker/lib/<modul>.sh` mit Docstring; `bats`-Test in `worker/tests/bats/`; `shellcheck` clean; vom `agent`-Entrypoint sourcen; in welchem Phase-Skript wird der Helper aufgerufen |
+| UI-Hint behauptet Verhalten | Backend implementiert das **für alle relevanten Pfade** — alle Agents, alle Provider, alle Status. Helper-Text der nur für den Default-Pfad stimmt ist eine Lüge. |
+
 ## Was du NICHT tust ohne Rücksprache
 
 - Architektur-Entscheidungen aus den Spec-Dokumenten umkehren — insbesondere: kein AI im Manager-Container, Worker ohne Docker-Socket
