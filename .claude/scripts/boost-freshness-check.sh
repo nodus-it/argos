@@ -17,10 +17,12 @@ fi
 
 # Case 2: A source file is newer than CLAUDE.md.
 # Use `|| true` so a missing .ai/ on early setup doesn't trip `set -e`.
-NEWEST_SOURCE=$(find .ai/ boost.json composer.lock 2>/dev/null \
+# Stderr is redirected at the end so it applies to the command as a whole
+# (avoids SC2227 about a redirection placed between path and action args).
+NEWEST_SOURCE=$(find .ai/ boost.json composer.lock \
   -type f \
   -newer "$CLAUDE_MD" \
-  -print -quit || true)
+  -print -quit 2>/dev/null || true)
 
 if [ -n "$NEWEST_SOURCE" ]; then
   if php artisan boost:install --no-interaction --quiet 2>/dev/null; then
