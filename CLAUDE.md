@@ -104,7 +104,7 @@ Wir fahren fünf Test-Ebenen — jede mit klarem Geltungsbereich, damit nicht je
 | UI-Smoke | `Livewire::test(ViewTask::class, ['record' => …])` | UI rendert korrekten Status-String pro Phase, Action-Wiring | ✅ (retro M10) |
 | Browser-E2E | Playwright lokal über `php artisan serve` | Realer Browser-Render, JS-/Alpine-Reaktivität, Login-Flow, Multi-Page-Navigation. Aufruf: `npx playwright test` (siehe „Häufige Befehle"). | ✅ (retro M11) |
 
-CI-Integration des Browser-E2E (Playwright als CI-Job) ist bewusst offen — siehe Retro M11c.
+Browser-E2E läuft heute nur lokal — die Disziplin, `npx playwright test` vor einem Commit zu laufen, ist die erste Verteidigungslinie. CI-Integration absichtlich nicht aufgebaut (Aufwand vs. Nutzen aktuell nicht gerechtfertigt).
 
 ## Caches & Resets
 
