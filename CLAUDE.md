@@ -122,6 +122,15 @@ Browser-E2E läuft heute nur lokal — die Disziplin, `npx playwright test` vor 
 | `.tools/docker/app/Dockerfile` | App-Image | `docker compose -f .tools/docker/docker-compose.yml build app` + restart |
 | `.tools/docker/worker/Dockerfile` | Worker-Image (alle Varianten) | `.tools/bin/dev-reset.sh` löscht Tags, nächster Phase-Run rebuilt |
 
+## Common Pitfalls
+
+Wave-1-Lehren mit Commit-Ref — falls du ein Symptom wiedererkennst, schau erst dort nach, bevor du neu debuggst. Liste wächst kuratiert (nur was sich wiederholen würde ohne Anker — keine Müllhalde).
+
+- **SQLite ignoriert ENUM-Constraints lautlos.** Drift `app/Enums/*` ↔ MariaDB-ENUM-Spalte zeigt sich erst gegen MariaDB. `tests/Feature/EnumPersistenceTest.php` greift das heute automatisch via Reflection über Model-`$casts`; bei neuen DB-backed Enums prüfen, dass das Auto-Discovery sie findet. (`f952aa0`)
+- **`set -euo pipefail` in einer source-only-Lib leakt in den Caller-Scope.** Strict-Mode setzt nur der Top-Level-Executor (Entrypoint, `.tools/bin/*.sh`, Test-Runner). Worker-Libs / Phase-Skripte sind sourced, dürfen das **nicht** setzen — sonst brechen bats-Setups, die `$BATS_*` ohne Default referenzieren. (`d50d3fe`)
+- **Phase-Jobs sind zu teuer für blinde Retries.** `RunPhaseJob::$tries = 1`; bei Exception markiert `failed()` den Task aktiv als Failed, damit der User es im UI sieht und manuell retried. Default-3-Retries kosten 200–800 k Tokens pro Versuch. (`f952aa0`)
+- **`$_SERVER['HOME']` ist im PHP-built-in-Server leer.** Config-Defaults müssen `getenv('HOME')` als Fallback nutzen, sonst landet der SQLite-Default-Pfad auf `/root/...` und `artisan serve` wirft 500. Trifft jeden „funktioniert im CLI, nicht im Server"-Bug. (`9b1046f`)
+
 ## Was du NICHT tust ohne Rücksprache
 
 - Architektur-Entscheidungen aus den Spec-Dokumenten umkehren — insbesondere: kein AI im Manager-Container, Worker ohne Docker-Socket
