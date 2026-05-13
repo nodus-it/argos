@@ -11,6 +11,7 @@ use App\Models\PhaseRun;
 use App\Models\Task;
 use App\Services\Task\TaskService;
 use App\Services\Workflow\StateReader;
+use App\Support\ConceptMarkdown;
 use Filament\Actions\Action;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
@@ -233,9 +234,16 @@ class ViewTask extends ViewRecord
         $lastConceptRun = ($phaseRuns['concept'] ?? collect())->last();
         $lastImplementRun = ($phaseRuns['implement'] ?? collect())->last();
 
+        // Defense-in-depth: rows persisted before PhaseRunner started
+        // stripping the outer ```markdown wrapper still have it. Strip on
+        // render so the UI heals old data without a backfill migration.
+        $conceptMd = $task->concept_md !== null
+            ? ConceptMarkdown::stripOuterCodeFence($task->concept_md)
+            : null;
+
         return [
             'phaseRuns' => $phaseRuns,
-            'conceptHtml' => $task->concept_md ? Str::markdown($task->concept_md) : null,
+            'conceptHtml' => $conceptMd !== null ? Str::markdown($conceptMd) : null,
             'conceptError' => $lastConceptRun?->status !== PhaseStatus::Completed
                 ? $lastConceptRun?->error_log
                 : null,

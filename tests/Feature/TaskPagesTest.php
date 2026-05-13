@@ -77,6 +77,22 @@ class TaskPagesTest extends TestCase
             ->assertSee('In Review');
     }
 
+    public function test_view_task_strips_outer_code_fence_from_legacy_concept_md(): void
+    {
+        // Pre-fix concept_md was persisted with the ```markdown wrapper that
+        // some agent replies produce. Render-time strip heals these rows
+        // without requiring a backfill migration.
+        $task = Task::factory()->create([
+            'concept_md' => "```markdown\n# Konzept: Foo\n\nBody.\n```",
+        ]);
+
+        Livewire::test(ViewTask::class, ['record' => $task->getKey()])
+            ->assertSuccessful()
+            // Heading should render as <h1>, not as plain text inside <pre><code>.
+            ->assertSeeHtml('<h1>Konzept: Foo</h1>')
+            ->assertDontSeeHtml('<pre><code class="language-markdown">');
+    }
+
     public function test_view_task_concept_action_dispatches_job(): void
     {
         $task = Task::factory()->create();

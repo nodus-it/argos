@@ -92,6 +92,40 @@ teardown() {
     [ "$status" -eq 0 ]
 }
 
+@test "agent_check_auth_error_log returns 0 for stderr file with 401" {
+    local log="$TEST_DIR/stderr.log"
+    printf 'Failed to authenticate. API Error: 401 Invalid authentication credentials\n' > "$log"
+    run agent_check_auth_error_log "$log"
+    [ "$status" -eq 0 ]
+}
+
+@test "agent_check_auth_error_log returns 1 for empty file" {
+    local log="$TEST_DIR/stderr.log"
+    : > "$log"
+    run agent_check_auth_error_log "$log"
+    [ "$status" -eq 1 ]
+}
+
+@test "agent_check_auth_error_log returns 1 for missing file" {
+    run agent_check_auth_error_log "$TEST_DIR/nope.log"
+    [ "$status" -eq 1 ]
+}
+
+@test "agent_claude_code_session_file_exists returns 0 when jsonl on disk" {
+    local cfg="$TEST_DIR/claude-state"
+    mkdir -p "$cfg/projects/-workspace"
+    touch "$cfg/projects/-workspace/sess-xyz.jsonl"
+    CLAUDE_CONFIG_DIR="$cfg" run agent_session_file_exists "sess-xyz"
+    [ "$status" -eq 0 ]
+}
+
+@test "agent_claude_code_session_file_exists returns 1 when missing" {
+    local cfg="$TEST_DIR/claude-state"
+    mkdir -p "$cfg/projects/-workspace"
+    CLAUDE_CONFIG_DIR="$cfg" run agent_session_file_exists "sess-missing"
+    [ "$status" -eq 1 ]
+}
+
 @test "agent_check_auth_error does not match unrelated messages" {
     run agent_check_auth_error "rate limit reached"
     [ "$status" -eq 1 ]

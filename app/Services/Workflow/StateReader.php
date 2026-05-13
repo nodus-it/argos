@@ -6,6 +6,7 @@ namespace App\Services\Workflow;
 
 use App\Models\PhaseRun;
 use App\Models\Task;
+use App\Support\ConceptMarkdown;
 use Symfony\Component\Process\Process;
 
 class StateReader
@@ -102,7 +103,11 @@ class StateReader
             ->get()
             ->map(fn (PhaseRun $run) => [
                 'timestamp' => $run->finished_at?->format('d.m.Y H:i') ?? '—',
-                'content' => $run->concept_md,
+                // Heal legacy rows persisted before PhaseRunner stripped the
+                // outer ```markdown wrapper. Idempotent on already-clean rows.
+                'content' => $run->concept_md !== null
+                    ? ConceptMarkdown::stripOuterCodeFence($run->concept_md)
+                    : null,
             ])
             ->all();
     }

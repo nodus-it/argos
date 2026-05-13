@@ -153,28 +153,33 @@ phase_implement_run() {
     started_epoch=$(date -u +%s)
 
     local stream_log="/workspace/.agent/logs/implement.${ITERATION}.stream.log"
+    local stderr_log="/workspace/.agent/logs/implement.${ITERATION}.stderr.log"
     local result_json="/workspace/.agent/logs/implement.${ITERATION}.result.json"
     local max_turns="${MAX_TURNS:-200}"
 
     # Resume mode: if continue=true AND a previous session_id is provided AND
-    # its session file is still on disk, ask the agent to continue that session
-    # instead of starting fresh.
+    # the agent runner confirms the session file is still on disk, ask the
+    # agent to continue that session instead of starting fresh. The
+    # existence check is agent-aware (claude/codex use different layouts).
     local resume_args=() resume_input="$user_prompt_path"
     if [[ "$continue_run" == "true" && -n "${RESUME_SESSION_ID:-}" ]]; then
-        local cfg_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
-        local session_file="$cfg_dir/projects/-workspace/${RESUME_SESSION_ID}.jsonl"
-        if [[ -f "$session_file" ]]; then
+        if agent_session_file_exists "$RESUME_SESSION_ID"; then
             log_info "implement: resuming session $RESUME_SESSION_ID"
             resume_args=(--resume "$RESUME_SESSION_ID")
             local continue_prompt
             continue_prompt="$(_implement_build_continue_prompt | render_user_prompt implement continue-prompt)"
             resume_input="$continue_prompt"
         else
-            log_warn "implement: RESUME_SESSION_ID set but session file not found ($session_file) — starting fresh session"
+            log_warn "implement: RESUME_SESSION_ID=$RESUME_SESSION_ID has no session file — starting fresh session"
         fi
     fi
 
     log_info "implement: calling agent (stream-json, max-turns $max_turns${resume_args[*]:+, resume})"
+
+    # Capture CLI stderr so the auth-error heuristic + manager-side
+    # error_log promotion can inspect it after the run.
+    export AGENT_STDERR_LOG="$stderr_log"
+    : > "$stderr_log"
 
     set +e
     agent_run \
@@ -209,6 +214,13 @@ phase_implement_run() {
             rm -f /workspace/.agent/implement.notes.md
             return "$EXIT_USAGE_LIMIT"
         fi
+        # 401 / token expired: surface a precise hint, return EXIT_AUTH.
+        if agent_check_auth_error_log "$stderr_log"; then
+            echo "  → Agent-Token ungültig oder abgelaufen — Worker kann sich nicht authentifizieren." >&2
+            echo "    Token in den Agent-Credentials erneuern (claude setup-token / ~/.codex/auth.json) und neu starten." >&2
+            rm -f /workspace/.agent/implement.notes.md
+            return "$EXIT_AUTH"
+        fi
     fi
 
     # Drop the notes file after the agent call — it was written from the DB
@@ -230,10 +242,11 @@ phase_implement_run() {
             echo "  → usage/rate limit — backing off" >&2
             return "$EXIT_USAGE_LIMIT"
         fi
-        if agent_check_auth_error "$err_msg"; then
+        if agent_check_auth_error "$err_msg" || agent_check_auth_error_log "$stderr_log"; then
             echo "  → Agent-Token ungültig oder abgelaufen." >&2
             echo "    Token erneuern: claude setup-token" >&2
             echo "    Dann: ./agent init --update-token" >&2
+            return "$EXIT_AUTH"
         fi
         return 3
     fi

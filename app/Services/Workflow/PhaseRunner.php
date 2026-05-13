@@ -14,6 +14,7 @@ use App\Models\PhaseRun;
 use App\Models\RepoProfile;
 use App\Models\Task;
 use App\Services\Anthropic\CredentialStore;
+use App\Support\ConceptMarkdown;
 use App\Workers\Agents\MaterializedAgentCredential;
 use App\Workers\Compose\WorkerImageResolver;
 use Illuminate\Support\Carbon;
@@ -94,6 +95,13 @@ class PhaseRunner
     {
         if ($phase === 'concept') {
             $conceptMd = $this->readFileFromVolume($task->volumeName(), '/workspace/.agent/concept.md');
+            // Defensive: the agent occasionally wraps its whole reply in a
+            // ```markdown … ``` fence despite the system prompt forbidding it.
+            // Strip a single outer wrapper so the UI renders the markdown
+            // body instead of a giant code block.
+            if ($conceptMd !== null) {
+                $conceptMd = ConceptMarkdown::stripOuterCodeFence($conceptMd);
+            }
             $stateJson = $this->readFileFromVolume($task->volumeName(), '/workspace/.agent/state.json');
 
             $phaseRunUpdate = [
@@ -103,10 +111,19 @@ class PhaseRunner
 
             // When concept fails before Claude runs (e.g. git clone), capture
             // logs/clone.err so the user sees the real reason in the UI.
+            // If we have no clone.err but the agent CLI did run and crashed
+            // (e.g. 401 from Anthropic), fall back to the captured stderr —
+            // the auth error went there, not into the stream-json.
             if ($phaseRun->status !== PhaseStatus::Completed && $conceptMd === null) {
                 $cloneErr = $this->readFileFromVolume($task->volumeName(), '/workspace/.agent/logs/clone.err');
                 if ($cloneErr !== null) {
                     $phaseRunUpdate['error_log'] = $cloneErr;
+                } else {
+                    $stderrPath = "/workspace/.agent/logs/concept.{$phaseRun->iteration}.stderr.log";
+                    $stderrLog = $this->readFileFromVolume($task->volumeName(), $stderrPath);
+                    if ($stderrLog !== null && trim($stderrLog) !== '') {
+                        $phaseRunUpdate['error_log'] = $stderrLog;
+                    }
                 }
             }
 
@@ -164,6 +181,17 @@ class PhaseRunner
                             $task->update(['current_status' => PhaseStatus::Paused]);
                         }
                     }
+                }
+            }
+
+            // On failure, surface the CLI's stderr (where auth errors land)
+            // in error_log so the UI can show a precise reason instead of
+            // just "exit 1". Skip when error_log was already populated.
+            if ($phaseRun->status !== PhaseStatus::Completed && $phaseRun->fresh()->error_log === null) {
+                $stderrPath = "/workspace/.agent/logs/{$phase}.{$phaseRun->iteration}.stderr.log";
+                $stderrLog = $this->readFileFromVolume($task->volumeName(), $stderrPath);
+                if ($stderrLog !== null && trim($stderrLog) !== '') {
+                    $phaseRun->update(['error_log' => $stderrLog]);
                 }
             }
         }

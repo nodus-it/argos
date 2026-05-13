@@ -136,9 +136,21 @@ agent_claude_code_run() {
     # REPO_TOKEN is in the env for git, but it must never leak into the
     # claude process — the CLI logs its env at debug levels. Sub-shell + unset
     # ensures the var is gone in the child.
-    ( unset REPO_TOKEN
-      claude "${args[@]}" < "$user_prompt_file"
-    )
+    #
+    # AGENT_STDERR_LOG: optional path for capturing the CLI's stderr to a
+    # file (in addition to stderr-passthrough). Used by the phase scripts to
+    # detect auth errors (claude writes "Failed to authenticate. API Error:
+    # 401..." to stderr, never into the stream-json on stdout). When unset,
+    # behaviour is unchanged.
+    if [[ -n "${AGENT_STDERR_LOG:-}" ]]; then
+        ( unset REPO_TOKEN
+          claude "${args[@]}" < "$user_prompt_file" 2> >(tee -a "$AGENT_STDERR_LOG" >&2)
+        )
+    else
+        ( unset REPO_TOKEN
+          claude "${args[@]}" < "$user_prompt_file"
+        )
+    fi
 }
 
 # agent_claude_code_check: probe whether the claude CLI is reachable.
@@ -161,4 +173,16 @@ agent_claude_code_check_auth_error() {
     local msg="${1:-}"
     [[ -z "$msg" ]] && return 1
     echo "$msg" | grep -qiE "invalid api key|authentication|oauth|unauthorized|401|token.*expired|invalid_api_key"
+}
+
+# agent_claude_code_session_file_exists: does the claude session file for
+# this id live under CLAUDE_CONFIG_DIR? The CLI persists every session as
+# <id>.jsonl under projects/-workspace/.
+# Args: $1=session_id
+# Returns: 0 if file exists, 1 otherwise.
+agent_claude_code_session_file_exists() {
+    local session_id="${1:-}"
+    [[ -n "$session_id" ]] || return 1
+    local cfg_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+    [[ -f "$cfg_dir/projects/-workspace/${session_id}.jsonl" ]]
 }

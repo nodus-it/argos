@@ -333,20 +333,6 @@ class PhaseRunnerTest extends TestCase
         $this->assertContains('MAX_TURNS=400', $this->captureCommand($task, 'implement'));
     }
 
-    public function test_build_command_uses_concept_default_max_turns_for_concept_phase(): void
-    {
-        config([
-            'argos.concept.max_turns_default' => 30,
-            'argos.implement.max_turns_default' => 200,
-        ]);
-        $task = $this->taskWithProfile();
-        // task.max_turns_concept intentionally left null so the phase default kicks in.
-
-        $cmd = $this->captureCommand($task, 'concept');
-
-        $this->assertContains('MAX_TURNS=30', $cmd);
-    }
-
     public function test_build_command_always_sets_claude_config_dir(): void
     {
         $task = $this->taskWithProfile();
@@ -424,6 +410,20 @@ class PhaseRunnerTest extends TestCase
 
         $this->assertContains('RESUME_SESSION_ID=concept-session-7', $cmd);
         $this->assertContains('PHASE_FLAGS={"continue":true}', $cmd);
+    }
+
+    public function test_build_command_uses_concept_default_max_turns_for_concept_phase(): void
+    {
+        config([
+            'argos.concept.max_turns_default' => 30,
+            'argos.implement.max_turns_default' => 200,
+        ]);
+        $task = $this->taskWithProfile();
+        // task.max_turns intentionally left null so the phase default kicks in.
+
+        $cmd = $this->captureCommand($task, 'concept');
+
+        $this->assertContains('MAX_TURNS=30', $cmd);
     }
 
     public function test_extract_stop_reason_returns_subtype_from_last_result_event(): void
@@ -669,6 +669,124 @@ class PhaseRunnerTest extends TestCase
         $this->assertSame(PhaseStatus::Paused, $fresh->status);
         $this->assertSame('error_max_turns', $fresh->stop_reason);
         $this->assertSame($streamLog, $fresh->stream_log);
+    }
+
+    public function test_post_phase_sync_promotes_concept_stderr_to_error_log_when_no_clone_err(): void
+    {
+        $task = $this->taskWithProfile();
+        $phaseRun = PhaseRun::create([
+            'task_id' => $task->id,
+            'phase' => 'concept',
+            'iteration' => 1,
+            'status' => 'failed',
+        ]);
+
+        $stderr = "Failed to authenticate. API Error: 401 Invalid authentication credentials\n";
+
+        $runner = $this->partialMock(PhaseRunner::class, function (MockInterface $mock) use ($stderr): void {
+            $mock->shouldAllowMockingProtectedMethods();
+            $mock->shouldReceive('readFileFromVolume')
+                ->andReturnUsing(function (string $volume, string $path) use ($stderr): ?string {
+                    return match ($path) {
+                        '/workspace/.agent/concept.md' => null,
+                        '/workspace/.agent/state.json' => null,
+                        '/workspace/.agent/logs/clone.err' => null,
+                        '/workspace/.agent/logs/concept.1.stderr.log' => $stderr,
+                        default => null,
+                    };
+                });
+        });
+
+        $runner->postPhaseSync($task, $phaseRun, 'concept', null);
+
+        $this->assertSame($stderr, $phaseRun->fresh()->error_log);
+    }
+
+    public function test_post_phase_sync_promotes_implement_stderr_to_error_log_on_failure(): void
+    {
+        $task = $this->taskWithProfile();
+        $phaseRun = PhaseRun::create([
+            'task_id' => $task->id,
+            'phase' => 'implement',
+            'iteration' => 1,
+            'status' => 'failed',
+        ]);
+
+        $stderr = "Failed to authenticate. API Error: 401 Invalid authentication credentials\n";
+
+        $runner = $this->partialMock(PhaseRunner::class, function (MockInterface $mock) use ($stderr): void {
+            $mock->shouldAllowMockingProtectedMethods();
+            $mock->shouldReceive('readFileFromVolume')
+                ->andReturnUsing(function (string $volume, string $path) use ($stderr): ?string {
+                    return match ($path) {
+                        '/workspace/.agent/logs/implement.1.stream.log' => null,
+                        '/workspace/.agent/logs/implement.1.stderr.log' => $stderr,
+                        default => null,
+                    };
+                });
+        });
+
+        $runner->postPhaseSync($task, $phaseRun, 'implement', null);
+
+        $this->assertSame($stderr, $phaseRun->fresh()->error_log);
+    }
+
+    public function test_post_phase_sync_strips_outer_code_fence_from_concept_md(): void
+    {
+        $task = $this->taskWithProfile();
+        $phaseRun = PhaseRun::create([
+            'task_id' => $task->id,
+            'phase' => 'concept',
+            'iteration' => 1,
+            'status' => 'completed',
+        ]);
+
+        $wrapped = "```markdown\n# Konzept: Foo\n\nInhalt mit ```bash\nls\n``` innerem Codeblock.\n```";
+        $expected = "# Konzept: Foo\n\nInhalt mit ```bash\nls\n``` innerem Codeblock.";
+
+        $runner = $this->partialMock(PhaseRunner::class, function (MockInterface $mock) use ($wrapped): void {
+            $mock->shouldAllowMockingProtectedMethods();
+            $mock->shouldReceive('readFileFromVolume')
+                ->andReturnUsing(function (string $volume, string $path) use ($wrapped): ?string {
+                    return match ($path) {
+                        '/workspace/.agent/concept.md' => $wrapped,
+                        default => null,
+                    };
+                });
+        });
+
+        $runner->postPhaseSync($task, $phaseRun, 'concept', null);
+
+        $this->assertSame($expected, $phaseRun->fresh()->concept_md);
+        $this->assertSame($expected, $task->fresh()->concept_md);
+    }
+
+    public function test_post_phase_sync_leaves_concept_md_untouched_when_no_outer_fence(): void
+    {
+        $task = $this->taskWithProfile();
+        $phaseRun = PhaseRun::create([
+            'task_id' => $task->id,
+            'phase' => 'concept',
+            'iteration' => 1,
+            'status' => 'completed',
+        ]);
+
+        $plain = "# Konzept: Bar\n\nKein Wrapper hier.\n";
+
+        $runner = $this->partialMock(PhaseRunner::class, function (MockInterface $mock) use ($plain): void {
+            $mock->shouldAllowMockingProtectedMethods();
+            $mock->shouldReceive('readFileFromVolume')
+                ->andReturnUsing(function (string $volume, string $path) use ($plain): ?string {
+                    return match ($path) {
+                        '/workspace/.agent/concept.md' => $plain,
+                        default => null,
+                    };
+                });
+        });
+
+        $runner->postPhaseSync($task, $phaseRun, 'concept', null);
+
+        $this->assertSame($plain, $phaseRun->fresh()->concept_md);
     }
 
     public function test_post_phase_sync_persists_concept_stream_log_on_success(): void

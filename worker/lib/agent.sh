@@ -98,3 +98,31 @@ agent_check_auth_error() {
         *) return 1 ;;
     esac
 }
+
+# agent_check_auth_error_log: like agent_check_auth_error, but takes a log
+# file path. Reads the file (which typically contains the captured CLI
+# stderr — claude prints "Failed to authenticate. API Error: 401..." to
+# stderr, never to the stream-json on stdout) and runs the agent's
+# auth-error heuristic over its contents.
+# Args: $1=log_file_path
+# Returns: 0 if the log contents look like an auth error, 1 otherwise.
+agent_check_auth_error_log() {
+    local log="${1:-}"
+    [[ -f "$log" && -s "$log" ]] || return 1
+    agent_check_auth_error "$(cat "$log")"
+}
+
+# agent_session_file_exists: agent-aware liveness check for a resume session.
+# Used by phase scripts before passing --resume to the CLI: if the session
+# is gone (e.g. the volume was wiped) we silently start a fresh session
+# rather than crashing the run on "session not found".
+# Args: $1=session_id
+# Returns: 0 if a usable session file is on disk, 1 otherwise.
+agent_session_file_exists() {
+    local agent="${AGENT_NAME:-claude_code}"
+    case "$agent" in
+        claude_code|claude-code) agent_claude_code_session_file_exists "$@" ;;
+        codex) agent_codex_session_file_exists "$@" ;;
+        *) return 1 ;;
+    esac
+}
