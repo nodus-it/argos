@@ -568,6 +568,13 @@ class PhaseRunner
             '-e', 'CLAUDE_CONFIG_DIR=/workspace/.agent/claude-state',
             '-e', 'LOG_LEVEL=info',
             '-e', "CLAUDE_MODEL={$modelId}",
+            // Deterministic placeholder APP_KEY so the target repo's
+            // composer `post-autoload-dump` (which boots Laravel for
+            // package:discover) and `php artisan boost:mcp` don't crash on
+            // encrypted-cast migrations / providers. We never persist
+            // anything in the worker volume, so this key has no security
+            // role — it only lets the boot pipeline get through.
+            '-e', 'APP_KEY=base64:QXJnb3NXb3JrZXJEdW1teUtleU5vU2VjcmV0c0hlcmU=',
         ];
 
         foreach ($materializedCredential->envVars as $key => $value) {

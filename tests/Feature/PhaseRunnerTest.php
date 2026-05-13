@@ -356,6 +356,25 @@ class PhaseRunnerTest extends TestCase
         $this->assertContains('CLAUDE_CONFIG_DIR=/workspace/.agent/claude-state', $cmd);
     }
 
+    public function test_build_command_passes_dummy_app_key_so_target_laravel_can_boot(): void
+    {
+        // Without APP_KEY the target repo's composer post-autoload-dump
+        // (package:discover boots Laravel) and `php artisan boost:mcp`
+        // crash on any provider/migration that touches an encrypted cast —
+        // see backfill_claude_token_to_agent_credentials.php.
+        $task = $this->taskWithProfile();
+
+        $cmd = $this->captureCommand($task, 'concept');
+
+        $appKeyEntry = array_values(array_filter($cmd, fn ($v) => str_starts_with($v, 'APP_KEY=')));
+        $this->assertCount(1, $appKeyEntry);
+        $this->assertStringStartsWith('APP_KEY=base64:', $appKeyEntry[0]);
+
+        $b64 = substr($appKeyEntry[0], strlen('APP_KEY=base64:'));
+        $this->assertSame(32, strlen((string) base64_decode($b64, true)),
+            'APP_KEY must decode to 32 bytes — Laravel uses AES-256-CBC by default');
+    }
+
     public function test_build_command_passes_resume_session_id_on_continue(): void
     {
         $task = $this->taskWithProfile();
