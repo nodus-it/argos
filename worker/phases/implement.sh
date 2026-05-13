@@ -51,6 +51,12 @@ _implement_reset_branch() {
 
 # _implement_setup_toolchain: composer install / npm ci if a manifest exists.
 _implement_setup_toolchain() {
+    # Seed .env before composer install: post-autoload-dump runs
+    # package:discover, which boots the target Laravel app. Without .env
+    # vlucas/phpdotenv logs a "Failed to open" warning that ends up in the
+    # composer log AND later in every pest run.
+    quality_ensure_workspace_dotenv
+
     if [[ -f /workspace/composer.json ]]; then
         log_info "implement: composer install"
         if ! (cd /workspace && composer install --no-interaction --prefer-dist --no-progress 2>&1 \

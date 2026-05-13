@@ -6,6 +6,8 @@ setup() {
     mkdir -p /workspace/.agent/concept.history
     unset REPO_URL BASE_BRANCH ITERATION
 
+    # shellcheck source=../../lib/logging.sh
+    source worker/lib/logging.sh
     # shellcheck source=../../phases/commit-message.sh
     source worker/phases/commit-message.sh
     # shellcheck source=../../lib/quality.sh
@@ -123,6 +125,33 @@ teardown() {
     run quality_gate_verdict "$gates"
     [ "$status" -eq 0 ]
     [ -z "$output" ]
+}
+
+# --- quality_ensure_workspace_dotenv ---
+
+@test "quality_ensure_workspace_dotenv: kein workspace/.env, kein .env.example → leere .env angelegt" {
+    rm -f /workspace/.env /workspace/.env.example
+    quality_ensure_workspace_dotenv >/dev/null 2>&1
+    [ -f /workspace/.env ]
+    [ ! -s /workspace/.env ]
+}
+
+@test "quality_ensure_workspace_dotenv: .env.example vorhanden, .env fehlt → .env wird aus example kopiert" {
+    rm -f /workspace/.env
+    printf 'APP_NAME=Example\nAPP_ENV=local\n' > /workspace/.env.example
+    quality_ensure_workspace_dotenv >/dev/null 2>&1
+    [ -f /workspace/.env ]
+    grep -q 'APP_NAME=Example' /workspace/.env
+    rm -f /workspace/.env /workspace/.env.example
+}
+
+@test "quality_ensure_workspace_dotenv: existierende .env wird nicht überschrieben" {
+    printf 'APP_KEY=user-set\n' > /workspace/.env
+    printf 'APP_NAME=Example\n' > /workspace/.env.example
+    quality_ensure_workspace_dotenv >/dev/null 2>&1
+    grep -q 'APP_KEY=user-set' /workspace/.env
+    ! grep -q 'APP_NAME=Example' /workspace/.env
+    rm -f /workspace/.env /workspace/.env.example
 }
 
 # --- _push_detect_platform ---

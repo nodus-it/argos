@@ -8,6 +8,33 @@
 
 # shellcheck shell=bash
 
+# quality_ensure_workspace_dotenv: make sure /workspace/.env exists so
+# Laravel's Foundation\Bootstrap\LoadEnvironmentVariables (via vlucas/
+# phpdotenv) does not emit a `file_get_contents(/workspace/.env): Failed
+# to open` warning every test run. That warning is harmless on its own
+# (safeLoad swallows the result) but it has historically poisoned the
+# Pest output enough that fix-session agents misinterpret the failure
+# mode, and some custom error handlers convert PHP warnings to
+# exceptions. We seed the file from `.env.example` (which the target
+# Laravel project ships) — every actual value comes from the worker's
+# docker -e env vars (APP_KEY etc.) and phpunit.xml `force="true"`
+# entries, so the seeded `.env` only needs to exist; contents don't
+# matter. Idempotent.
+quality_ensure_workspace_dotenv() {
+    if [[ -f /workspace/.env ]]; then
+        return 0
+    fi
+    if [[ -f /workspace/.env.example ]]; then
+        cp /workspace/.env.example /workspace/.env
+        log_info "workspace: seeded .env from .env.example"
+        return 0
+    fi
+    # No example to copy — drop a minimal stub so the file at least exists.
+    : > /workspace/.env
+    log_info "workspace: created empty .env (no .env.example present)"
+    return 0
+}
+
 # quality_changed_php_files: list PHP files modified or added in /workspace.
 # Output: NUL-separated file paths relative to /workspace root.
 quality_changed_php_files() {

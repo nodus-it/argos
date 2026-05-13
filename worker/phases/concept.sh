@@ -226,6 +226,11 @@ _concept_setup_toolchain() {
     if [[ ! -f /workspace/composer.json ]]; then
         return 0
     fi
+    # Same rationale as in implement: composer post-autoload-dump boots
+    # Laravel which reads .env via vlucas; seed the file so Boost MCP /
+    # artisan commands don't crash on the first read.
+    quality_ensure_workspace_dotenv
+
     log_info "concept: composer install"
     if ! (cd /workspace && composer install --no-interaction --prefer-dist --no-progress 2>&1 \
             | tee "/workspace/.agent/logs/composer-install.${ITERATION}.log") ; then
