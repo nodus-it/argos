@@ -592,22 +592,46 @@
                                     @if($implementQualityGates)
                                         <div class="mb-4 flex flex-wrap gap-2">
                                             @foreach($implementQualityGates as $gate => $result)
-                                                <span @class([
-                                                    'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset',
-                                                    'text-emerald-700 bg-emerald-50 ring-emerald-200 dark:text-emerald-300 dark:bg-emerald-950/40 dark:ring-emerald-800' => $result === 'pass',
-                                                    'text-red-700 bg-red-50 ring-red-200 dark:text-red-300 dark:bg-red-950/40 dark:ring-red-800' => $result === 'fail',
-                                                    'text-amber-700 bg-amber-50 ring-amber-200 dark:text-amber-300 dark:bg-amber-950/40 dark:ring-amber-800' => $result === 'advisory_fail',
-                                                    'text-gray-500 bg-gray-50 ring-gray-200 dark:text-gray-400 dark:bg-gray-800 dark:ring-gray-700' => $result === 'skip',
-                                                ])>
-                                                    @if($result === 'pass')
-                                                        <x-heroicon-o-check class="h-3 w-3" />
-                                                    @elseif(in_array($result, ['fail', 'advisory_fail']))
+                                                @php
+                                                    $isFail = in_array($result, ['fail', 'advisory_fail'], true);
+                                                    $logKeyMatches = array_values(array_filter(
+                                                        $implementQualityGateLogKeys ?? [],
+                                                        fn (string $k) => $k === $gate || str_starts_with($k, $gate.'.')
+                                                    ));
+                                                    sort($logKeyMatches);
+                                                    $lastLogKey = $isFail ? (end($logKeyMatches) ?: null) : null;
+                                                    $gateLogUrl = $lastLogKey
+                                                        ? \App\Filament\Admin\Resources\TaskResource::getUrl(
+                                                            'quality-gates',
+                                                            ['record' => $record, 'phase' => 'implement', 'key' => $lastLogKey]
+                                                        )
+                                                        : null;
+                                                    $badgeClasses = [
+                                                        'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset',
+                                                        'text-emerald-700 bg-emerald-50 ring-emerald-200 dark:text-emerald-300 dark:bg-emerald-950/40 dark:ring-emerald-800' => $result === 'pass',
+                                                        'text-red-700 bg-red-50 ring-red-200 dark:text-red-300 dark:bg-red-950/40 dark:ring-red-800' => $result === 'fail',
+                                                        'text-amber-700 bg-amber-50 ring-amber-200 dark:text-amber-300 dark:bg-amber-950/40 dark:ring-amber-800' => $result === 'advisory_fail',
+                                                        'text-gray-500 bg-gray-50 ring-gray-200 dark:text-gray-400 dark:bg-gray-800 dark:ring-gray-700' => $result === 'skip',
+                                                        'hover:underline cursor-pointer' => $gateLogUrl !== null,
+                                                    ];
+                                                @endphp
+                                                @if($gateLogUrl)
+                                                    <a href="{{ $gateLogUrl }}" @class($badgeClasses) title="{{ __('tasks.view.implement.gate_log_link', ['gate' => strtoupper($gate)]) }}">
                                                         <x-heroicon-o-x-mark class="h-3 w-3" />
-                                                    @else
-                                                        <x-heroicon-o-minus class="h-3 w-3" />
-                                                    @endif
-                                                    {{ strtoupper($gate) }}
-                                                </span>
+                                                        {{ strtoupper($gate) }}
+                                                    </a>
+                                                @else
+                                                    <span @class($badgeClasses)>
+                                                        @if($result === 'pass')
+                                                            <x-heroicon-o-check class="h-3 w-3" />
+                                                        @elseif($isFail)
+                                                            <x-heroicon-o-x-mark class="h-3 w-3" />
+                                                        @else
+                                                            <x-heroicon-o-minus class="h-3 w-3" />
+                                                        @endif
+                                                        {{ strtoupper($gate) }}
+                                                    </span>
+                                                @endif
                                             @endforeach
                                         </div>
                                     @endif

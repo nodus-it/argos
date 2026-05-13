@@ -10,6 +10,7 @@ use App\Enums\WorkerImageEntityStatus;
 use App\Filament\Admin\Concerns\TaskTableConcern;
 use App\Filament\Admin\Resources\TaskResource\Pages\CreateTask;
 use App\Filament\Admin\Resources\TaskResource\Pages\ListTasks;
+use App\Filament\Admin\Resources\TaskResource\Pages\ViewQualityGateLog;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTask;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTaskConcept;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTaskDiff;
@@ -351,6 +352,7 @@ class TaskResource extends Resource
             'concept' => ViewTaskConcept::route('/{record}/concept'),
             'diff' => ViewTaskDiff::route('/{record}/diff'),
             'logs' => ViewTaskLogs::route('/{record}/logs'),
+            'quality-gates' => ViewQualityGateLog::route('/{record}/quality-gates'),
             'respond' => ViewTaskRespond::route('/{record}/respond'),
         ];
     }

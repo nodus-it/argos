@@ -123,6 +123,7 @@ return [
             'technical_short' => 'Technical',
             'no_nontechnical_short' => 'No content summary.',
             'no_technical_short' => 'No technical summary.',
+            'gate_log_link' => 'Open :gate log',
         ],
 
         'push' => [
@@ -156,6 +157,16 @@ return [
             'iteration' => 'Iteration :number',
             'no_entries_iteration' => 'No entries for iteration :number.',
             'loading' => 'Loading…',
+        ],
+
+        'quality_gate_log' => [
+            'title' => 'Quality gate log — :name',
+            'breadcrumb_tasks' => 'Tasks',
+            'breadcrumb_self' => 'Quality gate logs',
+            'back' => '← Back to task',
+            'no_logs' => 'No quality gate logs available.',
+            'no_logs_hint' => 'Logs will be captured starting with the next implement/respond iteration, as soon as a gate fails or triggers a fix session.',
+            'empty_content' => 'Log file is empty.',
         ],
 
         'diff' => [

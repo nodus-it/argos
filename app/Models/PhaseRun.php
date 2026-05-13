@@ -33,6 +33,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $implement_summary_nontechnical
  * @property string|null $implement_summary_technical
  * @property string|null $implement_notes
+ * @property array<string, string>|null $quality_gate_logs
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read Task|null $task
@@ -62,6 +63,7 @@ class PhaseRun extends Model
         'implement_summary_nontechnical',
         'implement_summary_technical',
         'implement_notes',
+        'quality_gate_logs',
     ];
 
     protected function casts(): array
@@ -75,6 +77,7 @@ class PhaseRun extends Model
             'cost_usd' => 'decimal:6',
             'input_tokens' => 'integer',
             'output_tokens' => 'integer',
+            'quality_gate_logs' => 'array',
         ];
     }
 

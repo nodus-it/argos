@@ -261,6 +261,7 @@ class ViewTask extends ViewRecord
             'implementHistory' => $reader->readImplementHistory($task, $currentImplementIter),
             'implementNotesHistory' => $reader->readImplementNotesHistory($task),
             'implementQualityGates' => $lastImplementRun?->result_json['quality_gates'] ?? null,
+            'implementQualityGateLogKeys' => array_keys($lastImplementRun?->quality_gate_logs ?? []),
             'conceptLogIterations' => array_values(array_filter(
                 $reader->listLogIterations($task, 'concept'),
                 fn (int $i) => $i !== $currentConceptIter

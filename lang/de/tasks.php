@@ -123,6 +123,7 @@ return [
             'technical_short' => 'Technisch',
             'no_nontechnical_short' => 'Keine inhaltliche Zusammenfassung.',
             'no_technical_short' => 'Keine technische Zusammenfassung.',
+            'gate_log_link' => ':gate-Log öffnen',
         ],
 
         'push' => [
@@ -156,6 +157,16 @@ return [
             'iteration' => 'Iteration :number',
             'no_entries_iteration' => 'Keine Einträge für Iteration :number.',
             'loading' => 'Wird geladen…',
+        ],
+
+        'quality_gate_log' => [
+            'title' => 'Quality-Gate-Log — :name',
+            'breadcrumb_tasks' => 'Tasks',
+            'breadcrumb_self' => 'Quality-Gate-Logs',
+            'back' => '← Zurück zur Task',
+            'no_logs' => 'Keine Quality-Gate-Logs vorhanden.',
+            'no_logs_hint' => 'Logs werden ab der nächsten implement-/respond-Iteration erfasst, sobald ein Gate fehlschlägt oder einen Fix-Lauf auslöst.',
+            'empty_content' => 'Log-Datei ist leer.',
         ],
 
         'diff' => [

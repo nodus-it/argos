@@ -731,6 +731,142 @@ class PhaseRunnerTest extends TestCase
         $this->assertSame($stderr, $phaseRun->fresh()->error_log);
     }
 
+    // --- postPhaseSync quality_gate_logs persistence ---
+
+    public function test_post_phase_sync_persists_quality_gate_logs_for_implement(): void
+    {
+        $task = $this->taskWithProfile();
+        $phaseRun = PhaseRun::create([
+            'task_id' => $task->id,
+            'phase' => 'implement',
+            'iteration' => 1,
+            'status' => 'quality_gate_failed',
+        ]);
+
+        $gateLogs = [
+            'pest' => "FAIL  tests/Unit/Foo.php\nTests:  1 failed, 698 passed",
+            'pest.fix1' => "FAIL  tests/Unit/Foo.php\nTests:  1 failed, 698 passed",
+        ];
+
+        $runner = $this->partialMock(PhaseRunner::class, function (MockInterface $mock) use ($gateLogs): void {
+            $mock->shouldAllowMockingProtectedMethods();
+            $mock->shouldReceive('readFileFromVolume')->andReturn(null);
+            $mock->shouldReceive('readQualityGateLogsFromVolume')
+                ->once()
+                ->andReturn($gateLogs);
+        });
+
+        $runner->postPhaseSync($task, $phaseRun, 'implement', null);
+
+        $this->assertSame($gateLogs, $phaseRun->fresh()->quality_gate_logs);
+    }
+
+    public function test_post_phase_sync_persists_quality_gate_logs_for_respond(): void
+    {
+        $task = $this->taskWithProfile();
+        $phaseRun = PhaseRun::create([
+            'task_id' => $task->id,
+            'phase' => 'respond',
+            'iteration' => 2,
+            'status' => 'quality_gate_failed',
+        ]);
+
+        $gateLogs = ['phpstan' => 'Line 42: Method X has no return type'];
+
+        $runner = $this->partialMock(PhaseRunner::class, function (MockInterface $mock) use ($gateLogs): void {
+            $mock->shouldAllowMockingProtectedMethods();
+            $mock->shouldReceive('readFileFromVolume')->andReturn(null);
+            $mock->shouldReceive('readQualityGateLogsFromVolume')
+                ->with(Mockery::any(), 2)
+                ->once()
+                ->andReturn($gateLogs);
+        });
+
+        $runner->postPhaseSync($task, $phaseRun, 'respond', null);
+
+        $this->assertSame($gateLogs, $phaseRun->fresh()->quality_gate_logs);
+    }
+
+    public function test_post_phase_sync_does_not_query_gate_logs_for_concept_phase(): void
+    {
+        $task = $this->taskWithProfile();
+        $phaseRun = PhaseRun::create([
+            'task_id' => $task->id,
+            'phase' => 'concept',
+            'iteration' => 1,
+            'status' => 'completed',
+        ]);
+
+        $runner = $this->partialMock(PhaseRunner::class, function (MockInterface $mock): void {
+            $mock->shouldAllowMockingProtectedMethods();
+            $mock->shouldReceive('readFileFromVolume')->andReturn(null);
+            $mock->shouldReceive('readQualityGateLogsFromVolume')->never();
+        });
+
+        $runner->postPhaseSync($task, $phaseRun, 'concept', null);
+
+        $this->assertNull($phaseRun->fresh()->quality_gate_logs);
+    }
+
+    public function test_post_phase_sync_keeps_null_quality_gate_logs_when_volume_empty(): void
+    {
+        $task = $this->taskWithProfile();
+        $phaseRun = PhaseRun::create([
+            'task_id' => $task->id,
+            'phase' => 'implement',
+            'iteration' => 1,
+            'status' => 'completed',
+        ]);
+
+        $runner = $this->partialMock(PhaseRunner::class, function (MockInterface $mock): void {
+            $mock->shouldAllowMockingProtectedMethods();
+            $mock->shouldReceive('readFileFromVolume')->andReturn(null);
+            $mock->shouldReceive('readQualityGateLogsFromVolume')->andReturn([]);
+        });
+
+        $runner->postPhaseSync($task, $phaseRun, 'implement', null);
+
+        $this->assertNull($phaseRun->fresh()->quality_gate_logs);
+    }
+
+    public function test_parse_gate_log_output_extracts_multiple_logs_with_normalized_keys(): void
+    {
+        $output = "###GATE-LOG-START###pest###20###\n"
+            ."Tests: 1 failed\n"
+            ."###GATE-LOG-END###\n"
+            ."###GATE-LOG-START###pest.fix1###25###\n"
+            ."Tests: still failing\n"
+            ."###GATE-LOG-END###\n"
+            ."###GATE-LOG-START###artisan-smoke###10###\n"
+            ."boot error\n"
+            ."###GATE-LOG-END###\n";
+
+        $runner = app(PhaseRunner::class);
+        $reflection = new \ReflectionMethod($runner, 'parseGateLogOutput');
+        $reflection->setAccessible(true);
+
+        /** @var array<string, string> $logs */
+        $logs = $reflection->invoke($runner, $output);
+
+        $this->assertArrayHasKey('pest', $logs);
+        $this->assertSame('Tests: 1 failed', $logs['pest']);
+        $this->assertArrayHasKey('pest.fix1', $logs);
+        $this->assertArrayHasKey('artisan', $logs);
+        $this->assertSame('boot error', $logs['artisan']);
+        $this->assertArrayNotHasKey('artisan-smoke', $logs);
+    }
+
+    public function test_parse_gate_log_output_returns_empty_array_when_no_blocks(): void
+    {
+        $runner = app(PhaseRunner::class);
+        $reflection = new \ReflectionMethod($runner, 'parseGateLogOutput');
+        $reflection->setAccessible(true);
+
+        $logs = $reflection->invoke($runner, "noise without delimiters\n");
+
+        $this->assertSame([], $logs);
+    }
+
     public function test_post_phase_sync_strips_outer_code_fence_from_concept_md(): void
     {
         $task = $this->taskWithProfile();

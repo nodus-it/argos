@@ -6,6 +6,7 @@ namespace Tests\Feature;
 
 use App\Enums\WorkflowStatus;
 use App\Filament\Admin\Resources\TaskResource;
+use App\Filament\Admin\Resources\TaskResource\Pages\ViewQualityGateLog;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTask;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTaskConcept;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTaskDiff;
@@ -370,5 +371,174 @@ class TaskPagesTest extends TestCase
             ->assertNotified();
 
         Bus::assertNotDispatched(RunPhaseJob::class);
+    }
+
+    // ── ViewQualityGateLog ──────────────────────────────────────────────────
+
+    public function test_quality_gate_log_page_renders_empty_when_no_logs(): void
+    {
+        $task = Task::factory()->create();
+
+        Livewire::test(ViewQualityGateLog::class, ['record' => $task->getKey()])
+            ->assertSuccessful()
+            ->assertSet('availableKeys', [])
+            ->assertSee(__('tasks.view.quality_gate_log.no_logs'));
+    }
+
+    public function test_quality_gate_log_page_lists_available_keys(): void
+    {
+        $task = Task::factory()->create();
+        PhaseRun::factory()->create([
+            'task_id' => $task->id,
+            'phase' => 'implement',
+            'iteration' => 1,
+            'status' => 'quality_gate_failed',
+            'quality_gate_logs' => [
+                'pest' => 'pest initial fail',
+                'pest.fix1' => 'pest fix1 fail',
+                'phpstan' => 'phpstan errors',
+            ],
+        ]);
+
+        Livewire::test(ViewQualityGateLog::class, ['record' => $task->getKey()])
+            ->assertSuccessful()
+            ->assertSet('availableKeys', ['pest', 'pest.fix1', 'phpstan'])
+            ->assertSee('PEST');
+    }
+
+    public function test_quality_gate_log_page_defaults_to_failed_gate_last_fix(): void
+    {
+        $task = Task::factory()->create();
+        PhaseRun::factory()->create([
+            'task_id' => $task->id,
+            'phase' => 'implement',
+            'iteration' => 1,
+            'status' => 'quality_gate_failed',
+            'result_json' => ['failed_gate' => 'pest'],
+            'quality_gate_logs' => [
+                'pest' => 'initial output',
+                'pest.fix1' => 'fix1 output',
+                'pest.fix2' => 'fix2 output FINAL',
+                'phpstan' => 'phpstan output',
+            ],
+        ]);
+
+        Livewire::test(ViewQualityGateLog::class, ['record' => $task->getKey()])
+            ->assertSet('activeKey', 'pest.fix2')
+            ->assertSet('logContent', 'fix2 output FINAL');
+    }
+
+    public function test_quality_gate_log_page_selects_key_via_action(): void
+    {
+        $task = Task::factory()->create();
+        PhaseRun::factory()->create([
+            'task_id' => $task->id,
+            'phase' => 'implement',
+            'iteration' => 1,
+            'status' => 'quality_gate_failed',
+            'quality_gate_logs' => [
+                'pest' => 'pest output',
+                'phpstan' => 'phpstan output FINAL',
+            ],
+        ]);
+
+        Livewire::test(ViewQualityGateLog::class, ['record' => $task->getKey()])
+            ->call('selectKey', 'phpstan')
+            ->assertSet('activeKey', 'phpstan')
+            ->assertSet('logContent', 'phpstan output FINAL');
+    }
+
+    public function test_quality_gate_log_page_switches_phase(): void
+    {
+        $task = Task::factory()->create();
+        PhaseRun::factory()->create([
+            'task_id' => $task->id,
+            'phase' => 'implement',
+            'iteration' => 1,
+            'status' => 'quality_gate_failed',
+            'quality_gate_logs' => ['pest' => 'implement pest'],
+        ]);
+        PhaseRun::factory()->create([
+            'task_id' => $task->id,
+            'phase' => 'respond',
+            'iteration' => 1,
+            'status' => 'quality_gate_failed',
+            'quality_gate_logs' => ['pest' => 'respond pest'],
+        ]);
+
+        Livewire::test(ViewQualityGateLog::class, ['record' => $task->getKey()])
+            ->call('switchPhase', 'respond')
+            ->assertSet('phase', 'respond')
+            ->assertSet('logContent', 'respond pest');
+    }
+
+    public function test_quality_gate_log_page_honors_query_string_key(): void
+    {
+        $task = Task::factory()->create();
+        PhaseRun::factory()->create([
+            'task_id' => $task->id,
+            'phase' => 'implement',
+            'iteration' => 1,
+            'status' => 'quality_gate_failed',
+            'result_json' => ['failed_gate' => 'pest'],
+            'quality_gate_logs' => [
+                'pest' => 'initial',
+                'pest.fix1' => 'fix1',
+            ],
+        ]);
+
+        request()->query->set('key', 'pest.fix1');
+
+        Livewire::test(ViewQualityGateLog::class, ['record' => $task->getKey()])
+            ->assertSet('activeKey', 'pest.fix1')
+            ->assertSet('logContent', 'fix1');
+    }
+
+    public function test_quality_gate_log_page_ignores_unknown_query_key(): void
+    {
+        $task = Task::factory()->create();
+        PhaseRun::factory()->create([
+            'task_id' => $task->id,
+            'phase' => 'implement',
+            'iteration' => 1,
+            'status' => 'quality_gate_failed',
+            'quality_gate_logs' => ['pest' => 'pest only'],
+        ]);
+
+        request()->query->set('key', 'bogus');
+
+        Livewire::test(ViewQualityGateLog::class, ['record' => $task->getKey()])
+            ->assertSet('activeKey', 'pest');
+    }
+
+    public function test_view_task_renders_clickable_link_for_failed_gate_with_log(): void
+    {
+        $task = Task::factory()->create([
+            'implement_summary_technical' => 'Technical summary body.',
+        ]);
+        PhaseRun::factory()->create([
+            'task_id' => $task->id,
+            'phase' => 'implement',
+            'iteration' => 1,
+            'status' => 'quality_gate_failed',
+            'result_json' => [
+                'quality_gates' => ['pest' => 'fail', 'phpstan' => 'pass'],
+                'failed_gate' => 'pest',
+            ],
+            'quality_gate_logs' => [
+                'pest' => 'initial fail',
+                'pest.fix1' => 'fix1 fail',
+            ],
+        ]);
+
+        $expectedUrl = TaskResource::getUrl('quality-gates', [
+            'record' => $task,
+            'phase' => 'implement',
+            'key' => 'pest.fix1',
+        ]);
+
+        Livewire::test(ViewTask::class, ['record' => $task->getKey()])
+            ->assertSuccessful()
+            ->assertSeeHtml('href="'.e($expectedUrl).'"');
     }
 }
