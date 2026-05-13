@@ -59,8 +59,16 @@ return [
         'worker' => 'Worker & models',
         // table filter tabs (List tasks)
         'current' => 'Current',
+        'waiting' => 'Waiting',
         'completed' => 'Completed',
         'all' => 'All',
+    ],
+
+    'statuses' => [
+        'waiting' => [
+            'concept' => 'Concept waiting',
+            'implement' => 'Implementation waiting',
+        ],
     ],
 
     'view' => [

@@ -194,4 +194,31 @@ class Task extends Model
             ->first()
             ?->started_at;
     }
+
+    public function isWaitingForWorker(): bool
+    {
+        return $this->current_status === PhaseStatus::Pending
+            && in_array($this->workflow_status, [WorkflowStatus::ConceptRunning, WorkflowStatus::ImplementRunning], true);
+    }
+
+    public function displayStatusLabel(): string
+    {
+        if ($this->isWaitingForWorker()) {
+            return match ($this->workflow_status) {
+                WorkflowStatus::ConceptRunning => __('tasks.statuses.waiting.concept'),
+                default => __('tasks.statuses.waiting.implement'),
+            };
+        }
+
+        return $this->workflow_status->label();
+    }
+
+    public function displayStatusColor(): string
+    {
+        if ($this->isWaitingForWorker()) {
+            return 'info';
+        }
+
+        return $this->workflow_status->color();
+    }
 }

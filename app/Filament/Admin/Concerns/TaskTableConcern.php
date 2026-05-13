@@ -6,6 +6,7 @@ namespace App\Filament\Admin\Concerns;
 
 use App\Enums\AgentName;
 use App\Enums\Phase;
+use App\Enums\PhaseStatus;
 use App\Enums\WorkflowStatus;
 use App\Models\Task;
 use Filament\Schemas\Components\Tabs\Tab;
@@ -34,8 +35,9 @@ trait TaskTableConcern
         $columns[] = TextColumn::make('workflow_status')
             ->label(__('tasks.columns.workflow'))
             ->badge()
-            ->color(fn (?WorkflowStatus $state): string => $state?->color() ?? 'gray')
-            ->formatStateUsing(fn (?WorkflowStatus $state): string => $state?->label() ?? '—');
+            ->icon(fn (Task $record): ?string => $record->isWaitingForWorker() ? 'heroicon-o-clock' : null)
+            ->color(fn (Task $record): string => $record->displayStatusColor())
+            ->formatStateUsing(fn (Task $record): string => $record->displayStatusLabel());
 
         $columns[] = TextColumn::make('current_phase')
             ->label(__('tasks.columns.phase'))
@@ -99,6 +101,10 @@ trait TaskTableConcern
         return [
             'aktuell' => Tab::make(__('tasks.tabs.current'))
                 ->query(fn ($query) => $query->where('workflow_status', '!=', WorkflowStatus::Completed->value)),
+            'wartend' => Tab::make(__('tasks.tabs.waiting'))
+                ->query(fn ($query) => $query
+                    ->whereIn('workflow_status', [WorkflowStatus::ConceptRunning->value, WorkflowStatus::ImplementRunning->value])
+                    ->where('current_status', PhaseStatus::Pending->value)),
             'abgeschlossen' => Tab::make(__('tasks.tabs.completed'))
                 ->query(fn ($query) => $query->where('workflow_status', WorkflowStatus::Completed->value)),
             'alle' => Tab::make(__('tasks.tabs.all')),
