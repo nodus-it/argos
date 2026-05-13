@@ -137,14 +137,34 @@ class TaskServiceTest extends TestCase
         $this->assertSame(WorkflowStatus::ImplementRunning, $task->fresh()->workflow_status);
     }
 
-    public function test_start_phase_concept_does_not_change_workflow_status(): void
+    public function test_start_phase_concept_sets_workflow_status_to_concept_running(): void
     {
         Event::fake();
 
         $task = Task::factory()->create(['workflow_status' => WorkflowStatus::ConceptReview]);
         $this->service->startPhase($task, Phase::Concept);
 
-        $this->assertSame(WorkflowStatus::ConceptReview, $task->fresh()->workflow_status);
+        $this->assertSame(WorkflowStatus::ConceptRunning, $task->fresh()->workflow_status);
+    }
+
+    public function test_start_phase_concept_from_failed_sets_concept_running(): void
+    {
+        Event::fake();
+
+        $task = Task::factory()->create(['workflow_status' => WorkflowStatus::Failed]);
+        $this->service->startPhase($task, Phase::Concept);
+
+        $this->assertSame(WorkflowStatus::ConceptRunning, $task->fresh()->workflow_status);
+    }
+
+    public function test_start_phase_push_from_failed_sets_implement_running(): void
+    {
+        Event::fake();
+
+        $task = Task::factory()->create(['workflow_status' => WorkflowStatus::Failed]);
+        $this->service->startPhase($task, Phase::Push);
+
+        $this->assertSame(WorkflowStatus::ImplementRunning, $task->fresh()->workflow_status);
     }
 
     public function test_start_phase_passes_flags_to_job(): void

@@ -32,11 +32,11 @@ class TaskCurrentPhaseStartedAtTest extends TestCase
         $this->assertNull($task->currentPhaseStartedAt());
     }
 
-    public function test_returns_started_at_of_the_single_phase_run(): void
+    public function test_returns_started_at_of_the_single_running_phase_run(): void
     {
         $task = Task::factory()->create();
         $startedAt = Carbon::parse('2025-01-01 10:00:00');
-        PhaseRun::factory()->create([
+        PhaseRun::factory()->running()->create([
             'task_id' => $task->id,
             'started_at' => $startedAt,
         ]);
@@ -47,17 +47,28 @@ class TaskCurrentPhaseStartedAtTest extends TestCase
         $this->assertTrue($startedAt->equalTo($result));
     }
 
-    public function test_returns_most_recent_started_at_when_multiple_phase_runs(): void
+    public function test_returns_null_when_phase_run_is_not_running(): void
+    {
+        $task = Task::factory()->create();
+        PhaseRun::factory()->create([
+            'task_id' => $task->id,
+            'started_at' => Carbon::parse('2025-01-01 10:00:00'),
+        ]);
+
+        $this->assertNull($task->currentPhaseStartedAt());
+    }
+
+    public function test_returns_most_recent_started_at_of_running_phase_runs(): void
     {
         $task = Task::factory()->create();
         $older = Carbon::parse('2025-01-01 09:00:00');
         $newer = Carbon::parse('2025-01-01 10:00:00');
 
-        PhaseRun::factory()->create([
+        PhaseRun::factory()->running()->create([
             'task_id' => $task->id,
             'started_at' => $older,
         ]);
-        PhaseRun::factory()->create([
+        PhaseRun::factory()->running()->create([
             'task_id' => $task->id,
             'started_at' => $newer,
         ]);

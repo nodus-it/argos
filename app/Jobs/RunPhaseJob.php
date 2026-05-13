@@ -125,6 +125,20 @@ class RunPhaseJob implements ShouldQueue
             $task = Task::find($this->taskId);
 
             if ($task !== null) {
+                // Close any PhaseRun records still in 'running' state — the
+                // runner never got a chance to finalize them, so the timer
+                // would keep ticking until the 15-minute stale sweep.
+                $task->phaseRuns()
+                    ->where('phase', $this->phase)
+                    ->where('status', 'running')
+                    ->update([
+                        'status' => PhaseStatus::Failed->value,
+                        'finished_at' => now(),
+                    ]);
+
+                // Ensure current_status reflects the crash immediately.
+                $task->update(['current_status' => PhaseStatus::Failed]);
+
                 app(TaskService::class)->completePhase($task, $this->phase, PhaseStatus::Failed);
             }
         } catch (\Throwable $inner) {

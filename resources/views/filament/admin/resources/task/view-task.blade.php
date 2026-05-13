@@ -128,17 +128,28 @@
             @endif
 
             @if($currentStatus === 'running')
-                <div class="flex items-center gap-2 pt-1 border-t border-amber-100 dark:border-amber-900/40">
-                    <span class="flex h-2 w-2 relative flex-shrink-0">
-                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                        <span class="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-                    </span>
-                    <span class="text-xs text-amber-600 dark:text-amber-400 font-medium">{{ __('tasks.view.labels.phase_running', ['phase' => $currentPhase]) }}</span>
-                    <span x-data="{ sec: {{ max(0, now()->timestamp - ($record->currentPhaseStartedAt()?->timestamp ?? now()->timestamp)) }} }"
-                          x-init="setInterval(() => sec++, 1000)"
-                          x-text="Math.floor(sec/60) + ':' + String(sec % 60).padStart(2, '0')"
-                          class="ml-auto text-xs font-mono tabular-nums text-amber-500 dark:text-amber-400"></span>
-                </div>
+                @php $phaseStartedAt = $record->currentPhaseStartedAt(); @endphp
+                @if($phaseStartedAt !== null)
+                    <div class="flex items-center gap-2 pt-1 border-t border-amber-100 dark:border-amber-900/40">
+                        <span class="flex h-2 w-2 relative flex-shrink-0">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                        </span>
+                        <span class="text-xs text-amber-600 dark:text-amber-400 font-medium">{{ __('tasks.view.labels.phase_running', ['phase' => $currentPhase]) }}</span>
+                        <span x-data="{ sec: {{ max(0, now()->timestamp - $phaseStartedAt->timestamp) }} }"
+                              x-init="setInterval(() => sec++, 1000)"
+                              x-text="Math.floor(sec/60) + ':' + String(sec % 60).padStart(2, '0')"
+                              class="ml-auto text-xs font-mono tabular-nums text-amber-500 dark:text-amber-400"></span>
+                    </div>
+                @else
+                    <div class="flex items-center gap-2 pt-1 border-t border-sky-100 dark:border-sky-900/40">
+                        <svg class="animate-spin h-3 w-3 text-sky-500 flex-shrink-0" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                        </svg>
+                        <span class="text-xs text-sky-600 dark:text-sky-400 font-medium">{{ __('tasks.view.labels.phase_waiting', ['phase' => $currentPhase]) }}</span>
+                    </div>
+                @endif
             @elseif($currentStatus === 'pending')
                 <div class="flex items-center gap-2 pt-1 border-t border-sky-100 dark:border-sky-900/40">
                     <svg class="animate-spin h-3 w-3 text-sky-500 flex-shrink-0" fill="none" viewBox="0 0 24 24">

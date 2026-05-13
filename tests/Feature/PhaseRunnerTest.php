@@ -38,6 +38,11 @@ class PhaseRunnerTest extends TestCase
             'argos.claude_token' => 'test-claude-token',
         ]);
 
+        // The backfill migration may have seeded a credential from the developer's
+        // real ~/.config/argos/claude_token. Remove it so every test starts with a
+        // predictable credential state and the legacy config fallback is exercised.
+        AgentCredential::query()->delete();
+
         // PhaseRunner asks the resolver for the worker image tag — bypass the
         // compose pipeline (no docker build, no stack seeding) by binding a
         // stub resolver that returns a fixed tag every test can assert on.
