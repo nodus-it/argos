@@ -94,16 +94,11 @@ class TaskService
             throw new \RuntimeException('A phase is already running for this task.');
         }
 
-        $updates = [
+        $task->update([
             'current_phase' => $phase->value,
             'current_status' => 'running',
-        ];
-
-        if ($phase === Phase::Implement) {
-            $updates['workflow_status'] = WorkflowStatus::ImplementRunning;
-        }
-
-        $task->update($updates);
+            'workflow_status' => $task->workflow_status->retryingPhase($phase->value),
+        ]);
         RunPhaseJob::dispatch($task->id, $phase->value, $flags);
         Event::dispatch(new PhaseStarted($task, $phase));
     }

@@ -303,7 +303,7 @@ class WorkflowServiceTest extends TestCase
             'phase' => 'implement',
             'iteration' => 1,
             'status' => 'running',
-            'started_at' => now()->subMinutes(30),
+            'started_at' => now()->subMinutes(5),
         ]);
 
         $this->service->markStaleRunsAsFailed($task);

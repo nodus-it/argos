@@ -74,7 +74,7 @@ class WorkflowService
     {
         PhaseRun::where('task_id', $task->id)
             ->where('status', 'running')
-            ->where('started_at', '<', now()->subHours(2))
+            ->where('started_at', '<', now()->subMinutes(15))
             ->update(['status' => 'failed', 'finished_at' => now()]);
     }
 }

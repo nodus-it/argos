@@ -188,6 +188,7 @@ class Task extends Model
     public function currentPhaseStartedAt(): ?Carbon
     {
         return $this->phaseRuns()
+            ->where('status', 'running')
             ->whereNotNull('started_at')
             ->latest('started_at')
             ->first()
