@@ -154,6 +154,75 @@ teardown() {
     rm -f /workspace/.env /workspace/.env.example
 }
 
+# --- quality_gate_fix_prompt ---
+
+@test "quality_gate_fix_prompt: ohne Log enthält Gate-Namen und 'fehlgeschlagen'" {
+    output="$(quality_gate_fix_prompt pest)"
+    [[ "$output" == *"Quality-Gate-Fix: pest"* ]]
+    [[ "$output" == *"fehlgeschlagen"* ]]
+    [[ "$output" != *"Verbindliche Vorgehensweise"* ]]  # nur mit log_file
+}
+
+@test "quality_gate_fix_prompt: kurzer Log (≤ head+tail) wird komplett eingebettet" {
+    log="$(mktemp)"
+    seq 1 30 > "$log"
+    output="$(quality_gate_fix_prompt pest "$log")"
+    [[ "$output" == *$'\n1\n'* ]]
+    [[ "$output" == *$'\n30\n'* ]]
+    [[ "$output" != *"Zeilen ausgelassen"* ]]
+    rm -f "$log"
+}
+
+@test "quality_gate_fix_prompt: langer Log zeigt head UND tail mit Auslassungs-Marker" {
+    log="$(mktemp)"
+    QUALITY_GATE_LOG_HEAD_LINES=5 QUALITY_GATE_LOG_TAIL_LINES=5 \
+        seq 1 100 > "$log"
+    output="$(QUALITY_GATE_LOG_HEAD_LINES=5 QUALITY_GATE_LOG_TAIL_LINES=5 \
+        quality_gate_fix_prompt pest "$log")"
+    [[ "$output" == *$'\n1\n'* ]]
+    [[ "$output" == *$'\n5\n'* ]]
+    [[ "$output" == *$'\n96\n'* ]]
+    [[ "$output" == *$'\n100\n'* ]]
+    [[ "$output" == *"Zeilen ausgelassen"* ]]
+    rm -f "$log"
+}
+
+@test "quality_gate_fix_prompt: Pipe-Hinweis erscheint sobald Log vorhanden ist" {
+    log="$(mktemp)"
+    echo "fail summary" > "$log"
+    output="$(quality_gate_fix_prompt pest "$log")"
+    [[ "$output" == *"Verbindliche Vorgehensweise"* ]]
+    [[ "$output" == *"pipefail"* ]]
+    [[ "$output" == *"ohne Pipe"* ]]
+    rm -f "$log"
+}
+
+@test "quality_gate_fix_prompt: pest-Block erwähnt Architecture-Tests" {
+    log="$(mktemp)"
+    echo "fail summary" > "$log"
+    output="$(quality_gate_fix_prompt pest "$log")"
+    [[ "$output" == *"Architecture-Tests"* ]]
+    [[ "$output" == *"tests/Arch/"* ]]
+    rm -f "$log"
+}
+
+@test "quality_gate_fix_prompt: phpstan-Block erwähnt Baseline-Datei" {
+    log="$(mktemp)"
+    echo "type error" > "$log"
+    output="$(quality_gate_fix_prompt phpstan "$log")"
+    [[ "$output" == *"phpstan-baseline.neon"* ]]
+    rm -f "$log"
+}
+
+@test "quality_gate_fix_prompt: leeres Log-File wird wie 'kein log_file' behandelt" {
+    log="$(mktemp)"
+    : > "$log"
+    output="$(quality_gate_fix_prompt pest "$log")"
+    [[ "$output" != *"Verbindliche Vorgehensweise"* ]]
+    [[ "$output" != *"Auszug aus dem Gate-Log"* ]]
+    rm -f "$log"
+}
+
 # --- _push_detect_platform ---
 
 @test "_push_detect_platform: github.com URL → 'github'" {
