@@ -110,6 +110,26 @@ class PhaseRunner
                 }
             }
 
+            // Mirror the implement-phase logic: persist stream_log + stop_reason,
+            // and promote a max-turns hit from Failed to Paused. The worker now
+            // emits exit 8 (EXIT_MAX_TURNS) directly, which lands as Paused via
+            // exitCodeToStatus — but older worker images may still emit exit 1
+            // alongside a clean result event, so the stream_log fallback stays.
+            $streamLogPath = "/workspace/.agent/logs/concept.{$phaseRun->iteration}.stream.log";
+            $streamLog = $this->readFileFromVolume($task->volumeName(), $streamLogPath);
+            if ($streamLog !== null) {
+                $phaseRunUpdate['stream_log'] = $streamLog;
+
+                $stopReason = $this->extractStopReasonFromStreamLog($streamLog);
+                if ($stopReason !== null) {
+                    $phaseRunUpdate['stop_reason'] = $stopReason;
+
+                    if ($stopReason === 'error_max_turns' && $phaseRun->status === PhaseStatus::Failed) {
+                        $phaseRunUpdate['status'] = PhaseStatus::Paused;
+                    }
+                }
+            }
+
             $phaseRun->update($phaseRunUpdate);
 
             $taskUpdate = ['concept_notes' => null];
@@ -429,6 +449,7 @@ class PhaseRunner
             5 => PhaseStatus::NoChanges,
             6 => PhaseStatus::LockBlocked,
             7 => PhaseStatus::RateLimited,
+            8 => PhaseStatus::Paused,
             default => PhaseStatus::Failed,
         };
     }
@@ -676,14 +697,15 @@ class PhaseRunner
     }
 
     /**
-     * For continue-mode implement runs: find the session_id of the last
-     * implement run so the worker can call `claude --resume <id>`.
+     * For continue-mode runs: find the session_id of the last run of this
+     * phase so the worker can call `claude --resume <id>`. Both concept and
+     * implement support pause/resume.
      *
      * @param  array<string, mixed>  $flags
      */
     private function resolveResumeSessionId(Task $task, string $phase, array $flags): ?string
     {
-        if ($phase !== 'implement') {
+        if (! in_array($phase, ['concept', 'implement'], true)) {
             return null;
         }
         if (empty($flags['continue'])) {
@@ -691,7 +713,7 @@ class PhaseRunner
         }
 
         $lastRun = $task->phaseRuns()
-            ->where('phase', 'implement')
+            ->where('phase', $phase)
             ->orderByDesc('iteration')
             ->first();
 

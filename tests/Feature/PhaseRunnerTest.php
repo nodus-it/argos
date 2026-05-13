@@ -390,6 +390,23 @@ class PhaseRunnerTest extends TestCase
         $this->assertEmpty(array_filter($cmd, fn ($v) => str_starts_with($v, 'RESUME_SESSION_ID=')));
     }
 
+    public function test_build_command_passes_resume_session_id_for_concept_continue(): void
+    {
+        $task = $this->taskWithProfile();
+        PhaseRun::create([
+            'task_id' => $task->id,
+            'phase' => 'concept',
+            'iteration' => 1,
+            'status' => 'paused',
+            'result_json' => ['claude_session_id' => 'concept-session-7'],
+        ]);
+
+        $cmd = $this->captureCommand($task, 'concept', ['continue' => true]);
+
+        $this->assertContains('RESUME_SESSION_ID=concept-session-7', $cmd);
+        $this->assertContains('PHASE_FLAGS={"continue":true}', $cmd);
+    }
+
     public function test_extract_stop_reason_returns_subtype_from_last_result_event(): void
     {
         $runner = app(PhaseRunner::class);
@@ -595,6 +612,79 @@ class PhaseRunnerTest extends TestCase
         $runner->postPhaseSync($task, $phaseRun, 'concept', null);
 
         $this->assertNull($phaseRun->fresh()->error_log);
+    }
+
+    public function test_post_phase_sync_promotes_concept_failed_to_paused_on_max_turns(): void
+    {
+        $task = $this->taskWithProfile();
+        $phaseRun = PhaseRun::create([
+            'task_id' => $task->id,
+            'phase' => 'concept',
+            'iteration' => 1,
+            'status' => 'failed',
+        ]);
+
+        $streamLog = implode("\n", [
+            '{"type":"system","subtype":"init"}',
+            '{"type":"assistant","message":{}}',
+            '{"type":"result","subtype":"error_max_turns","is_error":true,"num_turns":31}',
+        ]);
+
+        $runner = $this->partialMock(PhaseRunner::class, function (MockInterface $mock) use ($streamLog): void {
+            $mock->shouldAllowMockingProtectedMethods();
+            $mock->shouldReceive('readFileFromVolume')
+                ->andReturnUsing(function (string $volume, string $path) use ($streamLog): ?string {
+                    return match ($path) {
+                        '/workspace/.agent/concept.md' => null,
+                        '/workspace/.agent/state.json' => null,
+                        '/workspace/.agent/logs/clone.err' => null,
+                        '/workspace/.agent/logs/concept.1.stream.log' => $streamLog,
+                        default => null,
+                    };
+                });
+        });
+
+        $runner->postPhaseSync($task, $phaseRun, 'concept', null);
+
+        $fresh = $phaseRun->fresh();
+        $this->assertSame(PhaseStatus::Paused, $fresh->status);
+        $this->assertSame('error_max_turns', $fresh->stop_reason);
+        $this->assertSame($streamLog, $fresh->stream_log);
+    }
+
+    public function test_post_phase_sync_persists_concept_stream_log_on_success(): void
+    {
+        $task = $this->taskWithProfile();
+        $phaseRun = PhaseRun::create([
+            'task_id' => $task->id,
+            'phase' => 'concept',
+            'iteration' => 1,
+            'status' => 'completed',
+        ]);
+
+        $streamLog = implode("\n", [
+            '{"type":"system","subtype":"init"}',
+            '{"type":"result","subtype":"success","is_error":false,"num_turns":12}',
+        ]);
+
+        $runner = $this->partialMock(PhaseRunner::class, function (MockInterface $mock) use ($streamLog): void {
+            $mock->shouldAllowMockingProtectedMethods();
+            $mock->shouldReceive('readFileFromVolume')
+                ->andReturnUsing(function (string $volume, string $path) use ($streamLog): ?string {
+                    return match ($path) {
+                        '/workspace/.agent/concept.md' => "# Konzept\n\nDone.",
+                        '/workspace/.agent/logs/concept.1.stream.log' => $streamLog,
+                        default => null,
+                    };
+                });
+        });
+
+        $runner->postPhaseSync($task, $phaseRun, 'concept', null);
+
+        $fresh = $phaseRun->fresh();
+        $this->assertSame(PhaseStatus::Completed, $fresh->status);
+        $this->assertSame('success', $fresh->stop_reason);
+        $this->assertSame($streamLog, $fresh->stream_log);
     }
 
     // --- resolveRepoToken / per-profile token resolution ---

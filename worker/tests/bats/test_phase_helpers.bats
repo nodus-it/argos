@@ -265,3 +265,16 @@ EOF
     printf "some weird unparseable git error message\n" > /workspace/.agent/logs/clone.err
     [ "$(_concept_classify_fetch_err)" = "unknown" ]
 }
+
+# --- _concept_build_continue_prompt ---
+
+@test "_concept_build_continue_prompt: enthaelt 'fortsetzen' und 'Turn-Limits'" {
+    output="$(_concept_build_continue_prompt)"
+    [[ "$output" == *"fortsetzen"* ]]
+    [[ "$output" == *"Turn-Limits"* ]]
+}
+
+@test "_concept_build_continue_prompt: erinnert, dass KEINE Datei geschrieben werden soll" {
+    output="$(_concept_build_continue_prompt)"
+    [[ "$output" == *"KEINE Datei"* ]]
+}

@@ -194,6 +194,34 @@ class TaskPagesTest extends TestCase
             && $j->flags === ['continue' => true, 'max_turns' => 300]);
     }
 
+    public function test_continue_concept_action_visible_only_when_concept_paused(): void
+    {
+        $paused = Task::factory()->create();
+        PhaseRun::factory()->paused()->create(['task_id' => $paused->id, 'phase' => 'concept']);
+
+        $completed = Task::factory()->create();
+        PhaseRun::factory()->create(['task_id' => $completed->id, 'phase' => 'concept', 'status' => 'completed']);
+
+        Livewire::test(ViewTask::class, ['record' => $paused->getKey()])
+            ->assertActionVisible('continueConcept');
+
+        Livewire::test(ViewTask::class, ['record' => $completed->getKey()])
+            ->assertActionHidden('continueConcept');
+    }
+
+    public function test_continue_concept_action_dispatches_job_with_continue_and_max_turns(): void
+    {
+        $task = Task::factory()->create();
+        PhaseRun::factory()->paused()->create(['task_id' => $task->id, 'phase' => 'concept']);
+
+        Livewire::test(ViewTask::class, ['record' => $task->getKey()])
+            ->callAction('continueConcept', ['max_turns' => 45])
+            ->assertNotified();
+
+        Bus::assertDispatched(RunPhaseJob::class, fn ($j) => $j->phase === 'concept'
+            && $j->flags === ['continue' => true, 'max_turns' => 45]);
+    }
+
     public function test_paused_banner_renders_for_paused_implement_run(): void
     {
         $task = Task::factory()->create();

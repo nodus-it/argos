@@ -134,6 +134,32 @@ class TaskService
     }
 
     /**
+     * Resume a paused concept run with a new max_turns limit. Mirrors
+     * continueImplement; differs only in the workflow status / phase value.
+     *
+     * @throws \RuntimeException when a phase is already running
+     */
+    public function continueConcept(Task $task, int $maxTurns): void
+    {
+        if ($task->phaseRuns()->where('status', 'running')->exists()) {
+            throw new \RuntimeException('A phase is already running for this task.');
+        }
+
+        $task->update([
+            'workflow_status' => WorkflowStatus::ConceptRunning,
+            'current_phase' => 'concept',
+            'current_status' => 'running',
+        ]);
+
+        RunPhaseJob::dispatch($task->id, 'concept', [
+            'continue' => true,
+            'max_turns' => $maxTurns,
+        ]);
+
+        Event::dispatch(new PhaseStarted($task, Phase::Concept));
+    }
+
+    /**
      * Force-unlock a lock-blocked implement run.
      *
      * @throws \RuntimeException when a phase is already running

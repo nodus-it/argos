@@ -211,6 +211,38 @@ class TaskServiceTest extends TestCase
         $this->service->continueImplement($task, 200);
     }
 
+    // ── continueConcept ───────────────────────────────────────────────────────
+
+    public function test_continue_concept_dispatches_job_with_continue_flags(): void
+    {
+        Event::fake();
+
+        $task = Task::factory()->create();
+        $this->service->continueConcept($task, 45);
+
+        Bus::assertDispatched(RunPhaseJob::class, fn ($j) => $j->phase === 'concept'
+            && $j->flags === ['continue' => true, 'max_turns' => 45]);
+    }
+
+    public function test_continue_concept_fires_phase_started(): void
+    {
+        Event::fake();
+
+        $task = Task::factory()->create();
+        $this->service->continueConcept($task, 30);
+
+        Event::assertDispatched(PhaseStarted::class, fn ($e) => $e->phase === Phase::Concept);
+    }
+
+    public function test_continue_concept_throws_when_running(): void
+    {
+        $task = Task::factory()->create();
+        PhaseRun::factory()->running()->create(['task_id' => $task->id, 'phase' => 'concept']);
+
+        $this->expectException(\RuntimeException::class);
+        $this->service->continueConcept($task, 30);
+    }
+
     // ── forceUnlockImplement ──────────────────────────────────────────────────
 
     public function test_force_unlock_dispatches_job_with_force_unlock_flag(): void
