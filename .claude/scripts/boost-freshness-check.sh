@@ -25,7 +25,7 @@ NEWEST_SOURCE=$(find .ai/ boost.json composer.lock \
   -print -quit 2>/dev/null || true)
 
 if [ -n "$NEWEST_SOURCE" ]; then
-  if php artisan boost:install --no-interaction --quiet 2>/dev/null; then
+  if php artisan boost:update --no-interaction --quiet 2>/dev/null; then
     echo "📝 CLAUDE.md regenerated ($NEWEST_SOURCE was newer)."
   fi
 fi
