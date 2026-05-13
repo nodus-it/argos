@@ -12,6 +12,12 @@
     "sail": false,
     "skills": [
         "laravel-best-practices",
-        "tailwindcss-development"
+        "socialite-development",
+        "pest-testing",
+        "tailwindcss-development",
+        "commit",
+        "feature-retro",
+        "review-learnings",
+        "test"
     ]
 }

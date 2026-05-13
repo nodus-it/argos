@@ -23,7 +23,7 @@ return [
 
         'sqlite' => [
             'driver' => 'sqlite',
-            'database' => env('DB_DATABASE', ($_SERVER['HOME'] ?? '/root').'/.config/argos/argos.db'),
+            'database' => env('DB_DATABASE', (getenv('HOME') ?: ($_SERVER['HOME'] ?? '/root')).'/.config/argos/argos.db'),
             'prefix' => '',
             'foreign_key_constraints' => true,
             'busy_timeout' => null,

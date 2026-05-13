@@ -21,6 +21,14 @@ class RunPhaseJob implements ShouldQueue
 
     public int $timeout = 3600;
 
+    /**
+     * Phase runs are expensive (100k–800k tokens each). A blind retry on
+     * non-recoverable errors (DB schema constraint, missing credential,
+     * validation) burns budget without ever succeeding. Surface the failure
+     * in the UI instead so a human can retry deliberately.
+     */
+    public int $tries = 1;
+
     public function __construct(
         public readonly string $taskId,
         public readonly string $phase,
@@ -108,5 +116,23 @@ class RunPhaseJob implements ShouldQueue
             'class' => $exception::class,
             'exhausted' => true,
         ]);
+
+        // With $tries=1 the failed() callback is the only place where the
+        // task status reflects the crash. Without this, the task would stay
+        // stuck in its previous workflow_status forever and the UI would
+        // show no signal that the run failed.
+        try {
+            $task = Task::find($this->taskId);
+
+            if ($task !== null) {
+                app(TaskService::class)->completePhase($task, $this->phase, PhaseStatus::Failed);
+            }
+        } catch (\Throwable $inner) {
+            Log::channel('argos')->error('Failed to record task failure in failed() callback', [
+                'task' => $this->taskId,
+                'phase' => $this->phase,
+                'error' => $inner->getMessage(),
+            ]);
+        }
     }
 }

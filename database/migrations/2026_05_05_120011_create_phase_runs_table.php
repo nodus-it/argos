@@ -30,6 +30,7 @@ return new class extends Migration
                 'quality_gate_failed',
                 'no_changes',
                 'paused',
+                'lock_blocked',
                 'rate_limited',
             ])->default('pending');
             $table->timestamp('started_at')->nullable();
