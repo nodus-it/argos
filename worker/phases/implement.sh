@@ -282,6 +282,15 @@ phase_implement_run() {
 
         if [[ "$gate_exit" -eq 0 ]]; then break; fi
 
+        # Bail out if the previous fix attempt produced byte-identical gate
+        # output — Claude isn't moving the needle and further sessions just
+        # burn tokens. (Only relevant after at least one fix run.)
+        if (( gate_retry >= 1 )) \
+                && quality_gate_log_converged "$failed_gate" "$ITERATION" "$gate_retry"; then
+            log_warn "implement: gate '$failed_gate' produced identical output as the prior attempt — fix loop converged, stopping"
+            break
+        fi
+
         if (( gate_retry >= max_gate_retries )); then
             log_warn "implement: '$failed_gate' still failing after ${max_gate_retries} fix attempt(s) — giving up"
             break

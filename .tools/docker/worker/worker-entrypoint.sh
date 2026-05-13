@@ -200,10 +200,22 @@ _ep_dispatch_phase() {
     return "$phase_exit"
 }
 
-# _ep_on_exit: trap for EXIT — release the lock, log.
+# _ep_on_exit: trap for EXIT — release the lock, log, and finalize the
+# state.json iteration so it never stays on "running" after the container
+# exits (whether cleanly, via `exit`, or because the host killed us).
 _ep_on_exit() {
+    local last_exit=$?
     local phase="$1"
     local task_id="$2"
+
+    # If the dispatch path created an iteration, make sure it has a terminal
+    # state — even when the run-function exited unexpectedly or signal-killed
+    # before reaching the state_update_iteration call below.
+    if [[ -n "${ITERATION:-}" ]] && declare -F state_finalize_running >/dev/null; then
+        state_finalize_running "$phase" "$ITERATION" "$last_exit" \
+            "worker exited (code $last_exit) without finalizing iteration" || true
+    fi
+
     lock_release || true
     log_debug "exit: phase=$phase task=$task_id"
 }

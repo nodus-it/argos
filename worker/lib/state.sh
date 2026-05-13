@@ -186,6 +186,34 @@ state_update_iteration() {
     mv "${STATE_FILE}.tmp" "$STATE_FILE"
 }
 
+# state_finalize_running: if the given iteration is still "running", flip it
+# to "failed" with the provided exit code + error message. Idempotent: if the
+# phase script already called state_update_iteration normally, this is a no-op.
+#
+# Used by the worker entrypoint as an EXIT-trap so a hard-killed container or
+# `exit` short-circuit cannot leave the state.json stuck on "running" forever.
+#
+# Args: $1=phase, $2=n, $3=exit_code, $4=optional error_message
+state_finalize_running() {
+    local phase="$1"
+    local n="$2"
+    local exit_code="$3"
+    local err="${4:-worker exited without finalizing iteration}"
+
+    [[ -f "$STATE_FILE" ]] || return 0
+    [[ -n "$phase" && -n "$n" ]] || return 0
+
+    local idx=$(( n - 1 ))
+    local current
+    current="$(jq -r ".phases[\"$phase\"].iterations[$idx].status // \"\"" \
+                "$STATE_FILE" 2>/dev/null || echo "")"
+    if [[ "$current" != "running" ]]; then
+        return 0
+    fi
+
+    state_update_iteration "$phase" "$n" failed "$exit_code" "$err"
+}
+
 # state_get_iteration_count: number of iterations of a phase.
 # Args: $1=phase
 state_get_iteration_count() {

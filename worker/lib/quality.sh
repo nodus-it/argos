@@ -187,6 +187,49 @@ quality_gates_run() {
     printf '%s' "$gates"
 }
 
+# quality_gate_log_path: filesystem path of the gate log for one iteration.
+# Args: $1=gate slug (artisan|pint|pest|phpunit|phpstan|migrations|debug_code),
+#       $2=log suffix (e.g. "2" for the initial run, "2.fix1" for a fix retry).
+# Output: absolute path on stdout.
+quality_gate_log_path() {
+    local gate="$1"
+    local suffix="$2"
+    local base
+    case "$gate" in
+        artisan)    base="artisan-smoke" ;;
+        debug_code) base="debug-code" ;;
+        *)          base="$gate" ;;
+    esac
+    printf '%s/%s.%s.log' "${QUALITY_LOG_DIR:-/workspace/.agent/logs}" "$base" "$suffix"
+}
+
+# quality_gate_log_converged: 0 if the latest gate log is byte-identical to the
+# previous attempt, 1 otherwise. Used by implement/respond to bail out of the
+# fix loop when Claude is producing the same failure output over and over —
+# further fix sessions burn budget without changing the outcome.
+#
+# Args: $1=gate slug, $2=iteration number, $3=fix retry index (1+)
+quality_gate_log_converged() {
+    local gate="$1"
+    local iter="$2"
+    local fix_n="$3"
+
+    local current previous
+    current="$(quality_gate_log_path "$gate" "${iter}.fix${fix_n}")"
+    if (( fix_n > 1 )); then
+        previous="$(quality_gate_log_path "$gate" "${iter}.fix$((fix_n - 1))")"
+    else
+        previous="$(quality_gate_log_path "$gate" "$iter")"
+    fi
+
+    [[ -f "$current" && -f "$previous" ]] || return 1
+
+    local cur_hash prev_hash
+    cur_hash="$(sha256sum "$current" 2>/dev/null | awk '{print $1}')"
+    prev_hash="$(sha256sum "$previous" 2>/dev/null | awk '{print $1}')"
+    [[ -n "$cur_hash" && "$cur_hash" == "$prev_hash" ]]
+}
+
 # quality_gate_verdict: determine which blocking gate failed (if any).
 # Args: $1=gates_json
 # Output: name of first failing gate on stdout, or empty string.

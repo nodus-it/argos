@@ -590,6 +590,15 @@ SH;
 
         $phaseRun->update($this->phaseRunUpdate($status, $exitCode, $stdout));
 
+        // Defensive cost recovery: if the worker crashed before emitting its
+        // result line (e.g. early `return 3` from a phase script), the stdout
+        // result_json is missing — but the per-iteration Claude `*.result.json`
+        // files were already written to the volume by the streaming pipeline,
+        // so we can still salvage cost/token counters from there.
+        if ($phaseRun->fresh()->cost_usd === null && $exitCode !== 0) {
+            $this->recoverUsageFromVolume($task, $phaseRun, $phase);
+        }
+
         if ($exitCode === 7) {
             $resetAt = $this->readUsageLimitResetAt($task);
             $this->storeUsageLimit($resetAt);
@@ -988,6 +997,89 @@ SH;
             'task_id' => $task->id,
             'phase' => $phase,
         ], $extra);
+    }
+
+    /**
+     * Read every Claude `*.result.json` for this iteration (initial + fixN
+     * retries) from the worker volume, sum their cost/token totals, and
+     * persist them on the phase run. The shell script returns one JSON line
+     * per matching file; we sum total_cost_usd + usage.{input,output}_tokens.
+     *
+     * This is a recovery path for phase scripts that died before
+     * `result_emit` (e.g. implement `return 3` on is_error=true). The
+     * happy-path phaseRunUpdate() handles the normal case.
+     */
+    private function recoverUsageFromVolume(Task $task, PhaseRun $phaseRun, string $phase): void
+    {
+        $iteration = (int) $phaseRun->iteration;
+        if ($iteration <= 0) {
+            return;
+        }
+
+        $script = sprintf(
+            'set -e; for f in /workspace/.agent/logs/%s.%d.result.json '.
+            '/workspace/.agent/logs/%s.%d.fix*.result.json; do [ -f "$f" ] && cat "$f"; done',
+            $phase,
+            $iteration,
+            $phase,
+            $iteration,
+        );
+
+        $process = $this->newProcess([
+            'docker', 'run', '--rm',
+            '-v', $task->volumeName().':/workspace:ro',
+            'alpine',
+            'sh', '-c', $script,
+        ]);
+
+        try {
+            $process->setTimeout(15);
+            $process->run();
+            if (! $process->isSuccessful()) {
+                return;
+            }
+            $output = $process->getOutput();
+        } catch (\Throwable $e) {
+            // Recovery is best-effort — missing docker, mock gaps in tests,
+            // or any other transient issue should not break the phase run.
+            Log::channel('argos')->debug('Cost recovery skipped', ['error' => $e->getMessage()]);
+
+            return;
+        }
+
+        if ($output === '') {
+            return;
+        }
+
+        $totalCost = 0.0;
+        $totalIn = 0;
+        $totalOut = 0;
+        $found = false;
+
+        foreach (preg_split('/\r?\n/', $output) ?: [] as $line) {
+            $line = trim($line);
+            if ($line === '') {
+                continue;
+            }
+            $decoded = json_decode($line, true);
+            if (! is_array($decoded)) {
+                continue;
+            }
+            $found = true;
+            $totalCost += (float) ($decoded['total_cost_usd'] ?? 0);
+            $totalIn += (int) ($decoded['usage']['input_tokens'] ?? 0);
+            $totalOut += (int) ($decoded['usage']['output_tokens'] ?? 0);
+        }
+
+        if (! $found) {
+            return;
+        }
+
+        $phaseRun->update([
+            'cost_usd' => $totalCost,
+            'input_tokens' => $totalIn,
+            'output_tokens' => $totalOut,
+        ]);
     }
 
     /**

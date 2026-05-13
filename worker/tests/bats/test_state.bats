@@ -102,3 +102,28 @@ teardown() {
     [ "$(state_get_iteration_count concept)" -eq 2 ]
     [ "$(state_get_iteration_count implement)" -eq 0 ]
 }
+
+@test "state_finalize_running flips a running iteration to failed" {
+    state_init "task-001" "url" "main"
+    state_add_iteration implement '{}' >/dev/null
+    state_finalize_running implement 1 137 "container killed"
+    [ "$(jq -r '.phases.implement.iterations[0].status' "$STATE_FILE")" = "failed" ]
+    [ "$(jq -r '.phases.implement.iterations[0].exit_code' "$STATE_FILE")" = "137" ]
+    [ "$(jq -r '.phases.implement.iterations[0].error_message' "$STATE_FILE")" = "container killed" ]
+    [ "$(jq -r '.phases.implement.current_status' "$STATE_FILE")" = "failed" ]
+}
+
+@test "state_finalize_running is a no-op for already-terminal iterations" {
+    state_init "task-001" "url" "main"
+    state_add_iteration implement '{}' >/dev/null
+    state_update_iteration implement 1 completed 0
+    state_finalize_running implement 1 99 "should not apply"
+    [ "$(jq -r '.phases.implement.iterations[0].status' "$STATE_FILE")" = "completed" ]
+    [ "$(jq -r '.phases.implement.iterations[0].exit_code' "$STATE_FILE")" = "0" ]
+}
+
+@test "state_finalize_running tolerates missing state file" {
+    rm -f "$STATE_FILE"
+    run state_finalize_running implement 1 1 "no state"
+    [ "$status" -eq 0 ]
+}

@@ -148,6 +148,82 @@ class PhaseRunnerTest extends TestCase
         $this->assertSame(300, $run->output_tokens);
     }
 
+    public function test_run_blocking_recovers_cost_from_volume_when_worker_crashes_before_result_emit(): void
+    {
+        $task = $this->taskWithProfile();
+
+        // The phase process exits non-zero with NO worker result_emit on stdout
+        // — mirrors implement.sh's `return 3` on is_error=true.
+        $phaseProcess = $this->makeProcessMock(exitCode: 3, stdout: "[tool:Edit] foo.php\n");
+
+        // The recovery docker run reads two Claude *.result.json lines off the
+        // volume (initial + fix1). Each line is a Claude result event.
+        $recoveryOutput = json_encode([
+            'type' => 'result',
+            'total_cost_usd' => 0.45,
+            'usage' => ['input_tokens' => 100, 'output_tokens' => 2000],
+        ])."\n".json_encode([
+            'type' => 'result',
+            'total_cost_usd' => 0.10,
+            'usage' => ['input_tokens' => 50, 'output_tokens' => 500],
+        ])."\n";
+
+        $recoveryProcess = Mockery::mock(Process::class);
+        $recoveryProcess->shouldReceive('setTimeout')->andReturnSelf();
+        $recoveryProcess->shouldReceive('run')->andReturn(0);
+        $recoveryProcess->shouldReceive('isSuccessful')->andReturn(true);
+        $recoveryProcess->shouldReceive('getOutput')->andReturn($recoveryOutput);
+
+        $runner = $this->partialMock(PhaseRunner::class, function (MockInterface $mock) use ($phaseProcess, $recoveryProcess): void {
+            $mock->shouldAllowMockingProtectedMethods();
+            // First newProcess call = phase docker run, second = recovery read.
+            $mock->shouldReceive('newProcess')->andReturn($phaseProcess, $recoveryProcess);
+            $mock->shouldReceive('postPhaseSync')->andReturn(null);
+            $mock->shouldReceive('writeNotesToVolume')->andReturn(null);
+            $mock->shouldReceive('writeImplementNotesToVolume')->andReturn(null);
+        });
+
+        $runner->runBlocking($task, 'implement');
+
+        $run = PhaseRun::where('task_id', $task->id)->first();
+        $this->assertNotNull($run);
+        $this->assertSame(3, $run->exit_code);
+        $this->assertEqualsWithDelta(0.55, (float) $run->cost_usd, 0.0001);
+        $this->assertSame(150, $run->input_tokens);
+        $this->assertSame(2500, $run->output_tokens);
+    }
+
+    public function test_run_blocking_skips_recovery_when_phase_succeeds(): void
+    {
+        $task = $this->taskWithProfile();
+
+        // Happy-path: phase exits 0 + emits worker result_emit on stdout.
+        // The recovery path must NOT run a second docker call.
+        $resultJson = json_encode([
+            'phase' => 'implement',
+            'status' => 'completed',
+            'claude_total_cost_usd' => '0.50',
+            'input_tokens' => 99,
+            'output_tokens' => 999,
+        ]);
+
+        $phaseProcess = $this->makeProcessMock(exitCode: 0, stdout: $resultJson."\n");
+
+        $runner = $this->partialMock(PhaseRunner::class, function (MockInterface $mock) use ($phaseProcess): void {
+            $mock->shouldAllowMockingProtectedMethods();
+            // newProcess is called exactly once for the phase — no recovery.
+            $mock->shouldReceive('newProcess')->once()->andReturn($phaseProcess);
+            $mock->shouldReceive('postPhaseSync')->andReturn(null);
+            $mock->shouldReceive('writeNotesToVolume')->andReturn(null);
+            $mock->shouldReceive('writeImplementNotesToVolume')->andReturn(null);
+        });
+
+        $runner->runBlocking($task, 'implement');
+
+        $run = PhaseRun::where('task_id', $task->id)->first();
+        $this->assertSame(99, $run->input_tokens);
+    }
+
     public function test_run_blocking_throws_when_task_has_no_repo_profile(): void
     {
         $task = Task::factory()->create(['repo_profile_id' => null]);
