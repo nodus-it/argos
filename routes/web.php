@@ -13,6 +13,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/tasks/{task}/logs/download', [TaskLogController::class, 'downloadPhaseLog'])
         ->name('tasks.logs.download');
 
+    Route::get('/tasks/{task}/logs/bundle', [TaskLogController::class, 'downloadBundle'])
+        ->name('tasks.logs.bundle');
+
     Route::get('/system/log/download', [TaskLogController::class, 'downloadAppLog'])
         ->name('system.log.download');
 });

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Models\Task;
+use App\Services\Workflow\TaskLogBundleBuilder;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
@@ -46,5 +47,20 @@ class TaskLogController extends Controller
         return response()->download($logPath, $filename, [
             'Content-Type' => 'text/plain; charset=UTF-8',
         ]);
+    }
+
+    public function downloadBundle(Task $task, TaskLogBundleBuilder $builder): BinaryFileResponse
+    {
+        $zipPath = $builder->build($task);
+
+        $filename = sprintf(
+            'argos-bundle-%s-%s.zip',
+            preg_replace('/[^A-Za-z0-9._-]+/', '_', $task->name) ?: 'task',
+            now()->format('Y-m-d_His'),
+        );
+
+        return response()->download($zipPath, $filename, [
+            'Content-Type' => 'application/zip',
+        ])->deleteFileAfterSend(true);
     }
 }

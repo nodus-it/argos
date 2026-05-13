@@ -59,6 +59,13 @@ class ViewTaskLogs extends Page
                 ->openUrlInNewTab()
                 ->visible(fn () => $this->currentLogExists()),
 
+            Action::make('downloadBundle')
+                ->label('Log-Bundle (ZIP)')
+                ->icon('heroicon-o-archive-box-arrow-down')
+                ->color('gray')
+                ->url(fn () => route('tasks.logs.bundle', ['task' => $this->task->id]))
+                ->openUrlInNewTab(),
+
             Action::make('back')
                 ->label('← Zurück zur Task')
                 ->color('gray')
