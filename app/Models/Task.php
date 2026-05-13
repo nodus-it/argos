@@ -30,7 +30,8 @@ use Illuminate\Support\Carbon;
  * @property PhaseStatus|null $current_status
  * @property WorkflowStatus $workflow_status
  * @property bool $auto_concept
- * @property int|null $max_turns
+ * @property int|null $max_turns_concept
+ * @property int|null $max_turns_implement
  * @property string|null $model_concept
  * @property string|null $model_implement
  * @property string|null $worker_stack_id_override
@@ -73,7 +74,8 @@ class Task extends Model
         'current_status',
         'workflow_status',
         'auto_concept',
-        'max_turns',
+        'max_turns_concept',
+        'max_turns_implement',
         'model_concept',
         'model_implement',
         'worker_stack_id_override',
@@ -90,7 +92,8 @@ class Task extends Model
             'current_phase' => Phase::class,
             'current_status' => PhaseStatus::class,
             'auto_concept' => 'boolean',
-            'max_turns' => 'integer',
+            'max_turns_concept' => 'integer',
+            'max_turns_implement' => 'integer',
             'worker_agent_name_override' => AgentName::class,
             'worker_config_override' => 'array',
             'agent_config' => 'array',

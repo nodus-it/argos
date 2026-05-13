@@ -159,9 +159,17 @@ class TaskResource extends Resource
                                 ->helperText(__('tasks.fields.agent_credential_helper'))
                                 ->native(false),
 
-                            TextInput::make('max_turns')
-                                ->label(__('tasks.fields.max_turns_label'))
-                                ->helperText(__('tasks.fields.max_turns_helper', ['default' => config('argos.implement.max_turns_default', 200)]))
+                            TextInput::make('max_turns_concept')
+                                ->label(__('tasks.fields.max_turns_concept_label'))
+                                ->helperText(__('tasks.fields.max_turns_concept_helper', ['default' => config('argos.concept.max_turns_default', 30)]))
+                                ->numeric()
+                                ->minValue(10)
+                                ->maxValue(1000)
+                                ->placeholder((string) config('argos.concept.max_turns_default', 30)),
+
+                            TextInput::make('max_turns_implement')
+                                ->label(__('tasks.fields.max_turns_implement_label'))
+                                ->helperText(__('tasks.fields.max_turns_implement_helper', ['default' => config('argos.implement.max_turns_default', 200)]))
                                 ->numeric()
                                 ->minValue(10)
                                 ->maxValue(1000)

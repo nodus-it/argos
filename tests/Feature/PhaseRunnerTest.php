@@ -296,11 +296,11 @@ class PhaseRunnerTest extends TestCase
         $this->assertContains('MAX_TURNS=250', $cmd);
     }
 
-    public function test_build_command_uses_task_max_turns_when_set(): void
+    public function test_build_command_uses_task_max_turns_implement_when_set(): void
     {
         config(['argos.implement.max_turns_default' => 200]);
         $task = $this->taskWithProfile();
-        $task->update(['max_turns' => 350]);
+        $task->update(['max_turns_implement' => 350]);
 
         $cmd = $this->captureCommand($task, 'implement');
 
@@ -310,11 +310,41 @@ class PhaseRunnerTest extends TestCase
     public function test_build_command_uses_explicit_flag_max_turns_over_task_setting(): void
     {
         $task = $this->taskWithProfile();
-        $task->update(['max_turns' => 350]);
+        $task->update(['max_turns_implement' => 350]);
 
         $cmd = $this->captureCommand($task, 'implement', ['max_turns' => 500]);
 
         $this->assertContains('MAX_TURNS=500', $cmd);
+    }
+
+    public function test_build_command_uses_task_max_turns_concept_for_concept_phase(): void
+    {
+        config([
+            'argos.concept.max_turns_default' => 30,
+            'argos.implement.max_turns_default' => 200,
+        ]);
+        $task = $this->taskWithProfile();
+        $task->update([
+            'max_turns_concept' => 60,
+            'max_turns_implement' => 400,
+        ]);
+
+        $this->assertContains('MAX_TURNS=60', $this->captureCommand($task, 'concept'));
+        $this->assertContains('MAX_TURNS=400', $this->captureCommand($task, 'implement'));
+    }
+
+    public function test_build_command_uses_concept_default_max_turns_for_concept_phase(): void
+    {
+        config([
+            'argos.concept.max_turns_default' => 30,
+            'argos.implement.max_turns_default' => 200,
+        ]);
+        $task = $this->taskWithProfile();
+        // task.max_turns_concept intentionally left null so the phase default kicks in.
+
+        $cmd = $this->captureCommand($task, 'concept');
+
+        $this->assertContains('MAX_TURNS=30', $cmd);
     }
 
     public function test_build_command_always_sets_claude_config_dir(): void

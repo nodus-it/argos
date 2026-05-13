@@ -409,7 +409,7 @@ class ViewTask extends ViewRecord
                     ->minValue(10)
                     ->maxValue(1000)
                     ->required()
-                    ->default(fn (): int => $this->task()->max_turns
+                    ->default(fn (): int => $this->task()->max_turns_implement
                         ?? (int) config('argos.implement.max_turns_default', 200)),
             ])
             ->action(function (array $data): void {

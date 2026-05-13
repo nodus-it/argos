@@ -183,7 +183,7 @@ class TaskPagesTest extends TestCase
 
     public function test_continue_action_dispatches_job_with_continue_and_max_turns(): void
     {
-        $task = Task::factory()->create(['max_turns' => 250]);
+        $task = Task::factory()->create(['max_turns_implement' => 250]);
         PhaseRun::factory()->paused()->create(['task_id' => $task->id, 'phase' => 'implement']);
 
         Livewire::test(ViewTask::class, ['record' => $task->getKey()])

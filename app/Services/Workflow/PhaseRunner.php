@@ -523,7 +523,7 @@ class PhaseRunner
         $workerImage = $this->resolveWorkerImage($task);
         $phaseFlags = $flags !== [] ? json_encode($flags) : '{}';
 
-        $maxTurns = $this->resolveMaxTurns($task, $flags);
+        $maxTurns = $this->resolveMaxTurns($task, $phase, $flags);
         $resumeSessionId = $this->resolveResumeSessionId($task, $phase, $flags);
         $modelId = $this->resolveModel($task, $agentName, $phase);
 
@@ -646,20 +646,33 @@ class PhaseRunner
     }
 
     /**
-     * Priority: explicit flags['max_turns'] > task setting > config default.
+     * Priority: explicit flags['max_turns'] > phase-specific task setting >
+     * phase-aware config default. Concept and implement have separate task
+     * overrides (`task.max_turns_concept`, `task.max_turns_implement`) so the
+     * UI can tune each independently — concept usually needs ~30, implement
+     * ~200.
      *
      * @param  array<string, mixed>  $flags
      */
-    private function resolveMaxTurns(Task $task, array $flags): int
+    private function resolveMaxTurns(Task $task, string $phase, array $flags): int
     {
         if (isset($flags['max_turns']) && (int) $flags['max_turns'] > 0) {
             return (int) $flags['max_turns'];
         }
-        if ($task->max_turns !== null && $task->max_turns > 0) {
-            return $task->max_turns;
+
+        $taskOverride = $phase === 'concept'
+            ? $task->max_turns_concept
+            : $task->max_turns_implement;
+
+        if ($taskOverride !== null && $taskOverride > 0) {
+            return $taskOverride;
         }
 
-        return (int) config('argos.implement.max_turns_default', 200);
+        $configKey = $phase === 'concept'
+            ? 'argos.concept.max_turns_default'
+            : 'argos.implement.max_turns_default';
+
+        return (int) config($configKey, $phase === 'concept' ? 30 : 200);
     }
 
     /**
