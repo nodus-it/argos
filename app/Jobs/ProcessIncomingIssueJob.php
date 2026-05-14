@@ -6,6 +6,7 @@ namespace App\Jobs;
 
 use App\Models\TaskProviderBinding;
 use App\Services\IssueTracker\IssueIngestService;
+use App\Services\IssueTracker\IssueTrackerRegistry;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -22,16 +23,18 @@ final class ProcessIncomingIssueJob implements ShouldQueue
     public int $backoff = 30;
 
     /**
-     * @param  array<string, mixed>  $issue  Raw issue payload from the provider
+     * @param  array<string, mixed>  $envelope  Raw webhook envelope from the provider
+     * @param  string|null  $eventType  Provider-specific event type header value
      */
     public function __construct(
         private readonly string $bindingId,
-        private readonly array $issue,
+        private readonly array $envelope,
+        private readonly ?string $eventType = null,
     ) {
         $this->onQueue('default');
     }
 
-    public function handle(IssueIngestService $ingestService): void
+    public function handle(IssueTrackerRegistry $registry, IssueIngestService $ingestService): void
     {
         $binding = TaskProviderBinding::find($this->bindingId);
 
@@ -39,6 +42,17 @@ final class ProcessIncomingIssueJob implements ShouldQueue
             return;
         }
 
-        $ingestService->ingest($this->issue, $binding);
+        if (! $registry->has($binding->kind)) {
+            return;
+        }
+
+        $tracker = $registry->make($binding->kind, $binding);
+        $issue = $tracker->normalizeWebhookPayload($this->envelope, $this->eventType);
+
+        if (empty($issue)) {
+            return;
+        }
+
+        $ingestService->ingest($issue, $binding);
     }
 }

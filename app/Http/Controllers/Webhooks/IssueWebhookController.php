@@ -33,6 +33,12 @@ final class IssueWebhookController extends Controller
             return response('Not found', 404);
         }
 
+        // For GitHub, filter out non-issue events early so GitHub doesn't retry
+        $eventType = $this->extractEventType($request, $providerKind);
+        if ($providerKind === TaskProviderKind::GitHub && ! $this->isRelevantGitHubEvent($eventType)) {
+            return response('ignored', 200);
+        }
+
         $payload = $request->getContent();
         $secret = $taskProviderBinding->webhook_secret;
 
@@ -71,7 +77,7 @@ final class IssueWebhookController extends Controller
 
         $issue = $request->json()->all();
 
-        ProcessIncomingIssueJob::dispatch($taskProviderBinding->id, $issue);
+        ProcessIncomingIssueJob::dispatch($taskProviderBinding->id, $issue, $eventType);
 
         return response('', 200);
     }
@@ -92,5 +98,18 @@ final class IssueWebhookController extends Controller
             TaskProviderKind::GitLab => $request->header('X-Gitlab-Event-UUID'),
             default => null,
         };
+    }
+
+    private function extractEventType(Request $request, TaskProviderKind $kind): ?string
+    {
+        return match ($kind) {
+            TaskProviderKind::GitHub => $request->header('X-GitHub-Event'),
+            default => null,
+        };
+    }
+
+    private function isRelevantGitHubEvent(?string $eventType): bool
+    {
+        return in_array($eventType, ['issues', 'issue_comment'], true);
     }
 }

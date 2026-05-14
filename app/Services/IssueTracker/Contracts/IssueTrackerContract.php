@@ -59,4 +59,17 @@ interface IssueTrackerContract
      * Remove a previously registered webhook.
      */
     public function unregisterWebhook(string $owner, string $project, int|string $webhookId): void;
+
+    /**
+     * Normalize a raw webhook envelope to the inner issue payload.
+     *
+     * GitHub wraps the issue in {action, issue:{…}, repository, sender}.
+     * GitLab and Bitbucket send the issue data directly, so they return $envelope unchanged.
+     * Returns an empty array when the event should be ignored (e.g. PR envelopes, non-issue events).
+     *
+     * @param  array<string, mixed>  $envelope
+     * @param  string|null  $eventType  Provider-specific event type header value
+     * @return array<string, mixed>
+     */
+    public function normalizeWebhookPayload(array $envelope, ?string $eventType): array;
 }

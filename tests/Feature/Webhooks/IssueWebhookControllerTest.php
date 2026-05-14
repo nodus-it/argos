@@ -46,13 +46,19 @@ class IssueWebhookControllerTest extends TestCase
     {
         $rawBody = json_encode($data);
 
+        // Default GitHub event type so tests don't get filtered out by the event-type guard
+        $defaults = ['CONTENT_TYPE' => 'application/json'];
+        if ($kind === 'github' && ! isset($headers['HTTP_X_GITHUB_EVENT'])) {
+            $defaults['HTTP_X_GITHUB_EVENT'] = 'issues';
+        }
+
         return $this->call(
             'POST',
             "/webhooks/issues/{$kind}/{$bindingId}",
             [],
             [],
             [],
-            array_merge(['CONTENT_TYPE' => 'application/json'], $headers),
+            array_merge($defaults, $headers),
             $rawBody,
         );
     }
@@ -144,7 +150,11 @@ class IssueWebhookControllerTest extends TestCase
             [],
             [],
             [],
-            ['CONTENT_TYPE' => 'application/json', 'HTTP_X_HUB_SIGNATURE_256' => 'sha256=anything'],
+            [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_X_HUB_SIGNATURE_256' => 'sha256=anything',
+                'HTTP_X_GITHUB_EVENT' => 'issues',
+            ],
             $rawBody,
         );
 
