@@ -72,6 +72,27 @@ class GitHubIssueTracker implements IssueTrackerContract
             ->json();
     }
 
+    /**
+     * GitHub signs payloads with HMAC-SHA256 and sends
+     * "sha256=<hex>" in the X-Hub-Signature-256 header.
+     */
+    public function verifySignature(string $payload, string $signature, string $secret): bool
+    {
+        $expected = 'sha256='.hash_hmac('sha256', $payload, $secret);
+
+        return hash_equals($expected, $signature);
+    }
+
+    public function registerWebhook(string $owner, string $project, string $url, string $secret): array
+    {
+        throw new \LogicException('registerWebhook not implemented yet for GitHub');
+    }
+
+    public function unregisterWebhook(string $owner, string $project, int|string $webhookId): void
+    {
+        throw new \LogicException('unregisterWebhook not implemented yet for GitHub');
+    }
+
     private function http(): PendingRequest
     {
         return Http::withHeaders([

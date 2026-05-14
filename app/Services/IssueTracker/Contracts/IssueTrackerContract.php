@@ -40,4 +40,23 @@ interface IssueTrackerContract
         int $issueNumber,
         string $body,
     ): array;
+
+    /**
+     * Verify the webhook payload signature against the shared secret.
+     * GitHub uses HMAC-SHA256; GitLab compares a plain token header.
+     */
+    public function verifySignature(string $payload, string $signature, string $secret): bool;
+
+    /**
+     * Register a webhook on the provider and return the provider's response
+     * (at minimum containing an 'id' key for later unregistration).
+     *
+     * @return array<string, mixed>
+     */
+    public function registerWebhook(string $owner, string $project, string $url, string $secret): array;
+
+    /**
+     * Remove a previously registered webhook.
+     */
+    public function unregisterWebhook(string $owner, string $project, int|string $webhookId): void;
 }

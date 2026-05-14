@@ -14,3 +14,9 @@ Artisan::command('inspire', function () {
 Schedule::command('argos:check-agent-versions')
     ->dailyAt('03:00')
     ->withoutOverlapping();
+
+// Every 5 minutes: dispatch PollIssueProviderJob for each active Poll binding.
+// Manual trigger: `php artisan argos:poll-issues`.
+Schedule::command('argos:poll-issues')
+    ->everyFiveMinutes()
+    ->withoutOverlapping();
