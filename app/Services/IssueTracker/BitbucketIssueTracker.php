@@ -105,6 +105,17 @@ class BitbucketIssueTracker implements IssueTrackerContract
         throw new \LogicException('unregisterWebhook not implemented yet for Bitbucket');
     }
 
+    /**
+     * Bitbucket sends issue data directly in the envelope — no unwrapping needed.
+     *
+     * @param  array<string, mixed>  $envelope
+     * @return array<string, mixed>
+     */
+    public function normalizeWebhookPayload(array $envelope, ?string $eventType): array
+    {
+        return $envelope;
+    }
+
     private function http(): PendingRequest
     {
         if ($this->isOAuth) {

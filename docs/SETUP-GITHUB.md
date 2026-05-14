@@ -80,6 +80,77 @@ manager so the new vars are picked up.
 
 ---
 
+## Option 3: Issue-Provider (Pull + Webhook)
+
+Argos can import GitHub Issues as Tasks and keep them in sync via polling or
+webhooks. Each repository needs a **TaskProviderBinding** (one per GitHub repo)
+configured through the Filament admin interface.
+
+### Step 1: Required token scopes
+
+| Token type | Scopes needed |
+|---|---|
+| Classic PAT | `repo` (includes webhook management) |
+| Fine-grained PAT | **Issues**: Read & Write · **Webhooks**: Read & Write |
+| OAuth (existing) | `repo` scope — already covers webhooks |
+
+> **Note**: `admin:repo_hook` is a sub-scope of `repo` in classic PATs.
+> Fine-grained tokens require "Webhooks: Read & Write" explicitly.
+
+### Step 2: Create a binding in Filament
+
+1. Open **Argos Admin → Task Provider Bindings → New**.
+2. Set **Kind** to `GitHub` and choose the **Connected Account** that holds your
+   PAT or OAuth token.
+3. Enter the **External Project Ref** in `owner/repo` format, e.g.
+   `your-org/your-repo`.
+4. Choose a **Mode**:
+   - **Webhook** — real-time; requires `APP_URL` to be publicly reachable.
+   - **Poll** — periodic polling; works behind firewalls or in local development.
+5. Optionally set **Filters** (e.g. `state=open`, label filters) so only
+   relevant issues become tasks.
+6. Click **Save**. The binding starts in `Pending` state.
+
+### Step 3: Activate with "Einrichten"
+
+Click the **Einrichten** (Setup) action on the binding row:
+
+- **Webhook mode**: Argos calls `POST /repos/{owner}/{repo}/hooks` on GitHub and
+  registers the callback URL `${APP_URL}/webhooks/issues/github/{binding-id}`
+  automatically. No manual URL entry needed. The binding moves to `Active` once
+  GitHub confirms the hook.
+- **Poll mode**: The binding moves to `Active` immediately. The poll scheduler
+  will fetch issues on the next run.
+
+If setup fails (invalid token, missing scopes, `APP_URL` not reachable), the
+binding stays `Pending` and the error message is shown in the **Last Error**
+column. Fix the issue and click **Einrichten** again.
+
+### Webhook vs. Poll
+
+| | Webhook | Poll |
+|---|---|---|
+| Latency | Seconds | Minutes (scheduled interval) |
+| Requires public `APP_URL` | Yes | No |
+| GitHub rate limits | Not applicable | Counts against API quota |
+
+> **Tip**: Use Poll mode during local development or when `APP_URL` is not
+> publicly reachable (e.g. behind a VPN or NAT). Switch to Webhook mode in
+> production for real-time updates.
+
+### Behaviour notes
+
+- **issue_comment** events are accepted by the webhook endpoint but not
+  currently ingested as tasks. Only `issues` events (opened, edited, etc.)
+  create or update Tasks.
+- **Issue state and Task state are independent.** Closing a GitHub issue does
+  not close the corresponding Task in Argos; Tasks are managed separately.
+- **Duplicate-safe**: the webhook endpoint ignores re-deliveries (identified by
+  the `X-GitHub-Delivery` header). Pull requests appearing in the issues list
+  are filtered out automatically.
+
+---
+
 ## Troubleshooting
 
 | Symptom | Likely cause |
