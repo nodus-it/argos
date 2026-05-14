@@ -53,6 +53,35 @@ return [
 
     ],
 
+    'redis' => [
+
+        'client' => env('REDIS_CLIENT', 'predis'),
+
+        'options' => [
+            'cluster' => env('REDIS_CLUSTER', 'redis'),
+            'prefix' => env('REDIS_PREFIX', ''),
+        ],
+
+        'default' => [
+            'url' => env('REDIS_URL'),
+            'host' => env('ARGOS_REDIS_HOST', env('REDIS_HOST', 'redis')),
+            'username' => env('REDIS_USERNAME'),
+            'password' => env('ARGOS_REDIS_PASSWORD', env('REDIS_PASSWORD')),
+            'port' => (int) env('ARGOS_REDIS_PORT', env('REDIS_PORT', 6379)),
+            'database' => (int) env('REDIS_DB', 0),
+        ],
+
+        'cache' => [
+            'url' => env('REDIS_URL'),
+            'host' => env('ARGOS_REDIS_HOST', env('REDIS_HOST', 'redis')),
+            'username' => env('REDIS_USERNAME'),
+            'password' => env('ARGOS_REDIS_PASSWORD', env('REDIS_PASSWORD')),
+            'port' => (int) env('ARGOS_REDIS_PORT', env('REDIS_PORT', 6379)),
+            'database' => (int) env('REDIS_CACHE_DB', 1),
+        ],
+
+    ],
+
     'migrations' => [
         'table' => 'migrations',
         'update_date_on_publish' => true,

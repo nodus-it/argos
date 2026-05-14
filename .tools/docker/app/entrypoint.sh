@@ -93,6 +93,13 @@ done
 # image (e.g. for one-shot artisan invocations) still self-heals the schema.
 case "${ARGOS_ROLE:-app}" in
     app)
+        # One-time drain of leftover database-queue jobs after migration to Horizon.
+        # Runs in ~1 s when the jobs table is empty; processes any stranded jobs otherwise.
+        if php /app/artisan tinker --execute="exit(\DB::table('jobs')->exists() ? 0 : 1);" >/dev/null 2>&1; then
+            echo "Draining leftover database queue jobs (one-time migration to Horizon)..."
+            php /app/artisan queue:work database --stop-when-empty --tries=1 --max-time=120 || true
+        fi
+
         php /app/artisan migrate --force --no-interaction
         php /app/artisan db:seed --class=AdminUserSeeder --force --no-interaction
         # Pre-warm the default worker image: dispatches a queued build for

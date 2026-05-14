@@ -33,7 +33,9 @@ class RunPhaseJob implements ShouldQueue
         public readonly string $taskId,
         public readonly string $phase,
         public readonly array $flags = [],
-    ) {}
+    ) {
+        $this->onQueue('tasks');
+    }
 
     public function handle(PhaseRunner $runner, WorkflowService $workflowService, TaskService $taskService): void
     {
