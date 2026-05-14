@@ -42,11 +42,25 @@ services:
       retries: 30
       start_period: 30s
 
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - argos-redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
   app:
     image: "${ARGOS_APP_IMAGE}"
     restart: unless-stopped
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     volumes:
       # Spawning worker containers needs the host's docker socket.
@@ -60,20 +74,25 @@ services:
       - argos-nginx-config:/srv/argos-nginx
     environment:
       <<: *oauth-env
-      ARGOS_ROLE:               "app"
-      APP_ENV:                  "${APP_ENV:-production}"
-      APP_DEBUG:                "${APP_DEBUG:-false}"
-      APP_URL:                  "${APP_URL:-http://localhost:${ARGOS_PORT:-8080}}"
-      APP_KEY:                  "${APP_KEY}"
-      ADMIN_PASSWORD:           "${ADMIN_PASSWORD:-}"
-      CLAUDE_CODE_OAUTH_TOKEN:  "${CLAUDE_CODE_OAUTH_TOKEN:-}"
-      ARGOS_CONFIG_DIR:         /data/config
-      DB_CONNECTION:            "mariadb"
-      ARGOS_DB_HOST:            "db"
-      ARGOS_DB_PORT:            "3306"
-      ARGOS_DB_DATABASE:        "${ARGOS_DB_DATABASE}"
-      ARGOS_DB_USERNAME:        "${ARGOS_DB_USERNAME}"
-      ARGOS_DB_PASSWORD:        "${ARGOS_DB_PASSWORD}"
+      ARGOS_ROLE:                        "app"
+      APP_ENV:                           "${APP_ENV:-production}"
+      APP_DEBUG:                         "${APP_DEBUG:-false}"
+      APP_URL:                           "${APP_URL:-http://localhost:${ARGOS_PORT:-8080}}"
+      APP_KEY:                           "${APP_KEY}"
+      ADMIN_PASSWORD:                    "${ADMIN_PASSWORD:-}"
+      CLAUDE_CODE_OAUTH_TOKEN:           "${CLAUDE_CODE_OAUTH_TOKEN:-}"
+      ARGOS_CONFIG_DIR:                  /data/config
+      DB_CONNECTION:                     "mariadb"
+      ARGOS_DB_HOST:                     "db"
+      ARGOS_DB_PORT:                     "3306"
+      ARGOS_DB_DATABASE:                 "${ARGOS_DB_DATABASE}"
+      ARGOS_DB_USERNAME:                 "${ARGOS_DB_USERNAME}"
+      ARGOS_DB_PASSWORD:                 "${ARGOS_DB_PASSWORD}"
+      QUEUE_CONNECTION:                  "redis"
+      REDIS_HOST:                        "redis"
+      REDIS_PORT:                        "6379"
+      ARGOS_QUEUE_DEFAULT_PROCESSES:     "${ARGOS_QUEUE_DEFAULT_PROCESSES:-5}"
+      ARGOS_QUEUE_TASKS_PROCESSES:       "${ARGOS_QUEUE_TASKS_PROCESSES:-2}"
     healthcheck:
       # Goes green only when DB is reachable AND the schema is fully migrated,
       # so dependents (queue) can rely on `service_healthy`.
@@ -101,31 +120,41 @@ services:
   queue:
     image: "${ARGOS_APP_IMAGE}"
     restart: unless-stopped
+    stop_signal: SIGTERM
+    stop_grace_period: 60s
     depends_on:
       app:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - argos-data:/data
     environment:
       <<: *oauth-env
-      ARGOS_ROLE:               "queue"
-      APP_ENV:                  "${APP_ENV:-production}"
-      APP_DEBUG:                "${APP_DEBUG:-false}"
-      APP_URL:                  "${APP_URL:-http://localhost:${ARGOS_PORT:-8080}}"
-      APP_KEY:                  "${APP_KEY}"
-      CLAUDE_CODE_OAUTH_TOKEN:  "${CLAUDE_CODE_OAUTH_TOKEN:-}"
-      ARGOS_CONFIG_DIR:         /data/config
-      DB_CONNECTION:            "mariadb"
-      ARGOS_DB_HOST:            "db"
-      ARGOS_DB_PORT:            "3306"
-      ARGOS_DB_DATABASE:        "${ARGOS_DB_DATABASE}"
-      ARGOS_DB_USERNAME:        "${ARGOS_DB_USERNAME}"
-      ARGOS_DB_PASSWORD:        "${ARGOS_DB_PASSWORD}"
-    command: ["php", "/app/artisan", "queue:work", "database", "--sleep=3", "--tries=3", "--max-time=3600"]
+      ARGOS_ROLE:                        "queue"
+      APP_ENV:                           "${APP_ENV:-production}"
+      APP_DEBUG:                         "${APP_DEBUG:-false}"
+      APP_URL:                           "${APP_URL:-http://localhost:${ARGOS_PORT:-8080}}"
+      APP_KEY:                           "${APP_KEY}"
+      CLAUDE_CODE_OAUTH_TOKEN:           "${CLAUDE_CODE_OAUTH_TOKEN:-}"
+      ARGOS_CONFIG_DIR:                  /data/config
+      DB_CONNECTION:                     "mariadb"
+      ARGOS_DB_HOST:                     "db"
+      ARGOS_DB_PORT:                     "3306"
+      ARGOS_DB_DATABASE:                 "${ARGOS_DB_DATABASE}"
+      ARGOS_DB_USERNAME:                 "${ARGOS_DB_USERNAME}"
+      ARGOS_DB_PASSWORD:                 "${ARGOS_DB_PASSWORD}"
+      QUEUE_CONNECTION:                  "redis"
+      REDIS_HOST:                        "redis"
+      REDIS_PORT:                        "6379"
+      ARGOS_QUEUE_DEFAULT_PROCESSES:     "${ARGOS_QUEUE_DEFAULT_PROCESSES:-5}"
+      ARGOS_QUEUE_TASKS_PROCESSES:       "${ARGOS_QUEUE_TASKS_PROCESSES:-2}"
+    command: ["php", "/app/artisan", "horizon"]
 
 volumes:
   argos-data:
   argos-db:
+  argos-redis:
   argos-public:
   argos-nginx-config:
