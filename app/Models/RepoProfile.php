@@ -41,6 +41,7 @@ use Illuminate\Support\Carbon;
  * @property-read Collection<int, Task> $tasks
  * @property-read ConnectedAccount|null $connectedAccount
  * @property-read WorkerStack|null $workerStack
+ * @property-read Collection<int, TaskProviderBinding> $taskProviderBindings
  */
 class RepoProfile extends Model
 {
@@ -85,6 +86,14 @@ class RepoProfile extends Model
     public function tasks(): HasMany
     {
         return $this->hasMany(Task::class);
+    }
+
+    /**
+     * @return HasMany<TaskProviderBinding, $this>
+     */
+    public function taskProviderBindings(): HasMany
+    {
+        return $this->hasMany(TaskProviderBinding::class);
     }
 
     /**

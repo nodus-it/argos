@@ -79,6 +79,36 @@ class GitLabIssueTracker implements IssueTrackerContract
             ->json();
     }
 
+    /**
+     * GitLab sends a plain token in the X-Gitlab-Token header.
+     * The $signature parameter carries the header value directly.
+     */
+    public function verifySignature(string $payload, string $signature, string $secret): bool
+    {
+        return hash_equals($secret, $signature);
+    }
+
+    public function registerWebhook(string $owner, string $project, string $url, string $secret): array
+    {
+        throw new \LogicException('registerWebhook not implemented yet for GitLab');
+    }
+
+    public function unregisterWebhook(string $owner, string $project, int|string $webhookId): void
+    {
+        throw new \LogicException('unregisterWebhook not implemented yet for GitLab');
+    }
+
+    /**
+     * GitLab sends issue data directly in the envelope — no unwrapping needed.
+     *
+     * @param  array<string, mixed>  $envelope
+     * @return array<string, mixed>
+     */
+    public function normalizeWebhookPayload(array $envelope, ?string $eventType): array
+    {
+        return $envelope;
+    }
+
     private function encodePath(string $owner, string $project): string
     {
         return urlencode("{$owner}/{$project}");

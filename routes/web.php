@@ -5,9 +5,18 @@ declare(strict_types=1);
 use App\Http\Controllers\Auth\BitbucketConnectedAccountController;
 use App\Http\Controllers\Auth\ConnectedAccountController;
 use App\Http\Controllers\TaskLogController;
+use App\Http\Controllers\Webhooks\IssueWebhookController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn () => redirect('/admin'));
+
+// Inbound issue webhooks — no session auth, signature verified in controller.
+// SubstituteBindings is re-added explicitly since withoutMiddleware('web') would
+// remove it together with CSRF, which would break route-model binding for {binding}.
+Route::post('/webhooks/issues/{kind}/{binding}', [IssueWebhookController::class, 'handle'])
+    ->name('webhooks.issues')
+    ->withoutMiddleware(['web'])
+    ->middleware(['throttle:60,1']);
 
 Route::middleware('auth')->group(function () {
     Route::get('/tasks/{task}/logs/download', [TaskLogController::class, 'downloadPhaseLog'])

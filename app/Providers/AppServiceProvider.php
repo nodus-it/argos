@@ -10,6 +10,10 @@ use App\Services\GitProvider\BitbucketGitService;
 use App\Services\GitProvider\GitHubGitService;
 use App\Services\GitProvider\GitLabGitService;
 use App\Services\GitProvider\GitProviderRegistry;
+use App\Services\IssueTracker\BitbucketIssueTracker;
+use App\Services\IssueTracker\GitHubIssueTracker;
+use App\Services\IssueTracker\GitLabIssueTracker;
+use App\Services\IssueTracker\IssueTrackerRegistry;
 use App\Workers\Agents\AgentRegistry;
 use App\Workers\Agents\ClaudeCodeRunner;
 use App\Workers\Agents\CodexRunner;
@@ -54,6 +58,35 @@ class AppServiceProvider extends ServiceProvider
                 'bitbucket',
                 fn (string $token, string $instanceUrl): BitbucketGitService => new BitbucketGitService($token),
             );
+
+            return $registry;
+        });
+
+        $this->app->singleton(IssueTrackerRegistry::class, function (): IssueTrackerRegistry {
+            $registry = new IssueTrackerRegistry;
+
+            // GitHub and GitLab OAuth scopes ('repo' / 'api') already cover
+            // webhook management — no additional scopes need to be requested.
+            $registry->register(
+                'github',
+                fn (string $token, string $instanceUrl): GitHubIssueTracker => new GitHubIssueTracker($token),
+            );
+
+            $registry->register(
+                'gitlab',
+                fn (string $token, string $instanceUrl): GitLabIssueTracker => new GitLabIssueTracker(
+                    $token,
+                    $instanceUrl ?: 'https://gitlab.com',
+                ),
+            );
+
+            $registry->register(
+                'bitbucket',
+                fn (string $token, string $instanceUrl): BitbucketIssueTracker => new BitbucketIssueTracker($token),
+            );
+
+            // Linear is on the roadmap but has no implementation yet.
+            // Register its provider key once LinearIssueTracker is built.
 
             return $registry;
         });
