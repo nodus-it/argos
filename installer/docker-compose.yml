@@ -124,6 +124,35 @@ services:
       ARGOS_DB_PASSWORD:        "${ARGOS_DB_PASSWORD}"
     command: ["php", "/app/artisan", "queue:work", "database", "--sleep=3", "--tries=3", "--max-time=3600"]
 
+  scheduler:
+    # Runs `schedule:work`, which invokes `schedule:run` every minute (see
+    # routes/console.php — e.g. argos:poll-issues every 5 min). No docker
+    # socket: scheduled commands only dispatch queued jobs, the `queue`
+    # worker does the actual work.
+    image: "${ARGOS_APP_IMAGE}"
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    volumes:
+      - argos-data:/data
+    environment:
+      <<: *oauth-env
+      ARGOS_ROLE:               "scheduler"
+      APP_ENV:                  "${APP_ENV:-production}"
+      APP_DEBUG:                "${APP_DEBUG:-false}"
+      APP_URL:                  "${APP_URL:-http://localhost:${ARGOS_PORT:-8080}}"
+      APP_KEY:                  "${APP_KEY}"
+      CLAUDE_CODE_OAUTH_TOKEN:  "${CLAUDE_CODE_OAUTH_TOKEN:-}"
+      ARGOS_CONFIG_DIR:         /data/config
+      DB_CONNECTION:            "mariadb"
+      ARGOS_DB_HOST:            "db"
+      ARGOS_DB_PORT:            "3306"
+      ARGOS_DB_DATABASE:        "${ARGOS_DB_DATABASE}"
+      ARGOS_DB_USERNAME:        "${ARGOS_DB_USERNAME}"
+      ARGOS_DB_PASSWORD:        "${ARGOS_DB_PASSWORD}"
+    command: ["php", "/app/artisan", "schedule:work"]
+
 volumes:
   argos-data:
   argos-db:
