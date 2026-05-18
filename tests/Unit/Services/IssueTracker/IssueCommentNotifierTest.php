@@ -36,10 +36,16 @@ class IssueCommentNotifierTest extends TestCase
 
     public function test_posts_comment_when_link_exists(): void
     {
+        $task = Task::factory()->create();
+
         $tracker = Mockery::mock(IssueTrackerContract::class);
         $tracker->shouldReceive('createComment')
             ->once()
-            ->with('acme', 'widget', 42, Mockery::type('string'));
+            ->with('acme', 'widget', 42, Mockery::on(
+                fn (string $body): bool => str_contains($body, 'Phase **Implement**')
+                    && str_contains($body, '[Task in Argos öffnen](')
+                    && str_contains($body, (string) $task->id),
+            ));
 
         $registry = Mockery::mock(IssueTrackerRegistry::class);
         $registry->shouldReceive('has')->andReturn(true);
@@ -47,7 +53,6 @@ class IssueCommentNotifierTest extends TestCase
 
         $notifier = new IssueCommentNotifier($registry);
 
-        $task = Task::factory()->create();
         $binding = TaskProviderBinding::factory()->create([
             'kind' => TaskProviderKind::GitHub,
             'mode' => TaskProviderMode::Poll,

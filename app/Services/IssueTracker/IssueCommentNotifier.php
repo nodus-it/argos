@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\IssueTracker;
 
+use App\Filament\Admin\Resources\TaskResource;
 use App\Models\ExternalIssueLink;
 use App\Models\Task;
 use Illuminate\Support\Facades\Log;
@@ -40,7 +41,7 @@ final class IssueCommentNotifier
 
             [$owner, $project] = $this->parseRef($binding->external_project_ref ?? '');
             $issueNumber = (int) $link->external_id;
-            $body = $this->formatComment($phase, $status);
+            $body = $this->formatComment($task, $phase, $status);
 
             $tracker->createComment($owner, $project, $issueNumber, $body);
         } catch (\Throwable $e) {
@@ -53,12 +54,14 @@ final class IssueCommentNotifier
         }
     }
 
-    private function formatComment(string $phase, string $status): string
+    private function formatComment(Task $task, string $phase, string $status): string
     {
         $phaseLabel = ucfirst($phase);
         $statusLabel = ucfirst($status);
+        $taskUrl = TaskResource::getUrl('view', ['record' => $task]);
 
-        return "**Argos** — Phase **{$phaseLabel}** abgeschlossen mit Status: **{$statusLabel}**";
+        return "**Argos** — Phase **{$phaseLabel}** abgeschlossen mit Status: **{$statusLabel}**"
+            ."\n\n[Task in Argos öffnen]({$taskUrl})";
     }
 
     /**
