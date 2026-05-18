@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Filament\Admin\Resources\RepoProfileResource;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\CreateRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\EditRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\ListRepoProfiles;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\ViewRepoProfile;
+use App\Filament\Admin\Resources\RepoProfileResource\RelationManagers\TaskProviderBindingsRelationManager;
 use App\Filament\Admin\Resources\RepoProfileResource\RelationManagers\TasksRelationManager;
 use App\Models\ConnectedAccount;
 use App\Models\RepoProfile;
@@ -415,6 +417,23 @@ class RepoProfileResourceTest extends TestCase
         Livewire::test(ViewRepoProfile::class, ['record' => $profile->getKey()])
             ->assertSuccessful()
             ->assertSeeLivewire(TasksRelationManager::class);
+    }
+
+    public function test_view_page_includes_task_provider_bindings_relation_manager(): void
+    {
+        $profile = RepoProfile::factory()->create();
+
+        // The bindings manager is the second relation manager tab; it loads
+        // lazily, so assertSeeLivewire cannot match the mounted component.
+        // Assert the resource registers it and the tab is rendered instead.
+        $this->assertContains(
+            TaskProviderBindingsRelationManager::class,
+            RepoProfileResource::getRelations(),
+        );
+
+        Livewire::test(ViewRepoProfile::class, ['record' => $profile->getKey()])
+            ->assertSuccessful()
+            ->assertSee('Task-Provider');
     }
 
     public function test_tasks_relation_manager_shows_tasks(): void
