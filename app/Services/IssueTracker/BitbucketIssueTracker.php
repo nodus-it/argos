@@ -59,23 +59,6 @@ class BitbucketIssueTracker implements IssueTrackerContract
         ];
     }
 
-    public function createIssue(
-        string $owner,
-        string $project,
-        string $title,
-        string $body,
-        array $options = [],
-    ): array {
-        return $this->http()
-            ->post("/repositories/{$owner}/{$project}/issues", [
-                'title' => $title,
-                'content' => ['raw' => $body],
-                ...$options,
-            ])
-            ->throw()
-            ->json();
-    }
-
     public function createComment(
         string $owner,
         string $project,

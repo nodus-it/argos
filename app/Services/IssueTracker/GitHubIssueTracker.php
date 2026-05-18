@@ -67,23 +67,6 @@ class GitHubIssueTracker implements IssueTrackerContract
         ];
     }
 
-    public function createIssue(
-        string $owner,
-        string $project,
-        string $title,
-        string $body,
-        array $options = [],
-    ): array {
-        return $this->http()
-            ->post("/repos/{$owner}/{$project}/issues", [
-                'title' => $title,
-                'body' => $body,
-                ...$options,
-            ])
-            ->throw()
-            ->json();
-    }
-
     public function createComment(
         string $owner,
         string $project,

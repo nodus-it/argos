@@ -46,25 +46,6 @@ class GitLabIssueTracker implements IssueTrackerContract
         ];
     }
 
-    public function createIssue(
-        string $owner,
-        string $project,
-        string $title,
-        string $body,
-        array $options = [],
-    ): array {
-        $projectPath = $this->encodePath($owner, $project);
-
-        return $this->http()
-            ->post("/projects/{$projectPath}/issues", [
-                'title' => $title,
-                'description' => $body,
-                ...$options,
-            ])
-            ->throw()
-            ->json();
-    }
-
     public function createComment(
         string $owner,
         string $project,

@@ -76,27 +76,6 @@ class GitLabIssueTrackerTest extends TestCase
         $this->assertSame([], $result['reactions_data']);
     }
 
-    public function test_create_issue_posts_correct_payload(): void
-    {
-        Http::fake([
-            'https://gitlab.com/api/v4/projects/acme%2Fwidget/issues' => Http::response([
-                'id' => 10, 'title' => 'New issue',
-            ], 201),
-        ]);
-
-        $result = (new GitLabIssueTracker('tok'))->createIssue(
-            'acme', 'widget', 'New issue', 'Description body'
-        );
-
-        $this->assertSame('New issue', $result['title']);
-
-        Http::assertSent(function ($request): bool {
-            $body = json_decode($request->body(), true);
-
-            return $body['title'] === 'New issue' && $body['description'] === 'Description body';
-        });
-    }
-
     public function test_create_comment_posts_note(): void
     {
         Http::fake([

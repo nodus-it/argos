@@ -20,18 +20,6 @@ interface IssueTrackerContract
     public function getIssue(string $owner, string $project, int $issueNumber): array;
 
     /**
-     * @param  array<string, mixed>  $options  e.g. labels, assignees, milestone
-     * @return array<string, mixed>
-     */
-    public function createIssue(
-        string $owner,
-        string $project,
-        string $title,
-        string $body,
-        array $options = [],
-    ): array;
-
-    /**
      * @return array<string, mixed>
      */
     public function createComment(
