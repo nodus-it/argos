@@ -16,7 +16,7 @@ return new class extends Migration
             $table->foreign('repo_profile_id')->references('id')->on('repo_profiles')->cascadeOnDelete();
             $table->string('kind');
             $table->string('mode')->default('disabled');
-            $table->unsignedInteger('connected_account_id')->nullable();
+            $table->unsignedBigInteger('connected_account_id')->nullable();
             $table->foreign('connected_account_id')->references('id')->on('connected_accounts')->nullOnDelete();
             $table->string('external_project_ref')->nullable();
             $table->json('filters')->nullable();
