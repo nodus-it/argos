@@ -110,6 +110,40 @@
                 </div>
             @endif
 
+            @if($record->externalIssueLink)
+                @php
+                    $issueLink = $record->externalIssueLink;
+                    preg_match('#/issues/(\d+)#', (string) $issueLink->external_url, $issueMatch);
+                    $issueNumber = $issueMatch[1] ?? null;
+                @endphp
+                <div class="flex items-center justify-between gap-2">
+                    <span class="text-xs font-medium text-gray-500 dark:text-gray-400 flex-shrink-0">{{ __('tasks.view.labels.source') }}</span>
+                    <span class="text-xs text-gray-700 dark:text-gray-300 truncate text-right">{{ $issueLink->binding?->kind?->label() ?? '—' }}</span>
+                </div>
+                @if($issueLink->binding?->external_project_ref)
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="text-xs font-medium text-gray-500 dark:text-gray-400 flex-shrink-0">{{ __('tasks.view.labels.external_project') }}</span>
+                        <code class="text-xs text-indigo-600 dark:text-indigo-400 font-mono truncate text-right">{{ $issueLink->binding->external_project_ref }}</code>
+                    </div>
+                @endif
+                @if($issueLink->external_url)
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="text-xs font-medium text-gray-500 dark:text-gray-400 flex-shrink-0">{{ __('tasks.view.labels.external_issue') }}</span>
+                        <a href="{{ $issueLink->external_url }}" target="_blank"
+                           class="inline-flex items-center gap-1 text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline">
+                            {{ $issueNumber ? "#{$issueNumber}" : __('tasks.view.labels.open') }}
+                            <x-heroicon-o-arrow-top-right-on-square class="h-3 w-3" />
+                        </a>
+                    </div>
+                @endif
+                @if($issueLink->last_synced_at)
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="text-xs font-medium text-gray-500 dark:text-gray-400 flex-shrink-0">{{ __('tasks.view.labels.last_synced') }}</span>
+                        <span class="text-xs text-gray-500 dark:text-gray-500">{{ $issueLink->last_synced_at->diffForHumans() }}</span>
+                    </div>
+                @endif
+            @endif
+
             @php
                 $totalCost = $phaseRuns->flatten()->sum(fn($r) => (float) $r->cost_usd);
                 $totalTokens = $phaseRuns->flatten()->sum(fn($r) => ($r->input_tokens ?? 0) + ($r->output_tokens ?? 0));

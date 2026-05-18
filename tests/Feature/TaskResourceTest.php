@@ -9,9 +9,12 @@ use App\Enums\PhaseStatus;
 use App\Enums\WorkflowStatus;
 use App\Filament\Admin\Resources\TaskResource\Pages\CreateTask;
 use App\Filament\Admin\Resources\TaskResource\Pages\ListTasks;
+use App\Filament\Admin\Resources\TaskResource\Pages\ViewTask;
 use App\Jobs\RunPhaseJob;
+use App\Models\ExternalIssueLink;
 use App\Models\RepoProfile;
 use App\Models\Task;
+use App\Models\TaskProviderBinding;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
@@ -50,6 +53,39 @@ class TaskResourceTest extends TestCase
         Livewire::test(ListTasks::class)
             ->assertSuccessful()
             ->assertSee('Draft');
+    }
+
+    public function test_list_shows_provider_source_for_imported_task(): void
+    {
+        $task = Task::factory()->create();
+        $binding = TaskProviderBinding::factory()->create();
+        ExternalIssueLink::factory()->create([
+            'task_id' => $task->id,
+            'task_provider_binding_id' => $binding->id,
+        ]);
+
+        Livewire::test(ListTasks::class)
+            ->assertSuccessful()
+            ->assertCanSeeTableRecords([$task])
+            ->assertSee('GitHub');
+    }
+
+    public function test_view_page_shows_external_issue_details(): void
+    {
+        $task = Task::factory()->create();
+        $binding = TaskProviderBinding::factory()->create([
+            'external_project_ref' => 'acme/widget',
+        ]);
+        ExternalIssueLink::factory()->create([
+            'task_id' => $task->id,
+            'task_provider_binding_id' => $binding->id,
+            'external_url' => 'https://github.com/acme/widget/issues/42',
+        ]);
+
+        Livewire::test(ViewTask::class, ['record' => $task->id])
+            ->assertSuccessful()
+            ->assertSee('acme/widget')
+            ->assertSee('https://github.com/acme/widget/issues/42');
     }
 
     public function test_create_page_renders(): void

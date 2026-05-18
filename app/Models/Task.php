@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
 /**
@@ -49,6 +50,7 @@ use Illuminate\Support\Carbon;
  * @property-read User|null $user
  * @property-read RepoProfile|null $repoProfile
  * @property-read Collection<int, PhaseRun> $phaseRuns
+ * @property-read ExternalIssueLink|null $externalIssueLink
  * @property-read WorkerStack|null $workerStackOverride
  * @property-read AgentCredential|null $agentCredential
  */
@@ -163,6 +165,16 @@ class Task extends Model
     public function phaseRuns(): HasMany
     {
         return $this->hasMany(PhaseRun::class);
+    }
+
+    /**
+     * The external issue this task was imported from, if any.
+     *
+     * @return HasOne<ExternalIssueLink, $this>
+     */
+    public function externalIssueLink(): HasOne
+    {
+        return $this->hasOne(ExternalIssueLink::class);
     }
 
     /**

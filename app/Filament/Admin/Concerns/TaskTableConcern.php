@@ -6,6 +6,7 @@ namespace App\Filament\Admin\Concerns;
 
 use App\Enums\AgentName;
 use App\Enums\Phase;
+use App\Enums\TaskProviderKind;
 use App\Enums\WorkflowStatus;
 use App\Models\Task;
 use Filament\Schemas\Components\Tabs\Tab;
@@ -30,6 +31,14 @@ trait TaskTableConcern
                 ->label(__('tasks.columns.project'))
                 ->sortable();
         }
+
+        $columns[] = TextColumn::make('externalIssueLink.binding.kind')
+            ->label(__('tasks.columns.source'))
+            ->badge()
+            ->color('gray')
+            ->icon('heroicon-o-arrow-down-tray')
+            ->formatStateUsing(fn (?TaskProviderKind $state): string => $state?->label() ?? '—')
+            ->placeholder('—');
 
         $columns[] = TextColumn::make('workflow_status')
             ->label(__('tasks.columns.workflow'))
