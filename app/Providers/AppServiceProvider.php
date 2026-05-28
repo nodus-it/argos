@@ -14,6 +14,7 @@ use App\Services\IssueTracker\BitbucketIssueTracker;
 use App\Services\IssueTracker\GitHubIssueTracker;
 use App\Services\IssueTracker\GitLabIssueTracker;
 use App\Services\IssueTracker\IssueTrackerRegistry;
+use App\Services\IssueTracker\LinearIssueTracker;
 use App\Workers\Agents\AgentRegistry;
 use App\Workers\Agents\ClaudeCodeRunner;
 use App\Workers\Agents\CodexRunner;
@@ -85,8 +86,10 @@ class AppServiceProvider extends ServiceProvider
                 fn (string $token, string $instanceUrl): BitbucketIssueTracker => new BitbucketIssueTracker($token),
             );
 
-            // Linear is on the roadmap but has no implementation yet.
-            // Register its provider key once LinearIssueTracker is built.
+            $registry->register(
+                'linear',
+                fn (string $token, string $instanceUrl): LinearIssueTracker => new LinearIssueTracker($token),
+            );
 
             return $registry;
         });

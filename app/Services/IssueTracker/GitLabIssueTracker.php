@@ -42,7 +42,7 @@ class GitLabIssueTracker implements IssueTrackerContract
         return $issues;
     }
 
-    public function getIssue(string $owner, string $project, int $issueNumber): array
+    public function getIssue(string $owner, string $project, int|string $issueNumber): array
     {
         $projectPath = $this->encodePath($owner, $project);
         $base = "/projects/{$projectPath}/issues/{$issueNumber}";
@@ -66,7 +66,7 @@ class GitLabIssueTracker implements IssueTrackerContract
     public function createComment(
         string $owner,
         string $project,
-        int $issueNumber,
+        int|string $issueNumber,
         string $body,
     ): array {
         $projectPath = $this->encodePath($owner, $project);

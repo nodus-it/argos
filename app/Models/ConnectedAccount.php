@@ -92,8 +92,14 @@ class ConnectedAccount extends Model
      */
     public function relinkOrphanedRepoProfiles(): int
     {
+        $gitProvider = GitProvider::tryFrom($this->provider);
+
+        if ($gitProvider === null) {
+            return 0;
+        }
+
         return RepoProfile::query()
-            ->where('platform', GitProvider::from($this->provider))
+            ->where('platform', $gitProvider)
             ->where('auth_method', AuthMethod::OAuth)
             ->whereNull('connected_account_id')
             ->update(['connected_account_id' => $this->id]);

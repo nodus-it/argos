@@ -87,7 +87,7 @@ final class IssueWebhookController extends Controller
         return match ($kind) {
             TaskProviderKind::GitHub => (string) $request->header('X-Hub-Signature-256', ''),
             TaskProviderKind::GitLab => (string) $request->header('X-Gitlab-Token', ''),
-            default => '',
+            TaskProviderKind::Linear => (string) $request->header('Linear-Signature', ''),
         };
     }
 
@@ -96,7 +96,7 @@ final class IssueWebhookController extends Controller
         return match ($kind) {
             TaskProviderKind::GitHub => $request->header('X-GitHub-Delivery'),
             TaskProviderKind::GitLab => $request->header('X-Gitlab-Event-UUID'),
-            default => null,
+            TaskProviderKind::Linear => $request->header('Linear-Delivery'),
         };
     }
 

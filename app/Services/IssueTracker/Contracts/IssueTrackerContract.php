@@ -17,7 +17,7 @@ interface IssueTrackerContract
      *
      * @return array<string, mixed>
      */
-    public function getIssue(string $owner, string $project, int $issueNumber): array;
+    public function getIssue(string $owner, string $project, int|string $issueNumber): array;
 
     /**
      * @return array<string, mixed>
@@ -25,7 +25,7 @@ interface IssueTrackerContract
     public function createComment(
         string $owner,
         string $project,
-        int $issueNumber,
+        int|string $issueNumber,
         string $body,
     ): array;
 
