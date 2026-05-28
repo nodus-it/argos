@@ -17,6 +17,25 @@ class GitHubIssueTracker implements IssueTrackerContract
 
     public function __construct(private readonly string $token) {}
 
+    public function listReferences(): array
+    {
+        $response = $this->http()->get('/user/repos', [
+            'per_page' => 100,
+            'sort' => 'updated',
+            'affiliation' => 'owner,collaborator,organization_member',
+        ])->throw();
+
+        $refs = [];
+        foreach ($response->json() as $repo) {
+            $fullName = (string) ($repo['full_name'] ?? '');
+            if ($fullName !== '') {
+                $refs[$fullName] = $fullName;
+            }
+        }
+
+        return $refs;
+    }
+
     public function listIssues(string $owner, string $project, array $filters = []): array
     {
         // Default state to 'open' when no state filter is provided

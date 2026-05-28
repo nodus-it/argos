@@ -85,6 +85,40 @@ class LinearIssueTrackerTest extends TestCase
         Http::assertSent(fn ($r) => $r->hasHeader('Authorization', 'Bearer lin_api_test_token'));
     }
 
+    // ── listReferences ───────────────────────────────────────────────────────
+
+    public function test_list_references_maps_team_keys_to_labelled_options(): void
+    {
+        Http::fake([
+            self::GRAPHQL_URL => Http::response([
+                'data' => [
+                    'teams' => [
+                        'nodes' => [
+                            ['key' => 'ENG', 'name' => 'Engineering'],
+                            ['key' => 'OPS', 'name' => ''],
+                        ],
+                    ],
+                ],
+            ]),
+        ]);
+
+        $refs = $this->tracker->listReferences();
+
+        $this->assertSame([
+            'ENG' => 'ENG — Engineering',
+            'OPS' => 'OPS',
+        ], $refs);
+
+        Http::assertSent(function ($request): bool {
+            $body = json_decode($request->body(), true);
+
+            // Linear rejects `variables: []` — a variable-less query must omit the key.
+            return str_contains((string) ($body['query'] ?? ''), 'teams')
+                && ! array_key_exists('variables', $body)
+                && $request->hasHeader('Authorization', 'Bearer lin_api_test_token');
+        });
+    }
+
     // ── getIssue ─────────────────────────────────────────────────────────────
 
     public function test_get_issue_fetches_by_uuid(): void

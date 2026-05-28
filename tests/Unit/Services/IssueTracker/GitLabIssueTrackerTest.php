@@ -10,6 +10,44 @@ use Tests\TestCase;
 
 class GitLabIssueTrackerTest extends TestCase
 {
+    public function test_list_references_maps_path_with_namespace_to_ref_options(): void
+    {
+        Http::fake([
+            'https://gitlab.com/api/v4/projects*' => Http::response([
+                ['path_with_namespace' => 'acme/widget'],
+                ['path_with_namespace' => 'acme/sub/gadget'],
+            ]),
+        ]);
+
+        $refs = (new GitLabIssueTracker('glpat-tok'))->listReferences();
+
+        $this->assertSame([
+            'acme/widget' => 'acme/widget',
+            'acme/sub/gadget' => 'acme/sub/gadget',
+        ], $refs);
+
+        Http::assertSent(function ($request): bool {
+            parse_str(parse_url((string) $request->url(), PHP_URL_QUERY) ?? '', $query);
+
+            return $request->hasHeader('Authorization', 'Bearer glpat-tok')
+                && str_starts_with((string) $request->url(), 'https://gitlab.com/api/v4/projects')
+                && ($query['membership'] ?? '') === '1';
+        });
+    }
+
+    public function test_list_references_uses_self_hosted_instance_url(): void
+    {
+        Http::fake([
+            'https://gitlab.example.com/api/v4/projects*' => Http::response([
+                ['path_with_namespace' => 'team/repo'],
+            ]),
+        ]);
+
+        $refs = (new GitLabIssueTracker('tok', 'https://gitlab.example.com'))->listReferences();
+
+        $this->assertSame(['team/repo' => 'team/repo'], $refs);
+    }
+
     public function test_list_issues_uses_bearer_auth(): void
     {
         Http::fake([

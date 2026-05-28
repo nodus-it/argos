@@ -29,21 +29,33 @@ class IssueTrackerRegistry
      */
     public function make(TaskProviderKind $kind, TaskProviderBinding $binding): IssueTrackerContract
     {
-        $key = $kind->value;
-
-        if (! isset($this->providers[$key])) {
-            throw new InvalidArgumentException("Kein Issue-Tracker-Provider registriert für: {$key}");
-        }
-
         $account = $binding->connectedAccount;
         $token = $account instanceof ConnectedAccount ? $account->token : '';
         $instanceUrl = $account instanceof ConnectedAccount ? $account->getInstanceUrl() : '';
 
-        return ($this->providers[$key])($token, $instanceUrl);
+        return $this->build($kind->value, $token, $instanceUrl);
+    }
+
+    /**
+     * Build an IssueTrackerContract straight from a ConnectedAccount, without a
+     * persisted binding — used by the setup UI to list selectable references.
+     */
+    public function makeFromAccount(TaskProviderKind $kind, ConnectedAccount $account): IssueTrackerContract
+    {
+        return $this->build($kind->value, $account->token, $account->getInstanceUrl());
     }
 
     public function has(TaskProviderKind $kind): bool
     {
         return isset($this->providers[$kind->value]);
+    }
+
+    private function build(string $key, string $token, string $instanceUrl): IssueTrackerContract
+    {
+        if (! isset($this->providers[$key])) {
+            throw new InvalidArgumentException("Kein Issue-Tracker-Provider registriert für: {$key}");
+        }
+
+        return ($this->providers[$key])($token, $instanceUrl);
     }
 }

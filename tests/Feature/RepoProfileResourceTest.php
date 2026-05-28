@@ -14,7 +14,9 @@ use App\Filament\Admin\Resources\RepoProfileResource\RelationManagers\TasksRelat
 use App\Models\ConnectedAccount;
 use App\Models\RepoProfile;
 use App\Models\Task;
+use App\Models\TaskProviderBinding;
 use App\Models\User;
+use Filament\Actions\CreateAction;
 use Filament\Actions\Testing\TestAction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -434,6 +436,62 @@ class RepoProfileResourceTest extends TestCase
         Livewire::test(ViewRepoProfile::class, ['record' => $profile->getKey()])
             ->assertSuccessful()
             ->assertSee('Task-Provider');
+    }
+
+    public function test_binding_create_form_loads_project_refs_from_provider(): void
+    {
+        $profile = RepoProfile::factory()->create();
+        $account = ConnectedAccount::factory()->create([
+            'user_id' => $this->user->id,
+            'provider' => 'github',
+        ]);
+
+        Http::fake([
+            'api.github.com/user/repos*' => Http::response([
+                ['full_name' => 'acme/widget'],
+                ['full_name' => 'acme/gadget'],
+            ]),
+        ]);
+
+        Livewire::test(TaskProviderBindingsRelationManager::class, [
+            'ownerRecord' => $profile,
+            'pageClass' => EditRepoProfile::class,
+        ])
+            ->callAction(TestAction::make(CreateAction::class)->table(), [
+                'kind' => 'github',
+                'mode' => 'poll',
+                'connected_account_id' => $account->id,
+                'external_project_ref' => 'acme/widget',
+            ])
+            ->assertHasNoActionErrors();
+
+        $this->assertDatabaseHas(TaskProviderBinding::class, [
+            'repo_profile_id' => $profile->id,
+            'kind' => 'github',
+            'external_project_ref' => 'acme/widget',
+        ]);
+    }
+
+    public function test_binding_account_options_are_filtered_by_provider(): void
+    {
+        $profile = RepoProfile::factory()->create();
+        $githubAccount = ConnectedAccount::factory()->create([
+            'user_id' => $this->user->id,
+            'provider' => 'github',
+        ]);
+
+        // Picking Linear must exclude the GitHub account from the account
+        // options, so selecting it fails the Select's implicit `in` rule.
+        Livewire::test(TaskProviderBindingsRelationManager::class, [
+            'ownerRecord' => $profile,
+            'pageClass' => EditRepoProfile::class,
+        ])
+            ->callAction(TestAction::make(CreateAction::class)->table(), [
+                'kind' => 'linear',
+                'mode' => 'poll',
+                'connected_account_id' => $githubAccount->id,
+            ])
+            ->assertHasActionErrors(['connected_account_id']);
     }
 
     public function test_tasks_relation_manager_shows_tasks(): void

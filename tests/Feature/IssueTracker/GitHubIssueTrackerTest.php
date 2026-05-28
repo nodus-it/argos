@@ -18,6 +18,35 @@ class GitHubIssueTrackerTest extends TestCase
         $this->tracker = new GitHubIssueTracker('ghp_test_token');
     }
 
+    // ── listReferences ───────────────────────────────────────────────────────
+
+    public function test_list_references_maps_full_names_to_ref_options(): void
+    {
+        Http::fake([
+            'https://api.github.com/user/repos*' => Http::response([
+                ['full_name' => 'acme/widget'],
+                ['full_name' => 'acme/gadget'],
+            ]),
+        ]);
+
+        $refs = $this->tracker->listReferences();
+
+        $this->assertSame([
+            'acme/widget' => 'acme/widget',
+            'acme/gadget' => 'acme/gadget',
+        ], $refs);
+
+        Http::assertSent(fn ($r) => $r->hasHeader('Authorization', 'Bearer ghp_test_token')
+            && str_starts_with($r->url(), 'https://api.github.com/user/repos'));
+    }
+
+    public function test_list_references_returns_empty_when_no_repos(): void
+    {
+        Http::fake(['https://api.github.com/user/repos*' => Http::response([])]);
+
+        $this->assertSame([], $this->tracker->listReferences());
+    }
+
     // ── registerWebhook ──────────────────────────────────────────────────────
 
     public function test_register_webhook_posts_to_github_hooks_endpoint(): void

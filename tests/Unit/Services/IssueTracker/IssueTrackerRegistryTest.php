@@ -8,6 +8,7 @@ use App\Enums\TaskProviderKind;
 use App\Models\ConnectedAccount;
 use App\Models\TaskProviderBinding;
 use App\Services\IssueTracker\GitHubIssueTracker;
+use App\Services\IssueTracker\GitLabIssueTracker;
 use App\Services\IssueTracker\IssueTrackerRegistry;
 use Illuminate\Support\Facades\Crypt;
 use InvalidArgumentException;
@@ -80,6 +81,41 @@ class IssueTrackerRegistryTest extends TestCase
         $this->registry->make(TaskProviderKind::GitHub, $binding);
 
         $this->assertSame('my-token', $captured['token']);
+    }
+
+    public function test_make_from_account_passes_token_and_instance_url(): void
+    {
+        $captured = [];
+        $this->registry->register(
+            'gitlab',
+            function (string $token, string $instanceUrl) use (&$captured): GitLabIssueTracker {
+                $captured = ['token' => $token, 'instanceUrl' => $instanceUrl];
+
+                return new GitLabIssueTracker($token, $instanceUrl);
+            }
+        );
+
+        $account = new ConnectedAccount;
+        $account->setRawAttributes([
+            'token' => Crypt::encryptString('gl-token'),
+            'instance_url' => 'https://gitlab.example.com',
+        ]);
+
+        $tracker = $this->registry->makeFromAccount(TaskProviderKind::GitLab, $account);
+
+        $this->assertInstanceOf(GitLabIssueTracker::class, $tracker);
+        $this->assertSame('gl-token', $captured['token']);
+        $this->assertSame('https://gitlab.example.com', $captured['instanceUrl']);
+    }
+
+    public function test_make_from_account_throws_for_unregistered_provider(): void
+    {
+        $account = new ConnectedAccount;
+        $account->setRawAttributes(['token' => Crypt::encryptString('tok')]);
+
+        $this->expectException(InvalidArgumentException::class);
+
+        $this->registry->makeFromAccount(TaskProviderKind::GitHub, $account);
     }
 
     public function test_global_registry_has_github_gitlab_bitbucket_linear(): void

@@ -16,6 +16,26 @@ class GitLabIssueTracker implements IssueTrackerContract
         private readonly string $instanceUrl = 'https://gitlab.com',
     ) {}
 
+    public function listReferences(): array
+    {
+        $response = $this->http()->get('/projects', [
+            'membership' => true,
+            'simple' => true,
+            'per_page' => 100,
+            'order_by' => 'last_activity_at',
+        ])->throw();
+
+        $refs = [];
+        foreach ($response->json() as $project) {
+            $path = (string) ($project['path_with_namespace'] ?? '');
+            if ($path !== '') {
+                $refs[$path] = $path;
+            }
+        }
+
+        return $refs;
+    }
+
     public function listIssues(string $owner, string $project, array $filters = []): array
     {
         if (! isset($filters['state']) || $filters['state'] === '') {

@@ -7,6 +7,19 @@ namespace App\Services\IssueTracker\Contracts;
 interface IssueTrackerContract
 {
     /**
+     * List the references a binding can be scoped to, for the given account's token.
+     *
+     * The array key is the exact value that belongs in
+     * TaskProviderBinding::$external_project_ref (and is consumed by parseRef);
+     * the value is a human-readable label for the UI. Examples:
+     *   - GitHub/GitLab/Bitbucket: 'owner/repo' => 'owner/repo'
+     *   - Linear:                  'ENG' => 'ENG — Engineering' (team key)
+     *
+     * @return array<string, string>
+     */
+    public function listReferences(): array;
+
+    /**
      * @param  array<string, mixed>  $filters  e.g. state, labels, assignee, milestone
      * @return array<int, array<string, mixed>>
      */

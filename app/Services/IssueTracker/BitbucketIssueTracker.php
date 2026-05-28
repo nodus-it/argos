@@ -30,6 +30,31 @@ class BitbucketIssueTracker implements IssueTrackerContract
         }
     }
 
+    public function listReferences(): array
+    {
+        $response = $this->http()->get('/repositories', [
+            'role' => 'member',
+            'pagelen' => 100,
+            'sort' => '-updated_on',
+        ]);
+
+        if ($response->status() === 403 || $response->status() === 404) {
+            return [];
+        }
+
+        $response->throw();
+
+        $refs = [];
+        foreach ($response->json('values', []) as $repo) {
+            $fullName = (string) ($repo['full_name'] ?? '');
+            if ($fullName !== '') {
+                $refs[$fullName] = $fullName;
+            }
+        }
+
+        return $refs;
+    }
+
     public function listIssues(string $owner, string $project, array $filters = []): array
     {
         // Bitbucket returns 403 when the issue tracker is disabled — treat as empty.

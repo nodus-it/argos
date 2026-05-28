@@ -10,6 +10,7 @@ use App\Enums\TaskProviderSyncStatus;
 use App\Models\ConnectedAccount;
 use App\Models\TaskProviderBinding;
 use App\Models\User;
+use App\Services\IssueTracker\IssueTrackerRegistry;
 use App\Services\IssueTracker\ProviderSetupService;
 use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
@@ -17,14 +18,16 @@ use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TagsInput;
-use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 
 class TaskProviderBindingsRelationManager extends RelationManager
 {
@@ -44,6 +47,8 @@ class TaskProviderBindingsRelationManager extends RelationManager
                     ->mapWithKeys(fn (TaskProviderKind $k): array => [$k->value => $k->label()])
                     ->all())
                 ->required()
+                ->live()
+                ->afterStateUpdated(fn (Set $set): mixed => $set('external_project_ref', null))
                 ->native(false),
 
             Select::make('mode')
@@ -56,32 +61,91 @@ class TaskProviderBindingsRelationManager extends RelationManager
 
             Select::make('connected_account_id')
                 ->label('OAuth-Account')
-                ->options(function (): array {
+                ->options(function (Get $get): array {
                     /** @var User|null $user */
                     $user = Auth::user();
                     if ($user === null) {
                         return [];
                     }
 
+                    $kind = TaskProviderKind::tryFrom((string) $get('kind'));
+
                     return $user->connectedAccounts()
+                        ->when(
+                            $kind !== null,
+                            fn ($query) => $query->where('provider', $kind->providerKey()),
+                        )
                         ->get()
                         ->mapWithKeys(fn (ConnectedAccount $account): array => [
                             $account->id => "{$account->provider}: ".($account->name ?? $account->nickname ?? "#{$account->id}"),
                         ])
                         ->all();
                 })
+                ->live()
+                ->afterStateUpdated(fn (Set $set): mixed => $set('external_project_ref', null))
                 ->nullable()
                 ->native(false),
 
-            TextInput::make('external_project_ref')
-                ->label('Projekt-Referenz (owner/repo)')
-                ->placeholder('owner/repo')
+            Select::make('external_project_ref')
+                ->label('Projekt / Team')
+                ->options(fn (Get $get): array => $this->loadProjectRefOptions($get))
+                ->searchable()
+                ->native(false)
+                ->placeholder('Erst Provider und OAuth-Account wählen')
+                ->helperText('Wird automatisch aus dem verbundenen Account geladen.')
                 ->nullable(),
 
             TagsInput::make('filters.labels')
                 ->label('Labels-Filter')
                 ->nullable(),
         ]);
+    }
+
+    /**
+     * Load the selectable project/team references for the chosen provider and
+     * OAuth account. Cached for 60s per (kind, account) to avoid hammering the
+     * provider API on every live form update. API failures degrade to an empty
+     * list rather than breaking the form. The currently stored value is always
+     * kept selectable, even if it is not (or no longer) in the fetched list.
+     *
+     * @return array<string, string>
+     */
+    protected function loadProjectRefOptions(Get $get): array
+    {
+        $kind = TaskProviderKind::tryFrom((string) $get('kind'));
+        $accountId = $get('connected_account_id');
+
+        $options = [];
+
+        if ($kind !== null && $accountId !== null) {
+            $account = ConnectedAccount::find($accountId);
+
+            if ($account instanceof ConnectedAccount) {
+                $cacheKey = "provider_refs:{$kind->value}:{$account->id}";
+                $options = Cache::get($cacheKey);
+
+                if (! is_array($options)) {
+                    try {
+                        $options = app(IssueTrackerRegistry::class)
+                            ->makeFromAccount($kind, $account)
+                            ->listReferences();
+                    } catch (\Throwable) {
+                        $options = [];
+                    }
+
+                    if ($options !== []) {
+                        Cache::put($cacheKey, $options, now()->addSeconds(60));
+                    }
+                }
+            }
+        }
+
+        $current = $get('external_project_ref');
+        if (is_string($current) && $current !== '' && ! array_key_exists($current, $options)) {
+            $options[$current] = $current;
+        }
+
+        return $options;
     }
 
     public function table(Table $table): Table

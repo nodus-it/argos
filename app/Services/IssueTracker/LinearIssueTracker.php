@@ -15,6 +15,28 @@ class LinearIssueTracker implements IssueTrackerContract
 
     public function __construct(private readonly string $token) {}
 
+    public function listReferences(): array
+    {
+        $result = $this->graphql('
+            query ListTeams {
+                teams(first: 250) {
+                    nodes { key name }
+                }
+            }
+        ');
+
+        $refs = [];
+        foreach ($result['data']['teams']['nodes'] ?? [] as $team) {
+            $key = (string) ($team['key'] ?? '');
+            if ($key !== '') {
+                $name = (string) ($team['name'] ?? '');
+                $refs[$key] = $name !== '' ? "{$key} — {$name}" : $key;
+            }
+        }
+
+        return $refs;
+    }
+
     public function listIssues(string $owner, string $project, array $filters = []): array
     {
         // $owner carries the team key (e.g. 'ENG'); $project is empty for Linear.
@@ -222,11 +244,16 @@ class LinearIssueTracker implements IssueTrackerContract
      */
     private function graphql(string $query, array $variables = []): array
     {
+        $payload = ['query' => $query];
+
+        // Linear rejects `variables: []` (an empty PHP array encodes to a JSON
+        // array, not an object) — omit the key entirely for variable-less queries.
+        if ($variables !== []) {
+            $payload['variables'] = $variables;
+        }
+
         return $this->http()
-            ->post(self::GRAPHQL_URL, [
-                'query' => $query,
-                'variables' => $variables,
-            ])
+            ->post(self::GRAPHQL_URL, $payload)
             ->throw()
             ->json();
     }
