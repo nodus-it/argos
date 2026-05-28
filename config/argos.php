@@ -63,6 +63,7 @@ return [
         'setup_github' => 'https://github.com/nodus-it/argos/blob/master/docs/SETUP-GITHUB.md',
         'setup_gitlab' => 'https://github.com/nodus-it/argos/blob/master/docs/SETUP-GITLAB.md',
         'setup_bitbucket' => 'https://github.com/nodus-it/argos/blob/master/docs/SETUP-BITBUCKET.md',
+        'setup_linear' => 'https://github.com/nodus-it/argos/blob/master/docs/SETUP-LINEAR.md',
         'contributing' => 'https://github.com/nodus-it/argos/blob/master/docs/CONTRIBUTING.md',
         'github_pat' => 'https://github.com/settings/tokens',
         'gitlab_pat' => 'https://gitlab.com/-/user_settings/personal_access_tokens',

@@ -182,5 +182,63 @@
             @endif
         </x-filament::section>
 
+        <x-filament::section heading="{{ __('accounts.blade.linear_section') }}">
+            @if ($accounts['linear'])
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        @if ($accounts['linear']->avatar)
+                            <img src="{{ $accounts['linear']->avatar }}" alt="Avatar" class="h-10 w-10 rounded-full">
+                        @endif
+                        <div>
+                            <p class="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                {{ $accounts['linear']->name ?? $accounts['linear']->nickname }}
+                            </p>
+                            @if ($accounts['linear']->nickname)
+                                <p class="text-xs text-gray-500 dark:text-gray-400">{{ $accounts['linear']->nickname }}</p>
+                            @endif
+                        </div>
+                        <x-filament::badge color="success">{{ __('accounts.blade.badge_connected') }}</x-filament::badge>
+                    </div>
+
+                    <x-filament::button
+                        wire:click="disconnectLinear"
+                        wire:confirm="{{ __('accounts.blade.disconnect') }}?"
+                        color="danger"
+                        size="sm"
+                    >
+                        {{ __('accounts.blade.disconnect') }}
+                    </x-filament::button>
+                </div>
+            @elseif (!$this->isLinearConfigured())
+                <div class="flex items-center gap-3">
+                    <x-filament::badge color="gray">{{ __('accounts.blade.badge_not_configured') }}</x-filament::badge>
+                    <span class="text-sm text-gray-500 dark:text-gray-400">
+                        {{ __('accounts.blade.linear_not_configured_description') }}
+                    </span>
+                </div>
+                <div class="mt-3">
+                    <a href="{{ config('argos.docs.setup_linear') }}" target="_blank" rel="noopener" class="text-xs underline text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200">
+                        {{ __('accounts.blade.setup_link') }} ↗
+                    </a>
+                </div>
+            @else
+                <div class="flex items-center gap-3">
+                    <x-filament::badge color="gray">{{ __('accounts.blade.badge_not_connected') }}</x-filament::badge>
+                    <span class="text-sm text-gray-500 dark:text-gray-400">
+                        {{ __('accounts.blade.linear_not_connected_description') }}
+                    </span>
+                </div>
+                <div class="mt-4">
+                    <x-filament::button
+                        tag="a"
+                        href="{{ route('auth.linear.redirect') }}"
+                        icon="heroicon-o-arrow-right-circle"
+                    >
+                        {{ __('accounts.blade.connect_linear') }}
+                    </x-filament::button>
+                </div>
+            @endif
+        </x-filament::section>
+
     </div>
 </x-filament-panels::page>

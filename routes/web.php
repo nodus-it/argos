@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Auth\BitbucketConnectedAccountController;
 use App\Http\Controllers\Auth\ConnectedAccountController;
+use App\Http\Controllers\Auth\LinearConnectedAccountController;
 use App\Http\Controllers\TaskLogController;
 use App\Http\Controllers\Webhooks\IssueWebhookController;
 use Illuminate\Support\Facades\Route;
@@ -56,4 +57,13 @@ Route::middleware('auth')->group(function () {
 
     Route::post('/auth/bitbucket/disconnect', [BitbucketConnectedAccountController::class, 'disconnect'])
         ->name('auth.bitbucket.disconnect');
+
+    Route::get('/auth/linear/redirect', [LinearConnectedAccountController::class, 'redirect'])
+        ->name('auth.linear.redirect');
+
+    Route::get('/auth/linear/callback', [LinearConnectedAccountController::class, 'callback'])
+        ->name('auth.linear.callback');
+
+    Route::post('/auth/linear/disconnect', [LinearConnectedAccountController::class, 'disconnect'])
+        ->name('auth.linear.disconnect');
 });

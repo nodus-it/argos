@@ -48,7 +48,7 @@ class GitHubIssueTracker implements IssueTrackerContract
         return $issues;
     }
 
-    public function getIssue(string $owner, string $project, int $issueNumber): array
+    public function getIssue(string $owner, string $project, int|string $issueNumber): array
     {
         $base = "/repos/{$owner}/{$project}/issues/{$issueNumber}";
 
@@ -70,7 +70,7 @@ class GitHubIssueTracker implements IssueTrackerContract
     public function createComment(
         string $owner,
         string $project,
-        int $issueNumber,
+        int|string $issueNumber,
         string $body,
     ): array {
         return $this->http()

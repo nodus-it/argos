@@ -11,12 +11,14 @@ return [
         'connect_github' => 'Mit GitHub verbinden',
         'connect_gitlab' => 'Mit GitLab verbinden',
         'connect_bitbucket' => 'Mit Bitbucket verbinden',
+        'connect_linear' => 'Mit Linear verbinden',
     ],
 
     'notifications' => [
         'github_disconnected' => 'GitHub-Verbindung getrennt',
         'gitlab_disconnected' => 'GitLab-Verbindung getrennt',
         'bitbucket_disconnected' => 'Bitbucket-Verbindung getrennt',
+        'linear_disconnected' => 'Linear-Verbindung getrennt',
     ],
 
     'blade' => [
@@ -35,6 +37,10 @@ return [
         'bitbucket_not_connected_description' => 'Verbinde deinen Bitbucket-Account, um Repos und Branches direkt auszuwählen.',
         'connect_bitbucket' => 'Mit Bitbucket verbinden',
         'bitbucket_not_configured_description' => 'Setze BITBUCKET_CLIENT_ID und BITBUCKET_CLIENT_SECRET in deiner .env, um die Bitbucket-Integration zu aktivieren.',
+        'linear_section' => 'Linear',
+        'linear_not_connected_description' => 'Verbinde deinen Linear-Account, um Issues zu importieren und Webhooks direkt zu verwalten.',
+        'connect_linear' => 'Mit Linear verbinden',
+        'linear_not_configured_description' => 'Setze LINEAR_CLIENT_ID und LINEAR_CLIENT_SECRET in deiner .env, um die Linear-Integration zu aktivieren.',
         'setup_link' => 'Setup-Anleitung',
         'github_not_configured_description' => 'Setze GITHUB_CLIENT_ID und GITHUB_CLIENT_SECRET in deiner .env, um die GitHub-OAuth-Integration zu aktivieren.',
     ],

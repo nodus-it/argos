@@ -1,11 +1,11 @@
 # Task-Provider-Anbindung (Issue-Tracker)
 
-Argos kann Issues aus externen Systemen (GitHub, GitLab) als Tasks importieren und bei Phasenabschluss automatisch einen Kommentar im Issue hinterlassen.
+Argos kann Issues aus externen Systemen (GitHub, GitLab, Linear) als Tasks importieren und bei Phasenabschluss automatisch einen Kommentar im Issue hinterlassen.
 
 ## Voraussetzungen
 
-- Ein konfiguriertes **Connected Account** (OAuth) für GitHub oder GitLab
-  (siehe `docs/SETUP-GITHUB.md` bzw. `docs/SETUP-GITLAB.md`)
+- Ein konfiguriertes **Connected Account** (OAuth) für GitHub, GitLab oder Linear
+  (siehe `docs/SETUP-GITHUB.md`, `docs/SETUP-GITLAB.md` bzw. `docs/SETUP-LINEAR.md`)
 - Das Projekt (Repo Profile) muss bereits in Argos angelegt sein
 
 ## Binding anlegen
@@ -16,10 +16,10 @@ Argos kann Issues aus externen Systemen (GitHub, GitLab) als Tasks importieren u
 
 | Feld | Beschreibung |
 |---|---|
-| **Kind** | GitHub oder GitLab |
+| **Kind** | GitHub, GitLab oder Linear |
 | **Mode** | `Poll` (periodisches Abrufen alle 5 min) oder `Webhook` (Push-Events) |
 | **Connected Account** | Das OAuth-Konto mit API-Zugriff |
-| **External Project Ref** | Repository im Format `owner/repo` (z. B. `acme/widget`) |
+| **External Project Ref** | GitHub/GitLab: `owner/repo` (z. B. `acme/widget`); Linear: Team-Key (z. B. `ENG`) |
 | **Labels** | Optional: nur Issues mit diesen Labels werden importiert |
 
 4. Speichern → Binding ist im Status **Pending**
@@ -40,6 +40,10 @@ gibt die Webhook-URL aus. Diese URL muss im externen System eingetragen werden:
 - URL: `https://<ARGOS_URL>/webhooks/issues/gitlab/<binding-id>`
 - Secret token: (das generierte Secret)
 - Trigger: **Issues events**
+
+**Linear:** Wird automatisch beim Setup registriert — kein manueller Schritt im Linear-Interface erforderlich (OAuth-Scope `admin` ist Voraussetzung).
+- Webhook-URL: `https://<ARGOS_URL>/webhooks/issues/linear/<binding-id>`
+- Signatur: HMAC-SHA256 im `Linear-Signature`-Header
 
 ## Poll-Modus
 

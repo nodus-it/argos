@@ -45,7 +45,7 @@ class BitbucketIssueTracker implements IssueTrackerContract
         return $response->json('values', []);
     }
 
-    public function getIssue(string $owner, string $project, int $issueNumber): array
+    public function getIssue(string $owner, string $project, int|string $issueNumber): array
     {
         $base = "/repositories/{$owner}/{$project}/issues/{$issueNumber}";
 
@@ -62,7 +62,7 @@ class BitbucketIssueTracker implements IssueTrackerContract
     public function createComment(
         string $owner,
         string $project,
-        int $issueNumber,
+        int|string $issueNumber,
         string $body,
     ): array {
         return $this->http()

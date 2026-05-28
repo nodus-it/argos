@@ -40,7 +40,7 @@ final class IssueCommentNotifier
             $tracker = $this->registry->make($binding->kind, $binding);
 
             [$owner, $project] = $this->parseRef($binding->external_project_ref ?? '');
-            $issueNumber = (int) $link->external_id;
+            $issueNumber = $link->external_id;
             $body = $this->formatComment($task, $phase, $status);
 
             $tracker->createComment($owner, $project, $issueNumber, $body);

@@ -25,7 +25,7 @@ enum TaskProviderKind: string
         return match ($this) {
             self::GitHub => 'github',
             self::GitLab => 'gitlab',
-            self::Linear => null,
+            self::Linear => 'linear',
         };
     }
 }

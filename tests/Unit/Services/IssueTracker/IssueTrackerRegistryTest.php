@@ -82,18 +82,12 @@ class IssueTrackerRegistryTest extends TestCase
         $this->assertSame('my-token', $captured['token']);
     }
 
-    public function test_linear_is_not_registered_in_global_registry(): void
-    {
-        $registry = app(IssueTrackerRegistry::class);
-
-        $this->assertFalse($registry->has(TaskProviderKind::Linear));
-    }
-
-    public function test_global_registry_has_github_gitlab_bitbucket(): void
+    public function test_global_registry_has_github_gitlab_bitbucket_linear(): void
     {
         $registry = app(IssueTrackerRegistry::class);
 
         $this->assertTrue($registry->has(TaskProviderKind::GitHub));
         $this->assertTrue($registry->has(TaskProviderKind::GitLab));
+        $this->assertTrue($registry->has(TaskProviderKind::Linear));
     }
 }
