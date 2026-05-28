@@ -6,6 +6,7 @@ namespace App\Services\IssueTracker;
 
 use App\Services\IssueTracker\Contracts\IssueTrackerContract;
 use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 
 class GitLabIssueTracker implements IssueTrackerContract
@@ -17,12 +18,28 @@ class GitLabIssueTracker implements IssueTrackerContract
 
     public function listIssues(string $owner, string $project, array $filters = []): array
     {
-        $projectPath = $this->encodePath($owner, $project);
+        if (! isset($filters['state']) || $filters['state'] === '') {
+            $filters['state'] = 'opened';
+        }
 
-        return $this->http()
-            ->get("/projects/{$projectPath}/issues", ['per_page' => 100, ...$filters])
-            ->throw()
-            ->json();
+        $projectPath = $this->encodePath($owner, $project);
+        $issues = [];
+        $params = ['per_page' => 100, ...$filters];
+
+        do {
+            $response = $this->http()
+                ->get("/projects/{$projectPath}/issues", $params)
+                ->throw();
+
+            $issues = array_merge($issues, $response->json());
+
+            $nextPage = $this->nextPageNumber($response);
+            if ($nextPage !== null) {
+                $params = ['per_page' => 100, 'page' => $nextPage, ...$filters];
+            }
+        } while ($nextPage !== null);
+
+        return $issues;
     }
 
     public function getIssue(string $owner, string $project, int $issueNumber): array
@@ -71,23 +88,67 @@ class GitLabIssueTracker implements IssueTrackerContract
 
     public function registerWebhook(string $owner, string $project, string $url, string $secret): array
     {
-        throw new \LogicException('registerWebhook not implemented yet for GitLab');
+        $projectPath = $this->encodePath($owner, $project);
+
+        return $this->http()
+            ->post("/projects/{$projectPath}/hooks", [
+                'url' => $url,
+                'token' => $secret,
+                'issues_events' => true,
+                'confidential_issues_events' => true,
+                'note_events' => false,
+                'enable_ssl_verification' => true,
+            ])
+            ->throw()
+            ->json();
     }
 
     public function unregisterWebhook(string $owner, string $project, int|string $webhookId): void
     {
-        throw new \LogicException('unregisterWebhook not implemented yet for GitLab');
+        $projectPath = $this->encodePath($owner, $project);
+
+        $this->http()
+            ->delete("/projects/{$projectPath}/hooks/{$webhookId}")
+            ->throw();
     }
 
     /**
-     * GitLab sends issue data directly in the envelope — no unwrapping needed.
+     * GitLab sends issue data in object_attributes — extract it for issue events only.
+     * Top-level labels (objects with 'title') are merged in as strings.
      *
      * @param  array<string, mixed>  $envelope
      * @return array<string, mixed>
      */
     public function normalizeWebhookPayload(array $envelope, ?string $eventType): array
     {
-        return $envelope;
+        if (($envelope['object_kind'] ?? null) !== 'issue') {
+            return [];
+        }
+
+        $issue = $envelope['object_attributes'] ?? null;
+
+        if (! is_array($issue) || empty($issue)) {
+            return [];
+        }
+
+        if (isset($envelope['labels']) && is_array($envelope['labels'])) {
+            $issue['labels'] = array_map(
+                fn (mixed $l): string => is_array($l) ? (string) ($l['title'] ?? '') : (string) $l,
+                $envelope['labels'],
+            );
+        }
+
+        return $issue;
+    }
+
+    private function nextPageNumber(Response $response): ?int
+    {
+        $header = $response->header('X-Next-Page');
+        if ($header === null || $header === '') {
+            return null;
+        }
+
+        return (int) $header;
     }
 
     private function encodePath(string $owner, string $project): string
