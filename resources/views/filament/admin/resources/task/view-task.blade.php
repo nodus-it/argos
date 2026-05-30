@@ -46,12 +46,12 @@
                 <span class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ __('tasks.view.labels.status') }}</span>
                 <span @class([
                     'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset',
-                    'text-gray-600 bg-gray-100 ring-gray-300 dark:text-gray-400 dark:bg-gray-800 dark:ring-gray-600' => $record->workflow_status->color() === 'gray',
-                    'text-amber-600 bg-amber-50 ring-amber-300 dark:text-amber-400 dark:bg-amber-400/10 dark:ring-amber-400/30' => $record->workflow_status->color() === 'warning',
-                    'text-blue-600 bg-blue-50 ring-blue-300 dark:text-blue-400 dark:bg-blue-400/10 dark:ring-blue-400/30' => in_array($record->workflow_status->color(), ['info', 'primary']),
-                    'text-emerald-600 bg-emerald-50 ring-emerald-300 dark:text-emerald-400 dark:bg-emerald-400/10 dark:ring-emerald-400/30' => $record->workflow_status->color() === 'success',
-                    'text-red-600 bg-red-50 ring-red-300 dark:text-red-400 dark:bg-red-400/10 dark:ring-red-400/30' => $record->workflow_status->color() === 'danger',
-                ])>{{ $record->workflow_status->label() }}</span>
+                    'text-gray-600 bg-gray-100 ring-gray-300 dark:text-gray-400 dark:bg-gray-800 dark:ring-gray-600' => $record->displayStatusColor() === 'gray',
+                    'text-amber-600 bg-amber-50 ring-amber-300 dark:text-amber-400 dark:bg-amber-400/10 dark:ring-amber-400/30' => $record->displayStatusColor() === 'warning',
+                    'text-blue-600 bg-blue-50 ring-blue-300 dark:text-blue-400 dark:bg-blue-400/10 dark:ring-blue-400/30' => in_array($record->displayStatusColor(), ['info', 'primary']),
+                    'text-emerald-600 bg-emerald-50 ring-emerald-300 dark:text-emerald-400 dark:bg-emerald-400/10 dark:ring-emerald-400/30' => $record->displayStatusColor() === 'success',
+                    'text-red-600 bg-red-50 ring-red-300 dark:text-red-400 dark:bg-red-400/10 dark:ring-red-400/30' => $record->displayStatusColor() === 'danger',
+                ])>{{ $record->displayStatusLabel() }}</span>
             </div>
 
             @if($record->repoProfile)

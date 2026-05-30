@@ -118,7 +118,10 @@ ENV DB_CONNECTION=mariadb \
     ARGOS_DB_USERNAME=argos \
     ARGOS_DB_PASSWORD=argos \
     ARGOS_CONFIG_DIR=/data/config \
-    QUEUE_CONNECTION=database \
+    QUEUE_CONNECTION=redis \
+    REDIS_HOST=redis \
+    REDIS_PORT=6379 \
+    REDIS_CLIENT=predis \
     SESSION_DRIVER=database \
     CACHE_STORE=database
 
