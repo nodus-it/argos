@@ -16,31 +16,69 @@ class ProviderDemoSeederTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_it_seeds_github_demo_profile_with_webhook_and_poll_bindings(): void
+    public function test_it_seeds_a_repo_profile_for_every_git_provider(): void
     {
         User::factory()->create();
 
         $this->seed(ProviderDemoSeeder::class);
 
-        $profile = RepoProfile::where('name', 'provider-demo (github)')->first();
-        $this->assertNotNull($profile);
-        $this->assertSame('github', $profile->platform->value);
-
-        $bindings = TaskProviderBinding::where('repo_profile_id', $profile->id)
-            ->where('kind', 'github')->get();
-        $this->assertCount(2, $bindings);
-        $this->assertEqualsCanonicalizing(
-            ['webhook', 'poll'],
-            $bindings->map(fn (TaskProviderBinding $b): string => $b->mode->value)->all(),
-        );
-
-        $webhook = $bindings->firstWhere('mode.value', 'webhook');
-        $this->assertNotNull($webhook->webhook_secret);
-        $this->assertSame(['labels' => ['argos-demo']], $webhook->filters);
-        $this->assertSame('nodus-it/argos-test', $webhook->external_project_ref);
+        // Defaults come from tests/External/providers.defaults.php.
+        foreach (['github', 'gitlab', 'bitbucket'] as $platform) {
+            $profile = RepoProfile::where('name', "provider-demo ({$platform})")->first();
+            $this->assertNotNull($profile, "{$platform} demo profile should exist");
+            $this->assertSame($platform, $profile->platform->value);
+        }
     }
 
-    public function test_it_links_an_existing_connected_account(): void
+    public function test_github_and_gitlab_get_webhook_and_poll_bindings_on_their_own_profile(): void
+    {
+        User::factory()->create();
+
+        $this->seed(ProviderDemoSeeder::class);
+
+        foreach (['github' => 'nodus-it/argos-test', 'gitlab' => 'bastian-schur/argos-test'] as $kind => $ref) {
+            $profile = RepoProfile::where('name', "provider-demo ({$kind})")->first();
+            $bindings = TaskProviderBinding::where('repo_profile_id', $profile->id)
+                ->where('kind', $kind)->get();
+
+            $this->assertEqualsCanonicalizing(
+                ['webhook', 'poll'],
+                $bindings->map(fn (TaskProviderBinding $b): string => $b->mode->value)->all(),
+                "{$kind} should have a webhook and a poll binding",
+            );
+            $this->assertSame($ref, $bindings->first()->external_project_ref);
+            $this->assertSame(['labels' => ['argos-demo']], $bindings->first()->filters);
+
+            $webhook = $bindings->firstWhere('mode.value', 'webhook');
+            $this->assertNotNull($webhook->webhook_secret);
+        }
+    }
+
+    public function test_linear_binding_hangs_off_the_bitbucket_profile(): void
+    {
+        config(['argos.provider_demo.linear_team' => 'ENG']);
+        User::factory()->create();
+
+        $this->seed(ProviderDemoSeeder::class);
+
+        $bitbucket = RepoProfile::where('name', 'provider-demo (bitbucket)')->first();
+        $linear = TaskProviderBinding::where('kind', 'linear')->get();
+
+        $this->assertCount(2, $linear); // webhook + poll
+        $this->assertSame($bitbucket->id, $linear->first()->repo_profile_id);
+        $this->assertSame('ENG', $linear->first()->external_project_ref);
+    }
+
+    public function test_linear_is_skipped_without_a_team_key(): void
+    {
+        User::factory()->create();
+
+        $this->seed(ProviderDemoSeeder::class);
+
+        $this->assertSame(0, TaskProviderBinding::where('kind', 'linear')->count());
+    }
+
+    public function test_it_links_existing_connected_accounts(): void
     {
         $user = User::factory()->create();
         $account = ConnectedAccount::factory()->create([
@@ -50,8 +88,10 @@ class ProviderDemoSeederTest extends TestCase
 
         $this->seed(ProviderDemoSeeder::class);
 
-        $binding = TaskProviderBinding::where('kind', 'github')->first();
-        $this->assertSame($account->id, $binding->connected_account_id);
+        $this->assertSame(
+            $account->id,
+            TaskProviderBinding::where('kind', 'github')->first()->connected_account_id,
+        );
     }
 
     public function test_it_stays_account_less_when_no_account_is_connected(): void
@@ -60,52 +100,36 @@ class ProviderDemoSeederTest extends TestCase
 
         $this->seed(ProviderDemoSeeder::class);
 
-        $binding = TaskProviderBinding::where('kind', 'github')->first();
-        $this->assertNull($binding->connected_account_id);
+        $this->assertNull(TaskProviderBinding::where('kind', 'github')->first()->connected_account_id);
     }
 
-    public function test_it_is_idempotent_and_preserves_the_webhook_secret(): void
+    public function test_env_override_wins_over_the_committed_default(): void
     {
+        config(['argos.provider_demo.gitlab_ref' => 'team/widget']);
         User::factory()->create();
 
         $this->seed(ProviderDemoSeeder::class);
+
+        $this->assertSame(
+            'team/widget',
+            TaskProviderBinding::where('kind', 'gitlab')->first()->external_project_ref,
+        );
+    }
+
+    public function test_it_is_idempotent_and_preserves_webhook_secrets(): void
+    {
+        config(['argos.provider_demo.linear_team' => 'ENG']);
+        User::factory()->create();
+
+        $this->seed(ProviderDemoSeeder::class);
+        $profileCount = RepoProfile::count();
+        $bindingCount = TaskProviderBinding::count();
         $secret = TaskProviderBinding::where('mode', 'webhook')->first()->webhook_secret;
 
         $this->seed(ProviderDemoSeeder::class);
 
-        $this->assertSame(1, RepoProfile::where('name', 'provider-demo (github)')->count());
-        $this->assertSame(2, TaskProviderBinding::count());
+        $this->assertSame($profileCount, RepoProfile::count());
+        $this->assertSame($bindingCount, TaskProviderBinding::count());
         $this->assertSame($secret, TaskProviderBinding::where('mode', 'webhook')->first()->webhook_secret);
-    }
-
-    public function test_it_seeds_gitlab_and_linear_when_configured(): void
-    {
-        config([
-            'argos.provider_demo.gitlab_ref' => 'group/sub/widget',
-            'argos.provider_demo.linear_team' => 'ENG',
-        ]);
-        User::factory()->create();
-
-        $this->seed(ProviderDemoSeeder::class);
-
-        $this->assertNotNull(RepoProfile::where('name', 'provider-demo (gitlab)')->first());
-        $this->assertSame(2, TaskProviderBinding::where('kind', 'gitlab')->count());
-
-        // Linear has no git repo; its bindings hang off the GitHub demo profile.
-        $github = RepoProfile::where('name', 'provider-demo (github)')->first();
-        $linear = TaskProviderBinding::where('kind', 'linear')->get();
-        $this->assertCount(2, $linear);
-        $this->assertSame($github->id, $linear->first()->repo_profile_id);
-        $this->assertSame('ENG', $linear->first()->external_project_ref);
-    }
-
-    public function test_it_skips_gitlab_and_linear_by_default(): void
-    {
-        User::factory()->create();
-
-        $this->seed(ProviderDemoSeeder::class);
-
-        $this->assertSame(0, TaskProviderBinding::where('kind', 'gitlab')->count());
-        $this->assertSame(0, TaskProviderBinding::where('kind', 'linear')->count());
     }
 }

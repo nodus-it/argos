@@ -37,18 +37,20 @@ return [
     'dev_login_email' => env('SEED_USER_EMAIL', 'admin@argos.local'),
     /*
      * Demo task-provider bindings seeded by ProviderDemoSeeder for local
-     * end-to-end testing of the issue integration. Refs are env-driven so
-     * internal / self-hosted paths never get committed: GitHub ships a public
-     * default; GitLab and Linear are only seeded when their ref is set.
-     * Bindings link to an existing OAuth account for the provider when one is
-     * present, otherwise they stay account-less (still usable via
-     * `argos:webhook:simulate`). Never read outside seeding.
+     * end-to-end testing of the issue integration. These env vars only
+     * OVERRIDE the defaults: GitHub and GitLab refs default to the committed
+     * coordinates in tests/External/providers.defaults.php (read by the
+     * seeder, dev-only). Linear has no entry there, so it is seeded only when
+     * SEED_LINEAR_TEAM is set. Set SEED_GITLAB_ISSUE_REF (+ optionally
+     * SEED_GITLAB_INSTANCE) to point at a self-hosted GitLab instead of the
+     * gitlab.com default. Never read outside seeding.
      */
     'provider_demo' => [
         'label' => env('SEED_PROVIDER_DEMO_LABEL', 'argos-demo'),
-        'github_ref' => env('SEED_GITHUB_ISSUE_REF', 'nodus-it/argos-test'),
+        'github_ref' => env('SEED_GITHUB_ISSUE_REF') ?: null,
         'gitlab_ref' => env('SEED_GITLAB_ISSUE_REF') ?: null,
-        'gitlab_instance' => env('SEED_GITLAB_INSTANCE', 'https://gitlab.com'),
+        'gitlab_instance' => env('SEED_GITLAB_INSTANCE') ?: null,
+        'bitbucket_ref' => env('SEED_BITBUCKET_REF') ?: null,
         'linear_team' => env('SEED_LINEAR_TEAM') ?: null,
     ],
     'docker' => [

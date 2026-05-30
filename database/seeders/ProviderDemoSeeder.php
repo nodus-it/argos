@@ -17,16 +17,25 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Env;
 
 /**
- * Seeds one demo RepoProfile per git provider and, for every issue provider
- * (GitHub / GitLab / Linear) with a configured ref, both a webhook and a poll
- * TaskProviderBinding with a label filter — so the issue integration can be
- * exercised end-to-end right after a reset.
+ * Seeds a complete demo matrix for the provider integrations so everything is
+ * testable end-to-end right after a reset:
+ *
+ *   - one demo RepoProfile per GIT provider — GitHub, GitLab, Bitbucket;
+ *   - one (webhook + poll) TaskProviderBinding per ISSUE provider — GitHub on
+ *     its own profile, GitLab on its own profile, and Linear (which has no git
+ *     repo) hung off the Bitbucket profile.
+ *
+ * So every git provider has a repo profile and every task provider has a
+ * binding. Demo refs default to the committed coordinates in
+ * tests/External/providers.defaults.php; the SEED_*_REF / SEED_GITLAB_INSTANCE
+ * env vars override them (e.g. to point GitLab at a self-hosted instance), and
+ * SEED_LINEAR_TEAM supplies the Linear team key (no committed default).
  *
  * Idempotent (updateOrCreate). OAuth tokens cannot be seeded, so each binding
- * links to an existing ConnectedAccount for its provider when one is present,
- * and otherwise stays account-less — still fully usable via
- * `argos:webhook:simulate` (webhook + ingestion + label matching), only the
- * real poll / write-back paths need the account connected first.
+ * links to an existing ConnectedAccount for its provider when one is present
+ * and otherwise stays account-less — still usable via `argos:webhook:simulate`
+ * (webhook + ingestion + label matching); only real poll / write-back need the
+ * account connected first.
  *
  * Not registered in DatabaseSeeder — run explicitly:
  *   php artisan db:seed --class=ProviderDemoSeeder
@@ -48,86 +57,41 @@ final class ProviderDemoSeeder extends Seeder
         }
 
         $label = (string) config('argos.provider_demo.label', 'argos-demo');
+        $defaults = $this->loadDefaults();
 
-        $githubProfile = $this->seedGitHub($user, $label);
-        $this->seedGitLab($user, $label);
-        $this->seedLinear($user, $label, $githubProfile);
-    }
+        $githubRef = $this->resolveRef('github', $defaults);
+        $gitlabRef = $this->resolveRef('gitlab', $defaults);
+        $bitbucketRef = $this->resolveRef('bitbucket', $defaults);
 
-    private function seedGitHub(User $user, string $label): ?RepoProfile
-    {
-        $ref = config('argos.provider_demo.github_ref');
-        if (! is_string($ref) || $ref === '') {
-            return null;
+        // Git providers → one demo repo profile each.
+        $githubProfile = $githubRef !== null ? $this->seedGitProfile($user, GitProvider::GitHub, 'github', $githubRef, $defaults) : null;
+        $gitlabProfile = $gitlabRef !== null ? $this->seedGitProfile($user, GitProvider::GitLab, 'gitlab', $gitlabRef, $defaults) : null;
+        $bitbucketProfile = $bitbucketRef !== null ? $this->seedGitProfile($user, GitProvider::Bitbucket, 'bitbucket', $bitbucketRef, $defaults) : null;
+
+        // Issue providers → bindings. GitHub and GitLab on their own profiles…
+        if ($githubProfile !== null) {
+            $this->seedBindings($githubProfile, TaskProviderKind::GitHub, $githubRef, $user->connectedAccount('github'), $label);
+        }
+        if ($gitlabProfile !== null) {
+            $this->seedBindings($gitlabProfile, TaskProviderKind::GitLab, $gitlabRef, $user->connectedAccount('gitlab'), $label);
         }
 
-        $account = $user->connectedAccount('github');
-        $profile = $this->upsertProfile(
-            name: 'provider-demo (github)',
-            platform: GitProvider::GitHub,
-            url: "https://github.com/{$ref}.git",
-            account: $account,
-        );
-
-        $this->upsertBindings($profile, TaskProviderKind::GitHub, $ref, $account, $label);
-
-        return $profile;
-    }
-
-    private function seedGitLab(User $user, string $label): void
-    {
-        $ref = config('argos.provider_demo.gitlab_ref');
-        if (! is_string($ref) || $ref === '') {
-            $this->command?->info('ProviderDemoSeeder: SEED_GITLAB_ISSUE_REF not set — GitLab demo skipped.');
-
-            return;
-        }
-
-        $account = $user->connectedAccount('gitlab');
-        $instance = $account?->getInstanceUrl()
-            ?? (string) config('argos.provider_demo.gitlab_instance', 'https://gitlab.com');
-
-        $profile = $this->upsertProfile(
-            name: 'provider-demo (gitlab)',
-            platform: GitProvider::GitLab,
-            url: rtrim($instance, '/')."/{$ref}.git",
-            account: $account,
-        );
-
-        $this->upsertBindings($profile, TaskProviderKind::GitLab, $ref, $account, $label);
+        // …and Linear (no git repo of its own) on the Bitbucket profile, so
+        // every task provider is covered.
+        $this->seedLinear($user, $label, $bitbucketProfile);
     }
 
     /**
-     * Linear has no git repo of its own; its imported issues become tasks
-     * against the GitHub demo profile (the closest "work repo").
+     * @param  array<string, array<string, mixed>>  $defaults
      */
-    private function seedLinear(User $user, string $label, ?RepoProfile $hostProfile): void
+    private function seedGitProfile(User $user, GitProvider $platform, string $key, string $ref, array $defaults): RepoProfile
     {
-        $team = config('argos.provider_demo.linear_team');
-        if (! is_string($team) || $team === '') {
-            $this->command?->info('ProviderDemoSeeder: SEED_LINEAR_TEAM not set — Linear demo skipped.');
+        $account = $user->connectedAccount($key);
+        $instance = $this->instanceFor($key, $account, $defaults);
+        $url = rtrim($instance, '/')."/{$ref}.git";
 
-            return;
-        }
-
-        if ($hostProfile === null) {
-            $this->command?->warn('ProviderDemoSeeder: no host RepoProfile for Linear (configure GitHub first) — Linear skipped.');
-
-            return;
-        }
-
-        $account = $user->connectedAccount('linear');
-        $this->upsertBindings($hostProfile, TaskProviderKind::Linear, $team, $account, $label);
-    }
-
-    private function upsertProfile(
-        string $name,
-        GitProvider $platform,
-        string $url,
-        ?ConnectedAccount $account,
-    ): RepoProfile {
-        return RepoProfile::updateOrCreate(
-            ['name' => $name],
+        $profile = RepoProfile::updateOrCreate(
+            ['name' => "provider-demo ({$key})"],
             [
                 'url' => $url,
                 'platform' => $platform->value,
@@ -138,9 +102,29 @@ final class ProviderDemoSeeder extends Seeder
                 'auto_pr' => false,
             ],
         );
+
+        return $profile;
     }
 
-    private function upsertBindings(
+    private function seedLinear(User $user, string $label, ?RepoProfile $bitbucketProfile): void
+    {
+        $team = config('argos.provider_demo.linear_team');
+        if (! is_string($team) || $team === '') {
+            $this->command?->info('ProviderDemoSeeder: SEED_LINEAR_TEAM not set — Linear demo skipped.');
+
+            return;
+        }
+
+        if ($bitbucketProfile === null) {
+            $this->command?->warn('ProviderDemoSeeder: no Bitbucket profile to host the Linear binding — Linear skipped.');
+
+            return;
+        }
+
+        $this->seedBindings($bitbucketProfile, TaskProviderKind::Linear, $team, $user->connectedAccount('linear'), $label);
+    }
+
+    private function seedBindings(
         RepoProfile $profile,
         TaskProviderKind $kind,
         string $ref,
@@ -154,7 +138,7 @@ final class ProviderDemoSeeder extends Seeder
                 ->first();
 
             // Webhook bindings need a secret; keep an already-generated one
-            // stable across re-seeds so a configured GitHub webhook keeps working.
+            // stable across re-seeds so a configured webhook keeps working.
             $secret = $existing?->webhook_secret;
             if ($mode === TaskProviderMode::Webhook && ($secret === null || $secret === '')) {
                 $secret = bin2hex(random_bytes(20));
@@ -183,5 +167,71 @@ final class ProviderDemoSeeder extends Seeder
             $profile->name,
             $account !== null ? ' (account linked)' : ' (no account — simulate only)',
         ));
+    }
+
+    /**
+     * Resolve a provider's demo ref: the SEED_*_REF env override wins, else the
+     * committed coordinates in providers.defaults.php, else null (skip).
+     *
+     * @param  array<string, array<string, mixed>>  $defaults
+     */
+    private function resolveRef(string $key, array $defaults): ?string
+    {
+        $override = config("argos.provider_demo.{$key}_ref");
+        if (is_string($override) && $override !== '') {
+            return $override;
+        }
+
+        $coords = $defaults[$key] ?? null;
+        if (is_array($coords) && isset($coords['testRepoOwner'], $coords['testRepo'])) {
+            return $coords['testRepoOwner'].'/'.$coords['testRepo'];
+        }
+
+        return null;
+    }
+
+    /**
+     * The host for a provider's clone URL. Only GitLab is instance-variable
+     * (self-hosted), resolved from the connected account, then the
+     * SEED_GITLAB_INSTANCE override, then the committed default. GitHub and
+     * Bitbucket are always their public hosts — never the account's
+     * getInstanceUrl(), which defaults to gitlab.com for non-GitLab accounts.
+     *
+     * @param  array<string, array<string, mixed>>  $defaults
+     */
+    private function instanceFor(string $key, ?ConnectedAccount $account, array $defaults): string
+    {
+        if ($key === 'github') {
+            return 'https://github.com';
+        }
+        if ($key === 'bitbucket') {
+            return 'https://bitbucket.org';
+        }
+
+        // gitlab
+        $override = config('argos.provider_demo.gitlab_instance');
+
+        return $account?->getInstanceUrl()
+            ?? (is_string($override) && $override !== '' ? $override : null)
+            ?? (string) ($defaults['gitlab']['instanceUrl'] ?? 'https://gitlab.com');
+    }
+
+    /**
+     * Load the committed provider coordinates (dev-only file). Returns [] when
+     * the file is absent (e.g. tests excluded from a deploy) so the seeder then
+     * relies purely on the SEED_*_REF env overrides.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    private function loadDefaults(): array
+    {
+        $path = base_path('tests/External/providers.defaults.php');
+        if (! is_file($path)) {
+            return [];
+        }
+
+        $data = require $path;
+
+        return is_array($data) ? $data : [];
     }
 }
