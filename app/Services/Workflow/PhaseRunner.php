@@ -750,7 +750,7 @@ SH;
             '-e', "REPO_PLATFORM={$profile->platform->value}",
             '-e', 'BASE_BRANCH='.($task->base_branch ?: $profile->default_branch),
             '-e', "AGENT_NAME={$agentName->value}",
-            '-e', "TASK_DESCRIPTION={$task->description}",
+            '-e', 'TASK_DESCRIPTION='.app(UntrustedTaskInput::class)->wrap($task),
             '-e', "PHASE_FLAGS={$phaseFlags}",
             '-e', "MAX_TURNS={$maxTurns}",
             '-e', 'CLAUDE_CONFIG_DIR=/workspace/.agent/claude-state',

@@ -23,6 +23,7 @@ build_system_prompt() {
     local phase="$1"
     local phase_prompt="$PROMPTS_DIR/${phase}.system.md"
     local user_global="$PROMPTS_DIR/user.global.system.md"
+    local security="$PROMPTS_DIR/security.system.md"
     local out="$RUNTIME_DIR/${phase}.system.merged.md"
 
     if [[ ! -f "$phase_prompt" ]]; then
@@ -33,6 +34,13 @@ build_system_prompt() {
     mkdir -p "$RUNTIME_DIR"
 
     {
+        # Worker-owned security layer first (not user-removable, unlike
+        # user.global) — instructs how to treat the untrusted task description.
+        if [[ -f "$security" ]]; then
+            cat "$security"
+            printf '\n---\n\n'
+        fi
+
         cat "$phase_prompt"
 
         if [[ -f "$user_global" ]]; then
