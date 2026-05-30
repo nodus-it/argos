@@ -168,6 +168,69 @@ class IssueCommentNotifierTest extends TestCase
         (new IssueCommentNotifier($registry))->notifyPhaseCompletion($task, 'implement', 'completed');
     }
 
+    public function test_implement_phase_inlines_the_result_summaries(): void
+    {
+        $task = Task::factory()->create([
+            'implement_summary_nontechnical' => 'Added a README with usage examples.',
+            'implement_summary_technical' => 'New README.md (40 lines), linked from index.',
+        ]);
+
+        $tracker = Mockery::mock(IssueTrackerContract::class);
+        $tracker->shouldReceive('createComment')
+            ->once()
+            ->with('acme', 'widget', 5, Mockery::on(
+                fn (string $body): bool => str_contains($body, 'Phase **Implement**')
+                    && str_contains($body, 'Added a README with usage examples.')
+                    && str_contains($body, 'New README.md (40 lines)'),
+            ));
+
+        $registry = Mockery::mock(IssueTrackerRegistry::class);
+        $registry->shouldReceive('has')->andReturn(true);
+        $registry->shouldReceive('make')->andReturn($tracker);
+
+        $binding = TaskProviderBinding::factory()->create([
+            'kind' => TaskProviderKind::GitHub,
+            'external_project_ref' => 'acme/widget',
+        ]);
+        ExternalIssueLink::factory()->create([
+            'task_id' => $task->id,
+            'task_provider_binding_id' => $binding->id,
+            'external_id' => '5',
+        ]);
+
+        (new IssueCommentNotifier($registry))->notifyPhaseCompletion($task, 'implement', 'completed');
+    }
+
+    public function test_push_phase_inlines_the_pull_request_link(): void
+    {
+        $task = Task::factory()->create(['pr_url' => 'https://github.com/acme/widget/pull/7']);
+
+        $tracker = Mockery::mock(IssueTrackerContract::class);
+        $tracker->shouldReceive('createComment')
+            ->once()
+            ->with('acme', 'widget', 5, Mockery::on(
+                fn (string $body): bool => str_contains($body, 'Phase **Push**')
+                    && str_contains($body, 'Pull Request')
+                    && str_contains($body, 'https://github.com/acme/widget/pull/7'),
+            ));
+
+        $registry = Mockery::mock(IssueTrackerRegistry::class);
+        $registry->shouldReceive('has')->andReturn(true);
+        $registry->shouldReceive('make')->andReturn($tracker);
+
+        $binding = TaskProviderBinding::factory()->create([
+            'kind' => TaskProviderKind::GitHub,
+            'external_project_ref' => 'acme/widget',
+        ]);
+        ExternalIssueLink::factory()->create([
+            'task_id' => $task->id,
+            'task_provider_binding_id' => $binding->id,
+            'external_id' => '5',
+        ]);
+
+        (new IssueCommentNotifier($registry))->notifyPhaseCompletion($task, 'push', 'completed');
+    }
+
     public function test_swallows_exception_and_does_not_rethrow(): void
     {
         $tracker = Mockery::mock(IssueTrackerContract::class);

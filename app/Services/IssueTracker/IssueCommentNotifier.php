@@ -77,35 +77,78 @@ final class IssueCommentNotifier
         $header = "**Argos** — Phase **{$phaseLabel}** abgeschlossen mit Status: **{$statusLabel}**";
         $link = "[Task in Argos öffnen]({$taskUrl})";
 
-        $concept = $this->conceptBody($task, $phase, $status);
-        if ($concept !== null) {
-            return $header."\n\n---\n\n".$concept."\n\n---\n\n".$link;
+        $extra = $this->phaseExtra($task, $phase, $status);
+        if ($extra !== null) {
+            return $header."\n\n---\n\n".$extra."\n\n---\n\n".$link;
         }
 
         return $header."\n\n".$link;
     }
 
     /**
-     * The concept document to inline when the concept phase completed, so it can
-     * be reviewed on the issue itself. Read fresh from the DB (the task instance
-     * handed in from the queue job may predate the worker writing concept_md),
-     * and capped to stay well under the providers' comment-size limits. Returns
-     * null for any other phase/status or when there is no concept.
+     * Per-phase content to inline in the comment on success, read fresh from the
+     * DB (the queue job's task instance may predate the worker writing these):
+     *  - concept:   the full concept for review on the issue;
+     *  - implement: the result summaries;
+     *  - push:      the pull/merge request link.
+     * Null for any other phase/status or when the content is missing.
      */
-    private function conceptBody(Task $task, string $phase, string $status): ?string
+    private function phaseExtra(Task $task, string $phase, string $status): ?string
     {
-        if ($phase !== 'concept' || $status !== PhaseStatus::Completed->value) {
+        if ($status !== PhaseStatus::Completed->value) {
             return null;
         }
 
-        $markdown = $task->fresh()?->concept_md;
+        $task = $task->fresh();
+        if ($task === null) {
+            return null;
+        }
+
+        return match ($phase) {
+            'concept' => $this->cap($task->concept_md),
+            'implement' => $this->implementResult($task),
+            'push' => $this->pullRequestLink($task),
+            default => null,
+        };
+    }
+
+    private function implementResult(Task $task): ?string
+    {
+        $sections = [];
+
+        $nonTechnical = trim((string) $task->implement_summary_nontechnical);
+        if ($nonTechnical !== '') {
+            $sections[] = "**Ergebnis**\n\n".$nonTechnical;
+        }
+
+        $technical = trim((string) $task->implement_summary_technical);
+        if ($technical !== '') {
+            $sections[] = "**Technische Details**\n\n".$technical;
+        }
+
+        return $sections === [] ? null : $this->cap(implode("\n\n", $sections));
+    }
+
+    private function pullRequestLink(Task $task): ?string
+    {
+        $prUrl = trim((string) $task->pr_url);
+
+        return $prUrl === '' ? null : "**Pull Request:** {$prUrl}";
+    }
+
+    /**
+     * Cap a body well under the providers' comment-size limits, with a note +
+     * the Argos link (already appended by the caller) for the full content.
+     */
+    private function cap(?string $markdown): ?string
+    {
         if (! is_string($markdown) || trim($markdown) === '') {
             return null;
         }
 
         $max = 60000;
         if (mb_strlen($markdown) > $max) {
-            return mb_substr($markdown, 0, $max)."\n\n_… gekürzt — vollständiges Konzept in Argos._";
+            return mb_substr($markdown, 0, $max)."\n\n_… gekürzt — vollständig in Argos._";
         }
 
         return $markdown;
