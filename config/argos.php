@@ -38,12 +38,11 @@ return [
     /*
      * Demo task-provider bindings seeded by ProviderDemoSeeder for local
      * end-to-end testing of the issue integration. These env vars only
-     * OVERRIDE the defaults: GitHub and GitLab refs default to the committed
-     * coordinates in tests/External/providers.defaults.php (read by the
-     * seeder, dev-only). Linear has no entry there, so it is seeded only when
-     * SEED_LINEAR_TEAM is set. Set SEED_GITLAB_ISSUE_REF (+ optionally
-     * SEED_GITLAB_INSTANCE) to point at a self-hosted GitLab instead of the
-     * gitlab.com default. Never read outside seeding.
+     * OVERRIDE the committed defaults in tests/External/providers.defaults.php
+     * (GitHub/GitLab/Bitbucket repos + the Linear team), read dev-only by the
+     * seeder. Set SEED_GITLAB_ISSUE_REF (+ optionally SEED_GITLAB_INSTANCE) to
+     * point GitLab at a self-hosted instance instead of the gitlab.com default.
+     * Never read outside seeding.
      */
     'provider_demo' => [
         'label' => env('SEED_PROVIDER_DEMO_LABEL', 'argos-demo'),

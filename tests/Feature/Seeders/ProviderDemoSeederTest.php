@@ -54,9 +54,8 @@ class ProviderDemoSeederTest extends TestCase
         }
     }
 
-    public function test_linear_binding_hangs_off_the_bitbucket_profile(): void
+    public function test_linear_binding_seeds_by_default_on_the_bitbucket_profile(): void
     {
-        config(['argos.provider_demo.linear_team' => 'ENG']);
         User::factory()->create();
 
         $this->seed(ProviderDemoSeeder::class);
@@ -66,16 +65,18 @@ class ProviderDemoSeederTest extends TestCase
 
         $this->assertCount(2, $linear); // webhook + poll
         $this->assertSame($bitbucket->id, $linear->first()->repo_profile_id);
-        $this->assertSame('ENG', $linear->first()->external_project_ref);
+        // Default team comes from providers.defaults.php.
+        $this->assertSame('BAS', $linear->first()->external_project_ref);
     }
 
-    public function test_linear_is_skipped_without_a_team_key(): void
+    public function test_linear_team_env_override_wins(): void
     {
+        config(['argos.provider_demo.linear_team' => 'ENG']);
         User::factory()->create();
 
         $this->seed(ProviderDemoSeeder::class);
 
-        $this->assertSame(0, TaskProviderBinding::where('kind', 'linear')->count());
+        $this->assertSame('ENG', TaskProviderBinding::where('kind', 'linear')->first()->external_project_ref);
     }
 
     public function test_it_links_existing_connected_accounts(): void

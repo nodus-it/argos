@@ -78,7 +78,7 @@ final class ProviderDemoSeeder extends Seeder
 
         // …and Linear (no git repo of its own) on the Bitbucket profile, so
         // every task provider is covered.
-        $this->seedLinear($user, $label, $bitbucketProfile);
+        $this->seedLinear($user, $label, $bitbucketProfile, $defaults);
     }
 
     /**
@@ -87,7 +87,7 @@ final class ProviderDemoSeeder extends Seeder
     private function seedGitProfile(User $user, GitProvider $platform, string $key, string $ref, array $defaults): RepoProfile
     {
         $account = $user->connectedAccount($key);
-        $instance = $this->instanceFor($key, $account, $defaults);
+        $instance = $this->instanceFor($key, $defaults);
         $url = rtrim($instance, '/')."/{$ref}.git";
 
         $profile = RepoProfile::updateOrCreate(
@@ -106,11 +106,18 @@ final class ProviderDemoSeeder extends Seeder
         return $profile;
     }
 
-    private function seedLinear(User $user, string $label, ?RepoProfile $bitbucketProfile): void
+    /**
+     * @param  array<string, array<string, mixed>>  $defaults
+     */
+    private function seedLinear(User $user, string $label, ?RepoProfile $bitbucketProfile, array $defaults): void
     {
-        $team = config('argos.provider_demo.linear_team');
+        $override = config('argos.provider_demo.linear_team');
+        $team = is_string($override) && $override !== ''
+            ? $override
+            : ($defaults['linear']['team'] ?? null);
+
         if (! is_string($team) || $team === '') {
-            $this->command?->info('ProviderDemoSeeder: SEED_LINEAR_TEAM not set — Linear demo skipped.');
+            $this->command?->info('ProviderDemoSeeder: no Linear team (SEED_LINEAR_TEAM / providers.defaults.php) — Linear demo skipped.');
 
             return;
         }
@@ -191,15 +198,17 @@ final class ProviderDemoSeeder extends Seeder
     }
 
     /**
-     * The host for a provider's clone URL. Only GitLab is instance-variable
-     * (self-hosted), resolved from the connected account, then the
-     * SEED_GITLAB_INSTANCE override, then the committed default. GitHub and
-     * Bitbucket are always their public hosts — never the account's
-     * getInstanceUrl(), which defaults to gitlab.com for non-GitLab accounts.
+     * The host for a provider's clone URL, taken from the committed entry. Only
+     * GitLab is instance-variable: the SEED_GITLAB_INSTANCE override wins, else
+     * the entry's instanceUrl (gitlab.com for the demo — we don't run a second
+     * self-hosted GitLab for tests). GitHub and Bitbucket are their public
+     * hosts. The account's getInstanceUrl() is deliberately NOT used here — it
+     * defaults to gitlab.com for non-GitLab accounts and would point a demo at
+     * the wrong host.
      *
      * @param  array<string, array<string, mixed>>  $defaults
      */
-    private function instanceFor(string $key, ?ConnectedAccount $account, array $defaults): string
+    private function instanceFor(string $key, array $defaults): string
     {
         if ($key === 'github') {
             return 'https://github.com';
@@ -210,10 +219,11 @@ final class ProviderDemoSeeder extends Seeder
 
         // gitlab
         $override = config('argos.provider_demo.gitlab_instance');
+        if (is_string($override) && $override !== '') {
+            return $override;
+        }
 
-        return $account?->getInstanceUrl()
-            ?? (is_string($override) && $override !== '' ? $override : null)
-            ?? (string) ($defaults['gitlab']['instanceUrl'] ?? 'https://gitlab.com');
+        return (string) ($defaults['gitlab']['instanceUrl'] ?? 'https://gitlab.com');
     }
 
     /**
