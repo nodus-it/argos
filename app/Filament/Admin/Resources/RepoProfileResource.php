@@ -20,6 +20,7 @@ use App\Models\User;
 use App\Models\WorkerStack;
 use App\Services\GitProvider\Contracts\GitServiceContract;
 use App\Services\GitProvider\GitServiceFactory;
+use App\Services\OAuth\TokenRefresher;
 use App\Workers\Agents\AgentRegistry;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
@@ -497,6 +498,9 @@ class RepoProfileResource extends Resource
      */
     private static function gitServiceForConnected(string $platform, ConnectedAccount $account): GitServiceContract
     {
+        // Refresh an expiring OAuth token so the repo/branch dropdowns keep
+        // loading instead of failing once the token lapses.
+        $account = app(TokenRefresher::class)->refreshIfNeeded($account);
         $instanceUrl = $platform === 'gitlab' ? $account->getInstanceUrl() : '';
 
         return app(GitServiceFactory::class)->forPlatform($platform, $account->token, $instanceUrl);

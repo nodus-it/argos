@@ -8,6 +8,7 @@ use App\Enums\TaskProviderKind;
 use App\Models\ConnectedAccount;
 use App\Models\TaskProviderBinding;
 use App\Services\IssueTracker\Contracts\IssueTrackerContract;
+use App\Services\OAuth\TokenRefresher;
 use InvalidArgumentException;
 
 class IssueTrackerRegistry
@@ -30,6 +31,12 @@ class IssueTrackerRegistry
     public function make(TaskProviderKind $kind, TaskProviderBinding $binding): IssueTrackerContract
     {
         $account = $binding->connectedAccount;
+        if ($account instanceof ConnectedAccount) {
+            // Refresh an expiring OAuth token before it 401s the poll /
+            // write-back / approval calls (GitLab/Bitbucket lapse in ~2h;
+            // GitHub OAuth-App and Linear tokens have no expiry → no-op).
+            $account = app(TokenRefresher::class)->refreshIfNeeded($account);
+        }
         $token = $account instanceof ConnectedAccount ? $account->token : '';
         $instanceUrl = $account instanceof ConnectedAccount ? $account->getInstanceUrl() : '';
 
@@ -42,6 +49,8 @@ class IssueTrackerRegistry
      */
     public function makeFromAccount(TaskProviderKind $kind, ConnectedAccount $account): IssueTrackerContract
     {
+        $account = app(TokenRefresher::class)->refreshIfNeeded($account);
+
         return $this->build($kind->value, $account->token, $account->getInstanceUrl());
     }
 
