@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Enums\AuthMethod;
 use App\Enums\GitProvider;
+use App\Enums\TaskProviderKind;
 use Database\Factories\ConnectedAccountFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -119,36 +120,46 @@ class ConnectedAccount extends Model
     }
 
     /**
-     * Heilt verwaiste OAuth-RepoProfiles, deren `connected_account_id` durch
-     * einen Disconnect (foreign-key `nullOnDelete`) auf NULL fiel: re-attacht
-     * jedes Profil mit gleicher Plattform und `auth_method=oauth` und ohne
-     * Account an diesen frisch wiederverbundenen Account.
+     * Heilt verwaiste OAuth-Ressourcen nach einem Re-Connect: sowohl
+     * RepoProfiles als auch Task-Provider-Bindings, deren `connected_account_id`
+     * durch einen Disconnect (foreign-key `nullOnDelete`) auf NULL fiel.
+     * Re-attacht jedes OAuth-RepoProfile gleicher Git-Plattform und jedes
+     * TaskProviderBinding gleicher Issue-Provider-Art ohne Account an diesen
+     * frisch wiederverbundenen Account.
      *
      * Aufrufer: OAuth-Callbacks nach `updateOrCreate`. Beim ersten Connect ist
      * die Menge leer (kein Schaden), nach Re-Connect werden die Bindungen
-     * zurückgesetzt — Tasks gegen alte Profile laufen direkt wieder.
+     * zurückgesetzt — Poll / Write-back laufen ohne erneutes Seeden wieder.
      *
-     * Annahme single-tenant: RepoProfile hat keine eigene `user_id`, daher
-     * lässt sich nicht weiter auf den Owner einschränken. `unique(user_id,
-     * provider)` auf `connected_accounts` garantiert aber, dass es pro Plattform
-     * nur einen aktiven Account gibt — alle Profile mit (platform=X, oauth,
-     * NULL) gehörten also zwangsläufig genau dem Account, der gerade gelöscht
-     * wurde.
+     * Annahme single-tenant: Weder RepoProfile noch TaskProviderBinding haben
+     * eine eigene `user_id`. `unique(user_id, provider)` auf
+     * `connected_accounts` garantiert aber genau einen aktiven Account pro
+     * Plattform — alle verwaisten (oauth, NULL)-Ressourcen gehörten also
+     * zwangsläufig dem gerade gelöschten Account.
      *
-     * @return int Anzahl re-attachter Profile (für Logging/Telemetrie)
+     * @return int Anzahl re-attachter RepoProfiles + Bindings
      */
-    public function relinkOrphanedRepoProfiles(): int
+    public function relinkOrphanedResources(): int
     {
-        $gitProvider = GitProvider::tryFrom($this->provider);
+        $count = 0;
 
-        if ($gitProvider === null) {
-            return 0;
+        $gitProvider = GitProvider::tryFrom($this->provider);
+        if ($gitProvider !== null) {
+            $count += RepoProfile::query()
+                ->where('platform', $gitProvider)
+                ->where('auth_method', AuthMethod::OAuth)
+                ->whereNull('connected_account_id')
+                ->update(['connected_account_id' => $this->id]);
         }
 
-        return RepoProfile::query()
-            ->where('platform', $gitProvider)
-            ->where('auth_method', AuthMethod::OAuth)
-            ->whereNull('connected_account_id')
-            ->update(['connected_account_id' => $this->id]);
+        $issueKind = TaskProviderKind::tryFrom($this->provider);
+        if ($issueKind !== null) {
+            $count += TaskProviderBinding::query()
+                ->where('kind', $issueKind)
+                ->whereNull('connected_account_id')
+                ->update(['connected_account_id' => $this->id]);
+        }
+
+        return $count;
     }
 }

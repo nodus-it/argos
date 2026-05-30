@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Models;
 
+use App\Enums\TaskProviderKind;
 use App\Models\ConnectedAccount;
 use App\Models\RepoProfile;
+use App\Models\TaskProviderBinding;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -34,7 +36,7 @@ class ConnectedAccountTest extends TestCase
             'connected_account_id' => null,
         ]);
 
-        $count = $bbAccount->relinkOrphanedRepoProfiles();
+        $count = $bbAccount->relinkOrphanedResources();
 
         $this->assertSame(1, $count);
         $this->assertSame($bbAccount->id, $orphanBb->fresh()->connected_account_id);
@@ -56,7 +58,7 @@ class ConnectedAccountTest extends TestCase
             'connected_account_id' => null,
         ]);
 
-        $account->relinkOrphanedRepoProfiles();
+        $account->relinkOrphanedResources();
 
         $this->assertNull($patProfile->fresh()->connected_account_id);
     }
@@ -76,7 +78,7 @@ class ConnectedAccountTest extends TestCase
         ]);
 
         // Reattach: own account is the same record (idempotent reconnect path)
-        $count = $other->relinkOrphanedRepoProfiles();
+        $count = $other->relinkOrphanedResources();
 
         $this->assertSame(0, $count);
         $this->assertSame($other->id, $linkedProfile->fresh()->connected_account_id);
@@ -90,6 +92,50 @@ class ConnectedAccountTest extends TestCase
             'provider' => 'github',
         ]);
 
-        $this->assertSame(0, $account->relinkOrphanedRepoProfiles());
+        $this->assertSame(0, $account->relinkOrphanedResources());
+    }
+
+    public function test_relink_attaches_orphaned_bindings_of_the_same_kind(): void
+    {
+        $user = User::factory()->create();
+        $account = ConnectedAccount::factory()->create([
+            'user_id' => $user->id,
+            'provider' => 'github',
+        ]);
+
+        $ghBinding = TaskProviderBinding::factory()->create([
+            'kind' => TaskProviderKind::GitHub,
+            'connected_account_id' => null,
+        ]);
+        $linearBinding = TaskProviderBinding::factory()->create([
+            'kind' => TaskProviderKind::Linear,
+            'connected_account_id' => null,
+        ]);
+
+        $count = $account->relinkOrphanedResources();
+
+        $this->assertSame(1, $count);
+        $this->assertSame($account->id, $ghBinding->fresh()->connected_account_id);
+        $this->assertNull($linearBinding->fresh()->connected_account_id);
+    }
+
+    public function test_relink_attaches_linear_bindings_for_a_linear_account(): void
+    {
+        $user = User::factory()->create();
+        $account = ConnectedAccount::factory()->create([
+            'user_id' => $user->id,
+            'provider' => 'linear',
+        ]);
+
+        $binding = TaskProviderBinding::factory()->create([
+            'kind' => TaskProviderKind::Linear,
+            'connected_account_id' => null,
+        ]);
+
+        // Linear has no git repo, so only the binding is re-attached.
+        $count = $account->relinkOrphanedResources();
+
+        $this->assertSame(1, $count);
+        $this->assertSame($account->id, $binding->fresh()->connected_account_id);
     }
 }
