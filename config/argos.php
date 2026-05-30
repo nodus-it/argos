@@ -35,6 +35,22 @@ return [
      * out of the box after a dev reset.
      */
     'dev_login_email' => env('SEED_USER_EMAIL', 'admin@argos.local'),
+    /*
+     * Demo task-provider bindings seeded by ProviderDemoSeeder for local
+     * end-to-end testing of the issue integration. Refs are env-driven so
+     * internal / self-hosted paths never get committed: GitHub ships a public
+     * default; GitLab and Linear are only seeded when their ref is set.
+     * Bindings link to an existing OAuth account for the provider when one is
+     * present, otherwise they stay account-less (still usable via
+     * `argos:webhook:simulate`). Never read outside seeding.
+     */
+    'provider_demo' => [
+        'label' => env('SEED_PROVIDER_DEMO_LABEL', 'argos-demo'),
+        'github_ref' => env('SEED_GITHUB_ISSUE_REF', 'nodus-it/argos-test'),
+        'gitlab_ref' => env('SEED_GITLAB_ISSUE_REF') ?: null,
+        'gitlab_instance' => env('SEED_GITLAB_INSTANCE', 'https://gitlab.com'),
+        'linear_team' => env('SEED_LINEAR_TEAM') ?: null,
+    ],
     'docker' => [
         'memory_limit' => env('ARGOS_MEM_LIMIT', '4g'),
         'cpu_limit' => env('ARGOS_CPU_LIMIT', '2'),

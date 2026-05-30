@@ -2,7 +2,7 @@
 # .tools/bin/dev-reset.sh — kompletter Reset der lokalen Dev-Umgebung.
 #
 # Pipeline:
-#   1. migrate:fresh + DemoSeeder im app-Container
+#   1. migrate:fresh + DemoSeeder + ProviderDemoSeeder im app-Container
 #   2. Task-Workspace-Volumes (task_ws_*) entfernen
 #   3. Worker-Images (argos-worker:*, argos-stack:*) entfernen
 #   4. Laravel-Cache leeren + queue-Worker neustarten
@@ -25,6 +25,9 @@ compose() {
 
 echo "==> migrate:fresh + DemoSeeder"
 compose exec -T app php artisan migrate:fresh --force --seed --seeder=DemoSeeder
+
+echo "==> ProviderDemoSeeder (demo task-provider bindings)"
+compose exec -T app php artisan db:seed --force --class=ProviderDemoSeeder
 
 echo "==> rm task_ws_* volumes"
 mapfile -t volumes < <(docker volume ls --filter 'name=task_ws_' --format '{{.Name}}')
