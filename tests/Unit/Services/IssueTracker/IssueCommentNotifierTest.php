@@ -13,6 +13,7 @@ use App\Models\TaskProviderBinding;
 use App\Services\IssueTracker\Contracts\IssueTrackerContract;
 use App\Services\IssueTracker\IssueCommentNotifier;
 use App\Services\IssueTracker\IssueTrackerRegistry;
+use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
 use Tests\TestCase;
@@ -66,6 +67,41 @@ class IssueCommentNotifierTest extends TestCase
         ]);
 
         $notifier->notifyPhaseCompletion($task, 'implement', 'completed');
+    }
+
+    public function test_posts_comment_without_a_current_filament_panel(): void
+    {
+        // Reproduces the queue-worker condition: no Filament panel is current.
+        // Building the task link via TaskResource::getUrl() throws there
+        // ("No default Filament panel is set"), so the comment was silently
+        // dropped. The named route must work regardless.
+        Filament::setCurrentPanel(null);
+
+        $task = Task::factory()->create();
+
+        $tracker = Mockery::mock(IssueTrackerContract::class);
+        $tracker->shouldReceive('createComment')
+            ->once()
+            ->with('acme', 'widget', 7, Mockery::on(
+                fn (string $body): bool => str_contains($body, 'Phase **Concept**')
+                    && str_contains($body, "/admin/tasks/{$task->getKey()}"),
+            ));
+
+        $registry = Mockery::mock(IssueTrackerRegistry::class);
+        $registry->shouldReceive('has')->andReturn(true);
+        $registry->shouldReceive('make')->andReturn($tracker);
+
+        $binding = TaskProviderBinding::factory()->create([
+            'kind' => TaskProviderKind::GitHub,
+            'external_project_ref' => 'acme/widget',
+        ]);
+        ExternalIssueLink::factory()->create([
+            'task_id' => $task->id,
+            'task_provider_binding_id' => $binding->id,
+            'external_id' => '7',
+        ]);
+
+        (new IssueCommentNotifier($registry))->notifyPhaseCompletion($task, 'concept', 'completed');
     }
 
     public function test_swallows_exception_and_does_not_rethrow(): void

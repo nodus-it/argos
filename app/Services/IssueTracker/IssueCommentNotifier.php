@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services\IssueTracker;
 
-use App\Filament\Admin\Resources\TaskResource;
 use App\Models\ExternalIssueLink;
 use App\Models\Task;
 use Illuminate\Support\Facades\Log;
@@ -58,7 +57,11 @@ final class IssueCommentNotifier
     {
         $phaseLabel = ucfirst($phase);
         $statusLabel = ucfirst($status);
-        $taskUrl = TaskResource::getUrl('view', ['record' => $task]);
+
+        // Build the link via the named route, NOT TaskResource::getUrl():
+        // the notifier runs inside the queue worker, where no Filament panel is
+        // current, and getUrl() throws "No default Filament panel is set" there.
+        $taskUrl = route('filament.admin.resources.tasks.view', ['record' => $task->getKey()]);
 
         return "**Argos** — Phase **{$phaseLabel}** abgeschlossen mit Status: **{$statusLabel}**"
             ."\n\n[Task in Argos öffnen]({$taskUrl})";
