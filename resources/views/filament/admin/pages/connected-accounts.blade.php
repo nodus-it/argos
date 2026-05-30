@@ -9,9 +9,7 @@
             @if ($accounts['github'])
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-3">
-                        @if ($accounts['github']->avatar)
-                            <img src="{{ $accounts['github']->avatar }}" alt="Avatar" class="h-10 w-10 rounded-full">
-                        @endif
+                        <x-connected-account-avatar :account="$accounts['github']" />
                         <div>
                             <p class="text-sm font-medium text-gray-900 dark:text-gray-100">
                                 {{ $accounts['github']->name ?? $accounts['github']->nickname }}
@@ -67,9 +65,7 @@
             @if ($accounts['gitlab'])
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-3">
-                        @if ($accounts['gitlab']->avatar)
-                            <img src="{{ $accounts['gitlab']->avatar }}" alt="Avatar" class="h-10 w-10 rounded-full">
-                        @endif
+                        <x-connected-account-avatar :account="$accounts['gitlab']" />
                         <div>
                             <p class="text-sm font-medium text-gray-900 dark:text-gray-100">
                                 {{ $accounts['gitlab']->name ?? $accounts['gitlab']->nickname }}
@@ -128,9 +124,7 @@
             @if ($accounts['bitbucket'])
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-3">
-                        @if ($accounts['bitbucket']->avatar)
-                            <img src="{{ $accounts['bitbucket']->avatar }}" alt="Avatar" class="h-10 w-10 rounded-full">
-                        @endif
+                        <x-connected-account-avatar :account="$accounts['bitbucket']" />
                         <div>
                             <p class="text-sm font-medium text-gray-900 dark:text-gray-100">
                                 {{ $accounts['bitbucket']->name ?? $accounts['bitbucket']->nickname }}
@@ -186,9 +180,7 @@
             @if ($accounts['linear'])
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-3">
-                        @if ($accounts['linear']->avatar)
-                            <img src="{{ $accounts['linear']->avatar }}" alt="Avatar" class="h-10 w-10 rounded-full">
-                        @endif
+                        <x-connected-account-avatar :account="$accounts['linear']" />
                         <div>
                             <p class="text-sm font-medium text-gray-900 dark:text-gray-100">
                                 {{ $accounts['linear']->name ?? $accounts['linear']->nickname }}

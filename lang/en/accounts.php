@@ -22,6 +22,7 @@ return [
     ],
 
     'blade' => [
+        'avatar_alt' => 'Avatar',
         'github_section' => 'GitHub',
         'gitlab_section' => 'GitLab',
         'bitbucket_section' => 'Bitbucket',

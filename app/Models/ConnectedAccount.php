@@ -64,6 +64,53 @@ class ConnectedAccount extends Model
     }
 
     /**
+     * The avatar URL ready for an <img> tag. Providers (notably self-hosted
+     * GitLab) can hand back an avatar that an unauthenticated browser request
+     * cannot load as-is: a path relative to the instance, or an http URL that
+     * an https page blocks as mixed content. Normalize both here so the stored
+     * raw value stays untouched but the rendered URL has a chance to load.
+     */
+    public function displayAvatarUrl(): ?string
+    {
+        return self::normalizeAvatarUrl($this->avatar, $this->instance_url);
+    }
+
+    /**
+     * Make a provider avatar URL renderable in the browser:
+     *  - a relative path is resolved against the provider instance base URL
+     *    (returns null when there is no base to resolve against — unusable);
+     *  - an http URL is upgraded to https, but only when the app itself runs
+     *    on https, where an http image would otherwise be blocked as mixed
+     *    content (on an http app the original is kept so local dev still works).
+     */
+    public static function normalizeAvatarUrl(?string $avatar, ?string $instanceUrl = null): ?string
+    {
+        if (! is_string($avatar) || trim($avatar) === '') {
+            return null;
+        }
+
+        $avatar = trim($avatar);
+
+        if (str_starts_with($avatar, '/')) {
+            $base = is_string($instanceUrl) && trim($instanceUrl) !== ''
+                ? rtrim(trim($instanceUrl), '/')
+                : '';
+
+            if ($base === '') {
+                return null;
+            }
+
+            $avatar = $base.$avatar;
+        }
+
+        if (str_starts_with($avatar, 'http://') && str_starts_with((string) config('app.url'), 'https://')) {
+            $avatar = 'https://'.substr($avatar, 7);
+        }
+
+        return $avatar;
+    }
+
+    /**
      * @return BelongsTo<User, $this>
      */
     public function user(): BelongsTo
