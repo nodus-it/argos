@@ -38,14 +38,17 @@ class GitHubIssueTracker implements IssueTrackerContract
 
     public function listIssues(string $owner, string $project, array $filters = []): array
     {
-        // Default state to 'open' when no state filter is provided
-        if (! isset($filters['state']) || $filters['state'] === '') {
-            $filters['state'] = 'open';
-        }
+        // Only forward `state` to the API. Labels are filtered locally by
+        // IssueIngestService (OR semantics); GitHub's `labels` param is AND-only
+        // and must be a comma string — passing the filter array as `labels[]`
+        // made the endpoint return 422.
+        $state = isset($filters['state']) && is_string($filters['state']) && $filters['state'] !== ''
+            ? $filters['state']
+            : 'open';
 
         $issues = [];
         $url = "/repos/{$owner}/{$project}/issues";
-        $params = ['per_page' => 100, ...$filters];
+        $params = ['per_page' => 100, 'state' => $state];
 
         // Paginate via Link header
         do {

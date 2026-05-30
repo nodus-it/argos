@@ -58,8 +58,10 @@ class BitbucketIssueTracker implements IssueTrackerContract
     public function listIssues(string $owner, string $project, array $filters = []): array
     {
         // Bitbucket returns 403 when the issue tracker is disabled — treat as empty.
+        // Labels are filtered locally (OR) by IssueIngestService; Bitbucket
+        // filters via a `q` BBQL string, so the raw filter array is not forwarded.
         $response = $this->http()
-            ->get("/repositories/{$owner}/{$project}/issues", ['pagelen' => 100, ...$filters]);
+            ->get("/repositories/{$owner}/{$project}/issues", ['pagelen' => 100]);
 
         if ($response->status() === 403 || $response->status() === 404) {
             return [];

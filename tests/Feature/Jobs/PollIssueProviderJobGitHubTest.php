@@ -106,6 +106,48 @@ class PollIssueProviderJobGitHubTest extends TestCase
         $this->assertNull($this->binding->last_error);
     }
 
+    // ── label filtering (regression: 422 from `labels[]` query param) ─────────
+
+    public function test_poll_does_not_forward_labels_as_a_query_param(): void
+    {
+        // GitHub returns 422 when `labels` is sent as an array (labels[0]=…),
+        // which is how the filter array used to leak into the query. Only
+        // `state` may be forwarded; labels are filtered locally.
+        $this->binding->update(['filters' => ['labels' => ['argos-demo']]]);
+        $this->fakeIssuesEndpoint([]);
+
+        (new PollIssueProviderJob($this->binding->id))->handle(
+            app(IssueTrackerRegistry::class),
+            app(IssueIngestService::class),
+        );
+
+        Http::assertSent(fn ($request): bool => str_contains($request->url(), 'state=open')
+            && ! str_contains($request->url(), 'labels'));
+
+        $this->binding->refresh();
+        $this->assertNull($this->binding->last_error);
+    }
+
+    public function test_poll_applies_label_filter_locally(): void
+    {
+        $this->binding->update(['filters' => ['labels' => ['argos-demo']]]);
+        $this->fakeIssuesEndpoint([
+            ['id' => 1, 'title' => 'Matches', 'body' => '', 'state' => 'open', 'labels' => [['name' => 'argos-demo']], 'html_url' => 'https://github.com/acme/widget/issues/1'],
+            ['id' => 2, 'title' => 'No label', 'body' => '', 'state' => 'open', 'labels' => [['name' => 'other']], 'html_url' => 'https://github.com/acme/widget/issues/2'],
+        ]);
+
+        (new PollIssueProviderJob($this->binding->id))->handle(
+            app(IssueTrackerRegistry::class),
+            app(IssueIngestService::class),
+        );
+
+        // Both issues are linked, but only the labelled one becomes a Task.
+        $this->assertDatabaseCount(ExternalIssueLink::class, 2);
+        $this->assertDatabaseCount('tasks', 1);
+        $this->assertNotNull(ExternalIssueLink::where('external_id', '1')->first()->task_id);
+        $this->assertNull(ExternalIssueLink::where('external_id', '2')->first()->task_id);
+    }
+
     // ── pagination ───────────────────────────────────────────────────────────
 
     public function test_poll_fetches_all_pages(): void

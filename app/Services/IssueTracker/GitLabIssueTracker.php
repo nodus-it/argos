@@ -38,13 +38,16 @@ class GitLabIssueTracker implements IssueTrackerContract
 
     public function listIssues(string $owner, string $project, array $filters = []): array
     {
-        if (! isset($filters['state']) || $filters['state'] === '') {
-            $filters['state'] = 'opened';
-        }
+        // Only forward `state` to the API; labels are filtered locally (OR
+        // semantics) by IssueIngestService. GitLab's `labels` param is AND-only
+        // and expects a comma string, not the filter array.
+        $state = isset($filters['state']) && is_string($filters['state']) && $filters['state'] !== ''
+            ? $filters['state']
+            : 'opened';
 
         $projectPath = $this->encodePath($owner, $project);
         $issues = [];
-        $params = ['per_page' => 100, ...$filters];
+        $params = ['per_page' => 100, 'state' => $state];
 
         do {
             $response = $this->http()
@@ -55,7 +58,7 @@ class GitLabIssueTracker implements IssueTrackerContract
 
             $nextPage = $this->nextPageNumber($response);
             if ($nextPage !== null) {
-                $params = ['per_page' => 100, 'page' => $nextPage, ...$filters];
+                $params = ['per_page' => 100, 'page' => $nextPage, 'state' => $state];
             }
         } while ($nextPage !== null);
 
