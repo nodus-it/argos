@@ -16,6 +16,18 @@ use Filament\Tables\Filters\SelectFilter;
 trait TaskTableConcern
 {
     /**
+     * Relations the task columns read on every render: the project name,
+     * the provider source badge, and the agent fallback. Eager-loading them
+     * on the table query avoids an N+1 storm under the 5s polling.
+     *
+     * @return list<string>
+     */
+    public static function taskTableEagerLoads(): array
+    {
+        return ['repoProfile', 'externalIssueLink.binding'];
+    }
+
+    /**
      * @return list<TextColumn>
      */
     public static function taskTableColumns(bool $withProject = true): array
