@@ -189,6 +189,22 @@ class IssueIngestServiceTest extends TestCase
         $this->assertNotNull($link->task_id, 'OR semantics: one of the configured labels should be enough');
     }
 
+    public function test_creates_task_when_a_previously_filtered_issue_starts_matching(): void
+    {
+        $binding = $this->makeBinding(['filters' => ['labels' => ['argos']]]);
+
+        // First seen without the label → filtered: link exists, no task.
+        $issue = $this->sampleIssue(7, ['labels' => []]);
+        $link = $this->service->ingest($issue, $binding);
+        $this->assertNull($link->task_id);
+
+        // Label added later → now matches → a task is created on the same link.
+        $issue['labels'] = [['name' => 'argos']];
+        $link = $this->service->ingest($issue, $binding);
+        $this->assertNotNull($link->task_id);
+        $this->assertDatabaseCount('tasks', 1);
+    }
+
     public function test_label_filter_blocks_issue_with_none_of_several_labels(): void
     {
         $binding = $this->makeBinding(['filters' => ['labels' => ['argos', 'ready']]]);

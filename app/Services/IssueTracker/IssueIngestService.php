@@ -49,13 +49,14 @@ final class IssueIngestService
             'external_id' => $externalId,
         ]);
 
-        $isNew = ! $link->exists;
-
         $link->external_url = (string) ($issue['html_url'] ?? $issue['web_url'] ?? '');
         $link->last_synced_at = now();
         $link->signature = $signature;
 
-        if ($isNew && $link->task_id === null) {
+        // Create a task whenever a filter-passing issue has none yet — including
+        // an issue first seen NOT matching (link exists, task null) that later
+        // gains a matching label. Keying only on "is the link new" missed that.
+        if ($link->task_id === null) {
             $task = $this->createTaskFromIssue($issue, $binding);
             $link->task_id = $task->id;
         }
