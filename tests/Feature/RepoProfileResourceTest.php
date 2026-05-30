@@ -21,6 +21,7 @@ use Filament\Actions\Testing\TestAction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class RepoProfileResourceTest extends TestCase
@@ -138,7 +139,7 @@ class RepoProfileResourceTest extends TestCase
             ->assertFormSet(['oauth_repo' => 'acme/widget']);
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('repoPathProvider')]
+    #[DataProvider('repoPathProvider')]
     public function test_repo_path_from_url_extracts_owner_repo(string $url, ?string $expected): void
     {
         $this->assertSame($expected, RepoProfileResource::repoPathFromUrl($url));
