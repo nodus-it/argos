@@ -53,12 +53,14 @@ final class IssueIngestService
         $link->last_synced_at = now();
         $link->signature = $signature;
 
-        // Create a task whenever a filter-passing issue has none yet — including
-        // an issue first seen NOT matching (link exists, task null) that later
-        // gains a matching label. Keying only on "is the link new" missed that.
-        if ($link->task_id === null) {
+        // Import once, ever. task_imported_at (not task_id) is the gate: an
+        // issue first seen NOT matching, then labelled later, still imports;
+        // but a task the user deleted (task_id nulled, marker kept) is never
+        // silently re-imported on the next poll.
+        if ($link->task_imported_at === null) {
             $task = $this->createTaskFromIssue($issue, $binding);
             $link->task_id = $task->id;
+            $link->task_imported_at = now();
         }
 
         $link->save();

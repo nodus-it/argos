@@ -8,6 +8,7 @@ use App\Enums\TaskProviderKind;
 use App\Enums\TaskProviderMode;
 use App\Enums\TaskProviderSyncStatus;
 use App\Models\ExternalIssueLink;
+use App\Models\Task;
 use App\Models\TaskProviderBinding;
 use App\Services\IssueTracker\IssueIngestService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -203,6 +204,26 @@ class IssueIngestServiceTest extends TestCase
         $link = $this->service->ingest($issue, $binding);
         $this->assertNotNull($link->task_id);
         $this->assertDatabaseCount('tasks', 1);
+    }
+
+    public function test_does_not_reimport_after_the_task_is_deleted(): void
+    {
+        $binding = $this->makeBinding(['filters' => ['labels' => ['argos']]]);
+        $issue = $this->sampleIssue(8, ['labels' => [['name' => 'argos']]]);
+
+        $link = $this->service->ingest($issue, $binding);
+        $this->assertNotNull($link->task_id);
+
+        // User deletes the Argos task → link.task_id is nulled (nullOnDelete),
+        // but the import marker stays.
+        Task::find($link->task_id)->delete();
+        $this->assertNull($link->fresh()->task_id);
+
+        // Next poll must NOT recreate a task.
+        $this->service->ingest($issue, $binding);
+
+        $this->assertDatabaseCount('tasks', 0);
+        $this->assertNull($link->fresh()->task_id);
     }
 
     public function test_label_filter_blocks_issue_with_none_of_several_labels(): void

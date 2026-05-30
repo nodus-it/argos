@@ -15,6 +15,7 @@ use Illuminate\Support\Carbon;
  * @property string $id
  * @property string $task_provider_binding_id
  * @property string|null $task_id
+ * @property Carbon|null $task_imported_at
  * @property string $external_id
  * @property string $external_url
  * @property Carbon|null $last_synced_at
@@ -35,6 +36,7 @@ class ExternalIssueLink extends Model
     protected $fillable = [
         'task_provider_binding_id',
         'task_id',
+        'task_imported_at',
         'external_id',
         'external_url',
         'last_synced_at',
@@ -46,6 +48,7 @@ class ExternalIssueLink extends Model
     {
         return [
             'last_synced_at' => 'datetime',
+            'task_imported_at' => 'datetime',
         ];
     }
 
