@@ -104,6 +104,65 @@ class IssueCommentNotifierTest extends TestCase
         (new IssueCommentNotifier($registry))->notifyPhaseCompletion($task, 'concept', 'completed');
     }
 
+    public function test_concept_phase_inlines_the_concept_markdown(): void
+    {
+        $task = Task::factory()->create(['concept_md' => "## Plan\n\nWrite the README."]);
+
+        $tracker = Mockery::mock(IssueTrackerContract::class);
+        $tracker->shouldReceive('createComment')
+            ->once()
+            ->with('acme', 'widget', 5, Mockery::on(
+                fn (string $body): bool => str_contains($body, 'Phase **Concept**')
+                    && str_contains($body, '## Plan')
+                    && str_contains($body, 'Write the README.'),
+            ));
+
+        $registry = Mockery::mock(IssueTrackerRegistry::class);
+        $registry->shouldReceive('has')->andReturn(true);
+        $registry->shouldReceive('make')->andReturn($tracker);
+
+        $binding = TaskProviderBinding::factory()->create([
+            'kind' => TaskProviderKind::GitHub,
+            'external_project_ref' => 'acme/widget',
+        ]);
+        ExternalIssueLink::factory()->create([
+            'task_id' => $task->id,
+            'task_provider_binding_id' => $binding->id,
+            'external_id' => '5',
+        ]);
+
+        (new IssueCommentNotifier($registry))->notifyPhaseCompletion($task, 'concept', 'completed');
+    }
+
+    public function test_non_concept_phase_does_not_inline_the_concept(): void
+    {
+        $task = Task::factory()->create(['concept_md' => 'DO NOT LEAK THIS INTO IMPLEMENT']);
+
+        $tracker = Mockery::mock(IssueTrackerContract::class);
+        $tracker->shouldReceive('createComment')
+            ->once()
+            ->with('acme', 'widget', 5, Mockery::on(
+                fn (string $body): bool => str_contains($body, 'Phase **Implement**')
+                    && ! str_contains($body, 'DO NOT LEAK THIS INTO IMPLEMENT'),
+            ));
+
+        $registry = Mockery::mock(IssueTrackerRegistry::class);
+        $registry->shouldReceive('has')->andReturn(true);
+        $registry->shouldReceive('make')->andReturn($tracker);
+
+        $binding = TaskProviderBinding::factory()->create([
+            'kind' => TaskProviderKind::GitHub,
+            'external_project_ref' => 'acme/widget',
+        ]);
+        ExternalIssueLink::factory()->create([
+            'task_id' => $task->id,
+            'task_provider_binding_id' => $binding->id,
+            'external_id' => '5',
+        ]);
+
+        (new IssueCommentNotifier($registry))->notifyPhaseCompletion($task, 'implement', 'completed');
+    }
+
     public function test_swallows_exception_and_does_not_rethrow(): void
     {
         $tracker = Mockery::mock(IssueTrackerContract::class);
