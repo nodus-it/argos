@@ -20,8 +20,7 @@ use Illuminate\Support\Str;
     {--body= : Issue body / description}
     {--state=open : Issue state (open/closed)}
     {--label=* : Label name(s) to attach; repeat the flag for several}
-    {--id= : External issue id (default: random)}
-    {--number= : Issue number/iid (default: random)}')]
+    {--id= : Addressable issue id stored as external_id — GitHub/GitLab number, Linear node id (default: random)}')]
 #[Description('Deliver a signed, fake provider issue webhook to a binding locally — no public URL, tunnel, or external account needed. Runs the real controller (signature check, idempotency, job dispatch) so you can watch a Task appear.')]
 final class SimulateIssueWebhookCommand extends Command
 {
@@ -54,15 +53,16 @@ final class SimulateIssueWebhookCommand extends Command
             $this->warn('Binding had no webhook_secret — generated and saved one for the simulation.');
         }
 
-        $issueId = (string) ($this->option('id') ?? '') ?: (string) random_int(100000, 999999);
-        $number = (int) ($this->option('number') ?? 0) ?: random_int(1, 9999);
-        $title = (string) ($this->option('title') ?? '') ?: "Simulated issue #{$number}";
+        // The addressable id that lands in external_id (GitHub/GitLab number,
+        // Linear node id) — what the comment/fetch APIs reference.
+        $externalId = (string) ($this->option('id') ?? '') ?: (string) random_int(1, 9999);
+        $title = (string) ($this->option('title') ?? '') ?: "Simulated issue #{$externalId}";
         $body = (string) ($this->option('body') ?? '') ?: 'Created by argos:webhook:simulate';
         $state = (string) $this->option('state');
         /** @var list<string> $labels */
         $labels = array_values(array_filter((array) $this->option('label'), 'is_string'));
 
-        [$envelope, $eventType] = $this->buildEnvelope($kind, $issueId, $number, $title, $body, $state, $labels);
+        [$envelope, $eventType] = $this->buildEnvelope($kind, $externalId, $title, $body, $state, $labels);
         $rawBody = (string) json_encode($envelope);
 
         $request = $this->buildRequest($kind, $binding, $rawBody, $eventType);
@@ -83,7 +83,7 @@ final class SimulateIssueWebhookCommand extends Command
 
         // ProcessIncomingIssueJob runs inline on the sync queue, otherwise the
         // worker picks it up — poll briefly so the command shows the result.
-        $link = $this->awaitIngestedLink($binding, $issueId, $countBefore);
+        $link = $this->awaitIngestedLink($binding, $externalId, $countBefore);
 
         if ($link === null) {
             $this->warn('Webhook accepted, but no ExternalIssueLink appeared yet.');
@@ -109,23 +109,27 @@ final class SimulateIssueWebhookCommand extends Command
      */
     private function buildEnvelope(
         TaskProviderKind $kind,
-        string $issueId,
-        int $number,
+        string $externalId,
         string $title,
         string $body,
         string $state,
         array $labels,
     ): array {
+        // $externalId lands in the field IssueIngestService reads as external_id:
+        // GitHub `number`, GitLab `iid`, Linear node `id`. The global provider
+        // `id` is distinct (and unused downstream) to mirror real payloads.
+        $globalId = "sim-global-{$externalId}";
+
         return match ($kind) {
             TaskProviderKind::GitHub => [[
                 'action' => 'opened',
                 'issue' => [
-                    'id' => $issueId,
-                    'number' => $number,
+                    'id' => $globalId,
+                    'number' => $externalId,
                     'title' => $title,
                     'body' => $body,
                     'state' => $state,
-                    'html_url' => "https://github.com/simulated/repo/issues/{$number}",
+                    'html_url' => "https://github.com/simulated/repo/issues/{$externalId}",
                     'labels' => array_map(fn (string $l): array => ['name' => $l], $labels),
                 ],
                 'repository' => ['full_name' => 'simulated/repo'],
@@ -135,12 +139,12 @@ final class SimulateIssueWebhookCommand extends Command
             TaskProviderKind::GitLab => [[
                 'object_kind' => 'issue',
                 'object_attributes' => [
-                    'id' => $issueId,
-                    'iid' => $number,
+                    'id' => $globalId,
+                    'iid' => $externalId,
                     'title' => $title,
                     'description' => $body,
                     'state' => $state,
-                    'url' => "https://gitlab.com/simulated/repo/-/issues/{$number}",
+                    'url' => "https://gitlab.com/simulated/repo/-/issues/{$externalId}",
                 ],
                 'labels' => array_map(fn (string $l): array => ['title' => $l], $labels),
             ], null],
@@ -149,8 +153,8 @@ final class SimulateIssueWebhookCommand extends Command
                 'type' => 'Issue',
                 'action' => 'create',
                 'data' => [
-                    'id' => $issueId,
-                    'url' => "https://linear.app/simulated/issue/{$number}",
+                    'id' => $externalId,
+                    'url' => "https://linear.app/simulated/issue/{$externalId}",
                     'title' => $title,
                     'description' => $body,
                     'state' => ['name' => $state],

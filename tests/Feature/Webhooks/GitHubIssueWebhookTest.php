@@ -103,9 +103,10 @@ class GitHubIssueWebhookTest extends TestCase
         $job = new ProcessIncomingIssueJob($this->binding->id, $envelope, 'issues');
         $job->handle(app(IssueTrackerRegistry::class), app(IssueIngestService::class));
 
+        // external_id is the addressable issue number (1), not the global id (101).
         $this->assertDatabaseHas(ExternalIssueLink::class, [
             'task_provider_binding_id' => $this->binding->id,
-            'external_id' => '101',
+            'external_id' => '1',
         ]);
 
         $link = ExternalIssueLink::where('task_provider_binding_id', $this->binding->id)->first();

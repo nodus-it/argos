@@ -64,6 +64,39 @@ class IssueIngestServiceTest extends TestCase
         $this->assertSame('42', $link->external_id);
     }
 
+    public function test_external_id_uses_github_number_not_global_id(): void
+    {
+        // The global id (4554618939) is not addressable by the comment API;
+        // the issue number (19) is. Regression for write-back posting to a
+        // non-existent issue (HTTP 404).
+        $binding = $this->makeBinding(['kind' => TaskProviderKind::GitHub]);
+        $issue = $this->sampleIssue(4554618939, ['number' => 19]);
+
+        $link = $this->service->ingest($issue, $binding);
+
+        $this->assertSame('19', $link->external_id);
+    }
+
+    public function test_external_id_uses_gitlab_iid_not_global_id(): void
+    {
+        $binding = $this->makeBinding(['kind' => TaskProviderKind::GitLab]);
+        $issue = $this->sampleIssue(987654, ['iid' => 3, 'web_url' => 'https://gitlab.com/acme/widget/-/issues/3']);
+
+        $link = $this->service->ingest($issue, $binding);
+
+        $this->assertSame('3', $link->external_id);
+    }
+
+    public function test_external_id_uses_linear_node_id(): void
+    {
+        $binding = $this->makeBinding(['kind' => TaskProviderKind::Linear]);
+        $issue = $this->sampleIssue(1, ['id' => 'lin_abc123']);
+
+        $link = $this->service->ingest($issue, $binding);
+
+        $this->assertSame('lin_abc123', $link->external_id);
+    }
+
     public function test_ingest_is_idempotent(): void
     {
         $binding = $this->makeBinding();

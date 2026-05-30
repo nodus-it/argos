@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\IssueTracker;
 
+use App\Enums\TaskProviderKind;
 use App\Models\ExternalIssueLink;
 use App\Models\Task;
 use App\Models\TaskProviderBinding;
@@ -25,10 +26,12 @@ final class IssueIngestService
      */
     public function ingest(array $issue, TaskProviderBinding $binding): ExternalIssueLink
     {
+        $externalId = $this->resolveExternalId($issue, $binding->kind);
+
         if (! $this->passesFilters($issue, $binding)) {
             $link = ExternalIssueLink::firstOrNew([
                 'task_provider_binding_id' => $binding->id,
-                'external_id' => (string) $issue['id'],
+                'external_id' => $externalId,
             ]);
 
             $link->external_url = (string) ($issue['html_url'] ?? $issue['web_url'] ?? '');
@@ -43,7 +46,7 @@ final class IssueIngestService
 
         $link = ExternalIssueLink::firstOrNew([
             'task_provider_binding_id' => $binding->id,
-            'external_id' => (string) $issue['id'],
+            'external_id' => $externalId,
         ]);
 
         $isNew = ! $link->exists;
@@ -60,6 +63,25 @@ final class IssueIngestService
         $link->save();
 
         return $link;
+    }
+
+    /**
+     * The per-repo identifier the issue is addressed by for API operations
+     * (comments, fetches) — NOT the provider's global id. GitHub uses `number`,
+     * GitLab `iid`, Linear the GraphQL node `id`. Using the global id made
+     * write-back POST to a non-existent issue (HTTP 404).
+     *
+     * @param  array<string, mixed>  $issue
+     */
+    private function resolveExternalId(array $issue, TaskProviderKind $kind): string
+    {
+        $id = match ($kind) {
+            TaskProviderKind::GitHub => $issue['number'] ?? $issue['id'] ?? null,
+            TaskProviderKind::GitLab => $issue['iid'] ?? $issue['id'] ?? null,
+            default => $issue['id'] ?? null,
+        };
+
+        return (string) ($id ?? '');
     }
 
     /**
