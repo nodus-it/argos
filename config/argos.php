@@ -27,6 +27,14 @@ return [
     // hasClaudeToken() / claudeTokenSource() / Settings UI all agree.
     'claude_token' => env('CLAUDE_CODE_OAUTH_TOKEN') ?: null,
     'admin_password' => env('ADMIN_PASSWORD') ?: '12345',
+    /*
+     * Local one-click developer login (filament-developer-logins). Only ever
+     * active in the `local` environment — the AdminPanelProvider gates the
+     * plugin on app()->environment('local'), so this email is meaningless in
+     * staging/production. Matches the DemoSeeder admin so the button works
+     * out of the box after a dev reset.
+     */
+    'dev_login_email' => env('SEED_USER_EMAIL', 'admin@argos.local'),
     'docker' => [
         'memory_limit' => env('ARGOS_MEM_LIMIT', '4g'),
         'cpu_limit' => env('ARGOS_CPU_LIMIT', '2'),
