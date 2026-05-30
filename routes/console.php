@@ -15,15 +15,17 @@ Schedule::command('argos:check-agent-versions')
     ->dailyAt('03:00')
     ->withoutOverlapping();
 
-// Every 5 minutes: dispatch PollIssueProviderJob for each active Poll binding.
-// Manual trigger: `php artisan argos:poll-issues`.
+// Poll issue providers and check concept-comment reactions on a configurable
+// interval (ARGOS_POLL_INTERVAL_MINUTES, default 5; set to 1 locally for fast
+// feedback). Providers don't push reaction events, so approvals are polled too.
+// Manual triggers: `php artisan argos:poll-issues`,
+// `php artisan argos:check-concept-approvals`.
+$pollCron = '*/'.config('argos.poll_interval_minutes', 5).' * * * *';
+
 Schedule::command('argos:poll-issues')
-    ->everyFiveMinutes()
+    ->cron($pollCron)
     ->withoutOverlapping();
 
-// Every 5 minutes: check concept comments for an authorized 👍 reaction and
-// start implement when present (providers don't push reaction events, so we
-// poll). Manual trigger: `php artisan argos:check-concept-approvals`.
 Schedule::command('argos:check-concept-approvals')
-    ->everyFiveMinutes()
+    ->cron($pollCron)
     ->withoutOverlapping();

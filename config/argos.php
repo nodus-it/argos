@@ -36,6 +36,12 @@ return [
      */
     'dev_login_email' => env('SEED_USER_EMAIL', 'admin@argos.local'),
     /*
+     * How often (minutes) the scheduler polls issue providers and checks
+     * concept-comment reactions. Default 5 keeps API usage low at scale; set
+     * ARGOS_POLL_INTERVAL_MINUTES=1 locally for fast feedback. Clamped to 1–59.
+     */
+    'poll_interval_minutes' => max(1, min(59, (int) env('ARGOS_POLL_INTERVAL_MINUTES', 5))),
+    /*
      * Demo task-provider bindings seeded by ProviderDemoSeeder for local
      * end-to-end testing of the issue integration. These env vars only
      * OVERRIDE the committed defaults in tests/External/providers.defaults.php
