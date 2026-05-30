@@ -79,11 +79,11 @@ final class IssueIngestService
 
         $requiredLabels = Arr::get($filters, 'labels');
         if (is_array($requiredLabels) && count($requiredLabels) > 0) {
+            // OR semantics: the issue must carry at least one of the configured
+            // labels (matches the documented behaviour in SETUP-TASK-PROVIDERS.md).
             $issueLabels = $this->extractLabels($issue);
-            foreach ($requiredLabels as $label) {
-                if (! in_array($label, $issueLabels, true)) {
-                    return false;
-                }
+            if (count(array_intersect($requiredLabels, $issueLabels)) === 0) {
+                return false;
             }
         }
 

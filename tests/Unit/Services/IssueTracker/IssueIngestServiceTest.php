@@ -144,4 +144,25 @@ class IssueIngestServiceTest extends TestCase
 
         $this->assertNotNull($link->task_id);
     }
+
+    public function test_label_filter_uses_or_semantics_for_multiple_labels(): void
+    {
+        // OR: a single matching label out of several configured is enough.
+        $binding = $this->makeBinding(['filters' => ['labels' => ['argos', 'ready']]]);
+        $issue = $this->sampleIssue(11, ['labels' => [['name' => 'argos'], ['name' => 'bug']]]);
+
+        $link = $this->service->ingest($issue, $binding);
+
+        $this->assertNotNull($link->task_id, 'OR semantics: one of the configured labels should be enough');
+    }
+
+    public function test_label_filter_blocks_issue_with_none_of_several_labels(): void
+    {
+        $binding = $this->makeBinding(['filters' => ['labels' => ['argos', 'ready']]]);
+        $issue = $this->sampleIssue(12, ['labels' => [['name' => 'bug'], ['name' => 'wontfix']]]);
+
+        $link = $this->service->ingest($issue, $binding);
+
+        $this->assertNull($link->task_id, 'No configured label present → no task');
+    }
 }
