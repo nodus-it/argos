@@ -100,6 +100,56 @@ class GitLabIssueTracker implements IssueTrackerContract
             ->json();
     }
 
+    public function commentId(array $createResult): ?string
+    {
+        $id = $createResult['id'] ?? null;
+
+        return $id !== null ? (string) $id : null;
+    }
+
+    public function getCommentReactions(string $owner, string $project, int|string $issueId, int|string $commentId): array
+    {
+        $projectPath = $this->encodePath($owner, $project);
+
+        $awards = $this->http()
+            ->get("/projects/{$projectPath}/issues/{$issueId}/notes/{$commentId}/award_emoji", ['per_page' => 100])
+            ->throw()
+            ->json();
+
+        $out = [];
+        foreach ($awards as $award) {
+            $out[] = [
+                'emoji' => (string) ($award['name'] ?? ''),
+                'user_id' => (string) ($award['user']['id'] ?? ''),
+                'user_login' => (string) ($award['user']['username'] ?? ''),
+            ];
+        }
+
+        return $out;
+    }
+
+    public function userCanApprove(string $owner, string $project, array $reactor): bool
+    {
+        $userId = $reactor['user_id'];
+        if ($userId === '') {
+            return false;
+        }
+
+        $projectPath = $this->encodePath($owner, $project);
+
+        try {
+            $member = $this->http()
+                ->get("/projects/{$projectPath}/members/all/{$userId}")
+                ->throw()
+                ->json();
+        } catch (\Throwable) {
+            return false;
+        }
+
+        // GitLab access levels: 30 = Developer (can push), 40 = Maintainer, 50 = Owner.
+        return (int) ($member['access_level'] ?? 0) >= 30;
+    }
+
     /**
      * GitLab sends a plain token in the X-Gitlab-Token header.
      * The $signature parameter carries the header value directly.

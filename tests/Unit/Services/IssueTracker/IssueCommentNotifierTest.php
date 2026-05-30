@@ -86,6 +86,7 @@ class IssueCommentNotifierTest extends TestCase
                 fn (string $body): bool => str_contains($body, 'Phase **Concept**')
                     && str_contains($body, "/admin/tasks/{$task->getKey()}"),
             ));
+        $tracker->shouldReceive('commentId')->andReturn('cmt-panel');
 
         $registry = Mockery::mock(IssueTrackerRegistry::class);
         $registry->shouldReceive('has')->andReturn(true);
@@ -116,6 +117,7 @@ class IssueCommentNotifierTest extends TestCase
                     && str_contains($body, '## Plan')
                     && str_contains($body, 'Write the README.'),
             ));
+        $tracker->shouldReceive('commentId')->andReturn('cmt-concept-99');
 
         $registry = Mockery::mock(IssueTrackerRegistry::class);
         $registry->shouldReceive('has')->andReturn(true);
@@ -125,13 +127,16 @@ class IssueCommentNotifierTest extends TestCase
             'kind' => TaskProviderKind::GitHub,
             'external_project_ref' => 'acme/widget',
         ]);
-        ExternalIssueLink::factory()->create([
+        $link = ExternalIssueLink::factory()->create([
             'task_id' => $task->id,
             'task_provider_binding_id' => $binding->id,
             'external_id' => '5',
         ]);
 
         (new IssueCommentNotifier($registry))->notifyPhaseCompletion($task, 'concept', 'completed');
+
+        // The concept comment id is stored for the later 👍-approval poll.
+        $this->assertSame('cmt-concept-99', $link->fresh()->concept_comment_id);
     }
 
     public function test_non_concept_phase_does_not_inline_the_concept(): void

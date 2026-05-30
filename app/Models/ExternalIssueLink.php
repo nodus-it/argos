@@ -19,6 +19,7 @@ use Illuminate\Support\Carbon;
  * @property string $external_url
  * @property Carbon|null $last_synced_at
  * @property string|null $signature
+ * @property string|null $concept_comment_id
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read TaskProviderBinding $binding
@@ -38,6 +39,7 @@ class ExternalIssueLink extends Model
         'external_url',
         'last_synced_at',
         'signature',
+        'concept_comment_id',
     ];
 
     protected function casts(): array

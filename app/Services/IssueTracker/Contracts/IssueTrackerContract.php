@@ -43,6 +43,34 @@ interface IssueTrackerContract
     ): array;
 
     /**
+     * Extract the provider's comment id from a createComment() response, so it
+     * can be stored and later polled for reactions. Null when not derivable.
+     *
+     * @param  array<string, mixed>  $createResult
+     */
+    public function commentId(array $createResult): ?string;
+
+    /**
+     * Reactions on a comment, normalised to a list of
+     * ['emoji' => string, 'user_id' => string, 'user_login' => string].
+     * The issue id is required because some providers (GitLab) address a
+     * comment only in the context of its issue.
+     *
+     * @return list<array{emoji: string, user_id: string, user_login: string}>
+     */
+    public function getCommentReactions(string $owner, string $project, int|string $issueId, int|string $commentId): array;
+
+    /**
+     * Whether the given reactor is allowed to approve work on this project —
+     * i.e. has write/admin access (GitHub/GitLab) or is a full org member
+     * (Linear). Used to gate the 👍-to-start-implement flow so not just anyone
+     * can trigger it.
+     *
+     * @param  array{emoji: string, user_id: string, user_login: string}  $reactor
+     */
+    public function userCanApprove(string $owner, string $project, array $reactor): bool;
+
+    /**
      * Verify the webhook payload signature against the shared secret.
      * GitHub uses HMAC-SHA256; GitLab compares a plain token header.
      */

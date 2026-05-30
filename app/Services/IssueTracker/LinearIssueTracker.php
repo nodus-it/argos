@@ -119,6 +119,75 @@ class LinearIssueTracker implements IssueTrackerContract
         return $result['data']['commentCreate'] ?? [];
     }
 
+    public function commentId(array $createResult): ?string
+    {
+        $id = $createResult['comment']['id'] ?? null;
+
+        return is_string($id) && $id !== '' ? $id : null;
+    }
+
+    /**
+     * Best-effort against the Linear GraphQL schema (reactions on comments) —
+     * verify live and adjust if the field shape differs. $owner/$project/$issueId
+     * are unused: Linear ids are global.
+     */
+    public function getCommentReactions(string $owner, string $project, int|string $issueId, int|string $commentId): array
+    {
+        $result = $this->graphql('
+            query CommentReactions($id: String!) {
+                comment(id: $id) {
+                    reactions { emoji user { id displayName } }
+                }
+            }
+        ', ['id' => (string) $commentId]);
+
+        $reactions = $result['data']['comment']['reactions'] ?? [];
+
+        $out = [];
+        foreach (is_array($reactions) ? $reactions : [] as $reaction) {
+            if (! is_array($reaction)) {
+                continue;
+            }
+            $out[] = [
+                'emoji' => (string) ($reaction['emoji'] ?? ''),
+                'user_id' => (string) ($reaction['user']['id'] ?? ''),
+                'user_login' => (string) ($reaction['user']['displayName'] ?? ''),
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Linear has no per-repo permissions. "write/admin" maps to an active,
+     * non-guest organisation member (admins are a non-guest superset). Tighten
+     * to `admin` only if needed.
+     */
+    public function userCanApprove(string $owner, string $project, array $reactor): bool
+    {
+        $userId = $reactor['user_id'];
+        if ($userId === '') {
+            return false;
+        }
+
+        try {
+            $result = $this->graphql('
+                query User($id: String!) {
+                    user(id: $id) { active admin guest }
+                }
+            ', ['id' => $userId]);
+        } catch (\Throwable) {
+            return false;
+        }
+
+        $user = $result['data']['user'] ?? null;
+        if (! is_array($user)) {
+            return false;
+        }
+
+        return ($user['active'] ?? false) === true && ($user['guest'] ?? false) !== true;
+    }
+
     /**
      * Linear sends a raw HMAC-SHA256 hex digest in the Linear-Signature header (no prefix).
      */

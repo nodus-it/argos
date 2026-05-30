@@ -101,6 +101,52 @@ class GitHubIssueTracker implements IssueTrackerContract
             ->json();
     }
 
+    public function commentId(array $createResult): ?string
+    {
+        $id = $createResult['id'] ?? null;
+
+        return $id !== null ? (string) $id : null;
+    }
+
+    public function getCommentReactions(string $owner, string $project, int|string $issueId, int|string $commentId): array
+    {
+        $reactions = $this->http()
+            ->get("/repos/{$owner}/{$project}/issues/comments/{$commentId}/reactions", ['per_page' => 100])
+            ->throw()
+            ->json();
+
+        $out = [];
+        foreach ($reactions as $reaction) {
+            $out[] = [
+                'emoji' => (string) ($reaction['content'] ?? ''),
+                'user_id' => (string) ($reaction['user']['id'] ?? ''),
+                'user_login' => (string) ($reaction['user']['login'] ?? ''),
+            ];
+        }
+
+        return $out;
+    }
+
+    public function userCanApprove(string $owner, string $project, array $reactor): bool
+    {
+        $login = $reactor['user_login'];
+        if ($login === '') {
+            return false;
+        }
+
+        try {
+            $data = $this->http()
+                ->get("/repos/{$owner}/{$project}/collaborators/{$login}/permission")
+                ->throw()
+                ->json();
+        } catch (\Throwable) {
+            return false;
+        }
+
+        // GitHub returns "admin" | "write" | "maintain" | "triage" | "read" | "none".
+        return in_array((string) ($data['permission'] ?? ''), ['admin', 'write', 'maintain'], true);
+    }
+
     /**
      * GitHub signs payloads with HMAC-SHA256 and sends
      * "sha256=<hex>" in the X-Hub-Signature-256 header.

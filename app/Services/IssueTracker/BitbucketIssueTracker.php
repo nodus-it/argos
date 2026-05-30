@@ -100,6 +100,26 @@ class BitbucketIssueTracker implements IssueTrackerContract
             ->json();
     }
 
+    // Bitbucket is not wired as a task issue-provider (no TaskProviderKind),
+    // so the 👍-approval flow does not apply — these satisfy the contract.
+
+    public function commentId(array $createResult): ?string
+    {
+        $id = $createResult['id'] ?? null;
+
+        return $id !== null ? (string) $id : null;
+    }
+
+    public function getCommentReactions(string $owner, string $project, int|string $issueId, int|string $commentId): array
+    {
+        return [];
+    }
+
+    public function userCanApprove(string $owner, string $project, array $reactor): bool
+    {
+        return false;
+    }
+
     public function verifySignature(string $payload, string $signature, string $secret): bool
     {
         throw new \LogicException('verifySignature not implemented yet for Bitbucket');

@@ -20,3 +20,10 @@ Schedule::command('argos:check-agent-versions')
 Schedule::command('argos:poll-issues')
     ->everyFiveMinutes()
     ->withoutOverlapping();
+
+// Every 5 minutes: check concept comments for an authorized 👍 reaction and
+// start implement when present (providers don't push reaction events, so we
+// poll). Manual trigger: `php artisan argos:check-concept-approvals`.
+Schedule::command('argos:check-concept-approvals')
+    ->everyFiveMinutes()
+    ->withoutOverlapping();

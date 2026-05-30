@@ -286,4 +286,49 @@ class GitHubIssueTrackerTest extends TestCase
 
         $this->assertSame([], $result);
     }
+
+    // ── reactions & approval (👍-to-start-implement) ──────────────────────────
+
+    public function test_get_comment_reactions_maps_content_and_user(): void
+    {
+        Http::fake([
+            'https://api.github.com/repos/acme/widget/issues/comments/555/reactions*' => Http::response([
+                ['content' => '+1', 'user' => ['id' => 7, 'login' => 'maintainer']],
+                ['content' => 'heart', 'user' => ['id' => 8, 'login' => 'fan']],
+            ]),
+        ]);
+
+        $reactions = $this->tracker->getCommentReactions('acme', 'widget', 19, 555);
+
+        $this->assertSame([
+            ['emoji' => '+1', 'user_id' => '7', 'user_login' => 'maintainer'],
+            ['emoji' => 'heart', 'user_id' => '8', 'user_login' => 'fan'],
+        ], $reactions);
+    }
+
+    public function test_user_can_approve_only_with_write_or_admin_permission(): void
+    {
+        Http::fake([
+            'https://api.github.com/repos/acme/widget/collaborators/maintainer/permission' => Http::response(['permission' => 'write']),
+            'https://api.github.com/repos/acme/widget/collaborators/reader/permission' => Http::response(['permission' => 'read']),
+        ]);
+
+        $this->assertTrue($this->tracker->userCanApprove('acme', 'widget', ['emoji' => '+1', 'user_id' => '7', 'user_login' => 'maintainer']));
+        $this->assertFalse($this->tracker->userCanApprove('acme', 'widget', ['emoji' => '+1', 'user_id' => '8', 'user_login' => 'reader']));
+    }
+
+    public function test_user_can_approve_is_false_when_permission_lookup_fails(): void
+    {
+        Http::fake([
+            'https://api.github.com/repos/acme/widget/collaborators/*/permission' => Http::response(['message' => 'Not Found'], 404),
+        ]);
+
+        $this->assertFalse($this->tracker->userCanApprove('acme', 'widget', ['emoji' => '+1', 'user_id' => '9', 'user_login' => 'stranger']));
+    }
+
+    public function test_comment_id_extracts_id_from_create_result(): void
+    {
+        $this->assertSame('12345', $this->tracker->commentId(['id' => 12345]));
+        $this->assertNull($this->tracker->commentId([]));
+    }
 }

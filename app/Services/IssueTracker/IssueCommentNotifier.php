@@ -43,7 +43,17 @@ final class IssueCommentNotifier
             $issueNumber = $link->external_id;
             $body = $this->formatComment($task, $phase, $status);
 
-            $tracker->createComment($owner, $project, $issueNumber, $body);
+            $result = $tracker->createComment($owner, $project, $issueNumber, $body);
+
+            // Remember the concept comment's id so a 👍 on it can later be
+            // polled to approve and start implement.
+            if ($phase === 'concept' && $status === PhaseStatus::Completed->value) {
+                $commentId = $tracker->commentId($result);
+                if ($commentId !== null) {
+                    $link->concept_comment_id = $commentId;
+                    $link->save();
+                }
+            }
         } catch (\Throwable $e) {
             Log::channel('argos')->warning('IssueCommentNotifier: failed to post comment', [
                 'task_id' => $task->id,
