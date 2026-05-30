@@ -43,6 +43,7 @@ return [
 
     'columns' => [
         'project' => 'Projekt',
+        'source' => 'Quelle',
         'phase' => 'Phase',
         'status' => 'Status',
         'workflow' => 'Workflow',
@@ -81,6 +82,10 @@ return [
             'branch' => 'Branch',
             'pull_request' => 'Pull Request',
             'open' => 'Öffnen',
+            'source' => 'Quelle',
+            'external_issue' => 'Externes Issue',
+            'external_project' => 'Externes Projekt',
+            'last_synced' => 'Zuletzt synchronisiert',
             'cost' => 'Kosten',
             'tokens' => 'Tokens',
             'created' => 'Erstellt',

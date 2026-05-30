@@ -56,7 +56,7 @@ final class BitbucketConnectedAccountController extends Controller
             ]
         );
 
-        $account->relinkOrphanedRepoProfiles();
+        $account->relinkOrphanedResources();
 
         $returnTo = $request->session()->pull(self::RETURN_SESSION_KEY);
 

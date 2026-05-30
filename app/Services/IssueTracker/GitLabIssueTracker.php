@@ -6,6 +6,7 @@ namespace App\Services\IssueTracker;
 
 use App\Services\IssueTracker\Contracts\IssueTrackerContract;
 use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 
 class GitLabIssueTracker implements IssueTrackerContract
@@ -15,17 +16,56 @@ class GitLabIssueTracker implements IssueTrackerContract
         private readonly string $instanceUrl = 'https://gitlab.com',
     ) {}
 
-    public function listIssues(string $owner, string $project, array $filters = []): array
+    public function listReferences(): array
     {
-        $projectPath = $this->encodePath($owner, $project);
+        $response = $this->http()->get('/projects', [
+            'membership' => true,
+            'simple' => true,
+            'per_page' => 100,
+            'order_by' => 'last_activity_at',
+        ])->throw();
 
-        return $this->http()
-            ->get("/projects/{$projectPath}/issues", ['per_page' => 100, ...$filters])
-            ->throw()
-            ->json();
+        $refs = [];
+        foreach ($response->json() as $project) {
+            $path = (string) ($project['path_with_namespace'] ?? '');
+            if ($path !== '') {
+                $refs[$path] = $path;
+            }
+        }
+
+        return $refs;
     }
 
-    public function getIssue(string $owner, string $project, int $issueNumber): array
+    public function listIssues(string $owner, string $project, array $filters = []): array
+    {
+        // Only forward `state` to the API; labels are filtered locally (OR
+        // semantics) by IssueIngestService. GitLab's `labels` param is AND-only
+        // and expects a comma string, not the filter array.
+        $state = isset($filters['state']) && is_string($filters['state']) && $filters['state'] !== ''
+            ? $filters['state']
+            : 'opened';
+
+        $projectPath = $this->encodePath($owner, $project);
+        $issues = [];
+        $params = ['per_page' => 100, 'state' => $state];
+
+        do {
+            $response = $this->http()
+                ->get("/projects/{$projectPath}/issues", $params)
+                ->throw();
+
+            $issues = array_merge($issues, $response->json());
+
+            $nextPage = $this->nextPageNumber($response);
+            if ($nextPage !== null) {
+                $params = ['per_page' => 100, 'page' => $nextPage, 'state' => $state];
+            }
+        } while ($nextPage !== null);
+
+        return $issues;
+    }
+
+    public function getIssue(string $owner, string $project, int|string $issueNumber): array
     {
         $projectPath = $this->encodePath($owner, $project);
         $base = "/projects/{$projectPath}/issues/{$issueNumber}";
@@ -46,29 +86,10 @@ class GitLabIssueTracker implements IssueTrackerContract
         ];
     }
 
-    public function createIssue(
-        string $owner,
-        string $project,
-        string $title,
-        string $body,
-        array $options = [],
-    ): array {
-        $projectPath = $this->encodePath($owner, $project);
-
-        return $this->http()
-            ->post("/projects/{$projectPath}/issues", [
-                'title' => $title,
-                'description' => $body,
-                ...$options,
-            ])
-            ->throw()
-            ->json();
-    }
-
     public function createComment(
         string $owner,
         string $project,
-        int $issueNumber,
+        int|string $issueNumber,
         string $body,
     ): array {
         $projectPath = $this->encodePath($owner, $project);
@@ -77,6 +98,130 @@ class GitLabIssueTracker implements IssueTrackerContract
             ->post("/projects/{$projectPath}/issues/{$issueNumber}/notes", ['body' => $body])
             ->throw()
             ->json();
+    }
+
+    public function commentId(array $createResult): ?string
+    {
+        $id = $createResult['id'] ?? null;
+
+        return $id !== null ? (string) $id : null;
+    }
+
+    public function getCommentReactions(string $owner, string $project, int|string $issueId, int|string $commentId): array
+    {
+        $projectPath = $this->encodePath($owner, $project);
+
+        $awards = $this->http()
+            ->get("/projects/{$projectPath}/issues/{$issueId}/notes/{$commentId}/award_emoji", ['per_page' => 100])
+            ->throw()
+            ->json();
+
+        $out = [];
+        foreach ($awards as $award) {
+            $out[] = [
+                'emoji' => (string) ($award['name'] ?? ''),
+                'user_id' => (string) ($award['user']['id'] ?? ''),
+                'user_login' => (string) ($award['user']['username'] ?? ''),
+            ];
+        }
+
+        return $out;
+    }
+
+    public function userCanApprove(string $owner, string $project, array $reactor): bool
+    {
+        $userId = $reactor['user_id'];
+        if ($userId === '') {
+            return false;
+        }
+
+        $projectPath = $this->encodePath($owner, $project);
+
+        try {
+            $member = $this->http()
+                ->get("/projects/{$projectPath}/members/all/{$userId}")
+                ->throw()
+                ->json();
+        } catch (\Throwable) {
+            return false;
+        }
+
+        // GitLab access levels: 30 = Developer (can push), 40 = Maintainer, 50 = Owner.
+        return (int) ($member['access_level'] ?? 0) >= 30;
+    }
+
+    /**
+     * GitLab sends a plain token in the X-Gitlab-Token header.
+     * The $signature parameter carries the header value directly.
+     */
+    public function verifySignature(string $payload, string $signature, string $secret): bool
+    {
+        return hash_equals($secret, $signature);
+    }
+
+    public function registerWebhook(string $owner, string $project, string $url, string $secret): array
+    {
+        $projectPath = $this->encodePath($owner, $project);
+
+        return $this->http()
+            ->post("/projects/{$projectPath}/hooks", [
+                'url' => $url,
+                'token' => $secret,
+                'issues_events' => true,
+                'confidential_issues_events' => true,
+                'note_events' => false,
+                'enable_ssl_verification' => true,
+            ])
+            ->throw()
+            ->json();
+    }
+
+    public function unregisterWebhook(string $owner, string $project, int|string $webhookId): void
+    {
+        $projectPath = $this->encodePath($owner, $project);
+
+        $this->http()
+            ->delete("/projects/{$projectPath}/hooks/{$webhookId}")
+            ->throw();
+    }
+
+    /**
+     * GitLab sends issue data in object_attributes — extract it for issue events only.
+     * Top-level labels (objects with 'title') are merged in as strings.
+     *
+     * @param  array<string, mixed>  $envelope
+     * @return array<string, mixed>
+     */
+    public function normalizeWebhookPayload(array $envelope, ?string $eventType): array
+    {
+        if (($envelope['object_kind'] ?? null) !== 'issue') {
+            return [];
+        }
+
+        $issue = $envelope['object_attributes'] ?? null;
+
+        if (! is_array($issue) || empty($issue)) {
+            return [];
+        }
+
+        if (isset($envelope['labels']) && is_array($envelope['labels'])) {
+            $issue['labels'] = array_map(
+                fn (mixed $l): string => is_array($l) ? (string) ($l['title'] ?? '') : (string) $l,
+                $envelope['labels'],
+            );
+        }
+
+        return $issue;
+    }
+
+    private function nextPageNumber(Response $response): ?int
+    {
+        $header = $response->header('X-Next-Page');
+        if ($header === null || $header === '') {
+            return null;
+        }
+
+        return (int) $header;
     }
 
     private function encodePath(string $owner, string $project): string

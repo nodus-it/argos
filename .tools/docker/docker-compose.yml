@@ -1,11 +1,12 @@
 # Argos — Docker Compose stack
 #
 # Services:
-#   db     — MariaDB 11
-#   redis  — Redis 7 (queue backend for Horizon)
-#   app    — Laravel app (PHP-FPM), runs migrations on boot, spawns worker containers via the docker socket
-#   nginx  — reverse proxy in front of app:9000
-#   queue  — Laravel Horizon (same image as app, ARGOS_ROLE=queue)
+#   db        — MariaDB 11
+#   redis     — Redis 7 (queue backend for Horizon)
+#   app       — Laravel app (PHP-FPM), runs migrations on boot, spawns worker containers via the docker socket
+#   nginx     — reverse proxy in front of app:9000
+#   queue     — Laravel Horizon (same image as app, ARGOS_ROLE=queue)
+#   scheduler — Laravel scheduler (`schedule:work`, ARGOS_ROLE=scheduler)
 #
 # Image source:
 #   By default the `app`/`queue` services build `argos-app:local` from the local
@@ -174,6 +175,36 @@ services:
       ARGOS_QUEUE_DEFAULT_PROCESSES:     "${ARGOS_QUEUE_DEFAULT_PROCESSES:-5}"
       ARGOS_QUEUE_TASKS_PROCESSES:       "${ARGOS_QUEUE_TASKS_PROCESSES:-2}"
     command: ["php", "/app/artisan", "horizon"]
+
+  scheduler:
+    # Same image as app/queue. Runs `schedule:work`, which invokes
+    # `schedule:run` every minute (see routes/console.php — e.g.
+    # argos:poll-issues every 5 min). No docker socket: scheduled commands
+    # only dispatch queued jobs, the `queue` worker does the actual work.
+    image: "${ARGOS_APP_IMAGE:-argos-app:local}"
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    volumes:
+      - argos-data:/data
+      - ../..:/app
+      - /app/node_modules
+      - /app/public/build
+      - /app/bootstrap/cache
+    environment:
+      ARGOS_ROLE:               "scheduler"
+      APP_ENV:                  "${APP_ENV:-local}"
+      APP_DEBUG:                "${APP_DEBUG:-true}"
+      APP_KEY:                  "${APP_KEY:-}"
+      ARGOS_CONFIG_DIR:         /data/config
+      DB_CONNECTION:            "mariadb"
+      ARGOS_DB_HOST:            "db"
+      ARGOS_DB_PORT:            "3306"
+      ARGOS_DB_DATABASE:        "${ARGOS_DB_DATABASE:-argos}"
+      ARGOS_DB_USERNAME:        "${ARGOS_DB_USERNAME:-argos}"
+      ARGOS_DB_PASSWORD:        "${ARGOS_DB_PASSWORD:-argos}"
+    command: ["php", "/app/artisan", "schedule:work"]
 
 volumes:
   argos-data:

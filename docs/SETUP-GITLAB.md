@@ -78,6 +78,66 @@ In the Argos project form:
 
 ---
 
+## Option 3: Issue-Provider (Pull + Webhook)
+
+Argos kann GitLab-Issues als Tasks importieren und bei Phasenabschluss automatisch einen Kommentar im Issue hinterlassen. Jedes Repository benötigt ein **TaskProviderBinding**, das im Filament-Admin-Interface angelegt wird.
+
+### Schritt 1: Benötigte Token-Scopes
+
+| Token-Typ | Benötigte Scopes |
+|---|---|
+| Personal Access Token (PAT) | `api` — Vollzugriff auf API inkl. Webhook-Verwaltung |
+| OAuth | Scope `api` (bereits bei der OAuth-App-Einrichtung gesetzt) |
+
+> **Hinweis**: Der `api`-Scope ist erforderlich für Webhook-Registrierung (`POST /projects/:id/hooks`). Ohne diesen Scope schlägt die Webhook-Einrichtung mit 403 fehl und das Binding bleibt im Status `Pending`.
+
+### Schritt 2: Binding in Filament anlegen
+
+1. Im Admin-Panel unter **Repo Profiles** das gewünschte Projekt öffnen
+2. Tab **Task Provider Bindings** → **New Binding**
+3. Felder ausfüllen:
+
+| Feld | Beschreibung |
+|---|---|
+| **Kind** | GitLab |
+| **Mode** | `Webhook` (Echtzeit) oder `Poll` (alle 5 min) |
+| **Connected Account** | OAuth- oder PAT-Account mit `api`-Scope |
+| **External Project Ref** | Projektpfad im Format `group/projekt`, z. B. `acme/widget` |
+| **Filters** | Optional: nur Issues mit bestimmtem State oder Labels importieren |
+
+4. Speichern → Binding ist im Status **Pending**
+
+### Schritt 3: Aktivieren mit „Einrichten"
+
+Klicke auf die **Einrichten**-Aktion beim Binding:
+
+- **Webhook-Modus**: Argos registriert automatisch einen Webhook in GitLab via `POST /projects/:id/hooks` mit `issues_events: true`. Die Callback-URL `${APP_URL}/webhooks/issues/gitlab/{binding-id}` und das Secret werden automatisch generiert — kein manuelles Eintragen in GitLab nötig. Das Binding wechselt auf `Active`.
+- **Poll-Modus**: Das Binding wechselt sofort auf `Active`. Der Poll-Scheduler fragt Issues beim nächsten Lauf ab.
+
+Schlägt die Einrichtung fehl (fehlender `api`-Scope, falscher Projektpfad, `APP_URL` nicht erreichbar), bleibt das Binding auf `Pending` und der Fehler steht in der **Last Error**-Spalte. Problem beheben und **Einrichten** erneut klicken.
+
+### Webhook- vs. Poll-Modus
+
+| | Webhook | Poll |
+|---|---|---|
+| Latenz | Sekunden | Minuten (Scheduler-Intervall) |
+| `APP_URL` öffentlich erreichbar | Ja | Nein |
+| GitLab API-Rate-Limits | Nicht relevant | Zählt gegen Quota |
+
+### Verhaltenshinweise
+
+- **Signatur**: GitLab sendet das Secret als Plain-Token im `X-Gitlab-Token`-Header (kein HMAC). Argos vergleicht direkt per `hash_equals`.
+- **Idempotenz**: Doppelte Deliveries werden anhand des `X-Gitlab-Event-UUID`-Headers erkannt und verworfen.
+- **Note- und MR-Hooks**: GitLab kann auch `note`- und `merge_request`-Events an dieselbe Webhook-URL senden. Diese werden vom Job erkannt (`object_kind ≠ issue`) und ohne Task-Erstellung verworfen.
+- **Confidential Issues**: Der Webhook ist mit `confidential_issues_events: true` registriert — vertrauliche Issues werden ebenfalls verarbeitet.
+- **Self-Hosted GitLab**: Der Tracker verwendet automatisch den `instance_url`-Wert des verknüpften `ConnectedAccount`. Für GitLab.com bleibt dieser leer (Standard `https://gitlab.com`).
+- **Labels**: GitLab-Issues liefern Labels als String-Array im API-Response; Webhook-Payloads liefern Label-Objekte im Top-Level-`labels`-Array. Argos normalisiert beide Formate automatisch.
+- **State**: GitLab verwendet `opened`/`closed` (nicht `open`). Der Default-State beim Polling ist `opened`.
+
+Weitere Details zum Binding-Setup: [`docs/SETUP-TASK-PROVIDERS.md`](SETUP-TASK-PROVIDERS.md)
+
+---
+
 ## Worker: REPO_PLATFORM
 
 The manager passes `REPO_PLATFORM=gitlab` to the worker container as an environment variable. The push phase uses this to detect the platform reliably — even for Self-Hosted GitLab instances with non-obvious hostnames — and pushes with `-o merge_request.create` to create the MR automatically.

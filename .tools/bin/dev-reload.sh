@@ -19,4 +19,4 @@ compose() {
 }
 
 compose exec -T app php artisan optimize:clear
-compose restart queue
+compose restart queue scheduler

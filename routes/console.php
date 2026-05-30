@@ -14,3 +14,18 @@ Artisan::command('inspire', function () {
 Schedule::command('argos:check-agent-versions')
     ->dailyAt('03:00')
     ->withoutOverlapping();
+
+// Poll issue providers and check concept-comment reactions on a configurable
+// interval (ARGOS_POLL_INTERVAL_MINUTES, default 5; set to 1 locally for fast
+// feedback). Providers don't push reaction events, so approvals are polled too.
+// Manual triggers: `php artisan argos:poll-issues`,
+// `php artisan argos:check-concept-approvals`.
+$pollCron = '*/'.config('argos.poll_interval_minutes', 5).' * * * *';
+
+Schedule::command('argos:poll-issues')
+    ->cron($pollCron)
+    ->withoutOverlapping();
+
+Schedule::command('argos:check-concept-approvals')
+    ->cron($pollCron)
+    ->withoutOverlapping();

@@ -224,6 +224,7 @@ class ViewTask extends ViewRecord
     {
         /** @var Task $task */
         $task = $this->getRecord();
+        $task->loadMissing(['externalIssueLink.binding']);
         $reader = app(StateReader::class);
 
         $phaseRuns = $task->phaseRuns()->orderBy('iteration')->get()->groupBy('phase');

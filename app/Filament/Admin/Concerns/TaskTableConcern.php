@@ -7,6 +7,7 @@ namespace App\Filament\Admin\Concerns;
 use App\Enums\AgentName;
 use App\Enums\Phase;
 use App\Enums\PhaseStatus;
+use App\Enums\TaskProviderKind;
 use App\Enums\WorkflowStatus;
 use App\Models\Task;
 use Filament\Schemas\Components\Tabs\Tab;
@@ -15,6 +16,18 @@ use Filament\Tables\Filters\SelectFilter;
 
 trait TaskTableConcern
 {
+    /**
+     * Relations the task columns read on every render: the project name,
+     * the provider source badge, and the agent fallback. Eager-loading them
+     * on the table query avoids an N+1 storm under the 5s polling.
+     *
+     * @return list<string>
+     */
+    public static function taskTableEagerLoads(): array
+    {
+        return ['repoProfile', 'externalIssueLink.binding'];
+    }
+
     /**
      * @return list<TextColumn>
      */
@@ -31,6 +44,14 @@ trait TaskTableConcern
                 ->label(__('tasks.columns.project'))
                 ->sortable();
         }
+
+        $columns[] = TextColumn::make('externalIssueLink.binding.kind')
+            ->label(__('tasks.columns.source'))
+            ->badge()
+            ->color('gray')
+            ->icon('heroicon-o-arrow-down-tray')
+            ->formatStateUsing(fn (?TaskProviderKind $state): string => $state?->label() ?? '—')
+            ->placeholder('—');
 
         $columns[] = TextColumn::make('workflow_status')
             ->label(__('tasks.columns.workflow'))

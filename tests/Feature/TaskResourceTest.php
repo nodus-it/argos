@@ -9,12 +9,16 @@ use App\Enums\PhaseStatus;
 use App\Enums\WorkflowStatus;
 use App\Filament\Admin\Resources\TaskResource\Pages\CreateTask;
 use App\Filament\Admin\Resources\TaskResource\Pages\ListTasks;
+use App\Filament\Admin\Resources\TaskResource\Pages\ViewTask;
 use App\Jobs\RunPhaseJob;
+use App\Models\ExternalIssueLink;
 use App\Models\RepoProfile;
 use App\Models\Task;
+use App\Models\TaskProviderBinding;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Process;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -50,6 +54,86 @@ class TaskResourceTest extends TestCase
         Livewire::test(ListTasks::class)
             ->assertSuccessful()
             ->assertSee('Draft');
+    }
+
+    public function test_list_shows_provider_source_for_imported_task(): void
+    {
+        $task = Task::factory()->create();
+        $binding = TaskProviderBinding::factory()->create();
+        ExternalIssueLink::factory()->create([
+            'task_id' => $task->id,
+            'task_provider_binding_id' => $binding->id,
+        ]);
+
+        Livewire::test(ListTasks::class)
+            ->assertSuccessful()
+            ->assertCanSeeTableRecords([$task])
+            ->assertSee('GitHub');
+    }
+
+    public function test_list_eager_loads_relations_so_query_count_is_constant(): void
+    {
+        // The task list polls every 5s and each row reads repoProfile +
+        // externalIssueLink.binding. Without eager loading every extra row
+        // adds queries against those tables. Count only the queries that
+        // touch the eager-loaded tables and assert they do not scale with
+        // the number of tasks.
+        $countRelationQueries = function (int $taskCount): int {
+            $binding = TaskProviderBinding::factory()->create();
+            Task::factory()
+                ->count($taskCount)
+                ->create()
+                ->each(function (Task $task) use ($binding): void {
+                    ExternalIssueLink::factory()->create([
+                        'task_id' => $task->id,
+                        'task_provider_binding_id' => $binding->id,
+                    ]);
+                });
+
+            $queries = 0;
+            DB::listen(function ($query) use (&$queries): void {
+                if (str_contains($query->sql, 'repo_profiles')
+                    || str_contains($query->sql, 'external_issue_links')
+                    || str_contains($query->sql, 'task_provider_bindings')) {
+                    $queries++;
+                }
+            });
+
+            Livewire::test(ListTasks::class)->assertSuccessful();
+
+            return $queries;
+        };
+
+        $few = $countRelationQueries(2);
+
+        Task::query()->delete();
+        ExternalIssueLink::query()->delete();
+
+        $many = $countRelationQueries(8);
+
+        $this->assertSame(
+            $few,
+            $many,
+            "Relation query count scaled with task count ({$few} -> {$many}); eager loading is missing.",
+        );
+    }
+
+    public function test_view_page_shows_external_issue_details(): void
+    {
+        $task = Task::factory()->create();
+        $binding = TaskProviderBinding::factory()->create([
+            'external_project_ref' => 'acme/widget',
+        ]);
+        ExternalIssueLink::factory()->create([
+            'task_id' => $task->id,
+            'task_provider_binding_id' => $binding->id,
+            'external_url' => 'https://github.com/acme/widget/issues/42',
+        ]);
+
+        Livewire::test(ViewTask::class, ['record' => $task->id])
+            ->assertSuccessful()
+            ->assertSee('acme/widget')
+            ->assertSee('https://github.com/acme/widget/issues/42');
     }
 
     public function test_create_page_renders(): void

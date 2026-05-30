@@ -10,6 +10,7 @@ use App\Models\Task;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 class TasksRelationManager extends RelationManager
@@ -33,6 +34,7 @@ class TasksRelationManager extends RelationManager
         return $table
             ->defaultSort('updated_at', 'desc')
             ->poll('5s')
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(static::taskTableEagerLoads()))
             ->columns(static::taskTableColumns(withProject: false))
             ->filters(static::taskTableFilters(withProject: false))
             ->recordUrl(fn (Task $record): string => TaskResource::getUrl('view', ['record' => $record]))

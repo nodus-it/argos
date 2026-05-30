@@ -30,11 +30,38 @@ class BitbucketIssueTracker implements IssueTrackerContract
         }
     }
 
+    public function listReferences(): array
+    {
+        $response = $this->http()->get('/repositories', [
+            'role' => 'member',
+            'pagelen' => 100,
+            'sort' => '-updated_on',
+        ]);
+
+        if ($response->status() === 403 || $response->status() === 404) {
+            return [];
+        }
+
+        $response->throw();
+
+        $refs = [];
+        foreach ($response->json('values', []) as $repo) {
+            $fullName = (string) ($repo['full_name'] ?? '');
+            if ($fullName !== '') {
+                $refs[$fullName] = $fullName;
+            }
+        }
+
+        return $refs;
+    }
+
     public function listIssues(string $owner, string $project, array $filters = []): array
     {
         // Bitbucket returns 403 when the issue tracker is disabled — treat as empty.
+        // Labels are filtered locally (OR) by IssueIngestService; Bitbucket
+        // filters via a `q` BBQL string, so the raw filter array is not forwarded.
         $response = $this->http()
-            ->get("/repositories/{$owner}/{$project}/issues", ['pagelen' => 100, ...$filters]);
+            ->get("/repositories/{$owner}/{$project}/issues", ['pagelen' => 100]);
 
         if ($response->status() === 403 || $response->status() === 404) {
             return [];
@@ -45,7 +72,7 @@ class BitbucketIssueTracker implements IssueTrackerContract
         return $response->json('values', []);
     }
 
-    public function getIssue(string $owner, string $project, int $issueNumber): array
+    public function getIssue(string $owner, string $project, int|string $issueNumber): array
     {
         $base = "/repositories/{$owner}/{$project}/issues/{$issueNumber}";
 
@@ -59,27 +86,10 @@ class BitbucketIssueTracker implements IssueTrackerContract
         ];
     }
 
-    public function createIssue(
-        string $owner,
-        string $project,
-        string $title,
-        string $body,
-        array $options = [],
-    ): array {
-        return $this->http()
-            ->post("/repositories/{$owner}/{$project}/issues", [
-                'title' => $title,
-                'content' => ['raw' => $body],
-                ...$options,
-            ])
-            ->throw()
-            ->json();
-    }
-
     public function createComment(
         string $owner,
         string $project,
-        int $issueNumber,
+        int|string $issueNumber,
         string $body,
     ): array {
         return $this->http()
@@ -88,6 +98,52 @@ class BitbucketIssueTracker implements IssueTrackerContract
             ])
             ->throw()
             ->json();
+    }
+
+    // Bitbucket is not wired as a task issue-provider (no TaskProviderKind),
+    // so the 👍-approval flow does not apply — these satisfy the contract.
+
+    public function commentId(array $createResult): ?string
+    {
+        $id = $createResult['id'] ?? null;
+
+        return $id !== null ? (string) $id : null;
+    }
+
+    public function getCommentReactions(string $owner, string $project, int|string $issueId, int|string $commentId): array
+    {
+        return [];
+    }
+
+    public function userCanApprove(string $owner, string $project, array $reactor): bool
+    {
+        return false;
+    }
+
+    public function verifySignature(string $payload, string $signature, string $secret): bool
+    {
+        throw new \LogicException('verifySignature not implemented yet for Bitbucket');
+    }
+
+    public function registerWebhook(string $owner, string $project, string $url, string $secret): array
+    {
+        throw new \LogicException('registerWebhook not implemented yet for Bitbucket');
+    }
+
+    public function unregisterWebhook(string $owner, string $project, int|string $webhookId): void
+    {
+        throw new \LogicException('unregisterWebhook not implemented yet for Bitbucket');
+    }
+
+    /**
+     * Bitbucket sends issue data directly in the envelope — no unwrapping needed.
+     *
+     * @param  array<string, mixed>  $envelope
+     * @return array<string, mixed>
+     */
+    public function normalizeWebhookPayload(array $envelope, ?string $eventType): array
+    {
+        return $envelope;
     }
 
     private function http(): PendingRequest
