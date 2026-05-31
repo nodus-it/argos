@@ -7,6 +7,7 @@ namespace App\Services\GitProvider;
 use App\Services\GitProvider\Contracts\GitProviderContract;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class GitHubGitService implements GitProviderContract
 {
@@ -70,7 +71,13 @@ class GitHubGitService implements GitProviderContract
 
         try {
             $data = $this->getRepository($owner, $repo);
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            Log::channel('argos')->warning('GitHub getDefaultBranch failed', [
+                'owner_repo' => $ownerRepo,
+                'error' => $e->getMessage(),
+                'class' => $e::class,
+            ]);
+
             return null;
         }
 

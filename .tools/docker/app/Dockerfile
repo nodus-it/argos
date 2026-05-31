@@ -31,10 +31,19 @@ RUN set -eux; \
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] \
         https://download.docker.com/linux/debian bookworm stable" \
         > /etc/apt/sources.list.d/docker.list; \
-    curl -fsSL https://deb.nodesource.com/setup_22.x | bash -; \
+    # Download then run the nodesource setup instead of `curl | bash`: the
+    # default /bin/sh has no `pipefail`, so a failed download would otherwise
+    # be swallowed and apt would silently fall back to Debian's nodejs (which
+    # ships no npm under --no-install-recommends), caching a broken base.
+    curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/nodesource_setup.sh; \
+    bash /tmp/nodesource_setup.sh; \
+    rm -f /tmp/nodesource_setup.sh; \
     apt-get update; \
     apt-get install -y --no-install-recommends docker-ce-cli nodejs; \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/*; \
+    # Guard: fail loudly if npm is missing rather than caching a broken layer.
+    node --version; \
+    npm --version
 
 # PHP extensions
 RUN set -eux; \
@@ -47,6 +56,8 @@ RUN set -eux; \
         zip \
         bcmath \
         gd \
+        pcntl \
+        posix \
         opcache; \
     docker-php-ext-enable opcache
 
@@ -109,7 +120,10 @@ ENV DB_CONNECTION=mariadb \
     ARGOS_DB_USERNAME=argos \
     ARGOS_DB_PASSWORD=argos \
     ARGOS_CONFIG_DIR=/data/config \
-    QUEUE_CONNECTION=database \
+    QUEUE_CONNECTION=redis \
+    REDIS_HOST=redis \
+    REDIS_PORT=6379 \
+    REDIS_CLIENT=predis \
     SESSION_DRIVER=database \
     CACHE_STORE=database
 

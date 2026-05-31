@@ -21,11 +21,21 @@ class RunPhaseJob implements ShouldQueue
 
     public int $timeout = 3600;
 
+    /**
+     * Phase runs are expensive (100k–800k tokens each). A blind retry on
+     * non-recoverable errors (DB schema constraint, missing credential,
+     * validation) burns budget without ever succeeding. Surface the failure
+     * in the UI instead so a human can retry deliberately.
+     */
+    public int $tries = 1;
+
     public function __construct(
         public readonly string $taskId,
         public readonly string $phase,
         public readonly array $flags = [],
-    ) {}
+    ) {
+        $this->onQueue('tasks');
+    }
 
     public function handle(PhaseRunner $runner, WorkflowService $workflowService, TaskService $taskService): void
     {
@@ -108,5 +118,37 @@ class RunPhaseJob implements ShouldQueue
             'class' => $exception::class,
             'exhausted' => true,
         ]);
+
+        // With $tries=1 the failed() callback is the only place where the
+        // task status reflects the crash. Without this, the task would stay
+        // stuck in its previous workflow_status forever and the UI would
+        // show no signal that the run failed.
+        try {
+            $task = Task::find($this->taskId);
+
+            if ($task !== null) {
+                // Close any PhaseRun records still in 'running' state — the
+                // runner never got a chance to finalize them, so the timer
+                // would keep ticking until the 15-minute stale sweep.
+                $task->phaseRuns()
+                    ->where('phase', $this->phase)
+                    ->where('status', 'running')
+                    ->update([
+                        'status' => PhaseStatus::Failed->value,
+                        'finished_at' => now(),
+                    ]);
+
+                // Ensure current_status reflects the crash immediately.
+                $task->update(['current_status' => PhaseStatus::Failed]);
+
+                app(TaskService::class)->completePhase($task, $this->phase, PhaseStatus::Failed);
+            }
+        } catch (\Throwable $inner) {
+            Log::channel('argos')->error('Failed to record task failure in failed() callback', [
+                'task' => $this->taskId,
+                'phase' => $this->phase,
+                'error' => $inner->getMessage(),
+            ]);
+        }
     }
 }

@@ -32,7 +32,7 @@ class CurrentTasksWidget extends BaseWidget
         return $table
             ->query(
                 Task::query()
-                    ->with('repoProfile')
+                    ->with(static::taskTableEagerLoads())
                     ->orderByRaw($this->priorityOrderClause())
                     ->orderByDesc('updated_at')
                     ->limit(15)

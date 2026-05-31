@@ -137,14 +137,34 @@ class TaskServiceTest extends TestCase
         $this->assertSame(WorkflowStatus::ImplementRunning, $task->fresh()->workflow_status);
     }
 
-    public function test_start_phase_concept_does_not_change_workflow_status(): void
+    public function test_start_phase_concept_sets_workflow_status_to_concept_running(): void
     {
         Event::fake();
 
         $task = Task::factory()->create(['workflow_status' => WorkflowStatus::ConceptReview]);
         $this->service->startPhase($task, Phase::Concept);
 
-        $this->assertSame(WorkflowStatus::ConceptReview, $task->fresh()->workflow_status);
+        $this->assertSame(WorkflowStatus::ConceptRunning, $task->fresh()->workflow_status);
+    }
+
+    public function test_start_phase_concept_from_failed_sets_concept_running(): void
+    {
+        Event::fake();
+
+        $task = Task::factory()->create(['workflow_status' => WorkflowStatus::Failed]);
+        $this->service->startPhase($task, Phase::Concept);
+
+        $this->assertSame(WorkflowStatus::ConceptRunning, $task->fresh()->workflow_status);
+    }
+
+    public function test_start_phase_push_from_failed_sets_implement_running(): void
+    {
+        Event::fake();
+
+        $task = Task::factory()->create(['workflow_status' => WorkflowStatus::Failed]);
+        $this->service->startPhase($task, Phase::Push);
+
+        $this->assertSame(WorkflowStatus::ImplementRunning, $task->fresh()->workflow_status);
     }
 
     public function test_start_phase_passes_flags_to_job(): void
@@ -209,6 +229,38 @@ class TaskServiceTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->service->continueImplement($task, 200);
+    }
+
+    // ── continueConcept ───────────────────────────────────────────────────────
+
+    public function test_continue_concept_dispatches_job_with_continue_flags(): void
+    {
+        Event::fake();
+
+        $task = Task::factory()->create();
+        $this->service->continueConcept($task, 45);
+
+        Bus::assertDispatched(RunPhaseJob::class, fn ($j) => $j->phase === 'concept'
+            && $j->flags === ['continue' => true, 'max_turns' => 45]);
+    }
+
+    public function test_continue_concept_fires_phase_started(): void
+    {
+        Event::fake();
+
+        $task = Task::factory()->create();
+        $this->service->continueConcept($task, 30);
+
+        Event::assertDispatched(PhaseStarted::class, fn ($e) => $e->phase === Phase::Concept);
+    }
+
+    public function test_continue_concept_throws_when_running(): void
+    {
+        $task = Task::factory()->create();
+        PhaseRun::factory()->running()->create(['task_id' => $task->id, 'phase' => 'concept']);
+
+        $this->expectException(\RuntimeException::class);
+        $this->service->continueConcept($task, 30);
     }
 
     // ── forceUnlockImplement ──────────────────────────────────────────────────

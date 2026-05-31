@@ -9,6 +9,7 @@ use App\Filament\Admin\Widgets\CurrentTasksWidget;
 use App\Filament\Admin\Widgets\StatsOverviewWidget;
 use App\Http\Middleware\RedirectToOnboarding;
 use App\Http\Middleware\SetUserLocale;
+use DutchCodingCompany\FilamentDeveloperLogins\FilamentDeveloperLoginsPlugin;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -61,6 +62,16 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->login()
             ->profile(Profile::class)
+            ->plugins([
+                // One-click developer login on the login screen. Hard-gated to
+                // the local environment — never renders in staging/production.
+                FilamentDeveloperLoginsPlugin::make()
+                    ->enabled(app()->environment('local'))
+                    ->switchable(false)
+                    ->users([
+                        'Admin' => (string) config('argos.dev_login_email'),
+                    ]),
+            ])
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,

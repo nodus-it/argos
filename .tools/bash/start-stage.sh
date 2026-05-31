@@ -58,6 +58,8 @@ export ARGOS_APP_IMAGE="${ARGOS_APP_IMAGE:-ghcr.io/nodus-it/argos-app:stage}"
 export ARGOS_DB_DATABASE="${ARGOS_DB_DATABASE:-argos}"
 export ARGOS_DB_USERNAME="${ARGOS_DB_USERNAME:-argos}"
 export ARGOS_DB_PASSWORD="${ARGOS_DB_PASSWORD:-argos}"
+export ARGOS_QUEUE_DEFAULT_PROCESSES="${ARGOS_QUEUE_DEFAULT_PROCESSES:-5}"
+export ARGOS_QUEUE_TASKS_PROCESSES="${ARGOS_QUEUE_TASKS_PROCESSES:-2}"
 
 DOCKER_COMPOSE=(docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE")
 
@@ -70,7 +72,7 @@ docker pull "$ARGOS_APP_IMAGE"
 
 # ── Stack neu starten ────────────────────────────────────────────────────────
 echo "Bringing up $PROJECT_NAME stack ..."
-"${DOCKER_COMPOSE[@]}" up -d --no-deps --remove-orphans db app nginx queue
+"${DOCKER_COMPOSE[@]}" up -d --no-deps --remove-orphans redis db app nginx queue
 
 echo ""
 echo "  Argos Stage läuft unter http://localhost:${ARGOS_PORT}"

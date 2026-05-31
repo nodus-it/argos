@@ -10,6 +10,11 @@ use App\Services\GitProvider\BitbucketGitService;
 use App\Services\GitProvider\GitHubGitService;
 use App\Services\GitProvider\GitLabGitService;
 use App\Services\GitProvider\GitProviderRegistry;
+use App\Services\IssueTracker\BitbucketIssueTracker;
+use App\Services\IssueTracker\GitHubIssueTracker;
+use App\Services\IssueTracker\GitLabIssueTracker;
+use App\Services\IssueTracker\IssueTrackerRegistry;
+use App\Services\IssueTracker\LinearIssueTracker;
 use App\Workers\Agents\AgentRegistry;
 use App\Workers\Agents\ClaudeCodeRunner;
 use App\Workers\Agents\CodexRunner;
@@ -22,6 +27,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Passport\Passport;
 use PDO;
 use PDOException;
 use SocialiteProviders\Bitbucket\BitbucketExtendSocialite;
@@ -53,6 +59,37 @@ class AppServiceProvider extends ServiceProvider
             $registry->register(
                 'bitbucket',
                 fn (string $token, string $instanceUrl): BitbucketGitService => new BitbucketGitService($token),
+            );
+
+            return $registry;
+        });
+
+        $this->app->singleton(IssueTrackerRegistry::class, function (): IssueTrackerRegistry {
+            $registry = new IssueTrackerRegistry;
+
+            // GitHub and GitLab OAuth scopes ('repo' / 'api') already cover
+            // webhook management — no additional scopes need to be requested.
+            $registry->register(
+                'github',
+                fn (string $token, string $instanceUrl): GitHubIssueTracker => new GitHubIssueTracker($token),
+            );
+
+            $registry->register(
+                'gitlab',
+                fn (string $token, string $instanceUrl): GitLabIssueTracker => new GitLabIssueTracker(
+                    $token,
+                    $instanceUrl ?: 'https://gitlab.com',
+                ),
+            );
+
+            $registry->register(
+                'bitbucket',
+                fn (string $token, string $instanceUrl): BitbucketIssueTracker => new BitbucketIssueTracker($token),
+            );
+
+            $registry->register(
+                'linear',
+                fn (string $token, string $instanceUrl): LinearIssueTracker => new LinearIssueTracker($token),
             );
 
             return $registry;
@@ -99,6 +136,29 @@ class AppServiceProvider extends ServiceProvider
         });
 
         $this->configureDatabase();
+        $this->configurePassport();
+    }
+
+    /**
+     * Wire up the Passport-backed MCP authentication: declare the single
+     * `mcp:use` scope the server requires and, in containerised deploys, load
+     * the signing keys from the persistent data volume so issued tokens survive
+     * image rebuilds. Locally the keys live in storage/ (passport:install).
+     */
+    private function configurePassport(): void
+    {
+        Passport::tokensCan(['mcp:use' => 'Argos via MCP steuern']);
+        Passport::tokensExpireIn(now()->addDays(30));
+        Passport::refreshTokensExpireIn(now()->addDays(60));
+
+        // Passport 13 ships no default consent screen; reuse the one bundled
+        // with laravel/mcp so the first browser OAuth connect renders.
+        Passport::authorizationView('mcp::authorize');
+
+        $keysPath = Env::get('PASSPORT_KEYS_PATH');
+        if ($keysPath !== null && $keysPath !== '') {
+            Passport::loadKeysFrom($keysPath);
+        }
     }
 
     private function configureDatabase(): void

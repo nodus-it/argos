@@ -6,6 +6,8 @@ namespace App\Filament\Admin\Concerns;
 
 use App\Enums\AgentName;
 use App\Enums\Phase;
+use App\Enums\PhaseStatus;
+use App\Enums\TaskProviderKind;
 use App\Enums\WorkflowStatus;
 use App\Models\Task;
 use Filament\Schemas\Components\Tabs\Tab;
@@ -14,6 +16,18 @@ use Filament\Tables\Filters\SelectFilter;
 
 trait TaskTableConcern
 {
+    /**
+     * Relations the task columns read on every render: the project name,
+     * the provider source badge, and the agent fallback. Eager-loading them
+     * on the table query avoids an N+1 storm under the 5s polling.
+     *
+     * @return list<string>
+     */
+    public static function taskTableEagerLoads(): array
+    {
+        return ['repoProfile', 'externalIssueLink.binding'];
+    }
+
     /**
      * @return list<TextColumn>
      */
@@ -31,11 +45,20 @@ trait TaskTableConcern
                 ->sortable();
         }
 
+        $columns[] = TextColumn::make('externalIssueLink.binding.kind')
+            ->label(__('tasks.columns.source'))
+            ->badge()
+            ->color('gray')
+            ->icon('heroicon-o-arrow-down-tray')
+            ->formatStateUsing(fn (?TaskProviderKind $state): string => $state?->label() ?? '—')
+            ->placeholder('—');
+
         $columns[] = TextColumn::make('workflow_status')
             ->label(__('tasks.columns.workflow'))
             ->badge()
-            ->color(fn (?WorkflowStatus $state): string => $state?->color() ?? 'gray')
-            ->formatStateUsing(fn (?WorkflowStatus $state): string => $state?->label() ?? '—');
+            ->icon(fn (Task $record): ?string => $record->isWaitingForWorker() ? 'heroicon-o-clock' : null)
+            ->color(fn (Task $record): string => $record->displayStatusColor())
+            ->formatStateUsing(fn (Task $record): string => $record->displayStatusLabel());
 
         $columns[] = TextColumn::make('current_phase')
             ->label(__('tasks.columns.phase'))
@@ -99,6 +122,10 @@ trait TaskTableConcern
         return [
             'aktuell' => Tab::make(__('tasks.tabs.current'))
                 ->query(fn ($query) => $query->where('workflow_status', '!=', WorkflowStatus::Completed->value)),
+            'wartend' => Tab::make(__('tasks.tabs.waiting'))
+                ->query(fn ($query) => $query
+                    ->whereIn('workflow_status', [WorkflowStatus::ConceptRunning->value, WorkflowStatus::ImplementRunning->value])
+                    ->where('current_status', PhaseStatus::Pending->value)),
             'abgeschlossen' => Tab::make(__('tasks.tabs.completed'))
                 ->query(fn ($query) => $query->where('workflow_status', WorkflowStatus::Completed->value)),
             'alle' => Tab::make(__('tasks.tabs.all')),

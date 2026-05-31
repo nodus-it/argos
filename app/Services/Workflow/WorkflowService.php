@@ -9,6 +9,7 @@ use App\Enums\WorkflowStatus;
 use App\Jobs\RunPhaseJob;
 use App\Models\PhaseRun;
 use App\Models\Task;
+use App\Services\IssueTracker\IssueCommentNotifier;
 
 class WorkflowService
 {
@@ -64,6 +65,10 @@ class WorkflowService
             && $task->repoProfile?->auto_pr) {
             RunPhaseJob::dispatch($task->id, 'push');
         }
+
+        // Notify the external issue tracker (if this task was imported from one).
+        // Errors are swallowed inside the notifier — the workflow must never stall.
+        app(IssueCommentNotifier::class)->notifyPhaseCompletion($task, $phase, $phaseStatus->value);
     }
 
     /**
@@ -74,7 +79,7 @@ class WorkflowService
     {
         PhaseRun::where('task_id', $task->id)
             ->where('status', 'running')
-            ->where('started_at', '<', now()->subHours(2))
+            ->where('started_at', '<', now()->subMinutes(15))
             ->update(['status' => 'failed', 'finished_at' => now()]);
     }
 }

@@ -46,6 +46,7 @@ return new class extends Migration
                 'diff',
                 'push',
                 'respond',
+                'commit-message',
             ])->nullable();
             $table->enum('current_status', [
                 'pending',
@@ -55,6 +56,7 @@ return new class extends Migration
                 'quality_gate_failed',
                 'no_changes',
                 'paused',
+                'lock_blocked',
                 'rate_limited',
             ])->nullable();
             $table->timestamps();

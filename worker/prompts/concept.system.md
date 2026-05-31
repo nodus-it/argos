@@ -17,6 +17,8 @@ Du bist ein erfahrener Software-Entwickler. Deine Aufgabe ist es, einen klaren, 
 
 Antworte direkt mit dem Konzept-Markdown — KEINE Datei schreiben, KEIN Tool-Call zum Schreiben. Dein Antwort-Text wird vom Worker in `/workspace/.agent/concept.md` abgelegt.
 
+**Wichtig zur Form deiner Antwort**: Schreibe das Markdown **direkt** in deine Antwort. Wickle deine Antwort **nicht** in einen Code-Fence (keine triple-Backticks ` ``` ` am Anfang und Ende, auch nicht ` ```markdown `). Der unten gezeigte ` ```markdown … ``` `-Block ist nur ein **Beispiel-Schema zur Veranschaulichung** der erwarteten Inhalts-Struktur — die Backticks gehören NICHT in deine tatsächliche Antwort. Code-Fences innerhalb des Konzepts (z. B. um Code-Snippets zu zeigen) sind weiter erlaubt; verboten ist nur ein äußerer Wrapper-Fence um das gesamte Konzept.
+
 Verwende folgende Struktur:
 
 ```markdown

@@ -73,6 +73,15 @@ if [[ -z "${APP_KEY:-}" ]]; then
     export APP_KEY
 fi
 
+# Passport signing keys for the MCP OAuth server live on the persistent /data
+# volume so issued tokens survive image rebuilds. AppServiceProvider reads
+# PASSPORT_KEYS_PATH and calls Passport::loadKeysFrom(); every role exports it
+# so token validation works in app/queue alike. Keys are generated once (never
+# with --force — that would invalidate live tokens on each boot).
+export PASSPORT_KEYS_PATH="${PASSPORT_KEYS_PATH:-/data/passport}"
+mkdir -p "$PASSPORT_KEYS_PATH"
+chown www-data:www-data "$PASSPORT_KEYS_PATH"
+
 # Wait for the database to accept connections. The compose healthcheck on `db`
 # already gates startup, but a belt-and-braces TCP probe here keeps this
 # entrypoint usable outside compose too.
@@ -93,8 +102,21 @@ done
 # image (e.g. for one-shot artisan invocations) still self-heals the schema.
 case "${ARGOS_ROLE:-app}" in
     app)
+        # One-time drain of leftover database-queue jobs after migration to Horizon.
+        # Runs in ~1 s when the jobs table is empty; processes any stranded jobs otherwise.
+        if php /app/artisan tinker --execute="exit(\DB::table('jobs')->exists() ? 0 : 1);" >/dev/null 2>&1; then
+            echo "Draining leftover database queue jobs (one-time migration to Horizon)..."
+            php /app/artisan queue:work database --stop-when-empty --tries=1 --max-time=120 || true
+        fi
+
         php /app/artisan migrate --force --no-interaction
         php /app/artisan db:seed --class=AdminUserSeeder --force --no-interaction
+        # Generate Passport keys once, into the persistent volume. www-data must
+        # own them so php-fpm can read the 0600 key files.
+        if [[ ! -f "${PASSPORT_KEYS_PATH}/oauth-private.key" ]]; then
+            php /app/artisan passport:keys --no-interaction
+            chown www-data:www-data "${PASSPORT_KEYS_PATH}"/oauth-private.key "${PASSPORT_KEYS_PATH}"/oauth-public.key
+        fi
         # Pre-warm the default worker image: dispatches a queued build for
         # the configured stack × claude-code so the first phase a fresh
         # install kicks off does not pay the 1-3 min cold-build cost. The

@@ -6,6 +6,8 @@ setup() {
     mkdir -p /workspace/.agent/concept.history
     unset REPO_URL BASE_BRANCH ITERATION
 
+    # shellcheck source=../../lib/logging.sh
+    source worker/lib/logging.sh
     # shellcheck source=../../phases/commit-message.sh
     source worker/phases/commit-message.sh
     # shellcheck source=../../lib/quality.sh
@@ -123,6 +125,102 @@ teardown() {
     run quality_gate_verdict "$gates"
     [ "$status" -eq 0 ]
     [ -z "$output" ]
+}
+
+# --- quality_ensure_workspace_dotenv ---
+
+@test "quality_ensure_workspace_dotenv: kein workspace/.env, kein .env.example → leere .env angelegt" {
+    rm -f /workspace/.env /workspace/.env.example
+    quality_ensure_workspace_dotenv >/dev/null 2>&1
+    [ -f /workspace/.env ]
+    [ ! -s /workspace/.env ]
+}
+
+@test "quality_ensure_workspace_dotenv: .env.example vorhanden, .env fehlt → .env wird aus example kopiert" {
+    rm -f /workspace/.env
+    printf 'APP_NAME=Example\nAPP_ENV=local\n' > /workspace/.env.example
+    quality_ensure_workspace_dotenv >/dev/null 2>&1
+    [ -f /workspace/.env ]
+    grep -q 'APP_NAME=Example' /workspace/.env
+    rm -f /workspace/.env /workspace/.env.example
+}
+
+@test "quality_ensure_workspace_dotenv: existierende .env wird nicht überschrieben" {
+    printf 'APP_KEY=user-set\n' > /workspace/.env
+    printf 'APP_NAME=Example\n' > /workspace/.env.example
+    quality_ensure_workspace_dotenv >/dev/null 2>&1
+    grep -q 'APP_KEY=user-set' /workspace/.env
+    ! grep -q 'APP_NAME=Example' /workspace/.env
+    rm -f /workspace/.env /workspace/.env.example
+}
+
+# --- quality_gate_fix_prompt ---
+
+@test "quality_gate_fix_prompt: ohne Log enthält Gate-Namen und 'fehlgeschlagen'" {
+    output="$(quality_gate_fix_prompt pest)"
+    [[ "$output" == *"Quality-Gate-Fix: pest"* ]]
+    [[ "$output" == *"fehlgeschlagen"* ]]
+    [[ "$output" != *"Verbindliche Vorgehensweise"* ]]  # nur mit log_file
+}
+
+@test "quality_gate_fix_prompt: kurzer Log (≤ head+tail) wird komplett eingebettet" {
+    log="$(mktemp)"
+    seq 1 30 > "$log"
+    output="$(quality_gate_fix_prompt pest "$log")"
+    [[ "$output" == *$'\n1\n'* ]]
+    [[ "$output" == *$'\n30\n'* ]]
+    [[ "$output" != *"Zeilen ausgelassen"* ]]
+    rm -f "$log"
+}
+
+@test "quality_gate_fix_prompt: langer Log zeigt head UND tail mit Auslassungs-Marker" {
+    log="$(mktemp)"
+    QUALITY_GATE_LOG_HEAD_LINES=5 QUALITY_GATE_LOG_TAIL_LINES=5 \
+        seq 1 100 > "$log"
+    output="$(QUALITY_GATE_LOG_HEAD_LINES=5 QUALITY_GATE_LOG_TAIL_LINES=5 \
+        quality_gate_fix_prompt pest "$log")"
+    [[ "$output" == *$'\n1\n'* ]]
+    [[ "$output" == *$'\n5\n'* ]]
+    [[ "$output" == *$'\n96\n'* ]]
+    [[ "$output" == *$'\n100\n'* ]]
+    [[ "$output" == *"Zeilen ausgelassen"* ]]
+    rm -f "$log"
+}
+
+@test "quality_gate_fix_prompt: Pipe-Hinweis erscheint sobald Log vorhanden ist" {
+    log="$(mktemp)"
+    echo "fail summary" > "$log"
+    output="$(quality_gate_fix_prompt pest "$log")"
+    [[ "$output" == *"Verbindliche Vorgehensweise"* ]]
+    [[ "$output" == *"pipefail"* ]]
+    [[ "$output" == *"ohne Pipe"* ]]
+    rm -f "$log"
+}
+
+@test "quality_gate_fix_prompt: pest-Block erwähnt Architecture-Tests" {
+    log="$(mktemp)"
+    echo "fail summary" > "$log"
+    output="$(quality_gate_fix_prompt pest "$log")"
+    [[ "$output" == *"Architecture-Tests"* ]]
+    [[ "$output" == *"tests/Arch/"* ]]
+    rm -f "$log"
+}
+
+@test "quality_gate_fix_prompt: phpstan-Block erwähnt Baseline-Datei" {
+    log="$(mktemp)"
+    echo "type error" > "$log"
+    output="$(quality_gate_fix_prompt phpstan "$log")"
+    [[ "$output" == *"phpstan-baseline.neon"* ]]
+    rm -f "$log"
+}
+
+@test "quality_gate_fix_prompt: leeres Log-File wird wie 'kein log_file' behandelt" {
+    log="$(mktemp)"
+    : > "$log"
+    output="$(quality_gate_fix_prompt pest "$log")"
+    [[ "$output" != *"Verbindliche Vorgehensweise"* ]]
+    [[ "$output" != *"Auszug aus dem Gate-Log"* ]]
+    rm -f "$log"
 }
 
 # --- _push_detect_platform ---
@@ -264,4 +362,17 @@ EOF
     mkdir -p /workspace/.agent/logs
     printf "some weird unparseable git error message\n" > /workspace/.agent/logs/clone.err
     [ "$(_concept_classify_fetch_err)" = "unknown" ]
+}
+
+# --- _concept_build_continue_prompt ---
+
+@test "_concept_build_continue_prompt: enthaelt 'fortsetzen' und 'Turn-Limits'" {
+    output="$(_concept_build_continue_prompt)"
+    [[ "$output" == *"fortsetzen"* ]]
+    [[ "$output" == *"Turn-Limits"* ]]
+}
+
+@test "_concept_build_continue_prompt: erinnert, dass KEINE Datei geschrieben werden soll" {
+    output="$(_concept_build_continue_prompt)"
+    [[ "$output" == *"KEINE Datei"* ]]
 }

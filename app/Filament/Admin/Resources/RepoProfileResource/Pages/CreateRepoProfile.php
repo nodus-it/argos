@@ -12,8 +12,8 @@ class CreateRepoProfile extends CreateRecord
     protected static string $resource = RepoProfileResource::class;
 
     /**
-     * Im OAuth-Pfad schreiben die sichtbaren Picker in `github_repo` /
-     * `github_branch`; die DB-Spalten sind `url` / `default_branch`. Mappen
+     * Im OAuth-Pfad schreibt der sichtbare Picker in `oauth_repo` /
+     * `oauth_branch`; die DB-Spalten sind `url` / `default_branch`. Mappen
      * und Helper-Keys vor dem Insert entfernen.
      *
      * @param  array<string, mixed>  $data

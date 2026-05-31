@@ -51,6 +51,12 @@ _implement_reset_branch() {
 
 # _implement_setup_toolchain: composer install / npm ci if a manifest exists.
 _implement_setup_toolchain() {
+    # Seed .env before composer install: post-autoload-dump runs
+    # package:discover, which boots the target Laravel app. Without .env
+    # vlucas/phpdotenv logs a "Failed to open" warning that ends up in the
+    # composer log AND later in every pest run.
+    quality_ensure_workspace_dotenv
+
     if [[ -f /workspace/composer.json ]]; then
         log_info "implement: composer install"
         if ! (cd /workspace && composer install --no-interaction --prefer-dist --no-progress 2>&1 \
@@ -153,28 +159,33 @@ phase_implement_run() {
     started_epoch=$(date -u +%s)
 
     local stream_log="/workspace/.agent/logs/implement.${ITERATION}.stream.log"
+    local stderr_log="/workspace/.agent/logs/implement.${ITERATION}.stderr.log"
     local result_json="/workspace/.agent/logs/implement.${ITERATION}.result.json"
     local max_turns="${MAX_TURNS:-200}"
 
     # Resume mode: if continue=true AND a previous session_id is provided AND
-    # its session file is still on disk, ask the agent to continue that session
-    # instead of starting fresh.
+    # the agent runner confirms the session file is still on disk, ask the
+    # agent to continue that session instead of starting fresh. The
+    # existence check is agent-aware (claude/codex use different layouts).
     local resume_args=() resume_input="$user_prompt_path"
     if [[ "$continue_run" == "true" && -n "${RESUME_SESSION_ID:-}" ]]; then
-        local cfg_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
-        local session_file="$cfg_dir/projects/-workspace/${RESUME_SESSION_ID}.jsonl"
-        if [[ -f "$session_file" ]]; then
+        if agent_session_file_exists "$RESUME_SESSION_ID"; then
             log_info "implement: resuming session $RESUME_SESSION_ID"
             resume_args=(--resume "$RESUME_SESSION_ID")
             local continue_prompt
             continue_prompt="$(_implement_build_continue_prompt | render_user_prompt implement continue-prompt)"
             resume_input="$continue_prompt"
         else
-            log_warn "implement: RESUME_SESSION_ID set but session file not found ($session_file) — starting fresh session"
+            log_warn "implement: RESUME_SESSION_ID=$RESUME_SESSION_ID has no session file — starting fresh session"
         fi
     fi
 
     log_info "implement: calling agent (stream-json, max-turns $max_turns${resume_args[*]:+, resume})"
+
+    # Capture CLI stderr so the auth-error heuristic + manager-side
+    # error_log promotion can inspect it after the run.
+    export AGENT_STDERR_LOG="$stderr_log"
+    : > "$stderr_log"
 
     set +e
     agent_run \
@@ -209,6 +220,13 @@ phase_implement_run() {
             rm -f /workspace/.agent/implement.notes.md
             return "$EXIT_USAGE_LIMIT"
         fi
+        # 401 / token expired: surface a precise hint, return EXIT_AUTH.
+        if agent_check_auth_error_log "$stderr_log"; then
+            echo "  → Agent-Token ungültig oder abgelaufen — Worker kann sich nicht authentifizieren." >&2
+            echo "    Token in den Agent-Credentials erneuern (claude setup-token / ~/.codex/auth.json) und neu starten." >&2
+            rm -f /workspace/.agent/implement.notes.md
+            return "$EXIT_AUTH"
+        fi
     fi
 
     # Drop the notes file after the agent call — it was written from the DB
@@ -230,10 +248,11 @@ phase_implement_run() {
             echo "  → usage/rate limit — backing off" >&2
             return "$EXIT_USAGE_LIMIT"
         fi
-        if agent_check_auth_error "$err_msg"; then
+        if agent_check_auth_error "$err_msg" || agent_check_auth_error_log "$stderr_log"; then
             echo "  → Agent-Token ungültig oder abgelaufen." >&2
             echo "    Token erneuern: claude setup-token" >&2
             echo "    Dann: ./agent init --update-token" >&2
+            return "$EXIT_AUTH"
         fi
         return 3
     fi
@@ -262,6 +281,15 @@ phase_implement_run() {
         set -e
 
         if [[ "$gate_exit" -eq 0 ]]; then break; fi
+
+        # Bail out if the previous fix attempt produced byte-identical gate
+        # output — Claude isn't moving the needle and further sessions just
+        # burn tokens. (Only relevant after at least one fix run.)
+        if (( gate_retry >= 1 )) \
+                && quality_gate_log_converged "$failed_gate" "$ITERATION" "$gate_retry"; then
+            log_warn "implement: gate '$failed_gate' produced identical output as the prior attempt — fix loop converged, stopping"
+            break
+        fi
 
         if (( gate_retry >= max_gate_retries )); then
             log_warn "implement: '$failed_gate' still failing after ${max_gate_retries} fix attempt(s) — giving up"

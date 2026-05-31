@@ -15,8 +15,10 @@ return [
         'description_helper' => 'Konkrete Akzeptanzkriterien führen zu besseren PRs. Was soll passieren, *warum*, und woran erkennst du das Ergebnis?',
         'auto_concept_label' => 'Konzept direkt starten',
         'auto_concept_helper' => 'Startet die Konzept-Phase sofort nach dem Anlegen.',
-        'max_turns_label' => 'Max-Turns für Implement',
-        'max_turns_helper' => 'Obergrenze für Tool-Calls pro Implement-Lauf. Leer = Default :default.',
+        'max_turns_concept_label' => 'Max-Turns für Konzept',
+        'max_turns_concept_helper' => 'Obergrenze für Tool-Calls pro Konzept-Lauf. Leer = Default :default.',
+        'max_turns_implement_label' => 'Max-Turns für Implement',
+        'max_turns_implement_helper' => 'Obergrenze für Tool-Calls pro Implement-Lauf. Leer = Default :default.',
         'base_branch_label' => 'Base Branch (Override)',
         'base_branch_helper' => 'Überschreibt den Start-Branch für genau diesen Task. Leer = Projekt-Default.',
         'worker_stack_label' => 'Worker-Stack (Override)',
@@ -41,6 +43,7 @@ return [
 
     'columns' => [
         'project' => 'Projekt',
+        'source' => 'Quelle',
         'phase' => 'Phase',
         'status' => 'Status',
         'workflow' => 'Workflow',
@@ -57,8 +60,16 @@ return [
         'worker' => 'Worker & Modelle',
         // table filter tabs (List tasks)
         'current' => 'Aktuell',
+        'waiting' => 'Wartend',
         'completed' => 'Abgeschlossen',
         'all' => 'Alle',
+    ],
+
+    'statuses' => [
+        'waiting' => [
+            'concept' => 'Konzept wartet',
+            'implement' => 'Implementierung wartet',
+        ],
     ],
 
     'view' => [
@@ -71,6 +82,10 @@ return [
             'branch' => 'Branch',
             'pull_request' => 'Pull Request',
             'open' => 'Öffnen',
+            'source' => 'Quelle',
+            'external_issue' => 'Externes Issue',
+            'external_project' => 'Externes Projekt',
+            'last_synced' => 'Zuletzt synchronisiert',
             'cost' => 'Kosten',
             'tokens' => 'Tokens',
             'created' => 'Erstellt',
@@ -121,6 +136,7 @@ return [
             'technical_short' => 'Technisch',
             'no_nontechnical_short' => 'Keine inhaltliche Zusammenfassung.',
             'no_technical_short' => 'Keine technische Zusammenfassung.',
+            'gate_log_link' => ':gate-Log öffnen',
         ],
 
         'push' => [
@@ -154,6 +170,16 @@ return [
             'iteration' => 'Iteration :number',
             'no_entries_iteration' => 'Keine Einträge für Iteration :number.',
             'loading' => 'Wird geladen…',
+        ],
+
+        'quality_gate_log' => [
+            'title' => 'Quality-Gate-Log — :name',
+            'breadcrumb_tasks' => 'Tasks',
+            'breadcrumb_self' => 'Quality-Gate-Logs',
+            'back' => '← Zurück zur Task',
+            'no_logs' => 'Keine Quality-Gate-Logs vorhanden.',
+            'no_logs_hint' => 'Logs werden ab der nächsten implement-/respond-Iteration erfasst, sobald ein Gate fehlschlägt oder einen Fix-Lauf auslöst.',
+            'empty_content' => 'Log-Datei ist leer.',
         ],
 
         'diff' => [
@@ -195,6 +221,9 @@ return [
             'continue' => 'Fortsetzen',
             'continue_heading' => 'Implement fortsetzen',
             'continue_description' => 'Der vorherige Lauf wurde wegen des Turn-Limits angehalten. Die Sitzung wird mit vollem Kontext fortgesetzt.',
+            'continue_concept' => 'Konzept fortsetzen',
+            'continue_concept_heading' => 'Konzept fortsetzen',
+            'continue_concept_description' => 'Der Konzept-Lauf wurde wegen des Turn-Limits angehalten. Die Sitzung wird mit vollem Kontext fortgesetzt und das Konzept abgeschlossen.',
             'concept_create' => 'Konzept erstellen',
             'concept_update' => 'Konzept aktualisieren',
             'implement' => 'Implement',
@@ -225,6 +254,8 @@ return [
             'feedback_write_error' => 'Fehler beim Schreiben des Feedbacks',
             'implement_continued' => 'Implement fortgesetzt',
             'implement_continued_body' => 'Resume-Modus, max_turns=:max_turns',
+            'concept_continued' => 'Konzept fortgesetzt',
+            'concept_continued_body' => 'Resume-Modus, max_turns=:max_turns',
             'max_turns_label' => 'Max-Turns für diesen Lauf',
             'max_turns_helper' => 'Frischer Turn-Budget. Vorbelegt mit dem vorherigen Wert.',
         ],

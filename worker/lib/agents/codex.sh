@@ -142,16 +142,36 @@ agent_codex_run() {
     local raw_out
     raw_out="$(mktemp /tmp/argos-codex-out-XXXXXX.jsonl)"
 
+    # AGENT_STDERR_LOG: optional stderr-capture file. Mirrors the
+    # claude_code runner — phase scripts use the captured stderr to
+    # diagnose auth errors that never reach the stream.
+    local stderr_redirect=""
+    if [[ -n "${AGENT_STDERR_LOG:-}" ]]; then
+        stderr_redirect="$AGENT_STDERR_LOG"
+    fi
+
     set +e
     if [[ "$output_format" == "stream-json" ]]; then
-        ( unset REPO_TOKEN
-          codex "${args[@]}" < "$combined_prompt_file"
-        ) | tee "$raw_out"
+        if [[ -n "$stderr_redirect" ]]; then
+            ( unset REPO_TOKEN
+              codex "${args[@]}" < "$combined_prompt_file" 2> >(tee -a "$stderr_redirect" >&2)
+            ) | tee "$raw_out"
+        else
+            ( unset REPO_TOKEN
+              codex "${args[@]}" < "$combined_prompt_file"
+            ) | tee "$raw_out"
+        fi
         local rc=${PIPESTATUS[0]}
     else
-        ( unset REPO_TOKEN
-          codex "${args[@]}" < "$combined_prompt_file"
-        ) > "$raw_out"
+        if [[ -n "$stderr_redirect" ]]; then
+            ( unset REPO_TOKEN
+              codex "${args[@]}" < "$combined_prompt_file" 2> >(tee -a "$stderr_redirect" >&2)
+            ) > "$raw_out"
+        else
+            ( unset REPO_TOKEN
+              codex "${args[@]}" < "$combined_prompt_file"
+            ) > "$raw_out"
+        fi
         local rc=$?
     fi
     set -e
@@ -270,4 +290,16 @@ agent_codex_check_auth_error() {
     local msg="${1:-}"
     [[ -z "$msg" ]] && return 1
     echo "$msg" | grep -qiE "invalid api key|authentication|oauth|unauthorized|401|sign[ -]?in"
+}
+
+# agent_codex_session_file_exists: optimistic check. Codex persists sessions
+# under ~/.codex/sessions/<id>* in newer builds, but the exact filename
+# format has shifted across versions. Rather than encode a brittle path
+# pattern, we return 0 whenever a session id is provided and let `codex
+# exec --resume <id>` itself surface "session not found" on stderr — that
+# error reaches the auth/stderr-log inspection in the phase script.
+# Args: $1=session_id
+# Returns: 0 if session_id is non-empty, 1 otherwise.
+agent_codex_session_file_exists() {
+    [[ -n "${1:-}" ]]
 }

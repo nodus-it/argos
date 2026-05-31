@@ -4,19 +4,24 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Filament\Admin\Resources\RepoProfileResource;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\CreateRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\EditRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\ListRepoProfiles;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\ViewRepoProfile;
+use App\Filament\Admin\Resources\RepoProfileResource\RelationManagers\TaskProviderBindingsRelationManager;
 use App\Filament\Admin\Resources\RepoProfileResource\RelationManagers\TasksRelationManager;
 use App\Models\ConnectedAccount;
 use App\Models\RepoProfile;
 use App\Models\Task;
+use App\Models\TaskProviderBinding;
 use App\Models\User;
+use Filament\Actions\CreateAction;
 use Filament\Actions\Testing\TestAction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class RepoProfileResourceTest extends TestCase
@@ -116,8 +121,8 @@ class RepoProfileResourceTest extends TestCase
 
         Livewire::test(EditRepoProfile::class, ['record' => $profile->getKey()])
             ->assertFormSet([
-                'github_repo' => 'acme/widget',
-                'github_branch' => 'develop',
+                'oauth_repo' => 'acme/widget',
+                'oauth_branch' => 'develop',
                 'default_branch' => 'develop',
             ]);
     }
@@ -131,7 +136,29 @@ class RepoProfileResourceTest extends TestCase
         ]);
 
         Livewire::test(EditRepoProfile::class, ['record' => $profile->getKey()])
-            ->assertFormSet(['github_repo' => 'acme/widget']);
+            ->assertFormSet(['oauth_repo' => 'acme/widget']);
+    }
+
+    #[DataProvider('repoPathProvider')]
+    public function test_repo_path_from_url_extracts_owner_repo(string $url, ?string $expected): void
+    {
+        $this->assertSame($expected, RepoProfileResource::repoPathFromUrl($url));
+    }
+
+    /**
+     * @return array<string, array{0: string, 1: ?string}>
+     */
+    public static function repoPathProvider(): array
+    {
+        return [
+            'github' => ['https://github.com/acme/widget', 'acme/widget'],
+            'github dot-git' => ['https://github.com/acme/widget.git', 'acme/widget'],
+            'github trailing slash' => ['https://github.com/acme/widget/', 'acme/widget'],
+            'bitbucket' => ['https://bitbucket.org/acme/myrepo', 'acme/myrepo'],
+            'gitlab nested groups' => ['https://gitlab.com/group/sub/widget', 'group/sub/widget'],
+            'gitlab self-hosted' => ['https://gitlab.example.com/team/widget.git', 'team/widget'],
+            'no path' => ['https://github.com', null],
+        ];
     }
 
     public function test_can_edit_repo_profile(): void
@@ -187,8 +214,8 @@ class RepoProfileResourceTest extends TestCase
                 'auth_method' => 'oauth',
                 'connected_account_id' => $account->id,
                 'name' => 'Widget',
-                'github_repo' => 'acme/widget',
-                'github_branch' => 'main',
+                'oauth_repo' => 'acme/widget',
+                'oauth_branch' => 'main',
             ])
             ->call('create')
             ->assertHasNoFormErrors()
@@ -230,10 +257,10 @@ class RepoProfileResourceTest extends TestCase
                 'auth_method' => 'oauth',
                 'connected_account_id' => $account->id,
                 'name' => 'Widget',
-                'gitlab_repo' => 'acme/widget',
+                'oauth_repo' => 'acme/widget',
             ])
             ->assertFormSet([
-                'gitlab_branch' => 'develop',
+                'oauth_branch' => 'develop',
                 'default_branch' => 'develop',
             ]);
     }
@@ -265,7 +292,7 @@ class RepoProfileResourceTest extends TestCase
         ]);
 
         Livewire::test(EditRepoProfile::class, ['record' => $profile->getKey()])
-            ->fillForm(['github_branch' => 'feature/php-app'])
+            ->fillForm(['oauth_branch' => 'feature/php-app'])
             ->call('save')
             ->assertHasNoFormErrors();
 
@@ -319,8 +346,8 @@ class RepoProfileResourceTest extends TestCase
                 'platform' => 'github',
                 'auth_method' => 'oauth',
                 'connected_account_id' => $account->id,
-                'github_repo' => 'org/repo',
-                'github_branch' => 'main',
+                'oauth_repo' => 'org/repo',
+                'oauth_branch' => 'main',
             ])
             ->call('create')
             ->assertHasNoFormErrors()
@@ -417,6 +444,79 @@ class RepoProfileResourceTest extends TestCase
             ->assertSeeLivewire(TasksRelationManager::class);
     }
 
+    public function test_view_page_includes_task_provider_bindings_relation_manager(): void
+    {
+        $profile = RepoProfile::factory()->create();
+
+        // The bindings manager is the second relation manager tab; it loads
+        // lazily, so assertSeeLivewire cannot match the mounted component.
+        // Assert the resource registers it and the tab is rendered instead.
+        $this->assertContains(
+            TaskProviderBindingsRelationManager::class,
+            RepoProfileResource::getRelations(),
+        );
+
+        Livewire::test(ViewRepoProfile::class, ['record' => $profile->getKey()])
+            ->assertSuccessful()
+            ->assertSee('Task-Provider');
+    }
+
+    public function test_binding_create_form_loads_project_refs_from_provider(): void
+    {
+        $profile = RepoProfile::factory()->create();
+        $account = ConnectedAccount::factory()->create([
+            'user_id' => $this->user->id,
+            'provider' => 'github',
+        ]);
+
+        Http::fake([
+            'api.github.com/user/repos*' => Http::response([
+                ['full_name' => 'acme/widget'],
+                ['full_name' => 'acme/gadget'],
+            ]),
+        ]);
+
+        Livewire::test(TaskProviderBindingsRelationManager::class, [
+            'ownerRecord' => $profile,
+            'pageClass' => EditRepoProfile::class,
+        ])
+            ->callAction(TestAction::make(CreateAction::class)->table(), [
+                'kind' => 'github',
+                'mode' => 'poll',
+                'connected_account_id' => $account->id,
+                'external_project_ref' => 'acme/widget',
+            ])
+            ->assertHasNoActionErrors();
+
+        $this->assertDatabaseHas(TaskProviderBinding::class, [
+            'repo_profile_id' => $profile->id,
+            'kind' => 'github',
+            'external_project_ref' => 'acme/widget',
+        ]);
+    }
+
+    public function test_binding_account_options_are_filtered_by_provider(): void
+    {
+        $profile = RepoProfile::factory()->create();
+        $githubAccount = ConnectedAccount::factory()->create([
+            'user_id' => $this->user->id,
+            'provider' => 'github',
+        ]);
+
+        // Picking Linear must exclude the GitHub account from the account
+        // options, so selecting it fails the Select's implicit `in` rule.
+        Livewire::test(TaskProviderBindingsRelationManager::class, [
+            'ownerRecord' => $profile,
+            'pageClass' => EditRepoProfile::class,
+        ])
+            ->callAction(TestAction::make(CreateAction::class)->table(), [
+                'kind' => 'linear',
+                'mode' => 'poll',
+                'connected_account_id' => $githubAccount->id,
+            ])
+            ->assertHasActionErrors(['connected_account_id']);
+    }
+
     public function test_tasks_relation_manager_shows_tasks(): void
     {
         $profile = RepoProfile::factory()->create();
@@ -504,8 +604,8 @@ class RepoProfileResourceTest extends TestCase
                 'auth_method' => 'oauth',
                 'connected_account_id' => $account->id,
                 'name' => 'Widget',
-                'bitbucket_repo' => 'acme/widget',
-                'bitbucket_branch' => 'main',
+                'oauth_repo' => 'acme/widget',
+                'oauth_branch' => 'main',
             ])
             ->call('create')
             ->assertHasNoFormErrors()
@@ -531,8 +631,8 @@ class RepoProfileResourceTest extends TestCase
 
         Livewire::test(EditRepoProfile::class, ['record' => $profile->getKey()])
             ->assertFormSet([
-                'bitbucket_repo' => 'acme/myrepo',
-                'bitbucket_branch' => 'develop',
+                'oauth_repo' => 'acme/myrepo',
+                'oauth_branch' => 'develop',
                 'default_branch' => 'develop',
             ]);
     }

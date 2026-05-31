@@ -25,6 +25,9 @@ class OnboardingPageTest extends TestCase
         $this->actingAs(User::factory()->create());
         config(['argos.config_dir' => storage_path('framework/testing/argos-'.uniqid())]);
         config(['argos.claude_token' => null]);
+        // The backfill migration may have created credentials from the developer's
+        // real ~/.config/argos/claude_token file. Remove them so tests start clean.
+        AgentCredential::query()->where('agent_name', AgentName::ClaudeCode->value)->delete();
     }
 
     public function test_onboarding_page_renders(): void

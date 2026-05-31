@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Enums\Phase;
+use App\Enums\PhaseStatus;
 use App\Enums\WorkflowStatus;
 use App\Events\Task\PhaseCompleted;
 use App\Jobs\RunPhaseJob;
+use App\Models\PhaseRun;
 use App\Models\RepoProfile;
 use App\Models\Task;
 use App\Services\Task\TaskService;
@@ -92,6 +94,90 @@ class RunPhaseJobTest extends TestCase
         $job = new RunPhaseJob('task-id', 'concept');
 
         $this->assertSame(3600, $job->timeout);
+    }
+
+    public function test_job_does_not_auto_retry(): void
+    {
+        $job = new RunPhaseJob('task-id', 'concept');
+
+        $this->assertSame(1, $job->tries);
+    }
+
+    public function test_failed_marks_task_as_failed_in_workflow(): void
+    {
+        $task = Task::factory()->create([
+            'workflow_status' => WorkflowStatus::ConceptRunning,
+            'current_status' => PhaseStatus::Running,
+        ]);
+
+        $job = new RunPhaseJob($task->id, 'concept');
+        $job->failed(new \RuntimeException('schema constraint violated'));
+
+        $this->assertSame(WorkflowStatus::Failed, $task->fresh()->workflow_status);
+    }
+
+    public function test_failed_closes_running_phase_run(): void
+    {
+        $task = Task::factory()->create([
+            'workflow_status' => WorkflowStatus::ConceptRunning,
+            'current_status' => PhaseStatus::Running,
+        ]);
+        $phaseRun = PhaseRun::factory()->running()->create([
+            'task_id' => $task->id,
+            'phase' => 'concept',
+        ]);
+
+        $job = new RunPhaseJob($task->id, 'concept');
+        $job->failed(new \RuntimeException('container killed'));
+
+        $this->assertSame(PhaseStatus::Failed, $phaseRun->fresh()->status);
+        $this->assertNotNull($phaseRun->fresh()->finished_at);
+    }
+
+    public function test_failed_sets_task_current_status_to_failed(): void
+    {
+        $task = Task::factory()->create([
+            'workflow_status' => WorkflowStatus::ConceptRunning,
+            'current_status' => PhaseStatus::Running,
+        ]);
+
+        $job = new RunPhaseJob($task->id, 'concept');
+        $job->failed(new \RuntimeException('container killed'));
+
+        $this->assertSame(PhaseStatus::Failed, $task->fresh()->current_status);
+    }
+
+    public function test_failed_does_not_close_phase_runs_of_other_phases(): void
+    {
+        $task = Task::factory()->create([
+            'workflow_status' => WorkflowStatus::ImplementRunning,
+            'current_status' => PhaseStatus::Running,
+        ]);
+        $conceptRun = PhaseRun::factory()->running()->create([
+            'task_id' => $task->id,
+            'phase' => 'concept',
+        ]);
+
+        $job = new RunPhaseJob($task->id, 'implement');
+        $job->failed(new \RuntimeException('boom'));
+
+        $this->assertSame(PhaseStatus::Running, $conceptRun->fresh()->status);
+    }
+
+    public function test_failed_is_safe_when_task_no_longer_exists(): void
+    {
+        $logged = null;
+        Log::listen(function (MessageLogged $event) use (&$logged): void {
+            if ($event->level === 'error' && isset($event->context['exhausted'])) {
+                $logged = $event->context;
+            }
+        });
+
+        $job = new RunPhaseJob('01J0000000000000000000NONE', 'concept');
+        $job->failed(new \RuntimeException('boom'));
+
+        $this->assertNotNull($logged);
+        $this->assertSame('01J0000000000000000000NONE', $logged['task']);
     }
 
     public function test_failed_logs_exhausted_error_entry(): void

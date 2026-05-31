@@ -17,7 +17,7 @@ class TaskFactory extends Factory
     public function definition(): array
     {
         return [
-            'name' => fake()->words(3, true),
+            'name' => fake()->unique()->words(3, true),
             'repo_profile_id' => RepoProfile::factory(),
             'description' => fake()->sentence(),
             'workflow_status' => WorkflowStatus::Draft,

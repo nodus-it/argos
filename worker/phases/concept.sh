@@ -201,6 +201,22 @@ _concept_build_user_prompt() {
     }
 }
 
+# _concept_build_continue_prompt: short user prompt for `claude --resume`.
+# Used when the previous run hit max-turns; the conversation history is
+# already in the resumed session, so we just need to nudge Claude to finish.
+_concept_build_continue_prompt() {
+    {
+        printf '# Konzept-Phase fortsetzen\n\n'
+        printf 'Der vorherige Lauf wurde wegen des Turn-Limits abgebrochen. '
+        printf 'Die Sitzung wird jetzt fortgesetzt — du hast den vollen Kontext '
+        printf 'und siehst deine bisherige Recherche.\n\n'
+        printf 'Bitte schliesse das Konzept jetzt ab:\n'
+        printf -- '- pruefe, ob du genug Kontext fuer einen vollstaendigen Plan hast\n'
+        printf -- '- antworte direkt mit dem Konzept-Markdown gemaess System-Prompt-Format\n'
+        printf -- '- KEINE Datei schreiben — der Worker uebernimmt das\n'
+    }
+}
+
 # _concept_setup_toolchain: composer install if a manifest exists. Concept is
 # read-only by design but still benefits from a populated vendor/ — Boost's
 # MCP server (php artisan boost:mcp) and tools like `php artisan route:list`
@@ -210,6 +226,11 @@ _concept_setup_toolchain() {
     if [[ ! -f /workspace/composer.json ]]; then
         return 0
     fi
+    # Same rationale as in implement: composer post-autoload-dump boots
+    # Laravel which reads .env via vlucas; seed the file so Boost MCP /
+    # artisan commands don't crash on the first read.
+    quality_ensure_workspace_dotenv
+
     log_info "concept: composer install"
     if ! (cd /workspace && composer install --no-interaction --prefer-dist --no-progress 2>&1 \
             | tee "/workspace/.agent/logs/composer-install.${ITERATION}.log") ; then
@@ -228,8 +249,9 @@ phase_concept_run() {
 
     mkdir -p /workspace/.agent/logs
 
-    local fresh
+    local fresh continue_run
     fresh="$(echo "${PHASE_FLAGS:-}" | jq -r '.fresh // false' 2>/dev/null || echo false)"
+    continue_run="$(echo "${PHASE_FLAGS:-}" | jq -r '.continue // false' 2>/dev/null || echo false)"
 
     if [[ ! -d /workspace/.git ]]; then
         log_info "concept: cloning $REPO_URL into /workspace"
@@ -240,12 +262,16 @@ phase_concept_run() {
     _concept_setup_toolchain
 
     # On --fresh move the prior concept aside; otherwise just copy it.
+    # In continue-mode we never touch history — the resume picks up the
+    # same in-flight session and the previous concept.md is irrelevant.
     local concept_file=/workspace/.agent/concept.md
     local has_existing=false
     [[ -f "$concept_file" ]] && has_existing=true
 
     local history_count
-    if [[ "$fresh" == "true" && "$has_existing" == "true" ]]; then
+    if [[ "$continue_run" == "true" ]]; then
+        history_count=0
+    elif [[ "$fresh" == "true" && "$has_existing" == "true" ]]; then
         history_count="$(_concept_archive_to_history move)"
         has_existing=false
     elif [[ "$has_existing" == "true" ]]; then
@@ -269,15 +295,41 @@ phase_concept_run() {
     started_epoch=$(date -u +%s)
 
     local stream_log="/workspace/.agent/logs/concept.${ITERATION}.stream.log"
+    local stderr_log="/workspace/.agent/logs/concept.${ITERATION}.stderr.log"
     local result_json="/workspace/.agent/logs/concept.${ITERATION}.result.json"
+    local max_turns="${MAX_TURNS:-30}"
 
-    log_info "concept: calling agent (stream-json, max-turns 15)"
+    # Resume mode: if continue=true AND a previous session_id is provided AND
+    # the agent runner confirms the session file is still on disk, ask the
+    # agent to continue that session instead of starting fresh. The
+    # existence check is agent-aware so Codex doesn't fall through Claude's
+    # CLAUDE_CONFIG_DIR path layout.
+    local resume_args=() resume_input="$user_prompt_path"
+    if [[ "$continue_run" == "true" && -n "${RESUME_SESSION_ID:-}" ]]; then
+        if agent_session_file_exists "$RESUME_SESSION_ID"; then
+            log_info "concept: resuming session $RESUME_SESSION_ID"
+            resume_args=(--resume "$RESUME_SESSION_ID")
+            local continue_prompt
+            continue_prompt="$(_concept_build_continue_prompt | render_user_prompt concept continue-prompt)"
+            resume_input="$continue_prompt"
+        else
+            log_warn "concept: RESUME_SESSION_ID=$RESUME_SESSION_ID has no session file — starting fresh session"
+        fi
+    fi
+
+    log_info "concept: calling agent (stream-json, max-turns $max_turns${resume_args[*]:+, resume})"
+
+    # Capture the CLI's stderr so the auth-error heuristic + manager-side
+    # error_log promotion can read it after the run.
+    export AGENT_STDERR_LOG="$stderr_log"
+    : > "$stderr_log"
 
     set +e
     agent_run \
         --system-prompt-file "$sysprompt" \
-        --user-prompt-file "$user_prompt_path" \
-        --max-turns 15 \
+        --user-prompt-file "$resume_input" \
+        --max-turns "$max_turns" \
+        "${resume_args[@]}" \
       | log_scrub \
       | tee "$stream_log" \
       | tee >(jq -rj '
@@ -297,18 +349,39 @@ phase_concept_run() {
     local agent_exit=${PIPESTATUS[0]}
     set -e
 
+    # The CLI may exit non-zero even after emitting a clean `result` event
+    # (e.g. error_max_turns surfaces as both is_error=true AND exit 1).
+    # Inspect the result_json before treating the exit code as fatal so a
+    # max-turns hit lands as Paused (resumable) rather than Failed.
+    local result_subtype="" result_is_error="false"
+    if [[ -s "$result_json" ]]; then
+        result_subtype="$(jq -r '.subtype // ""' "$result_json" 2>/dev/null || echo "")"
+        result_is_error="$(jq -r '.is_error // false' "$result_json" 2>/dev/null || echo true)"
+    fi
+
+    if [[ "$result_subtype" == "error_max_turns" ]]; then
+        echo "concept: max-turns reached — pausing (resume to continue)" >&2
+        return "$EXIT_MAX_TURNS"
+    fi
+
     if (( agent_exit != 0 )); then
         echo "concept: agent call failed (exit $agent_exit)" >&2
         if agent_check_usage_limit "$stream_log"; then
             echo "  → usage/rate limit — backing off" >&2
             return "$EXIT_USAGE_LIMIT"
         fi
+        # The CLI may have died with a 401 before emitting a result event;
+        # the auth message went to stderr (captured in stderr_log), not to
+        # the stream. Surface a precise hint and exit as auth failure.
+        if agent_check_auth_error_log "$stderr_log"; then
+            echo "  → Agent-Token ungültig oder abgelaufen — Worker kann sich nicht authentifizieren." >&2
+            echo "    Token in den Agent-Credentials erneuern (claude setup-token / ~/.codex/auth.json) und neu starten." >&2
+            return "$EXIT_AUTH"
+        fi
         return 3
     fi
 
-    local is_error
-    is_error="$(jq -r '.is_error // false' "$result_json" 2>/dev/null || echo true)"
-    if [[ "$is_error" != "false" ]]; then
+    if [[ "$result_is_error" != "false" ]]; then
         local err_msg
         err_msg="$(jq -r '.result // "(no result field)"' "$result_json" 2>/dev/null)"
         echo "concept: agent returned is_error=true: $err_msg" >&2
@@ -316,10 +389,11 @@ phase_concept_run() {
             echo "  → usage/rate limit — backing off" >&2
             return "$EXIT_USAGE_LIMIT"
         fi
-        if agent_check_auth_error "$err_msg"; then
+        if agent_check_auth_error "$err_msg" || agent_check_auth_error_log "$stderr_log"; then
             echo "  → Agent-Token ungültig oder abgelaufen." >&2
             echo "    Token erneuern: claude setup-token" >&2
             echo "    Dann: ./agent init --update-token" >&2
+            return "$EXIT_AUTH"
         fi
         return 3
     fi

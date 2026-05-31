@@ -10,6 +10,7 @@ use App\Enums\WorkerImageEntityStatus;
 use App\Filament\Admin\Concerns\TaskTableConcern;
 use App\Filament\Admin\Resources\TaskResource\Pages\CreateTask;
 use App\Filament\Admin\Resources\TaskResource\Pages\ListTasks;
+use App\Filament\Admin\Resources\TaskResource\Pages\ViewQualityGateLog;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTask;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTaskConcept;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTaskDiff;
@@ -35,6 +36,7 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\Rule;
 
 class TaskResource extends Resource
@@ -80,7 +82,7 @@ class TaskResource extends Resource
                                 ->required()
                                 ->live()
                                 ->afterStateUpdated(function (Set $set, ?string $state): void {
-                                    $set('auto_concept', RepoProfile::find($state)?->auto_concept ?? false);
+                                    $set('auto_concept', self::resolveProfile($state)?->auto_concept ?? false);
                                 }),
 
                             Textarea::make('description')
@@ -97,7 +99,7 @@ class TaskResource extends Resource
                                     if (! is_string($profileId) || $profileId === '') {
                                         return [];
                                     }
-                                    $profile = RepoProfile::find($profileId);
+                                    $profile = self::resolveProfile($profileId);
                                     if ($profile === null) {
                                         return [];
                                     }
@@ -107,14 +109,14 @@ class TaskResource extends Resource
                                         return [];
                                     }
                                 })
-                                ->placeholder(fn (Get $get): string => RepoProfile::find($get('repo_profile_id'))?->default_branch ?? 'main')
+                                ->placeholder(fn (Get $get): string => self::resolveProfile($get('repo_profile_id'))?->default_branch ?? 'main')
                                 ->searchable()
                                 ->native(false),
 
                             Toggle::make('auto_concept')
                                 ->label(__('tasks.fields.auto_concept_label'))
                                 ->helperText(__('tasks.fields.auto_concept_helper'))
-                                ->default(fn (Get $get): bool => RepoProfile::find($get('repo_profile_id'))?->auto_concept ?? false)
+                                ->default(fn (Get $get): bool => self::resolveProfile($get('repo_profile_id'))?->auto_concept ?? false)
                                 ->columnSpanFull(),
                         ]),
 
@@ -159,9 +161,17 @@ class TaskResource extends Resource
                                 ->helperText(__('tasks.fields.agent_credential_helper'))
                                 ->native(false),
 
-                            TextInput::make('max_turns')
-                                ->label(__('tasks.fields.max_turns_label'))
-                                ->helperText(__('tasks.fields.max_turns_helper', ['default' => config('argos.implement.max_turns_default', 200)]))
+                            TextInput::make('max_turns_concept')
+                                ->label(__('tasks.fields.max_turns_concept_label'))
+                                ->helperText(__('tasks.fields.max_turns_concept_helper', ['default' => config('argos.concept.max_turns_default', 30)]))
+                                ->numeric()
+                                ->minValue(10)
+                                ->maxValue(1000)
+                                ->placeholder((string) config('argos.concept.max_turns_default', 30)),
+
+                            TextInput::make('max_turns_implement')
+                                ->label(__('tasks.fields.max_turns_implement_label'))
+                                ->helperText(__('tasks.fields.max_turns_implement_helper', ['default' => config('argos.implement.max_turns_default', 200)]))
                                 ->numeric()
                                 ->minValue(10)
                                 ->maxValue(1000)
@@ -193,6 +203,36 @@ class TaskResource extends Resource
                 ])
                 ->columnSpanFull(),
         ]);
+    }
+
+    /**
+     * Request-local cache for the repo profile the form keeps reaching for.
+     * The form closures (options, placeholders, helper text, defaults) all
+     * resolve the same profile id; under the table's 5s polling that was a
+     * fresh `RepoProfile::find()` per closure per render. Memoizing collapses
+     * them to one query. Null results are cached too, so a never-set or
+     * stale id does not re-hit the DB on every closure.
+     *
+     * @var array<string, RepoProfile|null>
+     */
+    private static array $profileCache = [];
+
+    /**
+     * Resolve a repo profile by id, memoized for the current request.
+     */
+    private static function resolveProfile(mixed $id): ?RepoProfile
+    {
+        if (! is_string($id) && ! is_int($id)) {
+            return null;
+        }
+
+        $key = (string) $id;
+
+        if (! array_key_exists($key, self::$profileCache)) {
+            self::$profileCache[$key] = RepoProfile::find($id);
+        }
+
+        return self::$profileCache[$key];
     }
 
     /**
@@ -267,7 +307,7 @@ class TaskResource extends Resource
      */
     private static function projectAgent(Get $get): AgentName
     {
-        $profile = RepoProfile::find($get('repo_profile_id'));
+        $profile = self::resolveProfile($get('repo_profile_id'));
 
         return $profile?->worker_agent_name ?? AgentName::ClaudeCode;
     }
@@ -278,7 +318,7 @@ class TaskResource extends Resource
      */
     private static function projectStackLabel(Get $get): ?string
     {
-        $profile = RepoProfile::find($get('repo_profile_id'));
+        $profile = self::resolveProfile($get('repo_profile_id'));
         $stack = $profile?->workerStack;
 
         if ($stack === null) {
@@ -295,7 +335,7 @@ class TaskResource extends Resource
      */
     private static function effectiveModelLabel(Get $get, string $phase): string
     {
-        $profile = RepoProfile::find($get('repo_profile_id'));
+        $profile = self::resolveProfile($get('repo_profile_id'));
         $profileModel = match ($phase) {
             'concept' => $profile?->model_concept,
             'implement' => $profile?->model_implement,
@@ -317,6 +357,7 @@ class TaskResource extends Resource
         return $table
             ->defaultSort('updated_at', 'desc')
             ->poll('5s')
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(static::taskTableEagerLoads()))
             ->columns(static::taskTableColumns())
             ->filters(static::taskTableFilters())
             ->recordUrl(fn (Task $record): string => static::getUrl('view', ['record' => $record]))
@@ -343,6 +384,7 @@ class TaskResource extends Resource
             'concept' => ViewTaskConcept::route('/{record}/concept'),
             'diff' => ViewTaskDiff::route('/{record}/diff'),
             'logs' => ViewTaskLogs::route('/{record}/logs'),
+            'quality-gates' => ViewQualityGateLog::route('/{record}/quality-gates'),
             'respond' => ViewTaskRespond::route('/{record}/respond'),
         ];
     }

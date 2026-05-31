@@ -13,6 +13,11 @@ declare(strict_types=1);
  * `*_TEST_REPO`, etc. environment variables are set (e.g. via
  * `.env.testing.external`), they take precedence — useful when contributors
  * want to run the suite against their own sandbox repos.
+ *
+ * The `linear` entry is not a git repo and not used by the contract suite; it
+ * carries the demo Linear team key for ProviderDemoSeeder (overridable via
+ * SEED_LINEAR_TEAM). GitLab's demo repo lives on gitlab.com (the entry below),
+ * since we don't run a second self-hosted GitLab for tests.
  */
 return [
     'github' => [
@@ -35,5 +40,8 @@ return [
         'testRepo' => 'argos-provider-contract',
         'defaultBranch' => 'main',
         'repoCloneUrl' => 'https://bitbucket.org/nodus-it/argos-provider-contract.git',
+    ],
+    'linear' => [
+        'team' => 'BAS',
     ],
 ];

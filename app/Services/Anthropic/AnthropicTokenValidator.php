@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Anthropic;
 
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
@@ -31,7 +32,12 @@ final class AnthropicTokenValidator
             }
 
             return $response->successful();
-        } catch (Throwable) {
+        } catch (Throwable $e) {
+            Log::channel('argos')->warning('Anthropic token validation unreachable', [
+                'error' => $e->getMessage(),
+                'class' => $e::class,
+            ]);
+
             return null;
         }
     }

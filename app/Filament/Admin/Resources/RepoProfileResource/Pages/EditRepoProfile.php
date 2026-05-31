@@ -20,9 +20,9 @@ class EditRepoProfile extends EditRecord
     }
 
     /**
-     * Derive github_repo / github_branch and bitbucket_repo / bitbucket_branch
-     * from the persisted url + default_branch so the OAuth pickers show the
-     * current values when the form opens. Also ensures auth_method has a default.
+     * Derive the shared oauth_repo / oauth_branch picker values from the
+     * persisted url + default_branch so the OAuth picker shows the current
+     * values when the form opens. Also ensures auth_method has a default.
      *
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
@@ -34,30 +34,23 @@ class EditRepoProfile extends EditRecord
         }
 
         $url = $data['url'] ?? null;
-        if (is_string($url) && preg_match('#^https?://github\.com/([^/]+/[^/]+?)(?:\.git)?/?$#', $url, $m)) {
-            $data['github_repo'] = $m[1];
-        }
-
-        if (is_string($url) && ($data['platform'] ?? '') === 'gitlab' && preg_match('#^(https?://[^/]+)/(.+?)(?:\.git)?/?$#', $url, $m)) {
-            $data['gitlab_repo'] = $m[2];
-        }
-
-        if (is_string($url) && preg_match('#^https?://bitbucket\.org/([^/]+/[^/]+?)(?:\.git)?/?$#', $url, $m)) {
-            $data['bitbucket_repo'] = $m[1];
+        if (is_string($url) && $url !== '') {
+            $repoPath = RepoProfileResource::repoPathFromUrl($url);
+            if ($repoPath !== null) {
+                $data['oauth_repo'] = $repoPath;
+            }
         }
 
         if (isset($data['default_branch']) && is_string($data['default_branch'])) {
-            $data['github_branch'] = $data['default_branch'];
-            $data['gitlab_branch'] = $data['default_branch'];
-            $data['bitbucket_branch'] = $data['default_branch'];
+            $data['oauth_branch'] = $data['default_branch'];
         }
 
         return $data;
     }
 
     /**
-     * Im OAuth-Pfad schreiben die sichtbaren Picker in `github_repo` /
-     * `github_branch`; die DB-Spalten sind `url` / `default_branch`. Mappen
+     * Im OAuth-Pfad schreibt der sichtbare Picker in `oauth_repo` /
+     * `oauth_branch`; die DB-Spalten sind `url` / `default_branch`. Mappen
      * und Helper-Keys vor dem Save entfernen.
      *
      * @param  array<string, mixed>  $data

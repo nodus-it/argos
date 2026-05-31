@@ -60,7 +60,7 @@ final class ConnectedAccountController extends Controller
             ]
         );
 
-        $account->relinkOrphanedRepoProfiles();
+        $account->relinkOrphanedResources();
 
         $returnTo = $request->session()->pull(self::GITHUB_RETURN_SESSION_KEY);
 
@@ -124,7 +124,7 @@ final class ConnectedAccountController extends Controller
             ]
         );
 
-        $account->relinkOrphanedRepoProfiles();
+        $account->relinkOrphanedResources();
 
         $returnTo = $request->session()->pull(self::GITLAB_RETURN_SESSION_KEY);
 

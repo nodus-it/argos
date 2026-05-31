@@ -26,4 +26,10 @@ return [
         'redirect' => '/auth/bitbucket/callback',
     ],
 
+    'linear' => [
+        'client_id' => env('LINEAR_CLIENT_ID'),
+        'client_secret' => env('LINEAR_CLIENT_SECRET'),
+        'redirect' => '/auth/linear/callback',
+    ],
+
 ];

@@ -15,8 +15,10 @@ return [
         'description_helper' => 'Concrete acceptance criteria lead to better PRs. What should happen, *why*, and how will you know it worked?',
         'auto_concept_label' => 'Start concept immediately',
         'auto_concept_helper' => 'Starts the concept phase immediately after creation.',
-        'max_turns_label' => 'Max turns for implement',
-        'max_turns_helper' => 'Upper limit for tool calls per implement run. Empty = default :default.',
+        'max_turns_concept_label' => 'Max turns for Concept',
+        'max_turns_concept_helper' => 'Upper limit for tool calls per Concept run. Empty = default :default.',
+        'max_turns_implement_label' => 'Max turns for Implement',
+        'max_turns_implement_helper' => 'Upper limit for tool calls per Implement run. Empty = default :default.',
         'base_branch_label' => 'Base Branch (Override)',
         'base_branch_helper' => 'Overrides the base branch for this specific task. Empty = project default.',
         'worker_stack_label' => 'Worker Stack (Override)',
@@ -41,6 +43,7 @@ return [
 
     'columns' => [
         'project' => 'Project',
+        'source' => 'Source',
         'phase' => 'Phase',
         'status' => 'Status',
         'workflow' => 'Workflow',
@@ -57,8 +60,16 @@ return [
         'worker' => 'Worker & models',
         // table filter tabs (List tasks)
         'current' => 'Current',
+        'waiting' => 'Waiting',
         'completed' => 'Completed',
         'all' => 'All',
+    ],
+
+    'statuses' => [
+        'waiting' => [
+            'concept' => 'Concept waiting',
+            'implement' => 'Implementation waiting',
+        ],
     ],
 
     'view' => [
@@ -71,6 +82,10 @@ return [
             'branch' => 'Branch',
             'pull_request' => 'Pull Request',
             'open' => 'Open',
+            'source' => 'Source',
+            'external_issue' => 'External Issue',
+            'external_project' => 'External Project',
+            'last_synced' => 'Last Synced',
             'cost' => 'Cost',
             'tokens' => 'Tokens',
             'created' => 'Created',
@@ -121,6 +136,7 @@ return [
             'technical_short' => 'Technical',
             'no_nontechnical_short' => 'No content summary.',
             'no_technical_short' => 'No technical summary.',
+            'gate_log_link' => 'Open :gate log',
         ],
 
         'push' => [
@@ -154,6 +170,16 @@ return [
             'iteration' => 'Iteration :number',
             'no_entries_iteration' => 'No entries for iteration :number.',
             'loading' => 'Loading…',
+        ],
+
+        'quality_gate_log' => [
+            'title' => 'Quality gate log — :name',
+            'breadcrumb_tasks' => 'Tasks',
+            'breadcrumb_self' => 'Quality gate logs',
+            'back' => '← Back to task',
+            'no_logs' => 'No quality gate logs available.',
+            'no_logs_hint' => 'Logs will be captured starting with the next implement/respond iteration, as soon as a gate fails or triggers a fix session.',
+            'empty_content' => 'Log file is empty.',
         ],
 
         'diff' => [
@@ -195,6 +221,9 @@ return [
             'continue' => 'Continue',
             'continue_heading' => 'Continue Implement',
             'continue_description' => 'The previous run was stopped due to the turn limit. The session will be continued with full context.',
+            'continue_concept' => 'Continue concept',
+            'continue_concept_heading' => 'Continue concept',
+            'continue_concept_description' => 'The concept run was stopped due to the turn limit. The session will be continued with full context and the concept finalised.',
             'concept_create' => 'Create Concept',
             'concept_update' => 'Update Concept',
             'implement' => 'Implement',
@@ -225,6 +254,8 @@ return [
             'feedback_write_error' => 'Error writing feedback',
             'implement_continued' => 'Implement continued',
             'implement_continued_body' => 'Resume mode, max_turns=:max_turns',
+            'concept_continued' => 'Concept continued',
+            'concept_continued_body' => 'Resume mode, max_turns=:max_turns',
             'max_turns_label' => 'Max turns for this run',
             'max_turns_helper' => 'Fresh turn budget. Pre-filled with the previous value.',
         ],

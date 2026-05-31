@@ -46,12 +46,12 @@
                 <span class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ __('tasks.view.labels.status') }}</span>
                 <span @class([
                     'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset',
-                    'text-gray-600 bg-gray-100 ring-gray-300 dark:text-gray-400 dark:bg-gray-800 dark:ring-gray-600' => $record->workflow_status->color() === 'gray',
-                    'text-amber-600 bg-amber-50 ring-amber-300 dark:text-amber-400 dark:bg-amber-400/10 dark:ring-amber-400/30' => $record->workflow_status->color() === 'warning',
-                    'text-blue-600 bg-blue-50 ring-blue-300 dark:text-blue-400 dark:bg-blue-400/10 dark:ring-blue-400/30' => in_array($record->workflow_status->color(), ['info', 'primary']),
-                    'text-emerald-600 bg-emerald-50 ring-emerald-300 dark:text-emerald-400 dark:bg-emerald-400/10 dark:ring-emerald-400/30' => $record->workflow_status->color() === 'success',
-                    'text-red-600 bg-red-50 ring-red-300 dark:text-red-400 dark:bg-red-400/10 dark:ring-red-400/30' => $record->workflow_status->color() === 'danger',
-                ])>{{ $record->workflow_status->label() }}</span>
+                    'text-gray-600 bg-gray-100 ring-gray-300 dark:text-gray-400 dark:bg-gray-800 dark:ring-gray-600' => $record->displayStatusColor() === 'gray',
+                    'text-amber-600 bg-amber-50 ring-amber-300 dark:text-amber-400 dark:bg-amber-400/10 dark:ring-amber-400/30' => $record->displayStatusColor() === 'warning',
+                    'text-blue-600 bg-blue-50 ring-blue-300 dark:text-blue-400 dark:bg-blue-400/10 dark:ring-blue-400/30' => in_array($record->displayStatusColor(), ['info', 'primary']),
+                    'text-emerald-600 bg-emerald-50 ring-emerald-300 dark:text-emerald-400 dark:bg-emerald-400/10 dark:ring-emerald-400/30' => $record->displayStatusColor() === 'success',
+                    'text-red-600 bg-red-50 ring-red-300 dark:text-red-400 dark:bg-red-400/10 dark:ring-red-400/30' => $record->displayStatusColor() === 'danger',
+                ])>{{ $record->displayStatusLabel() }}</span>
             </div>
 
             @if($record->repoProfile)
@@ -110,6 +110,40 @@
                 </div>
             @endif
 
+            @if($record->externalIssueLink)
+                @php
+                    $issueLink = $record->externalIssueLink;
+                    preg_match('#/issues/(\d+)#', (string) $issueLink->external_url, $issueMatch);
+                    $issueNumber = $issueMatch[1] ?? null;
+                @endphp
+                <div class="flex items-center justify-between gap-2">
+                    <span class="text-xs font-medium text-gray-500 dark:text-gray-400 flex-shrink-0">{{ __('tasks.view.labels.source') }}</span>
+                    <span class="text-xs text-gray-700 dark:text-gray-300 truncate text-right">{{ $issueLink->binding?->kind?->label() ?? '—' }}</span>
+                </div>
+                @if($issueLink->binding?->external_project_ref)
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="text-xs font-medium text-gray-500 dark:text-gray-400 flex-shrink-0">{{ __('tasks.view.labels.external_project') }}</span>
+                        <code class="text-xs text-indigo-600 dark:text-indigo-400 font-mono truncate text-right">{{ $issueLink->binding->external_project_ref }}</code>
+                    </div>
+                @endif
+                @if($issueLink->external_url)
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="text-xs font-medium text-gray-500 dark:text-gray-400 flex-shrink-0">{{ __('tasks.view.labels.external_issue') }}</span>
+                        <a href="{{ $issueLink->external_url }}" target="_blank"
+                           class="inline-flex items-center gap-1 text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline">
+                            {{ $issueNumber ? "#{$issueNumber}" : __('tasks.view.labels.open') }}
+                            <x-heroicon-o-arrow-top-right-on-square class="h-3 w-3" />
+                        </a>
+                    </div>
+                @endif
+                @if($issueLink->last_synced_at)
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="text-xs font-medium text-gray-500 dark:text-gray-400 flex-shrink-0">{{ __('tasks.view.labels.last_synced') }}</span>
+                        <span class="text-xs text-gray-500 dark:text-gray-500">{{ $issueLink->last_synced_at->diffForHumans() }}</span>
+                    </div>
+                @endif
+            @endif
+
             @php
                 $totalCost = $phaseRuns->flatten()->sum(fn($r) => (float) $r->cost_usd);
                 $totalTokens = $phaseRuns->flatten()->sum(fn($r) => ($r->input_tokens ?? 0) + ($r->output_tokens ?? 0));
@@ -128,17 +162,28 @@
             @endif
 
             @if($currentStatus === 'running')
-                <div class="flex items-center gap-2 pt-1 border-t border-amber-100 dark:border-amber-900/40">
-                    <span class="flex h-2 w-2 relative flex-shrink-0">
-                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                        <span class="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-                    </span>
-                    <span class="text-xs text-amber-600 dark:text-amber-400 font-medium">{{ __('tasks.view.labels.phase_running', ['phase' => $currentPhase]) }}</span>
-                    <span x-data="{ sec: {{ max(0, now()->timestamp - ($record->currentPhaseStartedAt()?->timestamp ?? now()->timestamp)) }} }"
-                          x-init="setInterval(() => sec++, 1000)"
-                          x-text="Math.floor(sec/60) + ':' + String(sec % 60).padStart(2, '0')"
-                          class="ml-auto text-xs font-mono tabular-nums text-amber-500 dark:text-amber-400"></span>
-                </div>
+                @php $phaseStartedAt = $record->currentPhaseStartedAt(); @endphp
+                @if($phaseStartedAt !== null)
+                    <div class="flex items-center gap-2 pt-1 border-t border-amber-100 dark:border-amber-900/40">
+                        <span class="flex h-2 w-2 relative flex-shrink-0">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                        </span>
+                        <span class="text-xs text-amber-600 dark:text-amber-400 font-medium">{{ __('tasks.view.labels.phase_running', ['phase' => $currentPhase]) }}</span>
+                        <span x-data="{ sec: {{ max(0, now()->timestamp - $phaseStartedAt->timestamp) }} }"
+                              x-init="setInterval(() => sec++, 1000)"
+                              x-text="Math.floor(sec/60) + ':' + String(sec % 60).padStart(2, '0')"
+                              class="ml-auto text-xs font-mono tabular-nums text-amber-500 dark:text-amber-400"></span>
+                    </div>
+                @else
+                    <div class="flex items-center gap-2 pt-1 border-t border-sky-100 dark:border-sky-900/40">
+                        <svg class="animate-spin h-3 w-3 text-sky-500 flex-shrink-0" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                        </svg>
+                        <span class="text-xs text-sky-600 dark:text-sky-400 font-medium">{{ __('tasks.view.labels.phase_waiting', ['phase' => $currentPhase]) }}</span>
+                    </div>
+                @endif
             @elseif($currentStatus === 'pending')
                 <div class="flex items-center gap-2 pt-1 border-t border-sky-100 dark:border-sky-900/40">
                     <svg class="animate-spin h-3 w-3 text-sky-500 flex-shrink-0" fill="none" viewBox="0 0 24 24">
@@ -592,22 +637,46 @@
                                     @if($implementQualityGates)
                                         <div class="mb-4 flex flex-wrap gap-2">
                                             @foreach($implementQualityGates as $gate => $result)
-                                                <span @class([
-                                                    'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset',
-                                                    'text-emerald-700 bg-emerald-50 ring-emerald-200 dark:text-emerald-300 dark:bg-emerald-950/40 dark:ring-emerald-800' => $result === 'pass',
-                                                    'text-red-700 bg-red-50 ring-red-200 dark:text-red-300 dark:bg-red-950/40 dark:ring-red-800' => $result === 'fail',
-                                                    'text-amber-700 bg-amber-50 ring-amber-200 dark:text-amber-300 dark:bg-amber-950/40 dark:ring-amber-800' => $result === 'advisory_fail',
-                                                    'text-gray-500 bg-gray-50 ring-gray-200 dark:text-gray-400 dark:bg-gray-800 dark:ring-gray-700' => $result === 'skip',
-                                                ])>
-                                                    @if($result === 'pass')
-                                                        <x-heroicon-o-check class="h-3 w-3" />
-                                                    @elseif(in_array($result, ['fail', 'advisory_fail']))
+                                                @php
+                                                    $isFail = in_array($result, ['fail', 'advisory_fail'], true);
+                                                    $logKeyMatches = array_values(array_filter(
+                                                        $implementQualityGateLogKeys ?? [],
+                                                        fn (string $k) => $k === $gate || str_starts_with($k, $gate.'.')
+                                                    ));
+                                                    sort($logKeyMatches);
+                                                    $lastLogKey = $isFail ? (end($logKeyMatches) ?: null) : null;
+                                                    $gateLogUrl = $lastLogKey
+                                                        ? \App\Filament\Admin\Resources\TaskResource::getUrl(
+                                                            'quality-gates',
+                                                            ['record' => $record, 'phase' => 'implement', 'key' => $lastLogKey]
+                                                        )
+                                                        : null;
+                                                    $badgeClasses = [
+                                                        'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset',
+                                                        'text-emerald-700 bg-emerald-50 ring-emerald-200 dark:text-emerald-300 dark:bg-emerald-950/40 dark:ring-emerald-800' => $result === 'pass',
+                                                        'text-red-700 bg-red-50 ring-red-200 dark:text-red-300 dark:bg-red-950/40 dark:ring-red-800' => $result === 'fail',
+                                                        'text-amber-700 bg-amber-50 ring-amber-200 dark:text-amber-300 dark:bg-amber-950/40 dark:ring-amber-800' => $result === 'advisory_fail',
+                                                        'text-gray-500 bg-gray-50 ring-gray-200 dark:text-gray-400 dark:bg-gray-800 dark:ring-gray-700' => $result === 'skip',
+                                                        'hover:underline cursor-pointer' => $gateLogUrl !== null,
+                                                    ];
+                                                @endphp
+                                                @if($gateLogUrl)
+                                                    <a href="{{ $gateLogUrl }}" @class($badgeClasses) title="{{ __('tasks.view.implement.gate_log_link', ['gate' => strtoupper($gate)]) }}">
                                                         <x-heroicon-o-x-mark class="h-3 w-3" />
-                                                    @else
-                                                        <x-heroicon-o-minus class="h-3 w-3" />
-                                                    @endif
-                                                    {{ strtoupper($gate) }}
-                                                </span>
+                                                        {{ strtoupper($gate) }}
+                                                    </a>
+                                                @else
+                                                    <span @class($badgeClasses)>
+                                                        @if($result === 'pass')
+                                                            <x-heroicon-o-check class="h-3 w-3" />
+                                                        @elseif($isFail)
+                                                            <x-heroicon-o-x-mark class="h-3 w-3" />
+                                                        @else
+                                                            <x-heroicon-o-minus class="h-3 w-3" />
+                                                        @endif
+                                                        {{ strtoupper($gate) }}
+                                                    </span>
+                                                @endif
                                             @endforeach
                                         </div>
                                     @endif

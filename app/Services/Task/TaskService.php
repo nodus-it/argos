@@ -45,7 +45,8 @@ class TaskService
             'description' => $data['description'],
             'base_branch' => $data['base_branch'] ?? null,
             'auto_concept' => $data['auto_concept'] ?? false,
-            'max_turns' => $data['max_turns'] ?? null,
+            'max_turns_concept' => $data['max_turns_concept'] ?? null,
+            'max_turns_implement' => $data['max_turns_implement'] ?? null,
             'model_concept' => $data['model_concept'] ?? null,
             'model_implement' => $data['model_implement'] ?? null,
             'worker_stack_id_override' => $data['worker_stack_id_override'] ?? null,
@@ -93,16 +94,11 @@ class TaskService
             throw new \RuntimeException('A phase is already running for this task.');
         }
 
-        $updates = [
+        $task->update([
             'current_phase' => $phase->value,
             'current_status' => 'running',
-        ];
-
-        if ($phase === Phase::Implement) {
-            $updates['workflow_status'] = WorkflowStatus::ImplementRunning;
-        }
-
-        $task->update($updates);
+            'workflow_status' => $task->workflow_status->retryingPhase($phase->value),
+        ]);
         RunPhaseJob::dispatch($task->id, $phase->value, $flags);
         Event::dispatch(new PhaseStarted($task, $phase));
     }
@@ -130,6 +126,32 @@ class TaskService
         ]);
 
         Event::dispatch(new PhaseStarted($task, Phase::Implement));
+    }
+
+    /**
+     * Resume a paused concept run with a new max_turns limit. Mirrors
+     * continueImplement; differs only in the workflow status / phase value.
+     *
+     * @throws \RuntimeException when a phase is already running
+     */
+    public function continueConcept(Task $task, int $maxTurns): void
+    {
+        if ($task->phaseRuns()->where('status', 'running')->exists()) {
+            throw new \RuntimeException('A phase is already running for this task.');
+        }
+
+        $task->update([
+            'workflow_status' => WorkflowStatus::ConceptRunning,
+            'current_phase' => 'concept',
+            'current_status' => 'running',
+        ]);
+
+        RunPhaseJob::dispatch($task->id, 'concept', [
+            'continue' => true,
+            'max_turns' => $maxTurns,
+        ]);
+
+        Event::dispatch(new PhaseStarted($task, Phase::Concept));
     }
 
     /**

@@ -1,10 +1,12 @@
 # Argos — Docker Compose stack
 #
 # Services:
-#   db     — MariaDB 11
-#   app    — Laravel app (PHP-FPM), runs migrations on boot, spawns worker containers via the docker socket
-#   nginx  — reverse proxy in front of app:9000
-#   queue  — Laravel queue worker (same image as app, ARGOS_ROLE=queue)
+#   db        — MariaDB 11
+#   redis     — Redis 7 (queue backend for Horizon)
+#   app       — Laravel app (PHP-FPM), runs migrations on boot, spawns worker containers via the docker socket
+#   nginx     — reverse proxy in front of app:9000
+#   queue     — Laravel Horizon (same image as app, ARGOS_ROLE=queue)
+#   scheduler — Laravel scheduler (`schedule:work`, ARGOS_ROLE=scheduler)
 #
 # Image source:
 #   By default the `app`/`queue` services build `argos-app:local` from the local
@@ -40,6 +42,18 @@ services:
       retries: 30
       start_period: 30s
 
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - argos-redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
   app:
     # Default to the locally built image. Override ARGOS_APP_IMAGE to pull a
     # tagged registry build instead (e.g. `ghcr.io/nodus-it/argos-app:stage`)
@@ -52,6 +66,8 @@ services:
       target: app
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -67,17 +83,23 @@ services:
       - /app/public/build
       - /app/bootstrap/cache   # cache without dev-only providers (no Pail)
     environment:
-      ARGOS_ROLE:               "app"
-      APP_ENV:                  "${APP_ENV:-local}"
-      APP_DEBUG:                "${APP_DEBUG:-true}"
-      APP_KEY:                  "${APP_KEY:-}"
-      ARGOS_CONFIG_DIR:         /data/config
-      DB_CONNECTION:            "mariadb"
-      ARGOS_DB_HOST:            "db"
-      ARGOS_DB_PORT:            "3306"
-      ARGOS_DB_DATABASE:        "${ARGOS_DB_DATABASE:-argos}"
-      ARGOS_DB_USERNAME:        "${ARGOS_DB_USERNAME:-argos}"
-      ARGOS_DB_PASSWORD:        "${ARGOS_DB_PASSWORD:-argos}"
+      ARGOS_ROLE:                        "app"
+      APP_ENV:                           "${APP_ENV:-local}"
+      APP_DEBUG:                         "${APP_DEBUG:-true}"
+      APP_KEY:                           "${APP_KEY:-}"
+      ARGOS_CONFIG_DIR:                  /data/config
+      PASSPORT_KEYS_PATH:                /data/passport
+      DB_CONNECTION:                     "mariadb"
+      ARGOS_DB_HOST:                     "db"
+      ARGOS_DB_PORT:                     "3306"
+      ARGOS_DB_DATABASE:                 "${ARGOS_DB_DATABASE:-argos}"
+      ARGOS_DB_USERNAME:                 "${ARGOS_DB_USERNAME:-argos}"
+      ARGOS_DB_PASSWORD:                 "${ARGOS_DB_PASSWORD:-argos}"
+      QUEUE_CONNECTION:                  "redis"
+      REDIS_HOST:                        "redis"
+      REDIS_PORT:                        "6379"
+      ARGOS_QUEUE_DEFAULT_PROCESSES:     "${ARGOS_QUEUE_DEFAULT_PROCESSES:-5}"
+      ARGOS_QUEUE_TASKS_PROCESSES:       "${ARGOS_QUEUE_TASKS_PROCESSES:-2}"
     healthcheck:
       # Goes green only when DB is reachable AND the schema is fully migrated,
       # so dependents like `queue` can rely on `service_healthy` to mean
@@ -122,8 +144,12 @@ services:
     # compose from inventing a separate `argos-queue` image that could drift.
     image: "${ARGOS_APP_IMAGE:-argos-app:local}"
     restart: unless-stopped
+    stop_signal: SIGTERM
+    stop_grace_period: 60s
     depends_on:
       app:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -133,21 +159,59 @@ services:
       - /app/public/build
       - /app/bootstrap/cache
     environment:
-      ARGOS_ROLE:               "queue"
+      ARGOS_ROLE:                        "queue"
+      APP_ENV:                           "${APP_ENV:-local}"
+      APP_DEBUG:                         "${APP_DEBUG:-true}"
+      APP_KEY:                           "${APP_KEY:-}"
+      ARGOS_CONFIG_DIR:                  /data/config
+      PASSPORT_KEYS_PATH:                /data/passport
+      DB_CONNECTION:                     "mariadb"
+      ARGOS_DB_HOST:                     "db"
+      ARGOS_DB_PORT:                     "3306"
+      ARGOS_DB_DATABASE:                 "${ARGOS_DB_DATABASE:-argos}"
+      ARGOS_DB_USERNAME:                 "${ARGOS_DB_USERNAME:-argos}"
+      ARGOS_DB_PASSWORD:                 "${ARGOS_DB_PASSWORD:-argos}"
+      QUEUE_CONNECTION:                  "redis"
+      REDIS_HOST:                        "redis"
+      REDIS_PORT:                        "6379"
+      ARGOS_QUEUE_DEFAULT_PROCESSES:     "${ARGOS_QUEUE_DEFAULT_PROCESSES:-5}"
+      ARGOS_QUEUE_TASKS_PROCESSES:       "${ARGOS_QUEUE_TASKS_PROCESSES:-2}"
+    command: ["php", "/app/artisan", "horizon"]
+
+  scheduler:
+    # Same image as app/queue. Runs `schedule:work`, which invokes
+    # `schedule:run` every minute (see routes/console.php — e.g.
+    # argos:poll-issues every 5 min). No docker socket: scheduled commands
+    # only dispatch queued jobs, the `queue` worker does the actual work.
+    image: "${ARGOS_APP_IMAGE:-argos-app:local}"
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    volumes:
+      - argos-data:/data
+      - ../..:/app
+      - /app/node_modules
+      - /app/public/build
+      - /app/bootstrap/cache
+    environment:
+      ARGOS_ROLE:               "scheduler"
       APP_ENV:                  "${APP_ENV:-local}"
       APP_DEBUG:                "${APP_DEBUG:-true}"
       APP_KEY:                  "${APP_KEY:-}"
       ARGOS_CONFIG_DIR:         /data/config
+      PASSPORT_KEYS_PATH:       /data/passport
       DB_CONNECTION:            "mariadb"
       ARGOS_DB_HOST:            "db"
       ARGOS_DB_PORT:            "3306"
       ARGOS_DB_DATABASE:        "${ARGOS_DB_DATABASE:-argos}"
       ARGOS_DB_USERNAME:        "${ARGOS_DB_USERNAME:-argos}"
       ARGOS_DB_PASSWORD:        "${ARGOS_DB_PASSWORD:-argos}"
-    command: ["php", "/app/artisan", "queue:work", "database", "--sleep=3", "--tries=3", "--max-time=3600"]
+    command: ["php", "/app/artisan", "schedule:work"]
 
 volumes:
   argos-data:
   argos-db:
+  argos-redis:
   composer_cache:
   npm_cache:

@@ -9,7 +9,7 @@ declare(strict_types=1);
  * matches the git tag that ships the same commit. Local/develop builds keep
  * '0.0.0-dev' and use floating worker tags (no version pinning).
  */
-$argosVersion = '0.1.0-beta.2';
+$argosVersion = '0.1.0-beta.3';
 
 return [
     'version' => env('ARGOS_VERSION', $argosVersion),
@@ -27,6 +27,37 @@ return [
     // hasClaudeToken() / claudeTokenSource() / Settings UI all agree.
     'claude_token' => env('CLAUDE_CODE_OAUTH_TOKEN') ?: null,
     'admin_password' => env('ADMIN_PASSWORD') ?: '12345',
+    /*
+     * Local one-click developer login (filament-developer-logins). Only ever
+     * active in the `local` environment — the AdminPanelProvider gates the
+     * plugin on app()->environment('local'), so this email is meaningless in
+     * staging/production. Matches the DemoSeeder admin so the button works
+     * out of the box after a dev reset.
+     */
+    'dev_login_email' => env('SEED_USER_EMAIL', 'admin@argos.local'),
+    /*
+     * How often (minutes) the scheduler polls issue providers and checks
+     * concept-comment reactions. Default 5 keeps API usage low at scale; set
+     * ARGOS_POLL_INTERVAL_MINUTES=1 locally for fast feedback. Clamped to 1–59.
+     */
+    'poll_interval_minutes' => max(1, min(59, (int) env('ARGOS_POLL_INTERVAL_MINUTES', 5))),
+    /*
+     * Demo task-provider bindings seeded by ProviderDemoSeeder for local
+     * end-to-end testing of the issue integration. These env vars only
+     * OVERRIDE the committed defaults in tests/External/providers.defaults.php
+     * (GitHub/GitLab/Bitbucket repos + the Linear team), read dev-only by the
+     * seeder. Set SEED_GITLAB_ISSUE_REF (+ optionally SEED_GITLAB_INSTANCE) to
+     * point GitLab at a self-hosted instance instead of the gitlab.com default.
+     * Never read outside seeding.
+     */
+    'provider_demo' => [
+        'label' => env('SEED_PROVIDER_DEMO_LABEL', 'argos-demo'),
+        'github_ref' => env('SEED_GITHUB_ISSUE_REF') ?: null,
+        'gitlab_ref' => env('SEED_GITLAB_ISSUE_REF') ?: null,
+        'gitlab_instance' => env('SEED_GITLAB_INSTANCE') ?: null,
+        'bitbucket_ref' => env('SEED_BITBUCKET_REF') ?: null,
+        'linear_team' => env('SEED_LINEAR_TEAM') ?: null,
+    ],
     'docker' => [
         'memory_limit' => env('ARGOS_MEM_LIMIT', '4g'),
         'cpu_limit' => env('ARGOS_CPU_LIMIT', '2'),
@@ -39,6 +70,9 @@ return [
      */
     'compose' => [
         'default_stack' => env('ARGOS_DEFAULT_STACK', 'php-8.4'),
+    ],
+    'concept' => [
+        'max_turns_default' => (int) env('ARGOS_CONCEPT_MAX_TURNS_DEFAULT', 30),
     ],
     'implement' => [
         'max_turns_default' => (int) env('ARGOS_MAX_TURNS_DEFAULT', 200),
@@ -60,6 +94,7 @@ return [
         'setup_github' => 'https://github.com/nodus-it/argos/blob/master/docs/SETUP-GITHUB.md',
         'setup_gitlab' => 'https://github.com/nodus-it/argos/blob/master/docs/SETUP-GITLAB.md',
         'setup_bitbucket' => 'https://github.com/nodus-it/argos/blob/master/docs/SETUP-BITBUCKET.md',
+        'setup_linear' => 'https://github.com/nodus-it/argos/blob/master/docs/SETUP-LINEAR.md',
         'contributing' => 'https://github.com/nodus-it/argos/blob/master/docs/CONTRIBUTING.md',
         'github_pat' => 'https://github.com/settings/tokens',
         'gitlab_pat' => 'https://gitlab.com/-/user_settings/personal_access_tokens',

@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
 /**
@@ -30,7 +31,8 @@ use Illuminate\Support\Carbon;
  * @property PhaseStatus|null $current_status
  * @property WorkflowStatus $workflow_status
  * @property bool $auto_concept
- * @property int|null $max_turns
+ * @property int|null $max_turns_concept
+ * @property int|null $max_turns_implement
  * @property string|null $model_concept
  * @property string|null $model_implement
  * @property string|null $worker_stack_id_override
@@ -48,6 +50,7 @@ use Illuminate\Support\Carbon;
  * @property-read User|null $user
  * @property-read RepoProfile|null $repoProfile
  * @property-read Collection<int, PhaseRun> $phaseRuns
+ * @property-read ExternalIssueLink|null $externalIssueLink
  * @property-read WorkerStack|null $workerStackOverride
  * @property-read AgentCredential|null $agentCredential
  */
@@ -73,7 +76,8 @@ class Task extends Model
         'current_status',
         'workflow_status',
         'auto_concept',
-        'max_turns',
+        'max_turns_concept',
+        'max_turns_implement',
         'model_concept',
         'model_implement',
         'worker_stack_id_override',
@@ -90,7 +94,8 @@ class Task extends Model
             'current_phase' => Phase::class,
             'current_status' => PhaseStatus::class,
             'auto_concept' => 'boolean',
-            'max_turns' => 'integer',
+            'max_turns_concept' => 'integer',
+            'max_turns_implement' => 'integer',
             'worker_agent_name_override' => AgentName::class,
             'worker_config_override' => 'array',
             'agent_config' => 'array',
@@ -163,6 +168,16 @@ class Task extends Model
     }
 
     /**
+     * The external issue this task was imported from, if any.
+     *
+     * @return HasOne<ExternalIssueLink, $this>
+     */
+    public function externalIssueLink(): HasOne
+    {
+        return $this->hasOne(ExternalIssueLink::class);
+    }
+
+    /**
      * @return BelongsTo<WorkerStack, $this>
      */
     public function workerStackOverride(): BelongsTo
@@ -185,9 +200,37 @@ class Task extends Model
     public function currentPhaseStartedAt(): ?Carbon
     {
         return $this->phaseRuns()
+            ->where('status', 'running')
             ->whereNotNull('started_at')
             ->latest('started_at')
             ->first()
             ?->started_at;
+    }
+
+    public function isWaitingForWorker(): bool
+    {
+        return $this->current_status === PhaseStatus::Pending
+            && in_array($this->workflow_status, [WorkflowStatus::ConceptRunning, WorkflowStatus::ImplementRunning], true);
+    }
+
+    public function displayStatusLabel(): string
+    {
+        if ($this->isWaitingForWorker()) {
+            return match ($this->workflow_status) {
+                WorkflowStatus::ConceptRunning => __('tasks.statuses.waiting.concept'),
+                default => __('tasks.statuses.waiting.implement'),
+            };
+        }
+
+        return $this->workflow_status->label();
+    }
+
+    public function displayStatusColor(): string
+    {
+        if ($this->isWaitingForWorker()) {
+            return 'info';
+        }
+
+        return $this->workflow_status->color();
     }
 }

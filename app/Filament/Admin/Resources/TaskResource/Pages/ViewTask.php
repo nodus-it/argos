@@ -11,6 +11,7 @@ use App\Models\PhaseRun;
 use App\Models\Task;
 use App\Services\Task\TaskService;
 use App\Services\Workflow\StateReader;
+use App\Support\ConceptMarkdown;
 use Filament\Actions\Action;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
@@ -223,6 +224,7 @@ class ViewTask extends ViewRecord
     {
         /** @var Task $task */
         $task = $this->getRecord();
+        $task->loadMissing(['externalIssueLink.binding']);
         $reader = app(StateReader::class);
 
         $phaseRuns = $task->phaseRuns()->orderBy('iteration')->get()->groupBy('phase');
@@ -233,9 +235,16 @@ class ViewTask extends ViewRecord
         $lastConceptRun = ($phaseRuns['concept'] ?? collect())->last();
         $lastImplementRun = ($phaseRuns['implement'] ?? collect())->last();
 
+        // Defense-in-depth: rows persisted before PhaseRunner started
+        // stripping the outer ```markdown wrapper still have it. Strip on
+        // render so the UI heals old data without a backfill migration.
+        $conceptMd = $task->concept_md !== null
+            ? ConceptMarkdown::stripOuterCodeFence($task->concept_md)
+            : null;
+
         return [
             'phaseRuns' => $phaseRuns,
-            'conceptHtml' => $task->concept_md ? Str::markdown($task->concept_md) : null,
+            'conceptHtml' => $conceptMd !== null ? Str::markdown($conceptMd) : null,
             'conceptError' => $lastConceptRun?->status !== PhaseStatus::Completed
                 ? $lastConceptRun?->error_log
                 : null,
@@ -253,6 +262,7 @@ class ViewTask extends ViewRecord
             'implementHistory' => $reader->readImplementHistory($task, $currentImplementIter),
             'implementNotesHistory' => $reader->readImplementNotesHistory($task),
             'implementQualityGates' => $lastImplementRun?->result_json['quality_gates'] ?? null,
+            'implementQualityGateLogKeys' => array_keys($lastImplementRun?->quality_gate_logs ?? []),
             'conceptLogIterations' => array_values(array_filter(
                 $reader->listLogIterations($task, 'concept'),
                 fn (int $i) => $i !== $currentConceptIter
@@ -276,7 +286,11 @@ class ViewTask extends ViewRecord
                 ->label(fn (): string => $this->task()->phaseRuns()->where('phase', 'concept')->where('status', 'completed')->exists()
                     ? __('tasks.view.actions.concept_update')
                     : __('tasks.view.actions.concept_create'))
-                ->visible(fn (): bool => $this->task()->workflow_status->value !== 'completed'),
+                ->visible(fn (): bool => $this->task()->workflow_status->value !== 'completed'
+                    && $this->lastConceptRun()?->status !== PhaseStatus::Paused),
+
+            $this->makeContinueConceptAction()
+                ->visible(fn (): bool => $this->lastConceptRun()?->status === PhaseStatus::Paused),
 
             $this->makePhaseAction('implement', __('tasks.view.actions.implement'), 'heroicon-o-code-bracket')
                 ->visible(fn (): bool => $this->task()->workflow_status->value !== 'completed'
@@ -391,6 +405,15 @@ class ViewTask extends ViewRecord
             ->first();
     }
 
+    public function lastConceptRun(): ?PhaseRun
+    {
+        return $this->task()
+            ->phaseRuns()
+            ->where('phase', 'concept')
+            ->orderByDesc('iteration')
+            ->first();
+    }
+
     private function makeContinueImplementAction(): Action
     {
         return Action::make('continueImplement')
@@ -409,7 +432,7 @@ class ViewTask extends ViewRecord
                     ->minValue(10)
                     ->maxValue(1000)
                     ->required()
-                    ->default(fn (): int => $this->task()->max_turns
+                    ->default(fn (): int => $this->task()->max_turns_implement
                         ?? (int) config('argos.implement.max_turns_default', 200)),
             ])
             ->action(function (array $data): void {
@@ -425,6 +448,46 @@ class ViewTask extends ViewRecord
                 Notification::make()
                     ->title(__('tasks.view.actions.implement_continued'))
                     ->body(__('tasks.view.actions.implement_continued_body', ['max_turns' => $maxTurns]))
+                    ->success()
+                    ->send();
+                $this->redirect(TaskResource::getUrl('view', ['record' => $task]));
+            });
+    }
+
+    private function makeContinueConceptAction(): Action
+    {
+        return Action::make('continueConcept')
+            ->label(__('tasks.view.actions.continue_concept'))
+            ->icon('heroicon-o-play-circle')
+            ->color('warning')
+            ->disabled(fn (): bool => $this->task()->current_status === PhaseStatus::Running)
+            ->modalHeading(__('tasks.view.actions.continue_concept_heading'))
+            ->modalDescription(__('tasks.view.actions.continue_concept_description'))
+            ->modalSubmitActionLabel(__('tasks.view.actions.continue_concept'))
+            ->schema([
+                TextInput::make('max_turns')
+                    ->label(__('tasks.view.actions.max_turns_label'))
+                    ->helperText(__('tasks.view.actions.max_turns_helper'))
+                    ->numeric()
+                    ->minValue(10)
+                    ->maxValue(1000)
+                    ->required()
+                    ->default(fn (): int => $this->task()->max_turns_concept
+                        ?? (int) config('argos.concept.max_turns_default', 30)),
+            ])
+            ->action(function (array $data): void {
+                $task = $this->task();
+                $maxTurns = (int) $data['max_turns'];
+                try {
+                    app(TaskService::class)->continueConcept($task, $maxTurns);
+                } catch (\RuntimeException) {
+                    Notification::make()->title(__('tasks.view.actions.phase_already_running'))->warning()->send();
+
+                    return;
+                }
+                Notification::make()
+                    ->title(__('tasks.view.actions.concept_continued'))
+                    ->body(__('tasks.view.actions.concept_continued_body', ['max_turns' => $maxTurns]))
                     ->success()
                     ->send();
                 $this->redirect(TaskResource::getUrl('view', ['record' => $task]));

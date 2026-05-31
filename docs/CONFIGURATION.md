@@ -39,7 +39,36 @@ All Argos configuration is controlled via environment variables passed to the
 | `ARGOS_MAX_TURNS_DEFAULT` | `200` | Default max-turns for the implement phase (overridable per task). |
 | `ARGOS_CONFIG_DIR` | `~/.config/argos` | Persisted config / SQLite path inside the manager. |
 
-## MCP — Laravel Boost
+## Queue & Redis
+
+Background jobs — task phase runs and issue polling — run on **Laravel
+Horizon**, backed by **Redis**. In the compose stack the `redis` service and
+the `queue` (Horizon) + `scheduler` workers are wired up automatically; you
+normally only tune the process counts.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `QUEUE_CONNECTION` | `redis` (compose) / `database` (local) | Queue driver. The compose stack sets `redis` so Horizon processes jobs; bare `artisan serve` dev and the test suite fall back to the database queue. |
+| `REDIS_HOST` | `redis` | Redis host. Use `redis` for the compose sidecar. |
+| `REDIS_PORT` | `6379` | Redis port. |
+| `ARGOS_QUEUE_DEFAULT_PROCESSES` | `5` | Horizon worker processes for the `default` queue. |
+| `ARGOS_QUEUE_TASKS_PROCESSES` | `2` | Horizon worker processes for the `tasks` queue (phase runs). |
+
+## MCP Server (Argos API)
+
+Argos exposes a built-in [MCP server](SETUP-MCP.md) at `<APP_URL>/mcp` so an
+external client like Claude Code can drive it. Auth is OAuth 2.1 via Laravel
+Passport (scope `mcp:use`).
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `APP_URL` | `http://localhost` | Doubles as the OAuth **issuer**. Must be the public URL the MCP client can reach, or client registration/login fails. |
+| `PASSPORT_KEYS_PATH` | `/data/passport` (compose) | Directory for the Passport signing keys. Generated once on first boot and kept on the persistent volume so issued tokens survive image rebuilds. |
+
+See the [MCP Server guide](SETUP-MCP.md) for the connect flow and the available
+tools.
+
+## Target-project MCP (Laravel Boost)
 
 The worker checks the cloned target project's `boost.json` for `"mcp": true`.
 If present, the active agent runner attaches the project's MCP server as a

@@ -55,6 +55,11 @@ class ConnectedAccounts extends Page
         return filled(config('services.bitbucket.client_id'));
     }
 
+    public function isLinearConfigured(): bool
+    {
+        return filled(config('services.linear.client_id'));
+    }
+
     /**
      * @return array<string, ConnectedAccount|null>
      */
@@ -67,6 +72,7 @@ class ConnectedAccounts extends Page
             'github' => $user->connectedAccount('github'),
             'gitlab' => $user->connectedAccount('gitlab'),
             'bitbucket' => $user->connectedAccount('bitbucket'),
+            'linear' => $user->connectedAccount('linear'),
         ];
     }
 
@@ -77,6 +83,7 @@ class ConnectedAccounts extends Page
         $hasGitHub = $user->connectedAccount('github') !== null;
         $hasGitLab = $user->connectedAccount('gitlab') !== null;
         $hasBitbucket = $user->connectedAccount('bitbucket') !== null;
+        $hasLinear = $user->connectedAccount('linear') !== null;
 
         $actions = [];
 
@@ -99,6 +106,13 @@ class ConnectedAccounts extends Page
                 ->label(__('accounts.actions.connect_bitbucket'))
                 ->icon('heroicon-o-arrow-right-circle')
                 ->url(route('auth.bitbucket.redirect'));
+        }
+
+        if ($this->isLinearConfigured() && ! $hasLinear) {
+            $actions[] = Action::make('connectLinear')
+                ->label(__('accounts.actions.connect_linear'))
+                ->icon('heroicon-o-arrow-right-circle')
+                ->url(route('auth.linear.redirect'));
         }
 
         return $actions;
@@ -139,6 +153,19 @@ class ConnectedAccounts extends Page
 
         Notification::make()
             ->title(__('accounts.notifications.bitbucket_disconnected'))
+            ->success()
+            ->send();
+    }
+
+    public function disconnectLinear(): void
+    {
+        /** @var User $user */
+        $user = Auth::user();
+
+        $user->connectedAccounts()->where('provider', 'linear')->delete();
+
+        Notification::make()
+            ->title(__('accounts.notifications.linear_disconnected'))
             ->success()
             ->send();
     }

@@ -8,6 +8,33 @@
 
 # shellcheck shell=bash
 
+# quality_ensure_workspace_dotenv: make sure /workspace/.env exists so
+# Laravel's Foundation\Bootstrap\LoadEnvironmentVariables (via vlucas/
+# phpdotenv) does not emit a `file_get_contents(/workspace/.env): Failed
+# to open` warning every test run. That warning is harmless on its own
+# (safeLoad swallows the result) but it has historically poisoned the
+# Pest output enough that fix-session agents misinterpret the failure
+# mode, and some custom error handlers convert PHP warnings to
+# exceptions. We seed the file from `.env.example` (which the target
+# Laravel project ships) — every actual value comes from the worker's
+# docker -e env vars (APP_KEY etc.) and phpunit.xml `force="true"`
+# entries, so the seeded `.env` only needs to exist; contents don't
+# matter. Idempotent.
+quality_ensure_workspace_dotenv() {
+    if [[ -f /workspace/.env ]]; then
+        return 0
+    fi
+    if [[ -f /workspace/.env.example ]]; then
+        cp /workspace/.env.example /workspace/.env
+        log_info "workspace: seeded .env from .env.example"
+        return 0
+    fi
+    # No example to copy — drop a minimal stub so the file at least exists.
+    : > /workspace/.env
+    log_info "workspace: created empty .env (no .env.example present)"
+    return 0
+}
+
 # quality_changed_php_files: list PHP files modified or added in /workspace.
 # Output: NUL-separated file paths relative to /workspace root.
 quality_changed_php_files() {
@@ -160,6 +187,49 @@ quality_gates_run() {
     printf '%s' "$gates"
 }
 
+# quality_gate_log_path: filesystem path of the gate log for one iteration.
+# Args: $1=gate slug (artisan|pint|pest|phpunit|phpstan|migrations|debug_code),
+#       $2=log suffix (e.g. "2" for the initial run, "2.fix1" for a fix retry).
+# Output: absolute path on stdout.
+quality_gate_log_path() {
+    local gate="$1"
+    local suffix="$2"
+    local base
+    case "$gate" in
+        artisan)    base="artisan-smoke" ;;
+        debug_code) base="debug-code" ;;
+        *)          base="$gate" ;;
+    esac
+    printf '%s/%s.%s.log' "${QUALITY_LOG_DIR:-/workspace/.agent/logs}" "$base" "$suffix"
+}
+
+# quality_gate_log_converged: 0 if the latest gate log is byte-identical to the
+# previous attempt, 1 otherwise. Used by implement/respond to bail out of the
+# fix loop when Claude is producing the same failure output over and over —
+# further fix sessions burn budget without changing the outcome.
+#
+# Args: $1=gate slug, $2=iteration number, $3=fix retry index (1+)
+quality_gate_log_converged() {
+    local gate="$1"
+    local iter="$2"
+    local fix_n="$3"
+
+    local current previous
+    current="$(quality_gate_log_path "$gate" "${iter}.fix${fix_n}")"
+    if (( fix_n > 1 )); then
+        previous="$(quality_gate_log_path "$gate" "${iter}.fix$((fix_n - 1))")"
+    else
+        previous="$(quality_gate_log_path "$gate" "$iter")"
+    fi
+
+    [[ -f "$current" && -f "$previous" ]] || return 1
+
+    local cur_hash prev_hash
+    cur_hash="$(sha256sum "$current" 2>/dev/null | awk '{print $1}')"
+    prev_hash="$(sha256sum "$previous" 2>/dev/null | awk '{print $1}')"
+    [[ -n "$cur_hash" && "$cur_hash" == "$prev_hash" ]]
+}
+
 # quality_gate_verdict: determine which blocking gate failed (if any).
 # Args: $1=gates_json
 # Output: name of first failing gate on stdout, or empty string.
@@ -189,14 +259,35 @@ quality_gate_verdict() {
 # quality_gate_fix_prompt: build a focused prompt to fix a failing gate.
 # Args: $1=gate_name, $2=log_file (path to gate output; may be absent)
 # Output: prompt text on stdout (pass to claude via stdin or temp file)
+#
+# The embedded log excerpt uses head+tail (default 50 head / 200 tail lines)
+# because pest/phpunit/phpstan emit the failure summary at the END of the
+# output. A plain head() truncation hides the actual failures behind hundreds
+# of "PASS"/progress lines and tricks the agent into thinking the gate is
+# green when it isn't.
 quality_gate_fix_prompt() {
     local gate="$1"
     local log_file="${2:-}"
-    local max_log_lines=200
+    local head_lines="${QUALITY_GATE_LOG_HEAD_LINES:-50}"
+    local tail_lines="${QUALITY_GATE_LOG_TAIL_LINES:-200}"
 
     printf '# Quality-Gate-Fix: %s\n\n' "$gate"
     printf 'Du befindest dich im Workspace `/workspace`. Nach deiner Implementierung ist das\n'
     printf 'Quality-Gate `%s` fehlgeschlagen.\n\n' "$gate"
+
+    if [[ -n "$log_file" && -f "$log_file" && -s "$log_file" ]]; then
+        printf '## Verbindliche Vorgehensweise\n\n'
+        printf '1. Lies **zuerst** die vollständige Log-Datei `%s` mit `cat` /\n' "$log_file"
+        printf '   `Read`. Der unten eingebettete Auszug ist gekürzt und kann den\n'
+        printf '   eigentlichen Fehler verbergen.\n'
+        printf '2. Wenn du das Gate selbst nachprüfst, ruf den Test-Command **ohne Pipe**\n'
+        printf '   auf — `vendor/bin/pest | tail -N` verbirgt den Exit-Code von `pest` und\n'
+        printf '   du hältst einen fehlschlagenden Lauf fälschlich für grün. Wenn du eine\n'
+        printf '   Pipe brauchst, setze vorher `set -o pipefail` und prüfe `$?` separat,\n'
+        printf '   oder schreibe nach `/tmp/foo.log` und lies die Datei.\n'
+        printf '3. Wiederhol das Gate, bis es wirklich grün ist — verlasse dich nicht auf\n'
+        printf '   den Eindruck einer Sitzung davor, sondern auf das aktuelle Resultat.\n\n'
+    fi
 
     case "$gate" in
         artisan)
@@ -213,7 +304,11 @@ quality_gate_fix_prompt() {
         pest|phpunit)
             printf 'Tests sind fehlgeschlagen.\n'
             printf 'Analysiere jeden Failure: liegt es am Code oder am Test?\n'
-            printf 'Korrigiere und führe die Tests nochmals aus — iteriere bis alle grün sind.\n\n'
+            printf 'Korrigiere und führe die Tests nochmals aus — iteriere bis alle grün sind.\n'
+            printf 'Beachte: Pest führt auch die Architecture-Tests in `tests/Arch/` aus —\n'
+            printf 'z.B. „strict types in app/", „no debug calls in app/", „workers UI-isolated".\n'
+            printf 'Ein Failure dort meldet sich nicht über einen klassischen Test-Stacktrace,\n'
+            printf 'sondern als Arch-Regel-Verstoss am Anfang oder Ende der Pest-Ausgabe.\n\n'
             ;;
         phpstan)
             printf 'PHPStan hat Typ-Fehler oder andere statische Probleme gefunden.\n'
@@ -231,13 +326,18 @@ quality_gate_fix_prompt() {
     esac
 
     if [[ -n "$log_file" && -f "$log_file" && -s "$log_file" ]]; then
-        printf '## Ausgabe des Gates\n\n```\n'
-        head -n "$max_log_lines" "$log_file"
         local total_lines
         total_lines="$(wc -l < "$log_file")"
-        if (( total_lines > max_log_lines )); then
-            printf '\n... (%d weitere Zeilen nicht angezeigt)\n' \
-                "$(( total_lines - max_log_lines ))"
+        printf '## Auszug aus dem Gate-Log\n\n'
+        printf '_Quelle:_ `%s` (insgesamt %d Zeilen)\n\n' "$log_file" "$total_lines"
+        printf '```\n'
+        if (( total_lines <= head_lines + tail_lines )); then
+            cat "$log_file"
+        else
+            head -n "$head_lines" "$log_file"
+            printf '\n... (%d Zeilen ausgelassen — Datei direkt lesen für vollständigen Inhalt) ...\n\n' \
+                "$(( total_lines - head_lines - tail_lines ))"
+            tail -n "$tail_lines" "$log_file"
         fi
         printf '```\n\n'
     fi

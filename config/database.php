@@ -23,7 +23,7 @@ return [
 
         'sqlite' => [
             'driver' => 'sqlite',
-            'database' => env('DB_DATABASE', ($_SERVER['HOME'] ?? '/root').'/.config/argos/argos.db'),
+            'database' => env('DB_DATABASE', (getenv('HOME') ?: ($_SERVER['HOME'] ?? '/root')).'/.config/argos/argos.db'),
             'prefix' => '',
             'foreign_key_constraints' => true,
             'busy_timeout' => null,
@@ -49,6 +49,35 @@ return [
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 (PHP_VERSION_ID >= 80500 ? Mysql::ATTR_SSL_CA : PDO::MYSQL_ATTR_SSL_CA) => env('ARGOS_DB_SSL_CA'),
             ]) : [],
+        ],
+
+    ],
+
+    'redis' => [
+
+        'client' => env('REDIS_CLIENT', 'predis'),
+
+        'options' => [
+            'cluster' => env('REDIS_CLUSTER', 'redis'),
+            'prefix' => env('REDIS_PREFIX', ''),
+        ],
+
+        'default' => [
+            'url' => env('REDIS_URL'),
+            'host' => env('ARGOS_REDIS_HOST', env('REDIS_HOST', 'redis')),
+            'username' => env('REDIS_USERNAME'),
+            'password' => env('ARGOS_REDIS_PASSWORD', env('REDIS_PASSWORD')),
+            'port' => (int) env('ARGOS_REDIS_PORT', env('REDIS_PORT', 6379)),
+            'database' => (int) env('REDIS_DB', 0),
+        ],
+
+        'cache' => [
+            'url' => env('REDIS_URL'),
+            'host' => env('ARGOS_REDIS_HOST', env('REDIS_HOST', 'redis')),
+            'username' => env('REDIS_USERNAME'),
+            'password' => env('ARGOS_REDIS_PASSWORD', env('REDIS_PASSWORD')),
+            'port' => (int) env('ARGOS_REDIS_PORT', env('REDIS_PORT', 6379)),
+            'database' => (int) env('REDIS_CACHE_DB', 1),
         ],
 
     ],
