@@ -228,8 +228,11 @@ _concept_setup_toolchain() {
     fi
     # Same rationale as in implement: composer post-autoload-dump boots
     # Laravel which reads .env via vlucas; seed the file so Boost MCP /
-    # artisan commands don't crash on the first read.
+    # artisan commands don't crash on the first read. The Vite hot stub keeps
+    # apps that touch Vite in boot() from aborting package:discover (no built
+    # assets in the worker → no manifest).
     quality_ensure_workspace_dotenv
+    quality_ensure_vite_hot
 
     log_info "concept: composer install"
     if ! (cd /workspace && composer install --no-interaction --prefer-dist --no-progress 2>&1 \

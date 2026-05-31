@@ -35,6 +35,27 @@ quality_ensure_workspace_dotenv() {
     return 0
 }
 
+# quality_ensure_vite_hot: let target Laravel apps that reference Vite eagerly
+# (e.g. Vite::asset()/@vite in a ServiceProvider::boot()) boot under the
+# worker's artisan invocations — most importantly the package:discover that
+# composer's post-autoload-dump runs. The worker never builds frontend assets,
+# so there is no public/build/manifest.json and Vite::asset() throws
+# ViteManifestNotFoundException, which aborts package:discover → composer
+# "fails" → Boost is never registered → boost:mcp is unavailable and the agent
+# runs blind (burning extra turns). Laravel skips the manifest entirely when a
+# Vite "hot" file is present (it then resolves assets to a dev-server URL), so
+# we drop a placeholder one. The worker never serves the frontend, so the dummy
+# URL is inert. Idempotent.
+quality_ensure_vite_hot() {
+    if [[ -f /workspace/public/hot ]]; then
+        return 0
+    fi
+    mkdir -p /workspace/public
+    printf '%s' 'http://localhost:5173' > /workspace/public/hot
+    log_info "workspace: seeded public/hot (Vite stub) so artisan can boot without built assets"
+    return 0
+}
+
 # quality_changed_php_files: list PHP files modified or added in /workspace.
 # Output: NUL-separated file paths relative to /workspace root.
 quality_changed_php_files() {
