@@ -38,6 +38,7 @@ RUN set -eux; \
         libonig-dev \
         libxml2-dev \
         libsqlite3-dev \
+        libpq-dev \
         zlib1g-dev; \
     install -m 0755 -d /etc/apt/keyrings; \
     curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
@@ -51,6 +52,10 @@ RUN set -eux; \
     rm -rf /var/lib/apt/lists/*
 
 # PHP extensions: Laravel-Standard + Redis (PECL).
+# mbstring, sodium and OPcache ship with the php:8.x base image already.
+# pcntl  — Horizon, queue workers, Pail.
+# exif   — spatie/image, spatie/laravel-medialibrary.
+# pdo_pgsql — Postgres-backed projects (needs libpq-dev, installed above).
 RUN set -eux; \
     docker-php-ext-configure intl; \
     docker-php-ext-configure gd --with-freetype --with-jpeg; \
@@ -58,9 +63,12 @@ RUN set -eux; \
         intl \
         pdo_mysql \
         pdo_sqlite \
+        pdo_pgsql \
         zip \
         bcmath \
-        gd; \
+        gd \
+        pcntl \
+        exif; \
     pecl install redis; \
     docker-php-ext-enable redis
 
