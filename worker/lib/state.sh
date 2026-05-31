@@ -107,11 +107,6 @@ state_set_pr_url() {
     mv "${STATE_FILE}.tmp" "$STATE_FILE"
 }
 
-# state_get_pr_url: print repo.pr_url or empty string.
-state_get_pr_url() {
-    jq -r '.repo.pr_url // ""' "$STATE_FILE"
-}
-
 # state_add_iteration: append a new iteration to a phase.
 # Args: $1=phase, $2=flags_json (e.g. '{"fresh":false}'), $3=optional started_at
 # Output: the new iteration number on stdout.
@@ -219,13 +214,6 @@ state_finalize_running() {
 state_get_iteration_count() {
     local phase="$1"
     jq -r ".phases[\"$phase\"].iterations | length" "$STATE_FILE"
-}
-
-# state_get_current_status: current_status of a phase.
-# Args: $1=phase
-state_get_current_status() {
-    local phase="$1"
-    jq -r ".phases[\"$phase\"].current_status" "$STATE_FILE"
 }
 
 # state_validate: check required top-level fields and schema_version.
