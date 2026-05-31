@@ -9,7 +9,7 @@ declare(strict_types=1);
  * matches the git tag that ships the same commit. Local/develop builds keep
  * '0.0.0-dev' and use floating worker tags (no version pinning).
  */
-$argosVersion = '0.1.0-beta.2';
+$argosVersion = '0.1.0-beta.3';
 
 return [
     'version' => env('ARGOS_VERSION', $argosVersion),
