@@ -62,6 +62,8 @@ next to the compose file — the installer never touches that.
 - ✓ Authentication via Personal Access Token (paste a token per project)
 - ✓ Optimised for PHP / Laravel projects out of the box
 - ✓ Runs on your Claude Pro / Max / Team subscription
+- ✓ Drive Argos straight from Claude Code via the built-in [MCP server](docs/SETUP-MCP.md)
+- ✓ Import issues from GitHub / GitLab / Linear via [task providers](docs/SETUP-TASK-PROVIDERS.md)
 
 ### What this does **not** get you
 
@@ -95,6 +97,7 @@ Once the container is up:
 | GitLab setup (incl. self-hosted) | [docs/SETUP-GITLAB.md](docs/SETUP-GITLAB.md) |
 | Bitbucket setup | [docs/SETUP-BITBUCKET.md](docs/SETUP-BITBUCKET.md) |
 | Task-Provider / Issue-Tracker integration | [docs/SETUP-TASK-PROVIDERS.md](docs/SETUP-TASK-PROVIDERS.md) |
+| MCP server (drive Argos from Claude Code) | [docs/SETUP-MCP.md](docs/SETUP-MCP.md) |
 | Local development & tests | [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) |
 
 ## Contributing

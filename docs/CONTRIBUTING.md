@@ -45,8 +45,10 @@ php artisan migrate
 composer run dev
 ```
 
-That spins up the compose stack (db + app + nginx + queue) **and** runs the
-Vite watcher locally. Open <http://localhost:8080/admin>.
+That spins up the compose stack (db + redis + app + nginx + queue + scheduler)
+**and** runs the Vite watcher locally. Jobs run on Laravel Horizon (Redis), so
+the `redis` service is part of the stack — no separate install needed. Open
+<http://localhost:8080/admin>.
 
 Useful sub-commands:
 

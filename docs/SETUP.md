@@ -8,19 +8,23 @@ For just trying Argos out, follow the [Quick Start in the README](../README.md#q
 
 ## Architecture in one paragraph
 
-Argos runs as a Docker Compose stack: an **app** container (Laravel + PHP-FPM)
-fronted by **nginx**, backed by **MariaDB**, with a separate **queue** worker.
-The app container spawns short-lived **worker** containers via the host
-Docker socket — all AI runs inside the worker, the app process never touches
-Claude directly. The compose file is the deployment unit; only the manager
-image is pulled, worker images are built on demand from the local repo.
+Argos runs as a Docker Compose stack of six services: an **app** container
+(Laravel + PHP-FPM) fronted by **nginx**, backed by **MariaDB**, with **Redis**
+as the queue backend, a **queue** worker running **Laravel Horizon**, and a
+**scheduler** running Laravel's scheduler. The app container spawns short-lived
+**worker** containers via the host Docker socket — all AI runs inside the
+worker, the app process never touches Claude directly. The compose file is the
+deployment unit; only the manager image is pulled, worker images are built on
+demand from the local repo.
 
-| Image | Purpose |
-|---|---|
-| `ghcr.io/nodus-it/argos-app` | Web UI + queue. Needs the Docker socket to spawn workers. |
-| `argos-worker:<stack>-<hash>-<agent>-<version>` | Built on demand by the manager from `worker_stacks` rows × the chosen agent. |
+| Service | Image | Purpose |
+|---|---|---|
+| `app` | `ghcr.io/nodus-it/argos-app` | Web UI + [MCP server](SETUP-MCP.md). Needs the Docker socket to spawn workers. |
+| `queue` | `ghcr.io/nodus-it/argos-app` | Laravel Horizon worker — runs the task phases (`RunPhaseJob`) on Redis. |
+| `scheduler` | `ghcr.io/nodus-it/argos-app` | Laravel scheduler — dispatches recurring jobs (e.g. issue polling). |
+| `worker` | `argos-worker:<stack>-<hash>-<agent>-<version>` | Built on demand by the manager from `worker_stacks` rows × the chosen agent. |
 
-The compose stack also runs `mariadb:11` and `nginx:1.27-alpine` — these are
+The stack also runs `mariadb:11`, `redis:7-alpine`, and `nginx:1.27-alpine` —
 stock upstream images, no Argos build.
 
 ## Production-ish setup
