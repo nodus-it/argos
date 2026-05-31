@@ -86,10 +86,14 @@ RUN mkdir -p bootstrap/cache \
         storage/framework/sessions \
         storage/framework/views
 
-# Finish install + frontend build
+# Finish install + frontend build. `filament:assets` publishes Filament's
+# CSS/JS/fonts into public/{css,js,fonts}/filament — these are generated, not
+# committed, so the image must regenerate them. Explicit (not relying on the
+# composer post-autoload-dump hook) so a future --no-scripts can't drop them.
 RUN composer install --no-dev --optimize-autoloader --no-interaction \
     && npm ci \
     && npm run build \
+    && php artisan filament:assets \
     && chown -R www-data:www-data storage bootstrap/cache
 
 # Make /var/www writable for www-data so the docker CLI (called from
