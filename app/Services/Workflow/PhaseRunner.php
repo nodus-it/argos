@@ -890,6 +890,20 @@ SH;
             return $taskOverride;
         }
 
+        // Per-project default (task → project → global config), mirroring how
+        // modelForPhase resolves the model. Lets large repos raise the budget
+        // without bumping the global default for every project.
+        $profile = $task->repoProfile;
+        if ($profile !== null) {
+            $profileOverride = $phase === 'concept'
+                ? $profile->max_turns_concept
+                : $profile->max_turns_implement;
+
+            if ($profileOverride !== null && $profileOverride > 0) {
+                return $profileOverride;
+            }
+        }
+
         $configKey = $phase === 'concept'
             ? 'argos.concept.max_turns_default'
             : 'argos.implement.max_turns_default';

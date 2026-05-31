@@ -34,6 +34,8 @@ use Illuminate\Support\Carbon;
  * @property array<string, mixed>|null $worker_config
  * @property string|null $model_concept
  * @property string|null $model_implement
+ * @property int|null $max_turns_concept
+ * @property int|null $max_turns_implement
  * @property bool $auto_concept
  * @property bool $auto_pr
  * @property Carbon|null $created_at
@@ -62,6 +64,8 @@ class RepoProfile extends Model
         'worker_config',
         'model_concept',
         'model_implement',
+        'max_turns_concept',
+        'max_turns_implement',
         'auto_concept',
         'auto_pr',
     ];
@@ -75,6 +79,8 @@ class RepoProfile extends Model
             'worker_source' => WorkerSource::class,
             'worker_agent_name' => AgentName::class,
             'worker_config' => 'array',
+            'max_turns_concept' => 'integer',
+            'max_turns_implement' => 'integer',
             'auto_concept' => 'boolean',
             'auto_pr' => 'boolean',
         ];

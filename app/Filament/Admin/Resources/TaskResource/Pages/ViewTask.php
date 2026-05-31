@@ -433,6 +433,7 @@ class ViewTask extends ViewRecord
                     ->maxValue(1000)
                     ->required()
                     ->default(fn (): int => $this->task()->max_turns_implement
+                        ?? $this->task()->repoProfile?->max_turns_implement
                         ?? (int) config('argos.implement.max_turns_default', 200)),
             ])
             ->action(function (array $data): void {
@@ -473,7 +474,8 @@ class ViewTask extends ViewRecord
                     ->maxValue(1000)
                     ->required()
                     ->default(fn (): int => $this->task()->max_turns_concept
-                        ?? (int) config('argos.concept.max_turns_default', 30)),
+                        ?? $this->task()->repoProfile?->max_turns_concept
+                        ?? (int) config('argos.concept.max_turns_default', 50)),
             ])
             ->action(function (array $data): void {
                 $task = $this->task();

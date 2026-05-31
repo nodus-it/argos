@@ -78,6 +78,28 @@ class RepoProfileResourceTest extends TestCase
         ]);
     }
 
+    public function test_can_set_per_project_max_turns(): void
+    {
+        Http::fake([
+            'api.github.com/repos/test-org/test-repo/branches*' => Http::response([['name' => 'main']]),
+        ]);
+        $profile = RepoProfile::factory()->create(['default_branch' => 'main']);
+
+        Livewire::test(EditRepoProfile::class, ['record' => $profile->getKey()])
+            ->fillForm([
+                'max_turns_concept' => 80,
+                'max_turns_implement' => 300,
+            ])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $this->assertDatabaseHas(RepoProfile::class, [
+            'id' => $profile->id,
+            'max_turns_concept' => 80,
+            'max_turns_implement' => 300,
+        ]);
+    }
+
     public function test_create_requires_platform_first(): void
     {
         Livewire::test(CreateRepoProfile::class)

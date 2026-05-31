@@ -66,6 +66,10 @@ return [
         'model_implement_placeholder' => 'Standard: :model',
         'model_implement_helper' => 'Modell für die Implement-Phase. Auswahl hängt vom gewählten Agent ab. Leer lassen für den Agent-Default.',
         'model_implement_helper_with_default' => 'Modell für die Implement-Phase. Leer lassen für den Agent-Default (:model).',
+        'max_turns_concept_label' => 'Concept max-turns',
+        'max_turns_concept_helper' => 'Turn-Budget der Konzept-Phase für dieses Projekt. Leer lassen für den globalen Default (:default). Ein Task kann das weiterhin überschreiben.',
+        'max_turns_implement_label' => 'Implement max-turns',
+        'max_turns_implement_helper' => 'Turn-Budget der Implement-Phase für dieses Projekt. Leer lassen für den globalen Default (:default). Ein Task kann das weiterhin überschreiben.',
     ],
 
     'infolist' => [
