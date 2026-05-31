@@ -62,9 +62,9 @@ ask before introducing patterns.
 All Bash files must be `shellcheck`-clean (severity `error`/`warning`).
 `info` and `style` are optional.
 
-CI runs `shellcheck` over `agent`, `worker/lib/`, `worker/phases/`,
-`.tools/docker/worker/worker-entrypoint.sh`, and
-`worker/tests/integration/*.sh`.
+CI runs `shellcheck` (via `worker/tests/run-tests.sh`) over `worker/lib/`,
+`worker/phases/`, `.tools/docker/worker/worker-entrypoint.sh`, and the test
+runners (`run-tests.sh`, `run-bats.sh`).
 
 ### File layout
 
@@ -100,9 +100,8 @@ CI runs `shellcheck` over `agent`, `worker/lib/`, `worker/phases/`,
 ### Tests
 
 - Bash unit tests with `bats-core` under `worker/tests/bats/`. One test file
-  per lib file.
-- Integration tests under `worker/tests/integration/`. Mock Claude and
-  fake-remote-repo as fixtures.
+  per lib file. They run in a Docker image (bats + jq) via
+  `worker/tests/run-bats.sh`, so tests that need a real `/workspace` work.
 - Laravel (PHP) tests live under `tests/` at the repo root.
 - For bug fixes: write a test that reproduces the bug first, then fix.
 - Tests must run offline — no real GitHub, no real Claude API.
@@ -142,7 +141,7 @@ notice a missing row during a patch, add it.
 | New enum case | DB migration (`enum()` values) — `EnumPersistenceTest` catches drift, but you must write the migration yourself; `lang/{de,en}/enums.php`; `color()` / `label()` / other `match` paths on the enum; Filament filter options / `SelectFilter::options()` |
 | New DB column | Model `$fillable` / `$casts`; **factory** (otherwise `factory()->create()` silently breaks on NOT-NULL); Filament form field + table column if relevant; JSON schema in `worker/schemas/` if the worker reads/writes the field |
 | New Filament page (Resource or Page) | `RedirectToOnboarding` whitelist if reachable pre-onboarding; `getNavigationGroup` / Heroicon; **wiring test via the embedding page** (`Livewire::test(ViewFooPage::class, [...])->assertSeeLivewire(FooRelationManager::class)`) — isolated RelationManager test alone is not enough; locale strings `de` + `en` |
-| New phase helper | `worker/lib/<module>.sh` with docstring; `bats` test in `worker/tests/bats/`; `shellcheck`-clean; sourced by the `agent` entrypoint; which phase script calls the helper |
+| New phase helper | `worker/lib/<module>.sh` with docstring; `bats` test in `worker/tests/bats/`; `shellcheck`-clean; sourced by `worker-entrypoint.sh`; which phase script calls the helper |
 | UI hint claiming a behavior | The backend implements it **for every relevant path** — every agent, every provider, every status. Helper text that's only true for the default path is a lie. |
 
 ## Test levels
