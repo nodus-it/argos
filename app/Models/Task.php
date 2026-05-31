@@ -213,6 +213,21 @@ class Task extends Model
             && in_array($this->workflow_status, [WorkflowStatus::ConceptRunning, WorkflowStatus::ImplementRunning], true);
     }
 
+    /**
+     * Whether a phase has hit the turn limit repeatedly (default ≥2 runs ended
+     * with error_max_turns). A signal that the agent is not converging — the
+     * task is likely too broad or the budget too small — so the UI can nudge
+     * the user to narrow the task / raise max-turns instead of blindly
+     * resuming again.
+     */
+    public function hasRepeatedMaxTurns(string $phase, int $threshold = 2): bool
+    {
+        return $this->phaseRuns()
+            ->where('phase', $phase)
+            ->where('stop_reason', 'error_max_turns')
+            ->count() >= $threshold;
+    }
+
     public function displayStatusLabel(): string
     {
         if ($this->isWaitingForWorker()) {

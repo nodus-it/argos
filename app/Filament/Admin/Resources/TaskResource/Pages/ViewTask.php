@@ -422,7 +422,10 @@ class ViewTask extends ViewRecord
             ->color('warning')
             ->disabled(fn (): bool => $this->task()->current_status === PhaseStatus::Running)
             ->modalHeading(__('tasks.view.actions.continue_heading'))
-            ->modalDescription(__('tasks.view.actions.continue_description'))
+            ->modalDescription(fn (): string => __('tasks.view.actions.continue_description')
+                .($this->task()->hasRepeatedMaxTurns('implement')
+                    ? "\n\n".__('tasks.view.actions.max_turns_repeated_hint')
+                    : ''))
             ->modalSubmitActionLabel(__('tasks.view.actions.continue'))
             ->schema([
                 TextInput::make('max_turns')
@@ -463,7 +466,10 @@ class ViewTask extends ViewRecord
             ->color('warning')
             ->disabled(fn (): bool => $this->task()->current_status === PhaseStatus::Running)
             ->modalHeading(__('tasks.view.actions.continue_concept_heading'))
-            ->modalDescription(__('tasks.view.actions.continue_concept_description'))
+            ->modalDescription(fn (): string => __('tasks.view.actions.continue_concept_description')
+                .($this->task()->hasRepeatedMaxTurns('concept')
+                    ? "\n\n".__('tasks.view.actions.max_turns_repeated_hint')
+                    : ''))
             ->modalSubmitActionLabel(__('tasks.view.actions.continue_concept'))
             ->schema([
                 TextInput::make('max_turns')
