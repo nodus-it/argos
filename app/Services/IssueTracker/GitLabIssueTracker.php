@@ -100,6 +100,15 @@ class GitLabIssueTracker implements IssueTrackerContract
             ->json();
     }
 
+    public function closeIssue(string $owner, string $project, int|string $issueNumber): void
+    {
+        $projectPath = $this->encodePath($owner, $project);
+
+        $this->http()
+            ->put("/projects/{$projectPath}/issues/{$issueNumber}", ['state_event' => 'close'])
+            ->throw();
+    }
+
     public function commentId(array $createResult): ?string
     {
         $id = $createResult['id'] ?? null;

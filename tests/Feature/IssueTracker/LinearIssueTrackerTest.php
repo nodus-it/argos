@@ -24,6 +24,26 @@ class LinearIssueTrackerTest extends TestCase
         $this->tracker = new LinearIssueTracker('lin_api_test_token');
     }
 
+    public function test_close_issue_moves_to_completed_workflow_state(): void
+    {
+        Http::fake([
+            self::GRAPHQL_URL => Http::sequence()
+                ->push(['data' => ['issue' => ['team' => ['states' => ['nodes' => [['id' => 'state-done-1']]]]]]])
+                ->push(['data' => ['issueUpdate' => ['success' => true]]]),
+        ]);
+
+        $this->tracker->closeIssue('', '', 'issue-uuid-1');
+
+        Http::assertSentCount(2);
+        Http::assertSent(function ($request): bool {
+            $body = json_decode($request->body(), true);
+
+            return str_contains((string) ($body['query'] ?? ''), 'issueUpdate')
+                && ($body['variables']['id'] ?? null) === 'issue-uuid-1'
+                && ($body['variables']['stateId'] ?? null) === 'state-done-1';
+        });
+    }
+
     // ── listIssues ───────────────────────────────────────────────────────────
 
     public function test_list_issues_resolves_team_and_returns_normalized_issues(): void

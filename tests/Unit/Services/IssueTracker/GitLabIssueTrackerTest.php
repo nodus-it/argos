@@ -10,6 +10,19 @@ use Tests\TestCase;
 
 class GitLabIssueTrackerTest extends TestCase
 {
+    public function test_close_issue_sends_state_event_close(): void
+    {
+        Http::fake([
+            'https://gitlab.com/api/v4/projects/*' => Http::response([], 200),
+        ]);
+
+        (new GitLabIssueTracker('glpat-tok'))->closeIssue('acme', 'widget', 42);
+
+        Http::assertSent(fn ($r): bool => $r->method() === 'PUT'
+            && str_contains($r->url(), '/issues/42')
+            && $r['state_event'] === 'close');
+    }
+
     public function test_list_references_maps_path_with_namespace_to_ref_options(): void
     {
         Http::fake([

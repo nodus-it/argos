@@ -17,6 +17,7 @@ use App\Events\Task\TaskCreated;
 use App\Events\Task\TaskDeleted;
 use App\Jobs\RunPhaseJob;
 use App\Models\Task;
+use App\Services\IssueTracker\IssueStatusSync;
 use App\Services\Workflow\PhaseRunner;
 use App\Services\Workflow\WorkflowService;
 use Illuminate\Support\Collection;
@@ -181,6 +182,7 @@ class TaskService
     public function markCompleted(Task $task): void
     {
         $task->update(['workflow_status' => WorkflowStatus::Completed]);
+        app(IssueStatusSync::class)->closeSourceIssue($task);
         Process::run(['docker', 'volume', 'rm', $task->volumeName()]);
         Event::dispatch(new TaskCompleted($task));
     }
