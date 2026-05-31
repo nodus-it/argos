@@ -489,4 +489,31 @@ class TaskServiceTest extends TestCase
 
         Event::assertDispatched(PhaseCompleted::class, fn ($e) => $e->status === PhaseStatus::Failed);
     }
+
+    // ── find (used by MCP via InteractsWithTasks) ──────────────────────────────
+
+    public function test_find_by_name(): void
+    {
+        $task = Task::factory()->create(['name' => 'search-me']);
+
+        $found = $this->service->find('search-me');
+
+        $this->assertNotNull($found);
+        $this->assertSame($task->id, $found->id);
+    }
+
+    public function test_find_by_id(): void
+    {
+        $task = Task::factory()->create();
+
+        $found = $this->service->find($task->id);
+
+        $this->assertNotNull($found);
+        $this->assertSame($task->id, $found->id);
+    }
+
+    public function test_find_returns_null_for_unknown(): void
+    {
+        $this->assertNull($this->service->find('nonexistent'));
+    }
 }

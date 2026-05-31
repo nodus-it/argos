@@ -16,7 +16,6 @@ return [
     // :stage image at build time; `?:` (not the 2nd arg) so an *empty*
     // ARGOS_VERSION — what release images carry — falls back to the literal.
     'version' => env('ARGOS_VERSION') ?: $argosVersion,
-    'repo_root' => env('ARGOS_REPO_ROOT', dirname(__DIR__)),
     /*
      * AGPL-3.0 §13 source-offer URL. Every running instance must point users
      * to the corresponding source. For unmodified deployments this is the

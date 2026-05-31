@@ -20,7 +20,6 @@ use App\Models\Task;
 use App\Services\IssueTracker\IssueStatusSync;
 use App\Services\Workflow\PhaseRunner;
 use App\Services\Workflow\WorkflowService;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Process;
 
@@ -255,29 +254,12 @@ class TaskService
         Event::dispatch(new PhaseCompleted($task, Phase::from($phase), $status));
     }
 
-    // ── Legacy methods kept for backward compatibility (CLI, MCP) ─────────────
-
-    public function create(array $data): Task
-    {
-        return Task::create([
-            'name' => $data['name'],
-            'repo_profile_id' => $data['repo_profile_id'] ?? null,
-            'description' => $data['description'],
-        ]);
-    }
-
-    public function list(): Collection
-    {
-        return Task::with('repoProfile')->get();
-    }
-
+    /**
+     * Resolve a task by its name or ULID. Used by the MCP tools via
+     * InteractsWithTasks to turn a user-supplied reference into a Task.
+     */
     public function find(string $nameOrId): ?Task
     {
         return Task::where('name', $nameOrId)->orWhere('id', $nameOrId)->first();
-    }
-
-    public function delete(Task $task): void
-    {
-        $task->delete();
     }
 }

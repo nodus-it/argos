@@ -32,7 +32,8 @@ class IssueCommentNotifierTest extends TestCase
 
         $notifier->notifyPhaseCompletion($task, 'implement', 'completed');
 
-        $this->assertTrue(true);
+        // No external link → the registry is never asked to build a tracker.
+        // The shouldNotReceive('make') expectation above is the assertion.
     }
 
     public function test_posts_comment_when_link_exists(): void
