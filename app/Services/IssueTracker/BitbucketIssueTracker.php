@@ -100,6 +100,13 @@ class BitbucketIssueTracker implements IssueTrackerContract
             ->json();
     }
 
+    public function closeIssue(string $owner, string $project, int|string $issueNumber): void
+    {
+        $this->http()
+            ->put("/repositories/{$owner}/{$project}/issues/{$issueNumber}", ['state' => 'resolved'])
+            ->throw();
+    }
+
     // Bitbucket is not wired as a task issue-provider (no TaskProviderKind),
     // so the 👍-approval flow does not apply — these satisfy the contract.
 

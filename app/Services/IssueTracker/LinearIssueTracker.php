@@ -119,6 +119,36 @@ class LinearIssueTracker implements IssueTrackerContract
         return $result['data']['commentCreate'] ?? [];
     }
 
+    public function closeIssue(string $owner, string $project, int|string $issueNumber): void
+    {
+        // Linear has no generic "closed" flag — move the issue to the first
+        // completed-type workflow state of its team.
+        $states = $this->graphql('
+            query CompletedState($id: String!) {
+                issue(id: $id) {
+                    team {
+                        states(filter: { type: { eq: "completed" } }) {
+                            nodes { id }
+                        }
+                    }
+                }
+            }
+        ', ['id' => (string) $issueNumber]);
+
+        $stateId = $states['data']['issue']['team']['states']['nodes'][0]['id'] ?? null;
+        if (! is_string($stateId) || $stateId === '') {
+            throw new RuntimeException("No completed workflow state found for Linear issue: {$issueNumber}");
+        }
+
+        $this->graphql('
+            mutation CloseIssue($id: String!, $stateId: String!) {
+                issueUpdate(id: $id, input: { stateId: $stateId }) {
+                    success
+                }
+            }
+        ', ['id' => (string) $issueNumber, 'stateId' => $stateId]);
+    }
+
     public function commentId(array $createResult): ?string
     {
         $id = $createResult['comment']['id'] ?? null;

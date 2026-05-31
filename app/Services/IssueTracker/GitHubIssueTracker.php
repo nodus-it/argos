@@ -101,6 +101,16 @@ class GitHubIssueTracker implements IssueTrackerContract
             ->json();
     }
 
+    public function closeIssue(string $owner, string $project, int|string $issueNumber): void
+    {
+        $this->http()
+            ->patch("/repos/{$owner}/{$project}/issues/{$issueNumber}", [
+                'state' => 'closed',
+                'state_reason' => 'completed',
+            ])
+            ->throw();
+    }
+
     public function commentId(array $createResult): ?string
     {
         $id = $createResult['id'] ?? null;

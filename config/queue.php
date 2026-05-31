@@ -15,12 +15,26 @@ return [
             'driver' => 'sync',
         ],
 
+        // retry_after MUST exceed the longest job timeout (RunPhaseJob::$timeout
+        // = 3600s). With the Laravel default of 90s the queue re-reserves a
+        // still-running phase after 90s → Horizon re-attempts it → tries=1 →
+        // "RunPhaseJob has been attempted too many times", the task is marked
+        // failed while the worker container keeps running. 3900 > 3600 + headroom.
         'database' => [
             'driver' => 'database',
             'connection' => null,
             'table' => 'jobs',
             'queue' => 'default',
-            'retry_after' => 90,
+            'retry_after' => 3900,
+            'after_commit' => false,
+        ],
+
+        'redis' => [
+            'driver' => 'redis',
+            'connection' => env('REDIS_QUEUE_CONNECTION', 'default'),
+            'queue' => env('REDIS_QUEUE', 'default'),
+            'retry_after' => 3900,
+            'block_for' => null,
             'after_commit' => false,
         ],
 

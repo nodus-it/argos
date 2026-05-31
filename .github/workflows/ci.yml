@@ -164,6 +164,18 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=stage,enable=${{ github.ref == 'refs/heads/develop' }}
 
+      - name: Compute version build-arg
+        id: ver
+        run: |
+          # Only :stage (develop) images get a build-time version stamp; on
+          # release tags we leave it empty so the sed-bumped $argosVersion
+          # literal in config/argos.php is used instead.
+          if [ "${{ github.ref }}" = "refs/heads/develop" ]; then
+            echo "value=stage-$(date -u +%Y-%m-%d)-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Build and push app image
         uses: docker/build-push-action@v7
         with:
@@ -171,6 +183,8 @@ jobs:
           file: .tools/docker/app/Dockerfile
           target: app
           push: true
+          build-args: |
+            ARGOS_VERSION=${{ steps.ver.outputs.value }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha

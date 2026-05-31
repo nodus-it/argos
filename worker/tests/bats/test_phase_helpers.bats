@@ -127,6 +127,24 @@ teardown() {
     [ -z "$output" ]
 }
 
+# --- quality_ensure_vite_hot ---
+
+@test "quality_ensure_vite_hot: kein public/hot → wird mit Stub-URL angelegt" {
+    rm -rf /workspace/public
+    quality_ensure_vite_hot >/dev/null 2>&1
+    [ -f /workspace/public/hot ]
+    grep -q 'http' /workspace/public/hot
+    rm -rf /workspace/public
+}
+
+@test "quality_ensure_vite_hot: existierende public/hot wird nicht überschrieben" {
+    mkdir -p /workspace/public
+    printf 'http://user-set:1234' > /workspace/public/hot
+    quality_ensure_vite_hot >/dev/null 2>&1
+    grep -q 'user-set:1234' /workspace/public/hot
+    rm -rf /workspace/public
+}
+
 # --- quality_ensure_workspace_dotenv ---
 
 @test "quality_ensure_workspace_dotenv: kein workspace/.env, kein .env.example → leere .env angelegt" {

@@ -53,7 +53,11 @@ class PhaseRunner
             '-v', $task->volumeName().':/workspace',
             'alpine',
             'sh', '-c',
-            'mkdir -p /workspace/.agent && cat > /workspace/.agent/concept.notes.md',
+            // chown last: this alpine helper runs as root and is often the FIRST
+            // mount of a fresh volume — without handing /workspace back to the
+            // worker's uid (1000), the agent container (USER agent) can't mkdir
+            // inside it and the phase dies with "Permission denied".
+            'mkdir -p /workspace/.agent && cat > /workspace/.agent/concept.notes.md && chown -R 1000:1000 /workspace',
         ]);
         $process->setInput($notes);
         $process->setTimeout(10);
@@ -78,7 +82,8 @@ class PhaseRunner
             '-v', $task->volumeName().':/workspace',
             'alpine',
             'sh', '-c',
-            'mkdir -p /workspace/.agent && cat > /workspace/.agent/implement.notes.md',
+            // chown last — see writeNotesToVolume().
+            'mkdir -p /workspace/.agent && cat > /workspace/.agent/implement.notes.md && chown -R 1000:1000 /workspace',
         ]);
         $process->setInput($notes);
         $process->setTimeout(10);
@@ -440,7 +445,8 @@ SH;
             '-e', 'FEEDBACK',
             'alpine',
             'sh', '-c',
-            'mkdir -p /workspace/.agent && printf "%s" "$FEEDBACK" > /workspace/.agent/respond.feedback.md',
+            // chown last — see writeNotesToVolume().
+            'mkdir -p /workspace/.agent && printf "%s" "$FEEDBACK" > /workspace/.agent/respond.feedback.md && chown -R 1000:1000 /workspace',
         ]);
 
         $process->setEnv(['FEEDBACK' => $feedback]);

@@ -54,8 +54,11 @@ _implement_setup_toolchain() {
     # Seed .env before composer install: post-autoload-dump runs
     # package:discover, which boots the target Laravel app. Without .env
     # vlucas/phpdotenv logs a "Failed to open" warning that ends up in the
-    # composer log AND later in every pest run.
+    # composer log AND later in every pest run. The Vite hot stub keeps apps
+    # that touch Vite in boot() from aborting package:discover (no built assets
+    # in the worker → no manifest).
     quality_ensure_workspace_dotenv
+    quality_ensure_vite_hot
 
     if [[ -f /workspace/composer.json ]]; then
         log_info "implement: composer install"

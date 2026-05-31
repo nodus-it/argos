@@ -55,6 +55,20 @@ class TaskServiceTest extends TestCase
         $this->assertNotNull($task->id);
     }
 
+    public function test_create_task_chowns_the_volume_to_the_worker_uid(): void
+    {
+        Event::fake();
+
+        $task = $this->service->createTask(['name' => 'owned-task', 'description' => 'x']);
+
+        Process::assertRan(function ($process) use ($task): bool {
+            $cmd = is_array($process->command) ? implode(' ', $process->command) : (string) $process->command;
+
+            return str_contains($cmd, 'chown -R 1000:1000 /workspace')
+                && str_contains($cmd, $task->volumeName());
+        });
+    }
+
     public function test_create_task_fires_task_created_event(): void
     {
         Event::fake();

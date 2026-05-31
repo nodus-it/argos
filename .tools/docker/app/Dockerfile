@@ -127,6 +127,13 @@ ENV DB_CONNECTION=mariadb \
     SESSION_DRIVER=database \
     CACHE_STORE=database
 
+# Optional build-time version stamp. CI passes a `stage-<date>-<sha>` string
+# for :stage (develop) images so they stop masquerading as the last release;
+# release builds leave it empty and config/argos.php falls back to the
+# $argosVersion literal. Kept last so the changing value only busts this layer.
+ARG ARGOS_VERSION=
+ENV ARGOS_VERSION=${ARGOS_VERSION}
+
 EXPOSE 9000
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

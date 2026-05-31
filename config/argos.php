@@ -9,10 +9,13 @@ declare(strict_types=1);
  * matches the git tag that ships the same commit. Local/develop builds keep
  * '0.0.0-dev' and use floating worker tags (no version pinning).
  */
-$argosVersion = '0.1.0-beta.3';
+$argosVersion = '0.1.0-beta.4';
 
 return [
-    'version' => env('ARGOS_VERSION', $argosVersion),
+    // env() wins so CI can bake a `stage-<date>-<sha>` version into the
+    // :stage image at build time; `?:` (not the 2nd arg) so an *empty*
+    // ARGOS_VERSION — what release images carry — falls back to the literal.
+    'version' => env('ARGOS_VERSION') ?: $argosVersion,
     'repo_root' => env('ARGOS_REPO_ROOT', dirname(__DIR__)),
     /*
      * AGPL-3.0 §13 source-offer URL. Every running instance must point users
@@ -72,7 +75,7 @@ return [
         'default_stack' => env('ARGOS_DEFAULT_STACK', 'php-8.4'),
     ],
     'concept' => [
-        'max_turns_default' => (int) env('ARGOS_CONCEPT_MAX_TURNS_DEFAULT', 30),
+        'max_turns_default' => (int) env('ARGOS_CONCEPT_MAX_TURNS_DEFAULT', 50),
     ],
     'implement' => [
         'max_turns_default' => (int) env('ARGOS_MAX_TURNS_DEFAULT', 200),

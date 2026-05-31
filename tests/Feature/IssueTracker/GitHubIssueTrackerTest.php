@@ -18,6 +18,20 @@ class GitHubIssueTrackerTest extends TestCase
         $this->tracker = new GitHubIssueTracker('ghp_test_token');
     }
 
+    public function test_close_issue_patches_state_to_closed_completed(): void
+    {
+        Http::fake([
+            'https://api.github.com/repos/acme/widget/issues/42' => Http::response([], 200),
+        ]);
+
+        $this->tracker->closeIssue('acme', 'widget', 42);
+
+        Http::assertSent(fn ($r): bool => $r->method() === 'PATCH'
+            && str_starts_with($r->url(), 'https://api.github.com/repos/acme/widget/issues/42')
+            && $r['state'] === 'closed'
+            && $r['state_reason'] === 'completed');
+    }
+
     // ── listReferences ───────────────────────────────────────────────────────
 
     public function test_list_references_maps_full_names_to_ref_options(): void

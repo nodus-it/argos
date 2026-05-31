@@ -51,6 +51,14 @@ interface IssueTrackerContract
     public function commentId(array $createResult): ?string;
 
     /**
+     * Close / resolve the source issue — the outbound status-sync that fires
+     * when an Argos task is marked completed. Providers map this to their
+     * native "done" state (GitHub/GitLab close, Bitbucket resolved, Linear's
+     * first completed-type workflow state).
+     */
+    public function closeIssue(string $owner, string $project, int|string $issueNumber): void;
+
+    /**
      * Reactions on a comment, normalised to a list of
      * ['emoji' => string, 'user_id' => string, 'user_login' => string].
      * The issue id is required because some providers (GitLab) address a
