@@ -192,7 +192,13 @@ class PhaseRunner
             // On failure, surface the CLI's stderr (where auth errors land)
             // in error_log so the UI can show a precise reason instead of
             // just "exit 1". Skip when error_log was already populated.
-            if ($phaseRun->status !== PhaseStatus::Completed && $phaseRun->fresh()->error_log === null) {
+            // fresh() may be null if the row was removed concurrently (e.g. a
+            // job re-attempt cleaning up after a kill) — guard against it, which
+            // previously crashed with "read property error_log on null".
+            $freshRun = $phaseRun->fresh();
+            if ($freshRun !== null
+                && $freshRun->status !== PhaseStatus::Completed
+                && $freshRun->error_log === null) {
                 $stderrPath = "/workspace/.agent/logs/{$phase}.{$phaseRun->iteration}.stderr.log";
                 $stderrLog = $this->readFileFromVolume($task->volumeName(), $stderrPath);
                 if ($stderrLog !== null && trim($stderrLog) !== '') {
