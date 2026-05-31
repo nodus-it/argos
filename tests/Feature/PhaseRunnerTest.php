@@ -1158,6 +1158,70 @@ class PhaseRunnerTest extends TestCase
     }
 
     /**
+     * Volume writers hand /workspace back to the agent uid (1000).
+     *
+     * Regression: the alpine note/feedback writers run as root and are often the
+     * first mount of a fresh volume; without the trailing chown the agent worker
+     * (USER agent / uid 1000) failed with "mkdir .../claude-state: Permission denied".
+     */
+    public function test_write_notes_to_volume_chowns_workspace_to_agent_uid(): void
+    {
+        $cmd = $this->captureWriterCommand(function (PhaseRunner $runner): void {
+            $runner->writeNotesToVolume(Task::factory()->create(['concept_notes' => 'the plan']));
+        });
+
+        $this->assertStringContainsString('chown -R 1000:1000 /workspace', (string) end($cmd));
+    }
+
+    public function test_write_implement_notes_to_volume_chowns_workspace_to_agent_uid(): void
+    {
+        $cmd = $this->captureWriterCommand(function (PhaseRunner $runner): void {
+            $runner->writeImplementNotesToVolume(Task::factory()->create(['implement_notes' => 'the notes']));
+        });
+
+        $this->assertStringContainsString('chown -R 1000:1000 /workspace', (string) end($cmd));
+    }
+
+    public function test_write_feedback_to_volume_chowns_workspace_to_agent_uid(): void
+    {
+        $cmd = $this->captureWriterCommand(function (PhaseRunner $runner): void {
+            $runner->writeFeedbackToVolume(Task::factory()->create(), 'looks good');
+        });
+
+        $this->assertStringContainsString('chown -R 1000:1000 /workspace', (string) end($cmd));
+    }
+
+    /**
+     * Run a volume-writer through a PhaseRunner whose newProcess is stubbed, and
+     * return the docker command array it built.
+     *
+     * @return array<int, string>
+     */
+    private function captureWriterCommand(\Closure $invoke): array
+    {
+        $captured = [];
+
+        $runner = $this->partialMock(PhaseRunner::class, function (MockInterface $mock) use (&$captured): void {
+            $mock->shouldAllowMockingProtectedMethods();
+            $mock->shouldReceive('newProcess')->andReturnUsing(function (array $cmd) use (&$captured): Process {
+                $captured = $cmd;
+                $proc = Mockery::mock(Process::class);
+                $proc->shouldReceive('setInput')->andReturnSelf();
+                $proc->shouldReceive('setEnv')->andReturnSelf();
+                $proc->shouldReceive('setTimeout')->andReturnSelf();
+                $proc->shouldReceive('run')->andReturn(0);
+                $proc->shouldReceive('mustRun')->andReturnSelf();
+
+                return $proc;
+            });
+        });
+
+        $invoke($runner);
+
+        return $captured;
+    }
+
+    /**
      * @param  array<string, mixed>  $profileAttributes
      */
     private function taskWithProfile(array $profileAttributes = []): Task
