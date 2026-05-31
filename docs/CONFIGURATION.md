@@ -36,6 +36,7 @@ All Argos configuration is controlled via environment variables passed to the
 | `ARGOS_DEFAULT_STACK` | `php-8.4` | Slug of the worker stack used when neither the task nor the project pins one. Must match a row in `worker_stacks` (built-ins are mirrored on `migrate`). |
 | `ARGOS_MEM_LIMIT` | `4g` | Memory limit per worker container. |
 | `ARGOS_CPU_LIMIT` | `2` | CPU limit per worker container. |
+| `ARGOS_CONCEPT_MAX_TURNS_DEFAULT` | `50` | Default max-turns for the concept phase (overridable per task). max-turns is a ceiling, not a budget — well-scoped tasks finish early regardless; large repos need the headroom to explore *and* write. |
 | `ARGOS_MAX_TURNS_DEFAULT` | `200` | Default max-turns for the implement phase (overridable per task). |
 | `ARGOS_CONFIG_DIR` | `~/.config/argos` | Persisted config / SQLite path inside the manager. |
 

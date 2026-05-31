@@ -75,7 +75,7 @@ return [
         'default_stack' => env('ARGOS_DEFAULT_STACK', 'php-8.4'),
     ],
     'concept' => [
-        'max_turns_default' => (int) env('ARGOS_CONCEPT_MAX_TURNS_DEFAULT', 30),
+        'max_turns_default' => (int) env('ARGOS_CONCEPT_MAX_TURNS_DEFAULT', 50),
     ],
     'implement' => [
         'max_turns_default' => (int) env('ARGOS_MAX_TURNS_DEFAULT', 200),
