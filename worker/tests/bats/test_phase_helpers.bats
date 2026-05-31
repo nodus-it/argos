@@ -130,6 +130,7 @@ teardown() {
 # --- quality_pest_new_failures ---
 
 @test "quality_pest_new_failures: nur neue Failures vs. Baseline werden gemeldet" {
+    command -v php >/dev/null 2>&1 || skip "php not available in bats env (the worker image has it)"
     cat > /workspace/.agent/base.xml <<'X'
 <testsuites><testsuite name="s">
 <testcase name="old fails" classname="OldTest"><failure>x</failure></testcase>
@@ -149,6 +150,7 @@ X
 }
 
 @test "quality_pest_new_failures: fehlende Baseline → alle Failures (strict)" {
+    command -v php >/dev/null 2>&1 || skip "php not available in bats env (the worker image has it)"
     cat > /workspace/.agent/cur.xml <<'X'
 <testsuites><testsuite name="s">
 <testcase name="a fails" classname="AT"><failure>x</failure></testcase>
