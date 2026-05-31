@@ -12,7 +12,10 @@ declare(strict_types=1);
 $argosVersion = '0.1.0-beta.3';
 
 return [
-    'version' => env('ARGOS_VERSION', $argosVersion),
+    // env() wins so CI can bake a `stage-<date>-<sha>` version into the
+    // :stage image at build time; `?:` (not the 2nd arg) so an *empty*
+    // ARGOS_VERSION — what release images carry — falls back to the literal.
+    'version' => env('ARGOS_VERSION') ?: $argosVersion,
     'repo_root' => env('ARGOS_REPO_ROOT', dirname(__DIR__)),
     /*
      * AGPL-3.0 §13 source-offer URL. Every running instance must point users
