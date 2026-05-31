@@ -12,6 +12,8 @@
     "sail": false,
     "skills": [
         "laravel-best-practices",
+        "configuring-horizon",
+        "passport-development",
         "socialite-development",
         "pest-testing",
         "tailwindcss-development",

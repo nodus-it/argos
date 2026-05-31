@@ -56,6 +56,8 @@ RUN set -eux; \
         zip \
         bcmath \
         gd \
+        pcntl \
+        posix \
         opcache; \
     docker-php-ext-enable opcache
 

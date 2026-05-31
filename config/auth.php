@@ -2,7 +2,8 @@
 
 use App\Models\User;
 
-// Single-user-model app with one session guard — no ENVs needed.
+// Single-user-model app. The session `web` guard drives Filament; the
+// Passport-backed `api` guard authenticates the MCP server (scope `mcp:use`).
 
 return [
 
@@ -14,6 +15,11 @@ return [
     'guards' => [
         'web' => [
             'driver' => 'session',
+            'provider' => 'users',
+        ],
+
+        'api' => [
+            'driver' => 'passport',
             'provider' => 'users',
         ],
     ],

@@ -88,6 +88,7 @@ services:
       APP_DEBUG:                         "${APP_DEBUG:-true}"
       APP_KEY:                           "${APP_KEY:-}"
       ARGOS_CONFIG_DIR:                  /data/config
+      PASSPORT_KEYS_PATH:                /data/passport
       DB_CONNECTION:                     "mariadb"
       ARGOS_DB_HOST:                     "db"
       ARGOS_DB_PORT:                     "3306"
@@ -163,6 +164,7 @@ services:
       APP_DEBUG:                         "${APP_DEBUG:-true}"
       APP_KEY:                           "${APP_KEY:-}"
       ARGOS_CONFIG_DIR:                  /data/config
+      PASSPORT_KEYS_PATH:                /data/passport
       DB_CONNECTION:                     "mariadb"
       ARGOS_DB_HOST:                     "db"
       ARGOS_DB_PORT:                     "3306"
@@ -198,6 +200,7 @@ services:
       APP_DEBUG:                "${APP_DEBUG:-true}"
       APP_KEY:                  "${APP_KEY:-}"
       ARGOS_CONFIG_DIR:         /data/config
+      PASSPORT_KEYS_PATH:       /data/passport
       DB_CONNECTION:            "mariadb"
       ARGOS_DB_HOST:            "db"
       ARGOS_DB_PORT:            "3306"
