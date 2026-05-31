@@ -195,6 +195,30 @@ class WorkerImageResolverTest extends TestCase
         }
     }
 
+    public function test_default_worker_lib_paths_all_exist(): void
+    {
+        // Guards against the fingerprint hashing a stale path (e.g. a removed
+        // dockerfile): a missing path contributes nothing to the hash, so a
+        // typo silently disables cache invalidation for the file it meant to
+        // track. Every default path must resolve to a real file or directory.
+        $resolver = new class($this->builder) extends WorkerImageResolver
+        {
+            /** @return list<string> */
+            public function exposedWorkerLibPaths(): array
+            {
+                return $this->workerLibPaths();
+            }
+        };
+
+        foreach ($resolver->exposedWorkerLibPaths() as $rel) {
+            $abs = base_path($rel);
+            $this->assertTrue(
+                is_file($abs) || is_dir($abs),
+                "workerLibPaths() references a non-existent path: {$rel}"
+            );
+        }
+    }
+
     public function test_worker_lib_fingerprint_is_deterministic(): void
     {
         $rel = 'storage/framework/testing/wir-'.bin2hex(random_bytes(4));

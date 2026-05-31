@@ -128,8 +128,9 @@ class WorkerImageResolver
 
     /**
      * Source paths whose content gets baked into the worker image — must
-     * mirror the COPY directives in .tools/docker/worker/Dockerfile. Override
-     * in tests that need to feed a synthetic tree.
+     * mirror the COPY directives in .tools/docker/worker/Dockerfile.compose
+     * (the dockerfile WorkerImageBuilder actually builds). Override in tests
+     * that need to feed a synthetic tree.
      *
      * @return list<string> repo-relative paths (file or directory)
      */
@@ -141,7 +142,7 @@ class WorkerImageResolver
             'worker/prompts',
             'worker/schemas',
             '.tools/docker/worker/worker-entrypoint.sh',
-            '.tools/docker/worker/Dockerfile',
+            '.tools/docker/worker/Dockerfile.compose',
         ];
     }
 
