@@ -422,7 +422,10 @@ class ViewTask extends ViewRecord
             ->color('warning')
             ->disabled(fn (): bool => $this->task()->current_status === PhaseStatus::Running)
             ->modalHeading(__('tasks.view.actions.continue_heading'))
-            ->modalDescription(__('tasks.view.actions.continue_description'))
+            ->modalDescription(fn (): string => __('tasks.view.actions.continue_description')
+                .($this->task()->hasRepeatedMaxTurns('implement')
+                    ? "\n\n".__('tasks.view.actions.max_turns_repeated_hint')
+                    : ''))
             ->modalSubmitActionLabel(__('tasks.view.actions.continue'))
             ->schema([
                 TextInput::make('max_turns')
@@ -433,6 +436,7 @@ class ViewTask extends ViewRecord
                     ->maxValue(1000)
                     ->required()
                     ->default(fn (): int => $this->task()->max_turns_implement
+                        ?? $this->task()->repoProfile?->max_turns_implement
                         ?? (int) config('argos.implement.max_turns_default', 200)),
             ])
             ->action(function (array $data): void {
@@ -462,7 +466,10 @@ class ViewTask extends ViewRecord
             ->color('warning')
             ->disabled(fn (): bool => $this->task()->current_status === PhaseStatus::Running)
             ->modalHeading(__('tasks.view.actions.continue_concept_heading'))
-            ->modalDescription(__('tasks.view.actions.continue_concept_description'))
+            ->modalDescription(fn (): string => __('tasks.view.actions.continue_concept_description')
+                .($this->task()->hasRepeatedMaxTurns('concept')
+                    ? "\n\n".__('tasks.view.actions.max_turns_repeated_hint')
+                    : ''))
             ->modalSubmitActionLabel(__('tasks.view.actions.continue_concept'))
             ->schema([
                 TextInput::make('max_turns')
@@ -473,7 +480,8 @@ class ViewTask extends ViewRecord
                     ->maxValue(1000)
                     ->required()
                     ->default(fn (): int => $this->task()->max_turns_concept
-                        ?? (int) config('argos.concept.max_turns_default', 30)),
+                        ?? $this->task()->repoProfile?->max_turns_concept
+                        ?? (int) config('argos.concept.max_turns_default', 50)),
             ])
             ->action(function (array $data): void {
                 $task = $this->task();

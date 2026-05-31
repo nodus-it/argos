@@ -76,6 +76,12 @@ _implement_setup_toolchain() {
             return 1
         fi
     fi
+
+    # Snapshot which tests are already red on the pristine checkout (before the
+    # agent edits anything) so the quality gate only blocks on regressions, not
+    # on the target repo's pre-existing failures. Idempotent across iterations.
+    quality_pest_baseline_capture
+
     return 0
 }
 

@@ -441,6 +441,26 @@ class RepoProfileResource extends Resource
                                         ))
                                         ->live()
                                         ->native(false),
+
+                                    TextInput::make('max_turns_concept')
+                                        ->label(__('projects.fields.max_turns_concept_label'))
+                                        ->helperText(__('projects.fields.max_turns_concept_helper', [
+                                            'default' => (int) config('argos.concept.max_turns_default', 50),
+                                        ]))
+                                        ->numeric()
+                                        ->minValue(10)
+                                        ->maxValue(1000)
+                                        ->nullable(),
+
+                                    TextInput::make('max_turns_implement')
+                                        ->label(__('projects.fields.max_turns_implement_label'))
+                                        ->helperText(__('projects.fields.max_turns_implement_helper', [
+                                            'default' => (int) config('argos.implement.max_turns_default', 200),
+                                        ]))
+                                        ->numeric()
+                                        ->minValue(10)
+                                        ->maxValue(1000)
+                                        ->nullable(),
                                 ]),
                         ]),  // ↑ end of "Worker" tab
                 ]),  // ↑ end of Tabs::make()

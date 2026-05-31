@@ -66,6 +66,10 @@ return [
         'model_implement_placeholder' => 'Default: :model',
         'model_implement_helper' => 'Model for the implement phase. Options depend on the chosen agent. Leave empty for the agent default.',
         'model_implement_helper_with_default' => 'Model for the implement phase. Leave empty to use the agent default (:model).',
+        'max_turns_concept_label' => 'Concept max-turns',
+        'max_turns_concept_helper' => 'Turn budget for the concept phase on this project. Leave empty for the global default (:default). A task can still override this.',
+        'max_turns_implement_label' => 'Implement max-turns',
+        'max_turns_implement_helper' => 'Turn budget for the implement phase on this project. Leave empty for the global default (:default). A task can still override this.',
     ],
 
     'infolist' => [

@@ -224,6 +224,7 @@ return [
             'continue_concept' => 'Continue concept',
             'continue_concept_heading' => 'Continue concept',
             'continue_concept_description' => 'The concept run was stopped due to the turn limit. The session will be continued with full context and the concept finalised.',
+            'max_turns_repeated_hint' => 'Heads-up: this phase has hit the turn limit several times — it may not be converging. Consider narrowing the task or raising max-turns substantially instead of just resuming again.',
             'concept_create' => 'Create Concept',
             'concept_update' => 'Update Concept',
             'implement' => 'Implement',

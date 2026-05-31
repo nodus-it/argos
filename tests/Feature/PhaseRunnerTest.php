@@ -507,6 +507,29 @@ class PhaseRunnerTest extends TestCase
         $this->assertContains('MAX_TURNS=30', $cmd);
     }
 
+    public function test_build_command_uses_repo_profile_max_turns_when_task_has_none(): void
+    {
+        config(['argos.concept.max_turns_default' => 50]);
+        // task.max_turns_concept stays null → the repo-profile default (77) wins
+        // over the global config default (50).
+        $task = $this->taskWithProfile(['max_turns_concept' => 77]);
+
+        $cmd = $this->captureCommand($task, 'concept');
+
+        $this->assertContains('MAX_TURNS=77', $cmd);
+    }
+
+    public function test_task_max_turns_overrides_repo_profile_default(): void
+    {
+        config(['argos.concept.max_turns_default' => 50]);
+        $task = $this->taskWithProfile(['max_turns_concept' => 77]);
+        $task->update(['max_turns_concept' => 33]);
+
+        $cmd = $this->captureCommand($task, 'concept');
+
+        $this->assertContains('MAX_TURNS=33', $cmd);
+    }
+
     public function test_extract_stop_reason_returns_subtype_from_last_result_event(): void
     {
         $runner = app(PhaseRunner::class);

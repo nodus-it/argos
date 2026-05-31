@@ -192,7 +192,13 @@ class PhaseRunner
             // On failure, surface the CLI's stderr (where auth errors land)
             // in error_log so the UI can show a precise reason instead of
             // just "exit 1". Skip when error_log was already populated.
-            if ($phaseRun->status !== PhaseStatus::Completed && $phaseRun->fresh()->error_log === null) {
+            // fresh() may be null if the row was removed concurrently (e.g. a
+            // job re-attempt cleaning up after a kill) — guard against it, which
+            // previously crashed with "read property error_log on null".
+            $freshRun = $phaseRun->fresh();
+            if ($freshRun !== null
+                && $freshRun->status !== PhaseStatus::Completed
+                && $freshRun->error_log === null) {
                 $stderrPath = "/workspace/.agent/logs/{$phase}.{$phaseRun->iteration}.stderr.log";
                 $stderrLog = $this->readFileFromVolume($task->volumeName(), $stderrPath);
                 if ($stderrLog !== null && trim($stderrLog) !== '') {
@@ -888,6 +894,20 @@ SH;
 
         if ($taskOverride !== null && $taskOverride > 0) {
             return $taskOverride;
+        }
+
+        // Per-project default (task → project → global config), mirroring how
+        // modelForPhase resolves the model. Lets large repos raise the budget
+        // without bumping the global default for every project.
+        $profile = $task->repoProfile;
+        if ($profile !== null) {
+            $profileOverride = $phase === 'concept'
+                ? $profile->max_turns_concept
+                : $profile->max_turns_implement;
+
+            if ($profileOverride !== null && $profileOverride > 0) {
+                return $profileOverride;
+            }
         }
 
         $configKey = $phase === 'concept'

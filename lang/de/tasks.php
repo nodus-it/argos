@@ -224,6 +224,7 @@ return [
             'continue_concept' => 'Konzept fortsetzen',
             'continue_concept_heading' => 'Konzept fortsetzen',
             'continue_concept_description' => 'Der Konzept-Lauf wurde wegen des Turn-Limits angehalten. Die Sitzung wird mit vollem Kontext fortgesetzt und das Konzept abgeschlossen.',
+            'max_turns_repeated_hint' => 'Hinweis: Diese Phase hat das Turn-Limit mehrfach gerissen — sie konvergiert evtl. nicht. Erwäge, den Task einzugrenzen oder max-turns deutlich zu erhöhen, statt nur erneut fortzusetzen.',
             'concept_create' => 'Konzept erstellen',
             'concept_update' => 'Konzept aktualisieren',
             'implement' => 'Implement',
