@@ -9,6 +9,7 @@ use App\Enums\AuthMethod;
 use App\Enums\ClaudeModel;
 use App\Enums\GitProvider;
 use App\Enums\WorkerSource;
+use App\Enums\WorkflowStatus;
 use App\Services\OAuth\TokenRefresher;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Collection;
@@ -18,6 +19,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
+use Laravel\Sanctum\Contracts\HasApiTokens as HasApiTokensContract;
+use Laravel\Sanctum\HasApiTokens;
 
 /**
  * @property string $id
@@ -45,8 +48,11 @@ use Illuminate\Support\Carbon;
  * @property-read WorkerStack|null $workerStack
  * @property-read Collection<int, TaskProviderBinding> $taskProviderBindings
  */
-class RepoProfile extends Model
+class RepoProfile extends Model implements HasApiTokensContract
 {
+    // Project-bound Sanctum API tokens: one token = one project, fine-scoped
+    // (e.g. CI). $repoProfile->createToken('ci', ['tasks:write']).
+    use HasApiTokens;
     use HasFactory;
     use HasUlids;
 
@@ -92,6 +98,20 @@ class RepoProfile extends Model
     public function tasks(): HasMany
     {
         return $this->hasMany(Task::class);
+    }
+
+    /**
+     * Tasks that are not in a terminal workflow state — drives the API's
+     * "open_tasks" count.
+     *
+     * @return HasMany<Task, $this>
+     */
+    public function openTasks(): HasMany
+    {
+        return $this->tasks()->whereNotIn('workflow_status', [
+            WorkflowStatus::Completed->value,
+            WorkflowStatus::Failed->value,
+        ]);
     }
 
     /**
