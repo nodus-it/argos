@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Demo;
 
 use App\Enums\DemoStatus;
+use App\Models\Demo;
 use App\Models\RepoProfile;
 use App\Models\Task;
 use App\Services\Demo\DemoDeployer;
@@ -174,6 +175,31 @@ class DemoDeployerTest extends TestCase
         $this->assertStringContainsString('Demo command failed', $demo->build_log);
         // No route written for a failed demo.
         $this->assertFileDoesNotExist($this->traefikDir.'/demo-feat2.yml');
+    }
+
+    public function test_deploy_evicts_oldest_demo_when_over_concurrency_cap(): void
+    {
+        config(['argos.preview.max_concurrent' => 1]);
+        $this->fakeContract();
+        $profile = $this->profile();
+        $task = Task::factory()->for($profile, 'repoProfile')->create(['name' => 'feat4']);
+
+        // A running demo for a different task already occupies the only slot.
+        $old = Demo::factory()->live()->create();
+
+        $deployer = new FakeDemoDeployer(app(GitServiceFactory::class), [
+            ['cmd' => 'down', 'exit' => 0],   // teardown current (none yet)
+            ['cmd' => 'down', 'exit' => 0],   // evict the old demo
+            ['cmd' => 'up', 'exit' => 0],
+            ['cmd' => 'exec -T app', 'exit' => 0],   // command
+            ['cmd' => 'exec -T app', 'exit' => 0],   // health
+        ]);
+
+        $demo = $deployer->deploy($task);
+
+        $this->assertSame(DemoStatus::Live, $demo->status);
+        $this->assertSame(DemoStatus::Stopped, $old->fresh()->status);
+        $this->assertNull($old->fresh()->url);
     }
 
     public function test_deploy_fails_clearly_when_contract_missing(): void

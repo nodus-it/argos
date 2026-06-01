@@ -93,8 +93,14 @@ return [
         // per demo (Traefik mounts it read-only). Matches ARGOS_TRAEFIK_DIR in
         // docker-compose.yml.
         'traefik_dir' => env('ARGOS_TRAEFIK_DIR', '/data/traefik'),
-        // Cap on concurrently running demos.
+        // Cap on concurrently running demos. When a new deploy would exceed it,
+        // the oldest running demos of other tasks are evicted (logged) to make
+        // room. 0 disables the cap.
         'max_concurrent' => (int) env('ARGOS_PREVIEW_MAX_CONCURRENT', 10),
+        // Per-demo resource limits (separate from the worker limits — demos run
+        // alongside Argos and should stay modest).
+        'cpu_limit' => env('ARGOS_PREVIEW_CPU_LIMIT', '1.0'),
+        'memory_limit' => env('ARGOS_PREVIEW_MEM_LIMIT', '1g'),
     ],
     'concept' => [
         'max_turns_default' => (int) env('ARGOS_CONCEPT_MAX_TURNS_DEFAULT', 50),

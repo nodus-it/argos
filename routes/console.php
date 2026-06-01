@@ -29,3 +29,10 @@ Schedule::command('argos:poll-issues')
 Schedule::command('argos:check-concept-approvals')
     ->cron($pollCron)
     ->withoutOverlapping();
+
+// Tear down live demos past their TTL (preview.ttl_hours). Dispatches
+// StopDemoJob to the queue (the scheduler has no docker socket).
+// Manual trigger: `php artisan argos:cleanup-demos`.
+Schedule::command('argos:cleanup-demos')
+    ->everyFifteenMinutes()
+    ->withoutOverlapping();

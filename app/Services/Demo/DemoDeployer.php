@@ -70,6 +70,7 @@ class DemoDeployer
 
             $workDir = $this->prepareWorkDir($slug, $composeYaml, $this->buildOverrideYaml($task, $slug, $entry));
 
+            $log .= $this->enforceConcurrencyCap($task);
             $log .= $this->composeUp($project, $workDir);
             $log .= $this->runCommands($project, $entry['service'], $settings['commands'] ?? []);
             $log .= $this->probeHealth($project, $entry, $settings['health'] ?? null);
@@ -107,6 +108,49 @@ class DemoDeployer
     public function teardown(Task $task): void
     {
         $this->teardownExisting($task, $this->demoSlug($task));
+    }
+
+    /**
+     * Honour preview.max_concurrent: if running demos of OTHER tasks would push
+     * the total over the cap (counting the one we're about to start), evict the
+     * oldest ones until there is room. Evictions are logged — never silent.
+     */
+    private function enforceConcurrencyCap(Task $current): string
+    {
+        $max = (int) config('argos.preview.max_concurrent', 10);
+        if ($max <= 0) {
+            return '';
+        }
+
+        $active = Demo::query()
+            ->whereIn('status', [DemoStatus::Building->value, DemoStatus::Live->value])
+            ->where('task_id', '!=', $current->id)
+            ->orderBy('created_at')
+            ->get();
+
+        // Leave one slot for the demo we're starting.
+        $overflow = $active->count() - ($max - 1);
+        if ($overflow <= 0) {
+            return '';
+        }
+
+        $log = '';
+        foreach ($active->take($overflow) as $demo) {
+            $task = $demo->task;
+            if ($task !== null) {
+                $this->teardownExisting($task, $this->demoSlug($task));
+            }
+            $demo->update(['status' => DemoStatus::Stopped, 'url' => null]);
+
+            $log .= "[cap] evicted demo {$demo->id} (task {$demo->task_id}) to stay under max_concurrent={$max}\n";
+            Log::channel('argos')->info('Evicted demo to honour concurrency cap', [
+                'demo' => $demo->id,
+                'task' => $demo->task_id,
+                'max' => $max,
+            ]);
+        }
+
+        return $log;
     }
 
     private function teardownExisting(Task $task, string $slug): void
@@ -206,8 +250,8 @@ class DemoDeployer
                     'deploy' => [
                         'resources' => [
                             'limits' => [
-                                'cpus' => (string) config('argos.docker.cpu_limit', '2'),
-                                'memory' => (string) config('argos.docker.memory_limit', '4g'),
+                                'cpus' => (string) config('argos.preview.cpu_limit', '1.0'),
+                                'memory' => (string) config('argos.preview.memory_limit', '1g'),
                             ],
                         ],
                     ],
