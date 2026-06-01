@@ -110,13 +110,45 @@ services:
       retries: 12
       start_period: 60s
 
+  # Traefik is the single port-80 entry. It routes by Host: demo containers
+  # (started by the manager with `Host(demo-…)` labels on the argos_edge
+  # network) win; everything else falls through to nginx (the Argos app), so
+  # http://localhost:${ARGOS_PORT} keeps working locally.
+  traefik:
+    image: traefik:v3.1
+    restart: unless-stopped
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=argos_edge"
+      - "--entrypoints.web.address=:80"
+    ports:
+      - "${ARGOS_PORT:-8080}:80"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - default
+      - argos_edge
+    depends_on:
+      - nginx
+
   nginx:
     image: nginx:1.27-alpine
     restart: unless-stopped
     depends_on:
       - app
-    ports:
-      - "${ARGOS_PORT:-8080}:80"
+    networks:
+      - default
+      - argos_edge
+    labels:
+      # Catch-all fallback (priority 1) — any Host not matched by a demo router
+      # (which carry higher-priority Host rules) lands on the Argos app.
+      - "traefik.enable=true"
+      - "traefik.docker.network=argos_edge"
+      - "traefik.http.routers.argos.rule=PathPrefix(`/`)"
+      - "traefik.http.routers.argos.priority=1"
+      - "traefik.http.routers.argos.entrypoints=web"
+      - "traefik.http.services.argos.loadbalancer.server.port=80"
     volumes:
       # Read-only bind mount: nginx only needs /app/public for static files and
       # the Vite build output. The app service owns writes.
@@ -208,6 +240,12 @@ services:
       ARGOS_DB_USERNAME:        "${ARGOS_DB_USERNAME:-argos}"
       ARGOS_DB_PASSWORD:        "${ARGOS_DB_PASSWORD:-argos}"
     command: ["php", "/app/artisan", "schedule:work"]
+
+networks:
+  # Shared edge network: Traefik + nginx + the manager-started demo containers.
+  # Named explicitly so the per-demo compose override can join it as external.
+  argos_edge:
+    name: argos_edge
 
 volumes:
   argos-data:

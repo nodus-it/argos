@@ -73,6 +73,20 @@ return [
     'compose' => [
         'default_stack' => env('ARGOS_DEFAULT_STACK', 'php-8.4'),
     ],
+
+    // Live-Demo (P6): ephemeral per-task demo deployments, routed by Traefik
+    // under their own subdomain. See docs/backlog/live-demo-concept.md.
+    'preview' => [
+        'enabled' => (bool) env('ARGOS_PREVIEW_ENABLED', false),
+        // Demos live at demo-{task}.{base_domain}; nip.io gives zero-config
+        // wildcard subdomains locally (resolves to 127.0.0.1).
+        'base_domain' => env('ARGOS_PREVIEW_BASE_DOMAIN', '127.0.0.1.nip.io'),
+        'ttl_hours' => (int) env('ARGOS_PREVIEW_TTL_HOURS', 24),
+        // External Docker network shared with Traefik (defined in docker-compose.yml).
+        'network' => env('ARGOS_PREVIEW_NETWORK', 'argos_edge'),
+        // Cap on concurrently running demos.
+        'max_concurrent' => (int) env('ARGOS_PREVIEW_MAX_CONCURRENT', 10),
+    ],
     'concept' => [
         'max_turns_default' => (int) env('ARGOS_CONCEPT_MAX_TURNS_DEFAULT', 50),
     ],
