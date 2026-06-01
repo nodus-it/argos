@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 # lib/result.sh — build the per-phase result JSON on stdout.
 #
-# Each phase emits a single JSON object on stdout when it finishes
-# (see schemas/result.<phase>.schema.json). This library provides the
-# central `result_emit` function that checks the required fields and
-# uses jq to produce well-formed JSON.
+# Each phase emits a single JSON object on stdout when it finishes. This
+# library provides the central `result_emit` function that checks the
+# required fields and uses jq to produce well-formed JSON.
 
 # shellcheck shell=bash
 

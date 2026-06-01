@@ -47,10 +47,6 @@ return [
         'token_from_file' => 'Token ist im Config-Verzeichnis hinterlegt.',
         'token_missing' => 'Phasen können nicht ausgeführt werden, bis ein Token hinterlegt ist.',
 
-        'db_section' => 'Datenbank',
-        'db_connection' => 'Aktive Verbindung: <strong>:connection</strong>',
-        'db_config_hint' => 'Konfigurierbar über <code>DB_CONNECTION</code> und <code>DB_DATABASE</code>.',
-
         'logs_section' => 'Logs',
         'logs_description' => 'Manager-Log (PHP-Seite): Phase-Starts, Fehler, Job-Dispatches.',
         'logs_hint' => 'Worker-Logs pro Phase sind im Task-View unter „Logs" abrufbar.',
