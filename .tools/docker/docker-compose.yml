@@ -122,6 +122,10 @@ services:
       - "--providers.docker.exposedbydefault=false"
       - "--providers.docker.network=argos_edge"
       - "--entrypoints.web.address=:80"
+    environment:
+      # Traefik's docker client otherwise negotiates API 1.24, which modern
+      # daemons (min 1.40) reject. Pin a version every such daemon accepts.
+      DOCKER_API_VERSION: "1.41"
     ports:
       - "${ARGOS_PORT:-8080}:80"
     volumes:
