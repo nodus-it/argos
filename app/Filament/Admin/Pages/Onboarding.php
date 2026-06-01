@@ -6,17 +6,31 @@ namespace App\Filament\Admin\Pages;
 
 use App\Enums\AgentCredentialStatus;
 use App\Enums\AgentName;
+use App\Enums\AuthMethod;
 use App\Models\AgentCredential;
+use App\Models\ConnectedAccount;
+use App\Models\ProviderCredential;
 use App\Models\RepoProfile;
 use App\Models\User;
 use App\Services\Anthropic\AnthropicTokenValidator;
+use App\Services\GitProvider\GitServiceFactory;
+use App\Services\OAuth\TokenRefresher;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 
+/**
+ * Guided three-step setup wizard: authenticate an agent, connect & authorize a
+ * repository, done. The active step is state-driven so it survives the external
+ * OAuth round-trip (the provider callback redirects back here and we resume on
+ * the repository step once an agent is configured).
+ */
 class Onboarding extends Page
 {
-    /** Provider key → config()-path for OAuth client_id (used to detect "configured"). */
+    public const TOTAL_STEPS = 3;
+
+    /** Git providers usable as a repository source, mapped to their OAuth config key. */
     private const OAUTH_PROVIDERS = [
         'github' => 'services.github.client_id',
         'gitlab' => 'services.gitlab.client_id',
@@ -25,14 +39,18 @@ class Onboarding extends Page
 
     /**
      * Onboarding-managed credential row name. Used to update-or-create the
-     * single Default Claude credential when the user pastes a token here,
-     * so repeat onboarding does not litter the DB with extra rows.
+     * single Default agent credential so repeat onboarding does not litter the
+     * DB with extra rows.
      */
     private const ONBOARDING_CREDENTIAL_NAME = 'Default';
 
     protected string $view = 'filament.admin.pages.onboarding';
 
-    /** 'env' | 'agent_credential' | 'none' — drives which UI step is shown. */
+    public int $currentStep = 1;
+
+    // ── Step 1: agents ──────────────────────────────────────────────────────
+
+    /** 'env' | 'agent_credential' | 'none' — drives which Claude UI is shown. */
     public string $tokenSource = 'none';
 
     public bool $codexConfigured = false;
@@ -41,8 +59,23 @@ class Onboarding extends Page
 
     public string $codexAuthJson = '';
 
+    // ── Step 2: repository ──────────────────────────────────────────────────
+
     /** @var array<string, array{configured: bool, connected: bool}> */
     public array $oauthState = [];
+
+    /** Selected token source for the repo picker: '' | "oauth:{id}" | "pat:{ulid}". */
+    public string $repoSource = '';
+
+    public ?string $selectedRepo = null;
+
+    public ?string $selectedBranch = null;
+
+    public string $projectName = '';
+
+    // ── Step 3: done ────────────────────────────────────────────────────────
+
+    public ?string $createdProfileId = null;
 
     public static function getNavigationIcon(): string
     {
@@ -72,6 +105,9 @@ class Onboarding extends Page
     public function mount(): void
     {
         $this->refreshState();
+        // Resume on the repository step after an agent is set up (e.g. when an
+        // OAuth callback redirected back here mid-flow).
+        $this->currentStep = $this->isAnyAgentConfigured() ? 2 : 1;
     }
 
     private function refreshState(): void
@@ -109,6 +145,52 @@ class Onboarding extends Page
         return $hasCredential ? 'agent_credential' : 'none';
     }
 
+    // ── Step navigation ──────────────────────────────────────────────────────
+
+    /** The highest step the user is allowed to reach given current state. */
+    public function furthestUnlockedStep(): int
+    {
+        if (! $this->isAnyAgentConfigured()) {
+            return 1;
+        }
+
+        if ($this->createdProfileId === null) {
+            return 2;
+        }
+
+        return 3;
+    }
+
+    public function goToStep(int $step): void
+    {
+        $step = max(1, min(self::TOTAL_STEPS, $step));
+
+        if ($step <= $this->furthestUnlockedStep()) {
+            $this->currentStep = $step;
+        }
+    }
+
+    public function nextStep(): void
+    {
+        if ($this->currentStep === 1 && ! $this->isAnyAgentConfigured()) {
+            Notification::make()
+                ->title(__('onboarding.notifications.need_agent'))
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $this->goToStep($this->currentStep + 1);
+    }
+
+    public function prevStep(): void
+    {
+        $this->currentStep = max(1, $this->currentStep - 1);
+    }
+
+    // ── Step 1: agent actions ────────────────────────────────────────────────
+
     public function disconnectProvider(string $provider): void
     {
         if (! array_key_exists($provider, self::OAUTH_PROVIDERS)) {
@@ -122,6 +204,7 @@ class Onboarding extends Page
         }
 
         $user->connectedAccounts()->where('provider', $provider)->delete();
+        $this->resetRepoSelection();
         $this->refreshState();
 
         Notification::make()
@@ -133,10 +216,7 @@ class Onboarding extends Page
     public function saveClaudeToken(): void
     {
         if ($this->tokenSource === 'env') {
-            Notification::make()
-                ->title(__('onboarding.notifications.env_token'))
-                ->warning()
-                ->send();
+            Notification::make()->title(__('onboarding.notifications.env_token'))->warning()->send();
 
             return;
         }
@@ -225,10 +305,13 @@ class Onboarding extends Page
         Notification::make()->title(__('onboarding.notifications.codex_saved'))->success()->send();
     }
 
-    /**
-     * Did at least one OAuth provider have credentials configured?
-     * Drives whether the "Connect provider" step is shown at all.
-     */
+    public function isAnyAgentConfigured(): bool
+    {
+        return $this->tokenSource !== 'none' || $this->codexConfigured;
+    }
+
+    // ── Step 2: repository source + picker ────────────────────────────────────
+
     public function hasAnyOAuthConfigured(): bool
     {
         foreach ($this->oauthState as $state) {
@@ -240,24 +323,250 @@ class Onboarding extends Page
         return false;
     }
 
-    public function isAnyProviderConnected(): bool
+    /**
+     * Selectable repository token sources, grouped for the picker: connected
+     * OAuth accounts and stored Personal Access Tokens, for git providers only.
+     *
+     * @return array{oauth: array<string, string>, pat: array<string, string>}
+     */
+    public function repoSourceOptions(): array
     {
-        foreach ($this->oauthState as $state) {
-            if ($state['connected']) {
-                return true;
+        /** @var User|null $user */
+        $user = Auth::user();
+
+        $oauth = [];
+        if ($user !== null) {
+            foreach (array_keys(self::OAUTH_PROVIDERS) as $provider) {
+                $account = $user->connectedAccount($provider);
+                if ($account instanceof ConnectedAccount) {
+                    $label = $account->name ?? $account->nickname ?? "#{$account->id}";
+                    $oauth["oauth:{$account->id}"] = ucfirst($provider).' · '.$label;
+                }
             }
         }
 
-        return false;
+        $pat = [];
+        $credentials = ProviderCredential::query()
+            ->whereIn('provider', array_keys(self::OAUTH_PROVIDERS))
+            ->orderBy('label')
+            ->get();
+        foreach ($credentials as $credential) {
+            $pat["pat:{$credential->id}"] = $credential->provider->label().' · '.$credential->label;
+        }
+
+        return ['oauth' => $oauth, 'pat' => $pat];
+    }
+
+    public function hasAnyRepoSource(): bool
+    {
+        $options = $this->repoSourceOptions();
+
+        return $options['oauth'] !== [] || $options['pat'] !== [];
     }
 
     /**
-     * At least one agent (Claude Code or Codex) has usable credentials —
-     * drives the green checkmark on the agent step. The user can ship a
-     * project with either, so we don't require both.
+     * Resolve the selected source into the platform + token needed to talk to
+     * the provider API.
+     *
+     * @return array{platform: string, token: string, instance_url: string, auth_method: AuthMethod, account_id: ?int, credential_id: ?string}|null
      */
-    public function isAnyAgentConfigured(): bool
+    private function resolveRepoSource(): ?array
     {
-        return $this->tokenSource !== 'none' || $this->codexConfigured;
+        if (str_starts_with($this->repoSource, 'oauth:')) {
+            $account = ConnectedAccount::find((int) substr($this->repoSource, 6));
+            if (! $account instanceof ConnectedAccount) {
+                return null;
+            }
+            $account = app(TokenRefresher::class)->refreshIfNeeded($account);
+
+            return [
+                'platform' => $account->provider,
+                'token' => $account->token,
+                'instance_url' => $account->provider === 'gitlab' ? $account->getInstanceUrl() : '',
+                'auth_method' => AuthMethod::OAuth,
+                'account_id' => $account->id,
+                'credential_id' => null,
+            ];
+        }
+
+        if (str_starts_with($this->repoSource, 'pat:')) {
+            $credential = ProviderCredential::find(substr($this->repoSource, 4));
+            if (! $credential instanceof ProviderCredential) {
+                return null;
+            }
+
+            return [
+                'platform' => $credential->provider->value,
+                'token' => $credential->token,
+                'instance_url' => $credential->provider->value === 'gitlab' ? $credential->getInstanceUrl() : '',
+                'auth_method' => AuthMethod::Pat,
+                'account_id' => null,
+                'credential_id' => $credential->id,
+            ];
+        }
+
+        return null;
+    }
+
+    /**
+     * Repository options for the selected source, cached for 60s to spare the
+     * provider API on every Livewire round-trip. Failures degrade to an empty
+     * list rather than breaking the wizard.
+     *
+     * @return array<string, string>
+     */
+    public function repoOptions(): array
+    {
+        $source = $this->resolveRepoSource();
+        if ($source === null) {
+            return [];
+        }
+
+        try {
+            return Cache::remember(
+                'onboarding_repos:'.md5($this->repoSource),
+                now()->addSeconds(60),
+                fn (): array => app(GitServiceFactory::class)
+                    ->forPlatform($source['platform'], $source['token'], $source['instance_url'])
+                    ->getRepoOptions(),
+            );
+        } catch (\Throwable $e) {
+            report($e);
+
+            return [];
+        }
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function branchOptions(): array
+    {
+        $source = $this->resolveRepoSource();
+        if ($source === null || ! is_string($this->selectedRepo) || $this->selectedRepo === '') {
+            return [];
+        }
+
+        try {
+            return Cache::remember(
+                'onboarding_branches:'.md5($this->repoSource.'|'.$this->selectedRepo),
+                now()->addSeconds(60),
+                fn (): array => app(GitServiceFactory::class)
+                    ->forPlatform($source['platform'], $source['token'], $source['instance_url'])
+                    ->getBranchOptions($this->selectedRepo),
+            );
+        } catch (\Throwable $e) {
+            report($e);
+
+            return [];
+        }
+    }
+
+    public function updatedRepoSource(): void
+    {
+        $this->resetRepoSelection();
+    }
+
+    public function updatedSelectedRepo(): void
+    {
+        $this->selectedBranch = null;
+
+        if (is_string($this->selectedRepo) && $this->selectedRepo !== '') {
+            // Default the project name to the repo's short name.
+            $parts = explode('/', $this->selectedRepo);
+            $this->projectName = (string) end($parts);
+
+            $source = $this->resolveRepoSource();
+            if ($source !== null) {
+                try {
+                    $default = app(GitServiceFactory::class)
+                        ->forPlatform($source['platform'], $source['token'], $source['instance_url'])
+                        ->getDefaultBranch($this->selectedRepo);
+                    if (is_string($default) && $default !== '') {
+                        $this->selectedBranch = $default;
+                    }
+                } catch (\Throwable $e) {
+                    report($e);
+                }
+            }
+        }
+    }
+
+    private function resetRepoSelection(): void
+    {
+        $this->selectedRepo = null;
+        $this->selectedBranch = null;
+        $this->projectName = '';
+    }
+
+    public function createProject(): void
+    {
+        $source = $this->resolveRepoSource();
+
+        if ($source === null || ! is_string($this->selectedRepo) || $this->selectedRepo === '') {
+            Notification::make()->title(__('onboarding.notifications.repo_incomplete'))->warning()->send();
+
+            return;
+        }
+
+        $name = trim($this->projectName);
+        $branch = is_string($this->selectedBranch) ? trim($this->selectedBranch) : '';
+
+        if ($name === '' || $branch === '') {
+            Notification::make()->title(__('onboarding.notifications.repo_incomplete'))->warning()->send();
+
+            return;
+        }
+
+        if (RepoProfile::query()->where('name', $name)->exists()) {
+            Notification::make()
+                ->title(__('onboarding.notifications.name_taken_title'))
+                ->body(__('onboarding.notifications.name_taken_body'))
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $profile = RepoProfile::create([
+            'name' => $name,
+            'url' => $this->repoUrl($source['platform'], $this->selectedRepo, $source['instance_url']),
+            'platform' => $source['platform'],
+            'default_branch' => $branch,
+            'auth_method' => $source['auth_method'],
+            'connected_account_id' => $source['account_id'],
+            'token' => $source['credential_id'] !== null ? $source['token'] : null,
+            'worker_agent_name' => $this->preferredAgentName(),
+        ]);
+
+        $this->createdProfileId = $profile->id;
+        $this->currentStep = 3;
+
+        Notification::make()->title(__('onboarding.notifications.project_created'))->success()->send();
+    }
+
+    /** Build the canonical clone URL for an "owner/repo" path on a platform. */
+    private function repoUrl(string $platform, string $repo, string $instanceUrl): string
+    {
+        return match ($platform) {
+            'github' => "https://github.com/{$repo}",
+            'gitlab' => ($instanceUrl !== '' ? $instanceUrl : 'https://gitlab.com')."/{$repo}",
+            'bitbucket' => "https://bitbucket.org/{$repo}",
+            default => '',
+        };
+    }
+
+    /** The agent the user configured during onboarding, to pre-set on the profile. */
+    private function preferredAgentName(): ?string
+    {
+        if ($this->tokenSource !== 'none') {
+            return AgentName::ClaudeCode->value;
+        }
+
+        if ($this->codexConfigured) {
+            return AgentName::Codex->value;
+        }
+
+        return null;
     }
 }
