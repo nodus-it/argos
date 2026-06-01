@@ -72,6 +72,9 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - argos-data:/data
+      # Traefik dynamic-config dir (file provider). The app seeds the static
+      # Argos route here on boot; the manager writes one file per demo.
+      - argos-traefik:/data/traefik
       # Bind mount for local development (hot reload without rebuilding the image).
       # vendor/ is intentionally shared with the host — composer require on the host
       # propagates immediately, and the entrypoint runs `composer install` whenever
@@ -88,6 +91,7 @@ services:
       APP_DEBUG:                         "${APP_DEBUG:-true}"
       APP_KEY:                           "${APP_KEY:-}"
       ARGOS_CONFIG_DIR:                  /data/config
+      ARGOS_TRAEFIK_DIR:                 /data/traefik
       PASSPORT_KEYS_PATH:                /data/passport
       DB_CONNECTION:                     "mariadb"
       ARGOS_DB_HOST:                     "db"
@@ -110,26 +114,24 @@ services:
       retries: 12
       start_period: 60s
 
-  # Traefik is the single port-80 entry. It routes by Host: demo containers
-  # (started by the manager with `Host(demo-…)` labels on the argos_edge
-  # network) win; everything else falls through to nginx (the Argos app), so
-  # http://localhost:${ARGOS_PORT} keeps working locally.
+  # Traefik is the single port-80 entry, configured via the FILE provider
+  # (not the docker provider — Traefik pins Docker API 1.24, which Engine 29's
+  # daemon, min API 1.40, rejects). Routes live as YAML in a shared volume:
+  # the app seeds the catch-all Argos route; the manager writes one file per
+  # demo (Host(demo-…) → demo container). Higher-priority demo Host rules win;
+  # everything else falls through to nginx, so http://localhost:${ARGOS_PORT}
+  # keeps working locally.
   traefik:
-    image: traefik:v3.1
+    image: traefik:v3.5
     restart: unless-stopped
     command:
-      - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=false"
-      - "--providers.docker.network=argos_edge"
+      - "--providers.file.directory=/etc/traefik/dynamic"
+      - "--providers.file.watch=true"
       - "--entrypoints.web.address=:80"
-    environment:
-      # Traefik's docker client otherwise negotiates API 1.24, which modern
-      # daemons (min 1.40) reject. Pin a version every such daemon accepts.
-      DOCKER_API_VERSION: "1.41"
     ports:
       - "${ARGOS_PORT:-8080}:80"
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - argos-traefik:/etc/traefik/dynamic:ro
     networks:
       - default
       - argos_edge
@@ -144,15 +146,6 @@ services:
     networks:
       - default
       - argos_edge
-    labels:
-      # Catch-all fallback (priority 1) — any Host not matched by a demo router
-      # (which carry higher-priority Host rules) lands on the Argos app.
-      - "traefik.enable=true"
-      - "traefik.docker.network=argos_edge"
-      - "traefik.http.routers.argos.rule=PathPrefix(`/`)"
-      - "traefik.http.routers.argos.priority=1"
-      - "traefik.http.routers.argos.entrypoints=web"
-      - "traefik.http.services.argos.loadbalancer.server.port=80"
     volumes:
       # Read-only bind mount: nginx only needs /app/public for static files and
       # the Vite build output. The app service owns writes.
@@ -190,6 +183,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - argos-data:/data
+      - argos-traefik:/data/traefik
       - ../..:/app
       - /app/node_modules
       - /app/public/build
@@ -200,6 +194,7 @@ services:
       APP_DEBUG:                         "${APP_DEBUG:-true}"
       APP_KEY:                           "${APP_KEY:-}"
       ARGOS_CONFIG_DIR:                  /data/config
+      ARGOS_TRAEFIK_DIR:                 /data/traefik
       PASSPORT_KEYS_PATH:                /data/passport
       DB_CONNECTION:                     "mariadb"
       ARGOS_DB_HOST:                     "db"
@@ -255,5 +250,8 @@ volumes:
   argos-data:
   argos-db:
   argos-redis:
+  # Traefik dynamic config (file provider): written rw by app/queue, mounted
+  # ro by traefik. Holds the static Argos route + one file per live demo.
+  argos-traefik:
   composer_cache:
   npm_cache:

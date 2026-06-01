@@ -45,6 +45,36 @@ fi
 mkdir -p /data/config
 chown -R www-data:www-data /data
 
+# Seed the static Traefik route for the Argos app (file provider). Traefik does
+# NOT use the docker provider here — it pins Docker API 1.24, which modern
+# daemons (Engine 29, min API 1.40) reject — so routes are plain YAML in the
+# shared argos-traefik volume. The manager writes one file per live demo into
+# the same dir; their higher-priority Host(`demo-…`) rules win, everything else
+# falls through to this catch-all → nginx. Only the `app` role seeds it (queue
+# shares the volume; avoid a write race), but the dir/perms are ensured for all.
+TRAEFIK_DIR="${ARGOS_TRAEFIK_DIR:-/data/traefik}"
+mkdir -p "$TRAEFIK_DIR"
+chown -R www-data:www-data "$TRAEFIK_DIR"
+if [[ "${ARGOS_ROLE:-app}" == "app" ]]; then
+    cat > "$TRAEFIK_DIR/argos.yml" <<'YML'
+# Static catch-all route for the Argos app itself (file provider).
+# Managed by the app entrypoint — do not edit by hand.
+http:
+  routers:
+    argos:
+      rule: "PathPrefix(`/`)"
+      priority: 1
+      entryPoints: ["web"]
+      service: argos
+  services:
+    argos:
+      loadBalancer:
+        servers:
+          - url: "http://nginx:80"
+YML
+    chown www-data:www-data "$TRAEFIK_DIR/argos.yml"
+fi
+
 # Sync nginx-served assets and config into shared volumes if they are mounted.
 # The compose stack mounts:
 #   /srv/argos-public      ↔ nginx:/app/public:ro
