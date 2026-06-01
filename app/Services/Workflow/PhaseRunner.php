@@ -8,6 +8,7 @@ use App\Enums\AgentCredentialStatus;
 use App\Enums\AgentName;
 use App\Enums\PhaseStatus;
 use App\Enums\WorkflowStatus;
+use App\Jobs\DeployDemoJob;
 use App\Jobs\RunPhaseJob;
 use App\Models\AgentCredential;
 use App\Models\PhaseRun;
@@ -633,6 +634,17 @@ SH;
         if ($phase === 'implement' && $phaseRun->status === PhaseStatus::Completed && $task->fresh()->pr_url !== null) {
             Log::channel('argos')->info('Auto-triggering push after implement', $this->safeContext($task, 'push'));
             RunPhaseJob::dispatch($task->id, 'push');
+        }
+
+        // After a successful implement run: (re)deploy the live demo when the
+        // project enabled it and previews are switched on. The implemented code
+        // is already in the task volume, which the deployer mounts into the demo.
+        if ($phase === 'implement'
+            && $phaseRun->status === PhaseStatus::Completed
+            && config('argos.preview.enabled')
+            && $task->repoProfile?->live_demo_enabled) {
+            Log::channel('argos')->info('Dispatching live-demo deploy after implement', $this->safeContext($task, 'implement'));
+            DeployDemoJob::dispatch($task->id);
         }
     }
 

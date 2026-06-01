@@ -81,9 +81,18 @@ return [
         // Demos live at demo-{task}.{base_domain}; nip.io gives zero-config
         // wildcard subdomains locally (resolves to 127.0.0.1).
         'base_domain' => env('ARGOS_PREVIEW_BASE_DOMAIN', '127.0.0.1.nip.io'),
+        // Scheme + external port the demo URL is reachable on. Locally Traefik
+        // publishes ARGOS_PORT (default 8080); a real deployment terminates TLS
+        // on 443, so set scheme=https and port=443 (omitted from the URL).
+        'scheme' => env('ARGOS_PREVIEW_SCHEME', 'http'),
+        'port' => (int) env('ARGOS_PORT', 8080),
         'ttl_hours' => (int) env('ARGOS_PREVIEW_TTL_HOURS', 24),
         // External Docker network shared with Traefik (defined in docker-compose.yml).
         'network' => env('ARGOS_PREVIEW_NETWORK', 'argos_edge'),
+        // Shared volume where the manager writes one Traefik file-provider route
+        // per demo (Traefik mounts it read-only). Matches ARGOS_TRAEFIK_DIR in
+        // docker-compose.yml.
+        'traefik_dir' => env('ARGOS_TRAEFIK_DIR', '/data/traefik'),
         // Cap on concurrently running demos.
         'max_concurrent' => (int) env('ARGOS_PREVIEW_MAX_CONCURRENT', 10),
     ],
