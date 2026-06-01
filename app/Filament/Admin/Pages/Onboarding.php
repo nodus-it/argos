@@ -395,6 +395,38 @@ class Onboarding extends Page
         ];
     }
 
+    /**
+     * Stored Personal Access Tokens for git providers — shown in the authorize
+     * step alongside OAuth, so the user sees configured tokens there too.
+     *
+     * @return list<array{provider: string, label: string, display: string}>
+     */
+    public function patTargets(): array
+    {
+        $out = [];
+
+        $credentials = ProviderCredential::query()
+            ->whereIn('provider', array_keys(self::OAUTH_PROVIDERS))
+            ->orderBy('provider')
+            ->orderBy('label')
+            ->get();
+
+        foreach ($credentials as $credential) {
+            $instance = (string) $credential->instance_url;
+            $host = $instance !== ''
+                ? ' ('.(parse_url($instance, PHP_URL_HOST) ?: $instance).')'
+                : '';
+
+            $out[] = [
+                'provider' => $credential->provider->value,
+                'label' => $credential->label,
+                'display' => $credential->provider->label().$host.' · '.$credential->label,
+            ];
+        }
+
+        return $out;
+    }
+
     /** Disconnect a specific (provider, instance) account from the repo step. */
     public function disconnectTarget(string $provider, string $instanceUrl): void
     {

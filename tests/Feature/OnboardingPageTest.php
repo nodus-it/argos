@@ -189,6 +189,19 @@ class OnboardingPageTest extends TestCase
             ->assertSee('instance=');
     }
 
+    public function test_onboarding_lists_stored_tokens_in_authorize_step(): void
+    {
+        $this->configureCodexAgent();
+        ProviderCredential::factory()->create([
+            'provider' => IntegrationProvider::GitLab,
+            'label' => 'CI token',
+        ]);
+
+        Livewire::test(Onboarding::class)
+            ->assertSet('currentStep', 2)
+            ->assertSee('CI token');
+    }
+
     public function test_step_navigation_is_gated_by_agent_then_advances(): void
     {
         // No agent yet → next is refused and we stay on step 1.

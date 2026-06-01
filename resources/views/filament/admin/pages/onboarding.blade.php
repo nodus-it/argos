@@ -12,7 +12,7 @@
         $branchOptions = $this->currentStep === 2 ? $this->branchOptions() : [];
     @endphp
 
-    <div class="max-w-2xl mx-auto w-full space-y-8">
+    <div class="max-w-4xl mx-auto w-full space-y-8">
 
         {{-- ── Stepper header ──────────────────────────────────────────── --}}
         <nav class="flex items-center justify-between" aria-label="Progress">
@@ -214,14 +214,20 @@
                                     <span class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('onboarding.repo.pat_card_title') }}</span>
                                 </div>
                                 <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">{{ __('onboarding.repo.pat_card_desc') }}</p>
-                                <div class="mt-auto">
-                                    <x-filament::button
-                                        tag="a"
-                                        href="{{ route('filament.admin.resources.provider-credentials.create', ['return' => 'onboarding']) }}"
-                                        color="gray"
-                                        size="sm"
-                                        icon="heroicon-o-plus"
-                                    >{{ __('onboarding.repo.pat_link') }}</x-filament::button>
+
+                                @php $patTargets = $this->patTargets(); @endphp
+                                <div class="mt-auto space-y-2">
+                                    @foreach ($patTargets as $p)
+                                        <div class="flex items-center gap-1.5 text-sm text-gray-700 dark:text-gray-300">
+                                            <x-heroicon-s-check-circle class="h-4 w-4 text-emerald-500 flex-shrink-0" />
+                                            {{ $p['display'] }}
+                                        </div>
+                                    @endforeach
+
+                                    <a href="{{ route('filament.admin.resources.provider-credentials.create', ['return' => 'onboarding']) }}"
+                                        class="inline-flex items-center gap-1 {{ $patTargets !== [] ? 'pt-1 ' : '' }}text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline">
+                                        <x-heroicon-o-plus class="h-3.5 w-3.5" />{{ __('onboarding.repo.pat_link') }}
+                                    </a>
                                 </div>
                             </div>
 
