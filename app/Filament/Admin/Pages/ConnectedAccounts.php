@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Filament\Admin\Pages;
 
 use App\Models\ConnectedAccount;
+use App\Models\ProviderOAuthConfig;
 use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 
 class ConnectedAccounts extends Page
@@ -81,7 +83,11 @@ class ConnectedAccounts extends Page
         /** @var User $user */
         $user = Auth::user();
         $hasGitHub = $user->connectedAccount('github') !== null;
-        $hasGitLab = $user->connectedAccount('gitlab') !== null;
+        // Public gitlab.com only — self-hosted instances are handled per-config below.
+        $hasGitLab = $user->connectedAccounts()
+            ->where('provider', 'gitlab')
+            ->where('instance_url', '')
+            ->exists();
         $hasBitbucket = $user->connectedAccount('bitbucket') !== null;
         $hasLinear = $user->connectedAccount('linear') !== null;
 
@@ -101,6 +107,24 @@ class ConnectedAccounts extends Page
                 ->url(route('auth.gitlab.redirect'));
         }
 
+        // Self-hosted GitLab instances each have their own OAuth app; offer one
+        // connect button per configured instance that isn't connected yet.
+        foreach ($this->selfHostedGitlabConfigs() as $config) {
+            $connected = $user->connectedAccounts()
+                ->where('provider', 'gitlab')
+                ->where('instance_url', $config->instance_url)
+                ->exists();
+
+            if ($connected) {
+                continue;
+            }
+
+            $actions[] = Action::make('connectGitLab_'.$config->id)
+                ->label(__('accounts.actions.connect_gitlab_instance', ['instance' => $config->instance_url]))
+                ->icon('heroicon-o-arrow-right-circle')
+                ->url(route('auth.gitlab.redirect', ['instance' => $config->id]));
+        }
+
         if ($this->isBitbucketConfigured() && ! $hasBitbucket) {
             $actions[] = Action::make('connectBitbucket')
                 ->label(__('accounts.actions.connect_bitbucket'))
@@ -116,6 +140,21 @@ class ConnectedAccounts extends Page
         }
 
         return $actions;
+    }
+
+    /**
+     * Enabled self-hosted GitLab OAuth configs (instance_url <> '').
+     *
+     * @return Collection<int, ProviderOAuthConfig>
+     */
+    protected function selfHostedGitlabConfigs(): Collection
+    {
+        return ProviderOAuthConfig::query()
+            ->where('provider', 'gitlab')
+            ->where('enabled', true)
+            ->where('instance_url', '<>', '')
+            ->orderBy('instance_url')
+            ->get();
     }
 
     public function disconnectGitHub(): void

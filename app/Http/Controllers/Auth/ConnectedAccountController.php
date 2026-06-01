@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\ConnectedAccount;
+use App\Models\ProviderOAuthConfig;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -19,6 +20,8 @@ final class ConnectedAccountController extends Controller
     private const GITHUB_RETURN_SESSION_KEY = 'oauth.github.return';
 
     private const GITLAB_RETURN_SESSION_KEY = 'oauth.gitlab.return';
+
+    private const GITLAB_INSTANCE_SESSION_KEY = 'oauth.gitlab.instance';
 
     // ── GitHub ────────────────────────────────────────────────────────────────
 
@@ -91,6 +94,11 @@ final class ConnectedAccountController extends Controller
             $request->session()->forget(self::GITLAB_RETURN_SESSION_KEY);
         }
 
+        // Multi-instance: `?instance=<oauthConfigId>` selects a self-hosted
+        // GitLab. Without it we use the public-instance config hydrated at boot.
+        $instanceUrl = $this->applyGitlabInstance($request->query('instance'));
+        $request->session()->put(self::GITLAB_INSTANCE_SESSION_KEY, $instanceUrl);
+
         /** @var AbstractProvider $driver */
         $driver = Socialite::driver('gitlab');
 
@@ -99,6 +107,12 @@ final class ConnectedAccountController extends Controller
 
     public function callbackGitlab(Request $request): RedirectResponse
     {
+        // The callback is a fresh request: re-apply the per-instance OAuth
+        // config that the redirect selected, so the token exchange hits the
+        // right GitLab instance with the right client credentials.
+        $instanceUrl = (string) $request->session()->pull(self::GITLAB_INSTANCE_SESSION_KEY, '');
+        $this->applyGitlabConfigForInstance($instanceUrl);
+
         /** @var AbstractProvider $driver */
         $driver = Socialite::driver('gitlab');
 
@@ -108,10 +122,8 @@ final class ConnectedAccountController extends Controller
         /** @var User $user */
         $user = Auth::user();
 
-        $instanceUrl = rtrim((string) config('services.gitlab.instance_uri', 'https://gitlab.com'), '/');
-
         $account = ConnectedAccount::updateOrCreate(
-            ['user_id' => $user->id, 'provider' => 'gitlab'],
+            ['user_id' => $user->id, 'provider' => 'gitlab', 'instance_url' => $instanceUrl],
             [
                 'provider_id' => (string) $socialUser->getId(),
                 'token' => (string) $socialUser->token,
@@ -120,7 +132,6 @@ final class ConnectedAccountController extends Controller
                 'name' => $socialUser->getName(),
                 'nickname' => $socialUser->getNickname(),
                 'avatar' => $socialUser->getAvatar(),
-                'instance_url' => $instanceUrl === 'https://gitlab.com' ? null : $instanceUrl,
             ]
         );
 
@@ -133,6 +144,62 @@ final class ConnectedAccountController extends Controller
         }
 
         return redirect()->route('filament.admin.pages.connected-accounts');
+    }
+
+    /**
+     * Resolve the chosen GitLab OAuth config (by config id), push its
+     * credentials into config('services.gitlab.*'), and return the instance_url
+     * to remember ('' for the public instance / unknown id).
+     */
+    private function applyGitlabInstance(mixed $configId): string
+    {
+        if (! is_string($configId) || $configId === '') {
+            return '';
+        }
+
+        $config = ProviderOAuthConfig::query()
+            ->where('provider', 'gitlab')
+            ->where('enabled', true)
+            ->whereKey($configId)
+            ->first();
+
+        if (! $config instanceof ProviderOAuthConfig) {
+            return '';
+        }
+
+        $this->pushGitlabConfig($config->client_id, $config->client_secret, $config->instance_url);
+
+        return $config->instance_url;
+    }
+
+    /** Re-apply the gitlab OAuth config for a known instance_url (callback side). */
+    private function applyGitlabConfigForInstance(string $instanceUrl): void
+    {
+        if ($instanceUrl === '') {
+            return; // public instance already hydrated at boot
+        }
+
+        $config = ProviderOAuthConfig::query()
+            ->where('provider', 'gitlab')
+            ->where('enabled', true)
+            ->where('instance_url', $instanceUrl)
+            ->first();
+
+        if ($config instanceof ProviderOAuthConfig) {
+            $this->pushGitlabConfig($config->client_id, $config->client_secret, $config->instance_url);
+        }
+    }
+
+    private function pushGitlabConfig(string $clientId, string $clientSecret, string $instanceUrl): void
+    {
+        $instance = $instanceUrl !== '' ? $instanceUrl : 'https://gitlab.com';
+
+        config([
+            'services.gitlab.client_id' => $clientId,
+            'services.gitlab.client_secret' => $clientSecret,
+            // socialiteproviders/gitlab concatenates this verbatim — guarantee a trailing slash.
+            'services.gitlab.instance_uri' => rtrim($instance, '/').'/',
+        ]);
     }
 
     public function disconnectGitlab(): RedirectResponse
