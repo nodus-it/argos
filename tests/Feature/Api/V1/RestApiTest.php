@@ -29,6 +29,12 @@ test('rejects unauthenticated requests', function () {
     $this->getJson('/api/v1/projects')->assertUnauthorized();
 });
 
+test('answers 401 (not a redirect) even without an Accept header', function () {
+    // A bare client that forgets Accept: application/json must still get 401,
+    // never a 302 to the Filament login.
+    $this->get('/api/v1/projects')->assertUnauthorized();
+});
+
 test('rejects a token missing the required ability', function () {
     $token = fullToken(['tasks:read']); // not projects:read
 

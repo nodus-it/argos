@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\ForceJsonForApi;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -26,6 +27,10 @@ return Application::configure(basePath: dirname(__DIR__))
             | Request::HEADER_X_FORWARDED_PROTO);
 
         $middleware->redirectGuestsTo(fn () => route('filament.admin.auth.login'));
+
+        // REST API always speaks JSON — so an unauthenticated request answers
+        // 401 instead of redirecting (302) to the Filament login.
+        $middleware->api(prepend: [ForceJsonForApi::class]);
 
         // Sanctum ability gates for the REST API (not auto-registered).
         $middleware->alias([
