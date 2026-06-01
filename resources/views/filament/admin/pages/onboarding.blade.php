@@ -164,38 +164,38 @@
                                 </div>
                                 <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">{{ __('onboarding.repo.oauth_card_desc') }}</p>
 
+                                @php $oauthTargets = $this->oauthTargets(); @endphp
                                 <div class="mt-auto space-y-2">
-                                    @if ($this->hasAnyOAuthConfigured())
-                                        @foreach ($oauthState as $provider => $state)
-                                            @if (! $state['configured']) @continue @endif
+                                    @if ($oauthTargets !== [])
+                                        @foreach ($oauthTargets as $t)
                                             <div class="flex items-center justify-between gap-2">
                                                 <span class="flex items-center gap-1.5 text-sm text-gray-700 dark:text-gray-300">
-                                                    @if ($state['connected'])
+                                                    @if ($t['connected'])
                                                         <x-heroicon-s-check-circle class="h-4 w-4 text-emerald-500" />
                                                     @endif
-                                                    {{ __('onboarding.providers.'.$provider) }}
+                                                    {{ $t['label'] }}
                                                 </span>
-                                                @if ($state['connected'])
+                                                @if ($t['connected'])
                                                     <button type="button"
-                                                        wire:click="disconnectProvider('{{ $provider }}')"
+                                                        wire:click="disconnectTarget(@js($t['provider']), @js($t['instance_url']))"
                                                         wire:confirm="{{ __('onboarding.providers.disconnect') }}?"
                                                         class="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:underline">{{ __('onboarding.providers.disconnect') }}</button>
                                                 @else
-                                                    <a href="{{ route('auth.'.$provider.'.redirect', ['return' => 'onboarding']) }}"
-                                                        class="text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline">{{ __('onboarding.providers.connect_button', ['provider' => __('onboarding.providers.'.$provider)]) }} &rarr;</a>
+                                                    <a href="{{ $t['connect_url'] }}"
+                                                        class="text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline">{{ __('onboarding.providers.connect_button', ['provider' => $t['label']]) }} &rarr;</a>
                                                 @endif
                                             </div>
                                         @endforeach
 
                                         {{-- Always allow adding more OAuth apps (other providers / self-hosted instances). --}}
-                                        <a href="{{ route('filament.admin.resources.provider-oauth-configs.create') }}"
+                                        <a href="{{ route('filament.admin.resources.provider-oauth-configs.create', ['return' => 'onboarding']) }}"
                                             class="inline-flex items-center gap-1 pt-1 text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline">
                                             <x-heroicon-o-plus class="h-3.5 w-3.5" />{{ __('onboarding.repo.oauth_add_more') }}
                                         </a>
                                     @else
                                         <x-filament::button
                                             tag="a"
-                                            href="{{ route('filament.admin.resources.provider-oauth-configs.create') }}"
+                                            href="{{ route('filament.admin.resources.provider-oauth-configs.create', ['return' => 'onboarding']) }}"
                                             color="gray"
                                             size="sm"
                                             icon="heroicon-o-plus"
@@ -217,7 +217,7 @@
                                 <div class="mt-auto">
                                     <x-filament::button
                                         tag="a"
-                                        href="{{ route('filament.admin.resources.provider-credentials.create') }}"
+                                        href="{{ route('filament.admin.resources.provider-credentials.create', ['return' => 'onboarding']) }}"
                                         color="gray"
                                         size="sm"
                                         icon="heroicon-o-plus"

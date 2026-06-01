@@ -53,13 +53,12 @@ class ProviderOAuthConfig extends Model
 
     protected static function booted(): void
     {
-        // An empty form field arrives as null; normalize to '' so the
-        // (provider, instance_url) unique index treats "public instance" as a
-        // single, comparable value (NOT NULL column).
+        // Normalize the instance URL: an empty form field arrives as null →
+        // '' (the public-instance sentinel; keeps the unique index comparable),
+        // and any trailing slash is trimmed so it matches the value stored on
+        // connected_accounts during the OAuth callback (e.g. ".../" vs "...").
         static::saving(function (ProviderOAuthConfig $config): void {
-            if ($config->instance_url === null) {
-                $config->instance_url = '';
-            }
+            $config->instance_url = rtrim(trim((string) $config->instance_url), '/');
         });
 
         // Keep the hydrator's 1h cache honest: any write invalidates it so the

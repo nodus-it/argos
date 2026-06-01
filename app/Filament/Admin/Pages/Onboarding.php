@@ -10,6 +10,7 @@ use App\Enums\AuthMethod;
 use App\Models\AgentCredential;
 use App\Models\ConnectedAccount;
 use App\Models\ProviderCredential;
+use App\Models\ProviderOAuthConfig;
 use App\Models\RepoProfile;
 use App\Models\User;
 use App\Services\Anthropic\AnthropicTokenValidator;
@@ -314,13 +315,105 @@ class Onboarding extends Page
 
     public function hasAnyOAuthConfigured(): bool
     {
-        foreach ($this->oauthState as $state) {
-            if ($state['configured']) {
-                return true;
+        return $this->oauthTargets() !== [];
+    }
+
+    /**
+     * OAuth connect options for the repository step — built from the DB-stored
+     * OAuth apps (public AND self-hosted GitLab) plus any ENV-configured public
+     * provider. Mirrors what the Connected Accounts page offers, so a
+     * self-hosted GitLab app surfaces here too.
+     *
+     * @return list<array{key: string, provider: string, instance_url: string, label: string, connected: bool, connect_url: string}>
+     */
+    public function oauthTargets(): array
+    {
+        /** @var User|null $user */
+        $user = Auth::user();
+
+        $targets = [];
+        $seen = [];
+
+        $configs = ProviderOAuthConfig::query()
+            ->where('enabled', true)
+            ->whereIn('provider', array_keys(self::OAUTH_PROVIDERS))
+            ->orderBy('provider')
+            ->orderBy('instance_url')
+            ->get();
+
+        foreach ($configs as $config) {
+            $provider = $config->provider->value;
+            $instance = (string) $config->instance_url;
+
+            // Only GitLab has an instance-aware OAuth login flow today.
+            if ($instance !== '' && $provider !== 'gitlab') {
+                continue;
             }
+
+            $targets[] = $this->makeOauthTarget($user, $provider, $instance, $config->id);
+            $seen["{$provider}:{$instance}"] = true;
         }
 
-        return false;
+        // ENV-configured public providers without a DB row.
+        foreach (self::OAUTH_PROVIDERS as $provider => $configKey) {
+            if (isset($seen["{$provider}:"]) || ! filled(config($configKey))) {
+                continue;
+            }
+            $targets[] = $this->makeOauthTarget($user, $provider, '', null);
+        }
+
+        return $targets;
+    }
+
+    /**
+     * @return array{key: string, provider: string, instance_url: string, label: string, connected: bool, connect_url: string}
+     */
+    private function makeOauthTarget(?User $user, string $provider, string $instance, ?string $configId): array
+    {
+        $connected = $user !== null && $user->connectedAccounts()
+            ->where('provider', $provider)
+            ->where('instance_url', $instance)
+            ->exists();
+
+        $label = __('onboarding.providers.'.$provider);
+        if ($instance !== '') {
+            $label .= ' ('.(parse_url($instance, PHP_URL_HOST) ?: $instance).')';
+        }
+
+        $params = ['return' => 'onboarding'];
+        if ($instance !== '' && $configId !== null) {
+            $params['instance'] = $configId;
+        }
+
+        return [
+            'key' => "{$provider}:{$instance}",
+            'provider' => $provider,
+            'instance_url' => $instance,
+            'label' => $label,
+            'connected' => $connected,
+            'connect_url' => route("auth.{$provider}.redirect", $params),
+        ];
+    }
+
+    /** Disconnect a specific (provider, instance) account from the repo step. */
+    public function disconnectTarget(string $provider, string $instanceUrl): void
+    {
+        /** @var User|null $user */
+        $user = Auth::user();
+        if ($user === null) {
+            return;
+        }
+
+        $user->connectedAccounts()
+            ->where('provider', $provider)
+            ->where('instance_url', $instanceUrl)
+            ->delete();
+        $this->resetRepoSelection();
+
+        Notification::make()
+            ->title(__('onboarding.notifications.disconnected', ['provider' => __('onboarding.providers.'.$provider)]))
+            ->success()
+            ->send();
     }
 
     /**
@@ -336,12 +429,17 @@ class Onboarding extends Page
 
         $oauth = [];
         if ($user !== null) {
-            foreach (array_keys(self::OAUTH_PROVIDERS) as $provider) {
-                $account = $user->connectedAccount($provider);
-                if ($account instanceof ConnectedAccount) {
-                    $label = $account->name ?? $account->nickname ?? "#{$account->id}";
-                    $oauth["oauth:{$account->id}"] = ucfirst($provider).' · '.$label;
-                }
+            // Every connected git account — including multiple GitLab instances
+            // (public + self-hosted), which connectedAccount() would collapse to one.
+            $accounts = $user->connectedAccounts()
+                ->whereIn('provider', array_keys(self::OAUTH_PROVIDERS))
+                ->get();
+            foreach ($accounts as $account) {
+                $label = $account->name ?? $account->nickname ?? "#{$account->id}";
+                $host = ($account->instance_url !== null && $account->instance_url !== '')
+                    ? ' ('.(parse_url($account->instance_url, PHP_URL_HOST) ?: $account->instance_url).')'
+                    : '';
+                $oauth["oauth:{$account->id}"] = ucfirst($account->provider).$host.' · '.$label;
             }
         }
 

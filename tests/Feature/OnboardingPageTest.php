@@ -10,6 +10,7 @@ use App\Enums\IntegrationProvider;
 use App\Filament\Admin\Pages\Onboarding;
 use App\Models\AgentCredential;
 use App\Models\ProviderCredential;
+use App\Models\ProviderOAuthConfig;
 use App\Models\RepoProfile;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -168,6 +169,24 @@ class OnboardingPageTest extends TestCase
             ->call('disconnectProvider', 'github');
 
         $this->assertSame(0, $user->connectedAccounts()->where('provider', 'github')->count());
+    }
+
+    public function test_onboarding_offers_self_hosted_gitlab_oauth(): void
+    {
+        $this->configureCodexAgent();
+        ProviderOAuthConfig::factory()->create([
+            'provider' => IntegrationProvider::GitLab,
+            'instance_url' => 'https://git.example.com',
+            'enabled' => true,
+        ]);
+
+        // Regression: a self-hosted GitLab OAuth app (instance_url set) is not in
+        // config('services.*'), so the old config-only check hid it. It must now
+        // surface with an instance-scoped connect link.
+        Livewire::test(Onboarding::class)
+            ->assertSet('currentStep', 2)
+            ->assertSee('git.example.com')
+            ->assertSee('instance=');
     }
 
     public function test_step_navigation_is_gated_by_agent_then_advances(): void
