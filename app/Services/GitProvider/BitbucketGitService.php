@@ -213,6 +213,36 @@ class BitbucketGitService implements GitProviderContract
         return is_string($branch) && $branch !== '' ? $branch : null;
     }
 
+    public function getFileContents(string $ownerRepo, string $path, string $ref): ?string
+    {
+        [$owner, $repo] = explode('/', $ownerRepo, 2) + ['', ''];
+
+        if ($owner === '' || $repo === '') {
+            return null;
+        }
+
+        try {
+            $response = $this->http()->get(
+                "/repositories/{$owner}/{$repo}/src/{$ref}/".ltrim($path, '/'),
+            );
+
+            if ($response->status() === 404) {
+                return null;
+            }
+
+            return $response->throw()->body();
+        } catch (\Throwable $e) {
+            Log::channel('argos')->warning('Bitbucket getFileContents failed', [
+                'owner_repo' => "{$owner}/{$repo}",
+                'path' => $path,
+                'error' => $e->getMessage(),
+                'class' => $e::class,
+            ]);
+
+            return null;
+        }
+    }
+
     private function http(): PendingRequest
     {
         if ($this->isOAuth) {

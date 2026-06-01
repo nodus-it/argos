@@ -6,6 +6,7 @@ namespace Tests\Unit\Workers\Compose;
 
 use App\Enums\AgentName;
 use App\Enums\WorkerImageEntityStatus;
+use App\Enums\WorkerSource;
 use App\Models\RepoProfile;
 use App\Models\Task;
 use App\Models\WorkerStack;
@@ -13,6 +14,7 @@ use App\Workers\Compose\IncompatibleStackAgentException;
 use App\Workers\Compose\WorkerImageBuilder;
 use App\Workers\Compose\WorkerImageResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Mockery;
 use RuntimeException;
 use Tests\TestCase;
@@ -69,6 +71,54 @@ class WorkerImageResolverTest extends TestCase
         $resolved = $this->resolver->resolve($task);
 
         $this->assertSame($defaultStack->id, $resolved->stack->id);
+    }
+
+    public function test_byoi_materialises_repo_dockerfile_as_a_stack(): void
+    {
+        $dockerfile = "FROM php:8.4-cli\nRUN apt-get update && apt-get install -y jq git\n";
+        Http::fake([
+            'api.github.com/repos/acme/widget/contents/*' => Http::response([
+                'content' => base64_encode($dockerfile),
+                'encoding' => 'base64',
+            ]),
+        ]);
+
+        $profile = RepoProfile::factory()->create([
+            'platform' => 'github',
+            'url' => 'https://github.com/acme/widget',
+            'token' => 'ghp-test',
+            'worker_source' => WorkerSource::Byoi,
+            'worker_stack_id' => null,
+        ]);
+        $task = Task::factory()->create(['repo_profile_id' => $profile->id, 'base_branch' => 'main']);
+
+        $resolved = $this->resolver->resolve($task);
+
+        $this->assertSame("byoi-{$profile->id}", $resolved->stack->name);
+        $this->assertSame($dockerfile, $resolved->stack->dockerfile_body);
+        $this->assertSame('php:8.4-cli', $resolved->stack->base_image);
+        // Capabilities mirror the agent's requirements so the compatibility
+        // pre-check passes; the build's validate step enforces reality.
+        $this->assertSame(AgentName::ClaudeCode->spec()->requiresStackCapabilities, $resolved->stack->capabilities);
+        $this->assertDatabaseHas(WorkerStack::class, ['name' => "byoi-{$profile->id}", 'is_builtin' => false]);
+    }
+
+    public function test_byoi_throws_when_dockerfile_missing(): void
+    {
+        Http::fake([
+            'api.github.com/repos/*/contents/*' => Http::response('', 404),
+        ]);
+
+        $profile = RepoProfile::factory()->create([
+            'platform' => 'github',
+            'url' => 'https://github.com/acme/widget',
+            'token' => 'ghp-test',
+            'worker_source' => WorkerSource::Byoi,
+        ]);
+        $task = Task::factory()->create(['repo_profile_id' => $profile->id, 'base_branch' => 'main']);
+
+        $this->expectException(RuntimeException::class);
+        $this->resolver->resolve($task);
     }
 
     public function test_default_agent_is_claude_code(): void

@@ -6,8 +6,11 @@ namespace App\Workers\Compose;
 
 use App\Enums\AgentName;
 use App\Enums\WorkerImageEntityStatus;
+use App\Enums\WorkerSource;
+use App\Models\RepoProfile;
 use App\Models\Task;
 use App\Models\WorkerStack;
+use App\Services\GitProvider\GitServiceFactory;
 use App\Workers\Agents\AgentSpec;
 use RuntimeException;
 
@@ -77,11 +80,78 @@ class WorkerImageResolver
         return $resolved->workerTag;
     }
 
+    /** Repo-relative path of a BYOI stack-base recipe. */
+    private const BYOI_DOCKERFILE_PATH = '.argos/worker.dockerfile';
+
     private function resolveStack(Task $task): WorkerStack
     {
-        return $task->workerStackOverride
-            ?? $task->repoProfile?->workerStack
-            ?? $this->defaultStack();
+        // An explicit per-task stack override always wins.
+        if ($task->workerStackOverride !== null) {
+            return $task->workerStackOverride;
+        }
+
+        $profile = $task->repoProfile;
+
+        // BYOI: the repo ships its own stack-base recipe under
+        // .argos/worker.dockerfile. Argos still layers the agent + worker code
+        // on top (Dockerfile.compose), so this only replaces the FROM base.
+        if ($profile?->worker_source === WorkerSource::Byoi) {
+            return $this->resolveByoiStack($task, $profile);
+        }
+
+        return $profile?->workerStack ?? $this->defaultStack();
+    }
+
+    /**
+     * Materialise the repo's .argos/worker.dockerfile as a WorkerStack so the
+     * normal build pipeline (content-hash tag, on-demand build, image-build
+     * tracking) applies unchanged. The file is read via the provider API at the
+     * task's base branch — before any worker image (and thus any clone) exists.
+     */
+    private function resolveByoiStack(Task $task, RepoProfile $profile): WorkerStack
+    {
+        $ref = $task->base_branch ?? $profile->default_branch;
+
+        $dockerfile = app(GitServiceFactory::class)
+            ->fromRepoProfile($profile)
+            ->getFileContents($profile->getOwnerRepo(), self::BYOI_DOCKERFILE_PATH, $ref);
+
+        if ($dockerfile === null || trim($dockerfile) === '') {
+            throw new RuntimeException(sprintf(
+                "BYOI is enabled for '%s' but '%s' was not found on '%s'.",
+                $profile->name,
+                self::BYOI_DOCKERFILE_PATH,
+                $ref,
+            ));
+        }
+
+        $agent = $this->resolveAgentName($task)->spec();
+
+        return WorkerStack::query()->updateOrCreate(
+            ['name' => "byoi-{$profile->id}"],
+            [
+                'label' => "BYOI · {$profile->name}",
+                'is_builtin' => false,
+                'base_image' => $this->parseBaseImage($dockerfile),
+                'dockerfile_body' => $dockerfile,
+                // Trust the repo image to provide what the agent needs; the
+                // build's validateWorkerImage step enforces the real tool
+                // contract (bash, jq, git, …, agent CLI) and untags on failure.
+                'capabilities' => $agent->requiresStackCapabilities,
+                'common_tools' => [],
+                'status' => WorkerImageEntityStatus::Active,
+            ],
+        );
+    }
+
+    /** Best-effort base image from the first FROM line — metadata only. */
+    private function parseBaseImage(string $dockerfile): string
+    {
+        if (preg_match('/^\s*FROM\s+(\S+)/im', $dockerfile, $m) === 1) {
+            return $m[1];
+        }
+
+        return 'byoi';
     }
 
     private function resolveAgentName(Task $task): AgentName
