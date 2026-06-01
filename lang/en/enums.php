@@ -75,4 +75,10 @@ return [
         'expired' => 'Expired',
         'revoked' => 'Revoked',
     ],
+
+    'provider_credential_status' => [
+        'active' => 'Active',
+        'expired' => 'Expired',
+        'revoked' => 'Revoked',
+    ],
 ];

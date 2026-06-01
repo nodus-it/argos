@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\IssueTracker;
 
+use App\Enums\AuthMethod;
+use App\Enums\IntegrationProvider;
 use App\Enums\TaskProviderKind;
 use App\Models\ConnectedAccount;
+use App\Models\ProviderCredential;
 use App\Models\TaskProviderBinding;
 use App\Services\IssueTracker\GitHubIssueTracker;
 use App\Services\IssueTracker\GitLabIssueTracker;
@@ -81,6 +84,62 @@ class IssueTrackerRegistryTest extends TestCase
         $this->registry->make(TaskProviderKind::GitHub, $binding);
 
         $this->assertSame('my-token', $captured['token']);
+    }
+
+    public function test_make_resolves_token_from_provider_credential_for_pat_binding(): void
+    {
+        $captured = [];
+        $this->registry->register(
+            'gitlab',
+            function (string $token, string $instanceUrl) use (&$captured): GitLabIssueTracker {
+                $captured = ['token' => $token, 'instanceUrl' => $instanceUrl];
+
+                return new GitLabIssueTracker($token, $instanceUrl);
+            }
+        );
+
+        $credential = new ProviderCredential;
+        $credential->setRawAttributes([
+            'token' => Crypt::encryptString('pat-token'),
+            'instance_url' => 'https://gitlab.acme.test',
+        ]);
+        $credential->provider = IntegrationProvider::GitLab;
+
+        $binding = new TaskProviderBinding;
+        $binding->kind = TaskProviderKind::GitLab;
+        $binding->auth_method = AuthMethod::Pat;
+        $binding->setRelation('providerCredential', $credential);
+        // Even with a (stale) OAuth account present, the PAT path must win.
+        $binding->setRelation('connectedAccount', null);
+
+        $this->registry->make(TaskProviderKind::GitLab, $binding);
+
+        $this->assertSame('pat-token', $captured['token']);
+        $this->assertSame('https://gitlab.acme.test', $captured['instanceUrl']);
+    }
+
+    public function test_make_from_provider_credential_passes_token_and_instance_url(): void
+    {
+        $captured = [];
+        $this->registry->register(
+            'gitlab',
+            function (string $token, string $instanceUrl) use (&$captured): GitLabIssueTracker {
+                $captured = ['token' => $token, 'instanceUrl' => $instanceUrl];
+
+                return new GitLabIssueTracker($token, $instanceUrl);
+            }
+        );
+
+        $credential = new ProviderCredential;
+        $credential->setRawAttributes(['token' => Crypt::encryptString('gl-pat')]);
+        $credential->provider = IntegrationProvider::GitLab;
+
+        $tracker = $this->registry->makeFromProviderCredential(TaskProviderKind::GitLab, $credential);
+
+        $this->assertInstanceOf(GitLabIssueTracker::class, $tracker);
+        $this->assertSame('gl-pat', $captured['token']);
+        // No instance_url set → falls back to the public SaaS host.
+        $this->assertSame('https://gitlab.com', $captured['instanceUrl']);
     }
 
     public function test_make_from_account_passes_token_and_instance_url(): void

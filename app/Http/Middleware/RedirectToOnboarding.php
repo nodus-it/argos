@@ -20,6 +20,10 @@ class RedirectToOnboarding
             // setup flow — both create and the post-save edit route must be
             // reachable while no RepoProfile exists yet.
             'filament.admin.resources.agent-credentials.*',
+            // OAuth apps and Personal Access Tokens are set up before the first
+            // RepoProfile exists, so the onboarding flow can reach them too.
+            'filament.admin.resources.provider-oauth-configs.*',
+            'filament.admin.resources.provider-credentials.*',
             'filament.admin.auth.logout',
         )) {
             return $next($request);

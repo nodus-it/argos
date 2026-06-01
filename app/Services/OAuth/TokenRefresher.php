@@ -145,11 +145,18 @@ class TokenRefresher
                 (string) config('services.github.client_id'),
                 (string) config('services.github.client_secret'),
             ],
-            'gitlab' => [
-                rtrim($account->getInstanceUrl(), '/').'/oauth/token',
-                (string) config('services.gitlab.client_id'),
-                (string) config('services.gitlab.client_secret'),
-            ],
+            'gitlab' => (function () use ($account): array {
+                // Self-hosted instances carry their own OAuth app credentials;
+                // resolve per-instance (DB first, ENV fallback) since the queue
+                // context only hydrated the public-instance config at boot.
+                $creds = app(OAuthConfigHydrator::class)->resolve('gitlab', (string) $account->instance_url);
+
+                return [
+                    rtrim($account->getInstanceUrl(), '/').'/oauth/token',
+                    $creds['client_id'],
+                    $creds['client_secret'],
+                ];
+            })(),
             'bitbucket' => [
                 self::ENDPOINT_BITBUCKET,
                 (string) config('services.bitbucket.client_id'),

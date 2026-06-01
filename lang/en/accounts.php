@@ -10,6 +10,7 @@ return [
     'actions' => [
         'connect_github' => 'Connect with GitHub',
         'connect_gitlab' => 'Connect with GitLab',
+        'connect_gitlab_instance' => 'Connect with GitLab (:instance)',
         'connect_bitbucket' => 'Connect with Bitbucket',
         'connect_linear' => 'Connect with Linear',
     ],

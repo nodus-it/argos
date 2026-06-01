@@ -15,6 +15,7 @@ use App\Services\IssueTracker\GitHubIssueTracker;
 use App\Services\IssueTracker\GitLabIssueTracker;
 use App\Services\IssueTracker\IssueTrackerRegistry;
 use App\Services\IssueTracker\LinearIssueTracker;
+use App\Services\OAuth\OAuthConfigHydrator;
 use App\Workers\Agents\AgentRegistry;
 use App\Workers\Agents\ClaudeCodeRunner;
 use App\Workers\Agents\CodexRunner;
@@ -137,6 +138,10 @@ class AppServiceProvider extends ServiceProvider
 
         $this->configureDatabase();
         $this->configurePassport();
+
+        // DB-stored OAuth apps win over ENV (config/services.php). Runs after
+        // the DB connection is chosen so the table probe targets the right one.
+        app(OAuthConfigHydrator::class)->hydrate();
     }
 
     /**
