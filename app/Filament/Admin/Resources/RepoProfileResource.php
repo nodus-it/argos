@@ -8,6 +8,7 @@ use App\Enums\AgentName;
 use App\Enums\AuthMethod;
 use App\Enums\GitProvider;
 use App\Enums\WorkerImageEntityStatus;
+use App\Filament\Admin\RelationManagers\ApiTokensRelationManager;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\CreateRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\EditRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\ListRepoProfiles;
@@ -919,6 +920,7 @@ class RepoProfileResource extends Resource
         return [
             TasksRelationManager::class,
             TaskProviderBindingsRelationManager::class,
+            ApiTokensRelationManager::class,
         ];
     }
 
