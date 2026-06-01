@@ -12,7 +12,7 @@
         $branchOptions = $this->currentStep === 2 ? $this->branchOptions() : [];
     @endphp
 
-    <div class="max-w-4xl mx-auto w-full space-y-8">
+    <div class="max-w-6xl mx-auto w-full space-y-8">
 
         {{-- ── Stepper header ──────────────────────────────────────────── --}}
         <nav class="flex items-center justify-between" aria-label="Progress">
@@ -261,8 +261,14 @@
                                 </select>
                             </div>
 
+                            {{-- Loading repos from the provider (after picking a source). --}}
+                            <div wire:loading.flex wire:target="repoSource" class="items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                                <x-filament::loading-indicator class="h-4 w-4" />
+                                {{ __('onboarding.repo.loading_repos') }}
+                            </div>
+
                             @if ($repoSource !== '')
-                                <div>
+                                <div wire:loading.remove wire:target="repoSource">
                                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{{ __('onboarding.repo.repo_label') }}</label>
                                     <select wire:model.live="selectedRepo"
                                         class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500">
@@ -277,8 +283,14 @@
                                 </div>
                             @endif
 
+                            {{-- Loading branches / default branch after picking a repo. --}}
+                            <div wire:loading.flex wire:target="selectedRepo" class="items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                                <x-filament::loading-indicator class="h-4 w-4" />
+                                {{ __('onboarding.repo.loading_branches') }}
+                            </div>
+
                             @if (is_string($selectedRepo) && $selectedRepo !== '')
-                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div wire:loading.remove wire:target="selectedRepo" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div>
                                         <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{{ __('onboarding.repo.branch_label') }}</label>
                                         <select wire:model="selectedBranch"

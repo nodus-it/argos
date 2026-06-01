@@ -82,6 +82,8 @@ return [
         'group_pat' => 'Access-Tokens (PAT)',
         'repo_label' => 'Repository',
         'repo_placeholder' => 'Repository wählen…',
+        'loading_repos' => 'Repositories werden geladen…',
+        'loading_branches' => 'Branches werden geladen…',
         'no_repos' => 'Keine Repositories für diese Quelle gefunden.',
         'branch_label' => 'Standard-Branch',
         'branch_placeholder' => 'Branch wählen…',
