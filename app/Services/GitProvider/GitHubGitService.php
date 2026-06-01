@@ -86,6 +86,46 @@ class GitHubGitService implements GitProviderContract
         return is_string($branch) && $branch !== '' ? $branch : null;
     }
 
+    public function getFileContents(string $ownerRepo, string $path, string $ref): ?string
+    {
+        [$owner, $repo] = explode('/', $ownerRepo, 2) + ['', ''];
+
+        if ($owner === '' || $repo === '') {
+            return null;
+        }
+
+        try {
+            $response = $this->http()->get(
+                "/repos/{$owner}/{$repo}/contents/".ltrim($path, '/'),
+                ['ref' => $ref],
+            );
+
+            if ($response->status() === 404) {
+                return null;
+            }
+
+            $data = $response->throw()->json();
+        } catch (\Throwable $e) {
+            Log::channel('argos')->warning('GitHub getFileContents failed', [
+                'owner_repo' => $ownerRepo,
+                'path' => $path,
+                'error' => $e->getMessage(),
+                'class' => $e::class,
+            ]);
+
+            return null;
+        }
+
+        $content = $data['content'] ?? null;
+        if (! is_string($content)) {
+            return null;
+        }
+
+        $decoded = base64_decode(str_replace("\n", '', $content), true);
+
+        return $decoded === false ? null : $decoded;
+    }
+
     public function createPullRequest(
         string $owner,
         string $repo,

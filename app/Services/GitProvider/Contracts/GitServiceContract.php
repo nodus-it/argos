@@ -53,6 +53,13 @@ interface GitServiceContract
     public function getDefaultBranch(string $ownerRepo): ?string;
 
     /**
+     * Returns the raw contents of a file at a ref, or null when the file is
+     * absent or unreadable. Used by BYOI to read `.argos/worker.dockerfile`
+     * via the provider API before any worker image (and thus any clone) exists.
+     */
+    public function getFileContents(string $ownerRepo, string $path, string $ref): ?string;
+
+    /**
      * Posts a comment on the given pull/merge request. Used by the worker's
      * push phase to log iteration progress on the PR. PR identifier types
      * differ per provider (GitHub `int $number`, GitLab `int $iid`,

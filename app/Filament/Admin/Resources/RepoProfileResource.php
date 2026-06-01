@@ -8,6 +8,7 @@ use App\Enums\AgentName;
 use App\Enums\AuthMethod;
 use App\Enums\GitProvider;
 use App\Enums\WorkerImageEntityStatus;
+use App\Enums\WorkerSource;
 use App\Filament\Admin\RelationManagers\ApiTokensRelationManager;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\CreateRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\EditRepoProfile;
@@ -387,13 +388,33 @@ class RepoProfileResource extends Resource
                                 ->description(__('projects.sections.worker_description'))
                                 ->visible(fn (Get $get): bool => self::platformChosen($get))
                                 ->schema([
+                                    Select::make('worker_source')
+                                        ->label(__('projects.fields.worker_source_label'))
+                                        ->helperText(__('projects.fields.worker_source_helper'))
+                                        ->options([
+                                            WorkerSource::Standard->value => __('projects.fields.worker_source_standard'),
+                                            WorkerSource::Byoi->value => __('projects.fields.worker_source_byoi'),
+                                        ])
+                                        ->default(WorkerSource::Standard->value)
+                                        ->required()
+                                        ->live()
+                                        ->native(false),
+
+                                    Callout::make(__('projects.fields.worker_byoi_hint_heading'))
+                                        ->visible(fn (Get $get): bool => $get('worker_source') === WorkerSource::Byoi->value)
+                                        ->color('info')
+                                        ->icon('heroicon-o-information-circle')
+                                        ->description(__('projects.fields.worker_byoi_hint_body')),
+
                                     Select::make('worker_stack_id')
                                         ->label(__('projects.fields.worker_stack_label'))
                                         ->helperText(__('projects.fields.worker_stack_helper'))
                                         ->options(fn (): array => self::stackOptions())
                                         ->placeholder(__('projects.fields.worker_stack_placeholder', ['stack' => (string) config('argos.compose.default_stack', 'php-8.4')]))
                                         ->searchable()
-                                        ->native(false),
+                                        ->native(false)
+                                        // Hidden for BYOI — the repo defines its own image.
+                                        ->visible(fn (Get $get): bool => $get('worker_source') !== WorkerSource::Byoi->value),
 
                                     Select::make('worker_agent_name')
                                         ->label(__('projects.fields.worker_agent_label'))

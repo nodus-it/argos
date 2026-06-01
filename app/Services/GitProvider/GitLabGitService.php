@@ -78,6 +78,40 @@ class GitLabGitService implements GitProviderContract
         return is_string($branch) && $branch !== '' ? $branch : null;
     }
 
+    public function getFileContents(string $ownerRepo, string $path, string $ref): ?string
+    {
+        [$owner, $repo] = explode('/', $ownerRepo, 2) + ['', ''];
+
+        if ($owner === '' || $repo === '') {
+            return null;
+        }
+
+        $projectPath = $this->encodePath($owner, $repo);
+        $filePath = rawurlencode(ltrim($path, '/'));
+
+        try {
+            $response = $this->http()->get(
+                "/projects/{$projectPath}/repository/files/{$filePath}/raw",
+                ['ref' => $ref],
+            );
+
+            if ($response->status() === 404) {
+                return null;
+            }
+
+            return $response->throw()->body();
+        } catch (\Throwable $e) {
+            Log::channel('argos')->warning('GitLab getFileContents failed', [
+                'owner_repo' => "{$owner}/{$repo}",
+                'path' => $path,
+                'error' => $e->getMessage(),
+                'class' => $e::class,
+            ]);
+
+            return null;
+        }
+    }
+
     public function createPullRequest(
         string $owner,
         string $repo,
