@@ -23,7 +23,7 @@ final class IssueCommentNotifier
     {
         $link = ExternalIssueLink::query()
             ->where('task_id', $task->id)
-            ->with('binding.connectedAccount')
+            ->with(['binding.connectedAccount', 'binding.providerCredential'])
             ->first();
 
         if (! $link instanceof ExternalIssueLink) {

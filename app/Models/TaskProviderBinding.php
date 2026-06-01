@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\AuthMethod;
 use App\Enums\TaskProviderKind;
 use App\Enums\TaskProviderMode;
 use App\Enums\TaskProviderSyncStatus;
@@ -21,7 +22,9 @@ use Illuminate\Support\Carbon;
  * @property string $repo_profile_id
  * @property TaskProviderKind $kind
  * @property TaskProviderMode $mode
+ * @property AuthMethod $auth_method
  * @property int|null $connected_account_id
+ * @property string|null $provider_credential_id
  * @property string|null $external_project_ref
  * @property array<string, mixed>|null $filters
  * @property string|null $webhook_id
@@ -33,6 +36,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $updated_at
  * @property-read RepoProfile $repoProfile
  * @property-read ConnectedAccount|null $connectedAccount
+ * @property-read ProviderCredential|null $providerCredential
  * @property-read Collection<int, ExternalIssueLink> $externalIssueLinks
  */
 class TaskProviderBinding extends Model
@@ -46,7 +50,9 @@ class TaskProviderBinding extends Model
         'repo_profile_id',
         'kind',
         'mode',
+        'auth_method',
         'connected_account_id',
+        'provider_credential_id',
         'external_project_ref',
         'filters',
         'webhook_id',
@@ -61,6 +67,7 @@ class TaskProviderBinding extends Model
         return [
             'kind' => TaskProviderKind::class,
             'mode' => TaskProviderMode::class,
+            'auth_method' => AuthMethod::class,
             'sync_status' => TaskProviderSyncStatus::class,
             'filters' => 'array',
             'webhook_secret' => 'encrypted',
@@ -82,6 +89,14 @@ class TaskProviderBinding extends Model
     public function connectedAccount(): BelongsTo
     {
         return $this->belongsTo(ConnectedAccount::class);
+    }
+
+    /**
+     * @return BelongsTo<ProviderCredential, $this>
+     */
+    public function providerCredential(): BelongsTo
+    {
+        return $this->belongsTo(ProviderCredential::class);
     }
 
     /**

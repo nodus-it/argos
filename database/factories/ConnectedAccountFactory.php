@@ -25,6 +25,7 @@ class ConnectedAccountFactory extends Factory
             'name' => fake()->name(),
             'nickname' => fake()->userName(),
             'avatar' => fake()->imageUrl(),
+            'instance_url' => '',
         ];
     }
 }

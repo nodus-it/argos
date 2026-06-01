@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Enums\AuthMethod;
+use App\Enums\IntegrationProvider;
 use App\Filament\Admin\Resources\RepoProfileResource;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\CreateRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\EditRepoProfile;
@@ -12,6 +14,7 @@ use App\Filament\Admin\Resources\RepoProfileResource\Pages\ViewRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\RelationManagers\TaskProviderBindingsRelationManager;
 use App\Filament\Admin\Resources\RepoProfileResource\RelationManagers\TasksRelationManager;
 use App\Models\ConnectedAccount;
+use App\Models\ProviderCredential;
 use App\Models\RepoProfile;
 use App\Models\Task;
 use App\Models\TaskProviderBinding;
@@ -505,7 +508,7 @@ class RepoProfileResourceTest extends TestCase
             ->callAction(TestAction::make(CreateAction::class)->table(), [
                 'kind' => 'github',
                 'mode' => 'poll',
-                'connected_account_id' => $account->id,
+                'credential_ref' => "oauth:{$account->id}",
                 'external_project_ref' => 'acme/widget',
             ])
             ->assertHasNoActionErrors();
@@ -513,8 +516,68 @@ class RepoProfileResourceTest extends TestCase
         $this->assertDatabaseHas(TaskProviderBinding::class, [
             'repo_profile_id' => $profile->id,
             'kind' => 'github',
+            'auth_method' => 'oauth',
+            'connected_account_id' => $account->id,
             'external_project_ref' => 'acme/widget',
         ]);
+    }
+
+    public function test_binding_create_form_persists_pat_credential(): void
+    {
+        $profile = RepoProfile::factory()->create();
+        $credential = ProviderCredential::factory()->create([
+            'provider' => IntegrationProvider::GitHub,
+            'label' => 'CI PAT',
+        ]);
+
+        Http::fake([
+            'api.github.com/user/repos*' => Http::response([
+                ['full_name' => 'acme/widget'],
+            ]),
+        ]);
+
+        Livewire::test(TaskProviderBindingsRelationManager::class, [
+            'ownerRecord' => $profile,
+            'pageClass' => EditRepoProfile::class,
+        ])
+            ->callAction(TestAction::make(CreateAction::class)->table(), [
+                'kind' => 'github',
+                'mode' => 'poll',
+                'credential_ref' => "pat:{$credential->id}",
+                'external_project_ref' => 'acme/widget',
+            ])
+            ->assertHasNoActionErrors();
+
+        $this->assertDatabaseHas(TaskProviderBinding::class, [
+            'repo_profile_id' => $profile->id,
+            'kind' => 'github',
+            'auth_method' => 'pat',
+            'connected_account_id' => null,
+            'provider_credential_id' => $credential->id,
+        ]);
+    }
+
+    public function test_binding_edit_prefills_credential_ref_for_pat(): void
+    {
+        $profile = RepoProfile::factory()->create();
+        $credential = ProviderCredential::factory()->create([
+            'provider' => IntegrationProvider::GitHub,
+        ]);
+        $binding = TaskProviderBinding::factory()->pat($credential)->create([
+            'repo_profile_id' => $profile->id,
+            'kind' => 'github',
+        ]);
+
+        Livewire::test(TaskProviderBindingsRelationManager::class, [
+            'ownerRecord' => $profile,
+            'pageClass' => EditRepoProfile::class,
+        ])
+            ->mountAction(TestAction::make('edit')->table($binding))
+            ->assertActionDataSet([
+                'credential_ref' => "pat:{$credential->id}",
+            ]);
+
+        $this->assertSame(AuthMethod::Pat, $binding->fresh()->auth_method);
     }
 
     public function test_binding_account_options_are_filtered_by_provider(): void
@@ -534,9 +597,9 @@ class RepoProfileResourceTest extends TestCase
             ->callAction(TestAction::make(CreateAction::class)->table(), [
                 'kind' => 'linear',
                 'mode' => 'poll',
-                'connected_account_id' => $githubAccount->id,
+                'credential_ref' => "oauth:{$githubAccount->id}",
             ])
-            ->assertHasActionErrors(['connected_account_id']);
+            ->assertHasActionErrors(['credential_ref']);
     }
 
     public function test_tasks_relation_manager_shows_tasks(): void

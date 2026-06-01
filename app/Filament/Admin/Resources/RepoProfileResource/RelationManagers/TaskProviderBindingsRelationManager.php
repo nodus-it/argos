@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\RepoProfileResource\RelationManagers;
 
+use App\Enums\AuthMethod;
 use App\Enums\TaskProviderKind;
 use App\Enums\TaskProviderMode;
 use App\Enums\TaskProviderSyncStatus;
 use App\Models\ConnectedAccount;
+use App\Models\ProviderCredential;
 use App\Models\TaskProviderBinding;
 use App\Models\User;
+use App\Services\IssueTracker\Contracts\IssueTrackerContract;
 use App\Services\IssueTracker\IssueTrackerRegistry;
 use App\Services\IssueTracker\ProviderSetupService;
 use Filament\Actions\Action;
@@ -60,40 +63,26 @@ class TaskProviderBindingsRelationManager extends RelationManager
                 ->required()
                 ->native(false),
 
-            Select::make('connected_account_id')
-                ->label('OAuth-Account')
-                ->options(function (Get $get): array {
-                    /** @var User|null $user */
-                    $user = Auth::user();
-                    if ($user === null) {
-                        return [];
-                    }
-
-                    $kind = TaskProviderKind::tryFrom((string) $get('kind'));
-
-                    return $user->connectedAccounts()
-                        ->when(
-                            $kind !== null,
-                            fn ($query) => $query->where('provider', $kind->providerKey()),
-                        )
-                        ->get()
-                        ->mapWithKeys(fn (ConnectedAccount $account): array => [
-                            $account->id => "{$account->provider}: ".($account->name ?? $account->nickname ?? "#{$account->id}"),
-                        ])
-                        ->all();
-                })
+            // Unified credential picker: OAuth accounts and stored Personal
+            // Access Tokens (PATs) for this provider in one field. The chosen
+            // option encodes both the auth method and the source id (see
+            // applyCredentialRef / mutateRecordDataUsing).
+            Select::make('credential_ref')
+                ->label('Zugang')
+                ->options(fn (Get $get): array => $this->credentialRefOptions($get))
+                ->required()
                 ->live()
                 ->afterStateUpdated(fn (Set $set): mixed => $set('external_project_ref', null))
-                ->nullable()
-                ->native(false),
+                ->native(false)
+                ->helperText('OAuth-Account oder gespeichertes Access-Token (PAT) für diesen Provider.'),
 
             Select::make('external_project_ref')
                 ->label('Projekt / Team')
                 ->options(fn (Get $get): array => $this->loadProjectRefOptions($get))
                 ->searchable()
                 ->native(false)
-                ->placeholder('Erst Provider und OAuth-Account wählen')
-                ->helperText('Wird automatisch aus dem verbundenen Account geladen.')
+                ->placeholder('Erst Provider und Zugang wählen')
+                ->helperText('Wird automatisch aus dem gewählten Zugang geladen.')
                 ->nullable(),
 
             TagsInput::make('filters.labels')
@@ -108,40 +97,128 @@ class TaskProviderBindingsRelationManager extends RelationManager
     }
 
     /**
+     * Build the grouped option list for the unified credential picker: OAuth
+     * accounts and stored PATs that match the chosen provider. Keys encode the
+     * source: "oauth:{id}" or "pat:{ulid}".
+     *
+     * @return array<string, array<string, string>>
+     */
+    protected function credentialRefOptions(Get $get): array
+    {
+        $kind = TaskProviderKind::tryFrom((string) $get('kind'));
+
+        $groups = [];
+
+        /** @var User|null $user */
+        $user = Auth::user();
+        if ($user !== null) {
+            $oauth = $user->connectedAccounts()
+                ->when(
+                    $kind !== null,
+                    fn ($query) => $query->where('provider', $kind->providerKey()),
+                )
+                ->get()
+                ->mapWithKeys(fn (ConnectedAccount $account): array => [
+                    "oauth:{$account->id}" => $account->name ?? $account->nickname ?? "#{$account->id}",
+                ])
+                ->all();
+
+            if ($oauth !== []) {
+                $groups['OAuth-Accounts'] = $oauth;
+            }
+        }
+
+        $pats = ProviderCredential::query()
+            ->when(
+                $kind !== null,
+                fn ($query) => $query->where('provider', $kind->value),
+            )
+            ->get()
+            ->mapWithKeys(fn (ProviderCredential $credential): array => [
+                "pat:{$credential->id}" => $credential->label,
+            ])
+            ->all();
+
+        if ($pats !== []) {
+            $groups['Access-Tokens (PAT)'] = $pats;
+        }
+
+        return $groups;
+    }
+
+    /**
+     * Translate the picker's "credential_ref" virtual value into the persisted
+     * columns (auth_method + connected_account_id / provider_credential_id).
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    protected function applyCredentialRef(array $data): array
+    {
+        $ref = $data['credential_ref'] ?? null;
+        unset($data['credential_ref']);
+
+        $data['connected_account_id'] = null;
+        $data['provider_credential_id'] = null;
+
+        if (is_string($ref) && str_starts_with($ref, 'oauth:')) {
+            $data['auth_method'] = AuthMethod::OAuth->value;
+            $data['connected_account_id'] = (int) substr($ref, 6);
+        } elseif (is_string($ref) && str_starts_with($ref, 'pat:')) {
+            $data['auth_method'] = AuthMethod::Pat->value;
+            $data['provider_credential_id'] = substr($ref, 4);
+        }
+
+        return $data;
+    }
+
+    /**
+     * Reconstruct the picker's "credential_ref" value from a stored binding so
+     * the edit form pre-selects the right option.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    protected function hydrateCredentialRef(array $data): array
+    {
+        if (! empty($data['provider_credential_id'])) {
+            $data['credential_ref'] = 'pat:'.$data['provider_credential_id'];
+        } elseif (! empty($data['connected_account_id'])) {
+            $data['credential_ref'] = 'oauth:'.$data['connected_account_id'];
+        }
+
+        return $data;
+    }
+
+    /**
      * Load the selectable project/team references for the chosen provider and
-     * OAuth account. Cached for 60s per (kind, account) to avoid hammering the
-     * provider API on every live form update. API failures degrade to an empty
-     * list rather than breaking the form. The currently stored value is always
-     * kept selectable, even if it is not (or no longer) in the fetched list.
+     * credential. Cached for 60s per (kind, credential_ref) to avoid hammering
+     * the provider API on every live form update. API failures degrade to an
+     * empty list rather than breaking the form. The currently stored value is
+     * always kept selectable, even if it is not (or no longer) in the list.
      *
      * @return array<string, string>
      */
     protected function loadProjectRefOptions(Get $get): array
     {
         $kind = TaskProviderKind::tryFrom((string) $get('kind'));
-        $accountId = $get('connected_account_id');
+        $ref = $get('credential_ref');
 
         $options = [];
 
-        if ($kind !== null && $accountId !== null) {
-            $account = ConnectedAccount::find($accountId);
+        if ($kind !== null && is_string($ref) && $ref !== '') {
+            $cacheKey = "provider_refs:{$kind->value}:{$ref}";
+            $options = Cache::get($cacheKey);
 
-            if ($account instanceof ConnectedAccount) {
-                $cacheKey = "provider_refs:{$kind->value}:{$account->id}";
-                $options = Cache::get($cacheKey);
+            if (! is_array($options)) {
+                try {
+                    $options = $this->trackerForRef($kind, $ref)?->listReferences() ?? [];
+                } catch (\Throwable) {
+                    $options = [];
+                }
 
-                if (! is_array($options)) {
-                    try {
-                        $options = app(IssueTrackerRegistry::class)
-                            ->makeFromAccount($kind, $account)
-                            ->listReferences();
-                    } catch (\Throwable) {
-                        $options = [];
-                    }
-
-                    if ($options !== []) {
-                        Cache::put($cacheKey, $options, now()->addSeconds(60));
-                    }
+                if ($options !== []) {
+                    Cache::put($cacheKey, $options, now()->addSeconds(60));
                 }
             }
         }
@@ -152,6 +229,33 @@ class TaskProviderBindingsRelationManager extends RelationManager
         }
 
         return $options;
+    }
+
+    /**
+     * Build an issue-tracker for a picker "credential_ref" value, or null when
+     * the referenced source no longer exists.
+     */
+    protected function trackerForRef(TaskProviderKind $kind, string $ref): ?IssueTrackerContract
+    {
+        $registry = app(IssueTrackerRegistry::class);
+
+        if (str_starts_with($ref, 'oauth:')) {
+            $account = ConnectedAccount::find((int) substr($ref, 6));
+
+            return $account instanceof ConnectedAccount
+                ? $registry->makeFromAccount($kind, $account)
+                : null;
+        }
+
+        if (str_starts_with($ref, 'pat:')) {
+            $credential = ProviderCredential::find(substr($ref, 4));
+
+            return $credential instanceof ProviderCredential
+                ? $registry->makeFromProviderCredential($kind, $credential)
+                : null;
+        }
+
+        return null;
     }
 
     public function table(Table $table): Table
@@ -188,20 +292,22 @@ class TaskProviderBindingsRelationManager extends RelationManager
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->headerActions([
-                CreateAction::make(),
+                CreateAction::make()
+                    ->mutateDataUsing(fn (array $data): array => $this->applyCredentialRef($data)),
             ])
             ->actions([
-                EditAction::make(),
+                EditAction::make()
+                    ->mutateRecordDataUsing(fn (array $data): array => $this->hydrateCredentialRef($data))
+                    ->mutateDataUsing(fn (array $data): array => $this->applyCredentialRef($data)),
 
                 Action::make('setup')
                     ->label('Einrichten')
                     ->icon('heroicon-o-arrow-path')
                     ->action(function (TaskProviderBinding $record): void {
-                        $account = $record->connectedAccount;
-                        if (! $account instanceof ConnectedAccount) {
+                        if ($record->connected_account_id === null && $record->provider_credential_id === null) {
                             Notification::make()
-                                ->title('Kein OAuth-Account verknüpft')
-                                ->body('Bitte zuerst einen OAuth-Account im Binding auswählen.')
+                                ->title('Kein Zugang verknüpft')
+                                ->body('Bitte zuerst einen OAuth-Account oder ein Access-Token im Binding auswählen.')
                                 ->danger()
                                 ->send();
 
@@ -209,7 +315,7 @@ class TaskProviderBindingsRelationManager extends RelationManager
                         }
 
                         try {
-                            app(ProviderSetupService::class)->setup($record, $account);
+                            app(ProviderSetupService::class)->setup($record);
 
                             Notification::make()
                                 ->title('Provider eingerichtet')

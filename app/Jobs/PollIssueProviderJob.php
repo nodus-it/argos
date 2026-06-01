@@ -32,7 +32,7 @@ final class PollIssueProviderJob implements ShouldQueue
 
     public function handle(IssueTrackerRegistry $registry, IssueIngestService $ingestService): void
     {
-        $binding = TaskProviderBinding::with('connectedAccount')->find($this->bindingId);
+        $binding = TaskProviderBinding::with(['connectedAccount', 'providerCredential'])->find($this->bindingId);
 
         if (! $binding instanceof TaskProviderBinding) {
             return;
