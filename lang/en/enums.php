@@ -81,4 +81,11 @@ return [
         'expired' => 'Expired',
         'revoked' => 'Revoked',
     ],
+
+    'demo_status' => [
+        'building' => 'Building',
+        'live' => 'Live',
+        'failed' => 'Failed',
+        'stopped' => 'Stopped',
+    ],
 ];

@@ -194,6 +194,22 @@ class Task extends Model
     }
 
     /**
+     * Live-demo deployments for this task (latest is the current one).
+     *
+     * @return HasMany<Demo, $this>
+     */
+    public function demos(): HasMany
+    {
+        return $this->hasMany(Demo::class);
+    }
+
+    /** The most recent demo for this task, if any. */
+    public function currentDemo(): ?Demo
+    {
+        return $this->demos()->latest()->first();
+    }
+
+    /**
      * Returns the started_at timestamp of the most recently started PhaseRun,
      * or null if no PhaseRun has been started yet.
      */
