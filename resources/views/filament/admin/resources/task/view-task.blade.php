@@ -201,6 +201,70 @@
         </div>
     </div>
 
+    {{-- ===================== Live demo ===================== --}}
+    @php
+        $demoEnabled = (bool) config('argos.preview.enabled') && (bool) $record->repoProfile?->live_demo_enabled;
+    @endphp
+    @if($demo || $demoEnabled)
+        @php
+            $demoColorClasses = [
+                'success' => 'text-emerald-600 bg-emerald-50 ring-emerald-300 dark:text-emerald-400 dark:bg-emerald-400/10 dark:ring-emerald-400/30',
+                'warning' => 'text-amber-600 bg-amber-50 ring-amber-300 dark:text-amber-400 dark:bg-amber-400/10 dark:ring-amber-400/30',
+                'danger'  => 'text-red-600 bg-red-50 ring-red-300 dark:text-red-400 dark:bg-red-400/10 dark:ring-red-400/30',
+                'gray'    => 'text-gray-600 bg-gray-100 ring-gray-300 dark:text-gray-400 dark:bg-gray-800 dark:ring-gray-600',
+            ];
+            $demoBadge = $demo ? ($demoColorClasses[$demo->status->color()] ?? $demoColorClasses['gray']) : $demoColorClasses['gray'];
+        @endphp
+        <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-6 py-5 flex flex-col gap-3">
+            <div class="flex items-center justify-between gap-3">
+                <div class="flex items-center gap-2 min-w-0">
+                    <x-heroicon-o-globe-alt class="h-5 w-5 text-gray-400 flex-shrink-0" />
+                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('tasks.view.demo.title') }}</h3>
+                </div>
+                @if($demo)
+                    <span @class(['inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset flex-shrink-0', $demoBadge])>
+                        {{ $demo->status->label() }}
+                    </span>
+                @endif
+            </div>
+
+            @if($demo && $demo->status->value === 'live' && $demo->url)
+                <div class="flex items-center justify-between gap-2">
+                    <span class="text-xs font-medium text-gray-500 dark:text-gray-400 flex-shrink-0">{{ __('tasks.view.demo.url') }}</span>
+                    <a href="{{ $demo->url }}" target="_blank"
+                       class="inline-flex items-center gap-1 text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline truncate">
+                        {{ $demo->url }}
+                        <x-heroicon-o-arrow-top-right-on-square class="h-3 w-3 flex-shrink-0" />
+                    </a>
+                </div>
+                @if($demo->ttl_until)
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="text-xs font-medium text-gray-500 dark:text-gray-400 flex-shrink-0">{{ __('tasks.view.demo.expires') }}</span>
+                        <span class="text-xs text-gray-500 dark:text-gray-500">{{ $demo->ttl_until->diffForHumans() }}</span>
+                    </div>
+                @endif
+            @elseif($demo && $demo->status->value === 'building')
+                <div class="flex items-center gap-2">
+                    <svg class="animate-spin h-3 w-3 text-amber-500 flex-shrink-0" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                    </svg>
+                    <span class="text-xs text-amber-600 dark:text-amber-400">{{ __('tasks.view.demo.building') }}</span>
+                </div>
+            @elseif($demo && $demo->status->value === 'failed')
+                <p class="text-xs text-red-600 dark:text-red-400">{{ __('tasks.view.demo.failed_hint') }}</p>
+                @if($demo->build_log)
+                    <details class="text-xs">
+                        <summary class="cursor-pointer text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">{{ __('tasks.view.demo.show_log') }}</summary>
+                        <pre class="mt-2 max-h-64 overflow-auto rounded-lg bg-gray-50 dark:bg-gray-950 p-3 text-[11px] leading-relaxed text-gray-700 dark:text-gray-300 whitespace-pre-wrap break-words">{{ \Illuminate\Support\Str::limit($demo->build_log, 8000) }}</pre>
+                    </details>
+                @endif
+            @else
+                <p class="text-xs text-gray-500 dark:text-gray-400">{{ __('tasks.view.demo.empty_hint') }}</p>
+            @endif
+        </div>
+    @endif
+
     {{-- ===================== Paused banner (max-turns) ===================== --}}
     @php
         $lastImplement = ($phaseRuns['implement'] ?? collect())->last();

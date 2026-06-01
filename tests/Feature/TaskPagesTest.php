@@ -12,8 +12,12 @@ use App\Filament\Admin\Resources\TaskResource\Pages\ViewTaskConcept;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTaskDiff;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTaskLogs;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTaskRespond;
+use App\Jobs\DeployDemoJob;
 use App\Jobs\RunPhaseJob;
+use App\Jobs\StopDemoJob;
+use App\Models\Demo;
 use App\Models\PhaseRun;
+use App\Models\RepoProfile;
 use App\Models\Task;
 use App\Models\User;
 use App\Services\Workflow\PhaseRunner;
@@ -139,6 +143,65 @@ class TaskPagesTest extends TestCase
             ->assertNotified();
 
         Bus::assertDispatched(RunPhaseJob::class, fn ($j) => $j->phase === 'push');
+    }
+
+    public function test_view_task_shows_live_demo_card(): void
+    {
+        $task = Task::factory()->create();
+        Demo::factory()->live()->create([
+            'task_id' => $task->id,
+            'url' => 'http://demo-abc.127.0.0.1.nip.io:8080',
+        ]);
+
+        Livewire::test(ViewTask::class, ['record' => $task->getKey()])
+            ->assertSuccessful()
+            ->assertSee('http://demo-abc.127.0.0.1.nip.io:8080');
+    }
+
+    public function test_view_task_rebuild_demo_action_dispatches_job(): void
+    {
+        config(['argos.preview.enabled' => true]);
+        $profile = RepoProfile::factory()->create(['live_demo_enabled' => true]);
+        $task = Task::factory()->create(['repo_profile_id' => $profile->id]);
+        PhaseRun::factory()->create(['task_id' => $task->id, 'phase' => 'implement', 'status' => 'completed']);
+
+        Livewire::test(ViewTask::class, ['record' => $task->getKey()])
+            ->callAction('rebuildDemo')
+            ->assertNotified();
+
+        Bus::assertDispatched(DeployDemoJob::class, fn (DeployDemoJob $j): bool => $j->taskId === $task->id);
+    }
+
+    public function test_rebuild_demo_hidden_when_preview_disabled(): void
+    {
+        config(['argos.preview.enabled' => false]);
+        $profile = RepoProfile::factory()->create(['live_demo_enabled' => true]);
+        $task = Task::factory()->create(['repo_profile_id' => $profile->id]);
+        PhaseRun::factory()->create(['task_id' => $task->id, 'phase' => 'implement', 'status' => 'completed']);
+
+        Livewire::test(ViewTask::class, ['record' => $task->getKey()])
+            ->assertActionHidden('rebuildDemo');
+    }
+
+    public function test_view_task_stop_demo_action_dispatches_job(): void
+    {
+        $task = Task::factory()->create();
+        Demo::factory()->live()->create(['task_id' => $task->id]);
+
+        Livewire::test(ViewTask::class, ['record' => $task->getKey()])
+            ->callAction('stopDemo')
+            ->assertNotified();
+
+        Bus::assertDispatched(StopDemoJob::class, fn (StopDemoJob $j): bool => $j->taskId === $task->id);
+    }
+
+    public function test_stop_demo_hidden_without_running_demo(): void
+    {
+        $task = Task::factory()->create();
+        Demo::factory()->failed()->create(['task_id' => $task->id]);
+
+        Livewire::test(ViewTask::class, ['record' => $task->getKey()])
+            ->assertActionHidden('stopDemo');
     }
 
     public function test_view_task_mark_completed_action(): void

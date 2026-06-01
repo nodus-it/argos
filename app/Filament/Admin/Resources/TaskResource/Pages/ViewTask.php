@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\TaskResource\Pages;
 
+use App\Enums\DemoStatus;
 use App\Enums\Phase;
 use App\Enums\PhaseStatus;
 use App\Filament\Admin\Resources\TaskResource;
+use App\Jobs\DeployDemoJob;
+use App\Jobs\StopDemoJob;
 use App\Models\PhaseRun;
 use App\Models\Task;
 use App\Services\Task\TaskService;
@@ -244,6 +247,7 @@ class ViewTask extends ViewRecord
 
         return [
             'phaseRuns' => $phaseRuns,
+            'demo' => $task->currentDemo(),
             'conceptHtml' => $conceptMd !== null ? Str::markdown($conceptMd) : null,
             'conceptError' => $lastConceptRun?->status !== PhaseStatus::Completed
                 ? $lastConceptRun?->error_log
@@ -324,6 +328,42 @@ class ViewTask extends ViewRecord
                     $this->redirect(TaskResource::getUrl('view', ['record' => $task]));
                 })
                 ->visible(fn (): bool => $this->task()->current_status === PhaseStatus::LockBlocked),
+
+            Action::make('rebuildDemo')
+                ->label(__('tasks.view.demo.rebuild'))
+                ->icon('heroicon-o-arrow-path')
+                ->color('gray')
+                ->requiresConfirmation()
+                ->modalHeading(__('tasks.view.demo.rebuild_heading'))
+                ->modalDescription(__('tasks.view.demo.rebuild_description'))
+                ->action(function (): void {
+                    $task = $this->task();
+                    DeployDemoJob::dispatch($task->id);
+                    Notification::make()->title(__('tasks.view.demo.rebuild_queued'))->success()->send();
+                    $this->redirect(TaskResource::getUrl('view', ['record' => $task]));
+                })
+                ->visible(fn (): bool => (bool) config('argos.preview.enabled')
+                    && (bool) $this->task()->repoProfile?->live_demo_enabled
+                    && $this->task()->phaseRuns()->where('phase', 'implement')->where('status', 'completed')->exists()),
+
+            Action::make('stopDemo')
+                ->label(__('tasks.view.demo.stop'))
+                ->icon('heroicon-o-stop-circle')
+                ->color('danger')
+                ->requiresConfirmation()
+                ->modalHeading(__('tasks.view.demo.stop_heading'))
+                ->modalDescription(__('tasks.view.demo.stop_description'))
+                ->action(function (): void {
+                    $task = $this->task();
+                    StopDemoJob::dispatch($task->id);
+                    Notification::make()->title(__('tasks.view.demo.stop_queued'))->success()->send();
+                    $this->redirect(TaskResource::getUrl('view', ['record' => $task]));
+                })
+                ->visible(fn (): bool => in_array(
+                    $this->task()->currentDemo()?->status,
+                    [DemoStatus::Building, DemoStatus::Live],
+                    true,
+                )),
 
             Action::make('logsDownload')
                 ->label(__('tasks.view.actions.logs_download'))

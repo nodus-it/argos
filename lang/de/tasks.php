@@ -99,6 +99,24 @@ return [
             'phase_waiting' => ':phase wartet auf Worker',
         ],
 
+        'demo' => [
+            'title' => 'Live-Demo',
+            'url' => 'URL',
+            'expires' => 'Läuft ab',
+            'building' => 'Demo wird aufgebaut…',
+            'failed_hint' => 'Der Demo-Aufbau ist fehlgeschlagen.',
+            'show_log' => 'Build-Log anzeigen',
+            'empty_hint' => 'Noch keine Demo. Sie wird nach dem nächsten erfolgreichen Implement-Lauf automatisch aufgebaut.',
+            'rebuild' => 'Demo neu aufbauen',
+            'rebuild_heading' => 'Live-Demo neu aufbauen?',
+            'rebuild_description' => 'Eine laufende Demo dieses Tasks wird ersetzt. Der Aufbau läuft im Hintergrund.',
+            'rebuild_queued' => 'Demo-Aufbau eingereiht.',
+            'stop' => 'Demo stoppen',
+            'stop_heading' => 'Live-Demo stoppen?',
+            'stop_description' => 'Container, Volumes und Route der Demo werden entfernt.',
+            'stop_queued' => 'Demo wird gestoppt.',
+        ],
+
         'concept' => [
             'title' => 'Konzept',
             'tab_concept' => 'Konzept',
