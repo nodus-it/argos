@@ -248,4 +248,24 @@ class Task extends Model
 
         return $this->workflow_status->color();
     }
+
+    /**
+     * Map the workflow status onto the redesign's five badge states
+     * (running | waiting | success | failed | draft) for <x-argos.badge>.
+     * Semantic, not colour-derived. See docs/design/argos/ARGOS_REDESIGN.md §5.1.
+     */
+    public function displayBadgeStatus(): string
+    {
+        if ($this->isWaitingForWorker()) {
+            return 'running';
+        }
+
+        return match ($this->workflow_status) {
+            WorkflowStatus::Draft => 'draft',
+            WorkflowStatus::ConceptRunning, WorkflowStatus::ImplementRunning => 'running',
+            WorkflowStatus::ConceptReview, WorkflowStatus::ImplementPaused, WorkflowStatus::InReview => 'waiting',
+            WorkflowStatus::ImplementCompleted, WorkflowStatus::Completed => 'success',
+            WorkflowStatus::Failed => 'failed',
+        };
+    }
 }
