@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 use App\Providers\E2eFakeServiceProvider;
 use App\Services\Anthropic\AnthropicTokenValidator;
+use App\Services\GitProvider\GitHubGitService;
+use App\Services\GitProvider\GitProviderRegistry;
 use App\Testing\FakeAnthropicTokenValidator;
+use App\Testing\FakeGitService;
 
 it('uses the real Anthropic validator by default', function (): void {
     expect(app(AnthropicTokenValidator::class))
@@ -17,6 +20,22 @@ it('binds the fake Anthropic validator once the e2e provider is registered', fun
 
     expect(app(AnthropicTokenValidator::class))->toBeInstanceOf(FakeAnthropicTokenValidator::class);
     expect(app(AnthropicTokenValidator::class)->validate('whatever'))->toBeTrue();
+});
+
+it('uses the real git provider services by default', function (): void {
+    expect(app(GitProviderRegistry::class)->make('github', 'token'))
+        ->toBeInstanceOf(GitHubGitService::class);
+});
+
+it('serves canonical git data through the fake provider once registered', function (): void {
+    app()->register(E2eFakeServiceProvider::class);
+
+    $service = app(GitProviderRegistry::class)->make('github', 'token');
+
+    expect($service)->toBeInstanceOf(FakeGitService::class)
+        ->and($service->getRepoOptions())->not->toBeEmpty()
+        ->and($service->getDefaultBranch('argos-e2e/demo-app'))->toBe('main')
+        ->and($service->getBranchOptions('argos-e2e/demo-app'))->toHaveKey('main');
 });
 
 it('refuses to boot in production', function (): void {

@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Services\Anthropic\AnthropicTokenValidator;
+use App\Services\GitProvider\GitProviderRegistry;
 use App\Testing\FakeAnthropicTokenValidator;
+use App\Testing\FakeGitService;
 use Illuminate\Support\ServiceProvider;
 use RuntimeException;
 
@@ -19,8 +21,8 @@ use RuntimeException;
  * this provider were registered directly, it refuses to boot in production.
  *
  * Bindings are added incrementally per build phase:
- *   - AnthropicTokenValidator (this slice)
- *   - Git provider services + branch validator (next)
+ *   - AnthropicTokenValidator (done)
+ *   - Git provider services (done)
  *   - PhaseRunner (next)
  */
 class E2eFakeServiceProvider extends ServiceProvider
@@ -32,5 +34,21 @@ class E2eFakeServiceProvider extends ServiceProvider
         }
 
         $this->app->bind(AnthropicTokenValidator::class, fn (): FakeAnthropicTokenValidator => new FakeAnthropicTokenValidator);
+
+        // Replace the git provider registry so every platform resolves to a
+        // fake serving canonical repo/branch data — the RepoProfile dropdowns
+        // then fill in without any external API call.
+        $this->app->singleton(GitProviderRegistry::class, function (): GitProviderRegistry {
+            $registry = new GitProviderRegistry;
+
+            foreach (['github' => 'GitHub', 'gitlab' => 'GitLab', 'bitbucket' => 'Bitbucket'] as $key => $label) {
+                $registry->register(
+                    $key,
+                    fn (string $token, string $instanceUrl): FakeGitService => new FakeGitService($key, $label),
+                );
+            }
+
+            return $registry;
+        });
     }
 }
