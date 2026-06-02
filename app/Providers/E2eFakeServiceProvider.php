@@ -7,6 +7,7 @@ namespace App\Providers;
 use App\Services\Anthropic\AnthropicTokenValidator;
 use App\Services\GitProvider\GitProviderRegistry;
 use App\Services\Workflow\PhaseRunner;
+use App\Testing\E2eConnectAccountCommand;
 use App\Testing\FakeAnthropicTokenValidator;
 use App\Testing\FakeGitService;
 use App\Testing\FakePhaseRunner;
@@ -56,5 +57,10 @@ class E2eFakeServiceProvider extends ServiceProvider
         // Replace the phase runner so concept/implement/push complete
         // deterministically without docker, image builds, or volume I/O.
         $this->app->singleton(PhaseRunner::class, FakePhaseRunner::class);
+
+        // Test-only seeding helper for OAuth-auth runs (the real browser OAuth
+        // redirect can't be automated offline). Registered here so it never
+        // shows up in a normal/production CLI.
+        $this->commands([E2eConnectAccountCommand::class]);
     }
 }
