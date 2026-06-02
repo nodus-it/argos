@@ -37,6 +37,15 @@ trait HasArgosEditHeading
         return new HtmlString($html);
     }
 
+    /**
+     * Keep the form's Save/Cancel bar pinned to the bottom of the form card,
+     * matching the mockup. No-op on View pages (they have no form actions).
+     */
+    public function areFormActionsSticky(): bool
+    {
+        return true;
+    }
+
     protected function argosHeadingAttribute(): string
     {
         return 'name';

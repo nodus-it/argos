@@ -266,7 +266,7 @@ body,
    on the section so these win over Filament's own .fi-section.fi-aside rules
    regardless of stylesheet order. */
 .fi-main .fi-section.fi-aside {
-  padding: 28px 2px;
+  padding: 26px 28px;
   column-gap: 40px;
   background-color: transparent;
   border: none;
@@ -358,6 +358,52 @@ body,
 }
 .fi-main .fi-input-wrp.fi-disabled {
   background-color: var(--surface-2);
+}
+
+/* Edit/create form = ONE card (tabs + sections + sticky save bar), exactly
+   like the mockup. .fi-sc-form is the <form> that holds the tabs and the
+   footer actions; the form's tabs are "contained" (their own card) by default,
+   so we de-card them and let the single .fi-sc-form card be the box. */
+.fi-main .fi-sc-form {
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  row-gap: 0;
+}
+.fi-main .fi-sc-form .fi-sc-tabs.fi-contained {
+  background: none;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  --tw-shadow: 0 0 #0000;
+  --tw-ring-shadow: 0 0 #0000;
+}
+
+/* Relation-manager panel = ONE card with the (left-aligned) tabs on top and
+   the table below. Filament renders the relation tabs un-"contained", which is
+   how we tell them apart from the form's contained tabs. The inner table
+   section is de-carded so we don't double up cards. */
+.fi-main .fi-sc-tabs:not(.fi-contained) {
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.fi-main .fi-sc-tabs:not(.fi-contained) .fi-section {
+  background: none;
+  border: none;
+  box-shadow: none;
+  --tw-shadow: 0 0 #0000;
+  --tw-ring-shadow: 0 0 #0000;
+}
+
+/* Tighten the gap between the page heading and the content (mockup is ~20px,
+   Filament defaults to 2rem). */
+.fi-main .fi-page-content {
+  row-gap: 20px;
 }
 
 /* ============================================================
