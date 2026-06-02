@@ -445,6 +445,13 @@ body,
 .fi-main .fi-resource-relation-manager .fi-ta-header-heading {
   display: none;
 }
+/* The status filter (a contained Tabs component) — left-aligned segment that
+   shrinks to its content instead of a centred full-width pill. */
+.fi-main .fi-resource-relation-manager .fi-sc-tabs.fi-contained {
+  width: max-content;
+  max-width: 100%;
+  margin-inline: 0;
+}
 
 /* Tighten the gap between the page heading and the content (mockup is ~20px,
    Filament defaults to 2rem). */
