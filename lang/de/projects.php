@@ -8,6 +8,10 @@ return [
     'model_label' => 'Projekt',
     'model_label_plural' => 'Projekte',
 
+    'actions' => [
+        'new_task' => 'Neuer Task',
+    ],
+
     'tabs' => [
         'basics' => 'Allgemein',
         'worker' => 'Worker & Modelle',
