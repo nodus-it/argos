@@ -144,6 +144,25 @@ body,
 ::selection { background: var(--accent-soft); }
 
 /* ============================================================
+   Filament chrome — warm paper sidebar + topbar (the panel ships a
+   cool white/gray default). app.css loads after Filament's CSS via the
+   HEAD_END render hook, so these win on equal specificity.
+   ============================================================ */
+.fi-sidebar,
+.fi-sidebar-header {
+  background-color: var(--surface);
+  border-color: var(--border);
+}
+.fi-topbar,
+.fi-topbar > nav {
+  background-color: color-mix(in oklab, var(--bg) 82%, transparent);
+  border-color: var(--border);
+}
+.fi-main {
+  background-color: var(--bg);
+}
+
+/* ============================================================
    Reusable components (ported from docs/design/argos/styles.css,
    Warm Paper direction; dark overrides keyed on `.dark`). Consumed by
    the <x-argos.*> Blade components in later phases.
@@ -373,9 +392,12 @@ body,
 .link-btn:hover{filter:brightness(.97);}
 .link-btn.on{background:var(--accent);color:var(--on-accent);}
 
-/* Respond composer */
-.respond-inner{max-width:1320px;margin:0 auto;}
-.respond-dock{position:sticky;bottom:0;z-index:25;margin-top:24px;padding:14px 0;background:color-mix(in oklab,var(--surface) 92%,transparent);backdrop-filter:blur(10px);border-top:1px solid var(--border);}
+/* Respond composer — full-bleed dock flush to the content edges. The negative
+   inline margins cancel Filament's responsive page padding (px-4/6/8). */
+.respond-inner{margin:0 auto;}
+.respond-dock{position:sticky;bottom:0;z-index:25;margin-top:24px;margin-inline:-1rem;padding:14px 1rem;background:color-mix(in oklab,var(--surface) 92%,transparent);backdrop-filter:blur(10px);border-top:1px solid var(--border);}
+@media (min-width:768px){.respond-dock{margin-inline:-1.5rem;padding-left:1.5rem;padding-right:1.5rem;}}
+@media (min-width:1024px){.respond-dock{margin-inline:-2rem;padding-left:2rem;padding-right:2rem;}}
 .respond.is-waiting.respond-dock{border-top:2px solid var(--wn-500);}
 .respond-flag{display:flex;align-items:center;gap:8px;font-size:var(--t-sm);font-weight:600;color:var(--wn-700);margin-bottom:10px;}
 .respond-flag svg{width:16px;height:16px;}
