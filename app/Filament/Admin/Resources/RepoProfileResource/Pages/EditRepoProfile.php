@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\RepoProfileResource\Pages;
 
+use App\Filament\Admin\Concerns\HasArgosEditHeading;
 use App\Filament\Admin\Resources\RepoProfileResource;
 use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
 
 class EditRepoProfile extends EditRecord
 {
+    use HasArgosEditHeading;
+
     protected static string $resource = RepoProfileResource::class;
 
     protected function getHeaderActions(): array
@@ -17,6 +20,18 @@ class EditRepoProfile extends EditRecord
         return [
             DeleteAction::make(),
         ];
+    }
+
+    /**
+     * @return array{icon?: string, label: string}|null
+     */
+    protected function argosHeadingChip(): ?array
+    {
+        $platform = $this->getRecord()->platform?->value;
+
+        return $platform === null
+            ? null
+            : ['icon' => 'heroicon-o-globe-alt', 'label' => __('projects.fields.platform_'.$platform)];
     }
 
     /**

@@ -13,7 +13,6 @@ use App\Filament\Admin\RelationManagers\ApiTokensRelationManager;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\CreateRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\EditRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\ListRepoProfiles;
-use App\Filament\Admin\Resources\RepoProfileResource\Pages\ViewRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\RelationManagers\TaskProviderBindingsRelationManager;
 use App\Filament\Admin\Resources\RepoProfileResource\RelationManagers\TasksRelationManager;
 use App\Models\ConnectedAccount;
@@ -27,7 +26,6 @@ use App\Workers\Agents\AgentRegistry;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
-use Filament\Actions\EditAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -924,9 +922,8 @@ class RepoProfileResource extends Resource
                     ->label(__('projects.columns.tasks'))
                     ->counts('tasks'),
             ])
-            ->recordUrl(fn (RepoProfile $record): string => static::getUrl('view', ['record' => $record]))
+            ->recordUrl(fn (RepoProfile $record): string => static::getUrl('edit', ['record' => $record]))
             ->actions([
-                EditAction::make(),
                 DeleteAction::make(),
             ])
             ->bulkActions([
@@ -950,8 +947,9 @@ class RepoProfileResource extends Resource
         return [
             'index' => ListRepoProfiles::route('/'),
             'create' => CreateRepoProfile::route('/create'),
-            'view' => ViewRepoProfile::route('/{record}'),
-            'edit' => EditRepoProfile::route('/{record}/edit'),
+            // Detail = edit (no separate read-only view); relation managers
+            // render on the edit page.
+            'edit' => EditRepoProfile::route('/{record}'),
         ];
     }
 }
