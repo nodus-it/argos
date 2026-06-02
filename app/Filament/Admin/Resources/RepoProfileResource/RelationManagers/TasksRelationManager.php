@@ -6,6 +6,7 @@ namespace App\Filament\Admin\Resources\RepoProfileResource\RelationManagers;
 
 use App\Filament\Admin\Concerns\TaskTableConcern;
 use App\Filament\Admin\Resources\TaskResource;
+use App\Models\RepoProfile;
 use App\Models\Task;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
@@ -19,9 +20,19 @@ class TasksRelationManager extends RelationManager
 
     protected static string $relationship = 'tasks';
 
+    protected static string|\BackedEnum|null $icon = 'heroicon-o-queue-list';
+
     public static function getTitle(Model $ownerRecord, string $pageClass): string
     {
         return __('projects.columns.tasks');
+    }
+
+    public static function getBadge(Model $ownerRecord, string $pageClass): ?string
+    {
+        /** @var RepoProfile $ownerRecord */
+        $count = $ownerRecord->tasks()->count();
+
+        return $count > 0 ? (string) $count : null;
     }
 
     public function form(Schema $schema): Schema
