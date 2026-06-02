@@ -171,7 +171,7 @@ body,
   content: "";
   position: fixed;
   top: 0;
-  left: 14rem;
+  left: calc(14rem - 1px);
   width: 1px;
   height: 4rem;
   background-color: var(--border);
@@ -210,11 +210,19 @@ body,
 /* Breadcrumbs teleported into the topbar (see header view override).
    order:1 places the slot just after the logo/toggle (order 0); the right-hand
    items get order:2 + margin-left:auto so they stay on the far right. */
+/* The logo occupies exactly the sidebar-width column (topbar padding-inline is
+   16px, so width = 14rem - 16px puts its right edge at the divider); the
+   breadcrumb then starts just to the RIGHT of the logo divider. */
+.fi-topbar-start {
+  width: calc(14rem - 16px);
+  margin-inline-end: 0;
+}
 .fi-argos-topbar-breadcrumbs {
   order: 1;
   display: flex;
   align-items: center;
   min-width: 0;
+  padding-inline-start: 18px;
 }
 .fi-topbar-end {
   order: 2;
@@ -299,9 +307,17 @@ body,
   display: flex;
   align-items: center;
   gap: 16px;
+  border-bottom: 1px solid var(--border);
 }
 .fi-main .fi-ta-header-ctn:has(.fi-ta-header) > .fi-ta-header-toolbar {
   margin-left: auto;
+}
+/* The heading and toolbar each carry their own border-bottom; side by side
+   that's two short, offset lines. Drop them and keep only the container's
+   full-width divider above the table. */
+.fi-main .fi-ta-header-ctn:has(.fi-ta-header) > .fi-ta-header,
+.fi-main .fi-ta-header-ctn:has(.fi-ta-header) > .fi-ta-header-toolbar {
+  border-bottom: none;
 }
 .fi-ta-argos-heading {
   display: inline-flex;
