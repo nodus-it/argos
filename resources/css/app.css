@@ -161,6 +161,17 @@ body,
 .fi-main {
   background-color: var(--bg);
 }
+/* Lighter, smaller sidebar typography to match the designer. */
+.fi-sidebar-item-label {
+  font-weight: 500;
+  font-size: var(--t-sm);
+}
+.fi-sidebar-group-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  color: var(--faint);
+}
 
 /* ============================================================
    Reusable components (ported from docs/design/argos/styles.css,
@@ -392,12 +403,11 @@ body,
 .link-btn:hover{filter:brightness(.97);}
 .link-btn.on{background:var(--accent);color:var(--on-accent);}
 
-/* Respond composer — full-bleed dock flush to the content edges. The negative
-   inline margins cancel Filament's responsive page padding (px-4/6/8). */
+/* Respond composer — sticky dock spanning the content width, flush to the
+   content (card) edges. Content is centered (maxContentWidth), so the dock
+   tracks it rather than bleeding to the viewport. */
 .respond-inner{margin:0 auto;}
-.respond-dock{position:sticky;bottom:0;z-index:25;margin-top:24px;margin-inline:-1rem;padding:14px 1rem;background:color-mix(in oklab,var(--surface) 92%,transparent);backdrop-filter:blur(10px);border-top:1px solid var(--border);}
-@media (min-width:768px){.respond-dock{margin-inline:-1.5rem;padding-left:1.5rem;padding-right:1.5rem;}}
-@media (min-width:1024px){.respond-dock{margin-inline:-2rem;padding-left:2rem;padding-right:2rem;}}
+.respond-dock{position:sticky;bottom:0;z-index:25;margin-top:24px;padding:14px 0;background:color-mix(in oklab,var(--surface) 92%,transparent);backdrop-filter:blur(10px);border-top:1px solid var(--border);}
 .respond.is-waiting.respond-dock{border-top:2px solid var(--wn-500);}
 .respond-flag{display:flex;align-items:center;gap:8px;font-size:var(--t-sm);font-weight:600;color:var(--wn-700);margin-bottom:10px;}
 .respond-flag svg{width:16px;height:16px;}
