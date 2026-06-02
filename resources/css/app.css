@@ -452,7 +452,14 @@ body,
 .fi-main .fi-resource-relation-manager .fi-ta-header-toolbar {
   display: none;
 }
-/* Custom relation toolbar: status segment (left) + search + create (right). */
+/* Custom relation toolbar: status segment (left) + search + create (right).
+   Render it as a proper bar — padding + a divider line above the table. */
+.fi-main .fi-resource-relation-manager .fi-ta-header {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  background: none;
+  border-radius: 0;
+}
 .fi-rel-toolbar {
   display: flex;
   align-items: center;
