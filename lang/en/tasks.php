@@ -81,6 +81,7 @@ return [
             'implement' => 'Implementation',
             'implement_body' => 'The agent implemented the change.',
             'technical' => 'Technical',
+            'summary' => 'Summary',
             'diff' => 'Diff',
             'logs' => 'Logs',
             'push' => 'Pull request',

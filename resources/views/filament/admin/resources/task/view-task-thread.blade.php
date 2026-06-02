@@ -140,6 +140,11 @@
                     @endif
 
                     <x-slot:actions>
+                        @if ($implementSummaryNontechnicalHtml)
+                            <button type="button" class="link-btn" :class="panel === 'summary' && 'on'" @click="panel = (panel === 'summary' ? null : 'summary')">
+                                @svg('heroicon-o-bars-3-bottom-left') {{ __('tasks.view.thread.summary') }}
+                            </button>
+                        @endif
                         <button type="button" class="link-btn" :class="panel === 'diff' && 'on'"
                             @click="panel = (panel === 'diff' ? null : 'diff'); @if (! $diffLoaded) if (panel === 'diff') $wire.loadDiff() @endif">
                             @svg('heroicon-o-document-text') {{ __('tasks.view.thread.diff') }}
@@ -157,6 +162,11 @@
                     </x-slot:actions>
 
                     <x-slot:detail>
+                        @if ($implementSummaryNontechnicalHtml)
+                            <div x-show="panel === 'summary'" x-cloak class="card card-pad prose prose-sm dark:prose-invert max-w-none">
+                                {!! $implementSummaryNontechnicalHtml !!}
+                            </div>
+                        @endif
                         <div x-show="panel === 'diff'" x-cloak>
                             <div wire:loading wire:target="loadDiff" class="callout callout-info">@svg('heroicon-o-arrow-path') {{ __('tasks.view.diff.loading') }}</div>
                             <div wire:loading.remove wire:target="loadDiff"><x-argos.diff :files="$diffFiles" /></div>
