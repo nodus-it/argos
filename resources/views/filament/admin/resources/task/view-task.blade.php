@@ -25,6 +25,29 @@
             || ($currentPhase === null && $phase === 'concept');
     @endphp
 
+    {{-- ===================== Redesign: phase rail + meta strip =====================
+         Additive Warm-Paper elements at the top of the task detail. The full
+         chronological-thread rewrite (replacing the sections below) is the
+         visual-iteration follow-up. See docs/design/argos/ARGOS_REDESIGN.md §6.3. --}}
+    <div class="fade-in" style="margin-bottom:16px;">
+        <div class="card card-pad" style="margin-bottom:12px;">
+            <x-argos.phase-rail :rail="$record->phaseRail()" :current="$record->displayStatusLabel()" />
+        </div>
+        <x-argos.meta-strip>
+            @if ($record->repoProfile)
+                <x-argos.meta-item label="{{ __('tasks.columns.project') }}">{{ $record->repoProfile->name }}</x-argos.meta-item>
+            @endif
+            @if ($record->feature_branch)
+                <x-argos.meta-item label="Branch" :mono="true" :link="true">{{ $record->feature_branch }}</x-argos.meta-item>
+            @endif
+            @if ($record->pr_url)
+                <x-argos.meta-item label="PR" :link="true">
+                    <a href="{{ $record->pr_url }}" target="_blank" rel="noopener">Pull Request</a>
+                </x-argos.meta-item>
+            @endif
+        </x-argos.meta-strip>
+    </div>
+
     {{-- ===================== Task header ===================== --}}
     <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
 
