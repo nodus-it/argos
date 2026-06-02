@@ -287,7 +287,14 @@ body,
   padding: 0;
 }
 .fi-main .fi-section.fi-aside > .fi-section-content-ctn {
+  /* Filament cards the RIGHT column (fields) in aside mode — remove that box
+     entirely so only the section's top divider separates the areas. */
+  background-color: transparent;
   border: none;
+  border-radius: 0;
+  box-shadow: none;
+  --tw-shadow: 0 0 #0000;
+  --tw-ring-shadow: 0 0 #0000;
 }
 .fi-main .fi-section.fi-aside .fi-section-header-heading {
   gap: 8px;
@@ -415,7 +422,8 @@ body,
   --tw-ring-shadow: 0 0 #0000;
 }
 .fi-main .fi-sc-tabs:not(.fi-contained) .fi-ta-ctn,
-.fi-main .fi-sc-tabs:not(.fi-contained) .fi-section {
+.fi-main .fi-sc-tabs:not(.fi-contained) .fi-section,
+.fi-main .fi-resource-relation-manager .fi-ta-ctn {
   background: none;
   border: none;
   border-radius: 0;
