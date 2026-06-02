@@ -38,12 +38,14 @@ trait HasArgosEditHeading
     }
 
     /**
-     * Keep the form's Save/Cancel bar pinned to the bottom of the form card,
-     * matching the mockup. No-op on View pages (they have no form actions).
+     * Don't use Filament's sticky form actions — it renders a floating pill
+     * with negative margins that overflow our padding-less form card. We style
+     * the in-flow footer as a full-width bottom bar in CSS instead.
+     * No-op on View pages (they have no form actions).
      */
     public function areFormActionsSticky(): bool
     {
-        return true;
+        return false;
     }
 
     protected function argosHeadingAttribute(): string

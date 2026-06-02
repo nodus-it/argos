@@ -350,8 +350,9 @@ body,
 .fi-main .fi-input-wrp {
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);
-  --tw-shadow: 0 0 #0000;
-  --tw-ring-shadow: 0 0 #0000;
+  /* Kill Filament's own ring/shadow entirely (it draws a second outline at a
+     different radius -> looks like a double border). */
+  box-shadow: none;
 }
 .fi-main .fi-input-wrp:focus-within {
   border-color: var(--accent);
@@ -381,10 +382,22 @@ body,
   --tw-ring-shadow: 0 0 #0000;
 }
 
-/* Relation-manager panel = ONE card with the (left-aligned) tabs on top and
-   the table below. Filament renders the relation tabs un-"contained", which is
-   how we tell them apart from the form's contained tabs. The inner table
-   section is de-carded so we don't double up cards. */
+/* Save/Cancel bar — a full-width bar pinned to the bottom of the form card
+   (top divider + padding that matches the card). Filament's own sticky mode
+   turns it into a floating pill with negative margins that overflow our
+   padding-less card, so we disable that (areFormActionsSticky() = false) and
+   style the in-flow footer here instead. */
+.fi-main .fi-sc-form .fi-sc-actions {
+  padding: 14px 28px;
+  border-top: 1px solid var(--border);
+  background-color: var(--surface);
+}
+
+/* Relation-manager panel = ONE card with the (left-aligned) underline tabs on
+   top and the table below. Filament renders the relation tabs un-"contained"
+   (that's how we tell them apart from the form's contained tabs), but as a
+   floating white pill bar with the table in its own card below — so we de-pill
+   the tab bar (row + bottom divider) and de-card the inner table. */
 .fi-main .fi-sc-tabs:not(.fi-contained) {
   background-color: var(--surface);
   border: 1px solid var(--border);
@@ -392,9 +405,20 @@ body,
   box-shadow: var(--shadow-sm);
   overflow: hidden;
 }
+.fi-main .fi-sc-tabs:not(.fi-contained) .fi-tabs:not(.fi-contained) {
+  background: none;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border);
+  --tw-shadow: 0 0 #0000;
+  --tw-ring-shadow: 0 0 #0000;
+}
+.fi-main .fi-sc-tabs:not(.fi-contained) .fi-ta-ctn,
 .fi-main .fi-sc-tabs:not(.fi-contained) .fi-section {
   background: none;
   border: none;
+  border-radius: 0;
   box-shadow: none;
   --tw-shadow: 0 0 #0000;
   --tw-ring-shadow: 0 0 #0000;
