@@ -20,6 +20,35 @@ fi
 # Storage permissions for the dev bind mount.
 chmod -R a+w /app/storage/logs /app/storage/framework /app/bootstrap/cache 2>/dev/null || true
 
+# Resolve APP_KEY before any artisan/composer command boots the framework.
+# composer install's post-autoload-dump hook runs package:discover, which boots
+# the app (OAuthConfigHydrator decrypts an encrypted client_secret at boot) —
+# that needs APP_KEY present. So this must precede the composer sync and discover
+# blocks below, not follow them.
+#
+# Resolution order: explicit container env (compose) → repo /app/.env → a
+# persisted auto-generated key. The auto-generated key is a LAST resort: it must
+# never be exported when /app/.env already defines one. Laravel's dotenv is
+# immutable (it won't overwrite an already-set env var), so an exported
+# auto-key would silently shadow the real /app/.env key — running the app under
+# the wrong key and orphaning every encrypted DB value ("MAC is invalid").
+if [[ -z "${APP_KEY:-}" ]]; then
+    # Compose injects APP_KEY="" (empty but PRESENT) whenever it's not in its
+    # env-file. Drop it so it can't shadow /app/.env, then fall back to the
+    # persisted auto-key only if /app/.env carries none either.
+    unset APP_KEY
+    if ! grep -qE '^APP_KEY=.+' /app/.env 2>/dev/null; then
+        KEY_FILE=/data/app-key
+        mkdir -p /data
+        if [[ ! -s "$KEY_FILE" ]]; then
+            (umask 077 && printf 'base64:%s\n' "$(head -c 32 /dev/urandom | base64)" > "$KEY_FILE")
+            chown www-data:www-data "$KEY_FILE"
+        fi
+        APP_KEY="$(cat "$KEY_FILE")"
+        export APP_KEY
+    fi
+fi
+
 # Sync composer dependencies if the host's vendor/ is missing or stale.
 if [[ -f /app/composer.lock ]]; then
     if [[ ! -f /app/vendor/autoload.php ]] \
@@ -92,17 +121,6 @@ if [[ -d /srv/argos-nginx ]]; then
     install -m 0644 /usr/local/share/argos/nginx.conf /srv/argos-nginx/default.conf
 fi
 
-# Generate and persist APP_KEY on first boot if not provided.
-if [[ -z "${APP_KEY:-}" ]]; then
-    KEY_FILE=/data/app-key
-    if [[ ! -s "$KEY_FILE" ]]; then
-        (umask 077 && printf 'base64:%s\n' "$(head -c 32 /dev/urandom | base64)" > "$KEY_FILE")
-        chown www-data:www-data "$KEY_FILE"
-    fi
-    APP_KEY="$(cat "$KEY_FILE")"
-    export APP_KEY
-fi
-
 # Passport signing keys for the MCP OAuth server live on the persistent /data
 # volume so issued tokens survive image rebuilds. AppServiceProvider reads
 # PASSPORT_KEYS_PATH and calls Passport::loadKeysFrom(); every role exports it
@@ -153,6 +171,9 @@ case "${ARGOS_ROLE:-app}" in
         # queue worker picks the job up once the app reports healthy.
         # Failure here is non-fatal — the resolver still builds on demand.
         php /app/artisan argos:warm-builtin-images --default-only --no-interaction || true
+        # Pre-warm the default live-demo runtime image (no-op when previews are
+        # off or the image is already cached). Dispatched to the queue worker.
+        php /app/artisan argos:warm-demo-image --no-interaction || true
         ;;
     worker|queue|scheduler)
         echo "ARGOS_ROLE=${ARGOS_ROLE} — skipping migrations (app service owns the schema)."
