@@ -219,6 +219,42 @@ body,
 }
 
 /* ============================================================
+   Filament forms (sections) + tables — warm-paper theming applied
+   globally to every resource's edit form and list, so the whole
+   settings/worker area matches the design uniformly.
+   ============================================================ */
+.fi-section {
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+.fi-section-header-heading {
+  font-size: var(--t-h3);
+  font-weight: 600;
+}
+.fi-section-header-description {
+  font-size: var(--t-sm);
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+/* Tables: card + uppercase faint headers + warm row hover. */
+.fi-ta {
+  border-radius: var(--radius-lg);
+}
+.fi-ta-header-cell {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.fi-ta-row:hover {
+  background-color: var(--surface-2);
+}
+
+/* ============================================================
    Reusable components (ported from docs/design/argos/styles.css,
    Warm Paper direction; dark overrides keyed on `.dark`). Consumed by
    the <x-argos.*> Blade components in later phases.
