@@ -412,11 +412,20 @@ body,
   box-shadow: var(--shadow-sm);
   overflow: hidden;
 }
-.fi-main .fi-sc-tabs:not(.fi-contained) .fi-tabs:not(.fi-contained) {
+/* All un-contained tab bars left-aligned (Filament centres them with
+   margin-inline:auto), matching the mockup. */
+.fi-main .fi-tabs:not(.fi-contained) {
+  margin-inline: 0;
+  justify-content: flex-start;
+}
+/* The relation tab bar (direct child of the relation tabs container) becomes a
+   left-aligned underline row, not a floating pill. The table's own filter tabs
+   (deeper, inside .fi-ta-header) keep their segmented look. */
+.fi-main .fi-sc-tabs:not(.fi-contained) > .fi-tabs {
   background: none;
   border-radius: 0;
   box-shadow: none;
-  padding: 0 12px;
+  padding: 4px 20px 0;
   border-bottom: 1px solid var(--border);
   --tw-shadow: 0 0 #0000;
   --tw-ring-shadow: 0 0 #0000;
@@ -430,6 +439,11 @@ body,
   box-shadow: none;
   --tw-shadow: 0 0 #0000;
   --tw-ring-shadow: 0 0 #0000;
+}
+/* The relation tab already labels the panel — drop the table's redundant
+   heading (e.g. "Tasks") so it matches the mockup. */
+.fi-main .fi-resource-relation-manager .fi-ta-header-heading {
+  display: none;
 }
 
 /* Tighten the gap between the page heading and the content (mockup is ~20px,
