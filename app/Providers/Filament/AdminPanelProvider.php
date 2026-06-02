@@ -42,7 +42,15 @@ class AdminPanelProvider extends PanelProvider
             ->brandLogoHeight('1.75rem')
             ->favicon(asset('favicon.svg'))
             ->colors([
-                'primary' => Color::Slate,
+                // Terracotta primary + warm-sand gray ("Warm Paper" redesign;
+                // see docs/design/argos/ARGOS_REDESIGN.md §2.3).
+                'primary' => [
+                    50 => '251,243,239', 100 => '246,228,218', 200 => '238,199,180',
+                    300 => '227,164,134', 400 => '217,128,95', 500 => '207,100,70',
+                    600 => '187,80,52', 700 => '154,64,43', 800 => '124,55,39',
+                    900 => '104,47,35', 950 => '58,22,16',
+                ],
+                'gray' => Color::hex('#7d7565'),
             ])
             ->maxContentWidth(Width::Full)
             ->discoverResources(in: app_path('Filament/Admin/Resources'), for: 'App\Filament\Admin\Resources')
