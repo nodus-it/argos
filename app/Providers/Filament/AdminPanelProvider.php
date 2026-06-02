@@ -103,6 +103,13 @@ class AdminPanelProvider extends PanelProvider
                 }
             )
             ->renderHook(
+                // Slot the page breadcrumbs teleport into (see the overridden
+                // filament-panels::components.header view) — moves them from the
+                // content header into the topbar, matching the design.
+                PanelsRenderHook::TOPBAR_START,
+                fn (): string => '<div id="argos-topbar-breadcrumbs" class="fi-argos-topbar-breadcrumbs"></div>',
+            )
+            ->renderHook(
                 PanelsRenderHook::CONTENT_START,
                 fn (): string => Blade::render('@livewire(\'usage-limit-banner\')')
             )

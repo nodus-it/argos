@@ -172,6 +172,15 @@ body,
   letter-spacing: .08em;
   color: var(--faint);
 }
+/* Breadcrumbs teleported into the topbar (see header view override). */
+.fi-argos-topbar-breadcrumbs {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.fi-argos-topbar-breadcrumbs .fi-breadcrumbs {
+  font-size: var(--t-sm);
+}
 
 /* ============================================================
    Reusable components (ported from docs/design/argos/styles.css,
