@@ -8,7 +8,6 @@ use App\Filament\Admin\Concerns\TaskTableConcern;
 use App\Filament\Admin\Resources\TaskResource;
 use App\Models\RepoProfile;
 use App\Models\Task;
-use Filament\Actions\Action;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
 use Filament\Tables\Table;
@@ -50,14 +49,11 @@ class TasksRelationManager extends RelationManager
             ->columns(static::taskTableColumns(withProject: false))
             ->filters(static::taskTableFilters(withProject: false))
             ->recordUrl(fn (Task $record): string => TaskResource::getUrl('view', ['record' => $record]))
-            ->headerActions([
-                Action::make('createTask')
-                    ->label(__('projects.actions.new_task'))
-                    ->icon('heroicon-o-plus')
-                    ->url(fn (): string => TaskResource::getUrl('create', [
-                        'repo_profile_id' => $this->getOwnerRecord()->getKey(),
-                    ])),
-            ])
+            // Single-row toolbar (status segment + search + "Neuer Task") — see
+            // resources/views/filament/relation/tasks-toolbar.blade.php. The
+            // default filter pill + search row are hidden in CSS.
+            ->header(view('filament.relation.tasks-toolbar'))
+            ->headerActions([])
             ->actions([])
             ->bulkActions([]);
     }

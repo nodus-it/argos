@@ -5,6 +5,7 @@ declare(strict_types=1);
 return [
     'navigation_group' => 'Aufgaben',
     'navigation_label' => 'Tasks',
+    'search_placeholder' => 'Tasks suchen…',
 
     'fields' => [
         'name_label' => 'Name',
