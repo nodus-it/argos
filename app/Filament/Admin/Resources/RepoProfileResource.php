@@ -92,6 +92,8 @@ class RepoProfileResource extends Resource
                             // ── Block 1 ─ Plattform (gates everything below) ────────────────
                             Section::make(__('projects.sections.platform'))
                                 ->description(__('projects.sections.platform_description'))
+                                ->icon('heroicon-o-globe-alt')
+                                ->aside()
                                 ->schema([
                                     Select::make('platform')
                                         ->label(__('projects.fields.platform'))
@@ -118,6 +120,9 @@ class RepoProfileResource extends Resource
 
                             // ── Block 3a ─ Authentifizierung (GitHub/GitLab mit OAuth-Account) ─
                             Section::make(__('projects.sections.authentication'))
+                                ->description(__('projects.sections.authentication_description'))
+                                ->icon('heroicon-o-key')
+                                ->aside()
                                 ->visible(fn (Get $get): bool => self::hasOAuthAccount($get))
                                 ->schema([
                                     Select::make('auth_method')
@@ -168,6 +173,9 @@ class RepoProfileResource extends Resource
 
                             // ── Block 3b ─ Authentifizierung (Bitbucket mit OAuth-Account) ─
                             Section::make(__('projects.sections.authentication'))
+                                ->description(__('projects.sections.authentication_description'))
+                                ->icon('heroicon-o-key')
+                                ->aside()
                                 ->visible(fn (Get $get): bool => $get('platform') === 'bitbucket' && self::bitbucketAccount() !== null)
                                 ->schema([
                                     Select::make('auth_method')
@@ -216,11 +224,14 @@ class RepoProfileResource extends Resource
                                         ->dehydrated(),
                                 ]),
 
-                            // ── Block 2 + Block 4 nebeneinander (Allgemein + Repository) ─────
-                            Grid::make(2)
+                            // ── Block 2 + Block 4 gestapelt (Allgemein + Repository) ─────────
+                            Grid::make(1)
                                 ->columnSpanFull()
                                 ->schema([
                                     Section::make(__('projects.sections.general'))
+                                        ->description(__('projects.sections.general_description'))
+                                        ->icon('heroicon-o-adjustments-horizontal')
+                                        ->aside()
                                         ->visible(fn (Get $get): bool => self::platformChosen($get))
                                         ->columnSpan(1)
                                         ->schema([
@@ -239,6 +250,9 @@ class RepoProfileResource extends Resource
                                         ]),
 
                                     Section::make(__('projects.sections.repository'))
+                                        ->description(__('projects.sections.repository_description'))
+                                        ->icon('heroicon-o-code-bracket-square')
+                                        ->aside()
                                         ->visible(fn (Get $get): bool => self::platformChosen($get))
                                         ->columnSpan(1)
                                         ->schema([
@@ -384,6 +398,8 @@ class RepoProfileResource extends Resource
                             // ── Worker (Stack & Agent) ──────────────────────────────────────
                             Section::make(__('projects.sections.worker'))
                                 ->description(__('projects.sections.worker_description'))
+                                ->icon('heroicon-o-cpu-chip')
+                                ->aside()
                                 ->visible(fn (Get $get): bool => self::platformChosen($get))
                                 ->schema([
                                     Select::make('worker_source')
@@ -433,6 +449,9 @@ class RepoProfileResource extends Resource
 
                             // ── Modelle ─────────────────────────────────────────────────────
                             Section::make(__('projects.sections.models'))
+                                ->description(__('projects.sections.models_description'))
+                                ->icon('heroicon-o-sparkles')
+                                ->aside()
                                 ->visible(fn (Get $get): bool => self::platformChosen($get))
                                 ->schema([
                                     // The default-model hint lives in helperText (text inside a
