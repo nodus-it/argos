@@ -164,20 +164,24 @@ body,
 /* Sidebar nav typography + spacing, ported from the prototype (styles.css):
    13px/500 labels, 18px icons, 8/10 item padding, 16px between groups. */
 .fi-sidebar-item-btn {
-  padding: 8px 10px;
-  gap: 11px;
+  padding: 5px 10px;
+  gap: 10px;
   font-size: var(--t-sm);
 }
 .fi-sidebar-item-icon {
-  width: 18px;
-  height: 18px;
+  width: 17px;
+  height: 17px;
 }
 .fi-sidebar-item-label {
   font-size: var(--t-sm);
   font-weight: 500;
 }
 .fi-sidebar-group + .fi-sidebar-group {
-  margin-top: 16px;
+  margin-top: 12px;
+}
+/* No collapse/expand chevrons on the nav groups. */
+.fi-sidebar-group-collapse-btn {
+  display: none;
 }
 .fi-sidebar-group-label {
   font-size: 11px;
@@ -187,14 +191,17 @@ body,
   color: var(--faint);
 }
 /* Breadcrumbs teleported into the topbar (see header view override).
-   order:10 pushes the slot past the topbar logo/toggle so it sits in the main
-   topbar area (right of the sidebar), left-aligned before the right-hand items. */
+   order:1 places the slot just after the logo/toggle (order 0); the right-hand
+   items get order:2 + margin-left:auto so they stay on the far right. */
 .fi-argos-topbar-breadcrumbs {
-  order: 10;
+  order: 1;
   display: flex;
   align-items: center;
   min-width: 0;
-  margin-inline-end: auto;
+}
+.fi-topbar-end {
+  order: 2;
+  margin-left: auto;
 }
 .fi-argos-topbar-breadcrumbs .fi-breadcrumbs {
   font-size: var(--t-sm);
@@ -444,7 +451,7 @@ body,
 /* Respond composer — sticky dock spanning the content width, flush to the
    content (card) edges. Content is centered (maxContentWidth), so the dock
    tracks it rather than bleeding to the viewport. */
-.respond-inner{margin:0 auto;padding-inline:8px;}
+.respond-inner{margin:0 auto;padding-inline:16px;}
 .respond-dock{position:sticky;bottom:0;z-index:25;margin-top:24px;padding:14px 0;background:color-mix(in oklab,var(--surface) 92%,transparent);backdrop-filter:blur(10px);border-top:1px solid var(--border);}
 .respond.is-waiting.respond-dock{border-top:2px solid var(--wn-500);}
 .respond-flag{display:flex;align-items:center;gap:8px;font-size:var(--t-sm);font-weight:600;color:var(--wn-700);margin-bottom:10px;}

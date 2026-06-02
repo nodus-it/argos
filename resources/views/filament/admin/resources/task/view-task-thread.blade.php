@@ -11,6 +11,16 @@
         $waitingConcept = $ws === 'concept_review';
         $waitingImplement = in_array($ws, ['implement_completed', 'implement_paused', 'in_review'], true);
         $cost = fn ($run) => $run?->cost_usd ? '$'.number_format((float) $run->cost_usd, 2) : null;
+
+        $allRuns = collect($phaseRuns)->flatten(1);
+        $totalCost = $allRuns->sum(fn ($r) => (float) ($r->cost_usd ?? 0));
+        $totalTokens = $allRuns->sum(fn ($r) => (int) ($r->input_tokens ?? 0) + (int) ($r->output_tokens ?? 0));
+        $agentLabel = ($task->worker_agent_name_override ?? $task->repoProfile?->worker_agent_name ?? \App\Enums\AgentName::ClaudeCode)->label();
+        $stackName = $task->workerStackOverride?->name ?? $task->repoProfile?->workerStack?->name ?? config('argos.compose.default_stack');
+
+        $implShort = $implementSummaryNontechnicalHtml
+            ? \Illuminate\Support\Str::limit(trim(strip_tags($implementSummaryNontechnicalHtml)), 180)
+            : __('tasks.view.thread.implement_body');
     @endphp
 
     {{-- Task name + status badge now render in the page header (getHeading). --}}
@@ -33,24 +43,34 @@
         </div>
         <x-argos.meta-strip>
             @if ($task->repoProfile)
-                <x-argos.meta-item label="{{ __('tasks.columns.project') }}">{{ $task->repoProfile->name }}</x-argos.meta-item>
+                <x-argos.meta-item label="{{ __('tasks.view.labels.repository') }}" :mono="true">{{ $task->repoProfile->name }}</x-argos.meta-item>
             @endif
             @if ($task->feature_branch)
-                <x-argos.meta-item label="Branch" :mono="true" :link="true">{{ $task->feature_branch }}</x-argos.meta-item>
+                <x-argos.meta-item label="{{ __('tasks.view.labels.branch') }}" :mono="true" :link="true">{{ $task->feature_branch }}</x-argos.meta-item>
             @endif
-            @if ($task->pr_url)
-                <x-argos.meta-item label="PR" :link="true">
-                    <a href="{{ $task->pr_url }}" target="_blank" rel="noopener">Pull Request</a>
-                </x-argos.meta-item>
+            <x-argos.meta-item label="{{ __('tasks.view.labels.agent') }}">{{ $agentLabel }}</x-argos.meta-item>
+            <x-argos.meta-item label="{{ __('tasks.view.labels.stack') }}" :mono="true">{{ $stackName }}</x-argos.meta-item>
+            @if ($totalCost > 0)
+                <x-argos.meta-item label="{{ __('tasks.view.labels.cost') }}" :mono="true">${{ number_format($totalCost, 4) }} · {{ number_format($totalTokens) }} tok</x-argos.meta-item>
             @endif
-            @if ($task->externalIssueLink)
-                <x-argos.meta-item label="{{ __('tasks.columns.source') }}" :mono="true">
-                    {{ $task->externalIssueLink->binding?->external_project_ref }}
-                    @if ($task->externalIssueLink->external_url)
-                        <a href="{{ $task->externalIssueLink->external_url }}" target="_blank" rel="noopener" class="link">{{ $task->externalIssueLink->external_url }}</a>
-                    @endif
-                </x-argos.meta-item>
-            @endif
+
+            <x-slot:extra>
+                <x-argos.meta-item label="{{ __('tasks.view.labels.base_branch') }}" :mono="true">{{ $task->base_branch ?: '—' }}</x-argos.meta-item>
+                <x-argos.meta-item label="{{ __('tasks.view.labels.created') }}">{{ $task->created_at?->format('d.m.Y H:i') }}</x-argos.meta-item>
+                @if ($task->pr_url)
+                    <x-argos.meta-item label="{{ __('tasks.view.labels.pull_request') }}" :link="true">
+                        <a href="{{ $task->pr_url }}" target="_blank" rel="noopener">{{ $task->pr_url }}</a>
+                    </x-argos.meta-item>
+                @endif
+                @if ($task->externalIssueLink)
+                    <x-argos.meta-item label="{{ __('tasks.columns.source') }}" :mono="true">
+                        {{ $task->externalIssueLink->binding?->external_project_ref }}
+                        @if ($task->externalIssueLink->external_url)
+                            <a href="{{ $task->externalIssueLink->external_url }}" target="_blank" rel="noopener" class="link">{{ $task->externalIssueLink->external_url }}</a>
+                        @endif
+                    </x-argos.meta-item>
+                @endif
+            </x-slot:extra>
         </x-argos.meta-strip>
     </div>
 
@@ -64,10 +84,9 @@
 
         {{-- Concept --}}
         @if ($conceptRun || $conceptHtml || $waitingConcept)
-            <div x-data="{ open: false }">
-                <x-argos.thread-item phase="concept" :done="$isDone($conceptRun)"
-                    title="{{ __('tasks.view.thread.concept') }}" who="Claude Code"
-                    time="{{ $conceptRun?->finished_at?->diffForHumans() }}" :cost="$cost($conceptRun)">
+            <x-argos.thread-item x-data="{ open: false }" phase="concept" :done="$isDone($conceptRun)"
+                title="{{ __('tasks.view.thread.concept') }}" who="Claude Code"
+                time="{{ $conceptRun?->finished_at?->diffForHumans() }}" :cost="$cost($conceptRun)">
                     @if ($conceptError)
                         <span class="callout callout-warn" style="display:flex">@svg('heroicon-o-exclamation-triangle') {{ \Illuminate\Support\Str::limit($conceptError, 300) }}</span>
                     @else
@@ -86,21 +105,15 @@
                             </div>
                         </x-slot:detail>
                     @endif
-                </x-argos.thread-item>
-            </div>
+            </x-argos.thread-item>
         @endif
 
         {{-- Implementation --}}
         @if ($implementRun || $implementSummaryNontechnicalHtml)
-            <div x-data="{ panel: null }">
-                <x-argos.thread-item phase="implement" :done="$isDone($implementRun)"
-                    title="{{ __('tasks.view.thread.implement') }}" who="Claude Code"
-                    time="{{ $implementRun?->finished_at?->diffForHumans() }}" :cost="$cost($implementRun)">
-                    @if ($implementSummaryNontechnicalHtml)
-                        <span class="prose prose-sm dark:prose-invert max-w-none">{!! $implementSummaryNontechnicalHtml !!}</span>
-                    @else
-                        {{ __('tasks.view.thread.implement_body') }}
-                    @endif
+            <x-argos.thread-item x-data="{ panel: null }" phase="implement" :done="$isDone($implementRun)"
+                title="{{ __('tasks.view.thread.implement') }}" who="Claude Code"
+                time="{{ $implementRun?->finished_at?->diffForHumans() }}" :cost="$cost($implementRun)">
+                {{ $implShort }}
 
                     @if ($implementQualityGates)
                         <div class="feed-actions" style="margin-top:10px;">
@@ -157,8 +170,7 @@
                             </div>
                         @endif
                     </x-slot:detail>
-                </x-argos.thread-item>
-            </div>
+            </x-argos.thread-item>
         @endif
 
         {{-- Push / PR --}}

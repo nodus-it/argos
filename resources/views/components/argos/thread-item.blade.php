@@ -22,7 +22,7 @@
         'respond' => 'heroicon-o-chat-bubble-left-right',
     ];
 @endphp
-<div class="feed-item">
+<div {{ $attributes->merge(['class' => 'feed-item']) }}>
     @if ($phase === 'you')
         <div class="feed-node st-you"><x-argos.avatar>Du</x-argos.avatar></div>
     @else

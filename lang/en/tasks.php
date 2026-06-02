@@ -101,6 +101,8 @@ return [
             'base_branch' => 'Base Branch',
             'branch' => 'Branch',
             'pull_request' => 'Pull Request',
+            'cost' => 'Cost',
+            'created' => 'Created',
             'open' => 'Open',
             'source' => 'Source',
             'external_issue' => 'External Issue',
