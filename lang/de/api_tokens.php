@@ -24,6 +24,8 @@ return [
     'client' => [
         'label' => 'API-Client',
         'plural' => 'API-Clients',
+        'section' => 'Identität',
+        'section_description' => 'Ein wiedererkennbarer Name für diesen programmatischen Zugriff.',
         'name' => 'Name',
         'name_help' => 'Frei wählbarer Name für den programmatischen Zugriff (z. B. „CI", „Skripte"). Token mit Vollzugriff über alle Projekte.',
         'tokens' => 'Tokens',

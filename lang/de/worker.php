@@ -63,7 +63,9 @@ return [
         'plural' => 'Agent-Credentials',
         'sections' => [
             'identity' => 'Identität',
+            'identity_description' => 'Für welchen Agenten dieses Konto gilt, ein Anzeigename und der Status.',
             'auth' => 'Authentifizierung',
+            'auth_description' => 'Die Zugangsdaten des Agenten — je nach Agent ein Token oder die vollständige auth.json.',
         ],
         'fields' => [
             'agent_name' => 'Agent',

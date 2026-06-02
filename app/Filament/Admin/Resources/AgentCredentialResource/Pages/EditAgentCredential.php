@@ -5,12 +5,16 @@ declare(strict_types=1);
 namespace App\Filament\Admin\Resources\AgentCredentialResource\Pages;
 
 use App\Enums\AgentName;
+use App\Filament\Admin\Concerns\HasArgosEditHeading;
 use App\Filament\Admin\Resources\AgentCredentialResource;
+use App\Models\AgentCredential;
 use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
 
 class EditAgentCredential extends EditRecord
 {
+    use HasArgosEditHeading;
+
     protected static string $resource = AgentCredentialResource::class;
 
     protected function getHeaderActions(): array
@@ -18,6 +22,17 @@ class EditAgentCredential extends EditRecord
         return [
             DeleteAction::make(),
         ];
+    }
+
+    /**
+     * @return array{icon?: string, label: string}|null
+     */
+    protected function argosHeadingChip(): ?array
+    {
+        /** @var AgentCredential $record */
+        $record = $this->getRecord();
+
+        return ['icon' => 'heroicon-o-cpu-chip', 'label' => $record->agent_name->value];
     }
 
     /**

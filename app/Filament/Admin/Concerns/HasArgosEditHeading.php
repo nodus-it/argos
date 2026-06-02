@@ -19,7 +19,11 @@ trait HasArgosEditHeading
 {
     public function getHeading(): string|Htmlable
     {
-        $name = (string) ($this->getRecord()->getAttribute($this->argosHeadingAttribute()) ?? '');
+        $value = $this->getRecord()->getAttribute($this->argosHeadingAttribute());
+        if ($value instanceof \BackedEnum) {
+            $value = $value->value;
+        }
+        $name = (string) ($value ?? '');
         $html = '<span class="td-heading-name">'.e($name).'</span>';
 
         $chip = $this->argosHeadingChip();

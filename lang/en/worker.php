@@ -63,7 +63,9 @@ return [
         'plural' => 'Agent credentials',
         'sections' => [
             'identity' => 'Identity',
+            'identity_description' => 'Which agent this account is for, a display name, and the status.',
             'auth' => 'Authentication',
+            'auth_description' => "The agent's credentials — a token or the full auth.json, depending on the agent.",
         ],
         'fields' => [
             'agent_name' => 'Agent',
