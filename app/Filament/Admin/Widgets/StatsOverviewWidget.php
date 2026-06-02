@@ -13,6 +13,11 @@ use Illuminate\Support\Facades\DB;
 
 class StatsOverviewWidget extends BaseWidget
 {
+    // Warm-Paper redesign: render the stats as .stat control-room cards instead
+    // of Filament's default stat view. The getStats() data/logic below is
+    // unchanged. See docs/design/argos/ARGOS_REDESIGN.md §5.11/§6.2.
+    protected string $view = 'filament.widgets.argos-stats-overview';
+
     protected ?string $pollingInterval = '5s';
 
     protected int|string|array $columnSpan = 'full';

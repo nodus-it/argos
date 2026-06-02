@@ -24,6 +24,8 @@ return [
     'client' => [
         'label' => 'API client',
         'plural' => 'API clients',
+        'section' => 'Identity',
+        'section_description' => 'A recognizable name for this programmatic access.',
         'name' => 'Name',
         'name_help' => 'A free-form name for programmatic access (e.g. "CI", "scripts"). Tokens grant full access across all projects.',
         'tokens' => 'Tokens',

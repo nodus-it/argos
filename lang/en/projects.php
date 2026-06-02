@@ -8,6 +8,10 @@ return [
     'model_label' => 'Project',
     'model_label_plural' => 'Projects',
 
+    'actions' => [
+        'new_task' => 'New task',
+    ],
+
     'tabs' => [
         'basics' => 'General',
         'worker' => 'Worker & models',
@@ -18,11 +22,15 @@ return [
         'platform' => 'Platform',
         'platform_description' => 'Choose a platform — the remaining fields will be unlocked afterwards.',
         'general' => 'General',
+        'general_description' => 'The project display name and automation for the concept and PR phases.',
         'worker' => 'Worker',
         'worker_description' => 'Stack & agent that run the phases for this project. Overridable per task.',
         'models' => 'Models',
+        'models_description' => 'Model selection for the phases. Leave empty to use the stack defaults.',
         'authentication' => 'Authentication',
+        'authentication_description' => 'How Argos accesses the repository — a connected account or a personal access token.',
         'repository' => 'Repository',
+        'repository_description' => 'Repository address and the default branch the tasks build upon.',
     ],
 
     'fields' => [

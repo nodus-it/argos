@@ -67,6 +67,8 @@ class Settings extends Page implements HasForms
             ->components([
                 Section::make(__('settings.token_section_heading'))
                     ->description($this->tokenSourceDescription())
+                    ->icon('heroicon-o-key')
+                    ->aside()
                     ->components([
                         TextInput::make('claude_token')
                             ->label(__('settings.token_field.label'))

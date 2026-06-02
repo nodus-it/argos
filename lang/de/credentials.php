@@ -8,7 +8,9 @@ return [
         'plural' => 'Access-Tokens',
         'sections' => [
             'identity' => 'Identität',
+            'identity_description' => 'Plattform, optionale Instanz-URL und eine Bezeichnung zur Wiedererkennung.',
             'auth' => 'Token',
+            'auth_description' => 'Das Personal Access Token mit den nötigen Scopes — verschlüsselt gespeichert, nie geloggt.',
         ],
         'fields' => [
             'label' => 'Bezeichnung',
@@ -43,7 +45,9 @@ return [
         'public_instance' => 'Öffentliche Instanz',
         'sections' => [
             'app' => 'OAuth-App',
+            'app_description' => 'Plattform, optionale Instanz-URL und die Callback-URL für den OAuth-Flow.',
             'credentials' => 'Zugangsdaten',
+            'credentials_description' => 'Client-ID und Client-Secret der OAuth-App — verschlüsselt gespeichert, nie geloggt.',
         ],
         'fields' => [
             'provider' => 'Plattform',

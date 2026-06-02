@@ -59,27 +59,31 @@ class WorkerImageBuildResource extends Resource
     public static function infolist(Schema $schema): Schema
     {
         return $schema->components([
-            Section::make()->schema([
-                TextEntry::make('tag')
-                    ->label(__('worker.image_builds.fields.tag'))
-                    ->copyable()
-                    ->fontFamily('mono'),
-                TextEntry::make('stack.name')
-                    ->label(__('worker.image_builds.fields.stack')),
-                TextEntry::make('agent_name')
-                    ->label(__('worker.image_builds.fields.agent'))
-                    ->formatStateUsing(fn (AgentName $state): string => $state->label()),
-                TextEntry::make('status')
-                    ->label(__('worker.image_builds.fields.status'))
-                    ->badge(),
-                TextEntry::make('size_bytes')
-                    ->label(__('worker.image_builds.fields.size_bytes'))
-                    ->state(fn (WorkerImageBuild $r): string => self::formatBytes($r->size_bytes)),
-                TextEntry::make('built_at')
-                    ->label(__('worker.image_builds.fields.built_at'))
-                    ->dateTime()
-                    ->placeholder('—'),
-            ]),
+            Section::make(__('worker.image_builds.summary'))
+                ->description(__('worker.image_builds.summary_description'))
+                ->icon('heroicon-o-cube')
+                ->aside()
+                ->schema([
+                    TextEntry::make('tag')
+                        ->label(__('worker.image_builds.fields.tag'))
+                        ->copyable()
+                        ->fontFamily('mono'),
+                    TextEntry::make('stack.name')
+                        ->label(__('worker.image_builds.fields.stack')),
+                    TextEntry::make('agent_name')
+                        ->label(__('worker.image_builds.fields.agent'))
+                        ->formatStateUsing(fn (AgentName $state): string => $state->label()),
+                    TextEntry::make('status')
+                        ->label(__('worker.image_builds.fields.status'))
+                        ->badge(),
+                    TextEntry::make('size_bytes')
+                        ->label(__('worker.image_builds.fields.size_bytes'))
+                        ->state(fn (WorkerImageBuild $r): string => self::formatBytes($r->size_bytes)),
+                    TextEntry::make('built_at')
+                        ->label(__('worker.image_builds.fields.built_at'))
+                        ->dateTime()
+                        ->placeholder('—'),
+                ]),
             Section::make(__('worker.image_builds.fields.build_log'))
                 ->description(__('worker.image_builds.build_log_description'))
                 ->collapsed()

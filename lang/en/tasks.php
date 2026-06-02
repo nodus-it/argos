@@ -5,6 +5,7 @@ declare(strict_types=1);
 return [
     'navigation_group' => 'Tasks',
     'navigation_label' => 'Tasks',
+    'search_placeholder' => 'Search tasks…',
 
     'fields' => [
         'name_label' => 'Name',
@@ -73,6 +74,27 @@ return [
     ],
 
     'view' => [
+        'thread' => [
+            'created' => 'Task created',
+            'concept' => 'Concept',
+            'concept_body' => 'The agent proposed an approach.',
+            'view_concept' => 'View concept',
+            'implement' => 'Implementation',
+            'implement_body' => 'The agent implemented the change.',
+            'technical' => 'Technical',
+            'summary' => 'Summary',
+            'diff' => 'Diff',
+            'logs' => 'Logs',
+            'push' => 'Pull request',
+            'open_pr' => 'Open pull request',
+            'waiting_flag' => 'The agent is waiting for your feedback.',
+            'send' => 'Send',
+            'chip_changes' => 'Request changes',
+            'chip_changes_text' => 'Please change the following: ',
+            'chip_approve' => 'Approve & merge',
+            'chip_question' => 'Ask a question',
+            'chip_question_text' => 'Question: ',
+        ],
         'labels' => [
             'status' => 'Status',
             'repository' => 'Repository',
@@ -81,6 +103,8 @@ return [
             'base_branch' => 'Base Branch',
             'branch' => 'Branch',
             'pull_request' => 'Pull Request',
+            'cost' => 'Cost',
+            'created' => 'Created',
             'open' => 'Open',
             'source' => 'Source',
             'external_issue' => 'External Issue',
@@ -229,6 +253,7 @@ return [
             'concept_update' => 'Update Concept',
             'implement' => 'Implement',
             'push_pr' => 'Push & PR',
+            'more_label' => 'More actions',
             'force_unlock_label' => 'Release Lock',
             'force_unlock_heading' => 'Force Release Lock',
             'force_unlock_description' => 'The worker lock is still set (likely due to a crashed container). Release the lock and restart Implement?',
