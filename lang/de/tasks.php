@@ -73,6 +73,21 @@ return [
     ],
 
     'view' => [
+        'thread' => [
+            'created' => 'Aufgabe angelegt',
+            'concept' => 'Konzept',
+            'concept_body' => 'Der Agent hat einen Lösungsweg vorgeschlagen.',
+            'view_concept' => 'Konzept ansehen',
+            'implement' => 'Implementierung',
+            'implement_body' => 'Der Agent hat die Änderung umgesetzt.',
+            'technical' => 'Technisch',
+            'diff' => 'Diff',
+            'logs' => 'Logs',
+            'push' => 'Pull Request',
+            'open_pr' => 'Pull Request öffnen',
+            'waiting_flag' => 'Der Agent wartet auf dein Feedback.',
+            'send' => 'Senden',
+        ],
         'labels' => [
             'status' => 'Status',
             'repository' => 'Repository',

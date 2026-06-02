@@ -73,6 +73,21 @@ return [
     ],
 
     'view' => [
+        'thread' => [
+            'created' => 'Task created',
+            'concept' => 'Concept',
+            'concept_body' => 'The agent proposed an approach.',
+            'view_concept' => 'View concept',
+            'implement' => 'Implementation',
+            'implement_body' => 'The agent implemented the change.',
+            'technical' => 'Technical',
+            'diff' => 'Diff',
+            'logs' => 'Logs',
+            'push' => 'Pull request',
+            'open_pr' => 'Open pull request',
+            'waiting_flag' => 'The agent is waiting for your feedback.',
+            'send' => 'Send',
+        ],
         'labels' => [
             'status' => 'Status',
             'repository' => 'Repository',

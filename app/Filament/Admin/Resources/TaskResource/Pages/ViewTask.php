@@ -276,7 +276,10 @@ class ViewTask extends ViewRecord
 
     public function getView(): string
     {
-        return 'filament.admin.resources.task.view-task';
+        // Warm-Paper redesign: chronological thread layout. The previous
+        // section/tab view stays at ...task.view-task as a fallback to revert
+        // to. See docs/design/argos/ARGOS_REDESIGN.md §6.3.
+        return 'filament.admin.resources.task.view-task-thread';
     }
 
     protected function getHeaderActions(): array
