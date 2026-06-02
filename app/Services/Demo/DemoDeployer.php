@@ -34,7 +34,13 @@ class DemoDeployer
     /** Per in-container command timeout (seconds). */
     public int $commandTimeoutSeconds = 600;
 
-    public function __construct(private readonly GitServiceFactory $gitFactory) {}
+    /** Token in the bundled default compose that the runtime image tag replaces. */
+    private const DEMO_IMAGE_PLACEHOLDER = '__ARGOS_DEMO_IMAGE__';
+
+    public function __construct(
+        private readonly GitServiceFactory $gitFactory,
+        private readonly DemoImageBuilder $imageBuilder,
+    ) {}
 
     /**
      * Build (or rebuild) the live demo for a task. Always replaces a previous
@@ -65,7 +71,15 @@ class DemoDeployer
 
         $log = '';
         try {
-            [$composeYaml, $settings] = $this->readContract($profile);
+            [$composeYaml, $settings, $usingDefault] = $this->readContract($profile);
+
+            // The bundled default compose references the runtime image by a
+            // placeholder — resolve (build-on-demand) the content-hashed tag and
+            // inject it. Repo-supplied contracts bring their own images.
+            if ($usingDefault) {
+                $composeYaml = str_replace(self::DEMO_IMAGE_PLACEHOLDER, $this->imageBuilder->ensure(), $composeYaml);
+            }
+
             $entry = $this->parseEntry($settings);
 
             $workDir = $this->prepareWorkDir($slug, $composeYaml, $this->buildOverrideYaml($task, $slug, $entry));
@@ -170,9 +184,10 @@ class DemoDeployer
     }
 
     /**
-     * Fetch both contract files from the provider at the base branch.
+     * Fetch both contract files from the provider at the base branch, or fall
+     * back to the bundled default when the repo ships none.
      *
-     * @return array{0: string, 1: array<string, mixed>} [composeYaml, settings]
+     * @return array{0: string, 1: array<string, mixed>, 2: bool} [composeYaml, settings, usingDefault]
      */
     private function readContract(RepoProfile $profile): array
     {
@@ -183,7 +198,15 @@ class DemoDeployer
         $composeYaml = $service->getFileContents($ownerRepo, DemoConfigLocator::COMPOSE_PATH, $ref);
         $settingsYaml = $service->getFileContents($ownerRepo, DemoConfigLocator::SETTINGS_PATH, $ref);
 
-        if ($composeYaml === null || $settingsYaml === null) {
+        $usingDefault = false;
+
+        if ($composeYaml === null && $settingsYaml === null) {
+            // No contract at all → built-in default runtime.
+            [$composeYaml, $settingsYaml] = $this->defaultContract();
+            $usingDefault = true;
+        } elseif ($composeYaml === null || $settingsYaml === null) {
+            // A half-written contract is a mistake the author must see, not a
+            // silent fall-through to the generic demo.
             throw new RuntimeException(
                 'Demo contract incomplete: '.DemoConfigLocator::COMPOSE_PATH.' and '
                 .DemoConfigLocator::SETTINGS_PATH.' must both exist at '.$ref.'.'
@@ -195,7 +218,22 @@ class DemoDeployer
             throw new RuntimeException(DemoConfigLocator::SETTINGS_PATH.' is not valid YAML.');
         }
 
-        return [$composeYaml, $settings];
+        return [$composeYaml, $settings, $usingDefault];
+    }
+
+    /**
+     * Read the bundled default Laravel demo contract (compose + settings).
+     *
+     * @return array{0: string, 1: string} [composeYaml, settingsYaml]
+     */
+    private function defaultContract(): array
+    {
+        $dir = resource_path('stubs/demo/laravel');
+
+        return [
+            (string) file_get_contents($dir.'/demo.compose.yml'),
+            (string) file_get_contents($dir.'/demo.yml'),
+        ];
     }
 
     /**
@@ -239,6 +277,17 @@ class DemoDeployer
         $override = [
             'services' => [
                 $entry['service'] => [
+                    // The container only sees the internal port (80); it has no
+                    // idea Traefik publishes it on the external port. Without
+                    // this, Laravel/Vite generate asset URLs from the request
+                    // host WITHOUT the external port → the browser fetches CSS/JS
+                    // on :80 and fails. Pin the full external URL so asset()/
+                    // url()/Vite emit reachable links. (Harmless for non-Laravel
+                    // contracts — they ignore these env vars.)
+                    'environment' => [
+                        'APP_URL' => $this->demoUrlForSlug($slug),
+                        'ASSET_URL' => $this->demoUrlForSlug($slug),
+                    ],
                     'volumes' => [
                         $task->volumeName().':'.$entry['workspace_mount'],
                     ],
@@ -259,6 +308,14 @@ class DemoDeployer
             ],
             'networks' => [
                 $network => [
+                    'external' => true,
+                ],
+            ],
+            // The task workspace volume is created by the worker and pre-exists;
+            // declare it external so compose mounts it instead of erroring on an
+            // "undefined volume".
+            'volumes' => [
+                $task->volumeName() => [
                     'external' => true,
                 ],
             ],
@@ -414,6 +471,12 @@ class DemoDeployer
         file_put_contents($this->routeFilePath($slug), Yaml::dump($route, 8, 2));
 
         return $this->demoUrl($host);
+    }
+
+    /** Public URL for a demo slug (scheme + slug.base_domain + external port). */
+    private function demoUrlForSlug(string $slug): string
+    {
+        return $this->demoUrl($slug.'.'.config('argos.preview.base_domain', '127.0.0.1.nip.io'));
     }
 
     /** Public URL for a demo host, appending the external port unless it is 80/443. */

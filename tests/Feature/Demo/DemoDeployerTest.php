@@ -9,11 +9,13 @@ use App\Models\Demo;
 use App\Models\RepoProfile;
 use App\Models\Task;
 use App\Services\Demo\DemoDeployer;
+use App\Services\Demo\DemoImageBuilder;
 use App\Services\GitProvider\GitServiceFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 use Symfony\Component\Process\Process;
+use Symfony\Component\Yaml\Yaml;
 use Tests\TestCase;
 
 class DemoDeployerTest extends TestCase
@@ -102,9 +104,20 @@ class DemoDeployerTest extends TestCase
         $this->assertStringContainsString($task->volumeName().':/var/www/html', $yaml);
         $this->assertStringContainsString('argos_edge', $yaml);
         $this->assertStringContainsString('demo-feat1', $yaml);
-        $this->assertStringContainsString('external: true', $yaml);
         // No Traefik labels — routing is file-provider, not docker-provider.
         $this->assertStringNotContainsString('traefik', $yaml);
+
+        // Both the edge network AND the pre-existing workspace volume must be
+        // declared external at the top level, or `compose up` rejects the
+        // project ("undefined volume").
+        $parsed = Yaml::parse($yaml);
+        $this->assertTrue($parsed['networks']['argos_edge']['external']);
+        $this->assertTrue($parsed['volumes'][$task->volumeName()]['external']);
+
+        // The external URL (incl. port) must be pinned so Laravel/Vite emit
+        // browser-reachable asset URLs.
+        $this->assertSame('http://demo-feat1.127.0.0.1.nip.io:8080', $parsed['services']['app']['environment']['APP_URL']);
+        $this->assertSame('http://demo-feat1.127.0.0.1.nip.io:8080', $parsed['services']['app']['environment']['ASSET_URL']);
     }
 
     public function test_write_traefik_route_creates_file_and_returns_url_with_port(): void
@@ -138,7 +151,7 @@ class DemoDeployerTest extends TestCase
         $profile = $this->profile();
         $task = Task::factory()->for($profile, 'repoProfile')->create(['name' => 'feat1']);
 
-        $deployer = new FakeDemoDeployer(app(GitServiceFactory::class), [
+        $deployer = new FakeDemoDeployer(app(GitServiceFactory::class), new FakeDemoImageBuilder, [
             ['cmd' => 'docker compose -p demo-feat1 down', 'exit' => 0],   // initial teardown
             ['cmd' => 'docker compose -p demo-feat1 -f', 'exit' => 0, 'stdout' => "Container started\n"], // up
             ['cmd' => 'exec -T app', 'exit' => 0, 'stdout' => "composer ok\n"],  // command
@@ -161,7 +174,7 @@ class DemoDeployerTest extends TestCase
         $profile = $this->profile();
         $task = Task::factory()->for($profile, 'repoProfile')->create(['name' => 'feat2']);
 
-        $deployer = new FakeDemoDeployer(app(GitServiceFactory::class), [
+        $deployer = new FakeDemoDeployer(app(GitServiceFactory::class), new FakeDemoImageBuilder, [
             ['cmd' => 'down', 'exit' => 0],   // initial teardown
             ['cmd' => 'up', 'exit' => 0],     // up
             ['cmd' => 'exec -T app', 'exit' => 1, 'stderr' => 'composer failed'],  // command fails
@@ -187,7 +200,7 @@ class DemoDeployerTest extends TestCase
         // A running demo for a different task already occupies the only slot.
         $old = Demo::factory()->live()->create();
 
-        $deployer = new FakeDemoDeployer(app(GitServiceFactory::class), [
+        $deployer = new FakeDemoDeployer(app(GitServiceFactory::class), new FakeDemoImageBuilder, [
             ['cmd' => 'down', 'exit' => 0],   // teardown current (none yet)
             ['cmd' => 'down', 'exit' => 0],   // evict the old demo
             ['cmd' => 'up', 'exit' => 0],
@@ -202,15 +215,46 @@ class DemoDeployerTest extends TestCase
         $this->assertNull($old->fresh()->url);
     }
 
-    public function test_deploy_fails_clearly_when_contract_missing(): void
+    public function test_deploy_uses_default_contract_when_repo_has_none(): void
     {
+        // Neither contract file exists → the built-in default runtime kicks in.
         Http::fake([
             'api.github.com/repos/*' => Http::response('', 404),
         ]);
         $profile = $this->profile();
-        $task = Task::factory()->for($profile, 'repoProfile')->create(['name' => 'feat3']);
+        $task = Task::factory()->for($profile, 'repoProfile')->create(['name' => 'feat-default']);
 
-        $deployer = new FakeDemoDeployer(app(GitServiceFactory::class), [
+        // down + up + 7 default commands + health = 10; pad to be safe.
+        $script = array_fill(0, 12, ['cmd' => '', 'exit' => 0]);
+        $deployer = new FakeDemoDeployer(app(GitServiceFactory::class), new FakeDemoImageBuilder, $script);
+
+        $demo = $deployer->deploy($task);
+
+        $this->assertSame(DemoStatus::Live, $demo->status);
+        $this->assertSame('http://demo-feat-default.127.0.0.1.nip.io:8080', $demo->url);
+
+        // The placeholder in the bundled compose must be resolved to the runtime
+        // image tag before `compose up`.
+        $written = file_get_contents(sys_get_temp_dir().'/argos-demo-demo-feat-default/demo.compose.yml');
+        $this->assertStringContainsString('argos-demo:testtag', (string) $written);
+        $this->assertStringNotContainsString('__ARGOS_DEMO_IMAGE__', (string) $written);
+    }
+
+    public function test_deploy_fails_when_contract_is_half_written(): void
+    {
+        // Exactly one file present is a mistake the author must see — no silent
+        // fall-through to the default.
+        Http::fake([
+            'api.github.com/repos/acme/widget/contents/.argos/demo.compose.yml*' => Http::response([
+                'content' => base64_encode("services:\n  app:\n    image: php:8.4\n"),
+                'encoding' => 'base64',
+            ]),
+            'api.github.com/repos/acme/widget/contents/.argos/demo.yml*' => Http::response('', 404),
+        ]);
+        $profile = $this->profile();
+        $task = Task::factory()->for($profile, 'repoProfile')->create(['name' => 'feat-half']);
+
+        $deployer = new FakeDemoDeployer(app(GitServiceFactory::class), new FakeDemoImageBuilder, [
             ['cmd' => 'down', 'exit' => 0],   // initial teardown
             ['cmd' => 'down', 'exit' => 0],   // cleanup teardown
         ]);
@@ -237,9 +281,9 @@ class FakeDemoDeployer extends DemoDeployer
     /**
      * @param  list<array{cmd: string, exit: int, stdout?: string, stderr?: string}>  $script
      */
-    public function __construct(GitServiceFactory $factory, array $script)
+    public function __construct(GitServiceFactory $factory, DemoImageBuilder $imageBuilder, array $script)
     {
-        parent::__construct($factory);
+        parent::__construct($factory, $imageBuilder);
         $this->script = $script;
     }
 
@@ -265,6 +309,25 @@ class FakeDemoDeployer extends DemoDeployer
             stdout: $next['stdout'] ?? '',
             stderr: $next['stderr'] ?? '',
         );
+    }
+}
+
+/** Stubs the runtime image so the default-contract path never touches Docker. */
+class FakeDemoImageBuilder extends DemoImageBuilder
+{
+    public function tag(): string
+    {
+        return 'argos-demo:testtag';
+    }
+
+    public function ensure(): string
+    {
+        return 'argos-demo:testtag';
+    }
+
+    public function imageExists(string $tag): bool
+    {
+        return true;
     }
 }
 

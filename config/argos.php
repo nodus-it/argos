@@ -101,6 +101,11 @@ return [
         // alongside Argos and should stay modest).
         'cpu_limit' => env('ARGOS_PREVIEW_CPU_LIMIT', '1.0'),
         'memory_limit' => env('ARGOS_PREVIEW_MEM_LIMIT', '1g'),
+        // Built-in default demo runtime (php-fpm + nginx + node), used when a
+        // repo ships no .argos/demo.* contract. DemoImageBuilder appends a
+        // content hash to this repository name (argos-demo:<hash>) and builds
+        // it on demand; the app entrypoint warms it at boot.
+        'default_image' => env('ARGOS_PREVIEW_DEFAULT_IMAGE', 'argos-demo'),
     ],
     'concept' => [
         'max_turns_default' => (int) env('ARGOS_CONCEPT_MAX_TURNS_DEFAULT', 50),

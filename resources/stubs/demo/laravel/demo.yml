@@ -1,0 +1,28 @@
+# Argos built-in default demo contract (settings) for Laravel repos without a
+# .argos/demo.yml. Routed service is `app` (nginx on :80 inside the runtime
+# image); the task workspace is mounted at /var/www/html.
+entry:
+  service: app
+  port: 80
+
+workspace_mount: /var/www/html
+
+# Run in order inside the `app` container after `compose up`. First failure
+# fails the deploy; output is captured in the demo build log. Dev deps are kept
+# so factories/faker work during `migrate --seed`.
+commands:
+  - composer install --no-interaction --prefer-dist --no-progress
+  - "[ -f .env ] || cp .env.example .env"
+  - php artisan key:generate --force
+  - php artisan migrate --force --seed
+  - "[ -f package.json ] && npm ci && npm run build || true"
+  # Drop a stale Vite hot-file (left by `npm run dev`/`composer dev` in the
+  # worker checkout) so @vite serves the built manifest instead of pointing at
+  # a dev server (localhost:5173) that isn't running in the demo.
+  - rm -f public/hot
+  - php artisan storage:link || true
+  - "chown -R www-data:www-data storage bootstrap/cache 2>/dev/null; chmod -R ug+rwX storage bootstrap/cache 2>/dev/null; true"
+
+health:
+  path: /
+  timeout: 120
