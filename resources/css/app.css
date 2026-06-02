@@ -172,14 +172,29 @@ body,
   letter-spacing: .08em;
   color: var(--faint);
 }
-/* Breadcrumbs teleported into the topbar (see header view override). */
+/* Breadcrumbs teleported into the topbar (see header view override).
+   order:10 pushes the slot past the topbar logo/toggle so it sits in the main
+   topbar area (right of the sidebar), left-aligned before the right-hand items. */
 .fi-argos-topbar-breadcrumbs {
+  order: 10;
   display: flex;
   align-items: center;
   min-width: 0;
+  margin-inline-end: auto;
 }
 .fi-argos-topbar-breadcrumbs .fi-breadcrumbs {
   font-size: var(--t-sm);
+}
+
+/* Page heading: task name + status badge inline, actions stay on the right. */
+.fi-header-heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.td-heading-badge {
+  display: inline-flex;
 }
 
 /* ============================================================
@@ -415,7 +430,7 @@ body,
 /* Respond composer — sticky dock spanning the content width, flush to the
    content (card) edges. Content is centered (maxContentWidth), so the dock
    tracks it rather than bleeding to the viewport. */
-.respond-inner{margin:0 auto;}
+.respond-inner{margin:0 auto;padding-inline:8px;}
 .respond-dock{position:sticky;bottom:0;z-index:25;margin-top:24px;padding:14px 0;background:color-mix(in oklab,var(--surface) 92%,transparent);backdrop-filter:blur(10px);border-top:1px solid var(--border);}
 .respond.is-waiting.respond-dock{border-top:2px solid var(--wn-500);}
 .respond-flag{display:flex;align-items:center;gap:8px;font-size:var(--t-sm);font-weight:600;color:var(--wn-700);margin-bottom:10px;}

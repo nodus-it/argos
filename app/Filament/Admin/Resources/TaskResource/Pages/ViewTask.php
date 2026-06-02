@@ -17,7 +17,10 @@ use Filament\Actions\ActionGroup;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
+use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
 
 class ViewTask extends ViewRecord
@@ -273,6 +276,22 @@ class ViewTask extends ViewRecord
                 fn (int $i) => $i !== $currentImplementIter
             )),
         ];
+    }
+
+    public function getHeading(): string|Htmlable
+    {
+        // Task name + status badge inline in the page header (next to the
+        // title, with the actions on the right). See ARGOS_REDESIGN.md §6.3.
+        $task = $this->task();
+        $badge = Blade::render(
+            '<x-argos.badge :status="$status" :label="$label" />',
+            ['status' => $task->displayBadgeStatus(), 'label' => $task->displayStatusLabel()],
+        );
+
+        return new HtmlString(
+            '<span class="td-heading-name">'.e($task->name).'</span>'
+            .'<span class="td-heading-badge">'.$badge.'</span>'
+        );
     }
 
     public function getView(): string

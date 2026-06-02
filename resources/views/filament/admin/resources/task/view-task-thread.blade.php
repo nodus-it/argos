@@ -13,11 +13,7 @@
         $cost = fn ($run) => $run?->cost_usd ? '$'.number_format((float) $run->cost_usd, 2) : null;
     @endphp
 
-    {{-- Header: task name + status badge --}}
-    <div class="td-head" style="display:flex;align-items:flex-start;gap:16px;margin-bottom:16px;">
-        <h1 class="page-title" style="flex:1 1 auto;min-width:0;">{{ $task->name }}</h1>
-        <x-argos.badge :status="$task->displayBadgeStatus()" :label="$task->displayStatusLabel()" />
-    </div>
+    {{-- Task name + status badge now render in the page header (getHeading). --}}
 
     {{-- Paused banner (turn-limit) --}}
     @if ($implementRun?->status?->value === 'paused')
