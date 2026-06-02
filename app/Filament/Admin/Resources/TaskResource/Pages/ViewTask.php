@@ -13,6 +13,7 @@ use App\Services\Task\TaskService;
 use App\Services\Workflow\StateReader;
 use App\Support\ConceptMarkdown;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
@@ -306,47 +307,53 @@ class ViewTask extends ViewRecord
                 ->visible(fn (): bool => $this->task()->workflow_status->value !== 'completed'
                     && $this->task()->phaseRuns()->where('phase', 'implement')->where('status', 'completed')->exists()),
 
-            Action::make('forceUnlockImplement')
-                ->label(__('tasks.view.actions.force_unlock_label'))
-                ->icon('heroicon-o-lock-open')
-                ->color('danger')
-                ->requiresConfirmation()
-                ->modalHeading(__('tasks.view.actions.force_unlock_heading'))
-                ->modalDescription(__('tasks.view.actions.force_unlock_description'))
-                ->modalSubmitActionLabel(__('tasks.view.actions.force_unlock_submit'))
-                ->action(function (): void {
-                    $task = $this->task();
-                    try {
-                        app(TaskService::class)->forceUnlockImplement($task);
-                    } catch (\RuntimeException) {
-                        Notification::make()->title(__('tasks.view.actions.phase_already_running'))->warning()->send();
+            // One primary action per screen; utilities collapse into a ⋯ menu.
+            ActionGroup::make([
+                Action::make('forceUnlockImplement')
+                    ->label(__('tasks.view.actions.force_unlock_label'))
+                    ->icon('heroicon-o-lock-open')
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->modalHeading(__('tasks.view.actions.force_unlock_heading'))
+                    ->modalDescription(__('tasks.view.actions.force_unlock_description'))
+                    ->modalSubmitActionLabel(__('tasks.view.actions.force_unlock_submit'))
+                    ->action(function (): void {
+                        $task = $this->task();
+                        try {
+                            app(TaskService::class)->forceUnlockImplement($task);
+                        } catch (\RuntimeException) {
+                            Notification::make()->title(__('tasks.view.actions.phase_already_running'))->warning()->send();
 
-                        return;
-                    }
-                    Notification::make()->title(__('tasks.view.actions.lock_released'))->success()->send();
-                    $this->redirect(TaskResource::getUrl('view', ['record' => $task]));
-                })
-                ->visible(fn (): bool => $this->task()->current_status === PhaseStatus::LockBlocked),
+                            return;
+                        }
+                        Notification::make()->title(__('tasks.view.actions.lock_released'))->success()->send();
+                        $this->redirect(TaskResource::getUrl('view', ['record' => $task]));
+                    })
+                    ->visible(fn (): bool => $this->task()->current_status === PhaseStatus::LockBlocked),
 
-            Action::make('logsDownload')
-                ->label(__('tasks.view.actions.logs_download'))
-                ->icon('heroicon-o-arrow-down-tray')
-                ->color('gray')
-                ->url(fn (): string => TaskResource::getUrl('logs', ['record' => $this->task()])),
+                Action::make('logsDownload')
+                    ->label(__('tasks.view.actions.logs_download'))
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->color('gray')
+                    ->url(fn (): string => TaskResource::getUrl('logs', ['record' => $this->task()])),
 
-            Action::make('markCompleted')
-                ->label(__('tasks.view.actions.mark_completed'))
-                ->icon('heroicon-o-check-circle')
-                ->color('success')
-                ->requiresConfirmation()
-                ->modalDescription(__('tasks.view.actions.mark_completed_description'))
-                ->action(function (): void {
-                    $task = $this->task();
-                    app(TaskService::class)->markCompleted($task);
-                    Notification::make()->title(__('tasks.view.actions.task_completed'))->success()->send();
-                    $this->redirect(TaskResource::getUrl('view', ['record' => $task]));
-                })
-                ->visible(fn (): bool => $this->task()->workflow_status->value !== 'completed'),
+                Action::make('markCompleted')
+                    ->label(__('tasks.view.actions.mark_completed'))
+                    ->icon('heroicon-o-check-circle')
+                    ->color('success')
+                    ->requiresConfirmation()
+                    ->modalDescription(__('tasks.view.actions.mark_completed_description'))
+                    ->action(function (): void {
+                        $task = $this->task();
+                        app(TaskService::class)->markCompleted($task);
+                        Notification::make()->title(__('tasks.view.actions.task_completed'))->success()->send();
+                        $this->redirect(TaskResource::getUrl('view', ['record' => $task]));
+                    })
+                    ->visible(fn (): bool => $this->task()->workflow_status->value !== 'completed'),
+            ])
+                ->label(__('tasks.view.actions.more_label'))
+                ->icon('heroicon-o-ellipsis-vertical')
+                ->color('gray'),
         ];
     }
 

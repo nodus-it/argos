@@ -186,6 +186,20 @@
             <x-argos.btn variant="primary" wire:click="{{ $waitingConcept ? 'saveNotesAndRevise' : 'saveImplementNotesAndRevise' }}">
                 @svg('heroicon-o-paper-airplane') {{ __('tasks.view.thread.send') }}
             </x-argos.btn>
+
+            <x-slot:quick>
+                <span class="chip" x-on:click="$wire.set('{{ $field }}', @js(__('tasks.view.thread.chip_changes_text')))">
+                    @svg('heroicon-o-pencil-square') {{ __('tasks.view.thread.chip_changes') }}
+                </span>
+                @if ($waitingImplement)
+                    <span class="chip" wire:click="mountAction('markCompleted')">
+                        @svg('heroicon-o-check-circle') {{ __('tasks.view.thread.chip_approve') }}
+                    </span>
+                @endif
+                <span class="chip" x-on:click="$wire.set('{{ $field }}', @js(__('tasks.view.thread.chip_question_text')))">
+                    @svg('heroicon-o-question-mark-circle') {{ __('tasks.view.thread.chip_question') }}
+                </span>
+            </x-slot:quick>
         </x-argos.respond>
     @endif
 </x-filament-panels::page>
