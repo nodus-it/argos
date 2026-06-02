@@ -6,6 +6,7 @@ namespace App\Filament\Admin\Resources\TaskResource\Pages;
 
 use App\Enums\Phase;
 use App\Enums\PhaseStatus;
+use App\Enums\WorkflowStatus;
 use App\Filament\Admin\Resources\TaskResource;
 use App\Models\PhaseRun;
 use App\Models\Task;
@@ -304,76 +305,118 @@ class ViewTask extends ViewRecord
 
     protected function getHeaderActions(): array
     {
-        return [
-            $this->makePhaseAction('concept', __('tasks.view.actions.concept_create'), 'heroicon-o-light-bulb')
+        // One contextual primary button for the next step; every other action
+        // (re-run concept, re-implement, logs, complete, …) moves into the ⋯
+        // dropdown. See docs/design/argos/ARGOS_REDESIGN.md §6.3.
+        $actions = [
+            'concept' => $this->makePhaseAction('concept', __('tasks.view.actions.concept_create'), 'heroicon-o-light-bulb')
                 ->label(fn (): string => $this->task()->phaseRuns()->where('phase', 'concept')->where('status', 'completed')->exists()
                     ? __('tasks.view.actions.concept_update')
                     : __('tasks.view.actions.concept_create'))
                 ->visible(fn (): bool => $this->task()->workflow_status->value !== 'completed'
                     && $this->lastConceptRun()?->status !== PhaseStatus::Paused),
 
-            $this->makeContinueConceptAction()
+            'continueConcept' => $this->makeContinueConceptAction()
                 ->visible(fn (): bool => $this->lastConceptRun()?->status === PhaseStatus::Paused),
 
-            $this->makePhaseAction('implement', __('tasks.view.actions.implement'), 'heroicon-o-code-bracket')
+            'implement' => $this->makePhaseAction('implement', __('tasks.view.actions.implement'), 'heroicon-o-code-bracket')
                 ->visible(fn (): bool => $this->task()->workflow_status->value !== 'completed'
                     && $this->task()->phaseRuns()->where('phase', 'concept')->where('status', 'completed')->exists()),
 
-            $this->makeContinueImplementAction()
+            'continueImplement' => $this->makeContinueImplementAction()
                 ->visible(fn (): bool => $this->lastImplementRun()?->status === PhaseStatus::Paused),
 
-            $this->makePhaseAction('push', __('tasks.view.actions.push_pr'), 'heroicon-o-arrow-up-tray')
+            'push' => $this->makePhaseAction('push', __('tasks.view.actions.push_pr'), 'heroicon-o-arrow-up-tray')
                 ->visible(fn (): bool => $this->task()->workflow_status->value !== 'completed'
                     && $this->task()->phaseRuns()->where('phase', 'implement')->where('status', 'completed')->exists()),
 
-            // One primary action per screen; utilities collapse into a ⋯ menu.
-            ActionGroup::make([
-                Action::make('forceUnlockImplement')
-                    ->label(__('tasks.view.actions.force_unlock_label'))
-                    ->icon('heroicon-o-lock-open')
-                    ->color('danger')
-                    ->requiresConfirmation()
-                    ->modalHeading(__('tasks.view.actions.force_unlock_heading'))
-                    ->modalDescription(__('tasks.view.actions.force_unlock_description'))
-                    ->modalSubmitActionLabel(__('tasks.view.actions.force_unlock_submit'))
-                    ->action(function (): void {
-                        $task = $this->task();
-                        try {
-                            app(TaskService::class)->forceUnlockImplement($task);
-                        } catch (\RuntimeException) {
-                            Notification::make()->title(__('tasks.view.actions.phase_already_running'))->warning()->send();
+            'forceUnlockImplement' => Action::make('forceUnlockImplement')
+                ->label(__('tasks.view.actions.force_unlock_label'))
+                ->icon('heroicon-o-lock-open')
+                ->color('danger')
+                ->requiresConfirmation()
+                ->modalHeading(__('tasks.view.actions.force_unlock_heading'))
+                ->modalDescription(__('tasks.view.actions.force_unlock_description'))
+                ->modalSubmitActionLabel(__('tasks.view.actions.force_unlock_submit'))
+                ->action(function (): void {
+                    $task = $this->task();
+                    try {
+                        app(TaskService::class)->forceUnlockImplement($task);
+                    } catch (\RuntimeException) {
+                        Notification::make()->title(__('tasks.view.actions.phase_already_running'))->warning()->send();
 
-                            return;
-                        }
-                        Notification::make()->title(__('tasks.view.actions.lock_released'))->success()->send();
-                        $this->redirect(TaskResource::getUrl('view', ['record' => $task]));
-                    })
-                    ->visible(fn (): bool => $this->task()->current_status === PhaseStatus::LockBlocked),
+                        return;
+                    }
+                    Notification::make()->title(__('tasks.view.actions.lock_released'))->success()->send();
+                    $this->redirect(TaskResource::getUrl('view', ['record' => $task]));
+                })
+                ->visible(fn (): bool => $this->task()->current_status === PhaseStatus::LockBlocked),
 
-                Action::make('logsDownload')
-                    ->label(__('tasks.view.actions.logs_download'))
-                    ->icon('heroicon-o-arrow-down-tray')
-                    ->color('gray')
-                    ->url(fn (): string => TaskResource::getUrl('logs', ['record' => $this->task()])),
+            'logsDownload' => Action::make('logsDownload')
+                ->label(__('tasks.view.actions.logs_download'))
+                ->icon('heroicon-o-arrow-down-tray')
+                ->color('gray')
+                ->url(fn (): string => TaskResource::getUrl('logs', ['record' => $this->task()])),
 
-                Action::make('markCompleted')
-                    ->label(__('tasks.view.actions.mark_completed'))
-                    ->icon('heroicon-o-check-circle')
-                    ->color('success')
-                    ->requiresConfirmation()
-                    ->modalDescription(__('tasks.view.actions.mark_completed_description'))
-                    ->action(function (): void {
-                        $task = $this->task();
-                        app(TaskService::class)->markCompleted($task);
-                        Notification::make()->title(__('tasks.view.actions.task_completed'))->success()->send();
-                        $this->redirect(TaskResource::getUrl('view', ['record' => $task]));
-                    })
-                    ->visible(fn (): bool => $this->task()->workflow_status->value !== 'completed'),
-            ])
+            'markCompleted' => Action::make('markCompleted')
+                ->label(__('tasks.view.actions.mark_completed'))
+                ->icon('heroicon-o-check-circle')
+                ->color('success')
+                ->requiresConfirmation()
+                ->modalDescription(__('tasks.view.actions.mark_completed_description'))
+                ->action(function (): void {
+                    $task = $this->task();
+                    app(TaskService::class)->markCompleted($task);
+                    Notification::make()->title(__('tasks.view.actions.task_completed'))->success()->send();
+                    $this->redirect(TaskResource::getUrl('view', ['record' => $task]));
+                })
+                ->visible(fn (): bool => $this->task()->workflow_status->value !== 'completed'),
+        ];
+
+        $primaryKey = $this->primaryActionKey();
+        $primary = ($primaryKey !== null && isset($actions[$primaryKey]))
+            ? $actions[$primaryKey]->color('primary')
+            : null;
+
+        $rest = collect($actions)
+            ->reject(fn ($action, string $key): bool => $key === $primaryKey)
+            ->values()
+            ->all();
+
+        return array_values(array_filter([
+            $primary,
+            ActionGroup::make($rest)
                 ->label(__('tasks.view.actions.more_label'))
                 ->icon('heroicon-o-ellipsis-vertical')
                 ->color('gray'),
-        ];
+        ]));
+    }
+
+    /**
+     * The single header action that advances the workflow from the current
+     * state. Everything else lives in the ⋯ dropdown.
+     */
+    private function primaryActionKey(): ?string
+    {
+        if ($this->lastConceptRun()?->status === PhaseStatus::Paused) {
+            return 'continueConcept';
+        }
+        if ($this->lastImplementRun()?->status === PhaseStatus::Paused) {
+            return 'continueImplement';
+        }
+
+        return match ($this->task()->workflow_status) {
+            WorkflowStatus::Draft, WorkflowStatus::ConceptRunning => 'concept',
+            WorkflowStatus::ConceptReview => 'implement',
+            WorkflowStatus::ImplementRunning, WorkflowStatus::ImplementCompleted => 'push',
+            WorkflowStatus::InReview => 'markCompleted',
+            WorkflowStatus::Completed => null,
+            WorkflowStatus::Failed => match ($this->task()->current_phase?->value) {
+                'implement' => 'implement',
+                'push' => 'push',
+                default => 'concept',
+            },
+        };
     }
 
     private function task(): Task
