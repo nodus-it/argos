@@ -83,6 +83,8 @@ return [
     'image_builds' => [
         'label' => 'Image-Build',
         'plural' => 'Image-Builds',
+        'summary' => 'Zusammenfassung',
+        'summary_description' => 'Tag, Stack, Agent und Status dieses Image-Builds.',
         'build_log_description' => 'Stdout/stderr aus dem Stack-Build, dem Worker-Layer und dem Post-Build-Validate-Step.',
         'empty_log' => 'Kein Build-Log vorhanden.',
         'lines' => 'Zeilen',
