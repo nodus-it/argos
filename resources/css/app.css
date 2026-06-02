@@ -161,15 +161,29 @@ body,
 .fi-main {
   background-color: var(--bg);
 }
-/* Lighter, smaller sidebar typography to match the designer. */
-.fi-sidebar-item-label {
-  font-weight: 500;
+/* Sidebar nav typography + spacing, ported from the prototype (styles.css):
+   13px/500 labels, 18px icons, 8/10 item padding, 16px between groups. */
+.fi-sidebar-item-btn {
+  padding: 8px 10px;
+  gap: 11px;
   font-size: var(--t-sm);
+}
+.fi-sidebar-item-icon {
+  width: 18px;
+  height: 18px;
+}
+.fi-sidebar-item-label {
+  font-size: var(--t-sm);
+  font-weight: 500;
+}
+.fi-sidebar-group + .fi-sidebar-group {
+  margin-top: 16px;
 }
 .fi-sidebar-group-label {
   font-size: 11px;
   font-weight: 600;
   letter-spacing: .08em;
+  text-transform: uppercase;
   color: var(--faint);
 }
 /* Breadcrumbs teleported into the topbar (see header view override).
