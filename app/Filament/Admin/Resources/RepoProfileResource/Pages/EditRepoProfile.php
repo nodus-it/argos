@@ -6,6 +6,7 @@ namespace App\Filament\Admin\Resources\RepoProfileResource\Pages;
 
 use App\Filament\Admin\Concerns\HasArgosEditHeading;
 use App\Filament\Admin\Resources\RepoProfileResource;
+use App\Models\RepoProfile;
 use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
 
@@ -27,7 +28,9 @@ class EditRepoProfile extends EditRecord
      */
     protected function argosHeadingChip(): ?array
     {
-        $platform = $this->getRecord()->platform?->value;
+        /** @var RepoProfile $record */
+        $record = $this->getRecord();
+        $platform = $record->platform?->value;
 
         return $platform === null
             ? null
