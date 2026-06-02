@@ -161,6 +161,23 @@ body,
 .fi-main {
   background-color: var(--bg);
 }
+/* The nav's right edge runs unbroken top-to-bottom: keep the sidebar's right
+   border, and extend that line up through the topbar (next to the logo) with a
+   fixed 1px divider at the sidebar width. The breadcrumb sits to its right. */
+.fi-sidebar {
+  border-inline-end: 1px solid var(--border);
+}
+.fi-topbar::after {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 14rem;
+  width: 1px;
+  height: 4rem;
+  background-color: var(--border);
+  z-index: 31;
+  pointer-events: none;
+}
 /* Sidebar nav typography + spacing, ported from the prototype (styles.css):
    13px/500 labels, 18px icons, 8/10 item padding, 16px between groups. */
 .fi-sidebar-item-btn {
@@ -252,6 +269,50 @@ body,
 }
 .fi-ta-row:hover {
   background-color: var(--surface-2);
+}
+/* Table header row: white, not the default gray. */
+.fi-main .fi-ta-table > thead > tr {
+  background-color: var(--surface);
+}
+
+/* Active sidebar item: light-orange outline + tint instead of the gray fill,
+   and slightly less rounded. */
+.fi-sidebar .fi-sidebar-item.fi-active > .fi-sidebar-item-btn {
+  background-color: var(--accent-soft);
+  border: 1px solid var(--accent-soft-border);
+  border-radius: 8px;
+}
+.fi-sidebar .fi-sidebar-item.fi-active > .fi-sidebar-item-btn .fi-sidebar-item-label,
+.fi-sidebar .fi-sidebar-item.fi-active > .fi-sidebar-item-btn .fi-sidebar-item-icon {
+  color: var(--accent-text);
+}
+
+/* Feedback button: warm paper, not white. */
+.fi-argos-feedback-btn {
+  background-color: var(--surface-2) !important;
+}
+
+/* Table widgets (e.g. the dashboard "Current Tasks"): heading + search/filter
+   on ONE bar. Scoped via :has(.fi-ta-header) so list-page toolbars (which have
+   no heading) keep their own layout. */
+.fi-main .fi-ta-header-ctn:has(.fi-ta-header) {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.fi-main .fi-ta-header-ctn:has(.fi-ta-header) > .fi-ta-header-toolbar {
+  margin-left: auto;
+}
+.fi-ta-argos-heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+.fi-ta-argos-heading-icon {
+  width: 18px;
+  height: 18px;
+  color: var(--muted);
+  flex: none;
 }
 
 /* Aside form/infolist sections — match the design mockup (projekt.jsx
