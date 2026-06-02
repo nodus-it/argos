@@ -39,11 +39,15 @@ RUN set -eux; \
     bash /tmp/nodesource_setup.sh; \
     rm -f /tmp/nodesource_setup.sh; \
     apt-get update; \
-    apt-get install -y --no-install-recommends docker-ce-cli nodejs; \
+    # docker-compose-plugin provides `docker compose` (v2), used by DemoDeployer
+    # to bring live-demo stacks up/down via the host socket.
+    apt-get install -y --no-install-recommends docker-ce-cli docker-compose-plugin nodejs; \
     rm -rf /var/lib/apt/lists/*; \
-    # Guard: fail loudly if npm is missing rather than caching a broken layer.
+    # Guard: fail loudly if npm or the compose plugin is missing rather than
+    # caching a broken layer.
     node --version; \
-    npm --version
+    npm --version; \
+    docker compose version
 
 # PHP extensions
 RUN set -eux; \
