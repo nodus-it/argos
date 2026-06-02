@@ -448,23 +448,25 @@ body,
 /* The single-row toolbar (resources/views/filament/relation/tasks-toolbar)
    replaces both the default filter pill (a contained Tabs component, kept only
    for its query scoping) and the default table search/trigger row. Hide both. */
-.fi-main .fi-resource-relation-manager .fi-sc-tabs.fi-contained,
-.fi-main .fi-resource-relation-manager .fi-ta-header-toolbar {
+/* Hide the default status-filter tabs (rendered as #content.resourceTabs, a
+   .fi-sc-tabs WITHOUT .fi-contained) and the default table search/trigger row.
+   Scoped via :has(.fi-rel-toolbar) to the ONE relation manager that has our
+   custom toolbar (Tasks), so other relation managers keep their own UI. */
+.fi-main .fi-resource-relation-manager:has(.fi-rel-toolbar) .fi-sc-tabs,
+.fi-main .fi-resource-relation-manager:has(.fi-rel-toolbar) .fi-ta-header-toolbar {
   display: none;
 }
 /* Custom relation toolbar: status segment (left) + search + create (right).
-   Render it as a proper bar — padding + a divider line above the table. */
-.fi-main .fi-resource-relation-manager .fi-ta-header {
-  padding: 14px 20px;
-  border-bottom: 1px solid var(--border);
-  background: none;
-  border-radius: 0;
-}
+   Our ->header() content renders straight into .fi-ta-header-ctn (no
+   .fi-ta-header wrapper), so the bar styling lives on .fi-rel-toolbar itself:
+   padding + a divider line above the table. */
 .fi-rel-toolbar {
   display: flex;
   align-items: center;
   gap: 14px;
   width: 100%;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
 }
 .fi-rel-toolbar-end {
   margin-left: auto;
