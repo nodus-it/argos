@@ -6,8 +6,10 @@ namespace App\Providers;
 
 use App\Services\Anthropic\AnthropicTokenValidator;
 use App\Services\GitProvider\GitProviderRegistry;
+use App\Services\Workflow\PhaseRunner;
 use App\Testing\FakeAnthropicTokenValidator;
 use App\Testing\FakeGitService;
+use App\Testing\FakePhaseRunner;
 use Illuminate\Support\ServiceProvider;
 use RuntimeException;
 
@@ -23,7 +25,7 @@ use RuntimeException;
  * Bindings are added incrementally per build phase:
  *   - AnthropicTokenValidator (done)
  *   - Git provider services (done)
- *   - PhaseRunner (next)
+ *   - PhaseRunner (done)
  */
 class E2eFakeServiceProvider extends ServiceProvider
 {
@@ -50,5 +52,9 @@ class E2eFakeServiceProvider extends ServiceProvider
 
             return $registry;
         });
+
+        // Replace the phase runner so concept/implement/push complete
+        // deterministically without docker, image builds, or volume I/O.
+        $this->app->singleton(PhaseRunner::class, FakePhaseRunner::class);
     }
 }

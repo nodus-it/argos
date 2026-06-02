@@ -6,8 +6,10 @@ use App\Providers\E2eFakeServiceProvider;
 use App\Services\Anthropic\AnthropicTokenValidator;
 use App\Services\GitProvider\GitHubGitService;
 use App\Services\GitProvider\GitProviderRegistry;
+use App\Services\Workflow\PhaseRunner;
 use App\Testing\FakeAnthropicTokenValidator;
 use App\Testing\FakeGitService;
+use App\Testing\FakePhaseRunner;
 
 it('uses the real Anthropic validator by default', function (): void {
     expect(app(AnthropicTokenValidator::class))
@@ -36,6 +38,18 @@ it('serves canonical git data through the fake provider once registered', functi
         ->and($service->getRepoOptions())->not->toBeEmpty()
         ->and($service->getDefaultBranch('argos-e2e/demo-app'))->toBe('main')
         ->and($service->getBranchOptions('argos-e2e/demo-app'))->toHaveKey('main');
+});
+
+it('uses the real phase runner by default', function (): void {
+    expect(app(PhaseRunner::class))
+        ->toBeInstanceOf(PhaseRunner::class)
+        ->not->toBeInstanceOf(FakePhaseRunner::class);
+});
+
+it('binds the fake phase runner once the e2e provider is registered', function (): void {
+    app()->register(E2eFakeServiceProvider::class);
+
+    expect(app(PhaseRunner::class))->toBeInstanceOf(FakePhaseRunner::class);
 });
 
 it('refuses to boot in production', function (): void {
