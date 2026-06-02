@@ -255,15 +255,19 @@ body,
 }
 
 /* Aside form/infolist sections — match the design mockup (projekt.jsx
-   .form-section): the header (icon + title + description) sits in a sticky
-   280px left column, the fields fill the right column, and sections are
-   separated by a divider instead of being rendered as individual cards.
-   Scoped to .fi-aside so only detail/edit forms and aside infolists change. */
-.fi-section.fi-aside {
-  display: grid;
-  grid-template-columns: 280px 1fr;
-  gap: 40px;
+   .form-section): header (icon + title + description) on the left, fields on
+   the right, sections separated by a divider instead of being rendered as
+   individual cards.
+
+   Filament already lays out aside sections as a 3-column grid (header 1/3,
+   content spans 2/3) at >=48rem — we must NOT touch grid-template-columns or
+   the content's grid-column span, or the content drops onto its own row
+   (stacked). We only restyle the chrome. Scoped under .fi-main with .fi-aside
+   on the section so these win over Filament's own .fi-section.fi-aside rules
+   regardless of stylesheet order. */
+.fi-main .fi-section.fi-aside {
   padding: 28px 2px;
+  column-gap: 40px;
   background-color: transparent;
   border: none;
   border-top: 1px solid var(--border);
@@ -272,35 +276,88 @@ body,
   --tw-ring-shadow: 0 0 #0000;
   --tw-shadow: 0 0 #0000;
 }
-.fi-section.fi-aside:first-child {
+.fi-main .fi-section.fi-aside:first-of-type {
   border-top: none;
   padding-top: 6px;
 }
-.fi-section.fi-aside > .fi-section-header {
+.fi-main .fi-section.fi-aside > .fi-section-header {
   position: sticky;
   top: 84px;
   align-self: start;
   padding: 0;
 }
-.fi-section.fi-aside > .fi-section-content-ctn {
-  border: none !important;
+.fi-main .fi-section.fi-aside > .fi-section-content-ctn {
+  border: none;
 }
-.fi-section.fi-aside .fi-section-header-heading {
+.fi-main .fi-section.fi-aside .fi-section-header-heading {
   gap: 8px;
 }
-.fi-section.fi-aside .fi-section-header-heading svg {
+.fi-main .fi-section.fi-aside .fi-section-header-heading svg {
   width: 17px;
   height: 17px;
   color: var(--muted);
 }
-@media (max-width: 1024px) {
-  .fi-section.fi-aside {
-    grid-template-columns: 1fr;
-    gap: 14px;
-  }
-  .fi-section.fi-aside > .fi-section-header {
+@media (max-width: 48rem) {
+  .fi-main .fi-section.fi-aside > .fi-section-header {
     position: static;
   }
+}
+
+/* Tabs — underline style per the mockup (.tabs/.tab.on). Covers both the form
+   tabs (.fi-sc-tabs-tab, e.g. "Allgemein" / "Worker & Modelle") and the
+   relation-manager tabs (.fi-tabs-item, e.g. Tasks / Task-Provider / Tokens).
+   Scoped under .fi-main to win over Filament's pill defaults. */
+.fi-main .fi-tabs,
+.fi-main .fi-sc-tabs {
+  gap: 2px;
+  padding: 0;
+  background: none;
+  box-shadow: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+}
+.fi-main .fi-tabs-item,
+.fi-main .fi-sc-tabs-tab {
+  position: relative;
+  padding: 11px 14px;
+  background: none;
+  border-radius: 0;
+}
+.fi-main .fi-tabs-item:hover,
+.fi-main .fi-sc-tabs-tab:hover,
+.fi-main .fi-tabs-item.fi-active,
+.fi-main .fi-sc-tabs-tab.fi-active {
+  background: none;
+}
+.fi-main .fi-tabs-item.fi-active::after,
+.fi-main .fi-sc-tabs-tab.fi-active::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: -1px;
+  height: 2px;
+  background-color: var(--accent);
+  border-radius: 2px;
+}
+
+/* Inputs — give form controls a real visible border like the mockup
+   (.input border:1px solid var(--border-strong)). Filament draws the border
+   as a very faint ring that disappears on the warm-paper surface, so inputs
+   look borderless. We replace the ring with a solid border and accent the
+   border on focus (Filament keeps its focus ring on top). */
+.fi-main .fi-input-wrp {
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  --tw-shadow: 0 0 #0000;
+  --tw-ring-shadow: 0 0 #0000;
+}
+.fi-main .fi-input-wrp:focus-within {
+  border-color: var(--accent);
+}
+.fi-main .fi-input-wrp.fi-disabled {
+  background-color: var(--surface-2);
 }
 
 /* ============================================================
