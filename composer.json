@@ -75,6 +75,7 @@
         ],
         "test:external": "@php artisan test --compact --configuration=phpunit.external.xml",
         "test:browser": "npx playwright test",
+        "test:browser:real": "npx playwright test full-flow.real",
 
         "qa": [
             "@pint:test",
