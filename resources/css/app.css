@@ -465,8 +465,18 @@ body,
   align-items: center;
   gap: 14px;
   width: 100%;
-  padding: 14px 20px;
+  padding: 0 20px 14px;
   border-bottom: 1px solid var(--border);
+}
+/* Tighten the gap between the relation tab bar and the toolbar. */
+.fi-main .fi-sc-tabs:not(.fi-contained) [role="tabpanel"] {
+  padding-top: 0;
+}
+.fi-main .fi-sc-tabs:not(.fi-contained) [role="tabpanel"] > .fi-sc {
+  row-gap: 0;
+}
+.fi-main .fi-resource-relation-manager {
+  margin-top: -16px;
 }
 .fi-rel-toolbar-end {
   margin-left: auto;
