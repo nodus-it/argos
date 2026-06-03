@@ -91,6 +91,22 @@ return [
         'scheme' => env('ARGOS_PREVIEW_SCHEME', 'http'),
         'port' => (int) env('ARGOS_PREVIEW_PORT', env('ARGOS_PORT', 8080)),
         'ttl_hours' => (int) env('ARGOS_PREVIEW_TTL_HOURS', 24),
+        // Stack-wide default access protection for demos whose task is set to
+        // "inherit" (the default). One of: none | session | basic.
+        //   none    — public, anyone with the URL
+        //   session — Argos login required (Traefik forwardAuth → the gate below)
+        //   basic   — shared HTTP Basic credentials
+        // Per-task overrides (tasks.demo_access_mode) win over this default.
+        'auth' => env('ARGOS_PREVIEW_AUTH', 'none'),
+        // HTTP Basic username for basic-protected demos. The password is either
+        // per-task (generated when a task is switched to basic) or this global
+        // fallback for tasks that merely inherit the basic default.
+        'basic_user' => env('ARGOS_PREVIEW_BASIC_USER', 'demo'),
+        'basic_password' => env('ARGOS_PREVIEW_BASIC_PASSWORD') ?: null,
+        // Internal URL Traefik's forwardAuth middleware calls to validate the
+        // Argos session for session-protected demos. Points at the in-stack
+        // nginx that fronts the app; reachable from Traefik on the default net.
+        'auth_gate_url' => env('ARGOS_PREVIEW_AUTH_GATE_URL', 'http://nginx:80/_argos/demo-gate'),
         // External Docker network shared with Traefik (defined in docker-compose.yml).
         'network' => env('ARGOS_PREVIEW_NETWORK', 'argos_edge'),
         // Shared volume where the manager writes one Traefik file-provider route

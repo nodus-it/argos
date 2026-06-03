@@ -88,4 +88,10 @@ return [
         'failed' => 'Failed',
         'stopped' => 'Stopped',
     ],
+    'demo_access_mode' => [
+        'inherit' => 'Default',
+        'session' => 'Argos login',
+        'basic' => 'Password',
+        'public' => 'Public',
+    ],
 ];

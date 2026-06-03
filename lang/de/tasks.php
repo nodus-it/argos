@@ -139,6 +139,18 @@ return [
             'stop_heading' => 'Live-Demo stoppen?',
             'stop_description' => 'Container, Volumes und Route der Demo werden entfernt.',
             'stop_queued' => 'Demo wird gestoppt.',
+            'access' => [
+                'label' => 'Zugriff',
+                'heading' => 'Demo-Zugriff',
+                'description' => 'Legt fest, wer diese Demo aufrufen darf. Greift bei einer laufenden Demo sofort, sonst beim nächsten Aufbau.',
+                'mode_label' => 'Schutz',
+                'mode_inherit' => 'Standard (aktuell: :default)',
+                'password_label' => 'Passwort',
+                'password_hint' => 'Leer lassen, um automatisch ein Passwort zu erzeugen. Benutzername: siehe ARGOS_PREVIEW_BASIC_USER.',
+                'saved' => 'Demo-Zugriff gespeichert.',
+                'basic_credentials' => 'Zugangsdaten — Benutzer: :user · Passwort: :password',
+                'apply_failed' => 'Zugriff konnte nicht angewendet werden.',
+            ],
         ],
 
         'concept' => [
