@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Demo;
 
+use App\Enums\DemoAccessMode;
 use App\Enums\DemoStatus;
 use App\Models\Demo;
 use App\Models\RepoProfile;
@@ -89,11 +90,17 @@ class DemoDeployer
             $log .= $this->runCommands($project, $entry['service'], $settings['commands'] ?? []);
             $log .= $this->probeHealth($project, $entry, $settings['health'] ?? null);
 
-            $url = $this->writeTraefikRoute($slug, $entry['port']);
+            $url = $this->writeTraefikRoute(
+                $slug,
+                $entry['port'],
+                $task->effectiveDemoAccessMode(),
+                $task->demo_basic_password,
+            );
 
             $demo->forceFill([
                 'status' => DemoStatus::Live,
                 'url' => $url,
+                'port' => $entry['port'],
                 'build_log' => $this->truncateLog($log),
             ])->save();
         } catch (Throwable $e) {
@@ -437,40 +444,121 @@ class DemoDeployer
     /**
      * Write the Traefik file-provider route for this demo into the shared dir
      * and return the public URL. Traefik resolves the `{slug}` host alias on the
-     * edge network to the entry container.
+     * edge network to the entry container. The access mode attaches an auth
+     * middleware (session forwardAuth / shared basic-auth) or none (public).
      */
-    public function writeTraefikRoute(string $slug, int $port): string
-    {
+    public function writeTraefikRoute(
+        string $slug,
+        int $port,
+        DemoAccessMode $mode = DemoAccessMode::Public,
+        ?string $basicPassword = null,
+    ): string {
         $host = $slug.'.'.config('argos.preview.base_domain', '127.0.0.1.nip.io');
 
-        $route = [
-            'http' => [
-                'routers' => [
-                    $slug => [
-                        'rule' => "Host(`{$host}`)",
-                        'entryPoints' => ['web'],
-                        'service' => $slug,
-                    ],
-                ],
-                'services' => [
-                    $slug => [
-                        'loadBalancer' => [
-                            'servers' => [
-                                ['url' => "http://{$slug}:{$port}"],
-                            ],
+        $router = [
+            'rule' => "Host(`{$host}`)",
+            'entryPoints' => ['web'],
+            'service' => $slug,
+        ];
+
+        $middlewares = $this->buildAuthMiddleware($slug, $mode, $basicPassword);
+        if ($middlewares !== []) {
+            $router['middlewares'] = array_keys($middlewares);
+        }
+
+        $http = [
+            'routers' => [$slug => $router],
+            'services' => [
+                $slug => [
+                    'loadBalancer' => [
+                        'servers' => [
+                            ['url' => "http://{$slug}:{$port}"],
                         ],
                     ],
                 ],
             ],
         ];
+        if ($middlewares !== []) {
+            $http['middlewares'] = $middlewares;
+        }
 
         $dir = $this->traefikDir();
         if (! is_dir($dir) && ! mkdir($dir, 0755, true) && ! is_dir($dir)) {
             throw new RuntimeException("Traefik dynamic-config dir not writable: {$dir}");
         }
-        file_put_contents($this->routeFilePath($slug), Yaml::dump($route, 8, 2));
+        file_put_contents($this->routeFilePath($slug), Yaml::dump(['http' => $http], 8, 2));
 
         return $this->demoUrl($host);
+    }
+
+    /**
+     * Re-write the live demo's route for a task after its access mode (or basic
+     * password) changed — applies the new protection without a full redeploy.
+     * No-op when the task has no live demo with a known entry port.
+     */
+    public function applyAccessMode(Task $task): void
+    {
+        $demo = $task->currentDemo();
+        if ($demo === null || $demo->status !== DemoStatus::Live || $demo->port === null) {
+            return;
+        }
+
+        $this->writeTraefikRoute(
+            $this->demoSlug($task),
+            $demo->port,
+            $task->effectiveDemoAccessMode(),
+            $task->demo_basic_password,
+        );
+    }
+
+    /**
+     * Build the Traefik middleware definitions for the resolved access mode,
+     * keyed by middleware name (referenced from the router). Empty for public.
+     * Fails closed: basic mode without any password throws rather than shipping
+     * an unprotected demo.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    private function buildAuthMiddleware(string $slug, DemoAccessMode $mode, ?string $basicPassword): array
+    {
+        $name = $slug.'-auth';
+
+        return match ($mode->resolve()) {
+            DemoAccessMode::Session => [
+                $name => [
+                    'forwardAuth' => [
+                        'address' => (string) config('argos.preview.auth_gate_url', 'http://nginx:80/_argos/demo-gate'),
+                        'trustForwardHeader' => true,
+                    ],
+                ],
+            ],
+            DemoAccessMode::Basic => [
+                $name => [
+                    'basicAuth' => [
+                        'users' => [$this->basicAuthUserLine($basicPassword)],
+                    ],
+                ],
+            ],
+            default => [],
+        };
+    }
+
+    /**
+     * Render the `user:bcrypt-hash` line Traefik basicAuth expects. The password
+     * is the per-task one, falling back to the global config password.
+     */
+    private function basicAuthUserLine(?string $basicPassword): string
+    {
+        $password = $basicPassword ?: (string) config('argos.preview.basic_password', '');
+        if ($password === '') {
+            throw new RuntimeException(
+                'Demo basic-auth selected but no password set (task password or ARGOS_PREVIEW_BASIC_PASSWORD).'
+            );
+        }
+
+        $user = (string) config('argos.preview.basic_user', 'demo');
+
+        return $user.':'.password_hash($password, PASSWORD_BCRYPT);
     }
 
     /** Public URL for a demo slug (scheme + slug.base_domain + external port). */

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Enums\DemoAccessMode;
 use App\Enums\WorkflowStatus;
 use App\Filament\Admin\Resources\TaskResource;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewQualityGateLog;
@@ -170,6 +171,25 @@ class TaskPagesTest extends TestCase
             ->assertNotified();
 
         Bus::assertDispatched(DeployDemoJob::class, fn (DeployDemoJob $j): bool => $j->taskId === $task->id);
+    }
+
+    public function test_view_task_demo_access_action_persists_mode_and_password(): void
+    {
+        config(['argos.preview.enabled' => true]);
+        $profile = RepoProfile::factory()->create(['live_demo_enabled' => true]);
+        $task = Task::factory()->create(['repo_profile_id' => $profile->id]);
+        PhaseRun::factory()->create(['task_id' => $task->id, 'phase' => 'implement', 'status' => 'completed']);
+
+        Livewire::test(ViewTask::class, ['record' => $task->getKey()])
+            ->callAction('demoAccess', [
+                'access_mode' => DemoAccessMode::Basic->value,
+                'basic_password' => 'shared-pw',
+            ])
+            ->assertNotified();
+
+        $task->refresh();
+        $this->assertSame(DemoAccessMode::Basic, $task->demo_access_mode);
+        $this->assertSame('shared-pw', $task->demo_basic_password);
     }
 
     public function test_view_task_survives_a_failing_diff_load(): void

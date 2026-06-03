@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Enums\AgentName;
 use App\Enums\ClaudeModel;
+use App\Enums\DemoAccessMode;
 use App\Enums\Phase;
 use App\Enums\PhaseStatus;
 use App\Enums\WorkflowStatus;
@@ -83,6 +84,8 @@ class Task extends Model
         'worker_stack_id_override',
         'worker_agent_name_override',
         'worker_config_override',
+        'demo_access_mode',
+        'demo_basic_password',
         'agent_credential_id',
         'agent_config',
     ];
@@ -98,8 +101,18 @@ class Task extends Model
             'max_turns_implement' => 'integer',
             'worker_agent_name_override' => AgentName::class,
             'worker_config_override' => 'array',
+            'demo_access_mode' => DemoAccessMode::class,
             'agent_config' => 'array',
         ];
+    }
+
+    /**
+     * The effective demo access mode, resolving `Inherit` against the
+     * stack-wide default (config argos.preview.auth).
+     */
+    public function effectiveDemoAccessMode(): DemoAccessMode
+    {
+        return ($this->demo_access_mode ?? DemoAccessMode::Inherit)->resolve();
     }
 
     /**

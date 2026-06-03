@@ -88,4 +88,10 @@ return [
         'failed' => 'Fehlgeschlagen',
         'stopped' => 'Gestoppt',
     ],
+    'demo_access_mode' => [
+        'inherit' => 'Standard',
+        'session' => 'Argos-Login',
+        'basic' => 'Passwortschutz',
+        'public' => 'Öffentlich',
+    ],
 ];
