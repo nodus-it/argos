@@ -67,10 +67,17 @@ final class OAuthConfigHydrator
             ->first();
 
         if ($config !== null && $config->client_id !== '') {
-            return [
-                'client_id' => $config->client_id,
-                'client_secret' => $config->client_secret,
-            ];
+            try {
+                return [
+                    'client_id' => $config->client_id,
+                    'client_secret' => (string) $config->client_secret,
+                ];
+            } catch (Throwable $e) {
+                // client_secret is encrypted; if it was written under a different
+                // APP_KEY (rotation/divergence) the decrypt throws. Degrade to the
+                // ENV fallback instead of failing the whole request.
+                report($e);
+            }
         }
 
         return [
@@ -108,9 +115,20 @@ final class OAuthConfigHydrator
                 ->get();
 
             foreach ($configs as $config) {
+                try {
+                    $secret = (string) $config->client_secret;
+                } catch (Throwable $e) {
+                    // A secret encrypted under a different APP_KEY must not brick
+                    // every boot (this runs in AppServiceProvider::boot, web +
+                    // queue + package:discover). Skip it; the ENV config remains.
+                    report($e);
+
+                    continue;
+                }
+
                 $out[$config->provider->value] = [
                     'client_id' => $config->client_id,
-                    'client_secret' => $config->client_secret,
+                    'client_secret' => $secret,
                     'instance_url' => $config->instance_url,
                 ];
             }
