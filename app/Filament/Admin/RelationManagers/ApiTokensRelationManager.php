@@ -24,6 +24,8 @@ class ApiTokensRelationManager extends RelationManager
 {
     protected static string $relationship = 'tokens';
 
+    protected static string|\BackedEnum|null $icon = 'heroicon-o-key';
+
     /** The abilities a token may carry (mirrors the REST route gates). */
     public const ABILITIES = [
         'projects:read' => 'projects:read',

@@ -264,4 +264,77 @@ class Task extends Model
 
         return $this->workflow_status->color();
     }
+
+    /**
+     * Map the workflow status onto the redesign's five badge states
+     * (running | waiting | success | failed | draft) for <x-argos.badge>.
+     * Semantic, not colour-derived. See docs/design/argos/ARGOS_REDESIGN.md §5.1.
+     */
+    public function displayBadgeStatus(): string
+    {
+        if ($this->isWaitingForWorker()) {
+            return 'running';
+        }
+
+        return match ($this->workflow_status) {
+            WorkflowStatus::Draft => 'draft',
+            WorkflowStatus::ConceptRunning, WorkflowStatus::ImplementRunning => 'running',
+            WorkflowStatus::ConceptReview, WorkflowStatus::ImplementPaused, WorkflowStatus::InReview => 'waiting',
+            WorkflowStatus::ImplementCompleted, WorkflowStatus::Completed => 'success',
+            WorkflowStatus::Failed => 'failed',
+        };
+    }
+
+    /**
+     * Build the 5-node phase rail (Draft → Concept → Implement → Push → Review)
+     * for <x-argos.phase-rail>, deriving each node's state
+     * (done | active | wait | fail | todo) from the workflow status. On failure
+     * the node matching current_phase is flagged and everything before it done.
+     * See docs/design/argos/ARGOS_REDESIGN.md §5.5.
+     *
+     * @return list<array{phase: string, state: string}>
+     */
+    public function phaseRail(): array
+    {
+        $nodes = ['draft', 'concept', 'implement', 'push', 'review'];
+        $states = array_fill_keys($nodes, 'todo');
+
+        $mark = function (array $done, string $active, string $state) use (&$states): void {
+            foreach ($done as $d) {
+                $states[$d] = 'done';
+            }
+            if ($active !== '') {
+                $states[$active] = $state;
+            }
+        };
+
+        if ($this->workflow_status === WorkflowStatus::Failed) {
+            $failNode = match ($this->current_phase?->value) {
+                'implement' => 'implement',
+                'push' => 'push',
+                'respond' => 'review',
+                default => 'concept',
+            };
+            foreach ($nodes as $n) {
+                if (array_search($n, $nodes, true) < array_search($failNode, $nodes, true)) {
+                    $states[$n] = 'done';
+                }
+            }
+            $states[$failNode] = 'fail';
+        } else {
+            match ($this->workflow_status) {
+                WorkflowStatus::Draft => $mark([], 'draft', 'active'),
+                WorkflowStatus::ConceptRunning => $mark(['draft'], 'concept', 'active'),
+                WorkflowStatus::ConceptReview => $mark(['draft'], 'concept', 'wait'),
+                WorkflowStatus::ImplementRunning => $mark(['draft', 'concept'], 'implement', 'active'),
+                WorkflowStatus::ImplementPaused => $mark(['draft', 'concept'], 'implement', 'wait'),
+                WorkflowStatus::ImplementCompleted => $mark(['draft', 'concept', 'implement'], 'push', 'active'),
+                WorkflowStatus::InReview => $mark(['draft', 'concept', 'implement', 'push'], 'review', 'wait'),
+                WorkflowStatus::Completed => $mark($nodes, '', ''),
+                WorkflowStatus::Failed => null,
+            };
+        }
+
+        return array_map(static fn (string $n): array => ['phase' => $n, 'state' => $states[$n]], $nodes);
+    }
 }

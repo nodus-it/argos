@@ -63,7 +63,9 @@ return [
         'plural' => 'Agent-Credentials',
         'sections' => [
             'identity' => 'Identität',
+            'identity_description' => 'Für welchen Agenten dieses Konto gilt, ein Anzeigename und der Status.',
             'auth' => 'Authentifizierung',
+            'auth_description' => 'Die Zugangsdaten des Agenten — je nach Agent ein Token oder die vollständige auth.json.',
         ],
         'fields' => [
             'agent_name' => 'Agent',
@@ -81,6 +83,8 @@ return [
     'image_builds' => [
         'label' => 'Image-Build',
         'plural' => 'Image-Builds',
+        'summary' => 'Zusammenfassung',
+        'summary_description' => 'Tag, Stack, Agent und Status dieses Image-Builds.',
         'build_log_description' => 'Stdout/stderr aus dem Stack-Build, dem Worker-Layer und dem Post-Build-Validate-Step.',
         'empty_log' => 'Kein Build-Log vorhanden.',
         'lines' => 'Zeilen',

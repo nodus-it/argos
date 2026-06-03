@@ -5,6 +5,7 @@ declare(strict_types=1);
 return [
     'navigation_group' => 'Aufgaben',
     'navigation_label' => 'Tasks',
+    'search_placeholder' => 'Tasks suchen…',
 
     'fields' => [
         'name_label' => 'Name',
@@ -73,6 +74,27 @@ return [
     ],
 
     'view' => [
+        'thread' => [
+            'created' => 'Aufgabe angelegt',
+            'concept' => 'Konzept',
+            'concept_body' => 'Der Agent hat einen Lösungsweg vorgeschlagen.',
+            'view_concept' => 'Konzept ansehen',
+            'implement' => 'Implementierung',
+            'implement_body' => 'Der Agent hat die Änderung umgesetzt.',
+            'technical' => 'Technisch',
+            'summary' => 'Zusammenfassung',
+            'diff' => 'Diff',
+            'logs' => 'Logs',
+            'push' => 'Pull Request',
+            'open_pr' => 'Pull Request öffnen',
+            'waiting_flag' => 'Der Agent wartet auf dein Feedback.',
+            'send' => 'Senden',
+            'chip_changes' => 'Änderungen anfordern',
+            'chip_changes_text' => 'Bitte ändere Folgendes: ',
+            'chip_approve' => 'Approve & Merge',
+            'chip_question' => 'Frage stellen',
+            'chip_question_text' => 'Frage: ',
+        ],
         'labels' => [
             'status' => 'Status',
             'repository' => 'Repository',
@@ -81,6 +103,8 @@ return [
             'base_branch' => 'Base Branch',
             'branch' => 'Branch',
             'pull_request' => 'Pull Request',
+            'cost' => 'Kosten',
+            'created' => 'Erstellt',
             'open' => 'Öffnen',
             'source' => 'Quelle',
             'external_issue' => 'Externes Issue',
@@ -247,6 +271,7 @@ return [
             'concept_update' => 'Konzept aktualisieren',
             'implement' => 'Implement',
             'push_pr' => 'Push & PR',
+            'more_label' => 'Weitere Aktionen',
             'force_unlock_label' => 'Lock freigeben',
             'force_unlock_heading' => 'Lock erzwungen freigeben',
             'force_unlock_description' => 'Der Worker-Lock ist noch gesetzt (vermutlich durch einen abgestürzten Container). Den Lock freigeben und Implement neu starten?',

@@ -81,10 +81,14 @@ class WorkerStackResourceTest extends TestCase
 
     public function test_view_page_renders_for_built_in(): void
     {
-        $stack = WorkerStack::factory()->builtin()->create();
+        // Built-in stacks are read-only: they open the styled view page
+        // (recordUrl branches built-in -> view), which must render and show
+        // the record heading.
+        $stack = WorkerStack::factory()->builtin()->create(['label' => 'PHP 8.4 built-in']);
 
         Livewire::test(ViewWorkerStack::class, ['record' => $stack->getKey()])
-            ->assertSuccessful();
+            ->assertSuccessful()
+            ->assertSee('PHP 8.4 built-in');
     }
 
     public function test_create_dispatches_build_jobs_for_compatible_agents(): void

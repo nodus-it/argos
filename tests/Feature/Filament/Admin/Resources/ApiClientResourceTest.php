@@ -10,7 +10,7 @@ use App\Filament\Admin\Resources\ApiClientResource\Pages\CreateApiClient;
 use App\Filament\Admin\Resources\ApiClientResource\Pages\EditApiClient;
 use App\Filament\Admin\Resources\ApiClientResource\Pages\ListApiClients;
 use App\Filament\Admin\Resources\RepoProfileResource;
-use App\Filament\Admin\Resources\RepoProfileResource\Pages\ViewRepoProfile;
+use App\Filament\Admin\Resources\RepoProfileResource\Pages\EditRepoProfile;
 use App\Models\ApiClient;
 use App\Models\RepoProfile;
 use App\Models\User;
@@ -69,7 +69,7 @@ class ApiClientResourceTest extends TestCase
             RepoProfileResource::getRelations(),
         );
 
-        Livewire::test(ViewRepoProfile::class, ['record' => $profile->getKey()])
+        Livewire::test(EditRepoProfile::class, ['record' => $profile->getKey()])
             ->assertSuccessful()
             ->assertSee(__('api_tokens.title'));
     }

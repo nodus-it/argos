@@ -7,6 +7,7 @@ namespace App\Filament\Admin\Resources\TaskResource\Pages;
 use App\Enums\DemoStatus;
 use App\Enums\Phase;
 use App\Enums\PhaseStatus;
+use App\Enums\WorkflowStatus;
 use App\Filament\Admin\Resources\TaskResource;
 use App\Jobs\DeployDemoJob;
 use App\Jobs\StopDemoJob;
@@ -16,10 +17,14 @@ use App\Services\Task\TaskService;
 use App\Services\Workflow\StateReader;
 use App\Support\ConceptMarkdown;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
+use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
 
 class ViewTask extends ViewRecord
@@ -278,36 +283,58 @@ class ViewTask extends ViewRecord
         ];
     }
 
+    public function getHeading(): string|Htmlable
+    {
+        // Task name + status badge inline in the page header (next to the
+        // title, with the actions on the right). See ARGOS_REDESIGN.md §6.3.
+        $task = $this->task();
+        $badge = Blade::render(
+            '<x-argos.badge :status="$status" :label="$label" />',
+            ['status' => $task->displayBadgeStatus(), 'label' => $task->displayStatusLabel()],
+        );
+
+        return new HtmlString(
+            '<span class="td-heading-name">'.e($task->name).'</span>'
+            .'<span class="td-heading-badge">'.$badge.'</span>'
+        );
+    }
+
     public function getView(): string
     {
-        return 'filament.admin.resources.task.view-task';
+        // Warm-Paper redesign: chronological thread layout. The previous
+        // section/tab view stays at ...task.view-task as a fallback to revert
+        // to. See docs/design/argos/ARGOS_REDESIGN.md §6.3.
+        return 'filament.admin.resources.task.view-task-thread';
     }
 
     protected function getHeaderActions(): array
     {
-        return [
-            $this->makePhaseAction('concept', __('tasks.view.actions.concept_create'), 'heroicon-o-light-bulb')
+        // One contextual primary button for the next step; every other action
+        // (re-run concept, re-implement, logs, complete, …) moves into the ⋯
+        // dropdown. See docs/design/argos/ARGOS_REDESIGN.md §6.3.
+        $actions = [
+            'concept' => $this->makePhaseAction('concept', __('tasks.view.actions.concept_create'), 'heroicon-o-light-bulb')
                 ->label(fn (): string => $this->task()->phaseRuns()->where('phase', 'concept')->where('status', 'completed')->exists()
                     ? __('tasks.view.actions.concept_update')
                     : __('tasks.view.actions.concept_create'))
                 ->visible(fn (): bool => $this->task()->workflow_status->value !== 'completed'
                     && $this->lastConceptRun()?->status !== PhaseStatus::Paused),
 
-            $this->makeContinueConceptAction()
+            'continueConcept' => $this->makeContinueConceptAction()
                 ->visible(fn (): bool => $this->lastConceptRun()?->status === PhaseStatus::Paused),
 
-            $this->makePhaseAction('implement', __('tasks.view.actions.implement'), 'heroicon-o-code-bracket')
+            'implement' => $this->makePhaseAction('implement', __('tasks.view.actions.implement'), 'heroicon-o-code-bracket')
                 ->visible(fn (): bool => $this->task()->workflow_status->value !== 'completed'
                     && $this->task()->phaseRuns()->where('phase', 'concept')->where('status', 'completed')->exists()),
 
-            $this->makeContinueImplementAction()
+            'continueImplement' => $this->makeContinueImplementAction()
                 ->visible(fn (): bool => $this->lastImplementRun()?->status === PhaseStatus::Paused),
 
-            $this->makePhaseAction('push', __('tasks.view.actions.push_pr'), 'heroicon-o-arrow-up-tray')
+            'push' => $this->makePhaseAction('push', __('tasks.view.actions.push_pr'), 'heroicon-o-arrow-up-tray')
                 ->visible(fn (): bool => $this->task()->workflow_status->value !== 'completed'
                     && $this->task()->phaseRuns()->where('phase', 'implement')->where('status', 'completed')->exists()),
 
-            Action::make('forceUnlockImplement')
+            'forceUnlockImplement' => Action::make('forceUnlockImplement')
                 ->label(__('tasks.view.actions.force_unlock_label'))
                 ->icon('heroicon-o-lock-open')
                 ->color('danger')
@@ -329,7 +356,7 @@ class ViewTask extends ViewRecord
                 })
                 ->visible(fn (): bool => $this->task()->current_status === PhaseStatus::LockBlocked),
 
-            Action::make('rebuildDemo')
+            'rebuildDemo' => Action::make('rebuildDemo')
                 ->label(__('tasks.view.demo.rebuild'))
                 ->icon('heroicon-o-arrow-path')
                 ->color('gray')
@@ -346,7 +373,7 @@ class ViewTask extends ViewRecord
                     && (bool) $this->task()->repoProfile?->live_demo_enabled
                     && $this->task()->phaseRuns()->where('phase', 'implement')->where('status', 'completed')->exists()),
 
-            Action::make('stopDemo')
+            'stopDemo' => Action::make('stopDemo')
                 ->label(__('tasks.view.demo.stop'))
                 ->icon('heroicon-o-stop-circle')
                 ->color('danger')
@@ -365,13 +392,13 @@ class ViewTask extends ViewRecord
                     true,
                 )),
 
-            Action::make('logsDownload')
+            'logsDownload' => Action::make('logsDownload')
                 ->label(__('tasks.view.actions.logs_download'))
                 ->icon('heroicon-o-arrow-down-tray')
                 ->color('gray')
                 ->url(fn (): string => TaskResource::getUrl('logs', ['record' => $this->task()])),
 
-            Action::make('markCompleted')
+            'markCompleted' => Action::make('markCompleted')
                 ->label(__('tasks.view.actions.mark_completed'))
                 ->icon('heroicon-o-check-circle')
                 ->color('success')
@@ -385,6 +412,51 @@ class ViewTask extends ViewRecord
                 })
                 ->visible(fn (): bool => $this->task()->workflow_status->value !== 'completed'),
         ];
+
+        $primaryKey = $this->primaryActionKey();
+        $primary = ($primaryKey !== null && isset($actions[$primaryKey]))
+            ? $actions[$primaryKey]->color('primary')
+            : null;
+
+        $rest = collect($actions)
+            ->reject(fn ($action, string $key): bool => $key === $primaryKey)
+            ->values()
+            ->all();
+
+        return array_values(array_filter([
+            $primary,
+            ActionGroup::make($rest)
+                ->label(__('tasks.view.actions.more_label'))
+                ->icon('heroicon-o-ellipsis-vertical')
+                ->color('gray'),
+        ]));
+    }
+
+    /**
+     * The single header action that advances the workflow from the current
+     * state. Everything else lives in the ⋯ dropdown.
+     */
+    private function primaryActionKey(): ?string
+    {
+        if ($this->lastConceptRun()?->status === PhaseStatus::Paused) {
+            return 'continueConcept';
+        }
+        if ($this->lastImplementRun()?->status === PhaseStatus::Paused) {
+            return 'continueImplement';
+        }
+
+        return match ($this->task()->workflow_status) {
+            WorkflowStatus::Draft, WorkflowStatus::ConceptRunning => 'concept',
+            WorkflowStatus::ConceptReview => 'implement',
+            WorkflowStatus::ImplementRunning, WorkflowStatus::ImplementCompleted => 'push',
+            WorkflowStatus::InReview => 'markCompleted',
+            WorkflowStatus::Completed => null,
+            WorkflowStatus::Failed => match ($this->task()->current_phase?->value) {
+                'implement' => 'implement',
+                'push' => 'push',
+                default => 'concept',
+            },
+        };
     }
 
     private function task(): Task

@@ -8,6 +8,10 @@ return [
     'model_label' => 'Projekt',
     'model_label_plural' => 'Projekte',
 
+    'actions' => [
+        'new_task' => 'Neuer Task',
+    ],
+
     'tabs' => [
         'basics' => 'Allgemein',
         'worker' => 'Worker & Modelle',
@@ -18,12 +22,16 @@ return [
         'platform' => 'Plattform',
         'platform_description' => 'Wähle die Plattform — danach werden die weiteren Felder freigeschaltet.',
         'general' => 'Allgemein',
+        'general_description' => 'Anzeigename des Projekts und Automatik für Konzept- und PR-Phase.',
         'worker' => 'Worker',
         'worker_description' => 'Stack & Agent, mit denen die Phasen für dieses Projekt laufen. Pro Task überschreibbar.',
         'live_demo' => 'Live-Demo',
         'models' => 'Modelle',
+        'models_description' => 'Modell-Auswahl für die Phasen. Leer lassen, um die Stack-Vorgaben zu nutzen.',
         'authentication' => 'Authentifizierung',
+        'authentication_description' => 'Wie Argos auf das Repository zugreift — verbundener Account oder Personal Access Token.',
         'repository' => 'Repository',
+        'repository_description' => 'Repository-Adresse und Default-Branch, auf dem die Tasks aufsetzen.',
     ],
 
     'fields' => [

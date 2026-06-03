@@ -432,58 +432,31 @@ class RepoProfileResourceTest extends TestCase
             ->assertSee('GitLab Repo');
     }
 
-    public function test_view_page_renders(): void
+    public function test_edit_page_renders(): void
     {
+        // Detail = edit (the view page was removed in the redesign).
         $profile = RepoProfile::factory()->create();
 
-        Livewire::test(ViewRepoProfile::class, ['record' => $profile->getKey()])
+        Livewire::test(EditRepoProfile::class, ['record' => $profile->getKey()])
             ->assertSuccessful()
             ->assertSee($profile->name);
     }
 
-    public function test_view_page_masks_token(): void
-    {
-        $profile = RepoProfile::factory()->create(['token' => 'secret-pat-token']);
-
-        Livewire::test(ViewRepoProfile::class, ['record' => $profile->getKey()])
-            ->assertSuccessful()
-            ->assertSee('••••••••')
-            ->assertDontSee('secret-pat-token');
-    }
-
-    public function test_view_page_shows_no_token_placeholder_when_empty(): void
-    {
-        $profile = RepoProfile::factory()->create(['token' => null]);
-
-        Livewire::test(ViewRepoProfile::class, ['record' => $profile->getKey()])
-            ->assertSuccessful()
-            ->assertDontSee('••••••••');
-    }
-
-    public function test_view_page_includes_tasks_relation_manager(): void
+    public function test_edit_page_includes_tasks_relation_manager(): void
     {
         $profile = RepoProfile::factory()->create();
 
-        Livewire::test(ViewRepoProfile::class, ['record' => $profile->getKey()])
+        Livewire::test(EditRepoProfile::class, ['record' => $profile->getKey()])
             ->assertSuccessful()
             ->assertSeeLivewire(TasksRelationManager::class);
     }
 
-    public function test_view_page_includes_task_provider_bindings_relation_manager(): void
+    public function test_resource_registers_task_provider_bindings_relation_manager(): void
     {
-        $profile = RepoProfile::factory()->create();
-
-        // The bindings manager is the second relation manager tab; it loads
-        // lazily, so assertSeeLivewire cannot match the mounted component.
-        // Assert the resource registers it and the tab is rendered instead.
         $this->assertContains(
             TaskProviderBindingsRelationManager::class,
             RepoProfileResource::getRelations(),
         );
-
-        Livewire::test(ViewRepoProfile::class, ['record' => $profile->getKey()])
-            ->assertSuccessful()
-            ->assertSee('Task-Provider');
     }
 
     public function test_binding_create_form_loads_project_refs_from_provider(): void

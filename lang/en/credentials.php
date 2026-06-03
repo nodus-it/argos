@@ -8,7 +8,9 @@ return [
         'plural' => 'Access Tokens',
         'sections' => [
             'identity' => 'Identity',
+            'identity_description' => 'Platform, an optional instance URL, and a label to recognize it by.',
             'auth' => 'Token',
+            'auth_description' => 'The personal access token with the required scopes — stored encrypted, never logged.',
         ],
         'fields' => [
             'label' => 'Label',
@@ -43,7 +45,9 @@ return [
         'public_instance' => 'Public instance',
         'sections' => [
             'app' => 'OAuth App',
+            'app_description' => 'Platform, an optional instance URL, and the callback URL for the OAuth flow.',
             'credentials' => 'Credentials',
+            'credentials_description' => "The OAuth app's client ID and client secret — stored encrypted, never logged.",
         ],
         'fields' => [
             'provider' => 'Platform',

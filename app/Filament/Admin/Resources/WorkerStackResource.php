@@ -14,8 +14,6 @@ use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
-use Filament\Actions\EditAction;
-use Filament\Actions\ViewAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\Textarea;
@@ -66,6 +64,8 @@ class WorkerStackResource extends Resource
         return $schema->components([
             Section::make(__('worker.stacks.sections.definition'))
                 ->description(__('worker.stacks.sections.definition_description'))
+                ->icon('heroicon-o-cube')
+                ->aside()
                 ->schema([
                     TextInput::make('name')
                         ->label(__('worker.stacks.fields.name'))
@@ -113,6 +113,8 @@ class WorkerStackResource extends Resource
 
             Section::make(__('worker.stacks.sections.dockerfile'))
                 ->description(__('worker.stacks.sections.dockerfile_description'))
+                ->icon('heroicon-o-command-line')
+                ->aside()
                 ->schema([
                     // Code-editor-style textarea, matched to the task-log
                     // pane (slate-950 surface, slate-100 text, mono).
@@ -195,9 +197,11 @@ class WorkerStackResource extends Resource
                 SelectFilter::make('status')
                     ->options(WorkerImageEntityStatus::class),
             ])
+            ->recordUrl(fn (WorkerStack $r): string => static::getUrl(
+                $r->is_builtin ? 'view' : 'edit',
+                ['record' => $r],
+            ))
             ->recordActions([
-                ViewAction::make(),
-                EditAction::make()->visible(fn (WorkerStack $r): bool => ! $r->is_builtin),
                 self::duplicateAction(),
                 DeleteAction::make()->visible(fn (WorkerStack $r): bool => ! $r->is_builtin),
             ])
@@ -283,6 +287,8 @@ class WorkerStackResource extends Resource
         return [
             'index' => ListWorkerStacks::route('/'),
             'create' => CreateWorkerStack::route('/create'),
+            // Built-in stacks are read-only — they open the styled detail
+            // (view) page; user stacks open edit directly (recordUrl branches).
             'view' => ViewWorkerStack::route('/{record}'),
             'edit' => EditWorkerStack::route('/{record}/edit'),
         ];

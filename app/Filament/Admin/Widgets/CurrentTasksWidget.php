@@ -11,6 +11,8 @@ use App\Models\Task;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget as BaseWidget;
 use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\HtmlString;
 
 class CurrentTasksWidget extends BaseWidget
 {
@@ -24,7 +26,10 @@ class CurrentTasksWidget extends BaseWidget
 
     protected function getTableHeading(): string|Htmlable|null
     {
-        return __('widgets.current_tasks.heading');
+        return new HtmlString(Blade::render(
+            '<span class="fi-ta-argos-heading">@svg(\'heroicon-o-queue-list\', \'fi-ta-argos-heading-icon\')<span>{{ $label }}</span></span>',
+            ['label' => __('widgets.current_tasks.heading')],
+        ));
     }
 
     public function table(Table $table): Table
