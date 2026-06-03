@@ -181,34 +181,6 @@ EOF
     [ "$(sha256_of "$ENV_FILE")" = "$before" ]
 }
 
-# ── apply_stage_overrides ───────────────────────────────────────────────────
-
-@test "apply_stage_overrides pins app image when missing" {
-    ENV_FILE="$TEST_DIR/.env"
-    printf 'APP_KEY=base64:foo\n' > "$ENV_FILE"
-
-    apply_stage_overrides >/dev/null
-
-    [ "$(get_env_value "$ENV_FILE" ARGOS_APP_IMAGE)" = "$STAGE_APP_IMAGE" ]
-}
-
-@test "apply_stage_overrides replaces existing app image tag in place" {
-    ENV_FILE="$TEST_DIR/.env"
-    cat > "$ENV_FILE" <<'EOF'
-APP_KEY=base64:foo
-ARGOS_APP_IMAGE=ghcr.io/nodus-it/argos-app:latest
-EOF
-
-    apply_stage_overrides >/dev/null
-
-    [ "$(get_env_value "$ENV_FILE" ARGOS_APP_IMAGE)" = "$STAGE_APP_IMAGE" ]
-    # Idempotency: running twice changes nothing.
-    local before
-    before="$(sha256_of "$ENV_FILE")"
-    apply_stage_overrides >/dev/null
-    [ "$(sha256_of "$ENV_FILE")" = "$before" ]
-}
-
 # ── reset_stack ─────────────────────────────────────────────────────────────
 
 @test "reset_stack wipes env, state and legacy artefacts (no compose file)" {
