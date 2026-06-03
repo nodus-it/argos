@@ -7,6 +7,7 @@ namespace Tests\Feature;
 use App\Enums\AgentCredentialStatus;
 use App\Enums\AgentName;
 use App\Enums\PhaseStatus;
+use App\Jobs\DeployDemoJob;
 use App\Models\AgentCredential;
 use App\Models\ConnectedAccount;
 use App\Models\PhaseRun;
@@ -17,6 +18,7 @@ use App\Services\Anthropic\CredentialStore;
 use App\Services\Workflow\PhaseRunner;
 use App\Workers\Compose\WorkerImageResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 use Mockery;
 use Mockery\MockInterface;
 use Symfony\Component\Process\Process;
@@ -227,6 +229,69 @@ class PhaseRunnerTest extends TestCase
 
         $run = PhaseRun::where('task_id', $task->id)->first();
         $this->assertSame(99, $run->input_tokens);
+    }
+
+    public function test_dispatches_demo_deploy_after_successful_implement_when_enabled(): void
+    {
+        Bus::fake();
+        config(['argos.preview.enabled' => true]);
+        $task = $this->taskWithProfile(['live_demo_enabled' => true, 'auto_pr' => false]);
+
+        $resultJson = json_encode(['phase' => 'implement', 'status' => 'completed']);
+        $phaseProcess = $this->makeProcessMock(exitCode: 0, stdout: $resultJson."\n");
+
+        $runner = $this->partialMock(PhaseRunner::class, function (MockInterface $mock) use ($phaseProcess): void {
+            $mock->shouldAllowMockingProtectedMethods();
+            $mock->shouldReceive('newProcess')->andReturn($phaseProcess);
+            $mock->shouldReceive('postPhaseSync')->andReturn(null);
+            $mock->shouldReceive('writeImplementNotesToVolume')->andReturn(null);
+        });
+
+        $runner->runBlocking($task, 'implement');
+
+        Bus::assertDispatched(DeployDemoJob::class, fn (DeployDemoJob $job): bool => $job->taskId === $task->id);
+    }
+
+    public function test_does_not_dispatch_demo_deploy_when_preview_disabled(): void
+    {
+        Bus::fake();
+        config(['argos.preview.enabled' => false]);
+        $task = $this->taskWithProfile(['live_demo_enabled' => true, 'auto_pr' => false]);
+
+        $resultJson = json_encode(['phase' => 'implement', 'status' => 'completed']);
+        $phaseProcess = $this->makeProcessMock(exitCode: 0, stdout: $resultJson."\n");
+
+        $runner = $this->partialMock(PhaseRunner::class, function (MockInterface $mock) use ($phaseProcess): void {
+            $mock->shouldAllowMockingProtectedMethods();
+            $mock->shouldReceive('newProcess')->andReturn($phaseProcess);
+            $mock->shouldReceive('postPhaseSync')->andReturn(null);
+            $mock->shouldReceive('writeImplementNotesToVolume')->andReturn(null);
+        });
+
+        $runner->runBlocking($task, 'implement');
+
+        Bus::assertNotDispatched(DeployDemoJob::class);
+    }
+
+    public function test_does_not_dispatch_demo_deploy_when_project_toggle_off(): void
+    {
+        Bus::fake();
+        config(['argos.preview.enabled' => true]);
+        $task = $this->taskWithProfile(['live_demo_enabled' => false, 'auto_pr' => false]);
+
+        $resultJson = json_encode(['phase' => 'implement', 'status' => 'completed']);
+        $phaseProcess = $this->makeProcessMock(exitCode: 0, stdout: $resultJson."\n");
+
+        $runner = $this->partialMock(PhaseRunner::class, function (MockInterface $mock) use ($phaseProcess): void {
+            $mock->shouldAllowMockingProtectedMethods();
+            $mock->shouldReceive('newProcess')->andReturn($phaseProcess);
+            $mock->shouldReceive('postPhaseSync')->andReturn(null);
+            $mock->shouldReceive('writeImplementNotesToVolume')->andReturn(null);
+        });
+
+        $runner->runBlocking($task, 'implement');
+
+        Bus::assertNotDispatched(DeployDemoJob::class);
     }
 
     public function test_run_blocking_throws_when_task_has_no_repo_profile(): void

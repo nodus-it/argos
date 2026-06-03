@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\TaskResource\Pages;
 
+use App\Enums\DemoStatus;
 use App\Enums\Phase;
 use App\Enums\PhaseStatus;
 use App\Enums\WorkflowStatus;
 use App\Filament\Admin\Resources\TaskResource;
+use App\Jobs\DeployDemoJob;
+use App\Jobs\StopDemoJob;
 use App\Models\PhaseRun;
 use App\Models\Task;
 use App\Services\Task\TaskService;
@@ -35,7 +38,8 @@ class ViewTask extends ViewRecord
 
     public bool $diffLoaded = false;
 
-    public int $diffLoadedForIteration = 0;
+    /** Set when the diff command failed (e.g. timed out) so the UI can surface it instead of 500ing. */
+    public ?string $diffError = null;
 
     public string $notes = '';
 
@@ -60,8 +64,6 @@ class ViewTask extends ViewRecord
 
         $this->notes = $task->concept_notes ?? '';
         $this->implementNotes = $task->implement_notes ?? '';
-
-        $this->maybeAutoLoadDiff($task);
     }
 
     public function startEditingNotes(): void
@@ -156,7 +158,6 @@ class ViewTask extends ViewRecord
         $task->refresh();
         $this->notes = $task->concept_notes ?? '';
         $this->implementNotes = $task->implement_notes ?? '';
-        $this->maybeAutoLoadDiff($task);
     }
 
     public function loadDiff(): void
@@ -175,42 +176,46 @@ class ViewTask extends ViewRecord
         $vol = $task->volumeName();
         $g = "git -c safe.directory='*' -C /workspace";
 
-        $statResult = Process::timeout(15)->run([
-            'docker', 'run', '--rm',
-            '-v', "{$vol}:/workspace:ro",
-            '--entrypoint', 'sh', $image,
-            '-c',
-            "{$g} diff --stat origin/{$branch} 2>/dev/null; "
-            .$g.' ls-files --others --exclude-standard 2>/dev/null | while IFS= read -r f; do echo " (neu) $f"; done; '
-            ."echo ''; "
-            .$g.' status --short 2>/dev/null',
-        ]);
-        $this->diffStat = trim($statResult->output());
+        // The diff shells out to `docker run` against the task volume. That can
+        // be slow or hang (huge/polluted workspace, daemon pressure) and is
+        // auto-triggered on mount — so a failure must degrade to an inline
+        // notice, never 500 the whole page.
+        try {
+            $statResult = Process::timeout(15)->run([
+                'docker', 'run', '--rm',
+                '-v', "{$vol}:/workspace:ro",
+                '--entrypoint', 'sh', $image,
+                '-c',
+                "{$g} diff --stat origin/{$branch} 2>/dev/null; "
+                .$g.' ls-files --others --exclude-standard 2>/dev/null | while IFS= read -r f; do echo " (neu) $f"; done; '
+                ."echo ''; "
+                .$g.' status --short 2>/dev/null',
+            ]);
+            $this->diffStat = trim($statResult->output());
 
-        $diffResult = Process::timeout(15)->run([
-            'docker', 'run', '--rm',
-            '-v', "{$vol}:/workspace:ro",
-            '--entrypoint', 'sh', $image,
-            '-c',
-            "{ {$g} diff origin/{$branch} 2>/dev/null; "
-            .$g.' ls-files --others --exclude-standard 2>/dev/null | while IFS= read -r f; do '
-            .$g.' diff --no-index -- /dev/null "$f" 2>/dev/null || true; '
-            .'done; } | head -c 131072',
-        ]);
-        $this->diffFiles = $this->parseDiffStructured($diffResult->output());
-        $this->diffLoaded = true;
-    }
-
-    private function maybeAutoLoadDiff(Task $task): void
-    {
-        $latestCompleted = (int) ($task->phaseRuns()
-            ->where('phase', 'implement')
-            ->where('status', 'completed')
-            ->max('iteration') ?? 0);
-
-        if ($latestCompleted > 0 && $latestCompleted > $this->diffLoadedForIteration) {
-            $this->loadDiff();
-            $this->diffLoadedForIteration = $latestCompleted;
+            $diffResult = Process::timeout(15)->run([
+                'docker', 'run', '--rm',
+                '-v', "{$vol}:/workspace:ro",
+                '--entrypoint', 'sh', $image,
+                '-c',
+                "{ {$g} diff origin/{$branch} 2>/dev/null; "
+                .$g.' ls-files --others --exclude-standard 2>/dev/null | while IFS= read -r f; do '
+                .$g.' diff --no-index -- /dev/null "$f" 2>/dev/null || true; '
+                .'done; } | head -c 131072',
+            ]);
+            $this->diffFiles = $this->parseDiffStructured($diffResult->output());
+            $this->diffError = null;
+        } catch (\Throwable $e) {
+            $this->diffStat = '';
+            $this->diffFiles = [];
+            $this->diffError = __('tasks.view.diff.error');
+            // report() routes through the exception handler (default log
+            // stack) and never throws — unlike Log::channel('argos'), whose
+            // file may be unwritable, which would re-escalate a handled
+            // timeout into a 500.
+            report($e);
+        } finally {
+            $this->diffLoaded = true;
         }
     }
 
@@ -249,6 +254,7 @@ class ViewTask extends ViewRecord
 
         return [
             'phaseRuns' => $phaseRuns,
+            'demo' => $task->currentDemo(),
             'conceptHtml' => $conceptMd !== null ? Str::markdown($conceptMd) : null,
             'conceptError' => $lastConceptRun?->status !== PhaseStatus::Completed
                 ? $lastConceptRun?->error_log
@@ -351,6 +357,42 @@ class ViewTask extends ViewRecord
                     $this->redirect(TaskResource::getUrl('view', ['record' => $task]));
                 })
                 ->visible(fn (): bool => $this->task()->current_status === PhaseStatus::LockBlocked),
+
+            'rebuildDemo' => Action::make('rebuildDemo')
+                ->label(__('tasks.view.demo.rebuild'))
+                ->icon('heroicon-o-arrow-path')
+                ->color('gray')
+                ->requiresConfirmation()
+                ->modalHeading(__('tasks.view.demo.rebuild_heading'))
+                ->modalDescription(__('tasks.view.demo.rebuild_description'))
+                ->action(function (): void {
+                    $task = $this->task();
+                    DeployDemoJob::dispatch($task->id);
+                    Notification::make()->title(__('tasks.view.demo.rebuild_queued'))->success()->send();
+                    $this->redirect(TaskResource::getUrl('view', ['record' => $task]));
+                })
+                ->visible(fn (): bool => (bool) config('argos.preview.enabled')
+                    && (bool) $this->task()->repoProfile?->live_demo_enabled
+                    && $this->task()->phaseRuns()->where('phase', 'implement')->where('status', 'completed')->exists()),
+
+            'stopDemo' => Action::make('stopDemo')
+                ->label(__('tasks.view.demo.stop'))
+                ->icon('heroicon-o-stop-circle')
+                ->color('danger')
+                ->requiresConfirmation()
+                ->modalHeading(__('tasks.view.demo.stop_heading'))
+                ->modalDescription(__('tasks.view.demo.stop_description'))
+                ->action(function (): void {
+                    $task = $this->task();
+                    StopDemoJob::dispatch($task->id);
+                    Notification::make()->title(__('tasks.view.demo.stop_queued'))->success()->send();
+                    $this->redirect(TaskResource::getUrl('view', ['record' => $task]));
+                })
+                ->visible(fn (): bool => in_array(
+                    $this->task()->currentDemo()?->status,
+                    [DemoStatus::Building, DemoStatus::Live],
+                    true,
+                )),
 
             'logsDownload' => Action::make('logsDownload')
                 ->label(__('tasks.view.actions.logs_download'))

@@ -447,6 +447,23 @@ class RepoProfileResource extends Resource
                                         ->native(false),
                                 ]),
 
+                            // ── Live-Demo ───────────────────────────────────────────────────
+                            Section::make(__('projects.sections.live_demo'))
+                                ->visible(fn (Get $get): bool => self::platformChosen($get))
+                                ->schema([
+                                    Toggle::make('live_demo_enabled')
+                                        ->label(__('projects.fields.live_demo_label'))
+                                        ->helperText(__('projects.fields.live_demo_helper'))
+                                        ->default(false)
+                                        ->live(),
+
+                                    Callout::make(__('projects.fields.live_demo_hint_heading'))
+                                        ->visible(fn (Get $get): bool => (bool) $get('live_demo_enabled'))
+                                        ->color('info')
+                                        ->icon('heroicon-o-information-circle')
+                                        ->description(__('projects.fields.live_demo_hint_body')),
+                                ]),
+
                             // ── Modelle ─────────────────────────────────────────────────────
                             Section::make(__('projects.sections.models'))
                                 ->description(__('projects.sections.models_description'))

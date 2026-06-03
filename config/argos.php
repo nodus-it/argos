@@ -73,6 +73,40 @@ return [
     'compose' => [
         'default_stack' => env('ARGOS_DEFAULT_STACK', 'php-8.4'),
     ],
+
+    // Live-Demo (P6): ephemeral per-task demo deployments, routed by Traefik
+    // under their own subdomain. See docs/backlog/live-demo-concept.md.
+    'preview' => [
+        'enabled' => (bool) env('ARGOS_PREVIEW_ENABLED', false),
+        // Demos live at demo-{task}.{base_domain}; nip.io gives zero-config
+        // wildcard subdomains locally (resolves to 127.0.0.1).
+        'base_domain' => env('ARGOS_PREVIEW_BASE_DOMAIN', '127.0.0.1.nip.io'),
+        // Scheme + external port the demo URL is reachable on. Locally Traefik
+        // publishes ARGOS_PORT (default 8080); a real deployment terminates TLS
+        // on 443, so set scheme=https and port=443 (omitted from the URL).
+        'scheme' => env('ARGOS_PREVIEW_SCHEME', 'http'),
+        'port' => (int) env('ARGOS_PORT', 8080),
+        'ttl_hours' => (int) env('ARGOS_PREVIEW_TTL_HOURS', 24),
+        // External Docker network shared with Traefik (defined in docker-compose.yml).
+        'network' => env('ARGOS_PREVIEW_NETWORK', 'argos_edge'),
+        // Shared volume where the manager writes one Traefik file-provider route
+        // per demo (Traefik mounts it read-only). Matches ARGOS_TRAEFIK_DIR in
+        // docker-compose.yml.
+        'traefik_dir' => env('ARGOS_TRAEFIK_DIR', '/data/traefik'),
+        // Cap on concurrently running demos. When a new deploy would exceed it,
+        // the oldest running demos of other tasks are evicted (logged) to make
+        // room. 0 disables the cap.
+        'max_concurrent' => (int) env('ARGOS_PREVIEW_MAX_CONCURRENT', 10),
+        // Per-demo resource limits (separate from the worker limits — demos run
+        // alongside Argos and should stay modest).
+        'cpu_limit' => env('ARGOS_PREVIEW_CPU_LIMIT', '1.0'),
+        'memory_limit' => env('ARGOS_PREVIEW_MEM_LIMIT', '1g'),
+        // Built-in default demo runtime (php-fpm + nginx + node), used when a
+        // repo ships no .argos/demo.* contract. DemoImageBuilder appends a
+        // content hash to this repository name (argos-demo:<hash>) and builds
+        // it on demand; the app entrypoint warms it at boot.
+        'default_image' => env('ARGOS_PREVIEW_DEFAULT_IMAGE', 'argos-demo'),
+    ],
     'concept' => [
         'max_turns_default' => (int) env('ARGOS_CONCEPT_MAX_TURNS_DEFAULT', 50),
     ],

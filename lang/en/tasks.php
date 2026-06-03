@@ -123,6 +123,24 @@ return [
             'phase_waiting' => ':phase waiting for worker',
         ],
 
+        'demo' => [
+            'title' => 'Live demo',
+            'url' => 'URL',
+            'expires' => 'Expires',
+            'building' => 'Building demo…',
+            'failed_hint' => 'The demo build failed.',
+            'show_log' => 'Show build log',
+            'empty_hint' => 'No demo yet. It is built automatically after the next successful implement run.',
+            'rebuild' => 'Rebuild demo',
+            'rebuild_heading' => 'Rebuild live demo?',
+            'rebuild_description' => 'A running demo for this task will be replaced. The build runs in the background.',
+            'rebuild_queued' => 'Demo build queued.',
+            'stop' => 'Stop demo',
+            'stop_heading' => 'Stop live demo?',
+            'stop_description' => 'The demo’s containers, volumes and route will be removed.',
+            'stop_queued' => 'Demo is being stopped.',
+        ],
+
         'concept' => [
             'title' => 'Concept',
             'tab_concept' => 'Concept',
@@ -211,6 +229,7 @@ return [
             'load_button' => 'Load diff',
             'loading' => 'Loading…',
             'no_changes' => 'No changes compared to origin/:branch.',
+            'error' => 'The diff could not be loaded (the workspace may be unavailable or the read timed out).',
             'badge_new' => 'NEW',
             'badge_deleted' => 'DELETED',
             'loaded_at' => 'Loaded: :updated_at',

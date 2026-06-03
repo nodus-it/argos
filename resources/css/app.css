@@ -695,7 +695,22 @@ body,
 .dark .badge-success{background:color-mix(in oklab,var(--ok-500) 16%,transparent);color:var(--ok-400);border-color:color-mix(in oklab,var(--ok-500) 34%,transparent);}
 .dark .badge-failed{background:color-mix(in oklab,var(--dg-500) 16%,transparent);color:var(--dg-400);border-color:color-mix(in oklab,var(--dg-500) 34%,transparent);}
 .badge-running .dot{background:var(--in-500);animation:pulse 1.6s var(--ease) infinite;}
+.badge-success .dot{background:var(--ok-500);}
+.badge-failed .dot{background:var(--dg-500);}
+.badge-draft .dot{background:var(--muted);}
 @keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.4;transform:scale(.7);}}
+
+/* Live-demo bar — standalone status+URL strip above the task thread */
+.demo-bar{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+.demo-bar .demo-id{display:flex;align-items:center;gap:10px;min-width:0;}
+.demo-bar .demo-id svg{width:18px;height:18px;color:var(--muted);flex:none;}
+.demo-bar .demo-name{font-weight:600;}
+.demo-bar .demo-meta{display:flex;align-items:center;gap:14px;min-width:0;}
+.demo-bar .demo-link{font-family:var(--font-mono);font-size:var(--t-xs);color:var(--accent-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.demo-bar .demo-link:hover{text-decoration:underline;}
+.demo-bar .demo-exp{font-size:var(--t-xs);color:var(--muted);white-space:nowrap;}
+.demo-bar .demo-log{flex-basis:100%;margin-top:10px;}
+.demo-bar .demo-log pre{font-size:var(--t-xs);max-height:16rem;overflow:auto;white-space:pre-wrap;word-break:break-word;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;}
 
 /* Phase chip */
 .chip{display:inline-flex;align-items:center;gap:6px;font-size:var(--t-xs);font-weight:600;padding:3px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface-2);color:var(--text-2);}
