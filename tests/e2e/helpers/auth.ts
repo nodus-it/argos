@@ -13,5 +13,9 @@ export async function login(
   await page.getByRole('textbox', { name: /email/i }).fill(email);
   await page.getByRole('textbox', { name: /password/i }).fill(password);
   await page.getByRole('button', { name: /sign in/i }).click();
-  await page.waitForURL(/\/admin/);
+  // The Livewire auth round-trip keeps us on /admin/login until it succeeds, and
+  // a bare /\/admin/ match would resolve immediately against that same URL. Wait
+  // until we have actually left the login page (dashboard or onboarding).
+  await page.waitForURL((url) => /\/admin(\/|$)/.test(url.pathname) && !/\/admin\/login/.test(url.pathname));
+  await page.waitForLoadState('networkidle');
 }

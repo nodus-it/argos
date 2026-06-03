@@ -1,4 +1,4 @@
-import { test } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 import { MATRIX } from './matrix';
 import { connectAccount, resetDatabase } from './helpers/reset';
 import { login } from './helpers/auth';
@@ -43,7 +43,8 @@ for (const run of MATRIX) {
       await expectBodyText(page, /Concept/i);
 
       await runImplement(page);
-      await expectBodyText(page, /Implement Completed|Completed/i);
+      // Implement completed in fake mode → the Push & PR action is now available.
+      await expect(page.getByRole('button', { name: /push/i }).first()).toBeVisible();
     });
   });
 }
