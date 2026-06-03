@@ -3,7 +3,7 @@
 #
 # Self-host Argos in one command:
 #
-#   curl -fsSL https://raw.githubusercontent.com/nodus-it/argos/develop/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/nodus-it/argos/develop/.tools/install.sh | bash
 #
 # Default install directory is $PWD (the directory you ran the curl from).
 # Override:
@@ -11,19 +11,12 @@
 #   ARGOS_INSTALL_DIR=/opt/argos curl … | bash
 #
 # Re-running the script in the same install directory updates the stack:
-# downloads any newer docker-compose.yml / nginx.conf, merges new keys from
-# .env.example into .env without touching existing values, refreshes the
-# extracted public/ assets, then `docker compose pull && up -d`.
+# downloads any newer docker-compose.yml, merges new keys from .env.example
+# into .env without touching existing values, then `docker compose pull && up -d`.
 #
 # To layer in custom config (extra ports, labels, env), drop a
 # docker-compose.override.yml next to docker-compose.yml — the installer
 # never touches that file.
-#
-# Stage channel (rolling develop images, for testers):
-#   curl … | bash -s -- --stage
-#   ARGOS_STAGE=1 curl … | bash
-# Pins ARGOS_APP_IMAGE to the :stage tag published from develop and tracks
-# the develop branch for manifests.
 #
 # Beta channel (latest release including pre-releases):
 #   curl … | bash -s -- --beta
@@ -33,8 +26,8 @@
 # stable release exists yet.
 #
 # Reset (DESTRUCTIVE — wipes DB + all named volumes):
-#   bash install.sh --reset            # interactive: prompts for "yes"
-#   curl … | bash -s -- --reset --force # non-interactive: --force is required
+#   bash .tools/install.sh --reset            # interactive: prompts for "yes"
+#   curl … | bash -s -- --reset --force        # non-interactive: --force is required
 
 set -euo pipefail
 IFS=$'\n\t'
@@ -50,16 +43,10 @@ RESET=0
 # API call on every `source install.sh`.
 ARGOS_VERSION="${ARGOS_VERSION:-}"
 
-# Stage channel: pulls the rolling develop-branch images (CI publishes
-# :stage / :stage-php8.4 on every push to develop). Off by default — release
-# tags are the supported install path; stage is for testers tracking develop.
-STAGE="${ARGOS_STAGE:-0}"
-
 # Beta channel: resolves the newest release tag including pre-releases instead
 # of the latest stable-only tag. Off by default; also activates automatically
 # when no stable release exists yet (transparent fallback, with a warning).
 BETA="${ARGOS_BETA:-0}"
-STAGE_APP_IMAGE="ghcr.io/nodus-it/argos-app:stage"
 
 # Files the installer owns inside INSTALL_DIR.
 COMPOSE_FILE="docker-compose.yml"
@@ -106,9 +93,6 @@ Usage: install.sh [options]
 Options:
   -d, --dir PATH       Install directory (default: \$PWD = $PWD)
   -v, --version REF    Git ref to install from (default: $ARGOS_VERSION)
-  -s, --stage          Use the rolling 'stage' image built from develop
-                       (sets ARGOS_APP_IMAGE to the :stage tag; defaults
-                       --version to develop if unpinned)
   -b, --beta           Install the latest release including pre-releases.
                        Useful before the first stable release ships or to
                        track RC builds. Also activates automatically as a
@@ -124,7 +108,6 @@ Options:
 Environment overrides:
   ARGOS_INSTALL_DIR    Same as --dir
   ARGOS_VERSION        Same as --version
-  ARGOS_STAGE=1        Same as --stage
   ARGOS_BETA=1         Same as --beta
   ARGOS_REPO           GitHub repo (default: nodus-it/argos)
 USAGE
@@ -135,7 +118,6 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         -d|--dir)     INSTALL_DIR="$2"; shift 2;;
         -v|--version) ARGOS_VERSION="$2"; shift 2;;
-        -s|--stage)   STAGE=1; shift;;
         -b|--beta)    BETA=1; shift;;
         -r|--reset)   RESET=1; shift;;
         -f|--force)   FORCE=1; shift;;
@@ -276,8 +258,8 @@ merge_env_keys() {
     fi
 }
 
-# Older installer versions (< stage move-to-volumes) dropped a nginx.conf
-# file and a public/ directory next to docker-compose.yml. They are no longer
+# Older installer versions dropped a nginx.conf file and a public/ directory
+# next to docker-compose.yml. They are no longer
 # part of the runtime — nginx.conf is baked into the app image, public/ is
 # populated by the app entrypoint into a shared volume. Wipe them on update.
 remove_legacy_artefacts() {
@@ -387,22 +369,12 @@ backfill_missing_secrets() {
     fi
 }
 
-# apply_stage_overrides: Pin ARGOS_APP_IMAGE in $ENV_FILE to the rolling
-# :stage tag published from develop. Idempotent — safe to run on both fresh
-# installs and updates whenever --stage is in effect.
-# Args: none (reads $ENV_FILE, $STAGE_APP_IMAGE)
-# Returns: 0
-apply_stage_overrides() {
-    set_env_value "$ENV_FILE" ARGOS_APP_IMAGE "$STAGE_APP_IMAGE"
-    log "Stage channel: pinned ARGOS_APP_IMAGE=$STAGE_APP_IMAGE"
-}
-
 # reset_stack: Tear down the compose stack (containers + named volumes),
 # remove the local .env and state files, and clean up legacy artefacts so the
 # next install path is "fresh". Idempotent — runs cleanly even when nothing
 # of the stack exists yet (compose down on a missing project is a no-op).
 # Only touches volumes defined in $COMPOSE_FILE (compose's own scope) — never
-# unrelated volumes like a parallel argos-stage stack the user may run.
+# unrelated volumes from other compose projects the user may run.
 # Args: none (acts on cwd = $INSTALL_DIR)
 # Returns: 0 on success
 reset_stack() {
@@ -468,7 +440,6 @@ print_summary() {
     [[ -z "$url" ]] && url="http://localhost:${port:-8080}"
     channel="release"
     [[ "$BETA"  -eq 1 ]] && channel="beta (pre-release)"
-    [[ "$STAGE" -eq 1 ]] && channel="stage (rolling develop)"
 
     local b0="" b1=""
     if [[ -t 1 && "${TERM:-dumb}" != "dumb" ]]; then
@@ -512,11 +483,7 @@ main() {
     preflight
 
     if [[ -z "$ARGOS_VERSION" ]]; then
-        if [[ "$STAGE" -eq 1 ]]; then
-            # Stage tracks develop end-to-end: the :stage image tags are built
-            # from that branch, so the manifests must come from there too.
-            ARGOS_VERSION="develop"
-        elif [[ "$BETA" -eq 1 ]]; then
+        if [[ "$BETA" -eq 1 ]]; then
             log "Beta channel: resolving latest release including pre-releases …"
             ARGOS_VERSION="$(resolve_beta_version)"
             if [[ -z "$ARGOS_VERSION" ]]; then
@@ -535,7 +502,7 @@ main() {
             fi
         fi
     fi
-    RAW_BASE="${ARGOS_RAW_BASE:-https://raw.githubusercontent.com/${ARGOS_REPO}/${ARGOS_VERSION}/installer}"
+    RAW_BASE="${ARGOS_RAW_BASE:-https://raw.githubusercontent.com/${ARGOS_REPO}/${ARGOS_VERSION}/.tools/docker}"
 
     mkdir -p "$INSTALL_DIR"
     cd "$INSTALL_DIR"
@@ -552,9 +519,6 @@ main() {
 
     if [[ "$BETA" -eq 1 ]]; then
         log "Beta channel selected (latest release including pre-releases)."
-    fi
-    if [[ "$STAGE" -eq 1 ]]; then
-        log "Stage channel selected (rolling develop images)."
     fi
 
     if [[ "$mode" == "install" ]]; then
@@ -598,14 +562,6 @@ MSG
         download_install_files
         merge_env_keys "$ENV_EXAMPLE_FILE" "$ENV_FILE"
         backfill_missing_secrets
-    fi
-
-    # Stage overrides run after env init/merge so they win against whatever
-    # tags the upstream .env.example or a prior install left behind. Without
-    # --stage we don't touch the image tags on update, so users who pinned
-    # their own tag manually keep that pin.
-    if [[ "$STAGE" -eq 1 ]]; then
-        apply_stage_overrides
     fi
 
     remove_legacy_artefacts

@@ -7,8 +7,8 @@ setup() {
     # Source install.sh — the source-guard at the bottom keeps main() from
     # firing when BASH_SOURCE != $0, so we get the helpers without any of the
     # docker / curl side-effects.
-    # shellcheck source=../../install.sh
-    source install.sh
+    # shellcheck source=../install.sh
+    source .tools/install.sh
 }
 
 teardown() {
