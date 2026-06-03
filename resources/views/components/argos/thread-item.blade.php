@@ -18,6 +18,7 @@
         'concept' => 'heroicon-o-light-bulb',
         'implement' => 'heroicon-o-code-bracket',
         'push' => 'heroicon-o-arrow-up-tray',
+        'demo' => 'heroicon-o-globe-alt',
         'review' => 'heroicon-o-chat-bubble-left-right',
         'respond' => 'heroicon-o-chat-bubble-left-right',
     ];
