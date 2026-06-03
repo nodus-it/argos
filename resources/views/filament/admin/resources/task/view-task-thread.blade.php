@@ -74,6 +74,50 @@
         </x-argos.meta-strip>
     </div>
 
+    {{-- Live demo — standalone bar above the thread (status + URL) --}}
+    @php
+        $demoEnabled = (bool) config('argos.preview.enabled') && (bool) $task->repoProfile?->live_demo_enabled;
+        $demoStatus = $demo?->status?->value;
+        $demoBadgeCls = ['building' => 'badge-running', 'live' => 'badge-success', 'failed' => 'badge-failed', 'stopped' => 'badge-draft'][$demoStatus] ?? 'badge-draft';
+    @endphp
+    @if ($demo || $demoEnabled)
+        <div class="card card-pad demo-bar fade-in" style="margin-bottom:20px;" x-data="{ log: false }">
+            <div class="demo-id">
+                @svg('heroicon-o-globe-alt')
+                <span class="demo-name">{{ __('tasks.view.demo.title') }}</span>
+                @if ($demo)
+                    <span class="badge {{ $demoBadgeCls }}"><span class="dot"></span>{{ $demo->status->label() }}</span>
+                @endif
+            </div>
+
+            <div class="demo-meta">
+                @if ($demoStatus === 'live' && $demo->url)
+                    <a href="{{ $demo->url }}" target="_blank" rel="noopener" class="demo-link">{{ $demo->url }}</a>
+                    @if ($demo->ttl_until)
+                        <span class="demo-exp">{{ __('tasks.view.demo.expires') }} {{ $demo->ttl_until->diffForHumans() }}</span>
+                    @endif
+                @elseif ($demoStatus === 'building')
+                    <span class="demo-exp">{{ __('tasks.view.demo.building') }}</span>
+                @elseif ($demoStatus === 'failed')
+                    <span class="demo-exp" style="color:var(--dg-600);">{{ __('tasks.view.demo.failed_hint') }}</span>
+                    @if ($demo->build_log)
+                        <button type="button" class="link-btn" @click="log = !log" :class="log && 'on'">
+                            @svg('heroicon-o-command-line') {{ __('tasks.view.demo.show_log') }}
+                        </button>
+                    @endif
+                @else
+                    <span class="demo-exp">{{ __('tasks.view.demo.empty_hint') }}</span>
+                @endif
+            </div>
+
+            @if ($demoStatus === 'failed' && $demo->build_log)
+                <div x-show="log" x-cloak class="demo-log">
+                    <pre class="mono">{{ \Illuminate\Support\Str::limit($demo->build_log, 8000) }}</pre>
+                </div>
+            @endif
+        </div>
+    @endif
+
     {{-- Chronological thread --}}
     <x-argos.thread class="task-detail">
         {{-- Task created --}}
@@ -193,50 +237,6 @@
             </x-argos.thread-item>
         @endif
 
-        {{-- Live demo --}}
-        @php
-            $demoEnabled = (bool) config('argos.preview.enabled') && (bool) $task->repoProfile?->live_demo_enabled;
-            $demoStatus = $demo?->status?->value;
-            $demoBadgeMap = ['building' => 'running', 'live' => 'success', 'failed' => 'failed', 'stopped' => 'draft'];
-        @endphp
-        @if ($demo || $demoEnabled)
-            <x-argos.thread-item phase="demo" :done="$demoStatus === 'live'"
-                title="{{ __('tasks.view.demo.title') }}" who="Argos"
-                time="{{ $demo?->updated_at?->diffForHumans() }}">
-                @if ($demoStatus === 'live')
-                    {{ __('tasks.view.demo.url') }}
-                @elseif ($demoStatus === 'building')
-                    {{ __('tasks.view.demo.building') }}
-                @elseif ($demoStatus === 'failed')
-                    {{ __('tasks.view.demo.failed_hint') }}
-                @else
-                    {{ __('tasks.view.demo.empty_hint') }}
-                @endif
-
-                <x-slot:actions>
-                    @if ($demo)
-                        <x-argos.badge :status="$demoBadgeMap[$demoStatus] ?? 'draft'" :label="$demo->status->label()" />
-                    @endif
-                    @if ($demoStatus === 'live' && $demo->url)
-                        <a href="{{ $demo->url }}" target="_blank" rel="noopener" class="link-btn">
-                            @svg('heroicon-o-arrow-top-right-on-square') {{ $demo->url }}
-                        </a>
-                    @endif
-                    @if ($demoStatus === 'live' && $demo->ttl_until)
-                        <span class="mono" style="opacity:.7;">{{ __('tasks.view.demo.expires') }} {{ $demo->ttl_until->diffForHumans() }}</span>
-                    @endif
-                </x-slot:actions>
-
-                @if ($demoStatus === 'failed' && $demo->build_log)
-                    <x-slot:detail>
-                        <details class="card card-pad">
-                            <summary class="link-btn">@svg('heroicon-o-command-line') {{ __('tasks.view.demo.show_log') }}</summary>
-                            <pre class="mono" style="margin-top:8px;max-height:16rem;overflow:auto;white-space:pre-wrap;word-break:break-word;">{{ \Illuminate\Support\Str::limit($demo->build_log, 8000) }}</pre>
-                        </details>
-                    </x-slot:detail>
-                @endif
-            </x-argos.thread-item>
-        @endif
     </x-argos.thread>
 
     {{-- Respond composer (maps to the phase awaiting feedback) --}}
