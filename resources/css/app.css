@@ -873,6 +873,9 @@ body,
 .feed-node{width:38px;height:38px;border-radius:99px;flex:none;display:grid;place-items:center;border:2px solid var(--border);background:var(--surface);color:var(--muted);z-index:1;}
 .feed-node svg{width:18px;height:18px;}
 .feed-node.st-done{background:var(--ok-500);border-color:var(--ok-500);color:#fff;}
+.feed-node.st-run{background:var(--in-500);border-color:var(--in-500);color:#fff;animation:railpulse 1.8s var(--ease) infinite;}
+.feed-node.st-fail{background:var(--dg-500);border-color:var(--dg-500);color:#fff;}
+.feed-node.st-wait{background:var(--wn-500);border-color:var(--wn-500);color:#fff;}
 .feed-node.st-you{background:transparent;border:none;padding:0;}
 .feed-card{flex:1;min-width:0;padding:16px 18px;}
 .feed-head{display:flex;align-items:baseline;gap:10px;margin-bottom:6px;flex-wrap:wrap;}

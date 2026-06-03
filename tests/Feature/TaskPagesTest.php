@@ -86,8 +86,13 @@ class TaskPagesTest extends TestCase
     {
         // Pre-fix concept_md was persisted with the ```markdown wrapper that
         // some agent replies produce. Render-time strip heals these rows
-        // without requiring a backfill migration.
-        $task = Task::factory()->create([
+        // without requiring a backfill migration. The thread renders the
+        // concept from the phase_run, so attach it there.
+        $task = Task::factory()->conceptReady()->create();
+        PhaseRun::factory()->create([
+            'task_id' => $task->id,
+            'phase' => 'concept',
+            'status' => 'completed',
             'concept_md' => "```markdown\n# Konzept: Foo\n\nBody.\n```",
         ]);
 
