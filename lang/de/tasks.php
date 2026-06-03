@@ -186,6 +186,8 @@ return [
             'failed_hint' => 'Der Demo-Aufbau ist fehlgeschlagen.',
             'show_log' => 'Build-Log anzeigen',
             'empty_hint' => 'Noch keine Demo. Sie wird nach dem nächsten erfolgreichen Implement-Lauf automatisch aufgebaut.',
+            'stopped_hint' => 'Die Demo wurde nach dem Pull Request heruntergefahren. Du kannst sie jederzeit neu starten.',
+            'restart' => 'Demo neu starten',
             'rebuild' => 'Demo neu aufbauen',
             'rebuild_heading' => 'Live-Demo neu aufbauen?',
             'rebuild_description' => 'Eine laufende Demo dieses Tasks wird ersetzt. Der Aufbau läuft im Hintergrund.',

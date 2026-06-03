@@ -99,6 +99,13 @@
                             @svg('heroicon-o-command-line') {{ __('tasks.view.demo.show_log') }}
                         </button>
                     @endif
+                @elseif ($demoStatus === 'stopped')
+                    <span class="demo-exp">{{ __('tasks.view.demo.stopped_hint') }}</span>
+                    @if ($demoEnabled)
+                        <button type="button" class="link-btn" wire:click="mountAction('rebuildDemo')">
+                            @svg('heroicon-o-play') {{ __('tasks.view.demo.restart') }}
+                        </button>
+                    @endif
                 @else
                     <span class="demo-exp">{{ __('tasks.view.demo.empty_hint') }}</span>
                 @endif

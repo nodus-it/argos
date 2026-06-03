@@ -186,6 +186,8 @@ return [
             'failed_hint' => 'The demo build failed.',
             'show_log' => 'Show build log',
             'empty_hint' => 'No demo yet. It is built automatically after the next successful implement run.',
+            'stopped_hint' => 'The demo was torn down after the pull request. You can restart it anytime.',
+            'restart' => 'Restart demo',
             'rebuild' => 'Rebuild demo',
             'rebuild_heading' => 'Rebuild live demo?',
             'rebuild_description' => 'A running demo for this task will be replaced. The build runs in the background.',
