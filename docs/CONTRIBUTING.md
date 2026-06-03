@@ -58,20 +58,11 @@ composer run dev:logs      # follow compose logs
 composer run dev:exec      # bash into the app container
 ```
 
-The compose file lives at `.tools/docker/docker-compose.yml`. It builds the
-app + worker images automatically on first start.
-
-### Stage profile
-
-To preview the released `:stage` images (app + worker built from the
-`develop` branch):
-
-```bash
-composer run stage          # start
-composer run stage:stop     # tear down
-composer run stage:logs     # follow logs
-composer run stage:exec     # bash into it
-```
+The canonical compose file lives at `.tools/docker/docker-compose.yml` — the
+same file the self-host installer ships. Local development layers
+`.tools/docker/docker-compose.dev.yml` on top (build from source, bind-mounts,
+phpMyAdmin); the `composer dev` script and the `.tools/bin/dev-*.sh` helpers
+pass both `-f` files for you.
 
 ## Tests
 

@@ -204,7 +204,7 @@ jobs:
           git fetch origin master:master
           git checkout master
 
-          # Merge develop into master without committing. installer/.env.example
+          # Merge develop into master without committing. .tools/docker/.env.example
           # has a known conflict: master pins :prev-tag, develop carries
           # :latest as the rolling default. Resolve in favour of develop
           # (:latest) and immediately overwrite with the new release tag —
@@ -212,31 +212,31 @@ jobs:
           # the new pin in one step (previously needed a separate "pin"
           # commit on top, polluting master history).
           if ! git merge --no-ff develop --no-commit -m "Release ${{ steps.tag.outputs.name }}"; then
-            git checkout --theirs installer/.env.example
-            git add installer/.env.example
+            git checkout --theirs .tools/docker/.env.example
+            git add .tools/docker/.env.example
 
             UNRESOLVED=$(git diff --name-only --diff-filter=U)
             if [ -n "$UNRESOLVED" ]; then
-              echo "::error::Unerwartete Merge-Konflikte über installer/.env.example hinaus:"
+              echo "::error::Unerwartete Merge-Konflikte über .tools/docker/.env.example hinaus:"
               echo "$UNRESOLVED"
               exit 1
             fi
           fi
 
-          # Pin installer/.env.example to the version-suffixed app image tag
+          # Pin .tools/docker/.env.example to the version-suffixed app image tag
           # on master only. develop keeps the floating :latest default so
           # testers running `install.sh --version develop` track the rolling
           # tag. Self-host installs from this release tag get an immutable
           # image:tag pair that can't drift mid-release. Worker images are
           # built on demand by the manager and don't need pinning here.
-          if ! grep -qE '^ARGOS_APP_IMAGE=ghcr\.io/nodus-it/argos-app:' installer/.env.example; then
-            echo "::error::installer/.env.example fehlt die erwartete ARGOS_APP_IMAGE-Zeile"
+          if ! grep -qE '^ARGOS_APP_IMAGE=ghcr\.io/nodus-it/argos-app:' .tools/docker/.env.example; then
+            echo "::error::.tools/docker/.env.example fehlt die erwartete ARGOS_APP_IMAGE-Zeile"
             exit 1
           fi
-          sed -i -E "s|^(ARGOS_APP_IMAGE=ghcr\.io/nodus-it/argos-app):.*$|\1:${{ steps.tag.outputs.name }}|" installer/.env.example
-          echo "── Diff installer/.env.example ──"
-          git --no-pager diff installer/.env.example
-          git add installer/.env.example
+          sed -i -E "s|^(ARGOS_APP_IMAGE=ghcr\.io/nodus-it/argos-app):.*$|\1:${{ steps.tag.outputs.name }}|" .tools/docker/.env.example
+          echo "── Diff .tools/docker/.env.example ──"
+          git --no-pager diff .tools/docker/.env.example
+          git add .tools/docker/.env.example
 
           git commit -m "Release ${{ steps.tag.outputs.name }}"
 

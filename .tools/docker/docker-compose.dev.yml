@@ -1,0 +1,72 @@
+# Argos — local development overlay
+#
+# Layered on top of docker-compose.yml for local work:
+#   docker compose -f .tools/docker/docker-compose.yml \
+#                  -f .tools/docker/docker-compose.dev.yml up --build
+# (the `.tools/bin/dev-*.sh` scripts and `composer dev` do this for you).
+#
+# It carries ONLY the dev deltas — everything else (services, networks, named
+# volumes, the full env) comes from the canonical base file:
+#   • build argos-app:local from source instead of pulling a registry image
+#   • bind-mount the working tree into app/queue/scheduler for hot reload
+#   • APP_ENV=local / APP_DEBUG=true defaults
+#   • phpMyAdmin on ${ARGOS_PMA_PORT:-8081}
+#
+# Production never sees this file (the installer ships only docker-compose.yml),
+# so the two can't drift on anything but these deltas.
+
+services:
+
+  app:
+    build:
+      context: ../..
+      dockerfile: .tools/docker/app/Dockerfile
+      target: app
+    environment:
+      APP_ENV:   "${APP_ENV:-local}"
+      APP_DEBUG: "${APP_DEBUG:-true}"
+    volumes:
+      # Bind mount for hot reload without rebuilding the image. vendor/ is
+      # shared with the host — composer require on the host propagates
+      # immediately, and the entrypoint runs `composer install` when
+      # composer.lock drifts. The anonymous volumes mask host artefacts that
+      # would otherwise shadow the image-built ones.
+      - ../..:/app
+      - /app/node_modules
+      - /app/public/build
+      - /app/bootstrap/cache
+
+  queue:
+    environment:
+      APP_ENV:   "${APP_ENV:-local}"
+      APP_DEBUG: "${APP_DEBUG:-true}"
+    volumes:
+      - ../..:/app
+      - /app/node_modules
+      - /app/public/build
+      - /app/bootstrap/cache
+
+  scheduler:
+    environment:
+      APP_ENV:   "${APP_ENV:-local}"
+      APP_DEBUG: "${APP_DEBUG:-true}"
+    volumes:
+      - ../..:/app
+      - /app/node_modules
+      - /app/public/build
+      - /app/bootstrap/cache
+
+  # phpMyAdmin on port 8081 (override via ARGOS_PMA_PORT) — dev only.
+  phpmyadmin:
+    image: phpmyadmin:5
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${ARGOS_PMA_PORT:-8081}:80"
+    environment:
+      PMA_HOST: db
+      PMA_USER: "${ARGOS_DB_USERNAME:-argos}"
+      PMA_PASSWORD: "${ARGOS_DB_PASSWORD:-argos}"
+      UPLOAD_LIMIT: 256M

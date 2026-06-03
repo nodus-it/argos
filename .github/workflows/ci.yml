@@ -30,8 +30,8 @@ jobs:
             worker/tests/run-bats.sh \
             worker/lib/*.sh \
             worker/phases/*.sh \
-            install.sh \
-            installer/tests/run-bats.sh \
+            .tools/install.sh \
+            .tools/tests/run-bats.sh \
             .tools/bin/dev-reload.sh \
             .tools/bin/dev-reset.sh \
             .claude/scripts/boost-freshness-check.sh \
@@ -49,7 +49,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: bats unit tests for install.sh (via Docker)
-        run: bash installer/tests/run-bats.sh
+        run: bash .tools/tests/run-bats.sh
 
   secret-scan:
     runs-on: ubuntu-latest
