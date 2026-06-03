@@ -7,7 +7,6 @@ namespace App\Filament\Admin\Resources\TaskResource\Pages;
 use App\Enums\DemoStatus;
 use App\Enums\Phase;
 use App\Enums\PhaseStatus;
-use App\Enums\WorkflowStatus;
 use App\Filament\Admin\Resources\TaskResource;
 use App\Jobs\DeployDemoJob;
 use App\Jobs\StopDemoJob;
@@ -147,6 +146,40 @@ class ViewTask extends ViewRecord
         $task = $this->getRecord();
         $this->implementNotes = $task->fresh()->implement_notes ?? '';
         $this->editingImplementNotes = false;
+    }
+
+    /**
+     * Advance the workflow from the respond dock (M4). The phase-start
+     * controls live in the dock at the bottom, not in the page header.
+     */
+    public function startPhaseFromDock(string $phase): void
+    {
+        /** @var Task $task */
+        $task = $this->getRecord();
+
+        try {
+            app(TaskService::class)->startPhase($task, Phase::from($phase));
+        } catch (\RuntimeException) {
+            Notification::make()->title(__('tasks.view.actions.phase_already_running'))->warning()->send();
+
+            return;
+        }
+
+        $title = match ($phase) {
+            'concept' => __('tasks.view.actions.concept_started'),
+            'implement' => __('tasks.view.actions.implement_started'),
+            'push' => __('tasks.view.actions.push_started'),
+            default => $phase,
+        };
+        Notification::make()->title($title)->success()->send();
+        $this->redirect(TaskResource::getUrl('view', ['record' => $task]));
+    }
+
+    public function startConceptFromDock(): void
+    {
+        // Saves the (optional) concept notes, then runs the concept phase —
+        // used for the initial draft start and for retry-after-failure.
+        $this->saveNotesAndRevise();
     }
 
     public function poll(): void
@@ -451,30 +484,18 @@ class ViewTask extends ViewRecord
 
     protected function getHeaderActions(): array
     {
-        // One contextual primary button for the next step; every other action
-        // (re-run concept, re-implement, logs, complete, …) moves into the ⋯
-        // dropdown. See docs/design/argos/ARGOS_REDESIGN.md §6.3.
-        $actions = [
-            'concept' => $this->makePhaseAction('concept', __('tasks.view.actions.concept_create'), 'heroicon-o-light-bulb')
-                ->label(fn (): string => $this->task()->phaseRuns()->where('phase', 'concept')->where('status', 'completed')->exists()
-                    ? __('tasks.view.actions.concept_update')
-                    : __('tasks.view.actions.concept_create'))
-                ->visible(fn (): bool => $this->task()->workflow_status->value !== 'completed'
-                    && $this->lastConceptRun()?->status !== PhaseStatus::Paused),
+        // Phase advancement (start/refine/retry) lives in the respond dock at
+        // the bottom now (M4). The header carries only the contextual primary
+        // for states the dock doesn't own (resume a paused phase, unlock,
+        // complete after PR) plus auxiliary actions in the ⋯ dropdown.
+        $stage = TaskStage::for($this->task());
 
+        $actions = [
             'continueConcept' => $this->makeContinueConceptAction()
                 ->visible(fn (): bool => $this->lastConceptRun()?->status === PhaseStatus::Paused),
 
-            'implement' => $this->makePhaseAction('implement', __('tasks.view.actions.implement'), 'heroicon-o-code-bracket')
-                ->visible(fn (): bool => $this->task()->workflow_status->value !== 'completed'
-                    && $this->task()->phaseRuns()->where('phase', 'concept')->where('status', 'completed')->exists()),
-
             'continueImplement' => $this->makeContinueImplementAction()
                 ->visible(fn (): bool => $this->lastImplementRun()?->status === PhaseStatus::Paused),
-
-            'push' => $this->makePhaseAction('push', __('tasks.view.actions.push_pr'), 'heroicon-o-arrow-up-tray')
-                ->visible(fn (): bool => $this->task()->workflow_status->value !== 'completed'
-                    && $this->task()->phaseRuns()->where('phase', 'implement')->where('status', 'completed')->exists()),
 
             'forceUnlockImplement' => Action::make('forceUnlockImplement')
                 ->label(__('tasks.view.actions.force_unlock_label'))
@@ -555,7 +576,10 @@ class ViewTask extends ViewRecord
                 ->visible(fn (): bool => $this->task()->workflow_status->value !== 'completed'),
         ];
 
-        $primaryKey = $this->primaryActionKey();
+        // During a running/queued phase, the header collapses to nothing but
+        // the ⋯ menu (recovery + logs) — see the status banner above for the
+        // live indicator. No phase controls while the worker is busy.
+        $primaryKey = $stage->isBusy() ? null : $this->primaryActionKey($stage);
         $primary = ($primaryKey !== null && isset($actions[$primaryKey]))
             ? $actions[$primaryKey]->color('primary')
             : null;
@@ -575,29 +599,20 @@ class ViewTask extends ViewRecord
     }
 
     /**
-     * The single header action that advances the workflow from the current
-     * state. Everything else lives in the ⋯ dropdown.
+     * The single contextual header primary, for states the respond dock does
+     * not own: resume a paused phase, release a lock, or complete after PR.
+     * Phase start/refine/retry live in the dock.
      */
-    private function primaryActionKey(): ?string
+    private function primaryActionKey(TaskStage $stage): ?string
     {
-        if ($this->lastConceptRun()?->status === PhaseStatus::Paused) {
-            return 'continueConcept';
-        }
-        if ($this->lastImplementRun()?->status === PhaseStatus::Paused) {
-            return 'continueImplement';
-        }
-
-        return match ($this->task()->workflow_status) {
-            WorkflowStatus::Draft, WorkflowStatus::ConceptRunning => 'concept',
-            WorkflowStatus::ConceptReview => 'implement',
-            WorkflowStatus::ImplementRunning, WorkflowStatus::ImplementCompleted => 'push',
-            WorkflowStatus::InReview => 'markCompleted',
-            WorkflowStatus::Completed => null,
-            WorkflowStatus::Failed => match ($this->task()->current_phase?->value) {
-                'implement' => 'implement',
-                'push' => 'push',
-                default => 'concept',
-            },
+        return match ($stage) {
+            TaskStage::ConceptPaused => 'continueConcept',
+            TaskStage::ImplementPaused => 'continueImplement',
+            TaskStage::ImplementFailed => $this->task()->current_status === PhaseStatus::LockBlocked
+                ? 'forceUnlockImplement'
+                : null,
+            TaskStage::Review => 'markCompleted',
+            default => null,
         };
     }
 
@@ -605,49 +620,6 @@ class ViewTask extends ViewRecord
     {
         /** @var Task */
         return $this->getRecord();
-    }
-
-    public function reviseConcept(): void
-    {
-        /** @var Task $task */
-        $task = $this->getRecord();
-
-        try {
-            app(TaskService::class)->startPhase($task, Phase::Concept);
-        } catch (\RuntimeException) {
-            Notification::make()->title(__('tasks.view.actions.phase_already_running'))->warning()->send();
-
-            return;
-        }
-
-        Notification::make()->title(__('tasks.view.actions.concept_started'))->success()->send();
-        $this->redirect(TaskResource::getUrl('view', ['record' => $task]));
-    }
-
-    private function makePhaseAction(string $phase, string $label, string $icon): Action
-    {
-        return Action::make($phase)
-            ->label($label)
-            ->icon($icon)
-            ->disabled(fn (): bool => $this->task()->current_status === PhaseStatus::Running)
-            ->action(function () use ($phase): void {
-                $task = $this->task();
-                try {
-                    app(TaskService::class)->startPhase($task, Phase::from($phase));
-                } catch (\RuntimeException) {
-                    Notification::make()->title(__('tasks.view.actions.phase_already_running'))->warning()->send();
-
-                    return;
-                }
-                $notificationTitle = match ($phase) {
-                    'concept' => __('tasks.view.actions.concept_started'),
-                    'implement' => __('tasks.view.actions.implement_started'),
-                    'push' => __('tasks.view.actions.push_started'),
-                    default => $phase,
-                };
-                Notification::make()->title($notificationTitle)->success()->send();
-                $this->redirect(TaskResource::getUrl('view', ['record' => $task]));
-            });
     }
 
     public function lastImplementRun(): ?PhaseRun

@@ -2,10 +2,6 @@
     @php
         /** @var \App\Models\Task $record */
         $task = $record;
-        $ws = $task->workflow_status->value;
-        // Respond dock visibility (M4 reworks this; kept functional for now).
-        $waitingConcept = $ws === 'concept_review';
-        $waitingImplement = in_array($ws, ['implement_completed', 'implement_paused', 'in_review'], true);
 
         $allRuns = collect($phaseRuns)->flatten(1);
         $totalCost = $allRuns->sum(fn ($r) => (float) ($r->cost_usd ?? 0));
@@ -247,30 +243,79 @@
         @endforeach
     </x-argos.thread>
 
-    {{-- Respond composer (maps to the phase awaiting feedback) --}}
-    @if ($waitingConcept || $waitingImplement)
-        @php $field = $waitingConcept ? 'notes' : 'implementNotes'; @endphp
-        <x-argos.respond :waiting="true" flag="{{ __('tasks.view.thread.waiting_flag') }}">
-            <textarea class="respond-ta" rows="2"
-                wire:model="{{ $field }}"
-                placeholder="{{ __('tasks.view.feedback.concept_placeholder') }}"></textarea>
-            <x-argos.btn variant="primary" wire:click="{{ $waitingConcept ? 'saveNotesAndRevise' : 'saveImplementNotesAndRevise' }}">
-                @svg('heroicon-o-paper-airplane') {{ __('tasks.view.thread.send') }}
-            </x-argos.btn>
+    {{-- Respond / advance dock — drives phase progression from the bottom (M4).
+         Hidden while the worker is busy; the dock variant comes from TaskStage. --}}
+    @php $dock = $stage->dockMode(); @endphp
+    @if ($dock !== 'none')
+        @php
+            $isConceptField = in_array($dock, ['draft', 'concept', 'retry_concept'], true);
+            $field = $isConceptField ? 'notes' : 'implementNotes';
+            $isReview = in_array($dock, ['concept', 'implement'], true);
+            $hint = match ($dock) {
+                'draft' => __('tasks.view.dock.draft_hint'),
+                'concept' => __('tasks.view.dock.concept_hint'),
+                'implement' => __('tasks.view.dock.implement_hint'),
+                default => __('tasks.view.dock.retry_hint'),
+            };
+            $placeholder = $isConceptField
+                ? __('tasks.view.dock.concept_placeholder')
+                : __('tasks.view.dock.implement_placeholder');
+        @endphp
+        <x-argos.respond :waiting="$isReview" flag="{{ $hint }}">
+            @if ($dock !== 'retry_push')
+                <textarea class="respond-ta" rows="2" wire:model="{{ $field }}"
+                    placeholder="{{ $placeholder }}"></textarea>
+            @endif
 
-            <x-slot:quick>
-                <span class="chip" x-on:click="$wire.set('{{ $field }}', @js(__('tasks.view.thread.chip_changes_text')))">
-                    @svg('heroicon-o-pencil-square') {{ __('tasks.view.thread.chip_changes') }}
-                </span>
-                @if ($waitingImplement)
-                    <span class="chip" wire:click="mountAction('markCompleted')">
-                        @svg('heroicon-o-check-circle') {{ __('tasks.view.thread.chip_approve') }}
+            @switch($dock)
+                @case('concept')
+                    <x-argos.btn variant="secondary" wire:click="saveNotesAndRevise">
+                        @svg('heroicon-o-light-bulb') {{ __('tasks.view.dock.update_concept') }}
+                    </x-argos.btn>
+                    <x-argos.btn variant="primary" wire:click="startPhaseFromDock('implement')">
+                        @svg('heroicon-o-code-bracket') {{ __('tasks.view.dock.start_implement') }}
+                    </x-argos.btn>
+                    @break
+                @case('implement')
+                    <x-argos.btn variant="secondary" wire:click="saveImplementNotesAndRevise">
+                        @svg('heroicon-o-arrow-path') {{ __('tasks.view.dock.refine_implement') }}
+                    </x-argos.btn>
+                    <x-argos.btn variant="primary" wire:click="startPhaseFromDock('push')">
+                        @svg('heroicon-o-arrow-up-tray') {{ __('tasks.view.dock.start_push') }}
+                    </x-argos.btn>
+                    @break
+                @case('draft')
+                    <x-argos.btn variant="primary" wire:click="startConceptFromDock">
+                        @svg('heroicon-o-light-bulb') {{ __('tasks.view.dock.start_concept') }}
+                    </x-argos.btn>
+                    @break
+                @case('retry_concept')
+                    <x-argos.btn variant="primary" wire:click="startConceptFromDock">
+                        @svg('heroicon-o-arrow-path') {{ __('tasks.view.dock.retry') }}
+                    </x-argos.btn>
+                    @break
+                @case('retry_implement')
+                    <x-argos.btn variant="primary" wire:click="saveImplementNotesAndRevise">
+                        @svg('heroicon-o-arrow-path') {{ __('tasks.view.dock.retry') }}
+                    </x-argos.btn>
+                    @break
+                @case('retry_push')
+                    <x-argos.btn variant="primary" wire:click="startPhaseFromDock('push')">
+                        @svg('heroicon-o-arrow-path') {{ __('tasks.view.dock.retry') }}
+                    </x-argos.btn>
+                    @break
+            @endswitch
+
+            @if ($isReview)
+                <x-slot:quick>
+                    <span class="chip" x-on:click="$wire.set('{{ $field }}', @js(__('tasks.view.thread.chip_changes_text')))">
+                        @svg('heroicon-o-pencil-square') {{ __('tasks.view.thread.chip_changes') }}
                     </span>
-                @endif
-                <span class="chip" x-on:click="$wire.set('{{ $field }}', @js(__('tasks.view.thread.chip_question_text')))">
-                    @svg('heroicon-o-question-mark-circle') {{ __('tasks.view.thread.chip_question') }}
-                </span>
-            </x-slot:quick>
+                    <span class="chip" x-on:click="$wire.set('{{ $field }}', @js(__('tasks.view.thread.chip_question_text')))">
+                        @svg('heroicon-o-question-mark-circle') {{ __('tasks.view.thread.chip_question') }}
+                    </span>
+                </x-slot:quick>
+            @endif
         </x-argos.respond>
     @endif
 </x-filament-panels::page>

@@ -87,6 +87,16 @@ it('exposes review docks for the human-decision stages', function () {
         ->and(TaskStage::ImplementReview->isWaitingForUser())->toBeTrue();
 });
 
+it('exposes start and retry docks', function () {
+    expect(TaskStage::Draft->dockMode())->toBe('draft')
+        ->and(TaskStage::ConceptFailed->dockMode())->toBe('retry_concept')
+        ->and(TaskStage::ImplementFailed->dockMode())->toBe('retry_implement')
+        ->and(TaskStage::PushFailed->dockMode())->toBe('retry_push')
+        ->and(TaskStage::Done->dockMode())->toBe('none')
+        ->and(TaskStage::ConceptPaused->dockMode())->toBe('none')
+        ->and(TaskStage::ImplementPaused->dockMode())->toBe('none');
+});
+
 it('knows once the concept phase is locked', function () {
     expect(TaskStage::Draft->isPastConcept())->toBeFalse()
         ->and(TaskStage::ConceptReview->isPastConcept())->toBeFalse()

@@ -108,7 +108,7 @@ class TaskPagesTest extends TestCase
         $task = Task::factory()->create();
 
         Livewire::test(ViewTask::class, ['record' => $task->getKey()])
-            ->callAction('concept')
+            ->call('startConceptFromDock')
             ->assertNotified();
 
         Bus::assertDispatched(RunPhaseJob::class, fn ($j) => $j->phase === 'concept');
@@ -120,7 +120,7 @@ class TaskPagesTest extends TestCase
         PhaseRun::factory()->create(['task_id' => $task->id, 'phase' => 'concept', 'status' => 'completed']);
 
         Livewire::test(ViewTask::class, ['record' => $task->getKey()])
-            ->callAction('implement')
+            ->call('startPhaseFromDock', 'implement')
             ->assertNotified();
 
         Bus::assertDispatched(RunPhaseJob::class, fn ($j) => $j->phase === 'implement');
@@ -132,7 +132,7 @@ class TaskPagesTest extends TestCase
         PhaseRun::factory()->create(['task_id' => $task->id, 'phase' => 'concept', 'status' => 'completed']);
 
         Livewire::test(ViewTask::class, ['record' => $task->getKey()])
-            ->callAction('implement')
+            ->call('startPhaseFromDock', 'implement')
             ->assertNotified();
 
         $this->assertEquals(WorkflowStatus::ImplementRunning, $task->fresh()->workflow_status);
@@ -144,7 +144,7 @@ class TaskPagesTest extends TestCase
         PhaseRun::factory()->create(['task_id' => $task->id, 'phase' => 'implement', 'status' => 'completed']);
 
         Livewire::test(ViewTask::class, ['record' => $task->getKey()])
-            ->callAction('push')
+            ->call('startPhaseFromDock', 'push')
             ->assertNotified();
 
         Bus::assertDispatched(RunPhaseJob::class, fn ($j) => $j->phase === 'push');
@@ -368,7 +368,7 @@ class TaskPagesTest extends TestCase
         PhaseRun::factory()->running()->create(['task_id' => $task->id, 'phase' => 'concept']);
 
         Livewire::test(ViewTask::class, ['record' => $task->getKey()])
-            ->callAction('concept')
+            ->call('startConceptFromDock')
             ->assertNotified();
 
         Bus::assertNotDispatched(RunPhaseJob::class);

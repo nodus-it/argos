@@ -164,16 +164,21 @@ enum TaskStage: string
     }
 
     /**
-     * Which respond-dock variant to render, or 'none' to hide it.
-     * Drives both the visible buttons and the hint copy in the composer.
+     * Which respond-dock variant to render, or 'none' to hide it. Drives both
+     * the visible buttons and the hint copy in the composer. Phase
+     * advancement lives here, not in the header (M4). Paused states keep the
+     * header continue action (it carries the max-turns modal); review-after-PR
+     * and done show no dock (Abgeschlossen-Modus).
      */
     public function dockMode(): string
     {
         return match ($this) {
+            self::Draft => 'draft',
             self::ConceptReview => 'concept',
             self::ImplementReview => 'implement',
-            self::ConceptPaused => 'concept_paused',
-            self::ImplementPaused => 'implement_paused',
+            self::ConceptFailed => 'retry_concept',
+            self::ImplementFailed => 'retry_implement',
+            self::PushFailed => 'retry_push',
             default => 'none',
         };
     }
