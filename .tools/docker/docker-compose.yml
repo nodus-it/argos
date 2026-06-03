@@ -65,6 +65,13 @@ x-preview-env: &preview-env
   ARGOS_PREVIEW_CPU_LIMIT:      "${ARGOS_PREVIEW_CPU_LIMIT:-1.0}"
   ARGOS_PREVIEW_MEM_LIMIT:      "${ARGOS_PREVIEW_MEM_LIMIT:-1g}"
   ARGOS_PREVIEW_DEFAULT_IMAGE:  "${ARGOS_PREVIEW_DEFAULT_IMAGE:-argos-demo}"
+  # Demo access protection (none | session | basic). Per-task overrides win.
+  # `session` requires SESSION_DOMAIN (set on the app service) so the login
+  # cookie is shared with the demo subdomains.
+  ARGOS_PREVIEW_AUTH:           "${ARGOS_PREVIEW_AUTH:-none}"
+  ARGOS_PREVIEW_BASIC_USER:     "${ARGOS_PREVIEW_BASIC_USER:-demo}"
+  ARGOS_PREVIEW_BASIC_PASSWORD: "${ARGOS_PREVIEW_BASIC_PASSWORD:-}"
+  ARGOS_PREVIEW_AUTH_GATE_URL:  "${ARGOS_PREVIEW_AUTH_GATE_URL:-http://nginx:80/_argos/demo-gate}"
 
 services:
 
@@ -128,6 +135,9 @@ services:
       APP_URL:                           "${APP_URL:-http://localhost:${ARGOS_PORT:-8080}}"
       APP_KEY:                           "${APP_KEY:-}"
       ADMIN_PASSWORD:                    "${ADMIN_PASSWORD:-}"
+      # Shared parent domain so the Argos login cookie also reaches the demo
+      # subdomains — required for session-protected demos (ARGOS_PREVIEW_AUTH=session).
+      SESSION_DOMAIN:                    "${SESSION_DOMAIN:-}"
       CLAUDE_CODE_OAUTH_TOKEN:           "${CLAUDE_CODE_OAUTH_TOKEN:-}"
       ARGOS_CONFIG_DIR:                  /data/config
       ARGOS_TRAEFIK_DIR:                 /data/traefik

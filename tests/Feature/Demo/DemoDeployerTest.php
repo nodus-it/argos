@@ -211,6 +211,24 @@ class DemoDeployerTest extends TestCase
         );
     }
 
+    public function test_apply_access_mode_recovers_port_from_existing_route_when_null(): void
+    {
+        $deployer = app(DemoDeployer::class);
+        $task = Task::factory()->create(['name' => 'feat-legacy', 'demo_access_mode' => DemoAccessMode::Session]);
+        $demo = Demo::factory()->for($task)->create(['status' => DemoStatus::Live, 'port' => null]);
+
+        // An old route file written before the port column existed.
+        $slug = $deployer->demoSlug($task);
+        $deployer->writeTraefikRoute($slug, 8000, DemoAccessMode::Public);
+
+        $deployer->applyAccessMode($task);
+
+        $parsed = Yaml::parseFile($this->traefikDir.'/'.$slug.'.yml');
+        $this->assertSame([$slug.'-auth'], $parsed['http']['routers'][$slug]['middlewares']);
+        // The recovered port is backfilled for future rewrites.
+        $this->assertSame(8000, $demo->fresh()->port);
+    }
+
     public function test_apply_access_mode_is_noop_without_live_demo(): void
     {
         $deployer = app(DemoDeployer::class);
