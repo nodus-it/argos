@@ -213,7 +213,13 @@
                         @endif
                         <div x-show="panel === 'diff'" x-cloak>
                             <div wire:loading wire:target="loadDiff" class="callout callout-info">@svg('heroicon-o-arrow-path') {{ __('tasks.view.diff.loading') }}</div>
-                            <div wire:loading.remove wire:target="loadDiff"><x-argos.diff :files="$diffFiles" /></div>
+                            <div wire:loading.remove wire:target="loadDiff">
+                                @if ($diffError)
+                                    <div class="callout callout-warn">@svg('heroicon-o-exclamation-triangle') {{ $diffError }}</div>
+                                @else
+                                    <x-argos.diff :files="$diffFiles" />
+                                @endif
+                            </div>
                         </div>
                         <div x-show="panel === 'logs'" x-cloak>
                             <x-argos.terminal title="worker · {{ $task->feature_branch }}" :lines="$implementLog" />

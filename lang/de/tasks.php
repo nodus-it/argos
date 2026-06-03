@@ -229,6 +229,7 @@ return [
             'load_button' => 'Diff laden',
             'loading' => 'Lade…',
             'no_changes' => 'Keine Änderungen gegenüber origin/:branch.',
+            'error' => 'Der Diff konnte nicht geladen werden (Workspace nicht verfügbar oder Zeitüberschreitung beim Lesen).',
             'badge_new' => 'NEU',
             'badge_deleted' => 'GELÖSCHT',
             'loaded_at' => 'Geladen: :updated_at',

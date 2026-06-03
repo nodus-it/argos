@@ -172,6 +172,26 @@ class TaskPagesTest extends TestCase
         Bus::assertDispatched(DeployDemoJob::class, fn (DeployDemoJob $j): bool => $j->taskId === $task->id);
     }
 
+    public function test_view_task_survives_a_failing_diff_load(): void
+    {
+        // The diff auto-loads on mount via `docker run`. If that times out or
+        // errors, the page must degrade to an inline notice — never 500.
+        Process::fake(function (): void {
+            throw new \RuntimeException('docker run timed out');
+        });
+
+        $profile = RepoProfile::factory()->create();
+        $task = Task::factory()->create(['repo_profile_id' => $profile->id]);
+        PhaseRun::factory()->create([
+            'task_id' => $task->id, 'phase' => 'implement', 'status' => 'completed', 'iteration' => 1,
+        ]);
+
+        Livewire::test(ViewTask::class, ['record' => $task->getKey()])
+            ->assertSuccessful()
+            ->assertSet('diffLoaded', true)
+            ->assertSet('diffError', __('tasks.view.diff.error'));
+    }
+
     public function test_rebuild_demo_hidden_when_preview_disabled(): void
     {
         config(['argos.preview.enabled' => false]);

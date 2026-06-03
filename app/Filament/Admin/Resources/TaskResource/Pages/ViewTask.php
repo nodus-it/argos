@@ -23,6 +23,7 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
@@ -39,6 +40,9 @@ class ViewTask extends ViewRecord
     public bool $diffLoaded = false;
 
     public int $diffLoadedForIteration = 0;
+
+    /** Set when the diff command failed (e.g. timed out) so the UI can surface it instead of 500ing. */
+    public ?string $diffError = null;
 
     public string $notes = '';
 
@@ -178,30 +182,46 @@ class ViewTask extends ViewRecord
         $vol = $task->volumeName();
         $g = "git -c safe.directory='*' -C /workspace";
 
-        $statResult = Process::timeout(15)->run([
-            'docker', 'run', '--rm',
-            '-v', "{$vol}:/workspace:ro",
-            '--entrypoint', 'sh', $image,
-            '-c',
-            "{$g} diff --stat origin/{$branch} 2>/dev/null; "
-            .$g.' ls-files --others --exclude-standard 2>/dev/null | while IFS= read -r f; do echo " (neu) $f"; done; '
-            ."echo ''; "
-            .$g.' status --short 2>/dev/null',
-        ]);
-        $this->diffStat = trim($statResult->output());
+        // The diff shells out to `docker run` against the task volume. That can
+        // be slow or hang (huge/polluted workspace, daemon pressure) and is
+        // auto-triggered on mount — so a failure must degrade to an inline
+        // notice, never 500 the whole page.
+        try {
+            $statResult = Process::timeout(15)->run([
+                'docker', 'run', '--rm',
+                '-v', "{$vol}:/workspace:ro",
+                '--entrypoint', 'sh', $image,
+                '-c',
+                "{$g} diff --stat origin/{$branch} 2>/dev/null; "
+                .$g.' ls-files --others --exclude-standard 2>/dev/null | while IFS= read -r f; do echo " (neu) $f"; done; '
+                ."echo ''; "
+                .$g.' status --short 2>/dev/null',
+            ]);
+            $this->diffStat = trim($statResult->output());
 
-        $diffResult = Process::timeout(15)->run([
-            'docker', 'run', '--rm',
-            '-v', "{$vol}:/workspace:ro",
-            '--entrypoint', 'sh', $image,
-            '-c',
-            "{ {$g} diff origin/{$branch} 2>/dev/null; "
-            .$g.' ls-files --others --exclude-standard 2>/dev/null | while IFS= read -r f; do '
-            .$g.' diff --no-index -- /dev/null "$f" 2>/dev/null || true; '
-            .'done; } | head -c 131072',
-        ]);
-        $this->diffFiles = $this->parseDiffStructured($diffResult->output());
-        $this->diffLoaded = true;
+            $diffResult = Process::timeout(15)->run([
+                'docker', 'run', '--rm',
+                '-v', "{$vol}:/workspace:ro",
+                '--entrypoint', 'sh', $image,
+                '-c',
+                "{ {$g} diff origin/{$branch} 2>/dev/null; "
+                .$g.' ls-files --others --exclude-standard 2>/dev/null | while IFS= read -r f; do '
+                .$g.' diff --no-index -- /dev/null "$f" 2>/dev/null || true; '
+                .'done; } | head -c 131072',
+            ]);
+            $this->diffFiles = $this->parseDiffStructured($diffResult->output());
+            $this->diffError = null;
+        } catch (\Throwable $e) {
+            $this->diffStat = '';
+            $this->diffFiles = [];
+            $this->diffError = __('tasks.view.diff.error');
+            Log::channel('argos')->warning('Diff load failed', [
+                'task' => $task->name,
+                'error' => $e->getMessage(),
+            ]);
+        } finally {
+            $this->diffLoaded = true;
+        }
     }
 
     private function maybeAutoLoadDiff(Task $task): void

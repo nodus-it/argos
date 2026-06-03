@@ -229,6 +229,7 @@ return [
             'load_button' => 'Load diff',
             'loading' => 'Loading…',
             'no_changes' => 'No changes compared to origin/:branch.',
+            'error' => 'The diff could not be loaded (the workspace may be unavailable or the read timed out).',
             'badge_new' => 'NEW',
             'badge_deleted' => 'DELETED',
             'loaded_at' => 'Loaded: :updated_at',
