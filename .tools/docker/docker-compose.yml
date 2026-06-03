@@ -56,6 +56,9 @@ x-preview-env: &preview-env
   ARGOS_PREVIEW_BASE_DOMAIN:    "${ARGOS_PREVIEW_BASE_DOMAIN:-127.0.0.1.nip.io}"
   ARGOS_PREVIEW_SCHEME:         "${ARGOS_PREVIEW_SCHEME:-http}"
   ARGOS_PORT:                   "${ARGOS_PORT:-8080}"
+  # Public port the demo URL is reached on (omitted from the URL for 80/443).
+  # Defaults to ARGOS_PORT; set to 443 behind an upstream TLS proxy.
+  ARGOS_PREVIEW_PORT:           "${ARGOS_PREVIEW_PORT:-${ARGOS_PORT:-8080}}"
   ARGOS_PREVIEW_TTL_HOURS:      "${ARGOS_PREVIEW_TTL_HOURS:-24}"
   ARGOS_PREVIEW_NETWORK:        "${ARGOS_PREVIEW_NETWORK:-argos_edge}"
   ARGOS_PREVIEW_MAX_CONCURRENT: "${ARGOS_PREVIEW_MAX_CONCURRENT:-10}"
