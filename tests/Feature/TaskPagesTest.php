@@ -342,7 +342,13 @@ class TaskPagesTest extends TestCase
 
     public function test_paused_banner_renders_for_paused_implement_run(): void
     {
-        $task = Task::factory()->create();
+        // Realistic persisted state for a paused implement run: PhaseRunner
+        // promotes the task to ImplementPaused (afterPhase implement+Paused).
+        $task = Task::factory()->create([
+            'workflow_status' => WorkflowStatus::ImplementPaused,
+            'current_phase' => 'implement',
+            'current_status' => 'paused',
+        ]);
         PhaseRun::factory()->paused()->create(['task_id' => $task->id, 'phase' => 'implement']);
 
         Livewire::test(ViewTask::class, ['record' => $task->getKey()])

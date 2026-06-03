@@ -116,6 +116,17 @@ return [
             'chip_question' => 'Ask a question',
             'chip_question_text' => 'Question: ',
         ],
+        'banner' => [
+            'queued_hint' => 'The task is queued and will be picked up by the next available worker.',
+            'concept_review_hint' => 'Review the concept. Use the field below to update it or start the implementation.',
+            'implement_review_hint' => 'Review the implementation. Use the field below to refine it or start Push & PR.',
+            'review_hint' => 'The pull request is created. You can complete the task or restart the demo.',
+            'paused_hint' => 'The turn limit was reached. Resume the phase using the field below.',
+            'failed_hint' => 'The phase failed. See details below or in the log.',
+            'lock_blocked_hint' => 'The implementation is blocked by a lock. Use the ⋯ menu to release it manually.',
+            'failed_generic' => 'No error text available. See the log for details.',
+            'view_logs' => 'View log',
+        ],
         'labels' => [
             'status' => 'Status',
             'repository' => 'Repository',

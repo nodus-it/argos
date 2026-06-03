@@ -116,6 +116,17 @@ return [
             'chip_question' => 'Frage stellen',
             'chip_question_text' => 'Frage: ',
         ],
+        'banner' => [
+            'queued_hint' => 'Der Task ist in der Warteschlange und wird vom nächsten freien Worker übernommen.',
+            'concept_review_hint' => 'Prüfe das Konzept. Über das Feld unten kannst du es aktualisieren oder die Implementierung starten.',
+            'implement_review_hint' => 'Prüfe die Umsetzung. Über das Feld unten kannst du nachschärfen oder Push & PR starten.',
+            'review_hint' => 'Der Pull Request ist erstellt. Du kannst den Task abschließen oder die Demo erneut starten.',
+            'paused_hint' => 'Das Turn-Limit wurde erreicht. Setze die Phase über das Feld unten fort.',
+            'failed_hint' => 'Die Phase ist fehlgeschlagen. Details siehe unten bzw. im Log.',
+            'lock_blocked_hint' => 'Die Implementierung ist durch ein Lock blockiert. Über das ⋯-Menü kannst du das Lock manuell lösen.',
+            'failed_generic' => 'Kein Fehlertext verfügbar. Details im Log.',
+            'view_logs' => 'Log ansehen',
+        ],
         'labels' => [
             'status' => 'Status',
             'repository' => 'Repository',

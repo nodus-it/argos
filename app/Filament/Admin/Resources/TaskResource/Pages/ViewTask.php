@@ -16,6 +16,7 @@ use App\Models\Task;
 use App\Services\Task\TaskService;
 use App\Services\Workflow\StateReader;
 use App\Support\ConceptMarkdown;
+use App\Support\Workflow\TaskStage;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Forms\Components\TextInput;
@@ -252,7 +253,11 @@ class ViewTask extends ViewRecord
             ? ConceptMarkdown::stripOuterCodeFence($task->concept_md)
             : null;
 
+        $stage = TaskStage::for($task);
+
         return [
+            'stage' => $stage,
+            'banner' => $this->bannerData($task, $stage),
             'phaseRuns' => $phaseRuns,
             'demo' => $task->currentDemo(),
             'conceptHtml' => $conceptMd !== null ? Str::markdown($conceptMd) : null,
@@ -526,6 +531,70 @@ class ViewTask extends ViewRecord
             ->where('phase', 'concept')
             ->orderByDesc('iteration')
             ->first();
+    }
+
+    public function lastPushRun(): ?PhaseRun
+    {
+        return $this->task()
+            ->phaseRuns()
+            ->where('phase', 'push')
+            ->orderByDesc('iteration')
+            ->first();
+    }
+
+    /**
+     * Build the status-banner payload for the current stage — the single
+     * "what is the system doing right now" header. See <x-argos.status-banner>.
+     *
+     * @return array{state: string, title: string, hint: string|null, startedAt: int|null, error: string|null, logsUrl: string|null, logsLabel: string|null}
+     */
+    private function bannerData(Task $task, TaskStage $stage): array
+    {
+        $hint = null;
+        $error = null;
+        $startedAt = null;
+        $logsUrl = null;
+
+        if ($stage->isRunning()) {
+            $startedAt = $task->currentPhaseStartedAt()?->timestamp;
+        } elseif ($stage->isQueued()) {
+            $hint = __('tasks.view.banner.queued_hint');
+        } elseif ($stage->isPaused()) {
+            $hint = __('tasks.view.banner.paused_hint');
+        } else {
+            $hint = match ($stage) {
+                TaskStage::ConceptReview => __('tasks.view.banner.concept_review_hint'),
+                TaskStage::ImplementReview => __('tasks.view.banner.implement_review_hint'),
+                TaskStage::Review => __('tasks.view.banner.review_hint'),
+                default => null,
+            };
+        }
+
+        if ($stage->isFailed()) {
+            $run = match ($stage->phase()?->value) {
+                'implement' => $this->lastImplementRun(),
+                'push' => $this->lastPushRun(),
+                default => $this->lastConceptRun(),
+            };
+            $raw = $run?->error_log;
+            $error = ($raw !== null && trim($raw) !== '')
+                ? Str::limit(trim($raw), 1200)
+                : __('tasks.view.banner.failed_generic');
+            $hint = $task->current_status === PhaseStatus::LockBlocked
+                ? __('tasks.view.banner.lock_blocked_hint')
+                : __('tasks.view.banner.failed_hint');
+            $logsUrl = TaskResource::getUrl('logs', ['record' => $task]);
+        }
+
+        return [
+            'state' => $stage->bannerState(),
+            'title' => $stage->label(),
+            'hint' => $hint,
+            'startedAt' => $startedAt,
+            'error' => $error,
+            'logsUrl' => $logsUrl,
+            'logsLabel' => null,
+        ];
     }
 
     private function makeContinueImplementAction(): Action

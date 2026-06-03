@@ -25,15 +25,22 @@
 
     {{-- Task name + status badge now render in the page header (getHeading). --}}
 
-    {{-- Paused banner (turn-limit) --}}
-    @if ($implementRun?->status?->value === 'paused')
-        <div class="callout callout-warn" style="margin-bottom:16px;">
-            @svg('heroicon-o-pause-circle')
-            <div>
-                <strong>{{ __('tasks.view.implement.paused_title') }}</strong>
-                <div style="margin-top:2px;">{{ __('tasks.view.implement.paused_resume_hint') }}</div>
-            </div>
-        </div>
+    {{-- Status banner: the single "what is the system doing right now" header (M1). --}}
+    <div class="fade-in" style="margin-bottom:16px;">
+        <x-argos.status-banner
+            :state="$banner['state']"
+            :title="$banner['title']"
+            :hint="$banner['hint']"
+            :startedAt="$banner['startedAt']"
+            :error="$banner['error']"
+            :logsUrl="$banner['logsUrl']"
+            :logsLabel="$banner['logsLabel']" />
+    </div>
+
+    {{-- Auto-reload while the worker is busy (running or queued). Poll only then
+         so review/failed/done states don't reload needlessly (M2). --}}
+    @if ($stage->isBusy())
+        <div wire:poll.2500ms="poll" class="hidden"></div>
     @endif
 
     {{-- Phase rail + meta strip --}}
