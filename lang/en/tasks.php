@@ -73,6 +73,27 @@ return [
         ],
     ],
 
+    // Presentation stages (App\Support\Workflow\TaskStage) — the single
+    // UI-facing state shown in the status banner.
+    'stage' => [
+        'draft' => 'Draft',
+        'concept_queued' => 'Concept waiting for worker',
+        'concept_running' => 'Concept running',
+        'concept_paused' => 'Concept paused (turn limit)',
+        'concept_review' => 'Review concept',
+        'concept_failed' => 'Concept failed',
+        'implement_queued' => 'Implementation waiting for worker',
+        'implement_running' => 'Implementation running',
+        'implement_paused' => 'Implementation paused (turn limit)',
+        'implement_review' => 'Review implementation',
+        'implement_failed' => 'Implementation failed',
+        'push_queued' => 'Push waiting for worker',
+        'push_running' => 'Push & PR running',
+        'push_failed' => 'Push failed',
+        'review' => 'Pull request created',
+        'done' => 'Completed',
+    ],
+
     'view' => [
         'thread' => [
             'created' => 'Task created',
