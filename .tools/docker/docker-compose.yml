@@ -104,6 +104,19 @@ services:
       REDIS_PORT:                        "6379"
       ARGOS_QUEUE_DEFAULT_PROCESSES:     "${ARGOS_QUEUE_DEFAULT_PROCESSES:-5}"
       ARGOS_QUEUE_TASKS_PROCESSES:       "${ARGOS_QUEUE_TASKS_PROCESSES:-2}"
+      # Live-Demo (P6) — see config/argos.php. These must be listed here to
+      # reach the container process; a stack/Portainer env var alone only feeds
+      # ${...} interpolation in this file, not the running PHP process.
+      ARGOS_PREVIEW_ENABLED:             "${ARGOS_PREVIEW_ENABLED:-false}"
+      ARGOS_PREVIEW_BASE_DOMAIN:         "${ARGOS_PREVIEW_BASE_DOMAIN:-127.0.0.1.nip.io}"
+      ARGOS_PREVIEW_SCHEME:              "${ARGOS_PREVIEW_SCHEME:-http}"
+      ARGOS_PORT:                        "${ARGOS_PORT:-8080}"
+      ARGOS_PREVIEW_TTL_HOURS:           "${ARGOS_PREVIEW_TTL_HOURS:-24}"
+      ARGOS_PREVIEW_NETWORK:             "${ARGOS_PREVIEW_NETWORK:-argos_edge}"
+      ARGOS_PREVIEW_MAX_CONCURRENT:      "${ARGOS_PREVIEW_MAX_CONCURRENT:-10}"
+      ARGOS_PREVIEW_CPU_LIMIT:           "${ARGOS_PREVIEW_CPU_LIMIT:-1.0}"
+      ARGOS_PREVIEW_MEM_LIMIT:           "${ARGOS_PREVIEW_MEM_LIMIT:-1g}"
+      ARGOS_PREVIEW_DEFAULT_IMAGE:       "${ARGOS_PREVIEW_DEFAULT_IMAGE:-argos-demo}"
     healthcheck:
       # Goes green only when DB is reachable AND the schema is fully migrated,
       # so dependents like `queue` can rely on `service_healthy` to mean
@@ -207,6 +220,19 @@ services:
       REDIS_PORT:                        "6379"
       ARGOS_QUEUE_DEFAULT_PROCESSES:     "${ARGOS_QUEUE_DEFAULT_PROCESSES:-5}"
       ARGOS_QUEUE_TASKS_PROCESSES:       "${ARGOS_QUEUE_TASKS_PROCESSES:-2}"
+      # Live-Demo (P6) — the queue worker runs DeployDemoJob after a completed
+      # implement phase, so it needs the same preview env as `app`. See the
+      # note in the `app` service above on why these are listed explicitly.
+      ARGOS_PREVIEW_ENABLED:             "${ARGOS_PREVIEW_ENABLED:-false}"
+      ARGOS_PREVIEW_BASE_DOMAIN:         "${ARGOS_PREVIEW_BASE_DOMAIN:-127.0.0.1.nip.io}"
+      ARGOS_PREVIEW_SCHEME:              "${ARGOS_PREVIEW_SCHEME:-http}"
+      ARGOS_PORT:                        "${ARGOS_PORT:-8080}"
+      ARGOS_PREVIEW_TTL_HOURS:           "${ARGOS_PREVIEW_TTL_HOURS:-24}"
+      ARGOS_PREVIEW_NETWORK:             "${ARGOS_PREVIEW_NETWORK:-argos_edge}"
+      ARGOS_PREVIEW_MAX_CONCURRENT:      "${ARGOS_PREVIEW_MAX_CONCURRENT:-10}"
+      ARGOS_PREVIEW_CPU_LIMIT:           "${ARGOS_PREVIEW_CPU_LIMIT:-1.0}"
+      ARGOS_PREVIEW_MEM_LIMIT:           "${ARGOS_PREVIEW_MEM_LIMIT:-1g}"
+      ARGOS_PREVIEW_DEFAULT_IMAGE:       "${ARGOS_PREVIEW_DEFAULT_IMAGE:-argos-demo}"
     command: ["php", "/app/artisan", "horizon"]
 
   scheduler:
