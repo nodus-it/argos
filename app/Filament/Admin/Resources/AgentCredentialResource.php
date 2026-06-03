@@ -60,6 +60,9 @@ class AgentCredentialResource extends Resource
     {
         return $schema->components([
             Section::make(__('worker.credentials.sections.identity'))
+                ->description(__('worker.credentials.sections.identity_description'))
+                ->icon('heroicon-o-identification')
+                ->aside()
                 ->schema([
                     Select::make('agent_name')
                         ->label(__('worker.credentials.fields.agent_name'))
@@ -84,6 +87,9 @@ class AgentCredentialResource extends Resource
                 ]),
 
             Section::make(__('worker.credentials.sections.auth'))
+                ->description(__('worker.credentials.sections.auth_description'))
+                ->icon('heroicon-o-key')
+                ->aside()
                 ->schema([
                     // Claude: simple token field. Stored as ['token' => '…'].
                     TextInput::make('credentials.token')

@@ -8,6 +8,10 @@ return [
     'model_label' => 'Projekt',
     'model_label_plural' => 'Projekte',
 
+    'actions' => [
+        'new_task' => 'Neuer Task',
+    ],
+
     'tabs' => [
         'basics' => 'Allgemein',
         'worker' => 'Worker & Modelle',
@@ -18,11 +22,16 @@ return [
         'platform' => 'Plattform',
         'platform_description' => 'Wähle die Plattform — danach werden die weiteren Felder freigeschaltet.',
         'general' => 'Allgemein',
+        'general_description' => 'Anzeigename des Projekts und Automatik für Konzept- und PR-Phase.',
         'worker' => 'Worker',
         'worker_description' => 'Stack & Agent, mit denen die Phasen für dieses Projekt laufen. Pro Task überschreibbar.',
+        'live_demo' => 'Live-Demo',
         'models' => 'Modelle',
+        'models_description' => 'Modell-Auswahl für die Phasen. Leer lassen, um die Stack-Vorgaben zu nutzen.',
         'authentication' => 'Authentifizierung',
+        'authentication_description' => 'Wie Argos auf das Repository zugreift — verbundener Account oder Personal Access Token.',
         'repository' => 'Repository',
+        'repository_description' => 'Repository-Adresse und Default-Branch, auf dem die Tasks aufsetzen.',
     ],
 
     'fields' => [
@@ -41,6 +50,10 @@ return [
         'worker_source_byoi' => 'Eigenes Dockerfile im Repo (BYOI)',
         'worker_byoi_hint_heading' => 'Repo definiert sein eigenes Image',
         'worker_byoi_hint_body' => 'Argos liest .argos/worker.dockerfile aus dem Repo (am Basis-Branch) als Stack-Basis und schichtet Agent + Worker-Code automatisch darüber. Die nötigen Tools (bash, git, jq, …) müssen per FROM/RUN ins Image — kein COPY aus dem Repo (der Build-Context ist nicht das Repo).',
+        'live_demo_label' => 'Live-Demo aktivieren',
+        'live_demo_helper' => 'Startet nach jedem Implement automatisch eine Live-Demo unter eigener Subdomain.',
+        'live_demo_hint_heading' => 'Repo muss den Demo-Vertrag mitbringen',
+        'live_demo_hint_body' => 'Erfordert .argos/demo.compose.yml (Laufzeit) und .argos/demo.yml (Einstellungen: Entry-Service/Port, Commands) am Basis-Branch. Fehlen sie, schlägt der Demo-Aufbau mit klarer Meldung fehl.',
         'worker_stack_label' => 'Worker-Stack',
         'worker_stack_helper' => 'Basis-Image (PHP-Version, Tools). Leer lassen für den Argos-Default.',
         'worker_stack_placeholder' => 'Default :stack',

@@ -37,6 +37,8 @@ class TaskProviderBindingsRelationManager extends RelationManager
 {
     protected static string $relationship = 'taskProviderBindings';
 
+    protected static string|\BackedEnum|null $icon = 'heroicon-o-link';
+
     public static function getTitle(Model $ownerRecord, string $pageClass): string
     {
         return 'Task-Provider';

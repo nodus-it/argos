@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers\Filament;
 
+use App\Filament\Admin\Pages\Dashboard;
 use App\Filament\Admin\Pages\Profile;
 use App\Filament\Admin\Widgets\CurrentTasksWidget;
 use App\Filament\Admin\Widgets\StatsOverviewWidget;
@@ -14,7 +15,6 @@ use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
-use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
@@ -42,9 +42,19 @@ class AdminPanelProvider extends PanelProvider
             ->brandLogoHeight('1.75rem')
             ->favicon(asset('favicon.svg'))
             ->colors([
-                'primary' => Color::Slate,
+                // Terracotta primary + warm-sand gray ("Warm Paper" redesign;
+                // see docs/design/argos/ARGOS_REDESIGN.md §2.3).
+                'primary' => [
+                    50 => '251,243,239', 100 => '246,228,218', 200 => '238,199,180',
+                    300 => '227,164,134', 400 => '217,128,95', 500 => '207,100,70',
+                    600 => '187,80,52', 700 => '154,64,43', 800 => '124,55,39',
+                    900 => '104,47,35', 950 => '58,22,16',
+                ],
+                'gray' => Color::hex('#7d7565'),
             ])
-            ->maxContentWidth(Width::Full)
+            ->maxContentWidth(Width::SevenExtraLarge)
+            ->sidebarWidth('14rem')
+            ->collapsibleNavigationGroups(false)
             ->discoverResources(in: app_path('Filament/Admin/Resources'), for: 'App\Filament\Admin\Resources')
             ->discoverPages(in: app_path('Filament/Admin/Pages'), for: 'App\Filament\Admin\Pages')
             ->pages([
@@ -93,6 +103,13 @@ class AdminPanelProvider extends PanelProvider
                         return new HtmlString('');
                     }
                 }
+            )
+            ->renderHook(
+                // Slot the page breadcrumbs teleport into (see the overridden
+                // filament-panels::components.header view) — moves them from the
+                // content header into the topbar, matching the design.
+                PanelsRenderHook::TOPBAR_START,
+                fn (): string => '<div id="argos-topbar-breadcrumbs" class="fi-argos-topbar-breadcrumbs"></div>',
             )
             ->renderHook(
                 PanelsRenderHook::CONTENT_START,

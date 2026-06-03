@@ -13,7 +13,6 @@ use App\Filament\Admin\RelationManagers\ApiTokensRelationManager;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\CreateRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\EditRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\ListRepoProfiles;
-use App\Filament\Admin\Resources\RepoProfileResource\Pages\ViewRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\RelationManagers\TaskProviderBindingsRelationManager;
 use App\Filament\Admin\Resources\RepoProfileResource\RelationManagers\TasksRelationManager;
 use App\Models\ConnectedAccount;
@@ -27,7 +26,6 @@ use App\Workers\Agents\AgentRegistry;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
-use Filament\Actions\EditAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -94,6 +92,8 @@ class RepoProfileResource extends Resource
                             // ── Block 1 ─ Plattform (gates everything below) ────────────────
                             Section::make(__('projects.sections.platform'))
                                 ->description(__('projects.sections.platform_description'))
+                                ->icon('heroicon-o-globe-alt')
+                                ->aside()
                                 ->schema([
                                     Select::make('platform')
                                         ->label(__('projects.fields.platform'))
@@ -120,6 +120,9 @@ class RepoProfileResource extends Resource
 
                             // ── Block 3a ─ Authentifizierung (GitHub/GitLab mit OAuth-Account) ─
                             Section::make(__('projects.sections.authentication'))
+                                ->description(__('projects.sections.authentication_description'))
+                                ->icon('heroicon-o-key')
+                                ->aside()
                                 ->visible(fn (Get $get): bool => self::hasOAuthAccount($get))
                                 ->schema([
                                     Select::make('auth_method')
@@ -170,6 +173,9 @@ class RepoProfileResource extends Resource
 
                             // ── Block 3b ─ Authentifizierung (Bitbucket mit OAuth-Account) ─
                             Section::make(__('projects.sections.authentication'))
+                                ->description(__('projects.sections.authentication_description'))
+                                ->icon('heroicon-o-key')
+                                ->aside()
                                 ->visible(fn (Get $get): bool => $get('platform') === 'bitbucket' && self::bitbucketAccount() !== null)
                                 ->schema([
                                     Select::make('auth_method')
@@ -218,11 +224,14 @@ class RepoProfileResource extends Resource
                                         ->dehydrated(),
                                 ]),
 
-                            // ── Block 2 + Block 4 nebeneinander (Allgemein + Repository) ─────
-                            Grid::make(2)
+                            // ── Block 2 + Block 4 gestapelt (Allgemein + Repository) ─────────
+                            Grid::make(1)
                                 ->columnSpanFull()
                                 ->schema([
                                     Section::make(__('projects.sections.general'))
+                                        ->description(__('projects.sections.general_description'))
+                                        ->icon('heroicon-o-adjustments-horizontal')
+                                        ->aside()
                                         ->visible(fn (Get $get): bool => self::platformChosen($get))
                                         ->columnSpan(1)
                                         ->schema([
@@ -241,6 +250,9 @@ class RepoProfileResource extends Resource
                                         ]),
 
                                     Section::make(__('projects.sections.repository'))
+                                        ->description(__('projects.sections.repository_description'))
+                                        ->icon('heroicon-o-code-bracket-square')
+                                        ->aside()
                                         ->visible(fn (Get $get): bool => self::platformChosen($get))
                                         ->columnSpan(1)
                                         ->schema([
@@ -386,6 +398,8 @@ class RepoProfileResource extends Resource
                             // ── Worker (Stack & Agent) ──────────────────────────────────────
                             Section::make(__('projects.sections.worker'))
                                 ->description(__('projects.sections.worker_description'))
+                                ->icon('heroicon-o-cpu-chip')
+                                ->aside()
                                 ->visible(fn (Get $get): bool => self::platformChosen($get))
                                 ->schema([
                                     Select::make('worker_source')
@@ -433,8 +447,28 @@ class RepoProfileResource extends Resource
                                         ->native(false),
                                 ]),
 
+                            // ── Live-Demo ───────────────────────────────────────────────────
+                            Section::make(__('projects.sections.live_demo'))
+                                ->visible(fn (Get $get): bool => self::platformChosen($get))
+                                ->schema([
+                                    Toggle::make('live_demo_enabled')
+                                        ->label(__('projects.fields.live_demo_label'))
+                                        ->helperText(__('projects.fields.live_demo_helper'))
+                                        ->default(false)
+                                        ->live(),
+
+                                    Callout::make(__('projects.fields.live_demo_hint_heading'))
+                                        ->visible(fn (Get $get): bool => (bool) $get('live_demo_enabled'))
+                                        ->color('info')
+                                        ->icon('heroicon-o-information-circle')
+                                        ->description(__('projects.fields.live_demo_hint_body')),
+                                ]),
+
                             // ── Modelle ─────────────────────────────────────────────────────
                             Section::make(__('projects.sections.models'))
+                                ->description(__('projects.sections.models_description'))
+                                ->icon('heroicon-o-sparkles')
+                                ->aside()
                                 ->visible(fn (Get $get): bool => self::platformChosen($get))
                                 ->schema([
                                     // The default-model hint lives in helperText (text inside a
@@ -924,9 +958,8 @@ class RepoProfileResource extends Resource
                     ->label(__('projects.columns.tasks'))
                     ->counts('tasks'),
             ])
-            ->recordUrl(fn (RepoProfile $record): string => static::getUrl('view', ['record' => $record]))
+            ->recordUrl(fn (RepoProfile $record): string => static::getUrl('edit', ['record' => $record]))
             ->actions([
-                EditAction::make(),
                 DeleteAction::make(),
             ])
             ->bulkActions([
@@ -950,8 +983,9 @@ class RepoProfileResource extends Resource
         return [
             'index' => ListRepoProfiles::route('/'),
             'create' => CreateRepoProfile::route('/create'),
-            'view' => ViewRepoProfile::route('/{record}'),
-            'edit' => EditRepoProfile::route('/{record}/edit'),
+            // Detail = edit (no separate read-only view); relation managers
+            // render on the edit page.
+            'edit' => EditRepoProfile::route('/{record}'),
         ];
     }
 }

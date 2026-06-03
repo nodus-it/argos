@@ -15,6 +15,7 @@ use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -53,11 +54,17 @@ class ApiClientResource extends Resource
     public static function form(Schema $schema): Schema
     {
         return $schema->components([
-            TextInput::make('name')
-                ->label(__('api_tokens.client.name'))
-                ->helperText(__('api_tokens.client.name_help'))
-                ->required()
-                ->maxLength(255),
+            Section::make(__('api_tokens.client.section'))
+                ->description(__('api_tokens.client.section_description'))
+                ->icon('heroicon-o-identification')
+                ->aside()
+                ->schema([
+                    TextInput::make('name')
+                        ->label(__('api_tokens.client.name'))
+                        ->helperText(__('api_tokens.client.name_help'))
+                        ->required()
+                        ->maxLength(255),
+                ]),
         ]);
     }
 

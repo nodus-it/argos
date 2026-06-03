@@ -15,6 +15,23 @@ class CreateTask extends CreateRecord
 {
     protected static string $resource = TaskResource::class;
 
+    /**
+     * Pre-select the project when opened from a project's "Neuer Task" button
+     * (?repo_profile_id=…). RepoProfile keys are ULIDs, so read as a string.
+     */
+    protected function fillForm(): void
+    {
+        $repoProfileId = request()->query('repo_profile_id');
+
+        $this->callHook('beforeFill');
+        $this->form->fill(
+            (is_string($repoProfileId) && $repoProfileId !== '')
+                ? ['repo_profile_id' => $repoProfileId]
+                : []
+        );
+        $this->callHook('afterFill');
+    }
+
     protected function handleRecordCreation(array $data): Model
     {
         $data['user_id'] = auth()->id();

@@ -9,7 +9,8 @@
         :href="$issueUrl"
         target="_blank"
         icon="heroicon-o-chat-bubble-left-ellipsis"
-        color="primary"
+        color="gray"
+        outlined
         size="sm"
         :tooltip="__('common.feedback_button.tooltip')"
         class="fi-argos-feedback-btn"

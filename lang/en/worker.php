@@ -63,7 +63,9 @@ return [
         'plural' => 'Agent credentials',
         'sections' => [
             'identity' => 'Identity',
+            'identity_description' => 'Which agent this account is for, a display name, and the status.',
             'auth' => 'Authentication',
+            'auth_description' => "The agent's credentials — a token or the full auth.json, depending on the agent.",
         ],
         'fields' => [
             'agent_name' => 'Agent',
@@ -81,6 +83,8 @@ return [
     'image_builds' => [
         'label' => 'Image build',
         'plural' => 'Image builds',
+        'summary' => 'Summary',
+        'summary_description' => "This image build's tag, stack, agent, and status.",
         'build_log_description' => 'Stdout/stderr from the stack build, the worker layer, and the post-build validate step.',
         'empty_log' => 'No build log captured.',
         'lines' => 'lines',

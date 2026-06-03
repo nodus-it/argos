@@ -41,6 +41,7 @@ use Laravel\Sanctum\HasApiTokens;
  * @property int|null $max_turns_implement
  * @property bool $auto_concept
  * @property bool $auto_pr
+ * @property bool $live_demo_enabled
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read Collection<int, Task> $tasks
@@ -74,6 +75,7 @@ class RepoProfile extends Model implements HasApiTokensContract
         'max_turns_implement',
         'auto_concept',
         'auto_pr',
+        'live_demo_enabled',
     ];
 
     protected function casts(): array
@@ -89,6 +91,7 @@ class RepoProfile extends Model implements HasApiTokensContract
             'max_turns_implement' => 'integer',
             'auto_concept' => 'boolean',
             'auto_pr' => 'boolean',
+            'live_demo_enabled' => 'boolean',
         ];
     }
 

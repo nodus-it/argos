@@ -5,6 +5,7 @@ declare(strict_types=1);
 return [
     'navigation_group' => 'Tasks',
     'navigation_label' => 'Tasks',
+    'search_placeholder' => 'Search tasks…',
 
     'fields' => [
         'name_label' => 'Name',
@@ -73,6 +74,27 @@ return [
     ],
 
     'view' => [
+        'thread' => [
+            'created' => 'Task created',
+            'concept' => 'Concept',
+            'concept_body' => 'The agent proposed an approach.',
+            'view_concept' => 'View concept',
+            'implement' => 'Implementation',
+            'implement_body' => 'The agent implemented the change.',
+            'technical' => 'Technical',
+            'summary' => 'Summary',
+            'diff' => 'Diff',
+            'logs' => 'Logs',
+            'push' => 'Pull request',
+            'open_pr' => 'Open pull request',
+            'waiting_flag' => 'The agent is waiting for your feedback.',
+            'send' => 'Send',
+            'chip_changes' => 'Request changes',
+            'chip_changes_text' => 'Please change the following: ',
+            'chip_approve' => 'Approve & merge',
+            'chip_question' => 'Ask a question',
+            'chip_question_text' => 'Question: ',
+        ],
         'labels' => [
             'status' => 'Status',
             'repository' => 'Repository',
@@ -81,6 +103,8 @@ return [
             'base_branch' => 'Base Branch',
             'branch' => 'Branch',
             'pull_request' => 'Pull Request',
+            'cost' => 'Cost',
+            'created' => 'Created',
             'open' => 'Open',
             'source' => 'Source',
             'external_issue' => 'External Issue',
@@ -97,6 +121,24 @@ return [
             'status_paused' => 'paused',
             'phase_running' => ':phase running',
             'phase_waiting' => ':phase waiting for worker',
+        ],
+
+        'demo' => [
+            'title' => 'Live demo',
+            'url' => 'URL',
+            'expires' => 'Expires',
+            'building' => 'Building demo…',
+            'failed_hint' => 'The demo build failed.',
+            'show_log' => 'Show build log',
+            'empty_hint' => 'No demo yet. It is built automatically after the next successful implement run.',
+            'rebuild' => 'Rebuild demo',
+            'rebuild_heading' => 'Rebuild live demo?',
+            'rebuild_description' => 'A running demo for this task will be replaced. The build runs in the background.',
+            'rebuild_queued' => 'Demo build queued.',
+            'stop' => 'Stop demo',
+            'stop_heading' => 'Stop live demo?',
+            'stop_description' => 'The demo’s containers, volumes and route will be removed.',
+            'stop_queued' => 'Demo is being stopped.',
         ],
 
         'concept' => [
@@ -187,6 +229,7 @@ return [
             'load_button' => 'Load diff',
             'loading' => 'Loading…',
             'no_changes' => 'No changes compared to origin/:branch.',
+            'error' => 'The diff could not be loaded (the workspace may be unavailable or the read timed out).',
             'badge_new' => 'NEW',
             'badge_deleted' => 'DELETED',
             'loaded_at' => 'Loaded: :updated_at',
@@ -229,6 +272,7 @@ return [
             'concept_update' => 'Update Concept',
             'implement' => 'Implement',
             'push_pr' => 'Push & PR',
+            'more_label' => 'More actions',
             'force_unlock_label' => 'Release Lock',
             'force_unlock_heading' => 'Force Release Lock',
             'force_unlock_description' => 'The worker lock is still set (likely due to a crashed container). Release the lock and restart Implement?',

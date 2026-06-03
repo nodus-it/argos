@@ -8,6 +8,10 @@ return [
     'model_label' => 'Project',
     'model_label_plural' => 'Projects',
 
+    'actions' => [
+        'new_task' => 'New task',
+    ],
+
     'tabs' => [
         'basics' => 'General',
         'worker' => 'Worker & models',
@@ -18,11 +22,16 @@ return [
         'platform' => 'Platform',
         'platform_description' => 'Choose a platform — the remaining fields will be unlocked afterwards.',
         'general' => 'General',
+        'general_description' => 'The project display name and automation for the concept and PR phases.',
         'worker' => 'Worker',
         'worker_description' => 'Stack & agent that run the phases for this project. Overridable per task.',
+        'live_demo' => 'Live demo',
         'models' => 'Models',
+        'models_description' => 'Model selection for the phases. Leave empty to use the stack defaults.',
         'authentication' => 'Authentication',
+        'authentication_description' => 'How Argos accesses the repository — a connected account or a personal access token.',
         'repository' => 'Repository',
+        'repository_description' => 'Repository address and the default branch the tasks build upon.',
     ],
 
     'fields' => [
@@ -41,6 +50,10 @@ return [
         'worker_source_byoi' => 'Own Dockerfile in the repo (BYOI)',
         'worker_byoi_hint_heading' => 'Repo defines its own image',
         'worker_byoi_hint_body' => 'Argos reads .argos/worker.dockerfile from the repo (at the base branch) as the stack base and layers the agent + worker code on top automatically. Required tools (bash, git, jq, …) must come in via FROM/RUN — no COPY from the repo (the build context is not the repo).',
+        'live_demo_label' => 'Enable live demo',
+        'live_demo_helper' => 'Automatically spins up a live demo on its own subdomain after each implement.',
+        'live_demo_hint_heading' => 'Repo must ship the demo contract',
+        'live_demo_hint_body' => 'Requires .argos/demo.compose.yml (runtime) and .argos/demo.yml (settings: entry service/port, commands) at the base branch. If they are missing, the demo build fails with a clear message.',
         'worker_stack_label' => 'Worker Stack',
         'worker_stack_helper' => 'Base image (PHP version, tools). Leave empty for the Argos default.',
         'worker_stack_placeholder' => 'Default :stack',

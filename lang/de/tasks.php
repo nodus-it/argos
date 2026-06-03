@@ -5,6 +5,7 @@ declare(strict_types=1);
 return [
     'navigation_group' => 'Aufgaben',
     'navigation_label' => 'Tasks',
+    'search_placeholder' => 'Tasks suchen…',
 
     'fields' => [
         'name_label' => 'Name',
@@ -73,6 +74,27 @@ return [
     ],
 
     'view' => [
+        'thread' => [
+            'created' => 'Aufgabe angelegt',
+            'concept' => 'Konzept',
+            'concept_body' => 'Der Agent hat einen Lösungsweg vorgeschlagen.',
+            'view_concept' => 'Konzept ansehen',
+            'implement' => 'Implementierung',
+            'implement_body' => 'Der Agent hat die Änderung umgesetzt.',
+            'technical' => 'Technisch',
+            'summary' => 'Zusammenfassung',
+            'diff' => 'Diff',
+            'logs' => 'Logs',
+            'push' => 'Pull Request',
+            'open_pr' => 'Pull Request öffnen',
+            'waiting_flag' => 'Der Agent wartet auf dein Feedback.',
+            'send' => 'Senden',
+            'chip_changes' => 'Änderungen anfordern',
+            'chip_changes_text' => 'Bitte ändere Folgendes: ',
+            'chip_approve' => 'Approve & Merge',
+            'chip_question' => 'Frage stellen',
+            'chip_question_text' => 'Frage: ',
+        ],
         'labels' => [
             'status' => 'Status',
             'repository' => 'Repository',
@@ -81,6 +103,8 @@ return [
             'base_branch' => 'Base Branch',
             'branch' => 'Branch',
             'pull_request' => 'Pull Request',
+            'cost' => 'Kosten',
+            'created' => 'Erstellt',
             'open' => 'Öffnen',
             'source' => 'Quelle',
             'external_issue' => 'Externes Issue',
@@ -97,6 +121,24 @@ return [
             'status_paused' => 'pausiert',
             'phase_running' => ':phase läuft',
             'phase_waiting' => ':phase wartet auf Worker',
+        ],
+
+        'demo' => [
+            'title' => 'Live-Demo',
+            'url' => 'URL',
+            'expires' => 'Läuft ab',
+            'building' => 'Demo wird aufgebaut…',
+            'failed_hint' => 'Der Demo-Aufbau ist fehlgeschlagen.',
+            'show_log' => 'Build-Log anzeigen',
+            'empty_hint' => 'Noch keine Demo. Sie wird nach dem nächsten erfolgreichen Implement-Lauf automatisch aufgebaut.',
+            'rebuild' => 'Demo neu aufbauen',
+            'rebuild_heading' => 'Live-Demo neu aufbauen?',
+            'rebuild_description' => 'Eine laufende Demo dieses Tasks wird ersetzt. Der Aufbau läuft im Hintergrund.',
+            'rebuild_queued' => 'Demo-Aufbau eingereiht.',
+            'stop' => 'Demo stoppen',
+            'stop_heading' => 'Live-Demo stoppen?',
+            'stop_description' => 'Container, Volumes und Route der Demo werden entfernt.',
+            'stop_queued' => 'Demo wird gestoppt.',
         ],
 
         'concept' => [
@@ -187,6 +229,7 @@ return [
             'load_button' => 'Diff laden',
             'loading' => 'Lade…',
             'no_changes' => 'Keine Änderungen gegenüber origin/:branch.',
+            'error' => 'Der Diff konnte nicht geladen werden (Workspace nicht verfügbar oder Zeitüberschreitung beim Lesen).',
             'badge_new' => 'NEU',
             'badge_deleted' => 'GELÖSCHT',
             'loaded_at' => 'Geladen: :updated_at',
@@ -229,6 +272,7 @@ return [
             'concept_update' => 'Konzept aktualisieren',
             'implement' => 'Implement',
             'push_pr' => 'Push & PR',
+            'more_label' => 'Weitere Aktionen',
             'force_unlock_label' => 'Lock freigeben',
             'force_unlock_heading' => 'Lock erzwungen freigeben',
             'force_unlock_description' => 'Der Worker-Lock ist noch gesetzt (vermutlich durch einen abgestürzten Container). Den Lock freigeben und Implement neu starten?',

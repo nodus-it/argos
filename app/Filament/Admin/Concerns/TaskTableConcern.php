@@ -11,7 +11,9 @@ use App\Enums\TaskProviderKind;
 use App\Enums\WorkflowStatus;
 use App\Models\Task;
 use Filament\Schemas\Components\Tabs\Tab;
+use Filament\Tables\Columns\Column;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\ViewColumn;
 use Filament\Tables\Filters\SelectFilter;
 
 trait TaskTableConcern
@@ -29,7 +31,7 @@ trait TaskTableConcern
     }
 
     /**
-     * @return list<TextColumn>
+     * @return list<Column>
      */
     public static function taskTableColumns(bool $withProject = true): array
     {
@@ -53,19 +55,16 @@ trait TaskTableConcern
             ->formatStateUsing(fn (?TaskProviderKind $state): string => $state?->label() ?? '—')
             ->placeholder('—');
 
-        $columns[] = TextColumn::make('workflow_status')
+        // Warm-Paper status language: render the workflow + phase as the
+        // <x-argos.badge> / <x-argos.phase-chip> components (colour + icon +
+        // label). Shared by the dashboard widget and the task list.
+        $columns[] = ViewColumn::make('workflow_status')
             ->label(__('tasks.columns.workflow'))
-            ->badge()
-            ->icon(fn (Task $record): ?string => $record->isWaitingForWorker() ? 'heroicon-o-clock' : null)
-            ->color(fn (Task $record): string => $record->displayStatusColor())
-            ->formatStateUsing(fn (Task $record): string => $record->displayStatusLabel());
+            ->view('filament.tables.columns.argos-workflow-badge');
 
-        $columns[] = TextColumn::make('current_phase')
+        $columns[] = ViewColumn::make('current_phase')
             ->label(__('tasks.columns.phase'))
-            ->badge()
-            ->icon(fn (?Phase $state): ?string => $state?->icon())
-            ->color(fn (?Phase $state): string => $state?->color() ?? 'gray')
-            ->formatStateUsing(fn (?Phase $state): string => $state?->label() ?? '—');
+            ->view('filament.tables.columns.argos-phase-chip');
 
         $columns[] = TextColumn::make('agent')
             ->label(__('tasks.columns.agent'))

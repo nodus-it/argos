@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\WorkerImageBuildResource\Pages;
 
+use App\Filament\Admin\Concerns\HasArgosEditHeading;
 use App\Filament\Admin\Resources\WorkerImageBuildResource;
 use App\Jobs\BuildWorkerImageJob;
 use App\Models\WorkerImageBuild;
@@ -13,7 +14,25 @@ use Filament\Resources\Pages\ViewRecord;
 
 class ViewWorkerImageBuild extends ViewRecord
 {
+    use HasArgosEditHeading;
+
     protected static string $resource = WorkerImageBuildResource::class;
+
+    protected function argosHeadingAttribute(): string
+    {
+        return 'tag';
+    }
+
+    /**
+     * @return array{icon?: string, label: string}|null
+     */
+    protected function argosHeadingChip(): ?array
+    {
+        /** @var WorkerImageBuild $record */
+        $record = $this->getRecord();
+
+        return ['icon' => 'heroicon-o-cube', 'label' => $record->status->value];
+    }
 
     protected function getHeaderActions(): array
     {
