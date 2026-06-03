@@ -23,7 +23,6 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\Facades\Blade;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
@@ -38,8 +37,6 @@ class ViewTask extends ViewRecord
     public string $diffStat = '';
 
     public bool $diffLoaded = false;
-
-    public int $diffLoadedForIteration = 0;
 
     /** Set when the diff command failed (e.g. timed out) so the UI can surface it instead of 500ing. */
     public ?string $diffError = null;
@@ -67,8 +64,6 @@ class ViewTask extends ViewRecord
 
         $this->notes = $task->concept_notes ?? '';
         $this->implementNotes = $task->implement_notes ?? '';
-
-        $this->maybeAutoLoadDiff($task);
     }
 
     public function startEditingNotes(): void
@@ -163,7 +158,6 @@ class ViewTask extends ViewRecord
         $task->refresh();
         $this->notes = $task->concept_notes ?? '';
         $this->implementNotes = $task->implement_notes ?? '';
-        $this->maybeAutoLoadDiff($task);
     }
 
     public function loadDiff(): void
@@ -215,25 +209,13 @@ class ViewTask extends ViewRecord
             $this->diffStat = '';
             $this->diffFiles = [];
             $this->diffError = __('tasks.view.diff.error');
-            Log::channel('argos')->warning('Diff load failed', [
-                'task' => $task->name,
-                'error' => $e->getMessage(),
-            ]);
+            // report() routes through the exception handler (default log
+            // stack) and never throws — unlike Log::channel('argos'), whose
+            // file may be unwritable, which would re-escalate a handled
+            // timeout into a 500.
+            report($e);
         } finally {
             $this->diffLoaded = true;
-        }
-    }
-
-    private function maybeAutoLoadDiff(Task $task): void
-    {
-        $latestCompleted = (int) ($task->phaseRuns()
-            ->where('phase', 'implement')
-            ->where('status', 'completed')
-            ->max('iteration') ?? 0);
-
-        if ($latestCompleted > 0 && $latestCompleted > $this->diffLoadedForIteration) {
-            $this->loadDiff();
-            $this->diffLoadedForIteration = $latestCompleted;
         }
     }
 

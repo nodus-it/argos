@@ -174,22 +174,40 @@ class TaskPagesTest extends TestCase
 
     public function test_view_task_survives_a_failing_diff_load(): void
     {
-        // The diff auto-loads on mount via `docker run`. If that times out or
-        // errors, the page must degrade to an inline notice — never 500.
+        // The diff loads lazily via `docker run` when the user opens the panel.
+        // If that times out or errors, it must degrade to an inline notice and
+        // never 500 — including not re-escalating through a failing log write.
         Process::fake(function (): void {
             throw new \RuntimeException('docker run timed out');
         });
 
-        $profile = RepoProfile::factory()->create();
-        $task = Task::factory()->create(['repo_profile_id' => $profile->id]);
+        $task = Task::factory()->create();
+
+        Livewire::test(ViewTask::class, ['record' => $task->getKey()])
+            ->assertSuccessful()
+            ->call('loadDiff')
+            ->assertSet('diffLoaded', true)
+            ->assertSet('diffError', __('tasks.view.diff.error'));
+    }
+
+    public function test_view_task_does_not_auto_load_diff_on_mount(): void
+    {
+        // Auto-loading the diff on mount made the page wait on a 15s docker
+        // timeout for tasks with a slow/polluted workspace. It must stay lazy.
+        Process::fake(function (): void {
+            throw new \RuntimeException('docker must not run on mount');
+        });
+
+        $task = Task::factory()->create();
         PhaseRun::factory()->create([
             'task_id' => $task->id, 'phase' => 'implement', 'status' => 'completed', 'iteration' => 1,
         ]);
 
         Livewire::test(ViewTask::class, ['record' => $task->getKey()])
             ->assertSuccessful()
-            ->assertSet('diffLoaded', true)
-            ->assertSet('diffError', __('tasks.view.diff.error'));
+            ->assertSet('diffLoaded', false);
+
+        Process::assertNothingRan();
     }
 
     public function test_rebuild_demo_hidden_when_preview_disabled(): void
