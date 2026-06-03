@@ -499,16 +499,55 @@ class DemoDeployer
     public function applyAccessMode(Task $task): void
     {
         $demo = $task->currentDemo();
-        if ($demo === null || $demo->status !== DemoStatus::Live || $demo->port === null) {
+        if ($demo === null || $demo->status !== DemoStatus::Live) {
             return;
         }
 
+        $slug = $this->demoSlug($task);
+
+        // Demos deployed before the `port` column existed have a null port —
+        // recover it from the live route file so the toggle still works.
+        $port = $demo->port ?? $this->existingRoutePort($slug);
+        if ($port === null) {
+            return;
+        }
+
+        if ($demo->port === null) {
+            $demo->forceFill(['port' => $port])->save();
+        }
+
         $this->writeTraefikRoute(
-            $this->demoSlug($task),
-            $demo->port,
+            $slug,
+            $port,
             $task->effectiveDemoAccessMode(),
             $task->demo_basic_password,
         );
+    }
+
+    /**
+     * Recover the upstream port from an existing route file's service URL
+     * (`http://{slug}:{port}`). Returns null when the file is missing or
+     * unparseable.
+     */
+    private function existingRoutePort(string $slug): ?int
+    {
+        $file = $this->routeFilePath($slug);
+        if (! is_file($file)) {
+            return null;
+        }
+
+        try {
+            $parsed = Yaml::parseFile($file);
+        } catch (Throwable) {
+            return null;
+        }
+
+        $url = $parsed['http']['services'][$slug]['loadBalancer']['servers'][0]['url'] ?? null;
+        if (! is_string($url) || preg_match('/:(\d+)$/', $url, $m) !== 1) {
+            return null;
+        }
+
+        return (int) $m[1];
     }
 
     /**
