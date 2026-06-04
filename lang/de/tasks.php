@@ -94,6 +94,14 @@ return [
         'done' => 'Abgeschlossen',
     ],
 
+    'rail' => [
+        'draft' => 'Entwurf',
+        'concept' => 'Konzept',
+        'implement' => 'Umsetzung',
+        'push' => 'Push & PR',
+        'review' => 'Review',
+    ],
+
     'view' => [
         'thread' => [
             'created' => 'Aufgabe angelegt',

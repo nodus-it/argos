@@ -22,8 +22,6 @@ class CurrentTasksWidget extends BaseWidget
 
     protected static ?int $sort = 2;
 
-    protected ?string $pollingInterval = '5s';
-
     protected function getTableHeading(): string|Htmlable|null
     {
         return new HtmlString(Blade::render(
@@ -35,6 +33,10 @@ class CurrentTasksWidget extends BaseWidget
     public function table(Table $table): Table
     {
         return $table
+            // Table widgets ignore the class-level $pollingInterval property —
+            // polling is driven by the table's own poll() (see the docs). The
+            // old property silently never refreshed the dashboard task list.
+            ->poll('5s')
             ->query(
                 Task::query()
                     ->with(static::taskTableEagerLoads())

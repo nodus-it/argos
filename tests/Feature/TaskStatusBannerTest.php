@@ -55,6 +55,24 @@ final class TaskStatusBannerTest extends TestCase
             ->assertSee('Concept running');
     }
 
+    public function test_banner_embeds_the_phase_stepper_as_one_unit(): void
+    {
+        $task = Task::factory()->create([
+            'workflow_status' => WorkflowStatus::ImplementRunning,
+            'current_phase' => 'implement',
+            'current_status' => 'running',
+        ]);
+        PhaseRun::factory()->running()->create(['task_id' => $task->id, 'phase' => 'implement']);
+
+        Livewire::test(ViewTask::class, ['record' => $task->getKey()])
+            ->assertSuccessful()
+            // The unified banner card wraps the stepper + status band …
+            ->assertSee('workflow-banner', escape: false)
+            // … and the stepper renders the localized phase labels.
+            ->assertSee(__('tasks.rail.concept'))
+            ->assertSee(__('tasks.rail.implement'));
+    }
+
     public function test_failed_state_surfaces_error_log_and_logs_link(): void
     {
         $task = Task::factory()->failed()->create([

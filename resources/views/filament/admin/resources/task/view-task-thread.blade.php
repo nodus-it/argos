@@ -12,7 +12,8 @@
 
     {{-- Task name + status badge now render in the page header (getHeading). --}}
 
-    {{-- Status banner: the single "what is the system doing right now" header (M1). --}}
+    {{-- Status banner: the phase stepper + the single "what is the system doing
+         right now" status band, as one unit (M1). --}}
     <div class="fade-in" style="margin-bottom:16px;">
         <x-argos.status-banner
             :state="$banner['state']"
@@ -21,7 +22,8 @@
             :startedAt="$banner['startedAt']"
             :error="$banner['error']"
             :logsUrl="$banner['logsUrl']"
-            :logsLabel="$banner['logsLabel']" />
+            :logsLabel="$banner['logsLabel']"
+            :rail="$task->phaseRail()" />
     </div>
 
     {{-- Auto-reload while the worker is busy (running or queued). Poll only then
@@ -30,11 +32,8 @@
         <div wire:poll.2500ms="poll" class="hidden"></div>
     @endif
 
-    {{-- Phase rail + meta strip --}}
+    {{-- Meta strip --}}
     <div class="fade-in" style="margin-bottom:20px;">
-        <div class="card card-pad" style="margin-bottom:12px;">
-            <x-argos.phase-rail :rail="$task->phaseRail()" :current="$task->displayStatusLabel()" />
-        </div>
         <x-argos.meta-strip>
             @if ($task->repoProfile)
                 <x-argos.meta-item label="{{ __('tasks.view.labels.repository') }}" :mono="true">{{ $task->repoProfile->name }}</x-argos.meta-item>

@@ -94,6 +94,14 @@ return [
         'done' => 'Completed',
     ],
 
+    'rail' => [
+        'draft' => 'Draft',
+        'concept' => 'Concept',
+        'implement' => 'Implement',
+        'push' => 'Push & PR',
+        'review' => 'Review',
+    ],
+
     'view' => [
         'thread' => [
             'created' => 'Task created',

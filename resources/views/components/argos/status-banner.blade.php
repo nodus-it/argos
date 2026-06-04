@@ -6,56 +6,38 @@
     'error' => null,       // error text to surface (failed only)
     'logsUrl' => null,     // optional link (e.g. logs / quality gates)
     'logsLabel' => null,
+    'rail' => null,        // optional phase stepper: list of ['phase','state','label']
 ])
 {{--
-    The single "what is the system doing right now" header. Driven by
-    App\Support\Workflow\TaskStage::bannerState(): the worker is running a
-    phase, a job is queued (waiting for the worker), the system waits on a
-    human decision, a phase is paused, or it failed. Workflow M1.
+    The single "what is the system doing right now" header. When a phase stepper
+    (`rail`) is passed, it renders as one unit: the stepper on top, a coloured
+    status band (<x-argos.status-line>) below — so the workflow position and the
+    current state read together. Without a rail it degrades to the bare status
+    line. Driven by App\Support\Workflow\TaskStage. Workflow M1.
 --}}
-@php
-    $map = [
-        'running' => ['cls' => 'callout-info', 'icon' => null],
-        'queued'  => ['cls' => 'callout-info', 'icon' => 'spin'],
-        'waiting' => ['cls' => 'callout-warn', 'icon' => 'heroicon-o-hand-raised'],
-        'paused'  => ['cls' => 'callout-warn', 'icon' => 'heroicon-o-pause-circle'],
-        'failed'  => ['cls' => 'callout-danger', 'icon' => 'heroicon-o-exclamation-triangle'],
-        'done'    => ['cls' => 'callout-ok', 'icon' => 'heroicon-o-check-circle'],
-        'draft'   => ['cls' => 'callout-info', 'icon' => 'heroicon-o-document-text'],
-    ];
-    $m = $map[$state] ?? $map['draft'];
-@endphp
-<div {{ $attributes->merge(['class' => 'callout status-banner '.$m['cls']]) }}>
-    @if ($state === 'running')
-        <span class="sb-dot"></span>
-    @elseif ($m['icon'] === 'spin')
-        <svg class="sb-spin" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-        </svg>
-    @else
-        @svg($m['icon'])
-    @endif
-
-    <div class="sb-main">
-        <span class="sb-title">{{ $title }}</span>
-        @if ($hint)
-            <span class="sb-hint">{{ $hint }}</span>
-        @endif
-        @if ($error)
-            <pre class="sb-err">{{ $error }}</pre>
-        @endif
-        @if ($logsUrl)
-            <a href="{{ $logsUrl }}" class="link-btn" style="margin-top:6px;align-self:flex-start;">
-                @svg('heroicon-o-command-line') {{ $logsLabel ?? __('tasks.view.banner.view_logs') }}
-            </a>
-        @endif
+@if ($rail)
+    <div {{ $attributes->merge(['class' => 'workflow-banner']) }}>
+        <div class="wb-rail">
+            <x-argos.phase-rail :rail="$rail" />
+        </div>
+        <x-argos.status-line
+            :state="$state"
+            :title="$title"
+            :hint="$hint"
+            :startedAt="$startedAt"
+            :error="$error"
+            :logsUrl="$logsUrl"
+            :logsLabel="$logsLabel"
+            :flush="true" />
     </div>
-
-    @if ($state === 'running' && $startedAt !== null)
-        <span class="sb-timer"
-              x-data="{ sec: Math.max(0, Math.floor(Date.now()/1000) - {{ $startedAt }}) }"
-              x-init="setInterval(() => sec++, 1000)"
-              x-text="Math.floor(sec/60) + ':' + String(sec % 60).padStart(2, '0')"></span>
-    @endif
-</div>
+@else
+    <x-argos.status-line
+        :state="$state"
+        :title="$title"
+        :hint="$hint"
+        :startedAt="$startedAt"
+        :error="$error"
+        :logsUrl="$logsUrl"
+        :logsLabel="$logsLabel"
+        {{ $attributes }} />
+@endif

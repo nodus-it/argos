@@ -794,6 +794,14 @@ body,
 .status-banner .sb-dot{width:9px;height:9px;border-radius:99px;flex:none;background:currentColor;animation:pulse 1.6s var(--ease) infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
 
+/* Workflow banner — phase stepper + status band as one card. The rail sits on
+   top, the coloured status line (.sb-flush) is the lower band: no own border,
+   just a separator, square bottom so it tucks into the card. */
+.workflow-banner{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);overflow:hidden;}
+.workflow-banner .wb-rail{padding:8px 16px 2px;}
+.workflow-banner .rail{padding:6px 4px;}
+.status-banner.sb-flush{border:0;border-top:1px solid var(--border);border-radius:0;}
+
 /* Usage banner */
 .usage-banner{display:flex;align-items:center;gap:10px;padding:10px 28px;background:var(--wn-50);border-bottom:1px solid var(--wn-100);color:var(--wn-700);font-size:var(--t-sm);font-weight:500;}
 .usage-banner svg{width:17px;height:17px;}
