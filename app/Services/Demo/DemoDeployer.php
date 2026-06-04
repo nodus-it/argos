@@ -10,6 +10,7 @@ use App\Models\Demo;
 use App\Models\RepoProfile;
 use App\Models\Task;
 use App\Services\GitProvider\GitServiceFactory;
+use Illuminate\Encryption\Encrypter;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Symfony\Component\Process\Process;
@@ -294,6 +295,13 @@ class DemoDeployer
                     'environment' => [
                         'APP_URL' => $this->demoUrlForSlug($slug),
                         'ASSET_URL' => $this->demoUrlForSlug($slug),
+                        // Inject a throwaway app key so Laravel boots even when
+                        // the repo's .env.example ships no APP_KEY= line for
+                        // `key:generate` to fill (Argos itself is such a repo →
+                        // MissingAppKeyException → every request 500s). Laravel
+                        // reads real env over the repo .env, so this wins; a
+                        // fresh per-deploy key is fine for an ephemeral demo.
+                        'APP_KEY' => $this->generateAppKey(),
                     ],
                     'volumes' => [
                         $task->volumeName().':'.$entry['workspace_mount'],
@@ -329,6 +337,16 @@ class DemoDeployer
         ];
 
         return Yaml::dump($override, 6, 2);
+    }
+
+    /**
+     * A valid throwaway Laravel APP_KEY for the demo container — mirrors what
+     * `php artisan key:generate` produces, but without depending on the repo
+     * shipping an APP_KEY= line in .env(.example).
+     */
+    private function generateAppKey(): string
+    {
+        return 'base64:'.base64_encode(Encrypter::generateKey((string) config('app.cipher')));
     }
 
     private function prepareWorkDir(string $slug, string $composeYaml, string $overrideYaml): string

@@ -119,6 +119,13 @@ class DemoDeployerTest extends TestCase
         // browser-reachable asset URLs.
         $this->assertSame('http://demo-feat1.127.0.0.1.nip.io:8080', $parsed['services']['app']['environment']['APP_URL']);
         $this->assertSame('http://demo-feat1.127.0.0.1.nip.io:8080', $parsed['services']['app']['environment']['ASSET_URL']);
+
+        // A throwaway APP_KEY is injected so Laravel boots even when the repo
+        // ships no APP_KEY= line for `key:generate` (else MissingAppKeyException
+        // → 500). Must be a valid base64 32-byte key.
+        $appKey = $parsed['services']['app']['environment']['APP_KEY'];
+        $this->assertMatchesRegularExpression('/^base64:[A-Za-z0-9+\/]+={0,2}$/', $appKey);
+        $this->assertSame(32, strlen((string) base64_decode(substr($appKey, 7), true)));
     }
 
     public function test_write_traefik_route_creates_file_and_returns_url_with_port(): void
