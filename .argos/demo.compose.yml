@@ -25,6 +25,14 @@ services:
       APP_ENV: local
       APP_DEBUG: "true"
       LOG_CHANNEL: stderr
+      # Distinct session cookie name. This demo IS an Argos instance, so without
+      # this it would reuse `argos_session` — the same name the parent Argos sets
+      # with a leading-dot `.{domain}` cookie that spans this demo subdomain. The
+      # browser would then send the parent's cookie here, which we can't decrypt
+      # (different APP_KEY), resetting the session every request → login breaks.
+      # A static name is safe: each demo lives on its own subdomain, so their
+      # cookies don't overlap each other, only the (now differently-named) parent.
+      SESSION_COOKIE: argos_demo_session
       DB_CONNECTION: mysql
       DB_HOST: db
       DB_PORT: "3306"

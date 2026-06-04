@@ -52,6 +52,39 @@ class ConfigDerivationTest extends TestCase
         $this->assertNull($cfg['domain']);
     }
 
+    public function test_session_cookie_name_is_env_overridable_for_demos(): void
+    {
+        // Argos-deployed-as-its-own-demo sets a distinct SESSION_COOKIE
+        // (.argos/demo.compose.yml) so the parent's domain-spanning
+        // `argos_session` cookie can't shadow it. Default stays unchanged.
+        $this->assertSame('argos_session', $this->freshConfig('http://localhost', 'session')['cookie']);
+
+        Env::getRepository()->set('SESSION_COOKIE', 'argos_demo_session');
+        try {
+            $cfg = require dirname(__DIR__, 2).'/config/session.php';
+        } finally {
+            Env::getRepository()->clear('SESSION_COOKIE');
+        }
+
+        $this->assertSame('argos_demo_session', $cfg['cookie']);
+    }
+
+    public function test_concurrent_demos_get_non_overlapping_cookie_domains(): void
+    {
+        // Each demo runs under its own subdomain, so its cookie domain is scoped
+        // to that subdomain. Two demos are SIBLINGS — neither domain is a parent
+        // of the other — so a shared static SESSION_COOKIE name never collides
+        // across demos (only the differently-named parent cookie spans them).
+        $a = $this->freshConfig('https://demo-task-a.argos.example.com', 'session')['domain'];
+        $b = $this->freshConfig('https://demo-task-b.argos.example.com', 'session')['domain'];
+
+        $this->assertSame('.demo-task-a.argos.example.com', $a);
+        $this->assertSame('.demo-task-b.argos.example.com', $b);
+        // Sibling check: neither is a suffix-domain of the other.
+        $this->assertStringNotContainsString($a, $b);
+        $this->assertStringNotContainsString($b, $a);
+    }
+
     public function test_preview_base_domain_and_scheme_derive_from_app_url(): void
     {
         $cfg = $this->freshConfig('https://argos.example.com', 'argos');

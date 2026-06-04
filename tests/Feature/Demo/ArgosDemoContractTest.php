@@ -52,4 +52,15 @@ class ArgosDemoContractTest extends TestCase
         $this->assertArrayHasKey('app', $compose['services']);
         $this->assertSame('__ARGOS_DEMO_IMAGE__', $compose['services']['app']['image']);
     }
+
+    public function test_compose_sets_distinct_session_cookie(): void
+    {
+        $compose = Yaml::parseFile(base_path('.argos/demo.compose.yml'));
+        $cookie = $compose['services']['app']['environment']['SESSION_COOKIE'] ?? null;
+
+        // The demo is itself an Argos instance; reusing the parent's
+        // `argos_session` cookie name breaks login on a shared parent domain.
+        $this->assertNotNull($cookie);
+        $this->assertNotSame('argos_session', $cookie);
+    }
 }
