@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Enums\Phase;
 use App\Enums\WorkflowStatus;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTask;
 use App\Jobs\RunPhaseJob;
@@ -97,6 +98,6 @@ final class TaskDockAndOrderTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
 
-        app(TaskService::class)->startPhase($task, \App\Enums\Phase::Concept);
+        app(TaskService::class)->startPhase($task, Phase::Concept);
     }
 }
