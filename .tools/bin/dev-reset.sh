@@ -1,8 +1,14 @@
 #!/usr/bin/env bash
-# .tools/bin/dev-reset.sh — kompletter Reset der lokalen Dev-Umgebung.
+# .tools/bin/dev-reset.sh [basic|full|live] — kompletter Reset der lokalen
+# Dev-Umgebung mit Wahl des Demo-Profils (Default: full).
+#
+# Profile:
+#   basic — nur Admin-User; Onboarding startet bei null (BasicDemoSeeder)
+#   full  — jede Ansicht mit allen Varianten gefüllt (FullDemoSeeder)
+#   live  — echtes OAuth aus .env, ein echter Task startklar (LiveReadySeeder)
 #
 # Pipeline:
-#   1. migrate:fresh + DemoSeeder + ProviderDemoSeeder im app-Container
+#   1. migrate:fresh + <Profil>-Seeder im app-Container
 #   2. Task-Workspace-Volumes (task_ws_*) entfernen
 #   3. Worker-Images (argos-worker:*, argos-stack:*) entfernen
 #   4. Laravel-Cache leeren + queue-Worker neustarten
@@ -15,6 +21,17 @@
 set -euo pipefail
 IFS=$'\n\t'
 
+MODE="${1:-full}"
+case "$MODE" in
+    basic) SEEDER="BasicDemoSeeder" ;;
+    full)  SEEDER="FullDemoSeeder" ;;
+    live)  SEEDER="LiveReadySeeder" ;;
+    *)
+        echo "usage: $(basename "$0") [basic|full|live]" >&2
+        exit 64
+        ;;
+esac
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 # Canonical base + local dev overlay (build, bind mounts, phpMyAdmin).
@@ -25,16 +42,23 @@ compose() {
     docker compose -f "$COMPOSE_BASE" -f "$COMPOSE_DEV" "$@"
 }
 
-echo "==> migrate:fresh + DemoSeeder"
-compose exec -T app php artisan migrate:fresh --force --seed --seeder=DemoSeeder
-
-echo "==> ProviderDemoSeeder (demo task-provider bindings)"
-compose exec -T app php artisan db:seed --force --class=ProviderDemoSeeder
+echo "==> migrate:fresh + ${SEEDER} (${MODE} profile)"
+compose exec -T app php artisan migrate:fresh --force --seed --seeder="$SEEDER"
 
 echo "==> rm task_ws_* volumes"
 mapfile -t volumes < <(docker volume ls --filter 'name=task_ws_' --format '{{.Name}}')
 if [[ ${#volumes[@]} -gt 0 ]]; then
-    docker volume rm "${volumes[@]}"
+    for vol in "${volumes[@]}"; do
+        # A leftover worker/live-demo container (e.g. argos-demo:* from a live
+        # preview) may still mount the workspace volume and block its removal.
+        # Force-remove any such container first, then drop the volume. Cleanup
+        # is best-effort: a single failure must not abort the whole reset.
+        mapfile -t holders < <(docker ps -aq --filter "volume=${vol}")
+        if [[ ${#holders[@]} -gt 0 ]]; then
+            docker rm -f "${holders[@]}" >/dev/null || true
+        fi
+        docker volume rm "$vol" >/dev/null || echo "    (konnte ${vol} nicht entfernen — übersprungen)"
+    done
 else
     echo "    (keine vorhanden)"
 fi

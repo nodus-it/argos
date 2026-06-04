@@ -41,7 +41,7 @@ return [
      * Local one-click developer login (filament-developer-logins). Only ever
      * active in the `local` environment — the AdminPanelProvider gates the
      * plugin on app()->environment('local'), so this email is meaningless in
-     * staging/production. Matches the DemoSeeder admin so the button works
+     * staging/production. Matches the demo seeders' admin so the button works
      * out of the box after a dev reset.
      */
     'dev_login_email' => env('SEED_USER_EMAIL', 'admin@argos.local'),
@@ -52,7 +52,7 @@ return [
      */
     'poll_interval_minutes' => max(1, min(59, (int) env('ARGOS_POLL_INTERVAL_MINUTES', 5))),
     /*
-     * Demo task-provider bindings seeded by ProviderDemoSeeder for local
+     * Demo task-provider bindings seeded by ProviderMatrixBuilder (FullDemoSeeder) for local
      * end-to-end testing of the issue integration. These env vars only
      * OVERRIDE the committed defaults in tests/External/providers.defaults.php
      * (GitHub/GitLab/Bitbucket repos + the Linear team), read dev-only by the

@@ -15,7 +15,7 @@ declare(strict_types=1);
  * want to run the suite against their own sandbox repos.
  *
  * The `linear` entry is not a git repo and not used by the contract suite; it
- * carries the demo Linear team key for ProviderDemoSeeder (overridable via
+ * carries the demo Linear team key for ProviderMatrixBuilder (overridable via
  * SEED_LINEAR_TEAM). GitLab's demo repo lives on gitlab.com (the entry below),
  * since we don't run a second self-hosted GitLab for tests.
  */

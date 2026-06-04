@@ -138,8 +138,8 @@ notice a missing row during a patch, add it.
 
 | When you change… | …also check |
 | --- | --- |
-| New enum case | DB migration (`enum()` values) — `EnumPersistenceTest` catches drift, but you must write the migration yourself; `lang/{de,en}/enums.php`; `color()` / `label()` / other `match` paths on the enum; Filament filter options / `SelectFilter::options()` |
-| New DB column | Model `$fillable` / `$casts`; **factory** (otherwise `factory()->create()` silently breaks on NOT-NULL); Filament form field + table column if relevant; JSON schema in `worker/schemas/` if the worker reads/writes the field |
+| New enum case | DB migration (`enum()` values) — `EnumPersistenceTest` catches drift, but you must write the migration yourself; `lang/{de,en}/enums.php`; `color()` / `label()` / other `match` paths on the enum; Filament filter options / `SelectFilter::options()`; if a demo profile should showcase the case, add it to the relevant `database/seeders/Support/*Builder` and assert it in `tests/Feature/Seeders/` |
+| New DB column | Model `$fillable` / `$casts`; **factory** (otherwise `factory()->create()` silently breaks on NOT-NULL); Filament form field + table column if relevant; JSON schema in `worker/schemas/` if the worker reads/writes the field; if a demo seeder writes the model via raw `create()`/`updateOrCreate()`, set the new NOT-NULL column there too — the `tests/Feature/Seeders/*` tests run the seeders against MariaDB in CI and fail on the missing value |
 | New Filament page (Resource or Page) | `RedirectToOnboarding` whitelist if reachable pre-onboarding; `getNavigationGroup` / Heroicon; **wiring test via the embedding page** (`Livewire::test(ViewFooPage::class, [...])->assertSeeLivewire(FooRelationManager::class)`) — isolated RelationManager test alone is not enough; locale strings `de` + `en` |
 | New phase helper | `worker/lib/<module>.sh` with docstring; `bats` test in `worker/tests/bats/`; `shellcheck`-clean; sourced by `worker-entrypoint.sh`; which phase script calls the helper |
 | UI hint claiming a behavior | The backend implements it **for every relevant path** — every agent, every provider, every status. Helper text that's only true for the default path is a lie. |
@@ -286,11 +286,14 @@ php artisan test
 php artisan serve
 
 # Full dev reset (DB + task_ws_* volumes + argos-worker/stack images +
-# optimize:clear + queue restart). Seeds DemoSeeder with 1 admin, 1
-# RepoProfile (against nodus-it/argos), and 1 Draft task. Credentials are
-# only created if SEED_CLAUDE_OAUTH_TOKEN / SEED_CODEX_AUTH_JSON_B64 are set
-# in the environment (see .env.example).
-bash .tools/bin/dev-reset.sh
+# optimize:clear + queue restart) with a chosen demo profile (default full):
+#   composer dev:basic — admin user only; onboarding starts from scratch
+#   composer dev:full  — every view filled with all variants (FullDemoSeeder)
+#   composer dev:live  — real OAuth from .env, one real task startklar (local only)
+# Live-Ready reads SEED_GITHUB_OAUTH_TOKEN / SEED_REPO_URL / SEED_CLAUDE_OAUTH_TOKEN
+# (+ optional SEED_GITHUB_USER / SEED_GITHUB_REFRESH_TOKEN / SEED_REPO_BRANCH) from
+# the root .env. The composer scripts wrap `.tools/bin/dev-reset.sh [basic|full|live]`.
+composer dev:full
 
 # Fast reload after manager PHP changes (optimize:clear + queue restart,
 # without DB/volume/image cleanup). Addresses OPCache + queue worker
@@ -299,7 +302,7 @@ bash .tools/bin/dev-reload.sh
 
 # Browser-E2E (Playwright) — local self-check that the UI still loads.
 # One-time prereq: `npm install` + `npx playwright install chromium`.
-# Data prereq: DemoSeeder has run (e.g. via dev-reset.sh).
+# Data prereq: a demo profile has been seeded (e.g. `composer dev:full`).
 # Playwright boots `php artisan serve` itself — no running stack needed.
 composer test:browser
 ```

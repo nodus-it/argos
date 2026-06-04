@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Database\Seeders;
+namespace Database\Seeders\Support;
 
 use App\Enums\AuthMethod;
 use App\Enums\GitProvider;
@@ -13,8 +13,7 @@ use App\Models\ConnectedAccount;
 use App\Models\RepoProfile;
 use App\Models\TaskProviderBinding;
 use App\Models\User;
-use Illuminate\Database\Seeder;
-use Illuminate\Support\Env;
+use Illuminate\Console\Command;
 
 /**
  * Seeds a complete demo matrix for the provider integrations so everything is
@@ -36,26 +35,22 @@ use Illuminate\Support\Env;
  * and otherwise stays account-less — still usable via `argos:webhook:simulate`
  * (webhook + ingestion + label matching); only real poll / write-back need the
  * account connected first.
- *
- * Not registered in DatabaseSeeder — run explicitly:
- *   php artisan db:seed --class=ProviderDemoSeeder
- * (also invoked at the end of .tools/bin/dev-reset.sh).
  */
-final class ProviderDemoSeeder extends Seeder
+final class ProviderMatrixBuilder
 {
     private const MODES = [TaskProviderMode::Webhook, TaskProviderMode::Poll];
 
-    public function run(): void
+    public function __construct(private readonly ?Command $command = null) {}
+
+    /**
+     * Build the full provider matrix for the given user. Returns the seeded git
+     * profiles keyed by provider key (github/gitlab/bitbucket) so callers can
+     * hang further demo data (e.g. external issue links) off a real binding.
+     *
+     * @return array{github: ?RepoProfile, gitlab: ?RepoProfile, bitbucket: ?RepoProfile}
+     */
+    public function build(User $user): array
     {
-        $user = User::where('email', (string) Env::get('SEED_USER_EMAIL', 'admin@argos.local'))->first()
-            ?? User::orderBy('id')->first();
-
-        if ($user === null) {
-            $this->command?->warn('ProviderDemoSeeder: no user found — run DemoSeeder first. Skipped.');
-
-            return;
-        }
-
         $label = (string) config('argos.provider_demo.label', 'argos-demo');
         $defaults = $this->loadDefaults();
 
@@ -79,6 +74,12 @@ final class ProviderDemoSeeder extends Seeder
         // …and Linear (no git repo of its own) on the Bitbucket profile, so
         // every task provider is covered.
         $this->seedLinear($user, $label, $bitbucketProfile, $defaults);
+
+        return [
+            'github' => $githubProfile,
+            'gitlab' => $gitlabProfile,
+            'bitbucket' => $bitbucketProfile,
+        ];
     }
 
     /**
@@ -90,7 +91,7 @@ final class ProviderDemoSeeder extends Seeder
         $instance = $this->instanceFor($key, $defaults);
         $url = rtrim($instance, '/')."/{$ref}.git";
 
-        $profile = RepoProfile::updateOrCreate(
+        return RepoProfile::updateOrCreate(
             ['name' => "provider-demo ({$key})"],
             [
                 'url' => $url,
@@ -102,8 +103,6 @@ final class ProviderDemoSeeder extends Seeder
                 'auto_pr' => false,
             ],
         );
-
-        return $profile;
     }
 
     /**
@@ -117,13 +116,13 @@ final class ProviderDemoSeeder extends Seeder
             : ($defaults['linear']['team'] ?? null);
 
         if (! is_string($team) || $team === '') {
-            $this->command?->info('ProviderDemoSeeder: no Linear team (SEED_LINEAR_TEAM / providers.defaults.php) — Linear demo skipped.');
+            $this->command?->info('ProviderMatrixBuilder: no Linear team (SEED_LINEAR_TEAM / providers.defaults.php) — Linear demo skipped.');
 
             return;
         }
 
         if ($bitbucketProfile === null) {
-            $this->command?->warn('ProviderDemoSeeder: no Bitbucket profile to host the Linear binding — Linear skipped.');
+            $this->command?->warn('ProviderMatrixBuilder: no Bitbucket profile to host the Linear binding — Linear skipped.');
 
             return;
         }
@@ -228,7 +227,7 @@ final class ProviderDemoSeeder extends Seeder
 
     /**
      * Load the committed provider coordinates (dev-only file). Returns [] when
-     * the file is absent (e.g. tests excluded from a deploy) so the seeder then
+     * the file is absent (e.g. tests excluded from a deploy) so the builder then
      * relies purely on the SEED_*_REF env overrides.
      *
      * @return array<string, array<string, mixed>>

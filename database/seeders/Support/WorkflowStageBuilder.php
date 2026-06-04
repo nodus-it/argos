@@ -2,10 +2,8 @@
 
 declare(strict_types=1);
 
-namespace Database\Seeders;
+namespace Database\Seeders\Support;
 
-use App\Enums\AuthMethod;
-use App\Enums\GitProvider;
 use App\Enums\Phase;
 use App\Enums\PhaseStatus;
 use App\Enums\WorkflowStatus;
@@ -14,71 +12,51 @@ use App\Models\RepoProfile;
 use App\Models\Task;
 use App\Models\User;
 use App\Support\Workflow\TaskStage;
-use Illuminate\Database\Seeder;
-use Illuminate\Support\Env;
 
 /**
- * Creates one faked task per TaskStage so every status-banner state, phase
+ * Builds one faked task per TaskStage so every status-banner state, phase
  * stepper, dock variant and list/dashboard rendering can be eyeballed against
  * the running stack — without driving a real worker through the whole flow.
  *
- * Explicit-only (not registered in DatabaseSeeder); run it against the dev
- * stack with:
- *
- *   docker compose -f .tools/docker/docker-compose.yml \
- *     -f .tools/docker/docker-compose.dev.yml exec app \
- *     php artisan db:seed --class=WorkflowStageShowcaseSeeder
- *
- * Re-running is idempotent: it wipes every task whose name starts with the
- * showcase prefix and rebuilds the full set. These tasks have no real workspace
- * volume, so the live log / diff panels stay empty — that is expected; the
- * banner, stepper and timer are what this seeder exercises.
+ * These tasks have no real workspace volume, so the live log / diff panels stay
+ * empty — that is expected; the banner, stepper and timer are what this builder
+ * exercises. Re-running is idempotent: buildAll() wipes every task whose name
+ * starts with the prefix and rebuilds the full set.
  */
-final class WorkflowStageShowcaseSeeder extends Seeder
+final class WorkflowStageBuilder
 {
-    private const NAME_PREFIX = 'Showcase';
+    public function __construct(private readonly string $namePrefix = 'Showcase') {}
 
-    public function run(): void
+    /**
+     * Wipe the previous showcase set (cascades phase_runs) and rebuild one task
+     * per TaskStage.
+     *
+     * @return list<Task>
+     */
+    public function buildAll(User $user, RepoProfile $repo): array
     {
-        $user = User::firstOrCreate(
-            ['email' => (string) Env::get('SEED_USER_EMAIL', 'admin@argos.local')],
-            ['name' => 'Argos Admin', 'password' => bcrypt((string) config('argos.admin_password'))],
-        );
-
-        $repo = RepoProfile::firstOrCreate(
-            ['url' => 'https://github.com/nodus-it/argos-showcase.git'],
-            [
-                'name' => 'showcase',
-                'platform' => GitProvider::GitHub->value,
-                'auth_method' => AuthMethod::OAuth->value,
-                'default_branch' => 'main',
-                'auto_concept' => false,
-                'auto_pr' => false,
-            ],
-        );
-
-        // Idempotent: drop the previous showcase set (cascades phase_runs).
         Task::where('user_id', $user->id)
-            ->where('name', 'like', self::NAME_PREFIX.'%')
+            ->where('name', 'like', $this->namePrefix.'%')
             ->get()
             ->each(fn (Task $task) => $task->delete());
 
+        $tasks = [];
         foreach (TaskStage::cases() as $i => $stage) {
-            $this->seedStage($user, $repo, $stage, $i);
+            $tasks[] = $this->buildStage($user, $repo, $stage, $i);
         }
 
-        $this->command?->info('Seeded '.count(TaskStage::cases()).' showcase tasks (one per workflow stage).');
+        return $tasks;
     }
 
-    private function seedStage(User $user, RepoProfile $repo, TaskStage $stage, int $index): void
+    public function buildStage(User $user, RepoProfile $repo, TaskStage $stage, int $index): Task
     {
         [$ws, $cs, $phase] = $this->persistedTriple($stage);
 
         $task = Task::create([
             'user_id' => $user->id,
-            'name' => sprintf('%s %02d — %s', self::NAME_PREFIX, $index + 1, $stage->label()),
+            'name' => sprintf('%s %02d — %s', $this->namePrefix, $index + 1, $stage->label()),
             'repo_profile_id' => $repo->id,
-            'description' => 'Faked task pinned to the '.$stage->value.' stage by WorkflowStageShowcaseSeeder.',
+            'description' => 'Faked task pinned to the '.$stage->value.' stage by WorkflowStageBuilder.',
             'base_branch' => $repo->default_branch,
             'workflow_status' => $ws->value,
             'current_phase' => $phase?->value,
@@ -97,6 +75,8 @@ final class WorkflowStageShowcaseSeeder extends Seeder
         ]);
 
         $this->seedRuns($task, $stage);
+
+        return $task;
     }
 
     /**

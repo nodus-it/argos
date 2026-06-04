@@ -61,6 +61,10 @@
         "dev:logs": "docker compose --env-file .env -f .tools/docker/docker-compose.yml -f .tools/docker/docker-compose.dev.yml logs -f",
         "dev:exec": "docker compose --env-file .env -f .tools/docker/docker-compose.yml -f .tools/docker/docker-compose.dev.yml exec app bash",
 
+        "dev:basic": "bash .tools/bin/dev-reset.sh basic",
+        "dev:full": "bash .tools/bin/dev-reset.sh full",
+        "dev:live": "bash .tools/bin/dev-reset.sh live",
+
         "pint": "vendor/bin/pint --format agent",
         "pint:test": "vendor/bin/pint --test --format agent",
         "phpstan": "vendor/bin/phpstan analyse --no-progress --memory-limit=1G",
