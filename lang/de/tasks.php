@@ -3,8 +3,7 @@
 declare(strict_types=1);
 
 return [
-    'navigation_group' => 'Aufgaben',
-    'navigation_label' => 'Tasks',
+    'navigation_label' => 'Aufgaben',
     'search_placeholder' => 'Tasks suchen…',
 
     'fields' => [

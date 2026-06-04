@@ -127,7 +127,7 @@ class ConnectedAccountsPageTest extends TestCase
         config(['services.gitlab.client_id' => null]);
 
         Livewire::test(ConnectedAccounts::class)
-            ->assertSee('GITLAB_CLIENT_ID');
+            ->assertSee(__('accounts.blade.gitlab_not_configured_description'));
     }
 
     public function test_gitlab_section_shows_not_connected_when_configured_but_not_linked(): void
@@ -187,7 +187,7 @@ class ConnectedAccountsPageTest extends TestCase
         config(['services.bitbucket.client_id' => null]);
 
         Livewire::test(ConnectedAccounts::class)
-            ->assertSee('BITBUCKET_CLIENT_ID');
+            ->assertSee(__('accounts.blade.bitbucket_not_configured_description'));
     }
 
     public function test_bitbucket_section_shows_not_connected_when_configured_but_not_linked(): void

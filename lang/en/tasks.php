@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 return [
-    'navigation_group' => 'Tasks',
     'navigation_label' => 'Tasks',
     'search_placeholder' => 'Search tasks…',
 

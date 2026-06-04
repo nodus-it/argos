@@ -66,7 +66,6 @@ class AdminPanelProvider extends PanelProvider
                 CurrentTasksWidget::class,
             ])
             ->navigationGroups([
-                __('navigation.groups.tasks'),
                 __('navigation.groups.worker'),
                 __('navigation.groups.configuration'),
             ])
