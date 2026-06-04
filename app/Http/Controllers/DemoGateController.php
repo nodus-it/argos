@@ -40,6 +40,12 @@ class DemoGateController extends Controller
             $request->session()->put('url.intended', $proto.'://'.$host.$uri);
         }
 
-        return redirect()->to(route('filament.admin.auth.login'));
+        // The request reaches us via Traefik forwardAuth carrying the demo's
+        // X-Forwarded-Host, so route() would build the login URL on the demo
+        // subdomain. Pin it to APP_URL so the redirect lands on the Argos host.
+        $loginUrl = rtrim((string) config('app.url'), '/')
+            .route('filament.admin.auth.login', [], false);
+
+        return redirect()->to($loginUrl);
     }
 }

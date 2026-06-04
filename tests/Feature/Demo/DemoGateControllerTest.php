@@ -16,6 +16,7 @@ class DemoGateControllerTest extends TestCase
     {
         parent::setUp();
         config()->set('argos.preview.base_domain', 'preview.argos.test');
+        config()->set('app.url', 'https://argos.example.test');
     }
 
     public function test_authenticated_request_passes_with_204(): void
@@ -33,7 +34,8 @@ class DemoGateControllerTest extends TestCase
             'X-Forwarded-Uri' => '/dashboard',
         ]);
 
-        $response->assertRedirectContains('/admin/login');
+        // Login URL must be pinned to APP_URL, not the forwarded demo host.
+        $response->assertRedirect('https://argos.example.test/admin/login');
         $this->assertSame('https://demo-x.preview.argos.test/dashboard', session('url.intended'));
     }
 
@@ -45,7 +47,7 @@ class DemoGateControllerTest extends TestCase
             'X-Forwarded-Uri' => '/steal',
         ]);
 
-        $response->assertRedirectContains('/admin/login');
+        $response->assertRedirect('https://argos.example.test/admin/login');
         $this->assertNull(session('url.intended'));
     }
 }
