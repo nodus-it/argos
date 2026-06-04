@@ -1,11 +1,24 @@
 @props([
     'phase' => 'draft',  // phase icon for the timeline node, or 'you' for a user entry
-    'done' => false,     // green-filled node
+    'done' => false,     // green-filled node (shorthand for state="done")
+    'state' => null,     // done | running | failed | paused | queued — drives node colour
     'title' => '',
     'who' => null,       // "Du" / "Claude Code" pill
     'cost' => null,      // green mono cost
     'time' => null,      // mono timestamp
 ])
+@php
+    // Normalise the node state: explicit `state` wins, else fall back to the
+    // `done` shorthand. Maps to the st-* feed-node classes.
+    $nodeState = $state ?? ($done ? 'done' : null);
+    $nodeClass = match ($nodeState) {
+        'done' => 'st-done',
+        'running' => 'st-run',
+        'failed' => 'st-fail',
+        'paused', 'queued' => 'st-wait',
+        default => null,
+    };
+@endphp
 {{--
     One thread entry: a timeline node (left) + a card (right). The action
     buttons go in the `actions` slot (their own row); any expanded
@@ -26,7 +39,7 @@
     @if ($phase === 'you')
         <div class="feed-node st-you"><x-argos.avatar>Du</x-argos.avatar></div>
     @else
-        <div @class(['feed-node', 'st-done' => $done])>
+        <div @class(['feed-node', $nodeClass => $nodeClass !== null])>
             @svg($phaseIcons[$phase] ?? $phaseIcons['draft'])
         </div>
     @endif

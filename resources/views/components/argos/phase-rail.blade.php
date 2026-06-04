@@ -32,7 +32,7 @@
                     @default @svg($phaseIcons[$phase] ?? $phaseIcons['draft'])
                 @endswitch
             </div>
-            <div class="rail-lbl">{{ $node['label'] ?? ucfirst($phase) }}</div>
+            <div class="rail-lbl">{{ $node['label'] ?? __('tasks.rail.'.$phase) }}</div>
         </div>
     @endforeach
 
