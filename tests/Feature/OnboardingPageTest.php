@@ -46,19 +46,6 @@ class OnboardingPageTest extends TestCase
             ->assertSee('claude setup-token');
     }
 
-    public function test_onboarding_marks_token_done_when_env_set(): void
-    {
-        config(['argos.claude_token' => 'sk-ant-test']);
-
-        // With an env token the agent step is already satisfied, so the wizard
-        // resumes on step 2; step back to see the Claude env hint.
-        Livewire::test(Onboarding::class)
-            ->assertSet('tokenSource', 'env')
-            ->assertSet('currentStep', 2)
-            ->call('goToStep', 1)
-            ->assertSee('CLAUDE_CODE_OAUTH_TOKEN');
-    }
-
     public function test_save_claude_token_persists_and_updates_state(): void
     {
         Http::fake(['api.anthropic.com/*' => Http::response(['data' => []], 200)]);

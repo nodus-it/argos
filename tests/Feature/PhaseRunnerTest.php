@@ -35,15 +35,14 @@ class PhaseRunnerTest extends TestCase
         parent::setUp();
         $this->tmpDir = sys_get_temp_dir().'/argos_runner_'.uniqid();
         mkdir($this->tmpDir, 0755, true);
-        config([
-            'argos.config_dir' => $this->tmpDir,
-            'argos.claude_token' => 'test-claude-token',
-        ]);
+        config(['argos.config_dir' => $this->tmpDir]);
 
         // The backfill migration may have seeded a credential from the developer's
         // real ~/.config/argos/claude_token. Remove it so every test starts with a
-        // predictable credential state and the legacy config fallback is exercised.
+        // predictable credential state and the legacy on-disk token fallback is
+        // exercised (the authoritative path is a DB AgentCredential, tested below).
         AgentCredential::query()->delete();
+        file_put_contents($this->tmpDir.'/claude_token', 'test-claude-token');
 
         // PhaseRunner asks the resolver for the worker image tag — bypass the
         // compose pipeline (no docker build, no stack seeding) by binding a

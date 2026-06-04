@@ -35,43 +35,36 @@
 
 name: argos
 
-# OAuth client credentials are read by both the app (Connect flow) and the
-# queue worker (TokenRefresher during phase runs). Defined once, merged into
-# both services' environment via the YAML anchor below.
-x-oauth-env: &oauth-env
-  GITHUB_CLIENT_ID:        "${GITHUB_CLIENT_ID:-}"
-  GITHUB_CLIENT_SECRET:    "${GITHUB_CLIENT_SECRET:-}"
-  GITLAB_CLIENT_ID:        "${GITLAB_CLIENT_ID:-}"
-  GITLAB_CLIENT_SECRET:    "${GITLAB_CLIENT_SECRET:-}"
-  GITLAB_INSTANCE_URL:     "${GITLAB_INSTANCE_URL:-}"
-  BITBUCKET_CLIENT_ID:     "${BITBUCKET_CLIENT_ID:-}"
-  BITBUCKET_CLIENT_SECRET: "${BITBUCKET_CLIENT_SECRET:-}"
+# OAuth client credentials are managed entirely in the UI (Configuration →
+# OAuth Apps) and stored in the database; OAuthConfigHydrator mirrors them into
+# config at boot in every context (app + queue + scheduler). No ENV path.
 
 # Live-Demo (P6) preview settings — shared verbatim by app + queue (the queue
 # worker runs DeployDemoJob, the app warms the runtime image). Listed via an
-# anchor so the two stay in lockstep. All gated behind ARGOS_PREVIEW_ENABLED
-# (default off); see config/argos.php.
+# anchor so the two stay in lockstep.
+#
+# Only ARGOS_PREVIEW_ENABLED is a real operator switch; everything else is
+# forwarded empty so the defaults in config/argos.php apply. In particular the
+# base domain + scheme derive from APP_URL there — set them only for a demo
+# domain that differs from the app domain. Session-protected demos rely on the
+# APP_URL-derived cookie domain (config/session.php), so the login cookie spans
+# the demo subdomains automatically.
 x-preview-env: &preview-env
   ARGOS_PREVIEW_ENABLED:        "${ARGOS_PREVIEW_ENABLED:-false}"
-  ARGOS_PREVIEW_BASE_DOMAIN:    "${ARGOS_PREVIEW_BASE_DOMAIN:-127.0.0.1.nip.io}"
-  ARGOS_PREVIEW_SCHEME:         "${ARGOS_PREVIEW_SCHEME:-http}"
   ARGOS_PORT:                   "${ARGOS_PORT:-8080}"
-  # Public port the demo URL is reached on (omitted from the URL for 80/443).
-  # Defaults to ARGOS_PORT; set to 443 behind an upstream TLS proxy.
-  ARGOS_PREVIEW_PORT:           "${ARGOS_PREVIEW_PORT:-${ARGOS_PORT:-8080}}"
-  ARGOS_PREVIEW_TTL_HOURS:      "${ARGOS_PREVIEW_TTL_HOURS:-24}"
-  ARGOS_PREVIEW_NETWORK:        "${ARGOS_PREVIEW_NETWORK:-argos_edge}"
-  ARGOS_PREVIEW_MAX_CONCURRENT: "${ARGOS_PREVIEW_MAX_CONCURRENT:-10}"
-  ARGOS_PREVIEW_CPU_LIMIT:      "${ARGOS_PREVIEW_CPU_LIMIT:-1.0}"
-  ARGOS_PREVIEW_MEM_LIMIT:      "${ARGOS_PREVIEW_MEM_LIMIT:-1g}"
-  ARGOS_PREVIEW_DEFAULT_IMAGE:  "${ARGOS_PREVIEW_DEFAULT_IMAGE:-argos-demo}"
-  # Demo access protection (none | session | basic). Per-task overrides win.
-  # `session` requires SESSION_DOMAIN (set on the app service) so the login
-  # cookie is shared with the demo subdomains.
-  ARGOS_PREVIEW_AUTH:           "${ARGOS_PREVIEW_AUTH:-none}"
-  ARGOS_PREVIEW_BASIC_USER:     "${ARGOS_PREVIEW_BASIC_USER:-demo}"
+  ARGOS_PREVIEW_BASE_DOMAIN:    "${ARGOS_PREVIEW_BASE_DOMAIN:-}"
+  ARGOS_PREVIEW_SCHEME:         "${ARGOS_PREVIEW_SCHEME:-}"
+  ARGOS_PREVIEW_PORT:           "${ARGOS_PREVIEW_PORT:-}"
+  ARGOS_PREVIEW_TTL_HOURS:      "${ARGOS_PREVIEW_TTL_HOURS:-}"
+  ARGOS_PREVIEW_NETWORK:        "${ARGOS_PREVIEW_NETWORK:-}"
+  ARGOS_PREVIEW_MAX_CONCURRENT: "${ARGOS_PREVIEW_MAX_CONCURRENT:-}"
+  ARGOS_PREVIEW_CPU_LIMIT:      "${ARGOS_PREVIEW_CPU_LIMIT:-}"
+  ARGOS_PREVIEW_MEM_LIMIT:      "${ARGOS_PREVIEW_MEM_LIMIT:-}"
+  ARGOS_PREVIEW_DEFAULT_IMAGE:  "${ARGOS_PREVIEW_DEFAULT_IMAGE:-}"
+  ARGOS_PREVIEW_AUTH:           "${ARGOS_PREVIEW_AUTH:-}"
+  ARGOS_PREVIEW_BASIC_USER:     "${ARGOS_PREVIEW_BASIC_USER:-}"
   ARGOS_PREVIEW_BASIC_PASSWORD: "${ARGOS_PREVIEW_BASIC_PASSWORD:-}"
-  ARGOS_PREVIEW_AUTH_GATE_URL:  "${ARGOS_PREVIEW_AUTH_GATE_URL:-http://nginx:80/_argos/demo-gate}"
+  ARGOS_PREVIEW_AUTH_GATE_URL:  "${ARGOS_PREVIEW_AUTH_GATE_URL:-}"
 
 services:
 
@@ -128,17 +121,13 @@ services:
       - argos-public:/srv/argos-public
       - argos-nginx-config:/srv/argos-nginx
     environment:
-      <<: [*oauth-env, *preview-env]
+      <<: *preview-env
       ARGOS_ROLE:                        "app"
       APP_ENV:                           "${APP_ENV:-production}"
       APP_DEBUG:                         "${APP_DEBUG:-false}"
       APP_URL:                           "${APP_URL:-http://localhost:${ARGOS_PORT:-8080}}"
       APP_KEY:                           "${APP_KEY:-}"
       ADMIN_PASSWORD:                    "${ADMIN_PASSWORD:-}"
-      # Shared parent domain so the Argos login cookie also reaches the demo
-      # subdomains — required for session-protected demos (ARGOS_PREVIEW_AUTH=session).
-      SESSION_DOMAIN:                    "${SESSION_DOMAIN:-}"
-      CLAUDE_CODE_OAUTH_TOKEN:           "${CLAUDE_CODE_OAUTH_TOKEN:-}"
       ARGOS_CONFIG_DIR:                  /data/config
       ARGOS_TRAEFIK_DIR:                 /data/traefik
       DB_CONNECTION:                     "mariadb"
@@ -225,13 +214,12 @@ services:
       - argos-data:/data
       - argos-traefik:/data/traefik
     environment:
-      <<: [*oauth-env, *preview-env]
+      <<: *preview-env
       ARGOS_ROLE:                        "queue"
       APP_ENV:                           "${APP_ENV:-production}"
       APP_DEBUG:                         "${APP_DEBUG:-false}"
       APP_URL:                           "${APP_URL:-http://localhost:${ARGOS_PORT:-8080}}"
       APP_KEY:                           "${APP_KEY:-}"
-      CLAUDE_CODE_OAUTH_TOKEN:           "${CLAUDE_CODE_OAUTH_TOKEN:-}"
       ARGOS_CONFIG_DIR:                  /data/config
       ARGOS_TRAEFIK_DIR:                 /data/traefik
       DB_CONNECTION:                     "mariadb"
@@ -262,13 +250,11 @@ services:
     volumes:
       - argos-data:/data
     environment:
-      <<: *oauth-env
       ARGOS_ROLE:               "scheduler"
       APP_ENV:                  "${APP_ENV:-production}"
       APP_DEBUG:                "${APP_DEBUG:-false}"
       APP_URL:                  "${APP_URL:-http://localhost:${ARGOS_PORT:-8080}}"
       APP_KEY:                  "${APP_KEY:-}"
-      CLAUDE_CODE_OAUTH_TOKEN:  "${CLAUDE_CODE_OAUTH_TOKEN:-}"
       ARGOS_CONFIG_DIR:         /data/config
       DB_CONNECTION:            "mariadb"
       ARGOS_DB_HOST:            "db"

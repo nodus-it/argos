@@ -39,8 +39,7 @@ class AnthropicUsageSidebar extends Component
             return;
         }
 
-        $token = config('argos.claude_token')
-            ?? app(CredentialStore::class)->getClaudeToken();
+        $token = app(CredentialStore::class)->getClaudeToken();
 
         if (empty($token)) {
             return;

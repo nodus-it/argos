@@ -85,21 +85,17 @@
                             <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">{{ __('onboarding.agents.claude_label') }}</span>
                         </div>
 
-                        @if($tokenSource === 'env')
-                            <p class="text-sm text-gray-700 dark:text-gray-300">{!! __('onboarding.token.from_env') !!}</p>
-                        @else
-                            <p class="text-xs text-gray-500 dark:text-gray-400">{!! __('onboarding.agents.claude_hint') !!}</p>
-                            @if($tokenSource === 'agent_credential')
-                                <p class="text-xs text-emerald-600 dark:text-emerald-400">{{ __('onboarding.token.is_saved_short') }}</p>
-                            @endif
-                            <div class="flex gap-2">
-                                <input wire:model="claudeToken" type="password" placeholder="{{ __('onboarding.token.placeholder') }}" autocomplete="off"
-                                    class="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" />
-                                <x-filament::button wire:click="saveClaudeToken" type="button">
-                                    {{ __('onboarding.token.save_button') }}
-                                </x-filament::button>
-                            </div>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">{!! __('onboarding.agents.claude_hint') !!}</p>
+                        @if($tokenSource === 'agent_credential')
+                            <p class="text-xs text-emerald-600 dark:text-emerald-400">{{ __('onboarding.token.is_saved_short') }}</p>
                         @endif
+                        <div class="flex gap-2">
+                            <input wire:model="claudeToken" type="password" placeholder="{{ __('onboarding.token.placeholder') }}" autocomplete="off"
+                                class="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                            <x-filament::button wire:click="saveClaudeToken" type="button">
+                                {{ __('onboarding.token.save_button') }}
+                            </x-filament::button>
+                        </div>
                     </div>
 
                     {{-- Codex --}}

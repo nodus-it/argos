@@ -11,6 +11,18 @@ declare(strict_types=1);
  */
 $argosVersion = '0.1.0-beta.4';
 
+// APP_URL is the single source of truth for host + scheme; the live-demo
+// base domain and scheme derive from it (override only for an exotic setup
+// where demos live on a different domain than the app).
+$appUrl = (string) env('APP_URL', 'http://localhost');
+$appHost = parse_url($appUrl, PHP_URL_HOST) ?: 'localhost';
+$appScheme = parse_url($appUrl, PHP_URL_SCHEME) ?: 'http';
+// Bare localhost / IPs have no usable wildcard DNS; nip.io gives zero-config
+// wildcard subdomains locally (*.127.0.0.1.nip.io → 127.0.0.1).
+$bareHost = $appHost === 'localhost'
+    || filter_var($appHost, FILTER_VALIDATE_IP) !== false
+    || ! str_contains($appHost, '.');
+
 return [
     // env() wins so CI can bake a `stage-<date>-<sha>` version into the
     // :stage image at build time; `?:` (not the 2nd arg) so an *empty*
@@ -24,10 +36,6 @@ return [
      */
     'source_url' => env('ARGOS_SOURCE_URL', 'https://github.com/nodus-it/argos'),
     'config_dir' => env('ARGOS_CONFIG_DIR', (getenv('HOME') ?: ($_SERVER['HOME'] ?? posix_getpwuid(posix_getuid())['dir'])).'/.config/argos'),
-    // Empty .env entries (CLAUDE_CODE_OAUTH_TOKEN=) come back as "" from
-    // env(), but readers treat null as "not configured" — normalise here so
-    // hasClaudeToken() / claudeTokenSource() / Settings UI all agree.
-    'claude_token' => env('CLAUDE_CODE_OAUTH_TOKEN') ?: null,
     'admin_password' => env('ADMIN_PASSWORD') ?: '12345',
     /*
      * Local one-click developer login (filament-developer-logins). Only ever
@@ -78,9 +86,10 @@ return [
     // under their own subdomain. See docs/backlog/live-demo-concept.md.
     'preview' => [
         'enabled' => (bool) env('ARGOS_PREVIEW_ENABLED', false),
-        // Demos live at demo-{task}.{base_domain}; nip.io gives zero-config
-        // wildcard subdomains locally (resolves to 127.0.0.1).
-        'base_domain' => env('ARGOS_PREVIEW_BASE_DOMAIN', '127.0.0.1.nip.io'),
+        // Demos live at demo-{task}.{base_domain}. Defaults to the APP_URL host
+        // (demos as subdomains of the app); locally that host has no wildcard
+        // DNS, so fall back to nip.io (*.127.0.0.1.nip.io → 127.0.0.1).
+        'base_domain' => env('ARGOS_PREVIEW_BASE_DOMAIN') ?: ($bareHost ? '127.0.0.1.nip.io' : $appHost),
         // Scheme + external port the demo URL is reachable on — the PUBLIC
         // endpoint, independent of the port Traefik binds on the host
         // (ARGOS_PORT). Locally they coincide (Traefik publishes 8080, demos
@@ -88,7 +97,7 @@ return [
         // on 443 and forwards to ARGOS_PORT, set scheme=https and
         // ARGOS_PREVIEW_PORT=443 so the URL drops the port. Falls back to
         // ARGOS_PORT when ARGOS_PREVIEW_PORT is unset.
-        'scheme' => env('ARGOS_PREVIEW_SCHEME', 'http'),
+        'scheme' => env('ARGOS_PREVIEW_SCHEME') ?: $appScheme,
         'port' => (int) env('ARGOS_PREVIEW_PORT', env('ARGOS_PORT', 8080)),
         'ttl_hours' => (int) env('ARGOS_PREVIEW_TTL_HOURS', 24),
         // Stack-wide default access protection for demos whose task is set to
