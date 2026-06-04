@@ -28,7 +28,7 @@ request you can review.
 ## Quick Start
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/nodus-it/argos/master/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/nodus-it/argos/master/.tools/install.sh | bash
 ```
 
 That installs Argos into the **current directory** — drops a `docker-compose.yml`,

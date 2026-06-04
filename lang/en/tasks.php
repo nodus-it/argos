@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 return [
-    'navigation_group' => 'Tasks',
     'navigation_label' => 'Tasks',
     'search_placeholder' => 'Search tasks…',
 
@@ -73,14 +72,52 @@ return [
         ],
     ],
 
+    // Presentation stages (App\Support\Workflow\TaskStage) — the single
+    // UI-facing state shown in the status banner.
+    'stage' => [
+        'draft' => 'Draft',
+        'concept_queued' => 'Concept waiting for worker',
+        'concept_running' => 'Concept running',
+        'concept_paused' => 'Concept paused (turn limit)',
+        'concept_review' => 'Review concept',
+        'concept_failed' => 'Concept failed',
+        'implement_queued' => 'Implementation waiting for worker',
+        'implement_running' => 'Implementation running',
+        'implement_paused' => 'Implementation paused (turn limit)',
+        'implement_review' => 'Review implementation',
+        'implement_failed' => 'Implementation failed',
+        'push_queued' => 'Push waiting for worker',
+        'push_running' => 'Push & PR running',
+        'push_failed' => 'Push failed',
+        'review' => 'Pull request created',
+        'done' => 'Completed',
+    ],
+
+    'rail' => [
+        'draft' => 'Draft',
+        'concept' => 'Concept',
+        'implement' => 'Implement',
+        'push' => 'Push & PR',
+        'review' => 'Review',
+    ],
+
     'view' => [
         'thread' => [
             'created' => 'Task created',
+            'you' => 'You',
+            'agent' => 'Agent',
+            'feedback_title' => 'Your feedback',
+            'respond' => 'Revision',
+            'queued_body' => 'Queued — will be picked up by the next available worker.',
             'concept' => 'Concept',
             'concept_body' => 'The agent proposed an approach.',
+            'concept_running_body' => 'The agent is working out the concept …',
             'view_concept' => 'View concept',
             'implement' => 'Implementation',
             'implement_body' => 'The agent implemented the change.',
+            'implement_running_body' => 'The agent is implementing the change …',
+            'push_body' => 'Branch pushed and pull request created.',
+            'push_running_body' => 'Pushing the branch and creating the pull request …',
             'technical' => 'Technical',
             'summary' => 'Summary',
             'diff' => 'Diff',
@@ -94,6 +131,31 @@ return [
             'chip_approve' => 'Approve & merge',
             'chip_question' => 'Ask a question',
             'chip_question_text' => 'Question: ',
+        ],
+        'dock' => [
+            'draft_hint' => 'Optionally add extra guidance, then start the concept phase.',
+            'concept_hint' => 'This is where you update the concept — not just leave feedback. Or start the implementation directly.',
+            'implement_hint' => 'This is about refining the implementation — the concept is locked.',
+            'retry_hint' => 'The phase failed. You can run it again.',
+            'concept_placeholder' => 'What should change or be added in the concept?',
+            'implement_placeholder' => 'What should be refined in the implementation?',
+            'start_concept' => 'Start concept',
+            'update_concept' => 'Update concept',
+            'start_implement' => 'Start implementation',
+            'refine_implement' => 'Refine implementation',
+            'start_push' => 'Create Push & PR',
+            'retry' => 'Try again',
+        ],
+        'banner' => [
+            'queued_hint' => 'The task is queued and will be picked up by the next available worker.',
+            'concept_review_hint' => 'Review the concept. Use the field below to update it or start the implementation.',
+            'implement_review_hint' => 'Review the implementation. Use the field below to refine it or start Push & PR.',
+            'review_hint' => 'The pull request is created. You can complete the task or restart the demo.',
+            'paused_hint' => 'The turn limit was reached. Resume the phase using the field below.',
+            'failed_hint' => 'The phase failed. See details below or in the log.',
+            'lock_blocked_hint' => 'The implementation is blocked by a lock. Use the ⋯ menu to release it manually.',
+            'failed_generic' => 'No error text available. See the log for details.',
+            'view_logs' => 'View log',
         ],
         'labels' => [
             'status' => 'Status',
@@ -131,6 +193,8 @@ return [
             'failed_hint' => 'The demo build failed.',
             'show_log' => 'Show build log',
             'empty_hint' => 'No demo yet. It is built automatically after the next successful implement run.',
+            'stopped_hint' => 'The demo was torn down after the pull request. You can restart it anytime.',
+            'restart' => 'Restart demo',
             'rebuild' => 'Rebuild demo',
             'rebuild_heading' => 'Rebuild live demo?',
             'rebuild_description' => 'A running demo for this task will be replaced. The build runs in the background.',
@@ -139,6 +203,18 @@ return [
             'stop_heading' => 'Stop live demo?',
             'stop_description' => 'The demo’s containers, volumes and route will be removed.',
             'stop_queued' => 'Demo is being stopped.',
+            'access' => [
+                'label' => 'Access',
+                'heading' => 'Demo access',
+                'description' => 'Controls who may open this demo. Applies immediately to a running demo, otherwise on the next build.',
+                'mode_label' => 'Protection',
+                'mode_inherit' => 'Default (currently: :default)',
+                'password_label' => 'Password',
+                'password_hint' => 'Leave empty to auto-generate a password. Username: see ARGOS_PREVIEW_BASIC_USER.',
+                'saved' => 'Demo access saved.',
+                'basic_credentials' => 'Credentials — user: :user · password: :password',
+                'apply_failed' => 'Could not apply the access setting.',
+            ],
         ],
 
         'concept' => [

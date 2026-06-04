@@ -32,19 +32,8 @@ class MaterializeCredentialTest extends TestCase
         $this->assertSame('oat-from-db-1234', $env['CLAUDE_CODE_OAUTH_TOKEN']);
     }
 
-    public function test_claude_runner_falls_back_to_config_when_no_credential(): void
+    public function test_claude_runner_falls_back_to_credential_store_file(): void
     {
-        config(['argos.claude_token' => 'oat-from-config']);
-
-        $env = (new ClaudeCodeRunner)->materializeCredential(null)->envVars;
-
-        $this->assertSame('oat-from-config', $env['CLAUDE_CODE_OAUTH_TOKEN']);
-    }
-
-    public function test_claude_runner_falls_back_to_credential_store_when_config_empty(): void
-    {
-        config(['argos.claude_token' => null]);
-
         $store = Mockery::mock(CredentialStore::class);
         $store->shouldReceive('getClaudeToken')->andReturn('oat-from-store');
         $this->app->instance(CredentialStore::class, $store);
@@ -56,8 +45,6 @@ class MaterializeCredentialTest extends TestCase
 
     public function test_claude_runner_throws_when_nothing_configured(): void
     {
-        config(['argos.claude_token' => null]);
-
         $store = Mockery::mock(CredentialStore::class);
         $store->shouldReceive('getClaudeToken')->andReturn(null);
         $this->app->instance(CredentialStore::class, $store);

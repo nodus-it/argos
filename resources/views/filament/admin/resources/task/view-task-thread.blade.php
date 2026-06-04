@@ -2,45 +2,38 @@
     @php
         /** @var \App\Models\Task $record */
         $task = $record;
-        $ws = $task->workflow_status->value;
-        $lastRun = fn (string $p) => ($phaseRuns[$p] ?? collect())->last();
-        $conceptRun = $lastRun('concept');
-        $implementRun = $lastRun('implement');
-        $pushRun = $lastRun('push');
-        $isDone = fn ($run) => $run?->status?->value === 'completed';
-        $waitingConcept = $ws === 'concept_review';
-        $waitingImplement = in_array($ws, ['implement_completed', 'implement_paused', 'in_review'], true);
-        $cost = fn ($run) => $run?->cost_usd ? '$'.number_format((float) $run->cost_usd, 2) : null;
 
         $allRuns = collect($phaseRuns)->flatten(1);
         $totalCost = $allRuns->sum(fn ($r) => (float) ($r->cost_usd ?? 0));
         $totalTokens = $allRuns->sum(fn ($r) => (int) ($r->input_tokens ?? 0) + (int) ($r->output_tokens ?? 0));
         $agentLabel = ($task->worker_agent_name_override ?? $task->repoProfile?->worker_agent_name ?? \App\Enums\AgentName::ClaudeCode)->label();
         $stackName = $task->workerStackOverride?->name ?? $task->repoProfile?->workerStack?->name ?? config('argos.compose.default_stack');
-
-        $implShort = $implementSummaryNontechnicalHtml
-            ? \Illuminate\Support\Str::limit(trim(strip_tags($implementSummaryNontechnicalHtml)), 180)
-            : __('tasks.view.thread.implement_body');
     @endphp
 
     {{-- Task name + status badge now render in the page header (getHeading). --}}
 
-    {{-- Paused banner (turn-limit) --}}
-    @if ($implementRun?->status?->value === 'paused')
-        <div class="callout callout-warn" style="margin-bottom:16px;">
-            @svg('heroicon-o-pause-circle')
-            <div>
-                <strong>{{ __('tasks.view.implement.paused_title') }}</strong>
-                <div style="margin-top:2px;">{{ __('tasks.view.implement.paused_resume_hint') }}</div>
-            </div>
-        </div>
+    {{-- Status banner: the phase stepper + the single "what is the system doing
+         right now" status band, as one unit (M1). --}}
+    <div class="fade-in" style="margin-bottom:16px;">
+        <x-argos.status-banner
+            :state="$banner['state']"
+            :title="$banner['title']"
+            :hint="$banner['hint']"
+            :startedAt="$banner['startedAt']"
+            :error="$banner['error']"
+            :logsUrl="$banner['logsUrl']"
+            :logsLabel="$banner['logsLabel']"
+            :rail="$task->phaseRail()" />
+    </div>
+
+    {{-- Auto-reload while the worker is busy (running or queued). Poll only then
+         so review/failed/done states don't reload needlessly (M2). --}}
+    @if ($stage->isBusy())
+        <div wire:poll.2500ms="poll" class="hidden"></div>
     @endif
 
-    {{-- Phase rail + meta strip --}}
+    {{-- Meta strip --}}
     <div class="fade-in" style="margin-bottom:20px;">
-        <div class="card card-pad" style="margin-bottom:12px;">
-            <x-argos.phase-rail :rail="$task->phaseRail()" :current="$task->displayStatusLabel()" />
-        </div>
         <x-argos.meta-strip>
             @if ($task->repoProfile)
                 <x-argos.meta-item label="{{ __('tasks.view.labels.repository') }}" :mono="true">{{ $task->repoProfile->name }}</x-argos.meta-item>
@@ -79,6 +72,9 @@
         $demoEnabled = (bool) config('argos.preview.enabled') && (bool) $task->repoProfile?->live_demo_enabled;
         $demoStatus = $demo?->status?->value;
         $demoBadgeCls = ['building' => 'badge-running', 'live' => 'badge-success', 'failed' => 'badge-failed', 'stopped' => 'badge-draft'][$demoStatus] ?? 'badge-draft';
+        $accessMode = $task->effectiveDemoAccessMode();
+        $accessBadgeCls = ['success' => 'badge-success', 'warning' => 'badge-running', 'danger' => 'badge-failed', 'gray' => 'badge-draft'][$accessMode->color()] ?? 'badge-draft';
+        $accessIcon = $accessMode === \App\Enums\DemoAccessMode::Public ? 'heroicon-o-lock-open' : 'heroicon-o-lock-closed';
     @endphp
     @if ($demo || $demoEnabled)
         <div class="card card-pad demo-bar fade-in" style="margin-bottom:20px;" x-data="{ log: false }">
@@ -88,6 +84,10 @@
                 @if ($demo)
                     <span class="badge {{ $demoBadgeCls }}"><span class="dot"></span>{{ $demo->status->label() }}</span>
                 @endif
+                <span class="badge {{ $accessBadgeCls }}" title="{{ __('tasks.view.demo.access.heading') }}">
+                    @svg($accessIcon)
+                    {{ $accessMode->label() }}
+                </span>
             </div>
 
             <div class="demo-meta">
@@ -105,6 +105,13 @@
                             @svg('heroicon-o-command-line') {{ __('tasks.view.demo.show_log') }}
                         </button>
                     @endif
+                @elseif ($demoStatus === 'stopped')
+                    <span class="demo-exp">{{ __('tasks.view.demo.stopped_hint') }}</span>
+                    @if ($demoEnabled)
+                        <button type="button" class="link-btn" wire:click="mountAction('rebuildDemo')">
+                            @svg('heroicon-o-play') {{ __('tasks.view.demo.restart') }}
+                        </button>
+                    @endif
                 @else
                     <span class="demo-exp">{{ __('tasks.view.demo.empty_hint') }}</span>
                 @endif
@@ -118,60 +125,47 @@
         </div>
     @endif
 
-    {{-- Chronological thread --}}
+    {{-- Chronological thread: one entry per phase iteration, interleaved with
+         the feedback that triggered each re-run (M3). Built in ViewTask::buildThread. --}}
     <x-argos.thread class="task-detail">
-        {{-- Task created --}}
-        <x-argos.thread-item phase="draft" :done="true" title="{{ __('tasks.view.thread.created') }}"
-            who="Du" time="{{ $task->created_at?->diffForHumans() }}">
-            {{ \Illuminate\Support\Str::limit($task->description ?? '', 400) }}
-        </x-argos.thread-item>
+        @foreach ($thread as $item)
+            @if ($item['kind'] === 'created')
+                <x-argos.thread-item phase="draft" :done="true" :title="$item['title']"
+                    :who="$item['who']" :time="$item['time']">
+                    {{ $item['body'] }}
+                </x-argos.thread-item>
 
-        {{-- Concept --}}
-        @if ($conceptRun || $conceptHtml || $waitingConcept)
-            <x-argos.thread-item x-data="{ open: false }" phase="concept" :done="$isDone($conceptRun)"
-                title="{{ __('tasks.view.thread.concept') }}" who="Claude Code"
-                time="{{ $conceptRun?->finished_at?->diffForHumans() }}" :cost="$cost($conceptRun)">
-                    @if ($conceptError)
-                        <span class="callout callout-warn" style="display:flex">@svg('heroicon-o-exclamation-triangle') {{ \Illuminate\Support\Str::limit($conceptError, 300) }}</span>
+            @elseif ($item['kind'] === 'feedback')
+                <x-argos.thread-item phase="review" state="done" :title="__('tasks.view.thread.feedback_title')"
+                    :who="$item['who']" :time="$item['time']">
+                    {{ $item['body'] }}
+                </x-argos.thread-item>
+
+            @else
+                {{-- phase entry --}}
+                @php $isCode = in_array($item['phase'], ['implement', 'respond'], true); @endphp
+                <x-argos.thread-item x-data="{ panel: null }" :phase="$item['phase']" :state="$item['state']"
+                    :title="$item['title']" :who="$item['who']" :time="$item['time']" :cost="$item['cost']">
+
+                    @if ($item['error'])
+                        <span class="callout callout-danger" style="display:flex">@svg('heroicon-o-exclamation-triangle') {{ $item['error'] }}</span>
                     @else
-                        {{ __('tasks.view.thread.concept_body') }}
+                        {{ $item['body'] }}
                     @endif
 
-                    @if ($conceptHtml)
-                        <x-slot:actions>
-                            <button type="button" class="link-btn" :class="open && 'on'" @click="open = !open">
-                                @svg('heroicon-o-light-bulb') {{ __('tasks.view.thread.view_concept') }}
-                            </button>
-                        </x-slot:actions>
-                        <x-slot:detail>
-                            <div x-show="open" x-cloak class="card card-pad prose prose-sm dark:prose-invert max-w-none">
-                                {!! $conceptHtml !!}
-                            </div>
-                        </x-slot:detail>
-                    @endif
-            </x-argos.thread-item>
-        @endif
-
-        {{-- Implementation --}}
-        @if ($implementRun || $implementSummaryNontechnicalHtml)
-            <x-argos.thread-item x-data="{ panel: null }" phase="implement" :done="$isDone($implementRun)"
-                title="{{ __('tasks.view.thread.implement') }}" who="Claude Code"
-                time="{{ $implementRun?->finished_at?->diffForHumans() }}" :cost="$cost($implementRun)">
-                {{ $implShort }}
-
-                    @if ($implementQualityGates)
+                    @if ($item['qualityGates'])
                         <div class="feed-actions" style="margin-top:10px;">
-                            @foreach ($implementQualityGates as $gate => $result)
+                            @foreach ($item['qualityGates'] as $gate => $result)
                                 @php
                                     $isFail = in_array($result, ['fail', 'advisory_fail'], true);
                                     $matches = array_values(array_filter(
-                                        $implementQualityGateLogKeys ?? [],
+                                        $item['qualityGateLogKeys'] ?? [],
                                         fn (string $k): bool => $k === $gate || str_starts_with($k, $gate.'.')
                                     ));
                                     sort($matches);
                                     $lastKey = $isFail && $matches !== [] ? end($matches) : null;
                                     $gateUrl = $lastKey
-                                        ? \App\Filament\Admin\Resources\TaskResource::getUrl('quality-gates', ['record' => $record, 'phase' => 'implement', 'key' => $lastKey])
+                                        ? \App\Filament\Admin\Resources\TaskResource::getUrl('quality-gates', ['record' => $record, 'phase' => $item['phase'], 'key' => $lastKey])
                                         : null;
                                 @endphp
                                 @if ($gateUrl)
@@ -184,91 +178,157 @@
                     @endif
 
                     <x-slot:actions>
-                        @if ($implementSummaryNontechnicalHtml)
+                        @if ($item['phase'] === 'concept' && $item['conceptHtml'])
+                            <button type="button" class="link-btn" :class="panel === 'concept' && 'on'" @click="panel = (panel === 'concept' ? null : 'concept')">
+                                @svg('heroicon-o-light-bulb') {{ __('tasks.view.thread.view_concept') }}
+                            </button>
+                        @endif
+                        @if ($isCode && $item['summaryHtml'])
                             <button type="button" class="link-btn" :class="panel === 'summary' && 'on'" @click="panel = (panel === 'summary' ? null : 'summary')">
                                 @svg('heroicon-o-bars-3-bottom-left') {{ __('tasks.view.thread.summary') }}
                             </button>
                         @endif
-                        <button type="button" class="link-btn" :class="panel === 'diff' && 'on'"
-                            @click="panel = (panel === 'diff' ? null : 'diff'); @if (! $diffLoaded) if (panel === 'diff') $wire.loadDiff() @endif">
-                            @svg('heroicon-o-document-text') {{ __('tasks.view.thread.diff') }}
-                        </button>
-                        @if (count($implementLog))
-                            <button type="button" class="link-btn" :class="panel === 'logs' && 'on'" @click="panel = (panel === 'logs' ? null : 'logs')">
+                        @if ($item['showDiff'])
+                            <button type="button" class="link-btn" :class="panel === 'diff' && 'on'"
+                                @click="panel = (panel === 'diff' ? null : 'diff'); @if (! $diffLoaded) if (panel === 'diff') $wire.loadDiff() @endif">
+                                @svg('heroicon-o-document-text') {{ __('tasks.view.thread.diff') }}
+                            </button>
+                        @endif
+                        @if ($item['isLive'] || $item['hasStoredLog'])
+                            <button type="button" class="link-btn" :class="panel === 'logs' && 'on'"
+                                @click="panel = (panel === 'logs' ? null : 'logs'); @if (! $item['isLive'] && $item['iterationKey']) if (panel === 'logs') $wire.loadLogIteration('{{ $item['phase'] }}', {{ $item['iteration'] }}) @endif">
                                 @svg('heroicon-o-command-line') {{ __('tasks.view.thread.logs') }}
                             </button>
                         @endif
-                        @if ($implementSummaryTechnicalHtml)
+                        @if ($isCode && $item['techHtml'])
                             <button type="button" class="link-btn" :class="panel === 'tech' && 'on'" @click="panel = (panel === 'tech' ? null : 'tech')">
                                 @svg('heroicon-o-code-bracket') {{ __('tasks.view.thread.technical') }}
                             </button>
                         @endif
+                        @if ($item['phase'] === 'push' && $item['prUrl'])
+                            <a href="{{ $item['prUrl'] }}" target="_blank" rel="noopener" class="link-btn">
+                                @svg('heroicon-o-arrow-top-right-on-square') {{ __('tasks.view.thread.open_pr') }}
+                            </a>
+                        @endif
                     </x-slot:actions>
 
                     <x-slot:detail>
-                        @if ($implementSummaryNontechnicalHtml)
-                            <div x-show="panel === 'summary'" x-cloak class="card card-pad prose prose-sm dark:prose-invert max-w-none">
-                                {!! $implementSummaryNontechnicalHtml !!}
+                        @if ($item['phase'] === 'concept' && $item['conceptHtml'])
+                            <div x-show="panel === 'concept'" x-cloak class="card card-pad prose prose-sm dark:prose-invert max-w-none">
+                                {!! $item['conceptHtml'] !!}
                             </div>
                         @endif
-                        <div x-show="panel === 'diff'" x-cloak>
-                            <div wire:loading wire:target="loadDiff" class="callout callout-info">@svg('heroicon-o-arrow-path') {{ __('tasks.view.diff.loading') }}</div>
-                            <div wire:loading.remove wire:target="loadDiff">
-                                @if ($diffError)
-                                    <div class="callout callout-warn">@svg('heroicon-o-exclamation-triangle') {{ $diffError }}</div>
+                        @if ($isCode && $item['summaryHtml'])
+                            <div x-show="panel === 'summary'" x-cloak class="card card-pad prose prose-sm dark:prose-invert max-w-none">
+                                {!! $item['summaryHtml'] !!}
+                            </div>
+                        @endif
+                        @if ($item['showDiff'])
+                            <div x-show="panel === 'diff'" x-cloak>
+                                <div wire:loading wire:target="loadDiff" class="callout callout-info">@svg('heroicon-o-arrow-path') {{ __('tasks.view.diff.loading') }}</div>
+                                <div wire:loading.remove wire:target="loadDiff">
+                                    @if ($diffError)
+                                        <div class="callout callout-warn">@svg('heroicon-o-exclamation-triangle') {{ $diffError }}</div>
+                                    @else
+                                        <x-argos.diff :files="$diffFiles" />
+                                    @endif
+                                </div>
+                            </div>
+                        @endif
+                        @if ($item['isLive'] || $item['hasStoredLog'])
+                            <div x-show="panel === 'logs'" x-cloak>
+                                @if ($item['isLive'])
+                                    <x-argos.terminal title="worker · {{ $task->feature_branch }}" :lines="$liveLog" />
                                 @else
-                                    <x-argos.diff :files="$diffFiles" />
+                                    <x-argos.terminal title="worker · {{ $item['phase'] }} v{{ $item['iteration'] }}"
+                                        :lines="$loadedLogIterations[$item['iterationKey']] ?? []" />
                                 @endif
                             </div>
-                        </div>
-                        <div x-show="panel === 'logs'" x-cloak>
-                            <x-argos.terminal title="worker · {{ $task->feature_branch }}" :lines="$implementLog" />
-                        </div>
-                        @if ($implementSummaryTechnicalHtml)
+                        @endif
+                        @if ($isCode && $item['techHtml'])
                             <div x-show="panel === 'tech'" x-cloak class="card card-pad prose prose-sm dark:prose-invert max-w-none">
-                                {!! $implementSummaryTechnicalHtml !!}
+                                {!! $item['techHtml'] !!}
                             </div>
                         @endif
                     </x-slot:detail>
-            </x-argos.thread-item>
-        @endif
-
-        {{-- Push / PR --}}
-        @if ($task->pr_url)
-            <x-argos.thread-item phase="push" :done="true" title="{{ __('tasks.view.thread.push') }}"
-                time="{{ $pushRun?->finished_at?->diffForHumans() }}">
-                <a href="{{ $task->pr_url }}" target="_blank" rel="noopener" class="link-btn">
-                    @svg('heroicon-o-arrow-top-right-on-square') {{ __('tasks.view.thread.open_pr') }}
-                </a>
-            </x-argos.thread-item>
-        @endif
-
+                </x-argos.thread-item>
+            @endif
+        @endforeach
     </x-argos.thread>
 
-    {{-- Respond composer (maps to the phase awaiting feedback) --}}
-    @if ($waitingConcept || $waitingImplement)
-        @php $field = $waitingConcept ? 'notes' : 'implementNotes'; @endphp
-        <x-argos.respond :waiting="true" flag="{{ __('tasks.view.thread.waiting_flag') }}">
-            <textarea class="respond-ta" rows="2"
-                wire:model="{{ $field }}"
-                placeholder="{{ __('tasks.view.feedback.concept_placeholder') }}"></textarea>
-            <x-argos.btn variant="primary" wire:click="{{ $waitingConcept ? 'saveNotesAndRevise' : 'saveImplementNotesAndRevise' }}">
-                @svg('heroicon-o-paper-airplane') {{ __('tasks.view.thread.send') }}
-            </x-argos.btn>
+    {{-- Respond / advance dock — drives phase progression from the bottom (M4).
+         Hidden while the worker is busy; the dock variant comes from TaskStage. --}}
+    @php $dock = $stage->dockMode(); @endphp
+    @if ($dock !== 'none')
+        @php
+            $isConceptField = in_array($dock, ['draft', 'concept', 'retry_concept'], true);
+            $field = $isConceptField ? 'notes' : 'implementNotes';
+            $isReview = in_array($dock, ['concept', 'implement'], true);
+            $hint = match ($dock) {
+                'draft' => __('tasks.view.dock.draft_hint'),
+                'concept' => __('tasks.view.dock.concept_hint'),
+                'implement' => __('tasks.view.dock.implement_hint'),
+                default => __('tasks.view.dock.retry_hint'),
+            };
+            $placeholder = $isConceptField
+                ? __('tasks.view.dock.concept_placeholder')
+                : __('tasks.view.dock.implement_placeholder');
+        @endphp
+        <x-argos.respond :waiting="$isReview" flag="{{ $hint }}">
+            @if ($dock !== 'retry_push')
+                <textarea class="respond-ta" rows="2" wire:model="{{ $field }}"
+                    placeholder="{{ $placeholder }}"></textarea>
+            @endif
 
-            <x-slot:quick>
-                <span class="chip" x-on:click="$wire.set('{{ $field }}', @js(__('tasks.view.thread.chip_changes_text')))">
-                    @svg('heroicon-o-pencil-square') {{ __('tasks.view.thread.chip_changes') }}
-                </span>
-                @if ($waitingImplement)
-                    <span class="chip" wire:click="mountAction('markCompleted')">
-                        @svg('heroicon-o-check-circle') {{ __('tasks.view.thread.chip_approve') }}
+            @switch($dock)
+                @case('concept')
+                    <x-argos.btn variant="secondary" wire:click="saveNotesAndRevise">
+                        @svg('heroicon-o-light-bulb') {{ __('tasks.view.dock.update_concept') }}
+                    </x-argos.btn>
+                    <x-argos.btn variant="primary" wire:click="startPhaseFromDock('implement')">
+                        @svg('heroicon-o-code-bracket') {{ __('tasks.view.dock.start_implement') }}
+                    </x-argos.btn>
+                    @break
+                @case('implement')
+                    <x-argos.btn variant="secondary" wire:click="saveImplementNotesAndRevise">
+                        @svg('heroicon-o-arrow-path') {{ __('tasks.view.dock.refine_implement') }}
+                    </x-argos.btn>
+                    <x-argos.btn variant="primary" wire:click="startPhaseFromDock('push')">
+                        @svg('heroicon-o-arrow-up-tray') {{ __('tasks.view.dock.start_push') }}
+                    </x-argos.btn>
+                    @break
+                @case('draft')
+                    <x-argos.btn variant="primary" wire:click="startConceptFromDock">
+                        @svg('heroicon-o-light-bulb') {{ __('tasks.view.dock.start_concept') }}
+                    </x-argos.btn>
+                    @break
+                @case('retry_concept')
+                    <x-argos.btn variant="primary" wire:click="startConceptFromDock">
+                        @svg('heroicon-o-arrow-path') {{ __('tasks.view.dock.retry') }}
+                    </x-argos.btn>
+                    @break
+                @case('retry_implement')
+                    <x-argos.btn variant="primary" wire:click="saveImplementNotesAndRevise">
+                        @svg('heroicon-o-arrow-path') {{ __('tasks.view.dock.retry') }}
+                    </x-argos.btn>
+                    @break
+                @case('retry_push')
+                    <x-argos.btn variant="primary" wire:click="startPhaseFromDock('push')">
+                        @svg('heroicon-o-arrow-path') {{ __('tasks.view.dock.retry') }}
+                    </x-argos.btn>
+                    @break
+            @endswitch
+
+            @if ($isReview)
+                <x-slot:quick>
+                    <span class="chip" x-on:click="$wire.set('{{ $field }}', @js(__('tasks.view.thread.chip_changes_text')))">
+                        @svg('heroicon-o-pencil-square') {{ __('tasks.view.thread.chip_changes') }}
                     </span>
-                @endif
-                <span class="chip" x-on:click="$wire.set('{{ $field }}', @js(__('tasks.view.thread.chip_question_text')))">
-                    @svg('heroicon-o-question-mark-circle') {{ __('tasks.view.thread.chip_question') }}
-                </span>
-            </x-slot:quick>
+                    <span class="chip" x-on:click="$wire.set('{{ $field }}', @js(__('tasks.view.thread.chip_question_text')))">
+                        @svg('heroicon-o-question-mark-circle') {{ __('tasks.view.thread.chip_question') }}
+                    </span>
+                </x-slot:quick>
+            @endif
         </x-argos.respond>
     @endif
 </x-filament-panels::page>

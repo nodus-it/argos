@@ -23,8 +23,8 @@ interface AgentRunner
 
     /**
      * Translate a stored AgentCredential into the env-vars the worker
-     * needs. Implementations may fall back to legacy single-token
-     * config when $credential is null (claude_token env / file).
+     * needs. Implementations may fall back to the legacy on-disk token
+     * file when $credential is null.
      *
      * @throws \RuntimeException when no credential can be resolved.
      */

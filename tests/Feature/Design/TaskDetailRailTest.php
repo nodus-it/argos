@@ -59,3 +59,26 @@ it('derives phase rail node states from the workflow status', function (): void 
     expect($failed['implement']['state'])->toBe('fail')
         ->and($failed['concept']['state'])->toBe('done');
 });
+
+it('highlights push (not implement) while the push phase runs', function (): void {
+    // Push runs under workflow_status=ImplementRunning with current_phase=push.
+    $rail = collect(Task::factory()->make([
+        'workflow_status' => WorkflowStatus::ImplementRunning,
+        'current_phase' => 'push',
+        'current_status' => 'running',
+    ])->phaseRail())->keyBy('phase');
+
+    expect($rail['implement']['state'])->toBe('done')
+        ->and($rail['push']['state'])->toBe('active');
+});
+
+it('flags implement as waiting (not push) while the implementation is in review', function (): void {
+    $rail = collect(Task::factory()->make([
+        'workflow_status' => WorkflowStatus::ImplementCompleted,
+        'current_phase' => 'implement',
+        'current_status' => 'completed',
+    ])->phaseRail())->keyBy('phase');
+
+    expect($rail['implement']['state'])->toBe('wait')
+        ->and($rail['push']['state'])->toBe('todo');
+});

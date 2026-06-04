@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 return [
     'groups' => [
-        'tasks' => 'Tasks',
         'configuration' => 'Configuration',
         'worker' => 'Worker',
     ],

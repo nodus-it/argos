@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Enums\DemoAccessMode;
 use App\Enums\WorkflowStatus;
 use App\Filament\Admin\Resources\TaskResource;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewQualityGateLog;
@@ -86,8 +87,13 @@ class TaskPagesTest extends TestCase
     {
         // Pre-fix concept_md was persisted with the ```markdown wrapper that
         // some agent replies produce. Render-time strip heals these rows
-        // without requiring a backfill migration.
-        $task = Task::factory()->create([
+        // without requiring a backfill migration. The thread renders the
+        // concept from the phase_run, so attach it there.
+        $task = Task::factory()->conceptReady()->create();
+        PhaseRun::factory()->create([
+            'task_id' => $task->id,
+            'phase' => 'concept',
+            'status' => 'completed',
             'concept_md' => "```markdown\n# Konzept: Foo\n\nBody.\n```",
         ]);
 
@@ -103,7 +109,7 @@ class TaskPagesTest extends TestCase
         $task = Task::factory()->create();
 
         Livewire::test(ViewTask::class, ['record' => $task->getKey()])
-            ->callAction('concept')
+            ->call('startConceptFromDock')
             ->assertNotified();
 
         Bus::assertDispatched(RunPhaseJob::class, fn ($j) => $j->phase === 'concept');
@@ -115,7 +121,7 @@ class TaskPagesTest extends TestCase
         PhaseRun::factory()->create(['task_id' => $task->id, 'phase' => 'concept', 'status' => 'completed']);
 
         Livewire::test(ViewTask::class, ['record' => $task->getKey()])
-            ->callAction('implement')
+            ->call('startPhaseFromDock', 'implement')
             ->assertNotified();
 
         Bus::assertDispatched(RunPhaseJob::class, fn ($j) => $j->phase === 'implement');
@@ -127,7 +133,7 @@ class TaskPagesTest extends TestCase
         PhaseRun::factory()->create(['task_id' => $task->id, 'phase' => 'concept', 'status' => 'completed']);
 
         Livewire::test(ViewTask::class, ['record' => $task->getKey()])
-            ->callAction('implement')
+            ->call('startPhaseFromDock', 'implement')
             ->assertNotified();
 
         $this->assertEquals(WorkflowStatus::ImplementRunning, $task->fresh()->workflow_status);
@@ -139,7 +145,7 @@ class TaskPagesTest extends TestCase
         PhaseRun::factory()->create(['task_id' => $task->id, 'phase' => 'implement', 'status' => 'completed']);
 
         Livewire::test(ViewTask::class, ['record' => $task->getKey()])
-            ->callAction('push')
+            ->call('startPhaseFromDock', 'push')
             ->assertNotified();
 
         Bus::assertDispatched(RunPhaseJob::class, fn ($j) => $j->phase === 'push');
@@ -170,6 +176,25 @@ class TaskPagesTest extends TestCase
             ->assertNotified();
 
         Bus::assertDispatched(DeployDemoJob::class, fn (DeployDemoJob $j): bool => $j->taskId === $task->id);
+    }
+
+    public function test_view_task_demo_access_action_persists_mode_and_password(): void
+    {
+        config(['argos.preview.enabled' => true]);
+        $profile = RepoProfile::factory()->create(['live_demo_enabled' => true]);
+        $task = Task::factory()->create(['repo_profile_id' => $profile->id]);
+        PhaseRun::factory()->create(['task_id' => $task->id, 'phase' => 'implement', 'status' => 'completed']);
+
+        Livewire::test(ViewTask::class, ['record' => $task->getKey()])
+            ->callAction('demoAccess', [
+                'access_mode' => DemoAccessMode::Basic->value,
+                'basic_password' => 'shared-pw',
+            ])
+            ->assertNotified();
+
+        $task->refresh();
+        $this->assertSame(DemoAccessMode::Basic, $task->demo_access_mode);
+        $this->assertSame('shared-pw', $task->demo_basic_password);
     }
 
     public function test_view_task_survives_a_failing_diff_load(): void
@@ -342,7 +367,13 @@ class TaskPagesTest extends TestCase
 
     public function test_paused_banner_renders_for_paused_implement_run(): void
     {
-        $task = Task::factory()->create();
+        // Realistic persisted state for a paused implement run: PhaseRunner
+        // promotes the task to ImplementPaused (afterPhase implement+Paused).
+        $task = Task::factory()->create([
+            'workflow_status' => WorkflowStatus::ImplementPaused,
+            'current_phase' => 'implement',
+            'current_status' => 'paused',
+        ]);
         PhaseRun::factory()->paused()->create(['task_id' => $task->id, 'phase' => 'implement']);
 
         Livewire::test(ViewTask::class, ['record' => $task->getKey()])
@@ -357,7 +388,7 @@ class TaskPagesTest extends TestCase
         PhaseRun::factory()->running()->create(['task_id' => $task->id, 'phase' => 'concept']);
 
         Livewire::test(ViewTask::class, ['record' => $task->getKey()])
-            ->callAction('concept')
+            ->call('startConceptFromDock')
             ->assertNotified();
 
         Bus::assertNotDispatched(RunPhaseJob::class);

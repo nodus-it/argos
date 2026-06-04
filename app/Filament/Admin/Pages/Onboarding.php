@@ -51,7 +51,7 @@ class Onboarding extends Page
 
     // ── Step 1: agents ──────────────────────────────────────────────────────
 
-    /** 'env' | 'agent_credential' | 'none' — drives which Claude UI is shown. */
+    /** 'agent_credential' | 'none' — drives which Claude UI is shown. */
     public string $tokenSource = 'none';
 
     public bool $codexConfigured = false;
@@ -133,11 +133,6 @@ class Onboarding extends Page
 
     private function detectTokenSource(): string
     {
-        $envToken = config('argos.claude_token');
-        if (is_string($envToken) && $envToken !== '') {
-            return 'env';
-        }
-
         $hasCredential = AgentCredential::query()
             ->where('agent_name', AgentName::ClaudeCode->value)
             ->where('status', AgentCredentialStatus::Active->value)
@@ -216,12 +211,6 @@ class Onboarding extends Page
 
     public function saveClaudeToken(): void
     {
-        if ($this->tokenSource === 'env') {
-            Notification::make()->title(__('onboarding.notifications.env_token'))->warning()->send();
-
-            return;
-        }
-
         $token = trim($this->claudeToken);
 
         if ($token === '') {

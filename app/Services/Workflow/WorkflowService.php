@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Services\Workflow;
 
+use App\Enums\DemoStatus;
 use App\Enums\PhaseStatus;
 use App\Enums\WorkflowStatus;
 use App\Jobs\RunPhaseJob;
+use App\Jobs\StopDemoJob;
 use App\Models\PhaseRun;
 use App\Models\Task;
 use App\Services\IssueTracker\IssueCommentNotifier;
@@ -64,6 +66,15 @@ class WorkflowService
             && $phaseStatus === PhaseStatus::Completed
             && $task->repoProfile?->auto_pr) {
             RunPhaseJob::dispatch($task->id, 'push');
+        }
+
+        // Once the PR is created, tear the live demo down — it was a pre-PR
+        // preview. It stays restartable anytime from the detail view (M6).
+        if ($phase === 'push' && $phaseStatus === PhaseStatus::Completed) {
+            $demo = $task->currentDemo();
+            if ($demo !== null && in_array($demo->status, [DemoStatus::Building, DemoStatus::Live], true)) {
+                StopDemoJob::dispatch($task->id);
+            }
         }
 
         // Notify the external issue tracker (if this task was imported from one).

@@ -18,7 +18,6 @@ return [
     ],
 
     'notifications' => [
-        'env_token' => 'Token kommt aus der Umgebungsvariable',
         'empty_token' => 'Bitte einen Token eingeben',
         'invalid_token_title' => 'Token ungültig',
         'invalid_token_body' => 'Der eingegebene Token wurde von der API abgelehnt.',
@@ -49,7 +48,6 @@ return [
     ],
 
     'token' => [
-        'from_env' => 'Token kommt aus der Umgebungsvariable <code class="text-xs">CLAUDE_CODE_OAUTH_TOKEN</code> — nichts zu tun.',
         'is_saved_short' => 'Gespeichert — neuen Token einfügen, um zu überschreiben.',
         'placeholder' => 'sk-ant-oat01-…',
         'save_button' => 'Speichern',

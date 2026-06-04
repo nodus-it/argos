@@ -38,10 +38,10 @@ class FeedbackWorkflowTest extends TestCase
         parent::setUp();
         $this->tmpDir = sys_get_temp_dir().'/argos_feedback_'.uniqid();
         mkdir($this->tmpDir, 0755, true);
-        config([
-            'argos.config_dir' => $this->tmpDir,
-            'argos.claude_token' => 'test-token',
-        ]);
+        config(['argos.config_dir' => $this->tmpDir]);
+        // Legacy on-disk token fallback so phases resolve a Claude token without
+        // a per-task AgentCredential (the authoritative path is a DB credential).
+        file_put_contents($this->tmpDir.'/claude_token', 'test-token');
 
         $resolver = Mockery::mock(WorkerImageResolver::class);
         $resolver->shouldReceive('resolveOrBuild')->andReturn('argos-worker:test');

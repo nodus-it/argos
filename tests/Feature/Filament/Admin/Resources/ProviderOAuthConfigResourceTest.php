@@ -63,6 +63,26 @@ class ProviderOAuthConfigResourceTest extends TestCase
             ->assertFormSet(['callback_url' => 'https://argos.test/auth/gitlab/callback']);
     }
 
+    public function test_provider_query_param_preselects_the_provider(): void
+    {
+        config(['app.url' => 'https://argos.test']);
+
+        Livewire::withQueryParams(['provider' => 'gitlab'])
+            ->test(CreateProviderOAuthConfig::class)
+            ->assertFormSet([
+                'provider' => 'gitlab',
+                'callback_url' => 'https://argos.test/auth/gitlab/callback',
+            ]);
+    }
+
+    public function test_invalid_provider_query_param_is_ignored(): void
+    {
+        Livewire::withQueryParams(['provider' => 'bogus'])
+            ->test(CreateProviderOAuthConfig::class)
+            ->assertSuccessful()
+            ->assertFormSet(['provider' => null]);
+    }
+
     public function test_selecting_provider_shows_prefilled_oauth_app_link(): void
     {
         config(['app.url' => 'https://argos.test']);

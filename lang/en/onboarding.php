@@ -18,7 +18,6 @@ return [
     ],
 
     'notifications' => [
-        'env_token' => 'Token comes from the environment variable',
         'empty_token' => 'Please enter a token',
         'invalid_token_title' => 'Token invalid',
         'invalid_token_body' => 'The entered token was rejected by the API.',
@@ -49,7 +48,6 @@ return [
     ],
 
     'token' => [
-        'from_env' => 'Token comes from the environment variable <code class="text-xs">CLAUDE_CODE_OAUTH_TOKEN</code> — nothing to do.',
         'is_saved_short' => 'Saved — paste a new token to overwrite.',
         'placeholder' => 'sk-ant-oat01-…',
         'save_button' => 'Save',

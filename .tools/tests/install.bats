@@ -7,8 +7,8 @@ setup() {
     # Source install.sh — the source-guard at the bottom keeps main() from
     # firing when BASH_SOURCE != $0, so we get the helpers without any of the
     # docker / curl side-effects.
-    # shellcheck source=../../install.sh
-    source install.sh
+    # shellcheck source=../install.sh
+    source .tools/install.sh
 }
 
 teardown() {
@@ -178,34 +178,6 @@ EOF
     local before
     before="$(sha256_of "$ENV_FILE")"
     backfill_missing_secrets 2>/dev/null
-    [ "$(sha256_of "$ENV_FILE")" = "$before" ]
-}
-
-# ── apply_stage_overrides ───────────────────────────────────────────────────
-
-@test "apply_stage_overrides pins app image when missing" {
-    ENV_FILE="$TEST_DIR/.env"
-    printf 'APP_KEY=base64:foo\n' > "$ENV_FILE"
-
-    apply_stage_overrides >/dev/null
-
-    [ "$(get_env_value "$ENV_FILE" ARGOS_APP_IMAGE)" = "$STAGE_APP_IMAGE" ]
-}
-
-@test "apply_stage_overrides replaces existing app image tag in place" {
-    ENV_FILE="$TEST_DIR/.env"
-    cat > "$ENV_FILE" <<'EOF'
-APP_KEY=base64:foo
-ARGOS_APP_IMAGE=ghcr.io/nodus-it/argos-app:latest
-EOF
-
-    apply_stage_overrides >/dev/null
-
-    [ "$(get_env_value "$ENV_FILE" ARGOS_APP_IMAGE)" = "$STAGE_APP_IMAGE" ]
-    # Idempotency: running twice changes nothing.
-    local before
-    before="$(sha256_of "$ENV_FILE")"
-    apply_stage_overrides >/dev/null
     [ "$(sha256_of "$ENV_FILE")" = "$before" ]
 }
 

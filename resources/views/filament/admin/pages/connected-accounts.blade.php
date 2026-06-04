@@ -37,7 +37,15 @@
                         {{ __('accounts.blade.github_not_configured_description') }}
                     </span>
                 </div>
-                <div class="mt-3">
+                <div class="mt-3 flex flex-wrap items-center gap-4">
+                    <x-filament::button
+                        tag="a"
+                        href="{{ route('filament.admin.resources.provider-oauth-configs.create', ['provider' => 'github']) }}"
+                        icon="heroicon-o-shield-check"
+                        size="sm"
+                    >
+                        {{ __('accounts.blade.create_oauth_app') }}
+                    </x-filament::button>
                     <a href="{{ config('argos.docs.setup_github') }}" target="_blank" rel="noopener" class="text-xs underline text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200">
                         {{ __('accounts.blade.setup_link') }} ↗
                     </a>
@@ -96,7 +104,15 @@
                         {{ __('accounts.blade.gitlab_not_configured_description') }}
                     </span>
                 </div>
-                <div class="mt-3">
+                <div class="mt-3 flex flex-wrap items-center gap-4">
+                    <x-filament::button
+                        tag="a"
+                        href="{{ route('filament.admin.resources.provider-oauth-configs.create', ['provider' => 'gitlab']) }}"
+                        icon="heroicon-o-shield-check"
+                        size="sm"
+                    >
+                        {{ __('accounts.blade.create_oauth_app') }}
+                    </x-filament::button>
                     <a href="{{ config('argos.docs.setup_gitlab') }}" target="_blank" rel="noopener" class="text-xs underline text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200">
                         {{ __('accounts.blade.setup_link') }} ↗
                     </a>
@@ -152,7 +168,15 @@
                         {{ __('accounts.blade.bitbucket_not_configured_description') }}
                     </span>
                 </div>
-                <div class="mt-3">
+                <div class="mt-3 flex flex-wrap items-center gap-4">
+                    <x-filament::button
+                        tag="a"
+                        href="{{ route('filament.admin.resources.provider-oauth-configs.create', ['provider' => 'bitbucket']) }}"
+                        icon="heroicon-o-shield-check"
+                        size="sm"
+                    >
+                        {{ __('accounts.blade.create_oauth_app') }}
+                    </x-filament::button>
                     <a href="{{ config('argos.docs.setup_bitbucket') }}" target="_blank" rel="noopener" class="text-xs underline text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200">
                         {{ __('accounts.blade.setup_link') }} ↗
                     </a>
@@ -208,7 +232,15 @@
                         {{ __('accounts.blade.linear_not_configured_description') }}
                     </span>
                 </div>
-                <div class="mt-3">
+                <div class="mt-3 flex flex-wrap items-center gap-4">
+                    <x-filament::button
+                        tag="a"
+                        href="{{ route('filament.admin.resources.provider-oauth-configs.create', ['provider' => 'linear']) }}"
+                        icon="heroicon-o-shield-check"
+                        size="sm"
+                    >
+                        {{ __('accounts.blade.create_oauth_app') }}
+                    </x-filament::button>
                     <a href="{{ config('argos.docs.setup_linear') }}" target="_blank" rel="noopener" class="text-xs underline text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200">
                         {{ __('accounts.blade.setup_link') }} ↗
                     </a>

@@ -100,6 +100,12 @@ class TaskService
             throw new \RuntimeException('A phase is already running for this task.');
         }
 
+        // Order is strict: once the implement phase has run, the concept is
+        // locked — there is no going back to it (M5).
+        if ($phase === Phase::Concept && $task->phaseRuns()->where('phase', 'implement')->exists()) {
+            throw new \RuntimeException('The concept is locked once implementation has started.');
+        }
+
         $task->update([
             'current_phase' => $phase->value,
             'current_status' => 'running',

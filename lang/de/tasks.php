@@ -3,8 +3,7 @@
 declare(strict_types=1);
 
 return [
-    'navigation_group' => 'Aufgaben',
-    'navigation_label' => 'Tasks',
+    'navigation_label' => 'Aufgaben',
     'search_placeholder' => 'Tasks suchen…',
 
     'fields' => [
@@ -73,14 +72,52 @@ return [
         ],
     ],
 
+    // Presentation stages (App\Support\Workflow\TaskStage) — the single
+    // UI-facing state shown in the status banner.
+    'stage' => [
+        'draft' => 'Entwurf',
+        'concept_queued' => 'Konzept wartet auf Worker',
+        'concept_running' => 'Konzept läuft',
+        'concept_paused' => 'Konzept pausiert (Turn-Limit)',
+        'concept_review' => 'Konzept prüfen',
+        'concept_failed' => 'Konzept fehlgeschlagen',
+        'implement_queued' => 'Implementierung wartet auf Worker',
+        'implement_running' => 'Implementierung läuft',
+        'implement_paused' => 'Implementierung pausiert (Turn-Limit)',
+        'implement_review' => 'Implementierung prüfen',
+        'implement_failed' => 'Implementierung fehlgeschlagen',
+        'push_queued' => 'Push wartet auf Worker',
+        'push_running' => 'Push & PR läuft',
+        'push_failed' => 'Push fehlgeschlagen',
+        'review' => 'Pull Request erstellt',
+        'done' => 'Abgeschlossen',
+    ],
+
+    'rail' => [
+        'draft' => 'Entwurf',
+        'concept' => 'Konzept',
+        'implement' => 'Umsetzung',
+        'push' => 'Push & PR',
+        'review' => 'Review',
+    ],
+
     'view' => [
         'thread' => [
             'created' => 'Aufgabe angelegt',
+            'you' => 'Du',
+            'agent' => 'Agent',
+            'feedback_title' => 'Dein Feedback',
+            'respond' => 'Überarbeitung',
+            'queued_body' => 'In der Warteschlange — wird vom nächsten freien Worker übernommen.',
             'concept' => 'Konzept',
             'concept_body' => 'Der Agent hat einen Lösungsweg vorgeschlagen.',
+            'concept_running_body' => 'Der Agent erarbeitet gerade das Konzept …',
             'view_concept' => 'Konzept ansehen',
             'implement' => 'Implementierung',
             'implement_body' => 'Der Agent hat die Änderung umgesetzt.',
+            'implement_running_body' => 'Der Agent setzt die Änderung gerade um …',
+            'push_body' => 'Branch gepusht und Pull Request erstellt.',
+            'push_running_body' => 'Branch wird gepusht und der Pull Request erstellt …',
             'technical' => 'Technisch',
             'summary' => 'Zusammenfassung',
             'diff' => 'Diff',
@@ -94,6 +131,31 @@ return [
             'chip_approve' => 'Approve & Merge',
             'chip_question' => 'Frage stellen',
             'chip_question_text' => 'Frage: ',
+        ],
+        'dock' => [
+            'draft_hint' => 'Beschreibe optional zusätzliche Vorgaben und starte dann die Konzept-Phase.',
+            'concept_hint' => 'Hier aktualisierst du das Konzept — es geht nicht nur um Feedback. Oder starte direkt die Implementierung.',
+            'implement_hint' => 'Hier geht es um den Feinschliff der Implementierung — das Konzept ist abgeschlossen.',
+            'retry_hint' => 'Die Phase ist fehlgeschlagen. Du kannst sie erneut starten.',
+            'concept_placeholder' => 'Was soll am Konzept geändert oder ergänzt werden?',
+            'implement_placeholder' => 'Was soll an der Implementierung nachgeschärft werden?',
+            'start_concept' => 'Konzept starten',
+            'update_concept' => 'Konzept aktualisieren',
+            'start_implement' => 'Implementierung starten',
+            'refine_implement' => 'Implementierung verfeinern',
+            'start_push' => 'Push & PR erstellen',
+            'retry' => 'Erneut versuchen',
+        ],
+        'banner' => [
+            'queued_hint' => 'Der Task ist in der Warteschlange und wird vom nächsten freien Worker übernommen.',
+            'concept_review_hint' => 'Prüfe das Konzept. Über das Feld unten kannst du es aktualisieren oder die Implementierung starten.',
+            'implement_review_hint' => 'Prüfe die Umsetzung. Über das Feld unten kannst du nachschärfen oder Push & PR starten.',
+            'review_hint' => 'Der Pull Request ist erstellt. Du kannst den Task abschließen oder die Demo erneut starten.',
+            'paused_hint' => 'Das Turn-Limit wurde erreicht. Setze die Phase über das Feld unten fort.',
+            'failed_hint' => 'Die Phase ist fehlgeschlagen. Details siehe unten bzw. im Log.',
+            'lock_blocked_hint' => 'Die Implementierung ist durch ein Lock blockiert. Über das ⋯-Menü kannst du das Lock manuell lösen.',
+            'failed_generic' => 'Kein Fehlertext verfügbar. Details im Log.',
+            'view_logs' => 'Log ansehen',
         ],
         'labels' => [
             'status' => 'Status',
@@ -131,6 +193,8 @@ return [
             'failed_hint' => 'Der Demo-Aufbau ist fehlgeschlagen.',
             'show_log' => 'Build-Log anzeigen',
             'empty_hint' => 'Noch keine Demo. Sie wird nach dem nächsten erfolgreichen Implement-Lauf automatisch aufgebaut.',
+            'stopped_hint' => 'Die Demo wurde nach dem Pull Request heruntergefahren. Du kannst sie jederzeit neu starten.',
+            'restart' => 'Demo neu starten',
             'rebuild' => 'Demo neu aufbauen',
             'rebuild_heading' => 'Live-Demo neu aufbauen?',
             'rebuild_description' => 'Eine laufende Demo dieses Tasks wird ersetzt. Der Aufbau läuft im Hintergrund.',
@@ -139,6 +203,18 @@ return [
             'stop_heading' => 'Live-Demo stoppen?',
             'stop_description' => 'Container, Volumes und Route der Demo werden entfernt.',
             'stop_queued' => 'Demo wird gestoppt.',
+            'access' => [
+                'label' => 'Zugriff',
+                'heading' => 'Demo-Zugriff',
+                'description' => 'Legt fest, wer diese Demo aufrufen darf. Greift bei einer laufenden Demo sofort, sonst beim nächsten Aufbau.',
+                'mode_label' => 'Schutz',
+                'mode_inherit' => 'Standard (aktuell: :default)',
+                'password_label' => 'Passwort',
+                'password_hint' => 'Leer lassen, um automatisch ein Passwort zu erzeugen. Benutzername: siehe ARGOS_PREVIEW_BASIC_USER.',
+                'saved' => 'Demo-Zugriff gespeichert.',
+                'basic_credentials' => 'Zugangsdaten — Benutzer: :user · Passwort: :password',
+                'apply_failed' => 'Zugriff konnte nicht angewendet werden.',
+            ],
         ],
 
         'concept' => [

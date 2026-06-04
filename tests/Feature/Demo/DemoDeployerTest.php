@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Demo;
 
+use App\Enums\DemoAccessMode;
 use App\Enums\DemoStatus;
 use App\Models\Demo;
 use App\Models\RepoProfile;
@@ -143,6 +144,107 @@ class DemoDeployerTest extends TestCase
         $url = app(DemoDeployer::class)->writeTraefikRoute('demo-x', 80);
 
         $this->assertSame('https://demo-x.127.0.0.1.nip.io', $url);
+    }
+
+    public function test_public_mode_writes_no_auth_middleware(): void
+    {
+        app(DemoDeployer::class)->writeTraefikRoute('demo-p', 8000, DemoAccessMode::Public);
+
+        $parsed = Yaml::parseFile($this->traefikDir.'/demo-p.yml');
+        $this->assertArrayNotHasKey('middlewares', $parsed['http']);
+        $this->assertArrayNotHasKey('middlewares', $parsed['http']['routers']['demo-p']);
+    }
+
+    public function test_session_mode_adds_forward_auth_middleware(): void
+    {
+        config()->set('argos.preview.auth_gate_url', 'http://nginx:80/_argos/demo-gate');
+
+        app(DemoDeployer::class)->writeTraefikRoute('demo-s', 8000, DemoAccessMode::Session);
+
+        $parsed = Yaml::parseFile($this->traefikDir.'/demo-s.yml');
+        $this->assertSame(['demo-s-auth'], $parsed['http']['routers']['demo-s']['middlewares']);
+
+        $fwd = $parsed['http']['middlewares']['demo-s-auth']['forwardAuth'];
+        $this->assertSame('http://nginx:80/_argos/demo-gate', $fwd['address']);
+        $this->assertTrue($fwd['trustForwardHeader']);
+    }
+
+    public function test_basic_mode_adds_basic_auth_with_hashed_password(): void
+    {
+        config()->set('argos.preview.basic_user', 'demo');
+
+        app(DemoDeployer::class)->writeTraefikRoute('demo-b', 8000, DemoAccessMode::Basic, 'secret-pw');
+
+        $parsed = Yaml::parseFile($this->traefikDir.'/demo-b.yml');
+        $users = $parsed['http']['middlewares']['demo-b-auth']['basicAuth']['users'];
+        $this->assertCount(1, $users);
+
+        [$user, $hash] = explode(':', $users[0], 2);
+        $this->assertSame('demo', $user);
+        $this->assertTrue(password_verify('secret-pw', $hash));
+    }
+
+    public function test_basic_mode_without_any_password_fails_closed(): void
+    {
+        config()->set('argos.preview.basic_password', null);
+
+        $this->expectException(RuntimeException::class);
+        app(DemoDeployer::class)->writeTraefikRoute('demo-x', 8000, DemoAccessMode::Basic, null);
+    }
+
+    public function test_apply_access_mode_rewrites_live_route_in_place(): void
+    {
+        $deployer = app(DemoDeployer::class);
+        $task = Task::factory()->create(['name' => 'feat-live', 'demo_access_mode' => DemoAccessMode::Public]);
+        Demo::factory()->for($task)->create(['status' => DemoStatus::Live, 'port' => 8000]);
+
+        $file = $this->traefikDir.'/'.$deployer->demoSlug($task).'.yml';
+
+        $deployer->applyAccessMode($task);
+        $this->assertArrayNotHasKey('middlewares', Yaml::parseFile($file)['http']);
+
+        $task->update(['demo_access_mode' => DemoAccessMode::Session]);
+        $deployer->applyAccessMode($task);
+        $this->assertSame(
+            ['demo-feat-live-auth'],
+            Yaml::parseFile($file)['http']['routers']['demo-feat-live']['middlewares'],
+        );
+    }
+
+    public function test_apply_access_mode_recovers_port_from_existing_route_when_null(): void
+    {
+        $deployer = app(DemoDeployer::class);
+        $task = Task::factory()->create(['name' => 'feat-legacy', 'demo_access_mode' => DemoAccessMode::Session]);
+        $demo = Demo::factory()->for($task)->create(['status' => DemoStatus::Live, 'port' => null]);
+
+        // An old route file written before the port column existed.
+        $slug = $deployer->demoSlug($task);
+        $deployer->writeTraefikRoute($slug, 8000, DemoAccessMode::Public);
+
+        $deployer->applyAccessMode($task);
+
+        $parsed = Yaml::parseFile($this->traefikDir.'/'.$slug.'.yml');
+        $this->assertSame([$slug.'-auth'], $parsed['http']['routers'][$slug]['middlewares']);
+        // The recovered port is backfilled for future rewrites.
+        $this->assertSame(8000, $demo->fresh()->port);
+    }
+
+    public function test_apply_access_mode_is_noop_without_live_demo(): void
+    {
+        $deployer = app(DemoDeployer::class);
+        $task = Task::factory()->create(['name' => 'feat-none']);
+
+        $deployer->applyAccessMode($task);
+
+        $this->assertFileDoesNotExist($this->traefikDir.'/'.$deployer->demoSlug($task).'.yml');
+    }
+
+    public function test_inherit_resolves_to_global_default(): void
+    {
+        config()->set('argos.preview.auth', 'session');
+        $task = Task::factory()->create(['demo_access_mode' => DemoAccessMode::Inherit]);
+
+        $this->assertSame(DemoAccessMode::Session, $task->effectiveDemoAccessMode());
     }
 
     public function test_deploy_happy_path_marks_live_and_writes_route(): void
