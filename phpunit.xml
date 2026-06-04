@@ -37,6 +37,13 @@
         <env name="PULSE_ENABLED" value="false" force="true"/>
         <env name="TELESCOPE_ENABLED" value="false" force="true"/>
         <env name="NIGHTWATCH_ENABLED" value="false" force="true"/>
+        <!--
+            Fake mode is exclusively for the Playwright browser-E2E suite
+            (set on the Docker app/queue containers). The PHP test suite must
+            test the real bindings, so force it off here regardless of a local
+            .env that enabled it for browser testing.
+        -->
+        <env name="ARGOS_E2E_FAKE" value="false" force="true"/>
 
         <server name="APP_ENV" value="testing" force="true"/>
         <server name="APP_KEY" value="base64:zTobRxr7TepBXVjM/E3kjKGAwnxWQ7QWMMXaInQYKKg=" force="true"/>
@@ -48,5 +55,6 @@
         <server name="PULSE_ENABLED" value="false" force="true"/>
         <server name="TELESCOPE_ENABLED" value="false" force="true"/>
         <server name="NIGHTWATCH_ENABLED" value="false" force="true"/>
+        <server name="ARGOS_E2E_FAKE" value="false" force="true"/>
     </php>
 </phpunit>
