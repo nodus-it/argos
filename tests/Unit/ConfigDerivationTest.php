@@ -68,4 +68,43 @@ class ConfigDerivationTest extends TestCase
         $this->assertSame('127.0.0.1.nip.io', $cfg['preview']['base_domain']);
         $this->assertSame('http', $cfg['preview']['scheme']);
     }
+
+    /**
+     * The canonical docker-compose forwards the whole preview block as empty
+     * `${VAR:-}` so config defaults apply. A set-but-empty env must therefore
+     * behave like "unset" — otherwise default_image collapses to '' and the
+     * demo image tag becomes `:hash`, which `docker build` rejects (and
+     * ttl_hours/port/network silently go to 0/'').
+     */
+    public function test_empty_preview_env_falls_back_to_defaults(): void
+    {
+        $keys = [
+            'ARGOS_PREVIEW_DEFAULT_IMAGE', 'ARGOS_PREVIEW_TTL_HOURS', 'ARGOS_PREVIEW_PORT',
+            'ARGOS_PREVIEW_NETWORK', 'ARGOS_PREVIEW_AUTH', 'ARGOS_PREVIEW_AUTH_GATE_URL',
+            'ARGOS_PREVIEW_BASIC_USER', 'ARGOS_PREVIEW_MAX_CONCURRENT',
+            'ARGOS_PREVIEW_CPU_LIMIT', 'ARGOS_PREVIEW_MEM_LIMIT', 'ARGOS_PORT',
+        ];
+        foreach ($keys as $key) {
+            Env::getRepository()->set($key, '');
+        }
+
+        try {
+            $cfg = (require dirname(__DIR__, 2).'/config/argos.php')['preview'];
+        } finally {
+            foreach ($keys as $key) {
+                Env::getRepository()->clear($key);
+            }
+        }
+
+        $this->assertSame('argos-demo', $cfg['default_image']);
+        $this->assertSame(24, $cfg['ttl_hours']);
+        $this->assertSame(8080, $cfg['port']);
+        $this->assertSame('argos_edge', $cfg['network']);
+        $this->assertSame('none', $cfg['auth']);
+        $this->assertSame('http://nginx:80/_argos/demo-gate', $cfg['auth_gate_url']);
+        $this->assertSame('demo', $cfg['basic_user']);
+        $this->assertSame(10, $cfg['max_concurrent']);
+        $this->assertSame('1.0', $cfg['cpu_limit']);
+        $this->assertSame('1g', $cfg['memory_limit']);
+    }
 }

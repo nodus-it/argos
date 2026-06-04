@@ -9,8 +9,17 @@
 # volumes, the full env) comes from the canonical base file:
 #   • build argos-app:local from source instead of pulling a registry image
 #   • bind-mount the working tree into app/queue/scheduler for hot reload
-#   • APP_ENV=local / APP_DEBUG=true defaults
+#   • non-secret dev defaults baked in (APP_NAME/ENV/DEBUG/KEY, LOG_LEVEL,
+#     ADMIN_PASSWORD, ARGOS_PREVIEW_ENABLED, SEED_REPO_URL/BRANCH) so the repo
+#     root .env only needs to carry REAL credentials (the SEED_* OAuth tokens,
+#     read by the seeder via the bind-mounted /app/.env). Every value stays
+#     `${VAR:-default}`, so a key in .env still overrides the baked default.
 #   • phpMyAdmin on ${ARGOS_PMA_PORT:-8081}
+#
+# The APP_KEY below is a throwaway LOCAL dev key — it only encrypts demo data
+# in the local stack and is never used in staging/production (the installer
+# generates its own). Committing it is intentional so `composer dev` works
+# zero-config.
 #
 # Production never sees this file (the installer ships only docker-compose.yml),
 # so the two can't drift on anything but these deltas.
@@ -23,8 +32,17 @@ services:
       dockerfile: .tools/docker/app/Dockerfile
       target: app
     environment:
-      APP_ENV:   "${APP_ENV:-local}"
-      APP_DEBUG: "${APP_DEBUG:-true}"
+      APP_NAME:              "${APP_NAME:-Argos}"
+      APP_ENV:               "${APP_ENV:-local}"
+      APP_DEBUG:             "${APP_DEBUG:-true}"
+      APP_KEY:               "${APP_KEY:-base64:28CjcHgVoyT5B9N4+XGZuGrahXj6KrALGKEbrbgm+JY=}"
+      LOG_LEVEL:             "${LOG_LEVEL:-debug}"
+      ADMIN_PASSWORD:        "${ADMIN_PASSWORD:-12345}"
+      ARGOS_PREVIEW_ENABLED: "${ARGOS_PREVIEW_ENABLED:-true}"
+      # Demo seeder (composer dev:live) — non-secret repo target only. The
+      # GitHub/Claude/Codex OAuth tokens stay in the bind-mounted /app/.env.
+      SEED_REPO_URL:         "${SEED_REPO_URL:-https://github.com/nodus-it/argos}"
+      SEED_REPO_BRANCH:      "${SEED_REPO_BRANCH:-develop}"
     volumes:
       # Bind mount for hot reload without rebuilding the image. vendor/ is
       # shared with the host — composer require on the host propagates
@@ -38,8 +56,12 @@ services:
 
   queue:
     environment:
-      APP_ENV:   "${APP_ENV:-local}"
-      APP_DEBUG: "${APP_DEBUG:-true}"
+      APP_NAME:              "${APP_NAME:-Argos}"
+      APP_ENV:               "${APP_ENV:-local}"
+      APP_DEBUG:             "${APP_DEBUG:-true}"
+      APP_KEY:               "${APP_KEY:-base64:28CjcHgVoyT5B9N4+XGZuGrahXj6KrALGKEbrbgm+JY=}"
+      LOG_LEVEL:             "${LOG_LEVEL:-debug}"
+      ARGOS_PREVIEW_ENABLED: "${ARGOS_PREVIEW_ENABLED:-true}"
     volumes:
       - ../..:/app
       - /app/node_modules
@@ -48,8 +70,11 @@ services:
 
   scheduler:
     environment:
+      APP_NAME:  "${APP_NAME:-Argos}"
       APP_ENV:   "${APP_ENV:-local}"
       APP_DEBUG: "${APP_DEBUG:-true}"
+      APP_KEY:   "${APP_KEY:-base64:28CjcHgVoyT5B9N4+XGZuGrahXj6KrALGKEbrbgm+JY=}"
+      LOG_LEVEL: "${LOG_LEVEL:-debug}"
     volumes:
       - ../..:/app
       - /app/node_modules
