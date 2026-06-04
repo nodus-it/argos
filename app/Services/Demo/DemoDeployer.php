@@ -73,12 +73,16 @@ class DemoDeployer
 
         $log = '';
         try {
-            [$composeYaml, $settings, $usingDefault] = $this->readContract($profile);
+            [$composeYaml, $settings] = $this->readContract($profile);
 
-            // The bundled default compose references the runtime image by a
-            // placeholder — resolve (build-on-demand) the content-hashed tag and
-            // inject it. Repo-supplied contracts bring their own images.
-            if ($usingDefault) {
+            // Resolve the built-in runtime-image placeholder to the content-
+            // hashed, build-on-demand tag whenever a contract references it. The
+            // bundled default always does; a repo contract may opt into the
+            // built-in runtime by keeping the placeholder and only overriding
+            // settings/commands (Argos' own .argos/demo.* does exactly this to
+            // seed FullDemoSeeder). Contracts that ship their own image simply
+            // omit the token, so this is a no-op for them.
+            if (str_contains($composeYaml, self::DEMO_IMAGE_PLACEHOLDER)) {
                 $composeYaml = str_replace(self::DEMO_IMAGE_PLACEHOLDER, $this->imageBuilder->ensure(), $composeYaml);
             }
 
@@ -195,7 +199,7 @@ class DemoDeployer
      * Fetch both contract files from the provider at the base branch, or fall
      * back to the bundled default when the repo ships none.
      *
-     * @return array{0: string, 1: array<string, mixed>, 2: bool} [composeYaml, settings, usingDefault]
+     * @return array{0: string, 1: array<string, mixed>} [composeYaml, settings]
      */
     private function readContract(RepoProfile $profile): array
     {
@@ -206,12 +210,9 @@ class DemoDeployer
         $composeYaml = $service->getFileContents($ownerRepo, DemoConfigLocator::COMPOSE_PATH, $ref);
         $settingsYaml = $service->getFileContents($ownerRepo, DemoConfigLocator::SETTINGS_PATH, $ref);
 
-        $usingDefault = false;
-
         if ($composeYaml === null && $settingsYaml === null) {
             // No contract at all → built-in default runtime.
             [$composeYaml, $settingsYaml] = $this->defaultContract();
-            $usingDefault = true;
         } elseif ($composeYaml === null || $settingsYaml === null) {
             // A half-written contract is a mistake the author must see, not a
             // silent fall-through to the generic demo.
@@ -226,7 +227,7 @@ class DemoDeployer
             throw new RuntimeException(DemoConfigLocator::SETTINGS_PATH.' is not valid YAML.');
         }
 
-        return [$composeYaml, $settings, $usingDefault];
+        return [$composeYaml, $settings];
     }
 
     /**

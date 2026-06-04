@@ -1,0 +1,59 @@
+# Argos' own live-demo runtime contract (compose).
+#
+# Argos has no special runtime needs beyond a generic Laravel app, so this
+# reuses Argos' built-in default demo runtime: the deployer substitutes
+# __ARGOS_DEMO_IMAGE__ with the content-hashed runtime tag (php-fpm + nginx +
+# node, built on demand by DemoImageBuilder) and layers its override on top
+# (workspace mount, argos_edge alias, resource limits, injected APP_KEY).
+#
+# We only ship a repo contract so .argos/demo.yml can run FullDemoSeeder
+# instead of the production-safe default DatabaseSeeder — otherwise the live
+# demo would show nothing but the admin user. The compose itself is identical
+# to the bundled default (resources/stubs/demo/laravel/demo.compose.yml).
+#
+# `app` and `db` share a private `demo-internal` network; the override merges
+# argos_edge onto `app` additively so Traefik can reach it while app<->db keeps
+# working. Do NOT add host `ports:` or Traefik labels.
+services:
+  app:
+    image: __ARGOS_DEMO_IMAGE__
+    working_dir: /var/www/html
+    # Laravel reads real env vars over the repo .env (immutable dotenv), so the
+    # demo DB is wired here without touching the checked-out .env. Don't cache
+    # config in the contract commands or env() would stop seeing these.
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+      LOG_CHANNEL: stderr
+      DB_CONNECTION: mysql
+      DB_HOST: db
+      DB_PORT: "3306"
+      DB_DATABASE: demo
+      DB_USERNAME: demo
+      DB_PASSWORD: demo
+      CACHE_STORE: file
+      SESSION_DRIVER: file
+      QUEUE_CONNECTION: sync
+    networks:
+      - demo-internal
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: mariadb:11
+    environment:
+      MARIADB_DATABASE: demo
+      MARIADB_USER: demo
+      MARIADB_PASSWORD: demo
+      MARIADB_ROOT_PASSWORD: demo
+    networks:
+      - demo-internal
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+networks:
+  demo-internal:
