@@ -127,7 +127,9 @@ class ConnectedAccountsPageTest extends TestCase
         config(['services.gitlab.client_id' => null]);
 
         Livewire::test(ConnectedAccounts::class)
-            ->assertSee(__('accounts.blade.gitlab_not_configured_description'));
+            ->assertSee(__('accounts.blade.gitlab_not_configured_description'))
+            // Direct link to create the OAuth app with the provider preselected.
+            ->assertSee(route('filament.admin.resources.provider-oauth-configs.create', ['provider' => 'gitlab']), escape: false);
     }
 
     public function test_gitlab_section_shows_not_connected_when_configured_but_not_linked(): void
