@@ -5,11 +5,17 @@ declare(strict_types=1);
 use App\Http\Controllers\Auth\BitbucketConnectedAccountController;
 use App\Http\Controllers\Auth\ConnectedAccountController;
 use App\Http\Controllers\Auth\LinearConnectedAccountController;
+use App\Http\Controllers\DemoGateController;
 use App\Http\Controllers\TaskLogController;
 use App\Http\Controllers\Webhooks\IssueWebhookController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn () => redirect('/admin'));
+
+// Traefik forwardAuth target for session-protected live demos. Public route
+// (no auth middleware) — it answers 204 when logged in, else redirects to the
+// Argos login. See DemoGateController.
+Route::get('/_argos/demo-gate', DemoGateController::class)->name('demo.gate');
 
 // Inbound issue webhooks — no session auth, signature verified in controller.
 // SubstituteBindings is re-added explicitly since withoutMiddleware('web') would

@@ -196,6 +196,18 @@ return [
             'stop_heading' => 'Stop live demo?',
             'stop_description' => 'The demo’s containers, volumes and route will be removed.',
             'stop_queued' => 'Demo is being stopped.',
+            'access' => [
+                'label' => 'Access',
+                'heading' => 'Demo access',
+                'description' => 'Controls who may open this demo. Applies immediately to a running demo, otherwise on the next build.',
+                'mode_label' => 'Protection',
+                'mode_inherit' => 'Default (currently: :default)',
+                'password_label' => 'Password',
+                'password_hint' => 'Leave empty to auto-generate a password. Username: see ARGOS_PREVIEW_BASIC_USER.',
+                'saved' => 'Demo access saved.',
+                'basic_credentials' => 'Credentials — user: :user · password: :password',
+                'apply_failed' => 'Could not apply the access setting.',
+            ],
         ],
 
         'concept' => [

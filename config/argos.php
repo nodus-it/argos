@@ -81,12 +81,32 @@ return [
         // Demos live at demo-{task}.{base_domain}; nip.io gives zero-config
         // wildcard subdomains locally (resolves to 127.0.0.1).
         'base_domain' => env('ARGOS_PREVIEW_BASE_DOMAIN', '127.0.0.1.nip.io'),
-        // Scheme + external port the demo URL is reachable on. Locally Traefik
-        // publishes ARGOS_PORT (default 8080); a real deployment terminates TLS
-        // on 443, so set scheme=https and port=443 (omitted from the URL).
+        // Scheme + external port the demo URL is reachable on — the PUBLIC
+        // endpoint, independent of the port Traefik binds on the host
+        // (ARGOS_PORT). Locally they coincide (Traefik publishes 8080, demos
+        // are reached on :8080). Behind an upstream TLS proxy that terminates
+        // on 443 and forwards to ARGOS_PORT, set scheme=https and
+        // ARGOS_PREVIEW_PORT=443 so the URL drops the port. Falls back to
+        // ARGOS_PORT when ARGOS_PREVIEW_PORT is unset.
         'scheme' => env('ARGOS_PREVIEW_SCHEME', 'http'),
-        'port' => (int) env('ARGOS_PORT', 8080),
+        'port' => (int) env('ARGOS_PREVIEW_PORT', env('ARGOS_PORT', 8080)),
         'ttl_hours' => (int) env('ARGOS_PREVIEW_TTL_HOURS', 24),
+        // Stack-wide default access protection for demos whose task is set to
+        // "inherit" (the default). One of: none | session | basic.
+        //   none    — public, anyone with the URL
+        //   session — Argos login required (Traefik forwardAuth → the gate below)
+        //   basic   — shared HTTP Basic credentials
+        // Per-task overrides (tasks.demo_access_mode) win over this default.
+        'auth' => env('ARGOS_PREVIEW_AUTH', 'none'),
+        // HTTP Basic username for basic-protected demos. The password is either
+        // per-task (generated when a task is switched to basic) or this global
+        // fallback for tasks that merely inherit the basic default.
+        'basic_user' => env('ARGOS_PREVIEW_BASIC_USER', 'demo'),
+        'basic_password' => env('ARGOS_PREVIEW_BASIC_PASSWORD') ?: null,
+        // Internal URL Traefik's forwardAuth middleware calls to validate the
+        // Argos session for session-protected demos. Points at the in-stack
+        // nginx that fronts the app; reachable from Traefik on the default net.
+        'auth_gate_url' => env('ARGOS_PREVIEW_AUTH_GATE_URL', 'http://nginx:80/_argos/demo-gate'),
         // External Docker network shared with Traefik (defined in docker-compose.yml).
         'network' => env('ARGOS_PREVIEW_NETWORK', 'argos_edge'),
         // Shared volume where the manager writes one Traefik file-provider route

@@ -1,27 +1,77 @@
-# Argos — Docker Compose stack
+# Argos — canonical Docker Compose stack
+#
+# This is the SINGLE source of truth for the stack, used both by the self-host
+# installer (downloaded into the install directory by `.tools/install.sh` and
+# considered SYSTEM-MANAGED — the installer overwrites it on update) and by
+# local development (layered with docker-compose.dev.yml, see below).
 #
 # Services:
 #   db        — MariaDB 11
 #   redis     — Redis 7 (queue backend for Horizon)
-#   app       — Laravel app (PHP-FPM), runs migrations on boot, spawns worker containers via the docker socket
-#   nginx     — reverse proxy in front of app:9000
+#   app       — Laravel app (PHP-FPM); runs migrations on boot, spawns worker
+#               containers via the docker socket, seeds Traefik + nginx config
+#   traefik   — single port-80 entry; file-provider routing (app + live demos)
+#   nginx     — serves static assets + proxies to app:9000, behind Traefik
 #   queue     — Laravel Horizon (same image as app, ARGOS_ROLE=queue)
 #   scheduler — Laravel scheduler (`schedule:work`, ARGOS_ROLE=scheduler)
 #
-# Image source:
-#   By default the `app`/`queue` services build `argos-app:local` from the local
-#   sources. Set ARGOS_APP_IMAGE to a registry tag (e.g.
-#   `ghcr.io/nodus-it/argos-app:stage`) and run `docker compose pull` to use a
-#   prebuilt image instead.
+# Production vs. development:
+#   Production pulls a prebuilt image (ARGOS_APP_IMAGE points at a registry tag,
+#   set in .env). Local development layers docker-compose.dev.yml on top, which
+#   adds the `build:` block, source bind mounts (hot reload) and phpMyAdmin:
+#     docker compose -f .tools/docker/docker-compose.yml \
+#                    -f .tools/docker/docker-compose.dev.yml up
+#   The `.tools/bin/dev-*.sh` scripts and the `composer dev` script do this.
 #
-# Worker images:
-#   Worker images are built on demand by the WorkerImageResolver from
-#   .tools/docker/worker/Dockerfile + the active worker_stack row, with tags
-#   like `argos-worker:php-8.4-<stack-hash>-<agent>-<version>`. Nothing in
-#   this compose file pre-builds them — the first phase run triggers the
-#   build (1–3 min cold cache, instant after).
+# Customisation (production): drop a `docker-compose.override.yml` next to this
+# file — compose merges it automatically and the installer never touches it.
+#
+# All tunables live in `.env` (see .env.example for the full list with
+# defaults). Keys are read by compose via `${VAR:-default}` substitution.
+#
+# Worker images are built on demand by the WorkerImageResolver from
+# .tools/docker/worker/Dockerfile + the active worker_stack row — nothing here
+# pre-builds them; the first phase run triggers the build.
 
 name: argos
+
+# OAuth client credentials are read by both the app (Connect flow) and the
+# queue worker (TokenRefresher during phase runs). Defined once, merged into
+# both services' environment via the YAML anchor below.
+x-oauth-env: &oauth-env
+  GITHUB_CLIENT_ID:        "${GITHUB_CLIENT_ID:-}"
+  GITHUB_CLIENT_SECRET:    "${GITHUB_CLIENT_SECRET:-}"
+  GITLAB_CLIENT_ID:        "${GITLAB_CLIENT_ID:-}"
+  GITLAB_CLIENT_SECRET:    "${GITLAB_CLIENT_SECRET:-}"
+  GITLAB_INSTANCE_URL:     "${GITLAB_INSTANCE_URL:-}"
+  BITBUCKET_CLIENT_ID:     "${BITBUCKET_CLIENT_ID:-}"
+  BITBUCKET_CLIENT_SECRET: "${BITBUCKET_CLIENT_SECRET:-}"
+
+# Live-Demo (P6) preview settings — shared verbatim by app + queue (the queue
+# worker runs DeployDemoJob, the app warms the runtime image). Listed via an
+# anchor so the two stay in lockstep. All gated behind ARGOS_PREVIEW_ENABLED
+# (default off); see config/argos.php.
+x-preview-env: &preview-env
+  ARGOS_PREVIEW_ENABLED:        "${ARGOS_PREVIEW_ENABLED:-false}"
+  ARGOS_PREVIEW_BASE_DOMAIN:    "${ARGOS_PREVIEW_BASE_DOMAIN:-127.0.0.1.nip.io}"
+  ARGOS_PREVIEW_SCHEME:         "${ARGOS_PREVIEW_SCHEME:-http}"
+  ARGOS_PORT:                   "${ARGOS_PORT:-8080}"
+  # Public port the demo URL is reached on (omitted from the URL for 80/443).
+  # Defaults to ARGOS_PORT; set to 443 behind an upstream TLS proxy.
+  ARGOS_PREVIEW_PORT:           "${ARGOS_PREVIEW_PORT:-${ARGOS_PORT:-8080}}"
+  ARGOS_PREVIEW_TTL_HOURS:      "${ARGOS_PREVIEW_TTL_HOURS:-24}"
+  ARGOS_PREVIEW_NETWORK:        "${ARGOS_PREVIEW_NETWORK:-argos_edge}"
+  ARGOS_PREVIEW_MAX_CONCURRENT: "${ARGOS_PREVIEW_MAX_CONCURRENT:-10}"
+  ARGOS_PREVIEW_CPU_LIMIT:      "${ARGOS_PREVIEW_CPU_LIMIT:-1.0}"
+  ARGOS_PREVIEW_MEM_LIMIT:      "${ARGOS_PREVIEW_MEM_LIMIT:-1g}"
+  ARGOS_PREVIEW_DEFAULT_IMAGE:  "${ARGOS_PREVIEW_DEFAULT_IMAGE:-argos-demo}"
+  # Demo access protection (none | session | basic). Per-task overrides win.
+  # `session` requires SESSION_DOMAIN (set on the app service) so the login
+  # cookie is shared with the demo subdomains.
+  ARGOS_PREVIEW_AUTH:           "${ARGOS_PREVIEW_AUTH:-none}"
+  ARGOS_PREVIEW_BASIC_USER:     "${ARGOS_PREVIEW_BASIC_USER:-demo}"
+  ARGOS_PREVIEW_BASIC_PASSWORD: "${ARGOS_PREVIEW_BASIC_PASSWORD:-}"
+  ARGOS_PREVIEW_AUTH_GATE_URL:  "${ARGOS_PREVIEW_AUTH_GATE_URL:-http://nginx:80/_argos/demo-gate}"
 
 services:
 
@@ -55,44 +105,42 @@ services:
       start_period: 10s
 
   app:
-    # Default to the locally built image. Override ARGOS_APP_IMAGE to pull a
-    # tagged registry build instead (e.g. `ghcr.io/nodus-it/argos-app:stage`)
-    # — `docker compose pull` will fetch it; `docker compose build` would
-    # rebuild from source and re-tag.
+    # Production pulls the tag in ARGOS_APP_IMAGE; local dev (docker-compose.dev.yml)
+    # adds a build block and builds argos-app:local from source.
     image: "${ARGOS_APP_IMAGE:-argos-app:local}"
-    build:
-      context: ../..
-      dockerfile: .tools/docker/app/Dockerfile
-      target: app
+    restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
     volumes:
+      # Spawning worker containers needs the host's docker socket.
       - /var/run/docker.sock:/var/run/docker.sock
+      # Persistent app state (config, app-key, passport keys).
       - argos-data:/data
       # Traefik dynamic-config dir (file provider). The app seeds the static
-      # Argos route here on boot; the manager writes one file per demo.
+      # Argos route here on boot; the manager writes one file per live demo.
       - argos-traefik:/data/traefik
-      # Bind mount for local development (hot reload without rebuilding the image).
-      # vendor/ is intentionally shared with the host — composer require on the host
-      # propagates immediately, and the entrypoint runs `composer install` whenever
-      # composer.lock drifts from vendor/composer/installed.json (e.g. after a fresh
-      # clone or git pull). The other anonymous volumes mask host artefacts that
-      # would otherwise shadow the image-built ones.
-      - ../..:/app
-      - /app/node_modules
-      - /app/public/build
-      - /app/bootstrap/cache   # cache without dev-only providers (no Pail)
+      # Shared with nginx — the entrypoint syncs /app/public + the baked
+      # nginx.conf into these on every boot so nginx serves assets and site
+      # config without bind-mounts in the host install dir.
+      - argos-public:/srv/argos-public
+      - argos-nginx-config:/srv/argos-nginx
     environment:
+      <<: [*oauth-env, *preview-env]
       ARGOS_ROLE:                        "app"
-      APP_ENV:                           "${APP_ENV:-local}"
-      APP_DEBUG:                         "${APP_DEBUG:-true}"
+      APP_ENV:                           "${APP_ENV:-production}"
+      APP_DEBUG:                         "${APP_DEBUG:-false}"
+      APP_URL:                           "${APP_URL:-http://localhost:${ARGOS_PORT:-8080}}"
       APP_KEY:                           "${APP_KEY:-}"
+      ADMIN_PASSWORD:                    "${ADMIN_PASSWORD:-}"
+      # Shared parent domain so the Argos login cookie also reaches the demo
+      # subdomains — required for session-protected demos (ARGOS_PREVIEW_AUTH=session).
+      SESSION_DOMAIN:                    "${SESSION_DOMAIN:-}"
+      CLAUDE_CODE_OAUTH_TOKEN:           "${CLAUDE_CODE_OAUTH_TOKEN:-}"
       ARGOS_CONFIG_DIR:                  /data/config
       ARGOS_TRAEFIK_DIR:                 /data/traefik
-      PASSPORT_KEYS_PATH:                /data/passport
       DB_CONNECTION:                     "mariadb"
       ARGOS_DB_HOST:                     "db"
       ARGOS_DB_PORT:                     "3306"
@@ -106,8 +154,7 @@ services:
       ARGOS_QUEUE_TASKS_PROCESSES:       "${ARGOS_QUEUE_TASKS_PROCESSES:-2}"
     healthcheck:
       # Goes green only when DB is reachable AND the schema is fully migrated,
-      # so dependents like `queue` can rely on `service_healthy` to mean
-      # "schema is ready".
+      # so dependents (queue, nginx) can rely on `service_healthy`.
       test: ["CMD-SHELL", "php /app/artisan migrate:status >/dev/null 2>&1"]
       interval: 10s
       timeout: 10s
@@ -120,7 +167,7 @@ services:
   # the app seeds the catch-all Argos route; the manager writes one file per
   # demo (Host(demo-…) → demo container). Higher-priority demo Host rules win;
   # everything else falls through to nginx, so http://localhost:${ARGOS_PORT}
-  # keeps working locally.
+  # keeps working.
   traefik:
     image: traefik:v3.5
     restart: unless-stopped
@@ -128,6 +175,13 @@ services:
       - "--providers.file.directory=/etc/traefik/dynamic"
       - "--providers.file.watch=true"
       - "--entrypoints.web.address=:80"
+      # Trust + pass through X-Forwarded-* from an upstream TLS-terminating
+      # proxy (HAProxy/nginx/Caddy/another Traefik). Without this Traefik
+      # overwrites X-Forwarded-Proto with "http" for the :80 entrypoint, so
+      # Laravel (which trusts the proto header, see bootstrap/app.php) sees
+      # plain HTTP and emits http:// asset URLs → mixed-content blocked on an
+      # HTTPS site. Mirrors Laravel's trustProxies(at: '*') posture.
+      - "--entrypoints.web.forwardedHeaders.insecure=true"
     ports:
       - "${ARGOS_PORT:-8080}:80"
     volumes:
@@ -142,35 +196,21 @@ services:
     image: nginx:1.27-alpine
     restart: unless-stopped
     depends_on:
-      - app
+      app:
+        condition: service_healthy
     networks:
       - default
       - argos_edge
     volumes:
-      # Read-only bind mount: nginx only needs /app/public for static files and
-      # the Vite build output. The app service owns writes.
-      - ../..:/app:ro
-      - ./app/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-
-  # phpMyAdmin on port 8081 (override via ARGOS_PMA_PORT) — always on.
-  phpmyadmin:
-    image: phpmyadmin:5
-    restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
-    ports:
-      - "${ARGOS_PMA_PORT:-8081}:80"
-    environment:
-      PMA_HOST: db
-      PMA_USER: "${ARGOS_DB_USERNAME:-argos}"
-      PMA_PASSWORD: "${ARGOS_DB_PASSWORD:-argos}"
-      UPLOAD_LIMIT: 256M
+      # Both volumes are populated by the app container's entrypoint on every
+      # boot. Mounted RO here so nginx serves static assets directly without
+      # bouncing through PHP-FPM, and picks up the baked site config.
+      - argos-public:/app/public:ro
+      - argos-nginx-config:/etc/nginx/conf.d:ro
 
   queue:
     # Reuses the image built/pulled by the `app` service — same Dockerfile
-    # target, same content. Defining only `image:` (no `build:`) prevents
-    # compose from inventing a separate `argos-queue` image that could drift.
+    # target, same content.
     image: "${ARGOS_APP_IMAGE:-argos-app:local}"
     restart: unless-stopped
     stop_signal: SIGTERM
@@ -184,18 +224,16 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - argos-data:/data
       - argos-traefik:/data/traefik
-      - ../..:/app
-      - /app/node_modules
-      - /app/public/build
-      - /app/bootstrap/cache
     environment:
+      <<: [*oauth-env, *preview-env]
       ARGOS_ROLE:                        "queue"
-      APP_ENV:                           "${APP_ENV:-local}"
-      APP_DEBUG:                         "${APP_DEBUG:-true}"
+      APP_ENV:                           "${APP_ENV:-production}"
+      APP_DEBUG:                         "${APP_DEBUG:-false}"
+      APP_URL:                           "${APP_URL:-http://localhost:${ARGOS_PORT:-8080}}"
       APP_KEY:                           "${APP_KEY:-}"
+      CLAUDE_CODE_OAUTH_TOKEN:           "${CLAUDE_CODE_OAUTH_TOKEN:-}"
       ARGOS_CONFIG_DIR:                  /data/config
       ARGOS_TRAEFIK_DIR:                 /data/traefik
-      PASSPORT_KEYS_PATH:                /data/passport
       DB_CONNECTION:                     "mariadb"
       ARGOS_DB_HOST:                     "db"
       ARGOS_DB_PORT:                     "3306"
@@ -210,34 +248,37 @@ services:
     command: ["php", "/app/artisan", "horizon"]
 
   scheduler:
-    # Same image as app/queue. Runs `schedule:work`, which invokes
-    # `schedule:run` every minute (see routes/console.php — e.g.
-    # argos:poll-issues every 5 min). No docker socket: scheduled commands
-    # only dispatch queued jobs, the `queue` worker does the actual work.
+    # Runs `schedule:work`, which invokes `schedule:run` every minute (see
+    # routes/console.php — e.g. argos:poll-issues every 5 min). No docker
+    # socket: scheduled commands only dispatch queued jobs, the `queue`
+    # worker does the actual work.
     image: "${ARGOS_APP_IMAGE:-argos-app:local}"
     restart: unless-stopped
     depends_on:
       app:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     volumes:
       - argos-data:/data
-      - ../..:/app
-      - /app/node_modules
-      - /app/public/build
-      - /app/bootstrap/cache
     environment:
+      <<: *oauth-env
       ARGOS_ROLE:               "scheduler"
-      APP_ENV:                  "${APP_ENV:-local}"
-      APP_DEBUG:                "${APP_DEBUG:-true}"
+      APP_ENV:                  "${APP_ENV:-production}"
+      APP_DEBUG:                "${APP_DEBUG:-false}"
+      APP_URL:                  "${APP_URL:-http://localhost:${ARGOS_PORT:-8080}}"
       APP_KEY:                  "${APP_KEY:-}"
+      CLAUDE_CODE_OAUTH_TOKEN:  "${CLAUDE_CODE_OAUTH_TOKEN:-}"
       ARGOS_CONFIG_DIR:         /data/config
-      PASSPORT_KEYS_PATH:       /data/passport
       DB_CONNECTION:            "mariadb"
       ARGOS_DB_HOST:            "db"
       ARGOS_DB_PORT:            "3306"
       ARGOS_DB_DATABASE:        "${ARGOS_DB_DATABASE:-argos}"
       ARGOS_DB_USERNAME:        "${ARGOS_DB_USERNAME:-argos}"
       ARGOS_DB_PASSWORD:        "${ARGOS_DB_PASSWORD:-argos}"
+      QUEUE_CONNECTION:         "redis"
+      REDIS_HOST:               "redis"
+      REDIS_PORT:               "6379"
     command: ["php", "/app/artisan", "schedule:work"]
 
 networks:
@@ -253,5 +294,6 @@ volumes:
   # Traefik dynamic config (file provider): written rw by app/queue, mounted
   # ro by traefik. Holds the static Argos route + one file per live demo.
   argos-traefik:
-  composer_cache:
-  npm_cache:
+  # nginx-served assets + site config, populated by the app entrypoint.
+  argos-public:
+  argos-nginx-config:

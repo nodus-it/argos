@@ -73,6 +73,9 @@
         $demoEnabled = (bool) config('argos.preview.enabled') && (bool) $task->repoProfile?->live_demo_enabled;
         $demoStatus = $demo?->status?->value;
         $demoBadgeCls = ['building' => 'badge-running', 'live' => 'badge-success', 'failed' => 'badge-failed', 'stopped' => 'badge-draft'][$demoStatus] ?? 'badge-draft';
+        $accessMode = $task->effectiveDemoAccessMode();
+        $accessBadgeCls = ['success' => 'badge-success', 'warning' => 'badge-running', 'danger' => 'badge-failed', 'gray' => 'badge-draft'][$accessMode->color()] ?? 'badge-draft';
+        $accessIcon = $accessMode === \App\Enums\DemoAccessMode::Public ? 'heroicon-o-lock-open' : 'heroicon-o-lock-closed';
     @endphp
     @if ($demo || $demoEnabled)
         <div class="card card-pad demo-bar fade-in" style="margin-bottom:20px;" x-data="{ log: false }">
@@ -82,6 +85,10 @@
                 @if ($demo)
                     <span class="badge {{ $demoBadgeCls }}"><span class="dot"></span>{{ $demo->status->label() }}</span>
                 @endif
+                <span class="badge {{ $accessBadgeCls }}" title="{{ __('tasks.view.demo.access.heading') }}">
+                    @svg($accessIcon)
+                    {{ $accessMode->label() }}
+                </span>
             </div>
 
             <div class="demo-meta">

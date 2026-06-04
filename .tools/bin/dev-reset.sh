@@ -17,10 +17,12 @@ IFS=$'\n\t'
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-COMPOSE_FILE="$REPO_ROOT/.tools/docker/docker-compose.yml"
+# Canonical base + local dev overlay (build, bind mounts, phpMyAdmin).
+COMPOSE_BASE="$REPO_ROOT/.tools/docker/docker-compose.yml"
+COMPOSE_DEV="$REPO_ROOT/.tools/docker/docker-compose.dev.yml"
 
 compose() {
-    docker compose -f "$COMPOSE_FILE" "$@"
+    docker compose -f "$COMPOSE_BASE" -f "$COMPOSE_DEV" "$@"
 }
 
 echo "==> migrate:fresh + DemoSeeder"

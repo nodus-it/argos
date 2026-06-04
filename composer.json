@@ -55,16 +55,11 @@
 
         "dev": [
             "Composer\\Config::disableProcessTimeout",
-            "npx concurrently -c \"#93c5fd,#fb7185\" \"docker compose --env-file .env -f .tools/docker/docker-compose.yml up --build --remove-orphans\" \"npm run dev\" --names=compose,vite --kill-others"
+            "npx concurrently -c \"#93c5fd,#fb7185\" \"docker compose --env-file .env -f .tools/docker/docker-compose.yml -f .tools/docker/docker-compose.dev.yml up --build --remove-orphans\" \"npm run dev\" --names=compose,vite --kill-others"
         ],
-        "dev:stop": "docker compose --env-file .env -f .tools/docker/docker-compose.yml down",
-        "dev:logs": "docker compose --env-file .env -f .tools/docker/docker-compose.yml logs -f",
-        "dev:exec": "docker compose --env-file .env -f .tools/docker/docker-compose.yml exec app bash",
-
-        "stage": "bash .tools/bash/start-stage.sh",
-        "stage:stop": "docker compose -p argos-stage -f .tools/docker/docker-compose.yml down",
-        "stage:logs": "docker compose -p argos-stage -f .tools/docker/docker-compose.yml logs -f",
-        "stage:exec": "docker compose -p argos-stage -f .tools/docker/docker-compose.yml exec app bash",
+        "dev:stop": "docker compose --env-file .env -f .tools/docker/docker-compose.yml -f .tools/docker/docker-compose.dev.yml down",
+        "dev:logs": "docker compose --env-file .env -f .tools/docker/docker-compose.yml -f .tools/docker/docker-compose.dev.yml logs -f",
+        "dev:exec": "docker compose --env-file .env -f .tools/docker/docker-compose.yml -f .tools/docker/docker-compose.dev.yml exec app bash",
 
         "pint": "vendor/bin/pint --format agent",
         "pint:test": "vendor/bin/pint --test --format agent",

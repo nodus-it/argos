@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\TaskResource\Pages;
 
+use App\Enums\DemoAccessMode;
 use App\Enums\DemoStatus;
 use App\Enums\Phase;
 use App\Enums\PhaseStatus;
@@ -12,15 +13,18 @@ use App\Jobs\DeployDemoJob;
 use App\Jobs\StopDemoJob;
 use App\Models\PhaseRun;
 use App\Models\Task;
+use App\Services\Demo\DemoDeployer;
 use App\Services\Task\TaskService;
 use App\Services\Workflow\StateReader;
 use App\Support\ConceptMarkdown;
 use App\Support\Workflow\TaskStage;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
+use Filament\Schemas\Components\Utilities\Get;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Process;
@@ -528,6 +532,79 @@ class ViewTask extends ViewRecord
                     $task = $this->task();
                     DeployDemoJob::dispatch($task->id);
                     Notification::make()->title(__('tasks.view.demo.rebuild_queued'))->success()->send();
+                    $this->redirect(TaskResource::getUrl('view', ['record' => $task]));
+                })
+                ->visible(fn (): bool => (bool) config('argos.preview.enabled')
+                    && (bool) $this->task()->repoProfile?->live_demo_enabled
+                    && $this->task()->phaseRuns()->where('phase', 'implement')->where('status', 'completed')->exists()),
+
+            'demoAccess' => Action::make('demoAccess')
+                ->label(__('tasks.view.demo.access.label'))
+                ->icon('heroicon-o-lock-closed')
+                ->color('gray')
+                ->modalHeading(__('tasks.view.demo.access.heading'))
+                ->modalDescription(__('tasks.view.demo.access.description'))
+                ->schema([
+                    Select::make('access_mode')
+                        ->label(__('tasks.view.demo.access.mode_label'))
+                        ->options([
+                            DemoAccessMode::Inherit->value => __('tasks.view.demo.access.mode_inherit', [
+                                'default' => DemoAccessMode::Inherit->resolve()->label(),
+                            ]),
+                            DemoAccessMode::Session->value => DemoAccessMode::Session->label(),
+                            DemoAccessMode::Basic->value => DemoAccessMode::Basic->label(),
+                            DemoAccessMode::Public->value => DemoAccessMode::Public->label(),
+                        ])
+                        ->required()
+                        ->live(),
+                    TextInput::make('basic_password')
+                        ->label(__('tasks.view.demo.access.password_label'))
+                        ->helperText(__('tasks.view.demo.access.password_hint'))
+                        ->password()
+                        ->revealable()
+                        ->visible(fn (Get $get): bool => $get('access_mode') === DemoAccessMode::Basic->value),
+                ])
+                ->fillForm(fn (): array => [
+                    'access_mode' => ($this->task()->demo_access_mode ?? DemoAccessMode::Inherit)->value,
+                    'basic_password' => $this->task()->demo_basic_password,
+                ])
+                ->action(function (array $data): void {
+                    $task = $this->task();
+                    $mode = DemoAccessMode::from($data['access_mode']);
+
+                    $password = $task->demo_basic_password;
+                    if ($mode->resolve() === DemoAccessMode::Basic) {
+                        // Use the entered password, keep the existing one, or
+                        // auto-generate so a basic demo is never passwordless.
+                        $password = ($data['basic_password'] ?? null) ?: ($password ?: Str::random(16));
+                    }
+
+                    $task->update([
+                        'demo_access_mode' => $mode,
+                        'demo_basic_password' => $password,
+                    ]);
+
+                    try {
+                        app(DemoDeployer::class)->applyAccessMode($task);
+                    } catch (\RuntimeException $e) {
+                        Notification::make()
+                            ->title(__('tasks.view.demo.access.apply_failed'))
+                            ->body($e->getMessage())
+                            ->danger()
+                            ->send();
+
+                        return;
+                    }
+
+                    $note = Notification::make()->title(__('tasks.view.demo.access.saved'))->success();
+                    if ($mode->resolve() === DemoAccessMode::Basic) {
+                        $note->body(__('tasks.view.demo.access.basic_credentials', [
+                            'user' => (string) config('argos.preview.basic_user', 'demo'),
+                            'password' => (string) $password,
+                        ]));
+                    }
+                    $note->send();
+
                     $this->redirect(TaskResource::getUrl('view', ['record' => $task]));
                 })
                 ->visible(fn (): bool => (bool) config('argos.preview.enabled')

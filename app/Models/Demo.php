@@ -22,6 +22,7 @@ use Illuminate\Support\Carbon;
  * @property DemoStatus $status
  * @property string|null $url
  * @property string|null $compose_project
+ * @property int|null $port
  * @property Carbon|null $ttl_until
  * @property string|null $build_log
  * @property Carbon|null $created_at
@@ -40,6 +41,7 @@ class Demo extends Model
         'status',
         'url',
         'compose_project',
+        'port',
         'ttl_until',
         'build_log',
     ];
@@ -48,6 +50,7 @@ class Demo extends Model
     {
         return [
             'status' => DemoStatus::class,
+            'port' => 'integer',
             'ttl_until' => 'datetime',
         ];
     }

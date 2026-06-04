@@ -35,7 +35,7 @@ compose file:
 
 ```bash
 mkdir -p /srv/argos
-curl -fsSL https://raw.githubusercontent.com/nodus-it/argos/develop/install.sh \
+curl -fsSL https://raw.githubusercontent.com/nodus-it/argos/develop/.tools/install.sh \
     | bash -s -- --dir /srv/argos
 ```
 
@@ -111,28 +111,25 @@ want) overrides per task. Built-in stacks (`php-8.3`, `php-8.4`, …) are
 mirrored from the repo manifest into the DB on every `migrate`; you can add
 your own user stack in the same UI.
 
-## Pre-release / stage builds
+## Pre-release / develop builds
 
-Every push to the `develop` branch publishes the manager image:
+Every push to the `develop` branch publishes the rolling manager image
+`ghcr.io/nodus-it/argos-app:stage`. It tracks unreleased work and may break —
+useful for previewing fixes, **not** for production.
 
-- `ghcr.io/nodus-it/argos-app:stage`
-
-This tag tracks unreleased work and may break — useful for previewing
-fixes, **not** for production. To install the stage stack, point the
-installer at the develop branch:
+To track it, install from the develop branch and pin `ARGOS_APP_IMAGE` to the
+rolling tag in your `.env`:
 
 ```bash
 ARGOS_VERSION=develop \
-    curl -fsSL https://raw.githubusercontent.com/nodus-it/argos/develop/install.sh \
-    | bash -s -- --dir ./argos-stage --stage
+    curl -fsSL https://raw.githubusercontent.com/nodus-it/argos/develop/.tools/install.sh \
+    | bash -s -- --dir ./argos-develop
 
-docker compose -f ./argos-stage/docker-compose.yml pull
-docker compose -f ./argos-stage/docker-compose.yml up -d
+# in ./argos-develop/.env:
+#   ARGOS_APP_IMAGE=ghcr.io/nodus-it/argos-app:stage
+docker compose -f ./argos-develop/docker-compose.yml pull
+docker compose -f ./argos-develop/docker-compose.yml up -d
 ```
-
-When working on Argos itself (developing against a checkout of the repo),
-`composer run stage` wraps this flow against `.tools/bash/.env.stage` instead
-of using the installer.
 
 For stable use, stick with `:latest` or a `vX.Y.Z` tag.
 
