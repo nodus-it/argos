@@ -486,7 +486,21 @@ class DemoDeployer
         if (! is_dir($dir) && ! mkdir($dir, 0755, true) && ! is_dir($dir)) {
             throw new RuntimeException("Traefik dynamic-config dir not writable: {$dir}");
         }
-        file_put_contents($this->routeFilePath($slug), Yaml::dump(['http' => $http], 8, 2));
+
+        // Write atomically (temp + rename). An in-place overwrite only emits a
+        // MODIFY event, which Traefik's file watcher misses when the write comes
+        // from another container over a shared volume — so a live access-mode
+        // change would not take effect until the next rebuild. A rename emits a
+        // CREATE/MOVED_TO event that the watcher reliably picks up, and Traefik
+        // never reads a half-written file. The `.tmp` extension is ignored by
+        // the file provider (it only loads .yml/.yaml/.toml/.json).
+        $path = $this->routeFilePath($slug);
+        $tmp = $path.'.tmp';
+        file_put_contents($tmp, Yaml::dump(['http' => $http], 8, 2));
+        if (! rename($tmp, $path)) {
+            @unlink($tmp);
+            throw new RuntimeException("Could not write Traefik route: {$path}");
+        }
 
         return $this->demoUrl($host);
     }
