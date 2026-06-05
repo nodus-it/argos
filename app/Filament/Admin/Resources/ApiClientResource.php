@@ -57,7 +57,6 @@ class ApiClientResource extends Resource
             Section::make(__('api_tokens.client.section'))
                 ->description(__('api_tokens.client.section_description'))
                 ->icon('heroicon-o-identification')
-                ->aside()
                 ->schema([
                     TextInput::make('name')
                         ->label(__('api_tokens.client.name'))
