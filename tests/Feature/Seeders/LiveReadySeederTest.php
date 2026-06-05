@@ -80,6 +80,7 @@ it('wires a runnable github-oauth task when env is set', function () {
     expect($profile)->not->toBeNull();
     expect($profile->auth_method)->toBe(AuthMethod::OAuth);
     expect($profile->connected_account_id)->toBe($account->id);
+    expect($profile->live_demo_enabled)->toBeTrue();
 
     expect(AgentCredential::where('name', 'live')->where('status', 'active')->exists())->toBeTrue();
     expect(Task::where('name', 'Live demo task')->where('workflow_status', 'draft')->exists())->toBeTrue();

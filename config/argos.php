@@ -23,6 +23,14 @@ $bareHost = $appHost === 'localhost'
     || filter_var($appHost, FILTER_VALIDATE_IP) !== false
     || ! str_contains($appHost, '.');
 
+// Treat an empty-string env var as "unset". The canonical docker-compose.yml
+// forwards the whole preview block as empty `${VAR:-}` on purpose ("everything
+// else is forwarded empty so the defaults in config/argos.php apply"), but
+// Laravel's env('X', $default) returns '' — not $default — when the var is
+// set-but-empty. Without this, an empty default_image yields a `:hash` tag and
+// `docker build` fails; ttl_hours/port/network/etc. silently collapse to 0/''.
+$envOr = fn (string $key, mixed $default): mixed => (($v = env($key)) === null || $v === '') ? $default : $v;
+
 return [
     // env() wins so CI can bake a `stage-<date>-<sha>` version into the
     // :stage image at build time; `?:` (not the 2nd arg) so an *empty*
@@ -98,26 +106,26 @@ return [
         // ARGOS_PREVIEW_PORT=443 so the URL drops the port. Falls back to
         // ARGOS_PORT when ARGOS_PREVIEW_PORT is unset.
         'scheme' => env('ARGOS_PREVIEW_SCHEME') ?: $appScheme,
-        'port' => (int) env('ARGOS_PREVIEW_PORT', env('ARGOS_PORT', 8080)),
-        'ttl_hours' => (int) env('ARGOS_PREVIEW_TTL_HOURS', 24),
+        'port' => (int) $envOr('ARGOS_PREVIEW_PORT', $envOr('ARGOS_PORT', 8080)),
+        'ttl_hours' => (int) $envOr('ARGOS_PREVIEW_TTL_HOURS', 24),
         // Stack-wide default access protection for demos whose task is set to
         // "inherit" (the default). One of: none | session | basic.
         //   none    — public, anyone with the URL
         //   session — Argos login required (Traefik forwardAuth → the gate below)
         //   basic   — shared HTTP Basic credentials
         // Per-task overrides (tasks.demo_access_mode) win over this default.
-        'auth' => env('ARGOS_PREVIEW_AUTH', 'none'),
+        'auth' => $envOr('ARGOS_PREVIEW_AUTH', 'none'),
         // HTTP Basic username for basic-protected demos. The password is either
         // per-task (generated when a task is switched to basic) or this global
         // fallback for tasks that merely inherit the basic default.
-        'basic_user' => env('ARGOS_PREVIEW_BASIC_USER', 'demo'),
+        'basic_user' => $envOr('ARGOS_PREVIEW_BASIC_USER', 'demo'),
         'basic_password' => env('ARGOS_PREVIEW_BASIC_PASSWORD') ?: null,
         // Internal URL Traefik's forwardAuth middleware calls to validate the
         // Argos session for session-protected demos. Points at the in-stack
         // nginx that fronts the app; reachable from Traefik on the default net.
-        'auth_gate_url' => env('ARGOS_PREVIEW_AUTH_GATE_URL', 'http://nginx:80/_argos/demo-gate'),
+        'auth_gate_url' => $envOr('ARGOS_PREVIEW_AUTH_GATE_URL', 'http://nginx:80/_argos/demo-gate'),
         // External Docker network shared with Traefik (defined in docker-compose.yml).
-        'network' => env('ARGOS_PREVIEW_NETWORK', 'argos_edge'),
+        'network' => $envOr('ARGOS_PREVIEW_NETWORK', 'argos_edge'),
         // Shared volume where the manager writes one Traefik file-provider route
         // per demo (Traefik mounts it read-only). Matches ARGOS_TRAEFIK_DIR in
         // docker-compose.yml.
@@ -125,16 +133,16 @@ return [
         // Cap on concurrently running demos. When a new deploy would exceed it,
         // the oldest running demos of other tasks are evicted (logged) to make
         // room. 0 disables the cap.
-        'max_concurrent' => (int) env('ARGOS_PREVIEW_MAX_CONCURRENT', 10),
+        'max_concurrent' => (int) $envOr('ARGOS_PREVIEW_MAX_CONCURRENT', 10),
         // Per-demo resource limits (separate from the worker limits — demos run
         // alongside Argos and should stay modest).
-        'cpu_limit' => env('ARGOS_PREVIEW_CPU_LIMIT', '1.0'),
-        'memory_limit' => env('ARGOS_PREVIEW_MEM_LIMIT', '1g'),
+        'cpu_limit' => $envOr('ARGOS_PREVIEW_CPU_LIMIT', '1.0'),
+        'memory_limit' => $envOr('ARGOS_PREVIEW_MEM_LIMIT', '1g'),
         // Built-in default demo runtime (php-fpm + nginx + node), used when a
         // repo ships no .argos/demo.* contract. DemoImageBuilder appends a
         // content hash to this repository name (argos-demo:<hash>) and builds
         // it on demand; the app entrypoint warms it at boot.
-        'default_image' => env('ARGOS_PREVIEW_DEFAULT_IMAGE', 'argos-demo'),
+        'default_image' => $envOr('ARGOS_PREVIEW_DEFAULT_IMAGE', 'argos-demo'),
     ],
     'concept' => [
         'max_turns_default' => (int) env('ARGOS_CONCEPT_MAX_TURNS_DEFAULT', 50),

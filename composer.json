@@ -18,7 +18,8 @@
         "predis/predis": "^3.4",
         "socialiteproviders/bitbucket": "^4.1",
         "socialiteproviders/gitlab": "^4.1",
-        "symfony/process": "^8.0"
+        "symfony/process": "^8.0",
+        "symfony/yaml": "^8.0"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",

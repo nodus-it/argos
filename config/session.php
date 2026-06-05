@@ -36,7 +36,15 @@ return [
 
     'lottery' => [2, 100],
 
-    'cookie' => 'argos_demo_session',
+    // Env-overridable only so Argos-deployed-as-its-own-live-demo can pick a
+    // distinct name (.argos/demo.compose.yml sets SESSION_COOKIE). The main app
+    // sets a leading-dot `.{domain}` cookie that spans demo-<task>.{domain}; if
+    // the demo is also an Argos instance it would otherwise reuse `argos_session`
+    // too, the browser would send the main app's cookie to the demo, the demo
+    // couldn't decrypt it (different APP_KEY) and would reset the session every
+    // request → demo login never persists. Irrelevant for third-party demos
+    // (different cookie name) and for the main app (env unset → default below).
+    'cookie' => env('SESSION_COOKIE', 'argos_session'),
 
     'path' => '/',
 
