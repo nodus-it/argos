@@ -48,6 +48,7 @@ return [
             'input' => 'Input',
             'output' => 'Output',
             'cost' => 'Kosten',
+            'model' => 'Modell',
         ],
     ],
 

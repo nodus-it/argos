@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\TaskResource\RelationManagers;
 
+use App\Enums\ClaudeModel;
+use App\Enums\PhaseStatus;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
@@ -40,14 +42,7 @@ class PhaseRunsRelationManager extends RelationManager
                 TextColumn::make('status')
                     ->label(__('enums.phase_runs.columns.status'))
                     ->badge()
-                    ->color(fn (?string $state): string => match ($state) {
-                        'running' => 'warning',
-                        'completed' => 'success',
-                        'failed' => 'danger',
-                        'quality_gate_failed' => 'danger',
-                        'no_changes' => 'info',
-                        default => 'gray',
-                    }),
+                    ->color(fn (PhaseStatus $state): string => $state->color()),
 
                 TextColumn::make('started_at')
                     ->label(__('enums.phase_runs.columns.started'))
@@ -66,6 +61,14 @@ class PhaseRunsRelationManager extends RelationManager
                         : null
                     )
                     ->formatStateUsing(fn (?int $state): string => $state !== null ? $state.'s' : '—'),
+
+                TextColumn::make('model')
+                    ->label(__('enums.phase_runs.columns.model'))
+                    ->formatStateUsing(fn (?string $state): string => $state !== null && $state !== ''
+                        ? (ClaudeModel::tryFrom($state)?->label() ?? $state)
+                        : '—'
+                    )
+                    ->toggleable(),
 
                 TextColumn::make('input_tokens')
                     ->label(__('enums.phase_runs.columns.input'))
