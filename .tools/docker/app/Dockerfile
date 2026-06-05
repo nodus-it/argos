@@ -59,6 +59,7 @@ RUN set -eux; \
         pdo_sqlite \
         zip \
         bcmath \
+        exif \
         gd \
         pcntl \
         posix \
