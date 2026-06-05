@@ -643,6 +643,75 @@ class TaskPagesTest extends TestCase
             ->assertSet('activeKey', 'pest');
     }
 
+    public function test_build_thread_shows_diff_on_single_implement_run(): void
+    {
+        $task = Task::factory()->create();
+        PhaseRun::factory()->create([
+            'task_id' => $task->id,
+            'phase' => 'implement',
+            'status' => 'completed',
+            'iteration' => 1,
+        ]);
+
+        Livewire::test(ViewTask::class, ['record' => $task->getKey()])
+            ->assertSuccessful()
+            ->assertViewHas('thread', function (array $thread): bool {
+                return collect($thread)
+                    ->where('kind', 'phase')
+                    ->where('phase', 'implement')
+                    ->where('showDiff', true)
+                    ->isNotEmpty();
+            });
+    }
+
+    public function test_build_thread_shows_diff_only_on_latest_code_run(): void
+    {
+        $task = Task::factory()->create();
+        PhaseRun::factory()->create([
+            'task_id' => $task->id,
+            'phase' => 'implement',
+            'status' => 'completed',
+            'iteration' => 1,
+        ]);
+        PhaseRun::factory()->create([
+            'task_id' => $task->id,
+            'phase' => 'respond',
+            'status' => 'completed',
+            'iteration' => 2,
+        ]);
+
+        Livewire::test(ViewTask::class, ['record' => $task->getKey()])
+            ->assertSuccessful()
+            ->assertViewHas('thread', function (array $thread): bool {
+                $phases = collect($thread)->where('kind', 'phase');
+                $implementItem = $phases->firstWhere('phase', 'implement');
+                $respondItem = $phases->firstWhere('phase', 'respond');
+
+                return $implementItem !== null && $implementItem['showDiff'] === false
+                    && $respondItem !== null && $respondItem['showDiff'] === true;
+            });
+    }
+
+    public function test_build_thread_shows_no_diff_for_concept_only_task(): void
+    {
+        $task = Task::factory()->create();
+        PhaseRun::factory()->create([
+            'task_id' => $task->id,
+            'phase' => 'concept',
+            'status' => 'completed',
+            'iteration' => 1,
+        ]);
+
+        Livewire::test(ViewTask::class, ['record' => $task->getKey()])
+            ->assertSuccessful()
+            ->assertViewHas('thread', function (array $thread): bool {
+                return collect($thread)
+                    ->where('kind', 'phase')
+                    ->where('showDiff', true)
+                    ->isEmpty();
+            });
+    }
+
     public function test_view_task_renders_clickable_link_for_failed_gate_with_log(): void
     {
         $task = Task::factory()->create([
