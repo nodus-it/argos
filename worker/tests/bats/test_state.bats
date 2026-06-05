@@ -85,24 +85,6 @@ teardown() {
     [ "$(state_get_feature_branch)" = "ai/task-001-1714506000" ]
 }
 
-@test "state_write_atomic refused invalid JSON" {
-    state_init "task-001" "url" "main"
-    run --separate-stderr bash -c "STATE_FILE='$STATE_FILE'; source worker/lib/state.sh; echo 'NOT JSON' | state_write_atomic"
-    [ "$status" -ne 0 ]
-    [[ "$stderr" == *"invalid JSON"* ]]
-    # state.json muss unverändert bleiben
-    [ "$(jq -r .task_id "$STATE_FILE")" = "task-001" ]
-}
-
-@test "state_get_iteration_count zaehlt iterations richtig" {
-    state_init "task-001" "url" "main"
-    [ "$(state_get_iteration_count concept)" -eq 0 ]
-    state_add_iteration concept '{}' >/dev/null
-    state_add_iteration concept '{}' >/dev/null
-    [ "$(state_get_iteration_count concept)" -eq 2 ]
-    [ "$(state_get_iteration_count implement)" -eq 0 ]
-}
-
 @test "state_finalize_running flips a running iteration to failed" {
     state_init "task-001" "url" "main"
     state_add_iteration implement '{}' >/dev/null

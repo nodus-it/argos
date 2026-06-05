@@ -2,10 +2,11 @@
 # lib/logging.sh — central logging helpers for the worker.
 #
 # All output goes to stderr so stdout stays free for structured payloads.
-# LOG_LEVEL=debug -> debug+info+warn+error
-# LOG_LEVEL=info  -> info+warn+error  (default)
-# LOG_LEVEL=warn  -> warn+error
-# LOG_LEVEL=error -> error only
+# Errors are reported via die() (lib/error.sh), not a log level.
+# LOG_LEVEL=debug -> debug+info+warn
+# LOG_LEVEL=info  -> info+warn  (default)
+# LOG_LEVEL=warn  -> warn only
+# LOG_LEVEL=error -> silent
 
 _log_level_value() {
     case "${LOG_LEVEL:-info}" in
@@ -31,11 +32,6 @@ log_info() {
 log_warn() {
     [[ "$(_log_level_value)" -le 2 ]] || return 0
     echo "[WARN] $*" >&2
-}
-
-# log_error: always visible.
-log_error() {
-    echo "[ERROR] $*" >&2
 }
 
 # log_scrub: redact known token patterns from stdin → stdout.

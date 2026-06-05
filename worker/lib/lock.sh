@@ -70,10 +70,3 @@ lock_is_stale() {
     age=$(( now_epoch - started_epoch ))
     (( age >= LOCK_STALE_SECONDS ))
 }
-
-# lock_info: print phase + started_at + pid of the current lock, tab-separated.
-# Prints nothing if no lock is present.
-lock_info() {
-    [[ -f "$LOCK_FILE" ]] || return 0
-    jq -r '"\(.phase)\t\(.started_at)\t\(.pid)"' "$LOCK_FILE" 2>/dev/null
-}

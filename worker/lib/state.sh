@@ -55,29 +55,6 @@ state_init() {
     mv "${STATE_FILE}.tmp" "$STATE_FILE"
 }
 
-# state_read: print the current state.json to stdout.
-# Returns: 0 on success, 1 if the file is missing.
-state_read() {
-    if [[ ! -f "$STATE_FILE" ]]; then
-        echo "state_read: $STATE_FILE not found" >&2
-        return 1
-    fi
-    cat "$STATE_FILE"
-}
-
-# state_write_atomic: replace state.json atomically with JSON read from stdin.
-# Refuses to write unparseable JSON.
-state_write_atomic() {
-    local content
-    content="$(cat)"
-    if ! jq -e . <<< "$content" >/dev/null 2>&1; then
-        echo "state_write_atomic: invalid JSON refused" >&2
-        return 1
-    fi
-    printf '%s' "$content" > "${STATE_FILE}.tmp"
-    mv "${STATE_FILE}.tmp" "$STATE_FILE"
-}
-
 # state_set_feature_branch: set repo.feature_branch (first concept run only).
 # Args: $1=branch_name
 state_set_feature_branch() {
@@ -207,13 +184,6 @@ state_finalize_running() {
     fi
 
     state_update_iteration "$phase" "$n" failed "$exit_code" "$err"
-}
-
-# state_get_iteration_count: number of iterations of a phase.
-# Args: $1=phase
-state_get_iteration_count() {
-    local phase="$1"
-    jq -r ".phases[\"$phase\"].iterations | length" "$STATE_FILE"
 }
 
 # state_validate: check required top-level fields and schema_version.

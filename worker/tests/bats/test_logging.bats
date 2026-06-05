@@ -15,13 +15,6 @@ setup() {
     [[ "$stderr" == *"INFO"* ]]
 }
 
-@test "log_error ist immer sichtbar, auch bei LOG_LEVEL=error" {
-    LOG_LEVEL=error run --separate-stderr bash -c 'source worker/lib/logging.sh; log_error "boom"'
-    [ "$status" -eq 0 ]
-    [[ "$stderr" == *"boom"* ]]
-    [[ "$stderr" == *"ERROR"* ]]
-}
-
 @test "log_debug ist bei LOG_LEVEL=info unsichtbar" {
     LOG_LEVEL=info run --separate-stderr bash -c 'source worker/lib/logging.sh; log_debug "secret"'
     [ "$status" -eq 0 ]
