@@ -62,7 +62,6 @@ class WorkerImageBuildResource extends Resource
             Section::make(__('worker.image_builds.summary'))
                 ->description(__('worker.image_builds.summary_description'))
                 ->icon('heroicon-o-cube')
-                ->aside()
                 ->schema([
                     TextEntry::make('tag')
                         ->label(__('worker.image_builds.fields.tag'))

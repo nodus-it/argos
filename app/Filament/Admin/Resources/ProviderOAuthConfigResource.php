@@ -70,7 +70,6 @@ class ProviderOAuthConfigResource extends Resource
             Section::make(__('credentials.oauth.sections.app'))
                 ->description(__('credentials.oauth.sections.app_description'))
                 ->icon('heroicon-o-globe-alt')
-                ->aside()
                 ->schema([
                     Select::make('provider')
                         ->label(__('credentials.oauth.fields.provider'))
@@ -119,7 +118,6 @@ class ProviderOAuthConfigResource extends Resource
             Section::make(__('credentials.oauth.sections.credentials'))
                 ->description(__('credentials.oauth.sections.credentials_description'))
                 ->icon('heroicon-o-key')
-                ->aside()
                 ->schema([
                     TextInput::make('client_id')
                         ->label(__('credentials.oauth.fields.client_id'))
