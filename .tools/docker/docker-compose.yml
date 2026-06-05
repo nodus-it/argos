@@ -128,6 +128,12 @@ services:
       APP_URL:                           "${APP_URL:-http://localhost:${ARGOS_PORT:-8080}}"
       APP_KEY:                           "${APP_KEY:-}"
       ADMIN_PASSWORD:                    "${ADMIN_PASSWORD:-}"
+      # Browser-E2E only: boots E2eFakeServiceProvider (offline fakes for the
+      # worker run + external validations). Empty by default; double-gated in
+      # AppServiceProvider (set AND not-production), so production is never
+      # affected even if it leaks in. Forwarded to app + queue because the
+      # FakePhaseRunner runs in the queued RunPhaseJob.
+      ARGOS_E2E_FAKE:                    "${ARGOS_E2E_FAKE:-}"
       ARGOS_CONFIG_DIR:                  /data/config
       ARGOS_TRAEFIK_DIR:                 /data/traefik
       DB_CONNECTION:                     "mariadb"
@@ -220,6 +226,8 @@ services:
       APP_DEBUG:                         "${APP_DEBUG:-false}"
       APP_URL:                           "${APP_URL:-http://localhost:${ARGOS_PORT:-8080}}"
       APP_KEY:                           "${APP_KEY:-}"
+      # Browser-E2E only — see the note on the app service above.
+      ARGOS_E2E_FAKE:                    "${ARGOS_E2E_FAKE:-}"
       ARGOS_CONFIG_DIR:                  /data/config
       ARGOS_TRAEFIK_DIR:                 /data/traefik
       DB_CONNECTION:                     "mariadb"

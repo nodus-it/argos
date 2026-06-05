@@ -106,6 +106,15 @@ class AppServiceProvider extends ServiceProvider
 
             return $registry;
         });
+
+        // Browser-E2E test mode: deterministic, offline replacements for the
+        // worker run and external validations (Anthropic, Git providers).
+        // Double-gated — only when ARGOS_E2E_FAKE is set AND not in production —
+        // so the production autoload path is never touched. Registered last so
+        // its bindings override the real ones above.
+        if (Env::get('ARGOS_E2E_FAKE') && ! $this->app->isProduction()) {
+            $this->app->register(E2eFakeServiceProvider::class);
+        }
     }
 
     public function boot(): void

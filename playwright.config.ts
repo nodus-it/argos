@@ -1,22 +1,29 @@
 import { defineConfig, devices } from '@playwright/test';
 
 /**
- * Argos browser-E2E config (Wave-1 retro M11b).
+ * Argos browser-E2E config.
  *
- * Local-only for now. Boots `php artisan serve` on 127.0.0.1:8000 against
- * the configured .env DB. Run `.tools/bin/dev-reset.sh` before the first
- * test session to seed the DemoSeeder admin user + demo task — the specs
- * expect that exact data set.
+ * Local-only. Runs against the running Docker Compose stack (nginx on
+ * ARGOS_PORT, default 8080) — NOT `php artisan serve` — because the full flow
+ * needs the queue (Horizon/Redis) and the deterministic fake mode wired into
+ * the same server. Bring the stack up first:
  *
- * CI integration intentionally out of scope (see retro M11c).
+ *   docker compose -f .tools/docker/docker-compose.yml up -d
+ *
+ * and run the app container with ARGOS_E2E_FAKE=1 for the gemockt suite. The
+ * reset helper re-seeds via `migrate:fresh` inside the app container before
+ * each test. CI integration intentionally out of scope.
  */
+const PORT = process.env.ARGOS_PORT ?? '8080';
+const BASE_URL = `http://127.0.0.1:${PORT}`;
+
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: false,
   workers: 1,
   reporter: process.env.CI ? 'github' : 'list',
   use: {
-    baseURL: 'http://127.0.0.1:8000',
+    baseURL: BASE_URL,
     trace: 'on-first-retry',
   },
   projects: [
@@ -25,17 +32,14 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
+  // Reuse the already-running compose stack. If it is not up, the command
+  // exits immediately and Playwright reports the URL as unreachable — a clear
+  // "bring the stack up first" signal rather than silently booting a different
+  // server.
   webServer: {
-    command: 'php artisan serve --host=127.0.0.1 --port=8000',
-    url: 'http://127.0.0.1:8000',
+    command: `echo "Expecting the Argos compose stack on ${BASE_URL} (docker compose ... up -d)"`,
+    url: BASE_URL,
     reuseExistingServer: true,
     timeout: 30_000,
-    // php's built-in webserver does not forward $_SERVER['HOME'] to request
-    // scope — the default-SQLite-path in config/database.php then falls back
-    // to '/root' and the file does not exist. Pass HOME through so the
-    // default resolves to ~/.config/argos/argos.db as in CLI runs.
-    env: {
-      HOME: process.env.HOME ?? '',
-    },
   },
 });

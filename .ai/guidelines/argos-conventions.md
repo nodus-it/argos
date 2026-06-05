@@ -156,11 +156,20 @@ fit into exactly one of these levels; when in doubt, pick the narrower one.
 | Integration | Pest + MariaDB sidecar (CI) | DB schema, migrations, enum persistence, queue lifecycle | ✅ (retro M2) |
 | Backend-E2E | Pest + `FakeWorkerProcess` (`tests/Support/`) | Workflow phase run incl. recovery paths — RunPhaseJob → PhaseRunner → DB state | ✅ (retro M7) |
 | UI smoke | `Livewire::test(ViewTask::class, ['record' => …])` | UI renders correct status string per phase, action wiring | ✅ (retro M10) |
-| Browser-E2E | Playwright locally via `php artisan serve` | Real browser render, JS/Alpine reactivity, login flow, multi-page navigation. Run: `npx playwright test` (see "Common commands"). | ✅ (retro M11) |
+| Browser-E2E | Playwright against the compose stack | Full flow (login → onboarding → project → task → concept/implement) over the 4-run matrix + a mask smoke walk. Run: `npx playwright test` (see "Common commands"). | ✅ (retro M11) |
 
 Browser-E2E runs locally only today — the discipline of running
 `npx playwright test` before a commit is the first line of defense. CI
 integration deliberately not built (effort vs. value not justified yet).
+
+Two layers: **gemockt** (default, deterministic) runs the stack's `app`
+container with `ARGOS_E2E_FAKE=1`, which boots `E2eFakeServiceProvider` —
+offline fakes for the Anthropic validator, the git providers, and the worker
+run (`FakePhaseRunner`), so no tokens, API calls, or `docker run` are needed.
+The provider is double-gated (`ARGOS_E2E_FAKE` **and** not-production) and
+throws if it ever boots in production; an arch test keeps `App\Testing` out of
+production code paths. The **echt** layer (`full-flow.real.spec.ts`) is opt-in
+via `ARGOS_E2E_REAL=1` against a real stack + test repo — never in CI.
 
 ## Architecture tests
 
@@ -300,11 +309,16 @@ composer dev:full
 # staleness.
 bash .tools/bin/dev-reload.sh
 
-# Browser-E2E (Playwright) — local self-check that the UI still loads.
+# Browser-E2E (Playwright) — runs against the running compose stack.
 # One-time prereq: `npm install` + `npx playwright install chromium`.
-# Data prereq: a demo profile has been seeded (e.g. `composer dev:full`).
-# Playwright boots `php artisan serve` itself — no running stack needed.
+# Stack prereq: `docker compose -f .tools/docker/docker-compose.yml up -d`,
+# with the app/queue containers started with ARGOS_E2E_FAKE=1 for the gemockt
+# suite (the reset helper re-seeds via migrate:fresh per test). baseURL follows
+# ARGOS_PORT (default 8080).
 composer test:browser
+
+# Real (opt-in) flow: real worker, real credentials, real test repo. Not in CI.
+ARGOS_E2E_REAL=1 composer test:browser:real
 ```
 
 ## Output language

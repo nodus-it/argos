@@ -13,3 +13,9 @@ arch('strict types in app/')
 arch('workers are UI-isolated')
     ->expect('App\Workers')
     ->not->toUse('App\Filament');
+
+// The browser-E2E fakes must never be wired into production code paths — only
+// the (env-gated, prod-throwing) E2eFakeServiceProvider may reference them.
+arch('e2e fakes are not used by production code')
+    ->expect('App\Testing')
+    ->toOnlyBeUsedIn('App\Providers\E2eFakeServiceProvider');

@@ -12,8 +12,11 @@ use Throwable;
  * Validates a Claude OAuth token against the Anthropic API.
  *
  * Returns true (valid), false (rejected by API), or null (unreachable).
+ *
+ * Not final: the browser-E2E fake mode (E2eFakeServiceProvider) binds a
+ * subclass that always returns valid, so no Anthropic call happens offline.
  */
-final class AnthropicTokenValidator
+class AnthropicTokenValidator
 {
     public function validate(string $token): ?bool
     {
