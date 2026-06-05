@@ -39,6 +39,7 @@ class CurrentTasksWidget extends BaseWidget
             ->poll('5s')
             ->query(
                 Task::query()
+                    ->where('workflow_status', '!=', WorkflowStatus::Completed->value)
                     ->with(static::taskTableEagerLoads())
                     ->orderByRaw($this->priorityOrderClause())
                     ->orderByDesc('updated_at')

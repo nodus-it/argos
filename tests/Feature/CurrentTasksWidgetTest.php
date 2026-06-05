@@ -58,6 +58,22 @@ class CurrentTasksWidgetTest extends TestCase
             ->assertCanSeeTableRecords([$waiting, $running, $idle], inOrder: true);
     }
 
+    public function test_completed_tasks_are_hidden_from_widget(): void
+    {
+        $open = Task::factory()->create([
+            'name' => 'Open task',
+            'workflow_status' => WorkflowStatus::Draft,
+        ]);
+        $done = Task::factory()->create([
+            'name' => 'Completed task',
+            'workflow_status' => WorkflowStatus::Completed,
+        ]);
+
+        Livewire::test(CurrentTasksWidget::class)
+            ->assertCanSeeTableRecords([$open])
+            ->assertCanNotSeeTableRecords([$done]);
+    }
+
     public function test_phase_enum_returns_expected_values(): void
     {
         $this->assertSame('Concept', Phase::Concept->label());
