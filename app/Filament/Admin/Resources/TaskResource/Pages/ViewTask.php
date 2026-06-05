@@ -321,7 +321,7 @@ class ViewTask extends ViewRecord
 
         // The diff renders the live workspace, so it only makes sense on the
         // most recent code-producing run (implement or respond).
-        $latestCodeRunId = $runs->whereIn('phase', ['implement', 'respond'])->last()?->id;
+        $latestCodeRunId = $runs->whereIn('phase', [Phase::Implement, Phase::Respond])->last()?->id;
 
         foreach ($runs as $run) {
             $phase = $run->phase->value;
