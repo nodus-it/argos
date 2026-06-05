@@ -484,7 +484,8 @@ SH;
 
         file_put_contents($logPath, '');
 
-        $phaseRun = app(WorkflowService::class)->startPhase($task, $phase);
+        $resolvedModel = $this->resolveModel($task, $this->resolveAgentName($task), $phase);
+        $phaseRun = app(WorkflowService::class)->startPhase($task, $phase, $resolvedModel);
 
         Log::channel('argos')->info('Phase started', $this->safeContext($task, $phase, ['iteration' => $phaseRun->iteration]));
 
@@ -563,7 +564,8 @@ SH;
 
         file_put_contents($logPath, '');
 
-        $phaseRun = app(WorkflowService::class)->startPhase($task, $phase);
+        $resolvedModel = $this->resolveModel($task, $this->resolveAgentName($task), $phase);
+        $phaseRun = app(WorkflowService::class)->startPhase($task, $phase, $resolvedModel);
 
         Log::channel('argos')->info('Phase started', $this->safeContext($task, $phase, ['iteration' => $phaseRun->iteration]));
 

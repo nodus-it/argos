@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Enums\ClaudeModel;
 use App\Enums\Phase;
 use App\Enums\PhaseStatus;
 use App\Enums\WorkflowStatus;
@@ -80,6 +81,30 @@ class WorkflowEndToEndTest extends TestCase
             'status' => 'completed',
             'exit_code' => 0,
         ]);
+    }
+
+    public function test_phase_run_persists_resolved_model_default(): void
+    {
+        $task = $this->taskWithProfile();
+
+        $this->runJobWithExitCode($task, 'concept', 0);
+
+        $run = PhaseRun::where('task_id', $task->id)->where('phase', 'concept')->first();
+        $this->assertSame(ClaudeModel::Opus47->value, $run->model);
+    }
+
+    public function test_phase_run_persists_task_model_override(): void
+    {
+        // A Haiku-for-implement override used to be invisible in phase_runs and
+        // had to be inferred from the stream log; it must now be observable.
+        $task = $this->taskWithProfile();
+        $task->update(['model_implement' => ClaudeModel::Haiku45->value]);
+
+        $this->runJobWithExitCode($task, 'concept', 0);
+        $this->runJobWithExitCode($task, 'implement', 0);
+
+        $run = PhaseRun::where('task_id', $task->id)->where('phase', 'implement')->first();
+        $this->assertSame(ClaudeModel::Haiku45->value, $run->model);
     }
 
     // -------------------------------------------------------------------------

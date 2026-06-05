@@ -17,8 +17,11 @@ class WorkflowService
 {
     /**
      * Create a PhaseRun and mark the task as running for the given phase.
+     *
+     * @param  string|null  $model  the resolved model id for this phase, persisted
+     *                              so cost analysis can attribute spend per model
      */
-    public function startPhase(Task $task, string $phase): PhaseRun
+    public function startPhase(Task $task, string $phase, ?string $model = null): PhaseRun
     {
         $task->update([
             'current_phase' => $phase,
@@ -31,6 +34,7 @@ class WorkflowService
             'iteration' => $task->phaseRuns()->where('phase', $phase)->count() + 1,
             'status' => PhaseStatus::Running,
             'started_at' => now(),
+            'model' => ($model !== null && $model !== '') ? $model : null,
         ]);
     }
 
