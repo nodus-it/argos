@@ -52,13 +52,15 @@ async function waitForActionButton(page: Page, name: RegExp, timeoutMs = 60_000)
 
 /** Trigger the concept phase and wait for it to complete (Implement unlocks). */
 export async function runConcept(page: Page): Promise<void> {
-  await clickPhaseAction(page, /create concept|update concept|^concept$/i);
-  await waitForActionButton(page, /^implement$/i);
+  // Button labels: lang/en/tasks.php → start_concept / start_implement.
+  await clickPhaseAction(page, /start concept|update concept/i);
+  await waitForActionButton(page, /start implementation/i);
 }
 
 /** Trigger the implement phase and wait for it to complete (Push & PR unlocks). */
 export async function runImplement(page: Page): Promise<void> {
-  await clickPhaseAction(page, /^implement$/i);
+  await clickPhaseAction(page, /start implementation/i);
+  // start_push label is "Create Push & PR" — matched by /push/i.
   await waitForActionButton(page, /push/i);
 }
 

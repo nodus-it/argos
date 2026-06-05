@@ -4,14 +4,11 @@ import { login } from './helpers/auth';
 
 /**
  * Mask smoke: open every Filament resource/page and assert it renders without a
- * server error. Seeded with DemoSeeder so list pages have data to show.
- *
- * UNRUN draft: confirm the exact route slugs and tighten the per-page content
- * assertions locally.
+ * server error. Seeded with FullDemoSeeder so list pages have data to show.
  */
 const PAGES: Array<{ label: string; path: string; expect?: RegExp }> = [
   { label: 'Dashboard', path: '/admin' },
-  { label: 'Tasks', path: '/admin/tasks', expect: /Demo task/i },
+  { label: 'Tasks', path: '/admin/tasks', expect: /Demo ·|Showcase/i },
   { label: 'Projects', path: '/admin/repo-profiles' },
   { label: 'API clients', path: '/admin/api-clients' },
   { label: 'Agent credentials', path: '/admin/agent-credentials' },
@@ -22,7 +19,7 @@ const PAGES: Array<{ label: string; path: string; expect?: RegExp }> = [
 ];
 
 test.beforeEach(() => {
-  resetDatabase('DemoSeeder');
+  resetDatabase('FullDemoSeeder');
 });
 
 test('every admin mask renders without error', async ({ page }) => {
