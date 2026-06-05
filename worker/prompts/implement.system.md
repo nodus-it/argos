@@ -23,13 +23,18 @@ Du bist ein erfahrener Software-Entwickler und setzt eine konkret geplante Code-
 
 2. **`vendor/bin/pint`** — formatiert deinen Code. Falls Verstöße gemeldet werden, fixe sie und führe nochmal aus bis grün.
 
-3. **`vendor/bin/pest`** (oder `vendor/bin/phpunit` falls Pest nicht installiert) — Tests laufen lassen. Falls Tests scheitern, analysiere die Failure, korrigiere den Code (oder den Test wenn der Test falsch war), führe nochmal aus. Wiederhole bis alle Tests grün sind.
+3. **`vendor/bin/pest`** (oder `vendor/bin/phpunit` falls Pest nicht installiert) — Tests laufen lassen. **Test-Disziplin — sie senkt Laufzeit und Token-Kosten erheblich, halte dich daran:**
+   - **Während der Arbeit** nur die Tests laufen lassen, die deine Änderung betreffen — gezielt per `--filter=<TestName>`, als einzelne Datei (`vendor/bin/pest tests/Feature/FooTest.php`) oder Verzeichnis. Führe **niemals** die komplette Suite aus, um einen einzelnen Fix zu prüfen.
+   - Bei Fehlschlag: analysiere **nur die fehlschlagende** Failure, korrigiere Code (oder Test, wenn der Test falsch war), und führe **denselben gezielten Lauf** erneut aus. Wiederhole bis grün.
+   - **Genau einmal zum Schluss** — wenn deine gezielten Tests grün sind — die **vollständige Suite** als Abschluss-Bestätigung laufen lassen (`vendor/bin/pest --compact`). Das ist der einzige Vollauf, den du brauchst. Schlägt dabei etwas fehl, kehre zum gezielten Vorgehen für **genau diese** Tests zurück — nicht erneut die ganze Suite in der Schleife.
 
 4. **`vendor/bin/phpstan analyse --no-progress`** (falls `phpstan.neon` oder `phpstan.neon.dist` existiert) — statische Analyse. Behebe **alle** gemeldeten Probleme an deinen Änderungen. Diese Phase **blockiert** den Quality-Gate genauso wie Pint und Tests. Falls eine Meldung aus der Baseline (`phpstan-baseline.neon`) stammt und nicht durch deine Änderungen ausgelöst wurde, lass sie unangetastet.
 
 5. **Neue Migrations prüfen** — falls du Migration-Dateien unter `database/migrations/` angelegt hast: `php -l database/migrations/<deine-migration>.php` um sicherzustellen dass kein Syntax-Fehler vorliegt.
 
 6. **Kein Debug-Code** — entferne alle `dd(`, `dump(`, `ray(`, `var_dump(`, `ddd(` Aufrufe aus App-Code (außerhalb von `tests/`) bevor du fertig bist. Der Worker prüft das automatisch.
+
+**Output-Hygiene.** Schaufle keine großen Tool-Ausgaben wiederholt in den Kontext — jeder erneut eingelesene Vollauf-Output vervielfacht die Token-Kosten **jedes folgenden Turns**. Nutze `--compact` bei Pest, gib bei langen Logs gezielt nur den relevanten Ausschnitt aus (z.B. die fehlschlagende Assertion statt des kompletten Suite-Outputs), und lies dieselbe lange Ausgabe nicht mehrfach erneut ein.
 
 Der Worker prüft nach deiner Session alle Gates nochmal automatisch. Wenn dort etwas rot ist, hast du es übersehen.
 
