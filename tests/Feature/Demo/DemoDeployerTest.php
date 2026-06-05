@@ -126,6 +126,18 @@ class DemoDeployerTest extends TestCase
         $appKey = $parsed['services']['app']['environment']['APP_KEY'];
         $this->assertMatchesRegularExpression('/^base64:[A-Za-z0-9+\/]+={0,2}$/', $appKey);
         $this->assertSame(32, strlen((string) base64_decode(substr($appKey, 7), true)));
+
+        // A per-demo session cookie name, distinct from the parent's
+        // `argos_session`, so an Argos-deployed-as-its-own-demo keeps its login
+        // (the parent's leading-dot cookie would otherwise be sent here and fail
+        // to decrypt under a different APP_KEY → session reset every request).
+        $cookie = $parsed['services']['app']['environment']['SESSION_COOKIE'];
+        $this->assertSame('demo_feat1_session', $cookie);
+        $this->assertNotSame('argos_session', $cookie);
+
+        // Marks the container as a live demo so the seeded app loads its full
+        // demo profile (DatabaseSeeder → FullDemoSeeder) instead of admin-only.
+        $this->assertSame('1', $parsed['services']['app']['environment']['ARGOS_DEMO']);
     }
 
     public function test_write_traefik_route_creates_file_and_returns_url_with_port(): void

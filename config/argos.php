@@ -144,6 +144,17 @@ return [
         // it on demand; the app entrypoint warms it at boot.
         'default_image' => $envOr('ARGOS_PREVIEW_DEFAULT_IMAGE', 'argos-demo'),
     ],
+
+    /*
+     * Set inside an Argos live-demo container (DemoDeployer injects ARGOS_DEMO=1
+     * into the entry service). DatabaseSeeder reads this to seed the full demo
+     * profile instead of the production-safe admin-only seed, so Argos' own live
+     * demo is fully populated without a repo-side .argos/demo.* contract.
+     */
+    'demo' => [
+        'enabled' => filter_var($envOr('ARGOS_DEMO', false), FILTER_VALIDATE_BOOLEAN),
+    ],
+
     'concept' => [
         'max_turns_default' => (int) env('ARGOS_CONCEPT_MAX_TURNS_DEFAULT', 50),
     ],

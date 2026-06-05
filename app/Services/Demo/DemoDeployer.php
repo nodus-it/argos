@@ -79,8 +79,7 @@ class DemoDeployer
             // hashed, build-on-demand tag whenever a contract references it. The
             // bundled default always does; a repo contract may opt into the
             // built-in runtime by keeping the placeholder and only overriding
-            // settings/commands (Argos' own .argos/demo.* does exactly this to
-            // seed FullDemoSeeder). Contracts that ship their own image simply
+            // settings/commands. Contracts that ship their own image simply
             // omit the token, so this is a no-op for them.
             if (str_contains($composeYaml, self::DEMO_IMAGE_PLACEHOLDER)) {
                 $composeYaml = str_replace(self::DEMO_IMAGE_PLACEHOLDER, $this->imageBuilder->ensure(), $composeYaml);
@@ -303,6 +302,21 @@ class DemoDeployer
                         // reads real env over the repo .env, so this wins; a
                         // fresh per-deploy key is fine for an ephemeral demo.
                         'APP_KEY' => $this->generateAppKey(),
+                        // Per-demo session cookie name. Each demo runs on its own
+                        // subdomain under the shared parent domain; the parent app
+                        // sets a leading-dot `.{domain}` cookie (`argos_session`)
+                        // that spans the demo subdomain. If the demo is itself an
+                        // Argos instance it would otherwise reuse that name, the
+                        // browser would send the parent's cookie, the demo couldn't
+                        // decrypt it (different APP_KEY) and would reset the session
+                        // every request → login never persists. A per-slug name
+                        // sidesteps it; non-Laravel contracts ignore the var.
+                        'SESSION_COOKIE' => $this->demoCookieName($slug),
+                        // Mark this container as an Argos live demo. Argos' own
+                        // DatabaseSeeder reads it (config argos.demo.enabled) to
+                        // seed the full demo profile instead of the production-safe
+                        // admin-only seed. Harmless for any other repo.
+                        'ARGOS_DEMO' => '1',
                     ],
                     'volumes' => [
                         $task->volumeName().':'.$entry['workspace_mount'],
@@ -348,6 +362,16 @@ class DemoDeployer
     private function generateAppKey(): string
     {
         return 'base64:'.base64_encode(Encrypter::generateKey((string) config('app.cipher')));
+    }
+
+    /**
+     * A demo-unique session cookie name derived from the DNS-safe slug. Stable
+     * across requests of one demo (so the session persists) and distinct from
+     * both the parent app's `argos_session` and every other demo's cookie.
+     */
+    private function demoCookieName(string $slug): string
+    {
+        return str_replace('-', '_', $slug).'_session';
     }
 
     private function prepareWorkDir(string $slug, string $composeYaml, string $overrideYaml): string

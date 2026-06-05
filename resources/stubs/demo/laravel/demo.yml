@@ -10,10 +10,13 @@ workspace_mount: /var/www/html
 # Run in order inside the `app` container after `compose up`. First failure
 # fails the deploy; output is captured in the demo build log. Dev deps are kept
 # so factories/faker work during `migrate --seed`.
+#
+# No `key:generate` step: the deployer injects a throwaway APP_KEY env var into
+# the entry service (real env wins over the repo .env), so Laravel boots even
+# for repos whose .env.example ships no APP_KEY= line for key:generate to fill.
 commands:
   - composer install --no-interaction --prefer-dist --no-progress
   - "[ -f .env ] || cp .env.example .env"
-  - php artisan key:generate --force
   - php artisan migrate --force --seed
   - "[ -f package.json ] && npm ci && npm run build || true"
   # Drop a stale Vite hot-file (left by `npm run dev`/`composer dev` in the
