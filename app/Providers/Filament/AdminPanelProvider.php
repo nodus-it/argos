@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Providers\Filament;
 
 use App\Filament\Admin\Pages\Dashboard;
+use App\Filament\Admin\Pages\Login;
 use App\Filament\Admin\Pages\Profile;
 use App\Filament\Admin\Widgets\CurrentTasksWidget;
 use App\Filament\Admin\Widgets\StatsOverviewWidget;
@@ -69,7 +70,7 @@ class AdminPanelProvider extends PanelProvider
                 __('navigation.groups.worker'),
                 __('navigation.groups.configuration'),
             ])
-            ->login()
+            ->login(Login::class)
             ->profile(Profile::class)
             ->plugins([
                 // One-click developer login on the login screen. Hard-gated to

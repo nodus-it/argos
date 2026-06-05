@@ -937,3 +937,157 @@ body,
 @media (prefers-reduced-motion: reduce){
   *{animation-duration:.001ms !important;animation-iteration-count:1 !important;}
 }
+
+/* ============================================================
+   Login — dark "control-room" split-screen (see ARGOS_LOGIN.md).
+   Forces the dark variant locally regardless of the global theme.
+   The spec's `--a-*` / `--n-*` token names are aliased to this app's
+   `--color-accent-*` / `--color-neutral-*` scale.
+   ============================================================ */
+.login-scope{
+  /* token aliases so the spec rules below resolve against our scale */
+  --a-300:var(--color-accent-300); --a-400:var(--color-accent-400);
+  --a-500:var(--color-accent-500); --a-600:var(--color-accent-600);
+  --a-700:var(--color-accent-700); --a-800:var(--color-accent-800);
+  --n-50:var(--color-neutral-50);  --n-200:var(--color-neutral-200);
+  --n-400:var(--color-neutral-400);--n-500:var(--color-neutral-500);
+
+  --bg:#0c0907; --surface:#1a1612; --surface-2:#15110e;
+  --text:var(--n-50); --text-2:var(--n-200); --muted:var(--n-400); --faint:var(--n-500);
+  --border:#2a231d; --border-strong:#3a312a;
+  --accent:var(--a-500); --accent-hover:var(--a-400); --accent-text:var(--a-300);
+  --accent-soft:color-mix(in oklab,var(--a-500) 18%,transparent);
+  --accent-soft-border:color-mix(in oklab,var(--a-500) 38%,transparent);
+  --on-accent:#fff; --term-bg:#0a0706;
+  color-scheme:dark;
+  position:absolute; inset:0; min-height:100vh;
+  display:grid; grid-template-columns:1.08fr 1fr;
+  background:var(--bg); color:var(--text); font-family:var(--font-sans);
+}
+
+/* ---- Brand side ---- */
+.login-brand{position:relative;overflow:hidden;display:flex;flex-direction:column;
+  justify-content:space-between;padding:48px 52px;}
+.lb-glow{position:absolute;inset:0;pointer-events:none;background:
+  radial-gradient(120% 90% at 22% 32%, color-mix(in oklab,var(--a-600) 36%,transparent) 0%, transparent 55%),
+  radial-gradient(90% 80% at 88% 88%, color-mix(in oklab,var(--a-800) 30%,transparent) 0%, transparent 60%);}
+.lb-grid{position:absolute;inset:0;pointer-events:none;opacity:.5;
+  background-image:radial-gradient(circle at 1px 1px, color-mix(in oklab,var(--a-300) 22%,transparent) 1px, transparent 0);
+  background-size:26px 26px;
+  -webkit-mask-image:radial-gradient(circle at 30% 40%, #000 0%, transparent 72%);
+          mask-image:radial-gradient(circle at 30% 40%, #000 0%, transparent 72%);}
+.lb-vignette{position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(105deg,transparent 55%, color-mix(in oklab,#000 55%,transparent));}
+.lb-top{position:relative;z-index:2;display:flex;align-items:center;gap:11px;}
+.lb-top .word{font-family:var(--font-mono);font-weight:700;font-size:17px;letter-spacing:.28em;color:var(--text);}
+
+/* Eye hero */
+.lb-hero{position:relative;z-index:2;display:flex;flex-direction:column;align-items:flex-start;margin:auto 0;}
+.lb-eye-stage{position:relative;width:172px;height:172px;margin-bottom:34px;display:grid;place-items:center;}
+.lb-ring{position:absolute;border-radius:50%;border:1px solid color-mix(in oklab,var(--a-400) 38%,transparent);}
+.lb-ring.r1{inset:0;animation:spin 26s linear infinite;}
+.lb-ring.r2{inset:22px;border-style:dashed;border-color:color-mix(in oklab,var(--a-400) 24%,transparent);animation:spin 18s linear infinite reverse;}
+.lb-ring.r3{inset:46px;border-color:color-mix(in oklab,var(--a-300) 30%,transparent);}
+.lb-eye-glow{position:absolute;inset:30px;border-radius:50%;filter:blur(14px);
+  background:radial-gradient(circle, color-mix(in oklab,var(--a-500) 55%,transparent), transparent 70%);
+  animation:eyeglow 3.4s ease infinite;}
+.lb-eye-stage .eye{position:relative;z-index:2;width:96px;height:96px;animation:lb-eyeblink 7s steps(1) infinite;
+  filter:drop-shadow(0 0 14px color-mix(in oklab,var(--a-500) 55%,transparent));}
+@keyframes eyeglow{0%,100%{opacity:.5;transform:scale(.96);}50%{opacity:.9;transform:scale(1.04);}}
+/* scaleY blink — distinct name from the global opacity `blink` keyframe */
+@keyframes lb-eyeblink{0%,96%,100%{transform:scaleY(1);}98%{transform:scaleY(.08);}}
+.lb-hero h1{font-size:40px;line-height:1.08;font-weight:700;letter-spacing:-.02em;margin:0 0 16px;max-width:13ch;}
+.lb-hero h1 .hl{color:var(--accent-text);}
+.lb-hero p{margin:0 0 30px;color:var(--text-2);font-size:16px;line-height:1.6;max-width:42ch;}
+
+/* Live terminal */
+.lb-term{position:relative;z-index:2;width:100%;max-width:440px;background:var(--term-bg);
+  border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;
+  box-shadow:0 24px 60px rgba(0,0,0,.5);}
+.lb-term-head{display:flex;align-items:center;gap:8px;padding:9px 13px;border-bottom:1px solid rgba(255,255,255,.06);}
+.lb-term-head i{width:10px;height:10px;border-radius:99px;display:block;}
+.lb-term-head i.d1{background:#f06a5a;} .lb-term-head i.d2{background:#f5c451;} .lb-term-head i.d3{background:#5ad08e;}
+.lb-term-head .tt{font-family:var(--font-mono);font-size:11px;color:#7d8694;margin-left:5px;}
+.lb-term-head .live{margin-left:auto;display:flex;align-items:center;gap:6px;font-family:var(--font-mono);
+  font-size:10px;color:var(--ok-400);font-weight:600;letter-spacing:.05em;}
+.lb-term-head .live .dot{width:7px;height:7px;border-radius:99px;background:var(--ok-400);animation:pulse 1.6s ease infinite;}
+.lb-term-body{padding:12px 14px;font-family:var(--font-mono);font-size:12px;line-height:1.7;height:132px;
+  overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;}
+.lb-term-line{display:flex;gap:10px;white-space:nowrap;}
+.lb-term-line .tt{color:#5b626e;flex:none;}
+.lb-term-line .t-ok{color:#5ad08e;} .lb-term-line .t-info{color:#9aa3b2;}
+.lb-term-line .t-accent{color:var(--accent-hover);} .lb-term-line .t-warn{color:#f5c451;}
+.lb-term-line .t-err{color:#f08a8a;}
+.lb-foot{position:relative;z-index:2;display:flex;align-items:center;gap:18px;color:var(--faint);font-size:12px;}
+.lb-foot .st{display:flex;align-items:center;gap:7px;}
+.lb-foot .st .dot{width:7px;height:7px;border-radius:99px;background:var(--ok-400);box-shadow:0 0 8px var(--ok-400);}
+
+/* ---- Form side ---- */
+.login-form-side{position:relative;display:flex;align-items:center;justify-content:center;padding:40px;background:var(--surface);}
+.login-form-side::before{content:"";position:absolute;left:0;top:14%;bottom:14%;width:1px;
+  background:linear-gradient(transparent,var(--border-strong),transparent);}
+.login-card{width:100%;max-width:372px;}
+.login-card .lc-eye{display:none;}
+.login-card h2{font-size:26px;font-weight:700;letter-spacing:-.01em;margin:0 0 6px;color:var(--text);}
+.login-card .lc-sub{color:var(--muted);font-size:13px;margin:0 0 28px;}
+.login-form{display:flex;flex-direction:column;gap:18px;}
+.login-scope .lf-label{display:block;font-size:13px;font-weight:600;color:var(--text-2);margin-bottom:7px;}
+.login-scope .lf-label .req{color:var(--accent-text);}
+.login-scope .lf-error{color:#f08a8a;font-size:12px;margin-top:7px;}
+.login-scope .input{width:100%;padding:11px 13px;background:var(--surface-2);border:1px solid var(--border-strong);
+  border-radius:var(--radius-sm);color:var(--text);font-family:inherit;font-size:14px;outline:none;
+  transition:border-color .15s var(--ease),box-shadow .15s var(--ease);}
+.login-scope .input::placeholder{color:var(--faint);}
+.login-scope .input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);}
+.lf-pwhead{display:flex;align-items:baseline;justify-content:space-between;}
+.lf-pwhead .lf-label{margin-bottom:0;}
+.lf-pwhead a{font-size:12px;color:var(--accent-text);font-weight:600;}
+.input-wrap{position:relative;display:flex;align-items:center;margin-top:7px;}
+.input-wrap .input{padding-right:44px;}
+.input-eye{position:absolute;right:6px;width:32px;height:32px;display:grid;place-items:center;
+  border:none;background:none;color:var(--faint);cursor:pointer;border-radius:var(--radius-sm);}
+.input-eye:hover{color:var(--text);background:var(--surface-2);}
+.lf-remember{display:flex;align-items:center;gap:9px;cursor:pointer;font-size:13px;color:var(--text-2);user-select:none;}
+.lf-remember-input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;}
+.lf-check{width:18px;height:18px;border-radius:5px;border:1.5px solid var(--border-strong);
+  display:grid;place-items:center;flex:none;background:var(--surface);transition:.15s ease;}
+.lf-check svg{width:13px;height:13px;color:var(--on-accent);opacity:0;transform:scale(.6);transition:.15s ease;}
+.lf-remember:has(.lf-remember-input:checked) .lf-check{background:var(--accent);border-color:var(--accent);}
+.lf-remember:has(.lf-remember-input:checked) .lf-check svg{opacity:1;transform:scale(1);}
+.login-btn{width:100%;padding:12px;font-size:14px;margin-top:2px;}
+/* The eye draws its ink in --accent; on the accent-filled primary button that
+   would be invisible, so invert: ink -> --on-accent, pupil hole -> button bg. */
+.login-scope .login-btn .argos-eye{width:18px;height:18px;}
+.login-scope .login-btn .argos-eye [stroke="var(--accent)"]{stroke:var(--on-accent);}
+.login-scope .login-btn .argos-eye [fill="var(--accent)"]{fill:var(--on-accent);}
+.login-scope .login-btn .argos-eye [fill="var(--surface)"]{fill:var(--accent);}
+.lf-divider{display:flex;align-items:center;gap:14px;color:var(--faint);font-size:12px;margin:6px 0;}
+.lf-divider::before,.lf-divider::after{content:"";flex:1;height:1px;background:var(--border);}
+.sso-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.btn-sso{width:100%;justify-content:center;gap:10px;padding:10px;background:var(--surface);
+  border:1px solid var(--border-strong);color:var(--text);font-weight:600;}
+.btn-sso:hover{background:var(--surface-2);border-color:var(--faint);}
+.btn-sso:disabled{opacity:.5;cursor:not-allowed;}
+.btn-sso:disabled:hover{background:var(--surface);border-color:var(--border-strong);}
+/* Local-only "Login as" (filament-developer-logins) injected via the
+   AUTH_LOGIN_FORM_AFTER hook — restyle its Filament chrome to fit the dark card. */
+.login-scope .login-card .fi-simple-header{margin-top:22px;text-align:center;}
+.login-scope .login-card .fi-simple-header p{font-size:11px;color:var(--faint);
+  text-transform:uppercase;letter-spacing:.08em;margin:0;}
+.login-scope .login-card form[action*="filament-developer-logins"]{margin-top:10px;}
+.login-scope .login-card .fi-ac{display:flex;width:100%;}
+.login-scope .login-card .fi-btn{width:100%;justify-content:center;background:var(--surface-2);
+  border:1px solid var(--border-strong);color:var(--text);box-shadow:none;font-weight:600;}
+.login-scope .login-card .fi-btn:hover{background:var(--surface);border-color:var(--faint);color:var(--text);}
+
+.login-signup{text-align:center;margin-top:24px;font-size:13px;color:var(--muted);}
+.login-signup a{color:var(--accent-text);font-weight:600;}
+.login-legal{position:absolute;bottom:20px;left:0;right:0;text-align:center;font-size:11px;color:var(--faint);}
+.login-legal a{color:var(--muted);text-decoration:underline;}
+
+@media (max-width:920px){
+  .login-scope{grid-template-columns:1fr;}
+  .login-brand{display:none;}
+  .login-form-side::before{display:none;}
+  .login-card .lc-eye{display:flex;justify-content:center;margin-bottom:22px;}
+}
