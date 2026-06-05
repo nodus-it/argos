@@ -36,7 +36,7 @@ return [
 
     'lottery' => [2, 100],
 
-    'cookie' => 'argos_session',
+    'cookie' => 'argos_demo_session',
 
     'path' => '/',
 
