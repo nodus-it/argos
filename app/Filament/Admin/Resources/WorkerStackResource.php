@@ -65,7 +65,6 @@ class WorkerStackResource extends Resource
             Section::make(__('worker.stacks.sections.definition'))
                 ->description(__('worker.stacks.sections.definition_description'))
                 ->icon('heroicon-o-cube')
-                ->aside()
                 ->schema([
                     TextInput::make('name')
                         ->label(__('worker.stacks.fields.name'))
@@ -114,7 +113,6 @@ class WorkerStackResource extends Resource
             Section::make(__('worker.stacks.sections.dockerfile'))
                 ->description(__('worker.stacks.sections.dockerfile_description'))
                 ->icon('heroicon-o-command-line')
-                ->aside()
                 ->schema([
                     // Code-editor-style textarea, matched to the task-log
                     // pane (slate-950 surface, slate-100 text, mono).

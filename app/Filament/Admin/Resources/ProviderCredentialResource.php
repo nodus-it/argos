@@ -69,7 +69,6 @@ class ProviderCredentialResource extends Resource
             Section::make(__('credentials.pat.sections.identity'))
                 ->description(__('credentials.pat.sections.identity_description'))
                 ->icon('heroicon-o-identification')
-                ->aside()
                 ->schema([
                     // Provider first — it (and the instance URL) drive the
                     // pre-filled "create token" link below.
@@ -108,7 +107,6 @@ class ProviderCredentialResource extends Resource
             Section::make(__('credentials.pat.sections.auth'))
                 ->description(__('credentials.pat.sections.auth_description'))
                 ->icon('heroicon-o-key')
-                ->aside()
                 ->schema([
                     TextInput::make('token')
                         ->label(__('credentials.pat.fields.token'))

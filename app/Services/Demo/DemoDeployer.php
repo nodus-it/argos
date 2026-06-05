@@ -10,6 +10,7 @@ use App\Models\Demo;
 use App\Models\RepoProfile;
 use App\Models\Task;
 use App\Services\GitProvider\GitServiceFactory;
+use Illuminate\Encryption\Encrypter;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Symfony\Component\Process\Process;
@@ -72,12 +73,15 @@ class DemoDeployer
 
         $log = '';
         try {
-            [$composeYaml, $settings, $usingDefault] = $this->readContract($profile);
+            [$composeYaml, $settings] = $this->readContract($profile);
 
-            // The bundled default compose references the runtime image by a
-            // placeholder — resolve (build-on-demand) the content-hashed tag and
-            // inject it. Repo-supplied contracts bring their own images.
-            if ($usingDefault) {
+            // Resolve the built-in runtime-image placeholder to the content-
+            // hashed, build-on-demand tag whenever a contract references it. The
+            // bundled default always does; a repo contract may opt into the
+            // built-in runtime by keeping the placeholder and only overriding
+            // settings/commands. Contracts that ship their own image simply
+            // omit the token, so this is a no-op for them.
+            if (str_contains($composeYaml, self::DEMO_IMAGE_PLACEHOLDER)) {
                 $composeYaml = str_replace(self::DEMO_IMAGE_PLACEHOLDER, $this->imageBuilder->ensure(), $composeYaml);
             }
 
@@ -194,7 +198,7 @@ class DemoDeployer
      * Fetch both contract files from the provider at the base branch, or fall
      * back to the bundled default when the repo ships none.
      *
-     * @return array{0: string, 1: array<string, mixed>, 2: bool} [composeYaml, settings, usingDefault]
+     * @return array{0: string, 1: array<string, mixed>} [composeYaml, settings]
      */
     private function readContract(RepoProfile $profile): array
     {
@@ -205,12 +209,9 @@ class DemoDeployer
         $composeYaml = $service->getFileContents($ownerRepo, DemoConfigLocator::COMPOSE_PATH, $ref);
         $settingsYaml = $service->getFileContents($ownerRepo, DemoConfigLocator::SETTINGS_PATH, $ref);
 
-        $usingDefault = false;
-
         if ($composeYaml === null && $settingsYaml === null) {
             // No contract at all → built-in default runtime.
             [$composeYaml, $settingsYaml] = $this->defaultContract();
-            $usingDefault = true;
         } elseif ($composeYaml === null || $settingsYaml === null) {
             // A half-written contract is a mistake the author must see, not a
             // silent fall-through to the generic demo.
@@ -225,7 +226,7 @@ class DemoDeployer
             throw new RuntimeException(DemoConfigLocator::SETTINGS_PATH.' is not valid YAML.');
         }
 
-        return [$composeYaml, $settings, $usingDefault];
+        return [$composeYaml, $settings];
     }
 
     /**
@@ -294,6 +295,28 @@ class DemoDeployer
                     'environment' => [
                         'APP_URL' => $this->demoUrlForSlug($slug),
                         'ASSET_URL' => $this->demoUrlForSlug($slug),
+                        // Inject a throwaway app key so Laravel boots even when
+                        // the repo's .env.example ships no APP_KEY= line for
+                        // `key:generate` to fill (Argos itself is such a repo →
+                        // MissingAppKeyException → every request 500s). Laravel
+                        // reads real env over the repo .env, so this wins; a
+                        // fresh per-deploy key is fine for an ephemeral demo.
+                        'APP_KEY' => $this->generateAppKey(),
+                        // Per-demo session cookie name. Each demo runs on its own
+                        // subdomain under the shared parent domain; the parent app
+                        // sets a leading-dot `.{domain}` cookie (`argos_session`)
+                        // that spans the demo subdomain. If the demo is itself an
+                        // Argos instance it would otherwise reuse that name, the
+                        // browser would send the parent's cookie, the demo couldn't
+                        // decrypt it (different APP_KEY) and would reset the session
+                        // every request → login never persists. A per-slug name
+                        // sidesteps it; non-Laravel contracts ignore the var.
+                        'SESSION_COOKIE' => $this->demoCookieName($slug),
+                        // Mark this container as an Argos live demo. Argos' own
+                        // DatabaseSeeder reads it (config argos.demo.enabled) to
+                        // seed the full demo profile instead of the production-safe
+                        // admin-only seed. Harmless for any other repo.
+                        'ARGOS_DEMO' => '1',
                     ],
                     'volumes' => [
                         $task->volumeName().':'.$entry['workspace_mount'],
@@ -329,6 +352,26 @@ class DemoDeployer
         ];
 
         return Yaml::dump($override, 6, 2);
+    }
+
+    /**
+     * A valid throwaway Laravel APP_KEY for the demo container — mirrors what
+     * `php artisan key:generate` produces, but without depending on the repo
+     * shipping an APP_KEY= line in .env(.example).
+     */
+    private function generateAppKey(): string
+    {
+        return 'base64:'.base64_encode(Encrypter::generateKey((string) config('app.cipher')));
+    }
+
+    /**
+     * A demo-unique session cookie name derived from the DNS-safe slug. Stable
+     * across requests of one demo (so the session persists) and distinct from
+     * both the parent app's `argos_session` and every other demo's cookie.
+     */
+    private function demoCookieName(string $slug): string
+    {
+        return str_replace('-', '_', $slug).'_session';
     }
 
     private function prepareWorkDir(string $slug, string $composeYaml, string $overrideYaml): string

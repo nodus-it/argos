@@ -11,9 +11,17 @@ use Filament\Schemas\Schema;
 
 final class Profile extends EditProfile
 {
+    // Render with the full admin index layout so Argos CSS (scoped to .fi-main)
+    // applies consistently with resource edit forms.
+    public static function isSimple(): bool
+    {
+        return false;
+    }
+
     public function form(Schema $schema): Schema
     {
         return $schema
+            ->inlineLabel(false)
             ->components([
                 Section::make(__('common.profile.section_account'))
                     ->description(__('common.profile.section_account_description'))

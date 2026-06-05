@@ -98,6 +98,9 @@ final class LiveReadySeeder extends Seeder
                 'default_branch' => $branch,
                 'auto_concept' => false,
                 'auto_pr' => false,
+                // Live profile is meant to showcase the end-to-end flow incl.
+                // the per-task live demo, so enable it by default.
+                'live_demo_enabled' => true,
             ],
         );
     }

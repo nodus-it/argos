@@ -425,6 +425,13 @@ body,
   background-color: var(--accent);
   border-radius: 2px;
 }
+/* Filament sets overflow-x:auto on .fi-tabs, which implicitly sets overflow-y:auto too.
+   Our active-tab underline sits 1px outside the content box (bottom:-1px), which triggers
+   a spurious vertical scrollbar. Override to visible so neither axis clips or scrolls. */
+.fi-main .fi-tabs,
+.fi-main .fi-sc-tabs > .fi-tabs {
+  overflow: visible;
+}
 
 /* Inputs — give form controls a real visible border like the mockup
    (.input border:1px solid var(--border-strong)). Filament draws the border

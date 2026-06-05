@@ -119,6 +119,25 @@ class DemoDeployerTest extends TestCase
         // browser-reachable asset URLs.
         $this->assertSame('http://demo-feat1.127.0.0.1.nip.io:8080', $parsed['services']['app']['environment']['APP_URL']);
         $this->assertSame('http://demo-feat1.127.0.0.1.nip.io:8080', $parsed['services']['app']['environment']['ASSET_URL']);
+
+        // A throwaway APP_KEY is injected so Laravel boots even when the repo
+        // ships no APP_KEY= line for `key:generate` (else MissingAppKeyException
+        // → 500). Must be a valid base64 32-byte key.
+        $appKey = $parsed['services']['app']['environment']['APP_KEY'];
+        $this->assertMatchesRegularExpression('/^base64:[A-Za-z0-9+\/]+={0,2}$/', $appKey);
+        $this->assertSame(32, strlen((string) base64_decode(substr($appKey, 7), true)));
+
+        // A per-demo session cookie name, distinct from the parent's
+        // `argos_session`, so an Argos-deployed-as-its-own-demo keeps its login
+        // (the parent's leading-dot cookie would otherwise be sent here and fail
+        // to decrypt under a different APP_KEY → session reset every request).
+        $cookie = $parsed['services']['app']['environment']['SESSION_COOKIE'];
+        $this->assertSame('demo_feat1_session', $cookie);
+        $this->assertNotSame('argos_session', $cookie);
+
+        // Marks the container as a live demo so the seeded app loads its full
+        // demo profile (DatabaseSeeder → FullDemoSeeder) instead of admin-only.
+        $this->assertSame('1', $parsed['services']['app']['environment']['ARGOS_DEMO']);
     }
 
     public function test_write_traefik_route_creates_file_and_returns_url_with_port(): void
@@ -340,6 +359,49 @@ class DemoDeployerTest extends TestCase
         $written = file_get_contents(sys_get_temp_dir().'/argos-demo-demo-feat-default/demo.compose.yml');
         $this->assertStringContainsString('argos-demo:testtag', (string) $written);
         $this->assertStringNotContainsString('__ARGOS_DEMO_IMAGE__', (string) $written);
+    }
+
+    public function test_repo_contract_resolves_builtin_runtime_placeholder(): void
+    {
+        // A repo contract may opt into Argos' built-in runtime by keeping the
+        // __ARGOS_DEMO_IMAGE__ placeholder (Argos' own .argos/demo.* does this);
+        // the deployer must resolve it just like for the default contract.
+        $settings = <<<'YAML'
+        entry:
+          service: app
+          port: 80
+        workspace_mount: /var/www/html
+        commands:
+          - php artisan db:seed --class=FullDemoSeeder --force
+        health:
+          path: /
+          timeout: 30
+        YAML;
+
+        Http::fake([
+            'api.github.com/repos/acme/widget/contents/.argos/demo.compose.yml*' => Http::response([
+                'content' => base64_encode("services:\n  app:\n    image: __ARGOS_DEMO_IMAGE__\n"),
+                'encoding' => 'base64',
+            ]),
+            'api.github.com/repos/acme/widget/contents/.argos/demo.yml*' => Http::response([
+                'content' => base64_encode($settings),
+                'encoding' => 'base64',
+            ]),
+        ]);
+
+        $profile = $this->profile();
+        $task = Task::factory()->for($profile, 'repoProfile')->create(['name' => 'feat-byo-contract']);
+
+        $script = array_fill(0, 6, ['cmd' => '', 'exit' => 0]);
+        $deployer = new FakeDemoDeployer(app(GitServiceFactory::class), new FakeDemoImageBuilder, $script);
+
+        $demo = $deployer->deploy($task);
+
+        $this->assertSame(DemoStatus::Live, $demo->status);
+
+        $written = (string) file_get_contents(sys_get_temp_dir().'/argos-demo-demo-feat-byo-contract/demo.compose.yml');
+        $this->assertStringContainsString('argos-demo:testtag', $written);
+        $this->assertStringNotContainsString('__ARGOS_DEMO_IMAGE__', $written);
     }
 
     public function test_deploy_fails_when_contract_is_half_written(): void
