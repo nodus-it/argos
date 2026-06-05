@@ -256,17 +256,6 @@
         @endforeach
     </x-argos.thread>
 
-    {{-- Phase-run metrics — per-iteration cost / token / model breakdown. The
-         thread above is narrative; this read-only table is the data view used
-         for run-cost and model analysis. --}}
-    <div class="fade-in" style="margin-top:24px;">
-        @livewire(
-            \App\Filament\Admin\Resources\TaskResource\RelationManagers\PhaseRunsRelationManager::class,
-            ['ownerRecord' => $task, 'pageClass' => $this::class],
-            key('phase-runs-'.$task->id)
-        )
-    </div>
-
     {{-- Respond / advance dock — drives phase progression from the bottom (M4).
          Hidden while the worker is busy; the dock variant comes from TaskStage. --}}
     @php $dock = $stage->dockMode(); @endphp

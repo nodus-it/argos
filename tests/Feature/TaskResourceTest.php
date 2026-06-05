@@ -248,15 +248,6 @@ class TaskResourceTest extends TestCase
             ->assertCanSeeTableRecords([$task]);
     }
 
-    public function test_view_page_renders_phase_runs_relation_manager(): void
-    {
-        $task = Task::factory()->create();
-
-        Livewire::test(ViewTask::class, ['record' => $task->id])
-            ->assertSuccessful()
-            ->assertSeeLivewire(PhaseRunsRelationManager::class);
-    }
-
     public function test_phase_runs_relation_manager_renders_and_shows_resolved_model(): void
     {
         $task = Task::factory()->create();
