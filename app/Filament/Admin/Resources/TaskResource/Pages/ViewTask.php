@@ -26,10 +26,9 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Schemas\Components\Utilities\Get;
 use Illuminate\Contracts\Support\Htmlable;
-use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Process;
-use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
+use Illuminate\View\View;
 
 class ViewTask extends ViewRecord
 {
@@ -462,20 +461,37 @@ class ViewTask extends ViewRecord
         return $count > 1 ? $base.' v'.$iteration : $base;
     }
 
+    public function getHeader(): ?View
+    {
+        $task = $this->task();
+        $stage = TaskStage::for($task);
+
+        return view('filament.admin.resources.task.task-detail-hero', [
+            'task' => $task,
+            'stage' => $stage,
+            'headerActions' => $this->getCachedHeaderActions(),
+            'logTail' => $stage->isRunning() ? $this->phaseLogTail() : [],
+            'breadcrumbs' => filament()->hasBreadcrumbs() ? $this->getBreadcrumbs() : [],
+        ]);
+    }
+
     public function getHeading(): string|Htmlable
     {
-        // Task name + status badge inline in the page header (next to the
-        // title, with the actions on the right). See ARGOS_REDESIGN.md §6.3.
-        $task = $this->task();
-        $badge = Blade::render(
-            '<x-argos.badge :status="$status" :label="$label" />',
-            ['status' => $task->displayBadgeStatus(), 'label' => $task->displayStatusLabel()],
-        );
+        return '';
+    }
 
-        return new HtmlString(
-            '<span class="td-heading-name">'.e($task->name).'</span>'
-            .'<span class="td-heading-badge">'.$badge.'</span>'
-        );
+    /** @return array<int, array{text: string, class: string}> Last 2 lines of the current running phase log. */
+    public function phaseLogTail(): array
+    {
+        $task = $this->task();
+
+        if ($task->current_phase === null) {
+            return [];
+        }
+
+        $lines = $this->parseLogLines($this->readLogFile($task->current_phase->value));
+
+        return array_slice(array_filter($lines, fn (array $l): bool => $l['text'] !== ''), -2);
     }
 
     public function getView(): string

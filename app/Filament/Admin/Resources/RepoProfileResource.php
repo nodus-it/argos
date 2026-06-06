@@ -57,7 +57,7 @@ class RepoProfileResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return __('projects.navigation_group');
+        return null;
     }
 
     public static function getNavigationLabel(): string
@@ -67,7 +67,7 @@ class RepoProfileResource extends Resource
 
     public static function getNavigationSort(): ?int
     {
-        return 1;
+        return 2;
     }
 
     public static function getModelLabel(): string
