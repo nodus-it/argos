@@ -290,6 +290,14 @@ return [
             'loading' => 'Wird geladen…',
         ],
 
+        'stream' => [
+            'thinking' => 'Denken',
+            'completed' => 'Abgeschlossen',
+            'show_more' => '▾ mehr',
+            'show_less' => '▴ weniger',
+            'show_input' => '▾ Eingabe',
+        ],
+
         'quality_gate_log' => [
             'title' => 'Quality-Gate-Log — :name',
             'breadcrumb_tasks' => 'Tasks',

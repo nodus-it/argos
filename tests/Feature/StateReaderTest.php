@@ -242,11 +242,11 @@ class StateReaderTest extends TestCase
         ]);
         $reader = app(StateReader::class);
 
-        $lines = $reader->readStreamLogIteration($task, 'implement', 1);
+        $events = $reader->readStreamLogIteration($task, 'implement', 1);
 
-        $this->assertCount(1, $lines);
-        $this->assertSame('Hello from Claude', $lines[0]['text']);
-        $this->assertSame('text-slate-300', $lines[0]['class']);
+        $this->assertCount(1, $events);
+        $this->assertSame('text', $events[0]['kind']);
+        $this->assertSame('Hello from Claude', $events[0]['text']);
     }
 
     // --- syncToDb (DB-only) ---

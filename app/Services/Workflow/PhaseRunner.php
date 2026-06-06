@@ -39,6 +39,21 @@ class PhaseRunner
     }
 
     /**
+     * Read the host-side .bg.log of the just-finished phase run (orchestration +
+     * agent stream, in order). Local file read — no Docker round-trip.
+     */
+    private function readPhaseBgLog(string $taskName, string $phase): ?string
+    {
+        $path = $this->getPhaseLogPath($taskName, $phase);
+        if (! is_file($path)) {
+            return null;
+        }
+        $content = file_get_contents($path);
+
+        return $content === false || $content === '' ? null : $content;
+    }
+
+    /**
      * Before a concept phase: write task.concept_notes to concept.notes.md in the volume
      * so the worker can read it. Returns the notes value that was written (for post-phase storage).
      */
@@ -140,9 +155,16 @@ class PhaseRunner
             // alongside a clean result event, so the stream_log fallback stays.
             $streamLogPath = "/workspace/.agent/logs/concept.{$phaseRun->iteration}.stream.log";
             $streamLog = $this->readFileFromVolume($task->volumeName(), $streamLogPath);
-            if ($streamLog !== null) {
-                $phaseRunUpdate['stream_log'] = $streamLog;
 
+            // Persist the full .bg.log (orchestration + agent) for the log view,
+            // falling back to the agent-only stream from the volume. Stop-reason
+            // detection still uses the agent stream (single main session).
+            $displayLog = $this->readPhaseBgLog($task->name, 'concept') ?? $streamLog;
+            if ($displayLog !== null) {
+                $phaseRunUpdate['stream_log'] = $displayLog;
+            }
+
+            if ($streamLog !== null) {
                 $stopReason = $this->extractStopReasonFromStreamLog($streamLog);
                 if ($stopReason !== null) {
                     $phaseRunUpdate['stop_reason'] = $stopReason;
@@ -172,9 +194,15 @@ class PhaseRunner
         if (in_array($phase, ['implement', 'push'], true)) {
             $streamLogPath = "/workspace/.agent/logs/{$phase}.{$phaseRun->iteration}.stream.log";
             $streamLog = $this->readFileFromVolume($task->volumeName(), $streamLogPath);
-            if ($streamLog !== null) {
-                $phaseRun->update(['stream_log' => $streamLog]);
 
+            // Persist the full .bg.log for the log view; fall back to the
+            // agent-only volume stream when the host log is unavailable.
+            $displayLog = $this->readPhaseBgLog($task->name, $phase) ?? $streamLog;
+            if ($displayLog !== null) {
+                $phaseRun->update(['stream_log' => $displayLog]);
+            }
+
+            if ($streamLog !== null) {
                 if ($phase === 'implement') {
                     $stopReason = $this->extractStopReasonFromStreamLog($streamLog);
                     if ($stopReason !== null) {
@@ -1012,16 +1040,22 @@ SH;
         if ($streamLog === null || $streamLog === '') {
             return null;
         }
-        // The first line is the system/init event with the session_id field.
-        $firstLine = strtok($streamLog, "\n");
-        if ($firstLine === false) {
-            return null;
+        // The system/init event carries the session_id. It is the first JSON
+        // line of the agent stream, but the persisted log now prefixes the
+        // worker's orchestration lines — so scan for the first session_id
+        // rather than assuming line one.
+        foreach (explode("\n", $streamLog) as $line) {
+            $line = trim($line);
+            if ($line === '' || ! str_contains($line, '"session_id"')) {
+                continue;
+            }
+            $event = json_decode($line, true);
+            if (is_array($event) && isset($event['session_id']) && is_string($event['session_id'])) {
+                return $event['session_id'];
+            }
         }
-        $event = json_decode($firstLine, true);
 
-        return is_array($event) && isset($event['session_id']) && is_string($event['session_id'])
-            ? $event['session_id']
-            : null;
+        return null;
     }
 
     /**

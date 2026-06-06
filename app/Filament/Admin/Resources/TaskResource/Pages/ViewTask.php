@@ -15,8 +15,10 @@ use App\Models\PhaseRun;
 use App\Models\Task;
 use App\Services\Demo\DemoDeployer;
 use App\Services\Task\TaskService;
+use App\Services\Workflow\AgentStreamParser;
 use App\Services\Workflow\StateReader;
 use App\Support\ConceptMarkdown;
+use App\Support\LogTail;
 use App\Support\Workflow\TaskStage;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
@@ -279,7 +281,7 @@ class ViewTask extends ViewRecord
         // Live log of the currently-running phase, streamed from the .bg.log
         // file (the stream_log column is only populated post-phase).
         $liveLog = ($stage->isRunning() && $task->current_phase !== null)
-            ? $this->parseLogLines($this->readLogFile($task->current_phase->value))
+            ? app(AgentStreamParser::class)->parse($this->readLogFile($task->current_phase->value))
             : [];
 
         return [
@@ -874,45 +876,7 @@ class ViewTask extends ViewRecord
         $configDir = config('argos.config_dir');
         $path = "{$configDir}/tasks/{$task->name}/{$phase}.bg.log";
 
-        if (! file_exists($path)) {
-            return '';
-        }
-
-        $content = file_get_contents($path) ?: '';
-        $lines = explode("\n", $content);
-        if (count($lines) > 500) {
-            $lines = array_slice($lines, -500);
-            array_unshift($lines, __('tasks.view.logs.truncated'));
-        }
-
-        return implode("\n", $lines);
-    }
-
-    /** @return array<int, array{text: string, class: string}> */
-    private function parseLogLines(string $content): array
-    {
-        if ($content === '') {
-            return [];
-        }
-
-        $result = [];
-        foreach (explode("\n", $content) as $raw) {
-            $line = (string) preg_replace('/\033\[[0-9;]*[mGKHFABCDJsu]/', '', $raw);
-            $class = match (true) {
-                str_contains($line, '[ERROR]'), str_contains($line, 'FAILED') => 'text-red-400',
-                str_contains($line, '[WARN]') => 'text-amber-400',
-                str_contains($line, '[INFO]') => 'text-slate-300',
-                str_starts_with($line, '[tool:') => 'text-sky-400',
-                str_contains($line, 'completed'), str_contains($line, ': OK') => 'text-emerald-400',
-                str_starts_with(ltrim($line), '+') => 'text-emerald-500',
-                str_starts_with(ltrim($line), '-') => 'text-red-500',
-                $line === '' => 'text-slate-700',
-                default => 'text-slate-400',
-            };
-            $result[] = ['text' => $line, 'class' => $class];
-        }
-
-        return $result;
+        return LogTail::read($path);
     }
 
     /**

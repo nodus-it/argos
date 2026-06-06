@@ -29,7 +29,7 @@
     {{-- Auto-reload while the worker is busy (running or queued). Poll only then
          so review/failed/done states don't reload needlessly (M2). --}}
     @if ($stage->isBusy())
-        <div wire:poll.2500ms="poll" class="hidden"></div>
+        <div wire:poll.1000ms="poll" class="hidden"></div>
     @endif
 
     {{-- Meta strip --}}
@@ -238,10 +238,10 @@
                         @if ($item['isLive'] || $item['hasStoredLog'])
                             <div x-show="panel === 'logs'" x-cloak>
                                 @if ($item['isLive'])
-                                    <x-argos.terminal title="worker · {{ $task->feature_branch }}" :lines="$liveLog" />
+                                    <x-argos.agent-stream title="worker · {{ $task->feature_branch }}" :events="$liveLog" :live="true" />
                                 @else
-                                    <x-argos.terminal title="worker · {{ $item['phase'] }} v{{ $item['iteration'] }}"
-                                        :lines="$loadedLogIterations[$item['iterationKey']] ?? []" />
+                                    <x-argos.agent-stream title="worker · {{ $item['phase'] }} v{{ $item['iteration'] }}"
+                                        :events="$loadedLogIterations[$item['iterationKey']] ?? []" />
                                 @endif
                             </div>
                         @endif

@@ -210,19 +210,7 @@ phase_implement_run() {
         --include-partial \
         "${resume_args[@]}" \
       | log_scrub \
-      | tee "$stream_log" \
-      | tee >(jq -rj '
-            if .type == "assistant" then
-                (.message.content[]? |
-                    if .type == "text" then (.text // "")
-                    elif .type == "tool_use" then
-                        "\n[tool:" + .name + "] " +
-                        (.input.file_path // .input.command // (.input | tostring)[0:120]) + "\n"
-                    else empty end
-                )
-            elif .type == "result" then "\n"
-            else empty end
-          ' >&2 2>/dev/null) \
+      | agent_stream_tee "$stream_log" \
       | jq -c 'select(.type == "result")' \
       > "$result_json"
     local agent_exit=${PIPESTATUS[0]}
@@ -340,19 +328,7 @@ phase_implement_run() {
             --max-turns "${GATE_FIX_MAX_TURNS:-30}" \
             --include-partial \
           | log_scrub \
-          | tee "$fix_stream_log" \
-          | tee >(jq -rj '
-                if .type == "assistant" then
-                    (.message.content[]? |
-                        if .type == "text" then (.text // "")
-                        elif .type == "tool_use" then
-                            "\n[fix] " +
-                            (.input.file_path // .input.command // (.input | tostring)[0:80]) + "\n"
-                        else empty end
-                    )
-                elif .type == "result" then "\n"
-                else empty end
-              ' >&2 2>/dev/null) \
+          | agent_stream_tee "$fix_stream_log" \
           | jq -c 'select(.type == "result")' \
           > "$fix_result_json"
         local fix_exit=${PIPESTATUS[0]}

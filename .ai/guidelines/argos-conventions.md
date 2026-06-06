@@ -202,6 +202,7 @@ need to rebuild or something?".
 | `worker/lib/*.sh` or `worker/phases/*.sh` | Worker image | nothing — `libHash` triggers a rebuild on the next phase run |
 | `.tools/docker/app/Dockerfile` | App image | `docker compose -f .tools/docker/docker-compose.yml build app` + restart |
 | `.tools/docker/worker/Dockerfile` | Worker image (all variants) | `.tools/bin/dev-reset.sh` removes tags, the next phase run rebuilds |
+| Frontend CSS/JS (`resources/css/app.css`, `resources/js/*`) | `public/build` is an **anonymous volume** in the dev override (`docker-compose.dev.yml`), so a host `npm run build` does **not** reach the running stack | `docker exec argos-app-1 npm run build && docker restart argos-app-1` (the entrypoint re-syncs `/app/public` → the served `argos-public` volume on boot). For live work use `npm run dev` (HMR). |
 
 ## Common pitfalls
 
@@ -227,6 +228,14 @@ recur without an anchor — not a garbage dump).
   must use `getenv('HOME')` as a fallback, otherwise the SQLite default
   path lands at `/root/...` and `artisan serve` throws 500. Affects every
   "works in CLI, not in server" bug. (`9b1046f`)
+- **`phase_runs.stream_log` holds the full `.bg.log`, not just agent JSON.**
+  The worker mirrors the whole token-scrubbed stream (orchestration `[INFO]`
+  lines + agent stream-json) via `agent_stream_tee`; `postPhaseSync` persists
+  that `.bg.log` per iteration so the historical log view is as rich as the
+  live one. `AgentStreamParser` is the single renderer for both. Consequence:
+  parsers reading `stream_log` must skip non-JSON lines and **must not assume
+  line 1 is the agent's system/init event** — scan for the first `session_id`
+  instead (see `extractSessionIdFromStreamLog`).
 
 ## Things you do NOT do without checking back
 

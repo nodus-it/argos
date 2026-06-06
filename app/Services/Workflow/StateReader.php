@@ -172,9 +172,10 @@ class StateReader
     }
 
     /**
-     * Parse a stream log stored in phase_runs.stream_log into displayable lines.
+     * Parse a stored stream log (phase_runs.stream_log) into displayable events
+     * for the CLI-near transcript view.
      *
-     * @return array<int, array{text: string, class: string}>
+     * @return list<array<string, mixed>>
      */
     public function readStreamLogIteration(Task $task, string $phase, int $iteration): array
     {
@@ -187,7 +188,7 @@ class StateReader
             return [];
         }
 
-        return $this->parseStreamLog($phaseRun->stream_log);
+        return app(AgentStreamParser::class)->parse($phaseRun->stream_log);
     }
 
     /**
@@ -218,44 +219,6 @@ class StateReader
                 $task->update($updates);
             }
         }
-    }
-
-    /**
-     * @return array<int, array{text: string, class: string}>
-     */
-    private function parseStreamLog(string $streamLog): array
-    {
-        $lines = [];
-        foreach (explode("\n", $streamLog) as $raw) {
-            $raw = trim($raw);
-            if ($raw === '') {
-                continue;
-            }
-            $event = json_decode($raw, true);
-            if (! is_array($event)) {
-                continue;
-            }
-
-            if ($event['type'] === 'assistant') {
-                foreach ($event['message']['content'] ?? [] as $block) {
-                    if ($block['type'] === 'text' && ($block['text'] ?? '') !== '') {
-                        $lines[] = ['text' => $block['text'], 'class' => 'text-slate-300'];
-                    } elseif ($block['type'] === 'tool_use') {
-                        $input = $block['input'] ?? [];
-                        $detail = $input['file_path'] ?? $input['command'] ?? json_encode($input);
-                        if (strlen((string) $detail) > 120) {
-                            $detail = substr((string) $detail, 0, 120);
-                        }
-                        $lines[] = ['text' => "[tool:{$block['name']}] {$detail}", 'class' => 'text-sky-400'];
-                    }
-                }
-            } elseif ($event['type'] === 'result' && isset($event['total_cost_usd'])) {
-                $cost = number_format((float) $event['total_cost_usd'], 6);
-                $lines[] = ['text' => "[INFO] Abgeschlossen · Kosten: \${$cost}", 'class' => 'text-emerald-400'];
-            }
-        }
-
-        return $lines;
     }
 
     protected function newProcess(array $cmd): Process
