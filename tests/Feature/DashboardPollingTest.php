@@ -7,6 +7,7 @@ namespace Tests\Feature;
 use App\Filament\Admin\Pages\Dashboard;
 use App\Filament\Admin\Resources\TaskResource\Pages\ListTasks;
 use App\Filament\Admin\Widgets\CurrentTasksWidget;
+use App\Filament\Admin\Widgets\DashboardHeroWidget;
 use App\Filament\Admin\Widgets\StatsOverviewWidget;
 use App\Models\Task;
 use App\Models\User;
@@ -53,10 +54,9 @@ class DashboardPollingTest extends TestCase
             ->assertSee('wire:poll.5s', escape: false);
     }
 
-    public function test_dashboard_page_renders_both_polling_widgets(): void
+    public function test_dashboard_page_renders_hero_widget(): void
     {
         Livewire::test(Dashboard::class)
-            ->assertSeeLivewire(StatsOverviewWidget::class)
-            ->assertSeeLivewire(CurrentTasksWidget::class);
+            ->assertSeeLivewire(DashboardHeroWidget::class);
     }
 }

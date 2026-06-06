@@ -8,8 +8,8 @@ use App\Filament\Admin\Concerns\TaskTableConcern;
 use App\Filament\Admin\Resources\TaskResource;
 use App\Models\Task;
 use App\Services\Workflow\StateReader;
-use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
+use Illuminate\View\View;
 
 class ListTasks extends ListRecords
 {
@@ -17,9 +17,12 @@ class ListTasks extends ListRecords
 
     protected function getHeaderActions(): array
     {
-        return [
-            CreateAction::make(),
-        ];
+        return [];
+    }
+
+    public function getHeader(): ?View
+    {
+        return view('filament.admin.heros.tasks-list-hero');
     }
 
     public function getTabs(): array

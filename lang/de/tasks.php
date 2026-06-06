@@ -102,6 +102,14 @@ return [
     ],
 
     'view' => [
+        'live' => [
+            'concept_running' => 'Konzept läuft',
+            'implement_running' => 'Implementierung läuft',
+            'push_running' => 'Push & PR läuft',
+            'respond_running' => 'Respond läuft',
+            'running' => 'Phase läuft',
+            'waiting' => 'Warte auf Ausgabe…',
+        ],
         'thread' => [
             'created' => 'Aufgabe angelegt',
             'you' => 'Du',
@@ -338,6 +346,7 @@ return [
 
         'actions' => [
             'back' => '← Zurück zur Task',
+            'back_crumb' => 'Ansehen',
             'edit' => 'Bearbeiten',
             'add' => 'Hinzufügen',
             'save' => 'Speichern',

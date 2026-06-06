@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Filament\Admin\Resources\RepoProfileResource\Pages;
 
 use App\Filament\Admin\Resources\RepoProfileResource;
-use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
+use Illuminate\View\View;
 
 class ListRepoProfiles extends ListRecords
 {
@@ -14,8 +14,11 @@ class ListRepoProfiles extends ListRecords
 
     protected function getHeaderActions(): array
     {
-        return [
-            CreateAction::make(),
-        ];
+        return [];
+    }
+
+    public function getHeader(): ?View
+    {
+        return view('filament.admin.heros.projects-list-hero');
     }
 }

@@ -7,8 +7,6 @@ namespace App\Providers\Filament;
 use App\Filament\Admin\Pages\Dashboard;
 use App\Filament\Admin\Pages\Login;
 use App\Filament\Admin\Pages\Profile;
-use App\Filament\Admin\Widgets\CurrentTasksWidget;
-use App\Filament\Admin\Widgets\StatsOverviewWidget;
 use App\Http\Middleware\RedirectToOnboarding;
 use App\Http\Middleware\SetUserLocale;
 use DutchCodingCompany\FilamentDeveloperLogins\FilamentDeveloperLoginsPlugin;
@@ -62,10 +60,7 @@ class AdminPanelProvider extends PanelProvider
                 Dashboard::class,
             ])
             ->discoverWidgets(in: app_path('Filament/Admin/Widgets'), for: 'App\Filament\Admin\Widgets')
-            ->widgets([
-                StatsOverviewWidget::class,
-                CurrentTasksWidget::class,
-            ])
+            ->widgets([])
             ->navigationGroups([
                 __('navigation.groups.worker'),
                 __('navigation.groups.configuration'),
