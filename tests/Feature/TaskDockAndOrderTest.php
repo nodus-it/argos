@@ -60,6 +60,26 @@ final class TaskDockAndOrderTest extends TestCase
             ->assertSee('Create Push & PR');
     }
 
+    public function test_refine_implement_from_review_dock_passes_refine_flag(): void
+    {
+        $task = Task::factory()->create([
+            'workflow_status' => WorkflowStatus::ImplementCompleted,
+            'current_phase' => 'implement',
+            'current_status' => 'completed',
+        ]);
+        PhaseRun::factory()->create(['task_id' => $task->id, 'phase' => 'implement', 'status' => 'completed']);
+
+        Livewire::test(ViewTask::class, ['record' => $task->getKey()])
+            ->set('implementNotes', 'Tweak the spacing')
+            ->call('saveImplementNotesAndRevise', true);
+
+        // Refine must NOT reset to the base branch — the worker keys off this flag.
+        Bus::assertDispatched(
+            RunPhaseJob::class,
+            fn ($j) => $j->taskId === $task->id && $j->phase === 'implement' && $j->flags === ['refine' => true],
+        );
+    }
+
     public function test_no_dock_while_a_phase_is_running(): void
     {
         $task = Task::factory()->create([

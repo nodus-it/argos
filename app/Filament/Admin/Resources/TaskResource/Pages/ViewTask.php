@@ -126,13 +126,13 @@ class ViewTask extends ViewRecord
         Notification::make()->title(__('tasks.view.actions.feedback_saved'))->success()->send();
     }
 
-    public function saveImplementNotesAndRevise(): void
+    public function saveImplementNotesAndRevise(bool $refine = false): void
     {
         /** @var Task $task */
         $task = $this->getRecord();
 
         try {
-            app(TaskService::class)->saveImplementNotesAndRevise($task, $this->implementNotes);
+            app(TaskService::class)->saveImplementNotesAndRevise($task, $this->implementNotes, $refine);
         } catch (\RuntimeException) {
             Notification::make()->title(__('tasks.view.actions.phase_already_running'))->warning()->send();
 

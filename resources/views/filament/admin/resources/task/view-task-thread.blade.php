@@ -290,7 +290,7 @@
                     </x-argos.btn>
                     @break
                 @case('implement')
-                    <x-argos.btn variant="secondary" wire:click="saveImplementNotesAndRevise">
+                    <x-argos.btn variant="secondary" wire:click="saveImplementNotesAndRevise(true)">
                         @svg('heroicon-o-arrow-path') {{ __('tasks.view.dock.refine_implement') }}
                     </x-argos.btn>
                     <x-argos.btn variant="primary" wire:click="startPhaseFromDock('push')">

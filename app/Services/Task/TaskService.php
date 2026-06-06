@@ -230,12 +230,18 @@ class TaskService
     /**
      * Persist implement notes and immediately re-run the implement phase.
      *
+     * When $refine is true (the "refine implementation" action in the review
+     * dock) the re-run builds on the previous iteration's working tree instead
+     * of resetting to the base branch — otherwise the reviewed work would be
+     * discarded. The default (false) is a clean reset, used when retrying a
+     * failed implement run.
+     *
      * @throws \RuntimeException when a phase is already running
      */
-    public function saveImplementNotesAndRevise(Task $task, string $notes): void
+    public function saveImplementNotesAndRevise(Task $task, string $notes, bool $refine = false): void
     {
         $this->saveImplementNotes($task, $notes);
-        $this->startPhase($task, Phase::Implement);
+        $this->startPhase($task, Phase::Implement, $refine ? ['refine' => true] : []);
     }
 
     /**

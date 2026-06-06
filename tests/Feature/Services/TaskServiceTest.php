@@ -406,7 +406,19 @@ class TaskServiceTest extends TestCase
         $task = Task::factory()->create();
         $this->service->saveImplementNotesAndRevise($task, 'Impl notes');
 
-        Bus::assertDispatched(RunPhaseJob::class, fn ($j) => $j->phase === 'implement');
+        // Default (retry): clean reset — no refine flag.
+        Bus::assertDispatched(RunPhaseJob::class, fn ($j) => $j->phase === 'implement' && $j->flags === []);
+    }
+
+    public function test_save_implement_notes_and_revise_with_refine_passes_refine_flag(): void
+    {
+        Event::fake();
+
+        $task = Task::factory()->create();
+        $this->service->saveImplementNotesAndRevise($task, 'Impl notes', refine: true);
+
+        // Refine: re-run on top of the existing working tree, no base reset.
+        Bus::assertDispatched(RunPhaseJob::class, fn ($j) => $j->phase === 'implement' && $j->flags === ['refine' => true]);
     }
 
     public function test_save_implement_notes_and_revise_throws_when_running(): void

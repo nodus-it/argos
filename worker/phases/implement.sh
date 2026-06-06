@@ -3,7 +3,9 @@
 #
 # Default: --fresh (git reset --hard origin/$BASE_BRANCH, git clean -fd
 # without -x so vendor/ and node_modules/ survive), composer install / npm ci
-# if a manifest exists, then a Claude session. Quality gates (Pint,
+# if a manifest exists, then a Claude session. --refine skips the reset and
+# re-runs on top of the previous iteration's working tree (used when the user
+# refines a reviewed implementation from the UI). Quality gates (Pint,
 # Pest/PHPUnit, PHPStan when configured) are re-run by the worker AFTER the
 # Claude session as a verification step — Claude is expected to have made
 # them pass already. All four are blocking.
@@ -143,12 +145,16 @@ phase_implement_run() {
     }
     mkdir -p /workspace/.agent/logs
 
-    local fresh continue_run
+    local fresh continue_run refine
     fresh="$(echo "${PHASE_FLAGS:-}" | jq -r '.fresh // false' 2>/dev/null || echo false)"
     continue_run="$(echo "${PHASE_FLAGS:-}" | jq -r '.continue // false' 2>/dev/null || echo false)"
+    refine="$(echo "${PHASE_FLAGS:-}" | jq -r '.refine // false' 2>/dev/null || echo false)"
 
-    # Default to fresh=true when neither --fresh nor --continue is set.
-    if [[ "$fresh" == "false" && "$continue_run" == "false" ]]; then
+    # Default to fresh=true unless this is a --continue resume or a --refine run.
+    # --refine re-runs implement on top of the previous iteration's working
+    # tree (incorporating the user's review notes) instead of discarding it —
+    # so it must NOT reset to the base branch.
+    if [[ "$fresh" == "false" && "$continue_run" == "false" && "$refine" == "false" ]]; then
         fresh="true"
     fi
 
