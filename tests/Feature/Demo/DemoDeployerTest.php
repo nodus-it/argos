@@ -13,8 +13,9 @@ use App\Services\Demo\DemoDeployer;
 use App\Services\Demo\DemoImageBuilder;
 use App\Services\GitProvider\GitServiceFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Http;
 use RuntimeException;
+use Saloon\Http\Faking\MockResponse;
+use Saloon\Laravel\Facades\Saloon;
 use Symfony\Component\Process\Process;
 use Symfony\Component\Yaml\Yaml;
 use Tests\TestCase;
@@ -71,12 +72,12 @@ class DemoDeployerTest extends TestCase
           timeout: 30
         YAML;
 
-        Http::fake([
-            'api.github.com/repos/acme/widget/contents/.argos/demo.compose.yml*' => Http::response([
+        Saloon::fake([
+            'api.github.com/repos/acme/widget/contents/.argos/demo.compose.yml*' => MockResponse::make([
                 'content' => base64_encode("services:\n  app:\n    image: php:8.4\n"),
                 'encoding' => 'base64',
             ]),
-            'api.github.com/repos/acme/widget/contents/.argos/demo.yml*' => Http::response([
+            'api.github.com/repos/acme/widget/contents/.argos/demo.yml*' => MockResponse::make([
                 'content' => base64_encode($settings),
                 'encoding' => 'base64',
             ]),
@@ -339,8 +340,8 @@ class DemoDeployerTest extends TestCase
     public function test_deploy_uses_default_contract_when_repo_has_none(): void
     {
         // Neither contract file exists → the built-in default runtime kicks in.
-        Http::fake([
-            'api.github.com/repos/*' => Http::response('', 404),
+        Saloon::fake([
+            'api.github.com/repos/*' => MockResponse::make('', 404),
         ]);
         $profile = $this->profile();
         $task = Task::factory()->for($profile, 'repoProfile')->create(['name' => 'feat-default']);
@@ -378,12 +379,12 @@ class DemoDeployerTest extends TestCase
           timeout: 30
         YAML;
 
-        Http::fake([
-            'api.github.com/repos/acme/widget/contents/.argos/demo.compose.yml*' => Http::response([
+        Saloon::fake([
+            'api.github.com/repos/acme/widget/contents/.argos/demo.compose.yml*' => MockResponse::make([
                 'content' => base64_encode("services:\n  app:\n    image: __ARGOS_DEMO_IMAGE__\n"),
                 'encoding' => 'base64',
             ]),
-            'api.github.com/repos/acme/widget/contents/.argos/demo.yml*' => Http::response([
+            'api.github.com/repos/acme/widget/contents/.argos/demo.yml*' => MockResponse::make([
                 'content' => base64_encode($settings),
                 'encoding' => 'base64',
             ]),
@@ -408,12 +409,12 @@ class DemoDeployerTest extends TestCase
     {
         // Exactly one file present is a mistake the author must see — no silent
         // fall-through to the default.
-        Http::fake([
-            'api.github.com/repos/acme/widget/contents/.argos/demo.compose.yml*' => Http::response([
+        Saloon::fake([
+            'api.github.com/repos/acme/widget/contents/.argos/demo.compose.yml*' => MockResponse::make([
                 'content' => base64_encode("services:\n  app:\n    image: php:8.4\n"),
                 'encoding' => 'base64',
             ]),
-            'api.github.com/repos/acme/widget/contents/.argos/demo.yml*' => Http::response('', 404),
+            'api.github.com/repos/acme/widget/contents/.argos/demo.yml*' => MockResponse::make('', 404),
         ]);
         $profile = $this->profile();
         $task = Task::factory()->for($profile, 'repoProfile')->create(['name' => 'feat-half']);

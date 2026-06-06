@@ -14,8 +14,9 @@ use App\Models\Task;
 use App\Models\User;
 use App\Services\Workflow\PhaseRunner;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
+use Saloon\Http\Faking\MockResponse;
+use Saloon\Laravel\Facades\Saloon;
 use Tests\TestCase;
 
 class ClaudeModelSelectionTest extends TestCase
@@ -46,8 +47,8 @@ class ClaudeModelSelectionTest extends TestCase
 
     public function test_repo_profile_model_fields_are_saved(): void
     {
-        Http::fake([
-            'api.github.com/repos/test-org/test-repo/branches*' => Http::response([['name' => 'main']]),
+        Saloon::fake([
+            'api.github.com/repos/test-org/test-repo/branches*' => MockResponse::make([['name' => 'main']]),
         ]);
 
         $profile = RepoProfile::factory()->create(['platform' => 'github']);
@@ -69,8 +70,8 @@ class ClaudeModelSelectionTest extends TestCase
 
     public function test_repo_profile_model_fields_can_be_cleared(): void
     {
-        Http::fake([
-            'api.github.com/repos/test-org/test-repo/branches*' => Http::response([['name' => 'main']]),
+        Saloon::fake([
+            'api.github.com/repos/test-org/test-repo/branches*' => MockResponse::make([['name' => 'main']]),
         ]);
 
         $profile = RepoProfile::factory()->create([
