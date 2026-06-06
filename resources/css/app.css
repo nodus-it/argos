@@ -1091,3 +1091,174 @@ body,
   .login-form-side::before{display:none;}
   .login-card .lc-eye{display:flex;justify-content:center;margin-bottom:22px;}
 }
+
+/* ============================================================
+   Control-Room Heros — Dashboard · Page · Task-Detail.
+   Token aliases mirror .login-scope; no grid/position on .cr-scope
+   so it can be used as a modifier on any block element.
+   ============================================================ */
+.cr-scope{
+  --a-300:var(--color-accent-300); --a-400:var(--color-accent-400);
+  --a-500:var(--color-accent-500); --a-600:var(--color-accent-600);
+  --a-700:var(--color-accent-700); --a-800:var(--color-accent-800);
+  --n-50:var(--color-neutral-50);  --n-200:var(--color-neutral-200);
+  --n-400:var(--color-neutral-400);--n-500:var(--color-neutral-500);
+  --cr-bg:#100d0b; --cr-surface:#1a1612; --cr-surface-2:#15110e;
+  --cr-text:var(--n-50); --cr-text-2:var(--n-200); --cr-muted:var(--n-400); --cr-faint:var(--n-500);
+  --cr-border:#2a231d; --cr-border-strong:#3a312a;
+  --cr-accent:var(--a-500); --cr-accent-hover:var(--a-400); --cr-accent-text:var(--a-300);
+  --cr-accent-soft:color-mix(in oklab,var(--a-500) 18%,transparent);
+  --cr-accent-soft-border:color-mix(in oklab,var(--a-500) 38%,transparent);
+  --cr-on-accent:#fff; --cr-term-bg:#0a0706;
+  color-scheme:dark;
+}
+/* Decorative glow decklayer — absolutely positioned inside .cr-scope */
+.cr-glow{position:absolute;inset:0;pointer-events:none;border-radius:inherit;
+  background:
+    radial-gradient(120% 90% at 22% 32%, color-mix(in oklab,var(--a-600) 30%,transparent) 0%, transparent 55%),
+    radial-gradient(90% 80% at 88% 88%, color-mix(in oklab,var(--a-800) 22%,transparent) 0%, transparent 60%);}
+/* Decorative dot grid decklayer */
+.cr-grid{position:absolute;inset:0;pointer-events:none;opacity:.4;border-radius:inherit;
+  background-image:radial-gradient(circle at 1px 1px, color-mix(in oklab,var(--a-300) 20%,transparent) 1px, transparent 0);
+  background-size:26px 26px;
+  -webkit-mask-image:radial-gradient(circle at 30% 40%, #000 0%, transparent 72%);
+          mask-image:radial-gradient(circle at 30% 40%, #000 0%, transparent 72%);}
+
+/* statbar: accent bar slowly pulses on live .stat cards */
+@keyframes statbar{0%,100%{opacity:.55;transform:scaleY(.92);}50%{opacity:1;transform:scaleY(1);}}
+.stat.is-live .accent-bar{animation:statbar 2.6s ease infinite;}
+
+/* ---- Dashboard hero ---- */
+.dh-hero{
+  position:relative;overflow:hidden; /* clips decorations only; no dropdown inside */
+  background:var(--cr-bg);border:1px solid var(--cr-border);border-radius:var(--radius-lg);
+  padding:36px 32px;display:flex;align-items:center;gap:36px;
+  margin-bottom:24px;color:var(--cr-text);}
+.dh-eye-stage{position:relative;width:120px;height:120px;flex:none;display:grid;place-items:center;}
+.dh-ring{position:absolute;border-radius:50%;border:1px solid color-mix(in oklab,var(--a-400) 38%,transparent);}
+.dh-ring.r1{inset:0;animation:spin 26s linear infinite;}
+.dh-ring.r2{inset:16px;border-style:dashed;border-color:color-mix(in oklab,var(--a-400) 24%,transparent);animation:spin 18s linear infinite reverse;}
+.dh-ring.r3{inset:32px;border-color:color-mix(in oklab,var(--a-300) 30%,transparent);}
+.dh-eye-glow{position:absolute;inset:18px;border-radius:50%;filter:blur(12px);
+  background:radial-gradient(circle, color-mix(in oklab,var(--a-500) 50%,transparent), transparent 70%);
+  animation:eyeglow 3.4s ease infinite;}
+.dh-eye-stage .eye{position:relative;z-index:2;width:72px;height:72px;
+  filter:drop-shadow(0 0 10px color-mix(in oklab,var(--a-500) 55%,transparent));}
+.dh-txt{flex:1;min-width:0;}
+.dh-txt h1{font-size:28px;line-height:1.1;font-weight:700;letter-spacing:-.02em;margin:0 0 6px;color:var(--cr-text);}
+.dh-txt h1 .hl{color:var(--cr-accent-text);}
+.dh-txt .sub{color:var(--cr-text-2);font-size:14px;line-height:1.5;margin:0;}
+.dh-right{flex:none;width:380px;}
+.dh-term{width:100%;background:var(--cr-term-bg);
+  border:1px solid var(--cr-border);border-radius:var(--radius);overflow:hidden;}
+.dh-term-head{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,.06);}
+.dh-term-head i{width:9px;height:9px;border-radius:99px;display:block;}
+.dh-term-head i.d1{background:#f06a5a;}.dh-term-head i.d2{background:#f5c451;}.dh-term-head i.d3{background:#5ad08e;}
+.dh-term-head .tt{font-family:var(--font-mono);font-size:11px;color:#7d8694;margin-left:4px;}
+.dh-term-head .live{margin-left:auto;display:flex;align-items:center;gap:5px;font-family:var(--font-mono);
+  font-size:10px;color:var(--ok-400);font-weight:600;letter-spacing:.05em;}
+.dh-term-head .live .dot{width:6px;height:6px;border-radius:99px;background:var(--ok-400);animation:pulse 1.6s ease infinite;}
+.dh-term-body{padding:10px 12px;font-family:var(--font-mono);font-size:11.5px;line-height:1.65;
+  height:110px;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;}
+.dh-term-line{display:flex;gap:8px;white-space:nowrap;}
+.dh-term-line .tt{color:#5b626e;flex:none;}
+.dh-term-line .t-ok{color:#5ad08e;}.dh-term-line .t-info{color:#9aa3b2;}
+.dh-term-line .t-accent{color:var(--cr-accent-hover);}.dh-term-line .t-warn{color:#f5c451;}
+.dh-term-line .t-err{color:#f08a8a;}
+.dh-status{display:flex;align-items:center;justify-content:space-around;
+  padding:10px 14px;border-top:1px solid rgba(255,255,255,.06);}
+.dh-status-item{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--cr-muted);}
+.dh-status-item .num{font-family:var(--font-mono);font-weight:700;font-size:15px;line-height:1;}
+.dh-status-item.d-run .num{color:var(--wn-400);}
+.dh-status-item.d-wait .num{color:var(--cr-accent-text);}
+.dh-status-item.d-err .num{color:#f08a8a;}
+
+/* ---- Page hero (Tasks / Projekte list) ---- */
+.ph-hero{
+  position:relative;overflow:hidden; /* clips decorations; no dropdown inside */
+  background:var(--cr-bg);border:1px solid var(--cr-border);border-radius:var(--radius-lg);
+  padding:28px 28px 24px;display:flex;align-items:center;gap:20px;
+  color:var(--cr-text);margin-bottom:20px;}
+.ph-ic{width:48px;height:48px;flex:none;display:grid;place-items:center;
+  background:color-mix(in oklab,var(--a-500) 14%,transparent);
+  border:1px solid var(--cr-accent-soft-border);border-radius:14px;color:var(--cr-accent-text);}
+.ph-ic svg{width:24px;height:24px;}
+.ph-txt{flex:1;min-width:0;}
+.ph-txt h2{font-size:20px;font-weight:700;letter-spacing:-.01em;margin:0 0 4px;color:var(--cr-text);}
+.ph-txt .sub{color:var(--cr-text-2);font-size:13px;margin:0 0 12px;}
+.ph-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.ph-chip{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:99px;
+  border:1px solid var(--cr-border-strong);background:rgba(255,255,255,.04);
+  font-size:12px;color:var(--cr-text-2);white-space:nowrap;}
+.ph-chip .num{font-family:var(--font-mono);font-weight:600;color:var(--cr-text);}
+.ph-chip.d-run .num{color:var(--wn-400);}.ph-chip.d-wait .num{color:var(--cr-accent-text);}
+.ph-chip.d-ok .num{color:var(--ok-400);}
+.ph-chip .dot{width:6px;height:6px;border-radius:99px;background:currentColor;}
+.ph-chip.d-run .dot{color:var(--wn-400);box-shadow:0 0 6px currentColor;}
+.ph-chip.d-wait .dot{color:var(--cr-accent-text);box-shadow:0 0 6px currentColor;}
+.ph-act{flex:none;position:relative;z-index:1;}
+
+/* ---- Task detail hero ---- */
+/* NOTE: NO overflow:hidden here — allows the action-menu dropdown to escape
+   the hero boundary. Decorative layers clip themselves via border-radius:inherit. */
+.th-hero{
+  position:relative;border:1px solid var(--cr-border);border-radius:var(--radius-lg);margin-bottom:20px;
+  color:var(--cr-text);isolation:isolate;background:var(--cr-bg);}
+.th-crumbs{position:relative;z-index:1;padding:14px 20px 0;
+  display:flex;align-items:center;gap:6px;font-size:12px;color:var(--cr-muted);}
+.th-crumbs a{color:var(--cr-muted);text-decoration:none;}
+.th-crumbs a:hover{color:var(--cr-text-2);}
+.th-crumbs .sep{opacity:.5;}
+.th-body{position:relative;z-index:1;padding:14px 20px 20px;display:flex;align-items:flex-start;gap:16px;}
+.th-ic{width:44px;height:44px;flex:none;display:grid;place-items:center;
+  background:color-mix(in oklab,var(--a-500) 14%,transparent);
+  border:1px solid var(--cr-accent-soft-border);border-radius:12px;color:var(--cr-accent-text);margin-top:2px;}
+.th-ic svg{width:22px;height:22px;}
+.th-id{flex:1;min-width:0;}
+.th-title{display:flex;align-items:center;gap:10px;margin:0 0 8px;flex-wrap:wrap;}
+.th-title h2{font-size:18px;font-weight:700;letter-spacing:-.01em;margin:0;
+  color:var(--cr-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:50ch;}
+.th-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
+.th-mi{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--cr-muted);}
+.th-mi svg{width:13px;height:13px;opacity:.7;}
+.th-mi .val{font-family:var(--font-mono);color:var(--cr-text-2);}
+/* Actions: z-index:2 so dropdown floats above other hero content */
+.th-actions{position:relative;z-index:2;display:flex;align-items:center;gap:10px;
+  flex:none;align-self:flex-start;padding-top:2px;}
+/* Dark-surface overrides for Filament buttons inside .th-actions */
+.th-actions .fi-btn{box-shadow:none;}
+.th-actions .fi-btn-color-gray{background-color:rgba(255,255,255,.08);
+  border-color:var(--cr-border-strong);color:var(--cr-text-2);}
+.th-actions .fi-btn-color-gray:hover{background-color:rgba(255,255,255,.14);color:var(--cr-text);}
+.th-actions .fi-btn-color-primary{background-color:var(--cr-accent);color:var(--cr-on-accent);}
+.th-actions .fi-btn-color-primary:hover{background-color:var(--cr-accent-hover);}
+.th-actions .fi-dropdown-panel{min-width:200px;}
+/* Live working strip */
+.th-live{position:relative;z-index:1;padding:10px 20px 14px;
+  border-top:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:10px;}
+.th-live-tag{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;
+  letter-spacing:.04em;text-transform:uppercase;color:var(--ok-400);white-space:nowrap;}
+.th-live-tag .dot{width:6px;height:6px;border-radius:99px;background:var(--ok-400);animation:pulse 1.6s ease infinite;}
+.th-stream{flex:1;background:var(--cr-term-bg);border-radius:var(--radius-sm);
+  padding:6px 10px;font-family:var(--font-mono);font-size:11px;line-height:1.6;
+  overflow:hidden;height:42px;display:flex;flex-direction:column;justify-content:flex-end;}
+.th-stream-line{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#9aa3b2;}
+.th-stream-line.ok{color:#5ad08e;}.th-stream-line.err{color:#f08a8a;}
+
+/* Responsive breakpoints */
+@media(max-width:760px){
+  .dh-eye-stage{display:none;}
+  .dh-right{width:100%;}
+  .ph-hero{padding:20px 16px 18px;gap:14px;}
+  .ph-meta{gap:6px;}
+  .ph-chip{font-size:11px;padding:2px 8px;}
+}
+@media(max-width:680px){
+  .th-body{flex-wrap:wrap;}
+  .th-actions{width:100%;justify-content:flex-end;}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .dh-ring,.dh-eye-glow,.th-live-tag .dot,.dh-term-head .live .dot{animation:none!important;}
+  .stat.is-live .accent-bar{animation:none!important;}
+}
