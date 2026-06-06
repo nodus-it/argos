@@ -19,3 +19,15 @@ arch('workers are UI-isolated')
 arch('e2e fakes are not used by production code')
     ->expect('App\Testing')
     ->toOnlyBeUsedIn('App\Providers\E2eFakeServiceProvider');
+
+// Saloon is the transport layer for external APIs and must stay confined to
+// app/Integrations. Domain services reach it only through the connectors that
+// live there, never by depending on Saloon directly.
+arch('saloon is confined to integrations')
+    ->expect('Saloon')
+    ->toOnlyBeUsedIn('App\Integrations');
+
+// Integrations are pure transport — they must not reach into the UI layer.
+arch('integrations are UI-isolated')
+    ->expect('App\Integrations')
+    ->not->toUse('App\Filament');
