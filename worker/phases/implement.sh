@@ -88,6 +88,7 @@ _implement_setup_toolchain() {
 }
 
 # _implement_build_user_prompt: produce the user prompt for the Claude implement session.
+# shellcheck disable=SC2016  # printf prompt text contains literal `backticks`/$ by design
 _implement_build_user_prompt() {
     local concept_file=/workspace/.agent/concept.md
     local notes_file=/workspace/.agent/implement.notes.md
@@ -115,6 +116,7 @@ _implement_build_user_prompt() {
 # Used when the previous run hit max-turns; the conversation history is
 # already in the resumed session, so we just need to nudge Claude to keep
 # going and finish the quality gates.
+# shellcheck disable=SC2016  # printf prompt text contains literal `backticks`/$ by design
 _implement_build_continue_prompt() {
     {
         printf '# Implement-Phase fortsetzen\n\n'

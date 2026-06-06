@@ -37,6 +37,7 @@ phase_respond_preconditions() {
 }
 
 # _respond_build_user_prompt: produce the user prompt for the Claude respond session.
+# shellcheck disable=SC2016  # printf prompt text contains literal `backticks`/$ by design
 _respond_build_user_prompt() {
     local feedback_file=/workspace/.agent/respond.feedback.md
     local concept_file=/workspace/.agent/concept.md

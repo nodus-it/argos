@@ -369,6 +369,7 @@ quality_gate_verdict() {
 # output. A plain head() truncation hides the actual failures behind hundreds
 # of "PASS"/progress lines and tricks the agent into thinking the gate is
 # green when it isn't.
+# shellcheck disable=SC2016  # printf prompt text contains literal `backticks`/$ by design
 quality_gate_fix_prompt() {
     local gate="$1"
     local log_file="${2:-}"
