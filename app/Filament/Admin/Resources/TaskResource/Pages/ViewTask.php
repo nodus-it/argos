@@ -491,9 +491,21 @@ class ViewTask extends ViewRecord
             return [];
         }
 
-        $lines = $this->parseLogLines($this->readLogFile($task->current_phase->value));
+        $events = app(AgentStreamParser::class)->parse($this->readLogFile($task->current_phase->value));
 
-        return array_slice(array_filter($lines, fn (array $l): bool => $l['text'] !== ''), -2);
+        $lines = [];
+        foreach ($events as $event) {
+            $text = match ($event['kind']) {
+                'tool_use' => trim(($event['tool'] ?? '').' '.($event['summary'] ?? '')),
+                'result' => '',
+                default => trim($event['text'] ?? ''),
+            };
+            if ($text !== '') {
+                $lines[] = ['text' => $text, 'class' => $event['kind']];
+            }
+        }
+
+        return array_slice($lines, -2);
     }
 
     public function getView(): string
