@@ -25,22 +25,12 @@
     concept/diff/terminal goes in the `detail` slot, which renders as a
     separate block BELOW the buttons — never in the same flex row (§5.7).
 --}}
-@php
-    $phaseIcons = [
-        'draft' => 'heroicon-o-document-text',
-        'concept' => 'heroicon-o-light-bulb',
-        'implement' => 'heroicon-o-code-bracket',
-        'push' => 'heroicon-o-arrow-up-tray',
-        'review' => 'heroicon-o-chat-bubble-left-right',
-        'respond' => 'heroicon-o-chat-bubble-left-right',
-    ];
-@endphp
 <div {{ $attributes->merge(['class' => 'feed-item']) }}>
     @if ($phase === 'you')
         <div class="feed-node st-you"><x-argos.avatar>Du</x-argos.avatar></div>
     @else
         <div @class(['feed-node', $nodeClass => $nodeClass !== null])>
-            @svg($phaseIcons[$phase] ?? $phaseIcons['draft'])
+            @svg(\App\Support\PhaseGlyph::icon($phase))
         </div>
     @endif
 
