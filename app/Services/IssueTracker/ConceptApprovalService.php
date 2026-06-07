@@ -7,6 +7,7 @@ namespace App\Services\IssueTracker;
 use App\Enums\Phase;
 use App\Enums\WorkflowStatus;
 use App\Models\ExternalIssueLink;
+use App\Services\IssueTracker\Concerns\ParsesExternalProjectRef;
 use App\Services\Task\TaskService;
 use Illuminate\Support\Facades\Log;
 
@@ -19,6 +20,8 @@ use Illuminate\Support\Facades\Log;
  */
 final class ConceptApprovalService
 {
+    use ParsesExternalProjectRef;
+
     /** Provider-specific identifiers for the 👍 reaction. */
     private const THUMBS_UP = ['+1', 'thumbsup', '👍'];
 
@@ -86,10 +89,4 @@ final class ConceptApprovalService
     /**
      * @return array{string, string}
      */
-    private function parseRef(string $ref): array
-    {
-        $parts = explode('/', $ref, 2);
-
-        return [$parts[0] ?? '', $parts[1] ?? ''];
-    }
 }

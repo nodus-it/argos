@@ -7,10 +7,13 @@ namespace App\Services\IssueTracker;
 use App\Enums\PhaseStatus;
 use App\Models\ExternalIssueLink;
 use App\Models\Task;
+use App\Services\IssueTracker\Concerns\ParsesExternalProjectRef;
 use Illuminate\Support\Facades\Log;
 
 final class IssueCommentNotifier
 {
+    use ParsesExternalProjectRef;
+
     public function __construct(private readonly IssueTrackerRegistry $registry) {}
 
     /**
@@ -157,10 +160,4 @@ final class IssueCommentNotifier
     /**
      * @return array{string, string}
      */
-    private function parseRef(string $ref): array
-    {
-        $parts = explode('/', $ref, 2);
-
-        return [$parts[0] ?? '', $parts[1] ?? ''];
-    }
 }

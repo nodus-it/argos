@@ -7,9 +7,12 @@ namespace App\Services\IssueTracker;
 use App\Enums\TaskProviderMode;
 use App\Enums\TaskProviderSyncStatus;
 use App\Models\TaskProviderBinding;
+use App\Services\IssueTracker\Concerns\ParsesExternalProjectRef;
 
 final class ProviderSetupService
 {
+    use ParsesExternalProjectRef;
+
     public function __construct(private readonly IssueTrackerRegistry $registry) {}
 
     /**
@@ -72,10 +75,4 @@ final class ProviderSetupService
     /**
      * @return array{string, string}
      */
-    private function parseRef(string $ref): array
-    {
-        $parts = explode('/', $ref, 2);
-
-        return [$parts[0] ?? '', $parts[1] ?? ''];
-    }
 }
