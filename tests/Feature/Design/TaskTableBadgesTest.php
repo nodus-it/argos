@@ -26,11 +26,11 @@ it('renders the workflow badge and phase chip in the tasks table', function (): 
 });
 
 it('maps workflow statuses onto the five badge states', function (): void {
-    expect(Task::factory()->make(['workflow_status' => WorkflowStatus::Draft])->displayBadgeStatus())->toBe('draft')
-        ->and(Task::factory()->make(['workflow_status' => WorkflowStatus::ConceptRunning])->displayBadgeStatus())->toBe('running')
-        ->and(Task::factory()->make(['workflow_status' => WorkflowStatus::InReview])->displayBadgeStatus())->toBe('waiting')
-        ->and(Task::factory()->make(['workflow_status' => WorkflowStatus::Completed])->displayBadgeStatus())->toBe('success')
-        ->and(Task::factory()->make(['workflow_status' => WorkflowStatus::Failed])->displayBadgeStatus())->toBe('failed');
+    expect(Task::factory()->make(['workflow_status' => WorkflowStatus::Draft])->presenter()->badgeStatus())->toBe('draft')
+        ->and(Task::factory()->make(['workflow_status' => WorkflowStatus::ConceptRunning])->presenter()->badgeStatus())->toBe('running')
+        ->and(Task::factory()->make(['workflow_status' => WorkflowStatus::InReview])->presenter()->badgeStatus())->toBe('waiting')
+        ->and(Task::factory()->make(['workflow_status' => WorkflowStatus::Completed])->presenter()->badgeStatus())->toBe('success')
+        ->and(Task::factory()->make(['workflow_status' => WorkflowStatus::Failed])->presenter()->badgeStatus())->toBe('failed');
 });
 
 it('surfaces a paused concept run in the overview like implement-paused', function (): void {
@@ -42,7 +42,7 @@ it('surfaces a paused concept run in the overview like implement-paused', functi
         'current_status' => PhaseStatus::Paused,
     ]);
 
-    expect($task->displayBadgeStatus())->toBe('waiting')
-        ->and($task->displayStatusLabel())->toBe(__('tasks.stage.concept_paused'))
-        ->and($task->displayStatusColor())->toBe(WorkflowStatus::ImplementPaused->color());
+    expect($task->presenter()->badgeStatus())->toBe('waiting')
+        ->and($task->presenter()->statusLabel())->toBe(__('tasks.stage.concept_paused'))
+        ->and($task->presenter()->statusColor())->toBe(WorkflowStatus::ImplementPaused->color());
 });

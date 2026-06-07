@@ -46,7 +46,7 @@
         <div class="th-id">
             <div class="th-title">
                 <h2>{{ $task->name }}</h2>
-                <x-argos.badge :status="$task->displayBadgeStatus()" :label="$task->displayStatusLabel()" />
+                <x-argos.badge :status="$task->presenter()->badgeStatus()" :label="$task->presenter()->statusLabel()" />
             </div>
             <div class="th-meta">
                 {{-- Agent --}}

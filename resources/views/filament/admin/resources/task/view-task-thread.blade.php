@@ -23,7 +23,7 @@
             :error="$banner['error']"
             :logsUrl="$banner['logsUrl']"
             :logsLabel="$banner['logsLabel']"
-            :rail="$task->phaseRail()" />
+            :rail="$task->presenter()->phaseRail()" />
     </div>
 
     {{-- Auto-reload while the worker is busy (running or queued). Poll only then
