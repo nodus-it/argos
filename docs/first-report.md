@@ -67,12 +67,45 @@ HTTP-Setup (A4) und den Orchestrierungs-Services (B4).
 
 ## Optionaler Rest (nicht eingeplant)
 
-Kleiner C-Rest (geringer Wert): `onboarding.blade.php` Step-State-Berechnung
-(done/active/reachable) → in die Livewire-Page (`#[Computed]`). Reine UI-Conditionals,
-kein dringender Schnitt.
+Keiner dieser Punkte ist ein Blocker — alle Pflicht-Befunde (A/B/C/D) sind erledigt.
+Aufgeführt als bewusst offen gelassene Möglichkeiten, nicht als offene Schuld.
 
-Optional als Querschnitt: **Provider-Descriptor** („neuer Provider = ein Ort") aus der
-Saloon-/Driver-Diskussion — eigenes Vorhaben.
+| # | Was | Wo | Aufwand / Wert | Warum offen gelassen |
+| --- | --- | --- | --- | --- |
+| O1 | Onboarding Step-State (`done`/`active`/`reachable`) aus dem Blade in die Livewire-Page ziehen (`#[Computed]`) | `resources/views/livewire/onboarding.blade.php` + zugehörige Livewire-Page | klein / gering | Reine UI-Conditionals, kein echter Logik-Schnitt. Kosten > Nutzen, solange das Blade übersichtlich bleibt. |
+| O2 | Provider-Descriptor („neuer Provider = ein Ort": URL-Pattern, Token-Scopes, Capabilities zentral) | `app/Services/GitProvider/` + `app/Services/IssueTracker/` | mittel / mittel | Eigenständiges Vorhaben aus der Saloon-/Driver-Diskussion, kein God-Class-Symptom. Erst sinnvoll, wenn ein **neuer** Provider tatsächlich ansteht. |
+| O3 | `CredentialStore` ist nach B1 eine tote Konstruktor-Dependency in `PhaseRunner` (nur noch von den Tests gemockt) | `app/Services/Workflow/PhaseRunner.php` | klein / gering | Während B1 bewusst nicht angefasst, um den Diff fokussiert zu halten. Sauberer Folge-Cleanup: prüfen, ob der Claude-Token-Pfad noch über den Store läuft, sonst Parameter entfernen. |
 
-Jeder Schritt ist für sich lauffähig und testbar — pro Extraktion erst Test (bzw.
+---
+
+## Vor dem Merge: vollständiger Testlauf nötig
+
+Die bisherige Verifikation deckt nur die **PHP-Ebene** ab und ist grün:
+
+- ✅ `vendor/bin/pest` — volle Suite **1256 Tests / 2859 Assertions / 0 Fehler**
+- ✅ `vendor/bin/phpstan analyse` — **0 errors**
+- ✅ `vendor/bin/pint` — clean
+
+**Noch ausstehend** und vor dem Merge zwingend, weil B1 den Kern-Workflow
+(`PhaseRunner`) und B2 den Demo-Deploy umgebaut haben — beides Pfade, die die
+Pest-Suite nur gemockt durchläuft:
+
+1. **Browser-E2E (Playwright)** gegen den Compose-Stack — `composer test:browser`
+   (gemockt, `ARGOS_E2E_FAKE=1`). Deckt Login → Onboarding → Projekt → Task →
+   Concept/Implement über die 4-Run-Matrix ab. Läuft heute nur lokal, nicht in CI —
+   also die eigentliche Absicherung des umgebauten Workflows.
+2. **Mindestens ein echter Phasen-Lauf** (`concept` → `implement` → `push`) gegen ein
+   Test-Repo, um den neuen `PhaseCommandBuilder`/`PhaseResultSync`/`UsageLimitManager`-
+   Pfad mit echtem Worker-Container + Volume-I/O zu bestätigen (die Pest-Tests mocken
+   `newProcess`/`WorkerVolumeReader`).
+3. **Ein echter Demo-Deploy** (`live_demo_enabled`), um `TraefikRouter` (Route-Datei im
+   echten `traefik_dir` + Reachability) und `DemoComposeBuilder` (echtes `compose up`)
+   end-to-end zu prüfen.
+
+Erst nach grünem Schritt 1 (mindestens) ist der Branch merge-reif; Schritte 2–3
+idealerweise einmal manuell auf der Stage (`argos-stage`).
+
+---
+
+Jeder Schritt war für sich lauffähig und getestet — pro Extraktion erst Test (bzw.
 bestehenden Filter grün), dann Schnitt.
