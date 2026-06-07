@@ -10,7 +10,8 @@ use App\Models\ExternalIssueLink;
 use App\Models\Task;
 use App\Models\TaskProviderBinding;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Http;
+use Saloon\Http\Faking\MockResponse;
+use Saloon\Laravel\Facades\Saloon;
 use Tests\TestCase;
 
 class CheckConceptApprovalsCommandTest extends TestCase
@@ -21,7 +22,7 @@ class CheckConceptApprovalsCommandTest extends TestCase
     {
         // No reactions returned → nothing starts; we only assert which links
         // are picked up by the query.
-        Http::fake(['https://api.github.com/*' => Http::response([])]);
+        Saloon::fake(['https://api.github.com/*' => MockResponse::make([])]);
 
         $binding = TaskProviderBinding::factory()->create([
             'kind' => TaskProviderKind::GitHub,

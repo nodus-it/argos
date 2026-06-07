@@ -7,13 +7,16 @@ namespace Tests\Feature\Jobs;
 use App\Enums\TaskProviderKind;
 use App\Enums\TaskProviderMode;
 use App\Enums\TaskProviderSyncStatus;
+use App\Integrations\GitHub\Requests\ListIssues;
 use App\Jobs\PollIssueProviderJob;
 use App\Models\ExternalIssueLink;
 use App\Models\TaskProviderBinding;
 use App\Services\IssueTracker\IssueIngestService;
 use App\Services\IssueTracker\IssueTrackerRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Http;
+use Saloon\Http\Faking\MockResponse;
+use Saloon\Http\Request;
+use Saloon\Laravel\Facades\Saloon;
 use Tests\TestCase;
 
 class PollIssueProviderJobGitHubTest extends TestCase
@@ -37,8 +40,8 @@ class PollIssueProviderJobGitHubTest extends TestCase
 
     private function fakeIssuesEndpoint(array $issues): void
     {
-        Http::fake([
-            'https://api.github.com/repos/acme/widget/issues*' => Http::response($issues),
+        Saloon::fake([
+            'https://api.github.com/repos/acme/widget/issues*' => MockResponse::make($issues),
         ]);
     }
 
@@ -121,8 +124,11 @@ class PollIssueProviderJobGitHubTest extends TestCase
             app(IssueIngestService::class),
         );
 
-        Http::assertSent(fn ($request): bool => str_contains($request->url(), 'state=open')
-            && ! str_contains($request->url(), 'labels'));
+        Saloon::assertSent(function (Request $request): bool {
+            $query = $request instanceof ListIssues ? $request->query()->all() : [];
+
+            return ($query['state'] ?? '') === 'open' && ! array_key_exists('labels', $query);
+        });
 
         $this->binding->refresh();
         $this->assertNull($this->binding->last_error);
@@ -152,17 +158,16 @@ class PollIssueProviderJobGitHubTest extends TestCase
 
     public function test_poll_fetches_all_pages(): void
     {
-        Http::fake([
-            'https://api.github.com/repos/acme/widget/issues*' => Http::sequence()
-                ->push(
-                    [['id' => 1, 'title' => 'Issue 1', 'body' => '', 'state' => 'open', 'labels' => [], 'html_url' => 'https://github.com/acme/widget/issues/1']],
-                    200,
-                    ['Link' => '<https://api.github.com/repos/acme/widget/issues?page=2&per_page=100>; rel="next"'],
-                )
-                ->push(
-                    [['id' => 2, 'title' => 'Issue 2', 'body' => '', 'state' => 'open', 'labels' => [], 'html_url' => 'https://github.com/acme/widget/issues/2']],
-                    200,
-                ),
+        Saloon::fake([
+            MockResponse::make(
+                [['id' => 1, 'title' => 'Issue 1', 'body' => '', 'state' => 'open', 'labels' => [], 'html_url' => 'https://github.com/acme/widget/issues/1']],
+                200,
+                ['Link' => '<https://api.github.com/repos/acme/widget/issues?page=2&per_page=100>; rel="next"'],
+            ),
+            MockResponse::make(
+                [['id' => 2, 'title' => 'Issue 2', 'body' => '', 'state' => 'open', 'labels' => [], 'html_url' => 'https://github.com/acme/widget/issues/2']],
+                200,
+            ),
         ]);
 
         (new PollIssueProviderJob($this->binding->id))->handle(
@@ -178,8 +183,8 @@ class PollIssueProviderJobGitHubTest extends TestCase
 
     public function test_poll_stores_error_on_api_failure(): void
     {
-        Http::fake([
-            'https://api.github.com/repos/acme/widget/issues*' => Http::response(
+        Saloon::fake([
+            'https://api.github.com/repos/acme/widget/issues*' => MockResponse::make(
                 ['message' => 'Not Found'],
                 404,
             ),
@@ -200,14 +205,14 @@ class PollIssueProviderJobGitHubTest extends TestCase
     {
         $this->binding->update(['mode' => TaskProviderMode::Webhook]);
 
-        Http::fake();
+        Saloon::fake([]);
 
         (new PollIssueProviderJob($this->binding->id))->handle(
             app(IssueTrackerRegistry::class),
             app(IssueIngestService::class),
         );
 
-        Http::assertNothingSent();
+        Saloon::assertNothingSent();
         $this->assertDatabaseCount(ExternalIssueLink::class, 0);
     }
 
@@ -215,13 +220,13 @@ class PollIssueProviderJobGitHubTest extends TestCase
     {
         $this->binding->update(['sync_status' => TaskProviderSyncStatus::Pending]);
 
-        Http::fake();
+        Saloon::fake([]);
 
         (new PollIssueProviderJob($this->binding->id))->handle(
             app(IssueTrackerRegistry::class),
             app(IssueIngestService::class),
         );
 
-        Http::assertNothingSent();
+        Saloon::assertNothingSent();
     }
 }

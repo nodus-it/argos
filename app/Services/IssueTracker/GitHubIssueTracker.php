@@ -4,26 +4,32 @@ declare(strict_types=1);
 
 namespace App\Services\IssueTracker;
 
+use App\Integrations\GitHub\GitHubConnector;
+use App\Integrations\GitHub\Requests\CloseIssue;
+use App\Integrations\GitHub\Requests\CreateIssueComment;
+use App\Integrations\GitHub\Requests\GetCollaboratorPermission;
+use App\Integrations\GitHub\Requests\GetCommentReactions;
+use App\Integrations\GitHub\Requests\GetIssue;
+use App\Integrations\GitHub\Requests\GetIssueComments;
+use App\Integrations\GitHub\Requests\GetIssueReactions;
+use App\Integrations\GitHub\Requests\ListIssues;
+use App\Integrations\GitHub\Requests\ListRepositories;
+use App\Integrations\GitHub\Requests\RegisterWebhook;
+use App\Integrations\GitHub\Requests\UnregisterWebhook;
 use App\Services\IssueTracker\Contracts\IssueTrackerContract;
-use Illuminate\Http\Client\PendingRequest;
-use Illuminate\Http\Client\Response;
-use Illuminate\Support\Facades\Http;
 
 class GitHubIssueTracker implements IssueTrackerContract
 {
-    private const BASE_URL = 'https://api.github.com';
+    private readonly GitHubConnector $connector;
 
-    private const API_VERSION = '2022-11-28';
-
-    public function __construct(private readonly string $token) {}
+    public function __construct(string $token)
+    {
+        $this->connector = new GitHubConnector($token);
+    }
 
     public function listReferences(): array
     {
-        $response = $this->http()->get('/user/repos', [
-            'per_page' => 100,
-            'sort' => 'updated',
-            'affiliation' => 'owner,collaborator,organization_member',
-        ])->throw();
+        $response = $this->connector->send(new ListRepositories)->throw();
 
         $refs = [];
         foreach ($response->json() as $repo) {
@@ -47,15 +53,14 @@ class GitHubIssueTracker implements IssueTrackerContract
             : 'open';
 
         $issues = [];
-        $url = "/repos/{$owner}/{$project}/issues";
-        $params = ['per_page' => 100, 'state' => $state];
+        $page = null;
 
-        // Paginate via Link header
+        // Paginate by following GitHub's Link header, but only take the page
+        // number from it so each request stays a relative endpoint.
         do {
-            $response = $this->http()->get($url, $params)->throw();
-            $page = $response->json();
+            $response = $this->connector->send(new ListIssues($owner, $project, $state, $page))->throw();
 
-            foreach ($page as $item) {
+            foreach ($response->json() as $item) {
                 // GitHub returns PRs mixed into the issues endpoint; filter them out
                 if (isset($item['pull_request'])) {
                     continue;
@@ -63,24 +68,18 @@ class GitHubIssueTracker implements IssueTrackerContract
                 $issues[] = $item;
             }
 
-            $url = $this->nextPageUrl($response);
-            $params = [];
-        } while ($url !== null);
+            $link = $response->header('Link');
+            $page = $this->nextPage(is_string($link) ? $link : null);
+        } while ($page !== null);
 
         return $issues;
     }
 
     public function getIssue(string $owner, string $project, int|string $issueNumber): array
     {
-        $base = "/repos/{$owner}/{$project}/issues/{$issueNumber}";
-
-        $issue = $this->http()->get($base)->throw()->json();
-        $comments = $this->http()->get("{$base}/comments")->throw()->json();
-        $reactions = $this->http()
-            ->withHeaders(['Accept' => 'application/vnd.github+json'])
-            ->get("{$base}/reactions")
-            ->throw()
-            ->json();
+        $issue = $this->connector->send(new GetIssue($owner, $project, $issueNumber))->throw()->json();
+        $comments = $this->connector->send(new GetIssueComments($owner, $project, $issueNumber))->throw()->json();
+        $reactions = $this->connector->send(new GetIssueReactions($owner, $project, $issueNumber))->throw()->json();
 
         return [
             ...$issue,
@@ -95,20 +94,15 @@ class GitHubIssueTracker implements IssueTrackerContract
         int|string $issueNumber,
         string $body,
     ): array {
-        return $this->http()
-            ->post("/repos/{$owner}/{$project}/issues/{$issueNumber}/comments", ['body' => $body])
+        return $this->connector
+            ->send(new CreateIssueComment($owner, $project, $issueNumber, $body))
             ->throw()
             ->json();
     }
 
     public function closeIssue(string $owner, string $project, int|string $issueNumber): void
     {
-        $this->http()
-            ->patch("/repos/{$owner}/{$project}/issues/{$issueNumber}", [
-                'state' => 'closed',
-                'state_reason' => 'completed',
-            ])
-            ->throw();
+        $this->connector->send(new CloseIssue($owner, $project, $issueNumber))->throw();
     }
 
     public function commentId(array $createResult): ?string
@@ -120,8 +114,8 @@ class GitHubIssueTracker implements IssueTrackerContract
 
     public function getCommentReactions(string $owner, string $project, int|string $issueId, int|string $commentId): array
     {
-        $reactions = $this->http()
-            ->get("/repos/{$owner}/{$project}/issues/comments/{$commentId}/reactions", ['per_page' => 100])
+        $reactions = $this->connector
+            ->send(new GetCommentReactions($owner, $project, $commentId))
             ->throw()
             ->json();
 
@@ -145,8 +139,8 @@ class GitHubIssueTracker implements IssueTrackerContract
         }
 
         try {
-            $data = $this->http()
-                ->get("/repos/{$owner}/{$project}/collaborators/{$login}/permission")
+            $data = $this->connector
+                ->send(new GetCollaboratorPermission($owner, $project, $login))
                 ->throw()
                 ->json();
         } catch (\Throwable) {
@@ -170,27 +164,15 @@ class GitHubIssueTracker implements IssueTrackerContract
 
     public function registerWebhook(string $owner, string $project, string $url, string $secret): array
     {
-        return $this->http()
-            ->post("/repos/{$owner}/{$project}/hooks", [
-                'name' => 'web',
-                'active' => true,
-                'events' => ['issues', 'issue_comment'],
-                'config' => [
-                    'url' => $url,
-                    'secret' => $secret,
-                    'content_type' => 'json',
-                    'insecure_ssl' => '0',
-                ],
-            ])
+        return $this->connector
+            ->send(new RegisterWebhook($owner, $project, $url, $secret))
             ->throw()
             ->json();
     }
 
     public function unregisterWebhook(string $owner, string $project, int|string $webhookId): void
     {
-        $this->http()
-            ->delete("/repos/{$owner}/{$project}/hooks/{$webhookId}")
-            ->throw();
+        $this->connector->send(new UnregisterWebhook($owner, $project, $webhookId))->throw();
     }
 
     /**
@@ -225,30 +207,21 @@ class GitHubIssueTracker implements IssueTrackerContract
     }
 
     /**
-     * Parse the next page URL from a GitHub Link header.
-     * Returns null when there are no more pages.
+     * Take the next page number from a GitHub Link header, or null when there
+     * are no more pages. We follow the header for correctness but re-request a
+     * relative endpoint with ?page=N rather than the absolute next URL.
      */
-    private function nextPageUrl(Response $response): ?string
+    private function nextPage(?string $linkHeader): ?int
     {
-        $link = $response->header('Link');
-        if ($link === null || $link === '') {
+        if ($linkHeader === null || $linkHeader === '') {
             return null;
         }
 
-        // Link: <https://api.github.com/repos/…/issues?page=2>; rel="next", …
-        if (preg_match('/<([^>]+)>;\s*rel="next"/', $link, $matches)) {
-            return $matches[1];
+        // Link: <https://api.github.com/repos/…/issues?page=2&per_page=100>; rel="next", …
+        if (preg_match('/<[^>]*[?&]page=(\d+)[^>]*>;\s*rel="next"/', $linkHeader, $matches)) {
+            return (int) $matches[1];
         }
 
         return null;
-    }
-
-    private function http(): PendingRequest
-    {
-        return Http::withHeaders([
-            'Authorization' => "Bearer {$this->token}",
-            'Accept' => 'application/vnd.github+json',
-            'X-GitHub-Api-Version' => self::API_VERSION,
-        ])->baseUrl(self::BASE_URL);
     }
 }
