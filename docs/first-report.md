@@ -5,8 +5,8 @@ wie „DemoDeployer in 10 Micro-Services" verworfen). Vier Problemklassen:
 **A)** echte Duplikate, **B)** God-Classes / vermischte Logik, **C)** Logik in
 Filament & Views, **D)** Folge-Aktionen synchron statt über Events.
 
-> **Stand 2026-06-07** — Block **A** und **D komplett erledigt** (Branch
-> `feat/saloon-github-pilot`, gepusht). Verbleibend: **B, C**.
+> **Stand 2026-06-07** — Block **A**, **D** und **B3** erledigt (Branch
+> `feat/saloon-github-pilot`). Verbleibend: **B1, B2, B4, C-Rest**.
 
 ---
 
@@ -22,6 +22,7 @@ Filament & Views, **D)** Folge-Aktionen synchron statt über Events.
 | A7 | Git-Provider-Zugriff in Onboarding + RepoProfileResource | `App\Services\Git\RepositoryFetcher` | `5714c43` |
 | A6 | *(angeblich URL-Parsing 5×)* | **Fehlbefund** — `repoPathFromUrl` ist schon zentralisiert, die übrigen Stellen rufen sie nur auf | — |
 | D | Folge-Aktionen synchron inline statt über Events | 5 Listener in `app/Listeners/Task` an `PhaseCompleted`/`TaskCompleted`; `WorkflowService::completePhase` = reine State-Transition, `TaskService::markCompleted` = reiner DB-Write + Event (`docker volume rm` raus aus dem DB-Service) | `2f6f698` |
+| B3 | Presentation-Logik im Fat Model `Task.php` | `App\Presenters\TaskPresenter` (statusLabel/Color, badgeStatus, phaseRail + Helfer), erreichbar via `Task::presenter()`; Domain-Methoden bleiben im Model | `6637dce` |
 
 Außerdem teil-erledigt aus Block **C**: die Docker-Diff-Generierung verließ ViewTask/
 ViewTaskDiff (→ A1) und die Git-Provider-Form-Closures verließen RepoProfileResource/
@@ -35,7 +36,6 @@ Onboarding (→ A7).
 | --- | --- | --- | --- |
 | B1 | `PhaseRunner.php` (~1200 Z., 34 Methoden) | mischt: Docker-Run-Orchestrierung, Env-/Credential-Aufbau (`buildCommand`), Config-Resolver (`resolveModel/AgentName/WorkerImage/MaxTurns`), Volume-I/O, `postPhaseSync` ~180 Z. mit 3 Phasen-Zweigen, Cost-Recovery, Usage-Limit-Cache | mind. abspalten: `PhaseEnvironmentBuilder`, `PhaseConfigResolver`, `WorkerVolumeReader`, je Phase ein `…PhaseSync`, `UsageLimitManager` |
 | B2 | `DemoDeployer.php` (727 Z.) | Traefik-Routing (`writeTraefikRoute`, `buildAuthMiddleware`, `basicAuthUserLine`, `routeFilePath`, `traefikDir`) + Compose-Override-Bau (`buildOverrideYaml`) + Health-Probe + Concurrency-Cap + Slug/URL-Bau in einer Klasse | realistisch **3** Klassen, nicht 10: `TraefikRouter`, `DemoComposeBuilder`, `DemoDeployer` (Orchestrator) |
-| B3 | `Task.php` Fat Model | Presentation-Logik im Model: `displayStatusLabel`, `displayStatusColor`, `displayBadgeStatus`, `phaseRail` (~35 Z. State-Machine), `effectiveDemoAccessMode`, `modelForPhase` | `App\Presenters\TaskPresenter` |
 | B4 | `IssueCommentNotifier` / `IssueIngestService` | Orchestrierung + Markdown-Bau + Text-Capping bzw. Filter-Matching + Signatur-Hash + Task-Factory in je einer Klasse | `CommentFormatter`, `IssueFilterMatcher`, `IssueSignature` abspalten |
 
 Zu B2: „10 Micro-Services" ist Over-Engineering — Traefik raus + Compose-Bau raus
@@ -68,11 +68,11 @@ d.h. strukturell kein Ort für getypte Props/Computed-Logik.
 
 ## Empfohlene Reihenfolge (Rest)
 
-1. **B3 (`TaskPresenter`)** — klarer Schnitt, hebt Presentation-Logik aus dem Model;
-   zahlt auf C ein (View-`@php`-Status-Mappings können auf den Presenter zeigen).
-2. **C-Rest** — `TaskThreadBuilder`, `demoAccess`-Service, View-`@php` ins ViewModel.
-3. **B4** — `IssueCommentNotifier`/`IssueIngestService` aufteilen.
-4. **B1 / B2** (`PhaseRunner` / `DemoDeployer`) — größter Aufwand, zuletzt, jede
+1. **C-Rest** — `TaskThreadBuilder` (ViewTask `buildThread`/`buildPhaseItem`),
+   `demoAccess`-Service, View-`@php` ins ViewModel/Presenter (die Status-Badge-
+   Mappings in `view-task-thread` können nun auf `TaskPresenter` zeigen).
+2. **B4** — `IssueCommentNotifier`/`IssueIngestService` aufteilen.
+3. **B1 / B2** (`PhaseRunner` / `DemoDeployer`) — größter Aufwand, zuletzt, jede
    Extraktion mit eigenem Test.
 
 Optional als Querschnitt: **Provider-Descriptor** („neuer Provider = ein Ort") aus der
