@@ -264,16 +264,16 @@ class RepoProfileResourceTest extends TestCase
             'provider' => 'gitlab',
         ]);
 
-        // More-specific patterns first; Http::fake matches in definition order.
-        Http::fake([
-            'gitlab.com/api/v4/projects/acme%2Fwidget/repository/branches*' => Http::response([
+        // More-specific patterns first; Saloon matches in definition order.
+        Saloon::fake([
+            'gitlab.com/api/v4/projects/acme%2Fwidget/repository/branches*' => MockResponse::make([
                 ['name' => 'main'],
                 ['name' => 'develop'],
             ]),
-            'gitlab.com/api/v4/projects/acme%2Fwidget' => Http::response([
+            'gitlab.com/api/v4/projects/acme%2Fwidget' => MockResponse::make([
                 'default_branch' => 'develop',
             ]),
-            'gitlab.com/api/v4/projects*' => Http::response([
+            'gitlab.com/api/v4/projects*' => MockResponse::make([
                 ['path_with_namespace' => 'acme/widget'],
             ]),
         ]);

@@ -47,8 +47,8 @@ class GetFileContentsTest extends TestCase
 
     public function test_gitlab_returns_raw_file_body(): void
     {
-        Http::fake([
-            'gitlab.com/api/v4/projects/*/repository/files/*/raw*' => Http::response("FROM node:20\n"),
+        Saloon::fake([
+            'gitlab.com/api/v4/projects/*/repository/files/*/raw*' => MockResponse::make("FROM node:20\n"),
         ]);
 
         $body = $this->factory()->forPlatform('gitlab', 'tok', 'https://gitlab.com')

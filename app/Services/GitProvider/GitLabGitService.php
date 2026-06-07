@@ -4,17 +4,25 @@ declare(strict_types=1);
 
 namespace App\Services\GitProvider;
 
+use App\Integrations\GitLab\GitLabConnector;
+use App\Integrations\GitLab\Requests\CommentOnMergeRequest;
+use App\Integrations\GitLab\Requests\CreateMergeRequest;
+use App\Integrations\GitLab\Requests\GetProject;
+use App\Integrations\GitLab\Requests\GetRawFile;
+use App\Integrations\GitLab\Requests\ListBranches;
+use App\Integrations\GitLab\Requests\ListProjects;
+use App\Integrations\GitLab\Requests\UpdateMergeRequest;
 use App\Services\GitProvider\Contracts\GitProviderContract;
-use Illuminate\Http\Client\PendingRequest;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class GitLabGitService implements GitProviderContract
 {
-    public function __construct(
-        private readonly string $token,
-        private readonly string $instanceUrl = 'https://gitlab.com',
-    ) {}
+    private readonly GitLabConnector $connector;
+
+    public function __construct(string $token, string $instanceUrl = 'https://gitlab.com')
+    {
+        $this->connector = new GitLabConnector($token, $instanceUrl);
+    }
 
     public function getProviderKey(): string
     {
@@ -28,20 +36,12 @@ class GitLabGitService implements GitProviderContract
 
     public function listRepositories(): array
     {
-        return $this->http()
-            ->get('/projects', ['membership' => true, 'per_page' => 100, 'order_by' => 'last_activity_at'])
-            ->throw()
-            ->json();
+        return $this->connector->send(new ListProjects)->throw()->json();
     }
 
     public function listBranches(string $owner, string $repo): array
     {
-        $projectPath = $this->encodePath($owner, $repo);
-
-        return $this->http()
-            ->get("/projects/{$projectPath}/repository/branches", ['per_page' => 100])
-            ->throw()
-            ->json();
+        return $this->connector->send(new ListBranches($owner, $repo))->throw()->json();
     }
 
     /**
@@ -56,13 +56,8 @@ class GitLabGitService implements GitProviderContract
             return null;
         }
 
-        $projectPath = $this->encodePath($owner, $repo);
-
         try {
-            $data = $this->http()
-                ->get("/projects/{$projectPath}")
-                ->throw()
-                ->json();
+            $data = $this->connector->send(new GetProject($owner, $repo))->throw()->json();
         } catch (\Throwable $e) {
             Log::channel('argos')->warning('GitLab getDefaultBranch failed', [
                 'owner_repo' => "{$owner}/{$repo}",
@@ -86,14 +81,8 @@ class GitLabGitService implements GitProviderContract
             return null;
         }
 
-        $projectPath = $this->encodePath($owner, $repo);
-        $filePath = rawurlencode(ltrim($path, '/'));
-
         try {
-            $response = $this->http()->get(
-                "/projects/{$projectPath}/repository/files/{$filePath}/raw",
-                ['ref' => $ref],
-            );
+            $response = $this->connector->send(new GetRawFile($owner, $repo, $path, $ref));
 
             if ($response->status() === 404) {
                 return null;
@@ -121,16 +110,8 @@ class GitLabGitService implements GitProviderContract
         string $baseBranch,
         array $options = [],
     ): array {
-        $projectPath = $this->encodePath($owner, $repo);
-
-        return $this->http()
-            ->post("/projects/{$projectPath}/merge_requests", [
-                'title' => $title,
-                'description' => $body,
-                'source_branch' => $headBranch,
-                'target_branch' => $baseBranch,
-                ...$options,
-            ])
+        return $this->connector
+            ->send(new CreateMergeRequest($owner, $repo, $title, $body, $headBranch, $baseBranch, $options))
             ->throw()
             ->json();
     }
@@ -141,10 +122,8 @@ class GitLabGitService implements GitProviderContract
         int|string $pullRequestId,
         string $body,
     ): array {
-        $projectPath = $this->encodePath($owner, $repo);
-
-        return $this->http()
-            ->post("/projects/{$projectPath}/merge_requests/{$pullRequestId}/notes", ['body' => $body])
+        return $this->connector
+            ->send(new CommentOnMergeRequest($owner, $repo, $pullRequestId, $body))
             ->throw()
             ->json();
     }
@@ -156,13 +135,8 @@ class GitLabGitService implements GitProviderContract
         string $title,
         string $body,
     ): array {
-        $projectPath = $this->encodePath($owner, $repo);
-
-        return $this->http()
-            ->put("/projects/{$projectPath}/merge_requests/{$pullRequestId}", [
-                'title' => $title,
-                'description' => $body,
-            ])
+        return $this->connector
+            ->send(new UpdateMergeRequest($owner, $repo, $pullRequestId, $title, $body))
             ->throw()
             ->json();
     }
@@ -211,18 +185,5 @@ class GitLabGitService implements GitProviderContract
         }
 
         return $options;
-    }
-
-    private function encodePath(string $owner, string $repo): string
-    {
-        return urlencode("{$owner}/{$repo}");
-    }
-
-    private function http(): PendingRequest
-    {
-        return Http::withHeaders([
-            'Authorization' => "Bearer {$this->token}",
-            'Content-Type' => 'application/json',
-        ])->baseUrl("{$this->instanceUrl}/api/v4");
     }
 }

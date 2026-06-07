@@ -7,13 +7,16 @@ namespace Tests\Feature\Jobs;
 use App\Enums\TaskProviderKind;
 use App\Enums\TaskProviderMode;
 use App\Enums\TaskProviderSyncStatus;
+use App\Integrations\GitLab\Requests\ListIssues;
 use App\Jobs\PollIssueProviderJob;
 use App\Models\ExternalIssueLink;
 use App\Models\TaskProviderBinding;
 use App\Services\IssueTracker\IssueIngestService;
 use App\Services\IssueTracker\IssueTrackerRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Http;
+use Saloon\Http\Faking\MockResponse;
+use Saloon\Http\Request;
+use Saloon\Laravel\Facades\Saloon;
 use Tests\TestCase;
 
 class PollIssueProviderJobGitLabTest extends TestCase
@@ -37,8 +40,8 @@ class PollIssueProviderJobGitLabTest extends TestCase
 
     private function fakeIssuesEndpoint(array $issues): void
     {
-        Http::fake([
-            'https://gitlab.com/api/v4/projects/acme%2Fwidget/issues*' => Http::response($issues),
+        Saloon::fake([
+            'https://gitlab.com/api/v4/projects/acme%2Fwidget/issues*' => MockResponse::make($issues),
         ]);
     }
 
@@ -106,17 +109,16 @@ class PollIssueProviderJobGitLabTest extends TestCase
 
     public function test_poll_fetches_all_pages_via_x_next_page(): void
     {
-        Http::fake([
-            'https://gitlab.com/api/v4/projects/acme%2Fwidget/issues*' => Http::sequence()
-                ->push(
-                    [$this->gitlabIssue(1, 'Issue 1')],
-                    200,
-                    ['X-Next-Page' => '2'],
-                )
-                ->push(
-                    [$this->gitlabIssue(2, 'Issue 2')],
-                    200,
-                ),
+        Saloon::fake([
+            MockResponse::make(
+                [$this->gitlabIssue(1, 'Issue 1')],
+                200,
+                ['X-Next-Page' => '2'],
+            ),
+            MockResponse::make(
+                [$this->gitlabIssue(2, 'Issue 2')],
+                200,
+            ),
         ]);
 
         (new PollIssueProviderJob($this->binding->id))->handle(
@@ -139,8 +141,8 @@ class PollIssueProviderJobGitLabTest extends TestCase
             app(IssueIngestService::class),
         );
 
-        Http::assertSent(function ($request): bool {
-            parse_str(parse_url((string) $request->url(), PHP_URL_QUERY) ?? '', $query);
+        Saloon::assertSent(function (Request $request): bool {
+            $query = $request instanceof ListIssues ? $request->query()->all() : [];
 
             return ($query['state'] ?? '') === 'opened';
         });
@@ -150,8 +152,8 @@ class PollIssueProviderJobGitLabTest extends TestCase
 
     public function test_poll_stores_error_on_api_failure(): void
     {
-        Http::fake([
-            'https://gitlab.com/api/v4/projects/acme%2Fwidget/issues*' => Http::response(
+        Saloon::fake([
+            'https://gitlab.com/api/v4/projects/acme%2Fwidget/issues*' => MockResponse::make(
                 ['message' => '404 Not found'],
                 404,
             ),
@@ -172,14 +174,14 @@ class PollIssueProviderJobGitLabTest extends TestCase
     {
         $this->binding->update(['mode' => TaskProviderMode::Webhook]);
 
-        Http::fake();
+        Saloon::fake([]);
 
         (new PollIssueProviderJob($this->binding->id))->handle(
             app(IssueTrackerRegistry::class),
             app(IssueIngestService::class),
         );
 
-        Http::assertNothingSent();
+        Saloon::assertNothingSent();
         $this->assertDatabaseCount(ExternalIssueLink::class, 0);
     }
 
@@ -187,13 +189,13 @@ class PollIssueProviderJobGitLabTest extends TestCase
     {
         $this->binding->update(['sync_status' => TaskProviderSyncStatus::Pending]);
 
-        Http::fake();
+        Saloon::fake([]);
 
         (new PollIssueProviderJob($this->binding->id))->handle(
             app(IssueTrackerRegistry::class),
             app(IssueIngestService::class),
         );
 
-        Http::assertNothingSent();
+        Saloon::assertNothingSent();
     }
 }
