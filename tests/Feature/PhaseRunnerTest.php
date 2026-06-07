@@ -15,6 +15,7 @@ use App\Models\RepoProfile;
 use App\Models\Task;
 use App\Models\User;
 use App\Services\Anthropic\CredentialStore;
+use App\Services\Workflow\PhaseResultSync;
 use App\Services\Workflow\PhaseRunner;
 use App\Services\Workflow\WorkerVolumeReader;
 use App\Workers\Compose\WorkerImageResolver;
@@ -615,16 +616,16 @@ class PhaseRunnerTest extends TestCase
 
     public function test_extract_stop_reason_returns_subtype_from_last_result_event(): void
     {
-        $runner = app(PhaseRunner::class);
+        $sync = app(PhaseResultSync::class);
         $log = implode("\n", [
             '{"type":"system","subtype":"init"}',
             '{"type":"assistant","message":{}}',
             '{"type":"result","subtype":"error_max_turns","is_error":true,"num_turns":51}',
         ]);
 
-        $reflection = new \ReflectionMethod(PhaseRunner::class, 'extractStopReasonFromStreamLog');
+        $reflection = new \ReflectionMethod(PhaseResultSync::class, 'extractStopReasonFromStreamLog');
         $reflection->setAccessible(true);
-        $stopReason = $reflection->invoke($runner, $log);
+        $stopReason = $reflection->invoke($sync, $log);
 
         $this->assertSame('error_max_turns', $stopReason);
     }
@@ -698,12 +699,12 @@ class PhaseRunnerTest extends TestCase
 
     public function test_extract_stop_reason_returns_null_without_result_event(): void
     {
-        $runner = app(PhaseRunner::class);
+        $sync = app(PhaseResultSync::class);
         $log = '{"type":"system","subtype":"init"}'."\n".'{"type":"assistant","message":{}}';
 
-        $reflection = new \ReflectionMethod(PhaseRunner::class, 'extractStopReasonFromStreamLog');
+        $reflection = new \ReflectionMethod(PhaseResultSync::class, 'extractStopReasonFromStreamLog');
         $reflection->setAccessible(true);
-        $stopReason = $reflection->invoke($runner, $log);
+        $stopReason = $reflection->invoke($sync, $log);
 
         $this->assertNull($stopReason);
     }
