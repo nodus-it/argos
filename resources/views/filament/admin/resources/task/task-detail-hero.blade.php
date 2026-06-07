@@ -69,7 +69,7 @@
                     <span class="sep" aria-hidden="true" style="color:var(--cr-border-strong)">·</span>
                     <span class="th-mi">
                         @svg('heroicon-m-currency-dollar')
-                        <span class="val">${{ number_format($totalCost, 4) }} · {{ number_format($totalTokens) }} tok</span>
+                        <span class="val">{{ \App\Support\CostFormatter::usd($totalCost) }} · {{ \App\Support\CostFormatter::tokens($totalTokens) }}</span>
                     </span>
                 @endif
             </div>

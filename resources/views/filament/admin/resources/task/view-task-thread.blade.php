@@ -44,7 +44,7 @@
             <x-argos.meta-item label="{{ __('tasks.view.labels.agent') }}">{{ $agentLabel }}</x-argos.meta-item>
             <x-argos.meta-item label="{{ __('tasks.view.labels.stack') }}" :mono="true">{{ $stackName }}</x-argos.meta-item>
             @if ($totalCost > 0)
-                <x-argos.meta-item label="{{ __('tasks.view.labels.cost') }}" :mono="true">${{ number_format($totalCost, 4) }} · {{ number_format($totalTokens) }} tok</x-argos.meta-item>
+                <x-argos.meta-item label="{{ __('tasks.view.labels.cost') }}" :mono="true">{{ \App\Support\CostFormatter::usd($totalCost) }} · {{ \App\Support\CostFormatter::tokens($totalTokens) }}</x-argos.meta-item>
             @endif
 
             <x-slot:extra>

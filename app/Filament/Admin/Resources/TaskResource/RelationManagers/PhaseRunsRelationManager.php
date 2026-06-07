@@ -6,6 +6,7 @@ namespace App\Filament\Admin\Resources\TaskResource\RelationManagers;
 
 use App\Enums\ClaudeModel;
 use App\Enums\PhaseStatus;
+use App\Support\CostFormatter;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
@@ -89,7 +90,7 @@ class PhaseRunsRelationManager extends RelationManager
                 TextColumn::make('cost_usd')
                     ->label(__('enums.phase_runs.columns.cost'))
                     ->formatStateUsing(fn ($state): string => $state !== null
-                        ? '$'.number_format((float) $state, 4)
+                        ? CostFormatter::usd((float) $state)
                         : '—'
                     )
                     ->toggleable(),

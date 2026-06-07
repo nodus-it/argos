@@ -19,6 +19,7 @@ use App\Services\Task\TaskService;
 use App\Services\Workflow\AgentStreamParser;
 use App\Services\Workflow\StateReader;
 use App\Support\ConceptMarkdown;
+use App\Support\CostFormatter;
 use App\Support\LogTail;
 use App\Support\Workflow\TaskStage;
 use Filament\Actions\Action;
@@ -402,7 +403,7 @@ class ViewTask extends ViewRecord
             'state' => $state,
             'who' => __('tasks.view.thread.agent'),
             'time' => ($run->finished_at ?? $run->started_at)?->diffForHumans(),
-            'cost' => $run->cost_usd !== null ? '$'.number_format((float) $run->cost_usd, 2) : null,
+            'cost' => $run->cost_usd !== null ? CostFormatter::usd((float) $run->cost_usd) : null,
             'body' => $body,
             'error' => $error,
             'conceptHtml' => $conceptHtml,
