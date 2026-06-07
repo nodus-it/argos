@@ -14,7 +14,7 @@ use App\Jobs\StopDemoJob;
 use App\Models\PhaseRun;
 use App\Models\Task;
 use App\Presenters\TaskThreadBuilder;
-use App\Services\Demo\DemoDeployer;
+use App\Services\Demo\DemoAccessConfigurator;
 use App\Services\Git\WorkspaceDiffService;
 use App\Services\Task\TaskService;
 use App\Services\Workflow\AgentStreamParser;
@@ -401,20 +401,8 @@ class ViewTask extends ViewRecord
                     $task = $this->task();
                     $mode = DemoAccessMode::from($data['access_mode']);
 
-                    $password = $task->demo_basic_password;
-                    if ($mode->resolve() === DemoAccessMode::Basic) {
-                        // Use the entered password, keep the existing one, or
-                        // auto-generate so a basic demo is never passwordless.
-                        $password = ($data['basic_password'] ?? null) ?: ($password ?: Str::random(16));
-                    }
-
-                    $task->update([
-                        'demo_access_mode' => $mode,
-                        'demo_basic_password' => $password,
-                    ]);
-
                     try {
-                        app(DemoDeployer::class)->applyAccessMode($task);
+                        $password = app(DemoAccessConfigurator::class)->apply($task, $mode, $data['basic_password'] ?? null);
                     } catch (\RuntimeException $e) {
                         Notification::make()
                             ->title(__('tasks.view.demo.access.apply_failed'))
