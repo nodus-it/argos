@@ -14,12 +14,11 @@ use App\Models\ProviderOAuthConfig;
 use App\Models\RepoProfile;
 use App\Models\User;
 use App\Services\Anthropic\AnthropicTokenValidator;
-use App\Services\GitProvider\GitServiceFactory;
+use App\Services\Git\RepositoryFetcher;
 use App\Services\OAuth\TokenRefresher;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Cache;
 
 /**
  * Guided three-step setup wizard: authenticate an agent, connect & authorize a
@@ -541,19 +540,12 @@ class Onboarding extends Page
             return [];
         }
 
-        try {
-            return Cache::remember(
-                'onboarding_repos:'.md5($this->repoSource),
-                now()->addSeconds(60),
-                fn (): array => app(GitServiceFactory::class)
-                    ->forPlatform($source['platform'], $source['token'], $source['instance_url'])
-                    ->getRepoOptions(),
-            );
-        } catch (\Throwable $e) {
-            report($e);
-
-            return [];
-        }
+        return app(RepositoryFetcher::class)->repoOptions(
+            $source['platform'],
+            $source['token'],
+            $source['instance_url'],
+            'onboarding_repos:'.md5($this->repoSource),
+        );
     }
 
     /**
@@ -566,19 +558,13 @@ class Onboarding extends Page
             return [];
         }
 
-        try {
-            return Cache::remember(
-                'onboarding_branches:'.md5($this->repoSource.'|'.$this->selectedRepo),
-                now()->addSeconds(60),
-                fn (): array => app(GitServiceFactory::class)
-                    ->forPlatform($source['platform'], $source['token'], $source['instance_url'])
-                    ->getBranchOptions($this->selectedRepo),
-            );
-        } catch (\Throwable $e) {
-            report($e);
-
-            return [];
-        }
+        return app(RepositoryFetcher::class)->branchOptions(
+            $source['platform'],
+            $source['token'],
+            $source['instance_url'],
+            $this->selectedRepo,
+            'onboarding_branches:'.md5($this->repoSource.'|'.$this->selectedRepo),
+        );
     }
 
     public function updatedRepoSource(): void
@@ -597,15 +583,14 @@ class Onboarding extends Page
 
             $source = $this->resolveRepoSource();
             if ($source !== null) {
-                try {
-                    $default = app(GitServiceFactory::class)
-                        ->forPlatform($source['platform'], $source['token'], $source['instance_url'])
-                        ->getDefaultBranch($this->selectedRepo);
-                    if (is_string($default) && $default !== '') {
-                        $this->selectedBranch = $default;
-                    }
-                } catch (\Throwable $e) {
-                    report($e);
+                $default = app(RepositoryFetcher::class)->defaultBranch(
+                    $source['platform'],
+                    $source['token'],
+                    $source['instance_url'],
+                    $this->selectedRepo,
+                );
+                if (is_string($default) && $default !== '') {
+                    $this->selectedBranch = $default;
                 }
             }
         }
