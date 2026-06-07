@@ -6,7 +6,6 @@ namespace Tests\Feature\GitProvider;
 
 use App\Integrations\GitHub\Requests\GetFileContents;
 use App\Services\GitProvider\GitServiceFactory;
-use Illuminate\Support\Facades\Http;
 use Saloon\Http\Faking\MockResponse;
 use Saloon\Laravel\Facades\Saloon;
 use Tests\TestCase;
@@ -59,8 +58,8 @@ class GetFileContentsTest extends TestCase
 
     public function test_bitbucket_returns_raw_file_body(): void
     {
-        Http::fake([
-            'api.bitbucket.org/2.0/repositories/acme/widget/src/main/*' => Http::response("FROM alpine\n"),
+        Saloon::fake([
+            'api.bitbucket.org/2.0/repositories/acme/widget/src/main/*' => MockResponse::make("FROM alpine\n"),
         ]);
 
         $body = $this->factory()->forPlatform('bitbucket', 'tok')

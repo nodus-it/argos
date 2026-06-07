@@ -22,7 +22,6 @@ use App\Models\User;
 use Filament\Actions\CreateAction;
 use Filament\Actions\Testing\TestAction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Saloon\Http\Faking\MockResponse;
@@ -608,8 +607,8 @@ class RepoProfileResourceTest extends TestCase
 
     public function test_can_create_bitbucket_repo_profile_with_pat(): void
     {
-        Http::fake([
-            'api.bitbucket.org/2.0/repositories/myworkspace/myrepo/refs/branches*' => Http::response([
+        Saloon::fake([
+            'api.bitbucket.org/2.0/repositories/myworkspace/myrepo/refs/branches*' => MockResponse::make([
                 'values' => [['name' => 'main']],
             ]),
         ]);
@@ -642,18 +641,18 @@ class RepoProfileResourceTest extends TestCase
             'provider' => 'bitbucket',
         ]);
 
-        // More-specific patterns must come first; Http::fake matches in definition order.
-        Http::fake([
-            'api.bitbucket.org/2.0/repositories/acme/widget/refs/branches*' => Http::response([
+        // More-specific patterns must come first; Saloon matches in definition order.
+        Saloon::fake([
+            'api.bitbucket.org/2.0/repositories/acme/widget/refs/branches*' => MockResponse::make([
                 'values' => [['name' => 'main'], ['name' => 'develop']],
             ]),
-            'api.bitbucket.org/2.0/repositories/acme/widget' => Http::response([
+            'api.bitbucket.org/2.0/repositories/acme/widget' => MockResponse::make([
                 'mainbranch' => ['name' => 'main'],
             ]),
-            'api.bitbucket.org/2.0/user/workspaces*' => Http::response([
+            'api.bitbucket.org/2.0/user/workspaces*' => MockResponse::make([
                 'values' => [['workspace' => ['slug' => 'acme']]],
             ]),
-            'api.bitbucket.org/2.0/repositories/acme*' => Http::response([
+            'api.bitbucket.org/2.0/repositories/acme*' => MockResponse::make([
                 'values' => [['full_name' => 'acme/widget']],
             ]),
         ]);
