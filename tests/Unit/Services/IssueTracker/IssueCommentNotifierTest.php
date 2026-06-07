@@ -10,6 +10,7 @@ use App\Enums\TaskProviderSyncStatus;
 use App\Models\ExternalIssueLink;
 use App\Models\Task;
 use App\Models\TaskProviderBinding;
+use App\Services\IssueTracker\CommentFormatter;
 use App\Services\IssueTracker\Contracts\IssueTrackerContract;
 use App\Services\IssueTracker\IssueCommentNotifier;
 use App\Services\IssueTracker\IssueTrackerRegistry;
@@ -27,7 +28,7 @@ class IssueCommentNotifierTest extends TestCase
         $registry = Mockery::mock(IssueTrackerRegistry::class);
         $registry->shouldNotReceive('make');
 
-        $notifier = new IssueCommentNotifier($registry);
+        $notifier = new IssueCommentNotifier($registry, new CommentFormatter);
         $task = Task::factory()->create();
 
         $notifier->notifyPhaseCompletion($task, 'implement', 'completed');
@@ -53,7 +54,7 @@ class IssueCommentNotifierTest extends TestCase
         $registry->shouldReceive('has')->andReturn(true);
         $registry->shouldReceive('make')->andReturn($tracker);
 
-        $notifier = new IssueCommentNotifier($registry);
+        $notifier = new IssueCommentNotifier($registry, new CommentFormatter);
 
         $binding = TaskProviderBinding::factory()->create([
             'kind' => TaskProviderKind::GitHub,
@@ -103,7 +104,7 @@ class IssueCommentNotifierTest extends TestCase
             'external_id' => '7',
         ]);
 
-        (new IssueCommentNotifier($registry))->notifyPhaseCompletion($task, 'concept', 'completed');
+        (new IssueCommentNotifier($registry, new CommentFormatter))->notifyPhaseCompletion($task, 'concept', 'completed');
     }
 
     public function test_concept_phase_inlines_the_concept_markdown(): void
@@ -134,7 +135,7 @@ class IssueCommentNotifierTest extends TestCase
             'external_id' => '5',
         ]);
 
-        (new IssueCommentNotifier($registry))->notifyPhaseCompletion($task, 'concept', 'completed');
+        (new IssueCommentNotifier($registry, new CommentFormatter))->notifyPhaseCompletion($task, 'concept', 'completed');
 
         // The concept comment id is stored for the later 👍-approval poll.
         $this->assertSame('cmt-concept-99', $link->fresh()->concept_comment_id);
@@ -166,7 +167,7 @@ class IssueCommentNotifierTest extends TestCase
             'external_id' => '5',
         ]);
 
-        (new IssueCommentNotifier($registry))->notifyPhaseCompletion($task, 'implement', 'completed');
+        (new IssueCommentNotifier($registry, new CommentFormatter))->notifyPhaseCompletion($task, 'implement', 'completed');
     }
 
     public function test_implement_phase_inlines_the_result_summaries(): void
@@ -199,7 +200,7 @@ class IssueCommentNotifierTest extends TestCase
             'external_id' => '5',
         ]);
 
-        (new IssueCommentNotifier($registry))->notifyPhaseCompletion($task, 'implement', 'completed');
+        (new IssueCommentNotifier($registry, new CommentFormatter))->notifyPhaseCompletion($task, 'implement', 'completed');
     }
 
     public function test_push_phase_inlines_the_pull_request_link(): void
@@ -229,7 +230,7 @@ class IssueCommentNotifierTest extends TestCase
             'external_id' => '5',
         ]);
 
-        (new IssueCommentNotifier($registry))->notifyPhaseCompletion($task, 'push', 'completed');
+        (new IssueCommentNotifier($registry, new CommentFormatter))->notifyPhaseCompletion($task, 'push', 'completed');
     }
 
     public function test_swallows_exception_and_does_not_rethrow(): void
@@ -241,7 +242,7 @@ class IssueCommentNotifierTest extends TestCase
         $registry->shouldReceive('has')->andReturn(true);
         $registry->shouldReceive('make')->andReturn($tracker);
 
-        $notifier = new IssueCommentNotifier($registry);
+        $notifier = new IssueCommentNotifier($registry, new CommentFormatter);
 
         $task = Task::factory()->create();
         $binding = TaskProviderBinding::factory()->create([
@@ -267,7 +268,7 @@ class IssueCommentNotifierTest extends TestCase
         $registry->shouldReceive('has')->andReturn(false);
         $registry->shouldNotReceive('make');
 
-        $notifier = new IssueCommentNotifier($registry);
+        $notifier = new IssueCommentNotifier($registry, new CommentFormatter);
 
         $task = Task::factory()->create();
         $binding = TaskProviderBinding::factory()->create([
