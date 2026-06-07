@@ -88,6 +88,7 @@ class TaskThreadBuilder
                 'techHtml' => null,
                 'qualityGates' => null,
                 'qualityGateLogKeys' => [],
+                'qualityGateLastKeys' => [],
                 'iterationKey' => null,
                 'hasStoredLog' => false,
                 'isLive' => false,
@@ -123,6 +124,7 @@ class TaskThreadBuilder
         $techHtml = null;
         $qualityGates = null;
         $qualityGateLogKeys = [];
+        $qualityGateLastKeys = [];
         $prUrl = null;
 
         if ($phase === 'concept') {
@@ -139,6 +141,7 @@ class TaskThreadBuilder
             }
             $qualityGates = $run->result_json['quality_gates'] ?? null;
             $qualityGateLogKeys = array_keys($run->quality_gate_logs ?? []);
+            $qualityGateLastKeys = $this->qualityGateLastKeys($qualityGates, $qualityGateLogKeys);
             $short = $run->implement_summary_nontechnical !== null
                 ? Str::limit(trim(strip_tags(Str::markdown($run->implement_summary_nontechnical))), 180)
                 : null;
@@ -164,6 +167,9 @@ class TaskThreadBuilder
             'techHtml' => $techHtml,
             'qualityGates' => $qualityGates,
             'qualityGateLogKeys' => $qualityGateLogKeys,
+            // Per failed gate, the latest matching log key (or null) for linking
+            // to its quality-gate log — the filter/sort kept out of the view.
+            'qualityGateLastKeys' => $qualityGateLastKeys,
             // Lazy-load key for the stored stream log of this iteration.
             'iterationKey' => $run->stream_log !== null ? $phase.'.'.$run->iteration : null,
             'hasStoredLog' => $run->stream_log !== null,
@@ -171,6 +177,34 @@ class TaskThreadBuilder
             'showDiff' => $isLatestCode && in_array($phase, ['implement', 'respond'], true),
             'prUrl' => $prUrl,
         ];
+    }
+
+    /**
+     * For each failed gate, the latest log key matching it (exact or `gate.*`),
+     * or null when there is none. Non-failed gates are omitted.
+     *
+     * @param  array<string, string>|null  $qualityGates  gate => result
+     * @param  list<string>  $logKeys
+     * @return array<string, string|null>
+     */
+    private function qualityGateLastKeys(?array $qualityGates, array $logKeys): array
+    {
+        $lastKeys = [];
+
+        foreach ($qualityGates ?? [] as $gate => $result) {
+            if (! in_array($result, ['fail', 'advisory_fail'], true)) {
+                continue;
+            }
+
+            $matches = array_values(array_filter(
+                $logKeys,
+                fn (string $k): bool => $k === $gate || str_starts_with($k, $gate.'.'),
+            ));
+            sort($matches);
+            $lastKeys[$gate] = $matches !== [] ? end($matches) : null;
+        }
+
+        return $lastKeys;
     }
 
     private function phaseTitle(string $phase, int $iteration, int $count): string

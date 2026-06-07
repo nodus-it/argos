@@ -71,10 +71,10 @@
     @php
         $demoEnabled = (bool) config('argos.preview.enabled') && (bool) $task->repoProfile?->live_demo_enabled;
         $demoStatus = $demo?->status?->value;
-        $demoBadgeCls = ['building' => 'badge-running', 'live' => 'badge-success', 'failed' => 'badge-failed', 'stopped' => 'badge-draft'][$demoStatus] ?? 'badge-draft';
+        $demoBadgeCls = $demo?->status ? \App\Support\BadgeClass::for($demo->status->color()) : 'badge-draft';
         $accessMode = $task->effectiveDemoAccessMode();
-        $accessBadgeCls = ['success' => 'badge-success', 'warning' => 'badge-running', 'danger' => 'badge-failed', 'gray' => 'badge-draft'][$accessMode->color()] ?? 'badge-draft';
-        $accessIcon = $accessMode === \App\Enums\DemoAccessMode::Public ? 'heroicon-o-lock-open' : 'heroicon-o-lock-closed';
+        $accessBadgeCls = \App\Support\BadgeClass::for($accessMode->color());
+        $accessIcon = $accessMode->icon();
     @endphp
     @if ($demo || $demoEnabled)
         <div class="card card-pad demo-bar fade-in" style="margin-bottom:20px;" x-data="{ log: false }">
@@ -158,12 +158,7 @@
                             @foreach ($item['qualityGates'] as $gate => $result)
                                 @php
                                     $isFail = in_array($result, ['fail', 'advisory_fail'], true);
-                                    $matches = array_values(array_filter(
-                                        $item['qualityGateLogKeys'] ?? [],
-                                        fn (string $k): bool => $k === $gate || str_starts_with($k, $gate.'.')
-                                    ));
-                                    sort($matches);
-                                    $lastKey = $isFail && $matches !== [] ? end($matches) : null;
+                                    $lastKey = $item['qualityGateLastKeys'][$gate] ?? null;
                                     $gateUrl = $lastKey
                                         ? \App\Filament\Admin\Resources\TaskResource::getUrl('quality-gates', ['record' => $record, 'phase' => $item['phase'], 'key' => $lastKey])
                                         : null;

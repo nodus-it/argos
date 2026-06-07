@@ -58,4 +58,22 @@ class TaskThreadBuilderTest extends TestCase
         // created → feedback → phase
         $this->assertSame(['created', 'feedback', 'phase'], $kinds);
     }
+
+    public function test_failed_quality_gate_resolves_to_its_latest_log_key(): void
+    {
+        $task = Task::factory()->create();
+        PhaseRun::factory()->create([
+            'task_id' => $task->id,
+            'phase' => 'implement',
+            'iteration' => 1,
+            'result_json' => ['quality_gates' => ['phpstan' => 'fail', 'pint' => 'pass']],
+            'quality_gate_logs' => ['phpstan.1' => 'a', 'phpstan.2' => 'b', 'pint.1' => 'c'],
+        ]);
+
+        $item = array_values(array_filter($this->build($task), fn (array $i): bool => $i['kind'] === 'phase'))[0];
+
+        // The failed gate links to its newest log key; the passing one is omitted.
+        $this->assertSame('phpstan.2', $item['qualityGateLastKeys']['phpstan']);
+        $this->assertArrayNotHasKey('pint', $item['qualityGateLastKeys']);
+    }
 }
