@@ -5,8 +5,8 @@ wie „DemoDeployer in 10 Micro-Services" verworfen). Vier Problemklassen:
 **A)** echte Duplikate, **B)** God-Classes / vermischte Logik, **C)** Logik in
 Filament & Views, **D)** Folge-Aktionen synchron statt über Events.
 
-> **Stand 2026-06-07** — Block **A**, **D**, **B3**, **B4** und **C** erledigt
-> (Branch `feat/saloon-github-pilot`). Verbleibend: **B1, B2**.
+> **Stand 2026-06-07** — Block **A**, **D**, **B1**, **B3**, **B4** und **C** erledigt
+> (Branch `feat/saloon-github-pilot`). Verbleibend: **B2**.
 
 ---
 
@@ -61,9 +61,17 @@ HTTP-Setup (A4, erledigt) und den Orchestrierungs-Services (B4).
      jetzt 541 Z. Runner liest das host-seitige `.bg.log` (besitzt die Log-Datei)
      und reicht es an `sync()`; `postPhaseSync` bleibt als dünne, public Delegation
      (partial-mock-Seam für die Tests).
-   - ⏳ B1.4 Usage/Cost (`recoverUsageFromVolume`, Usage-Limit-Cache) → `UsageLimitManager`
-   Jede Extraktion einzeln mit Test (die partial-mock-Tests müssen pro Schnitt
-   mitwandern — die Test-Kopplung an die alte Struktur ist der eigentliche Aufwand).
+   - ✅ B1.4 `UsageLimitManager` (Cost-Recovery + `usage_limit.env`-Read + Usage-Limit-
+     Cache) — **PhaseRunner jetzt 405 Z.** (von ~1207). Der Cache ist zentralisiert:
+     `UsageLimitBanner` und `RunPhaseJob` lesen über `current()`/`isActive()`/
+     `retryDelaySeconds()`/`clear()` statt direkt auf `Cache::get(CACHE_KEY)`; die
+     doppelte Delay-Berechnung im Job ist dedupliziert.
+   Jede Extraktion einzeln mit Test (die partial-mock-Tests sind pro Schnitt
+   mitgewandert — die Test-Kopplung an die alte Struktur war der eigentliche Aufwand).
+
+**B1 abgeschlossen.** PhaseRunner orchestriert nur noch den Phasen-Lauf; Command-Bau
+(`PhaseCommandBuilder`), Volume-I/O (`WorkerVolumeReader`), Phasen-Ergebnis-Sync
+(`PhaseResultSync`) und Usage/Cost (`UsageLimitManager`) sind eigene Klassen.
 2. **B2 (`DemoDeployer`)** — `TraefikRouter` + `DemoComposeBuilder` raus, Rest bleibt
    lesbarer Orchestrator. Gut durch `DemoDeployerTest` abgedeckt.
 

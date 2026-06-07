@@ -8,11 +8,10 @@ use App\Enums\PhaseStatus;
 use App\Models\Task;
 use App\Services\Task\TaskService;
 use App\Services\Workflow\PhaseRunner;
+use App\Services\Workflow\UsageLimitManager;
 use App\Services\Workflow\WorkflowService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
-use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 class RunPhaseJob implements ShouldQueue
@@ -40,12 +39,9 @@ class RunPhaseJob implements ShouldQueue
     public function handle(PhaseRunner $runner, WorkflowService $workflowService, TaskService $taskService): void
     {
         // Hold back while a usage limit is active — release back to the queue.
-        $limit = Cache::get(PhaseRunner::CACHE_KEY_USAGE_LIMIT);
-        if (is_array($limit) && ($limit['active'] ?? false)) {
-            $resetAt = isset($limit['reset_at']) ? Carbon::parse($limit['reset_at']) : null;
-            $delaySec = ($resetAt !== null && $resetAt->isFuture())
-                ? max(60, (int) now()->diffInSeconds($resetAt))
-                : 900;
+        $usage = app(UsageLimitManager::class);
+        if ($usage->isActive()) {
+            $delaySec = $usage->retryDelaySeconds();
 
             Log::channel('argos')->info('Job held back: usage limit active', [
                 'task' => $this->taskId,
@@ -73,11 +69,7 @@ class RunPhaseJob implements ShouldQueue
 
             // Phase hit the usage limit — re-schedule instead of failing permanently.
             if ($task->current_status === PhaseStatus::RateLimited) {
-                $retryLimit = Cache::get(PhaseRunner::CACHE_KEY_USAGE_LIMIT);
-                $resetAt = isset($retryLimit['reset_at']) ? Carbon::parse($retryLimit['reset_at']) : null;
-                $delaySec = ($resetAt !== null && $resetAt->isFuture())
-                    ? max(60, (int) now()->diffInSeconds($resetAt))
-                    : 900;
+                $delaySec = $usage->retryDelaySeconds();
 
                 Log::channel('argos')->info('Phase rate-limited, re-scheduling', [
                     'task' => $this->taskId,

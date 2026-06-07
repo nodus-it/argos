@@ -10,15 +10,11 @@ use App\Jobs\RunPhaseJob;
 use App\Models\PhaseRun;
 use App\Models\Task;
 use App\Services\Anthropic\CredentialStore;
-use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\Process\Process;
 
 class PhaseRunner
 {
-    public const CACHE_KEY_USAGE_LIMIT = 'usage_limit';
-
     public function __construct(
         private readonly CredentialStore $credentials,
         private readonly WorkerVolumeReader $volumeReader,
@@ -283,12 +279,12 @@ class PhaseRunner
         // files were already written to the volume by the streaming pipeline,
         // so we can still salvage cost/token counters from there.
         if ($phaseRun->fresh()->cost_usd === null && $exitCode !== 0) {
-            $this->recoverUsageFromVolume($task, $phaseRun, $phase);
+            app(UsageLimitManager::class)->recoverUsageFromVolume($task, $phaseRun, $phase);
         }
 
         if ($exitCode === 7) {
-            $resetAt = $this->readUsageLimitResetAt($task);
-            $this->storeUsageLimit($resetAt);
+            $usage = app(UsageLimitManager::class);
+            $usage->store($usage->readResetAt($task));
         }
 
         // postPhaseSync writes content (concept_md, implement_summary, …) to the DB.
@@ -405,137 +401,5 @@ class PhaseRunner
             'task_id' => $task->id,
             'phase' => $phase,
         ], $extra);
-    }
-
-    /**
-     * Read every Claude `*.result.json` for this iteration (initial + fixN
-     * retries) from the worker volume, sum their cost/token totals, and
-     * persist them on the phase run. The shell script returns one JSON line
-     * per matching file; we sum total_cost_usd + usage.{input,output}_tokens.
-     *
-     * This is a recovery path for phase scripts that died before
-     * `result_emit` (e.g. implement `return 3` on is_error=true). The
-     * happy-path phaseRunUpdate() handles the normal case.
-     */
-    private function recoverUsageFromVolume(Task $task, PhaseRun $phaseRun, string $phase): void
-    {
-        $iteration = (int) $phaseRun->iteration;
-        if ($iteration <= 0) {
-            return;
-        }
-
-        $script = sprintf(
-            'set -e; for f in /workspace/.agent/logs/%s.%d.result.json '.
-            '/workspace/.agent/logs/%s.%d.fix*.result.json; do [ -f "$f" ] && cat "$f"; done',
-            $phase,
-            $iteration,
-            $phase,
-            $iteration,
-        );
-
-        $process = $this->newProcess([
-            'docker', 'run', '--rm',
-            '-v', $task->volumeName().':/workspace:ro',
-            'alpine',
-            'sh', '-c', $script,
-        ]);
-
-        try {
-            $process->setTimeout(15);
-            $process->run();
-            if (! $process->isSuccessful()) {
-                return;
-            }
-            $output = $process->getOutput();
-        } catch (\Throwable $e) {
-            // Recovery is best-effort — missing docker, mock gaps in tests,
-            // or any other transient issue should not break the phase run.
-            Log::channel('argos')->debug('Cost recovery skipped', ['error' => $e->getMessage()]);
-
-            return;
-        }
-
-        if ($output === '') {
-            return;
-        }
-
-        $totalCost = 0.0;
-        $totalIn = 0;
-        $totalOut = 0;
-        $found = false;
-
-        foreach (preg_split('/\r?\n/', $output) ?: [] as $line) {
-            $line = trim($line);
-            if ($line === '') {
-                continue;
-            }
-            $decoded = json_decode($line, true);
-            if (! is_array($decoded)) {
-                continue;
-            }
-            $found = true;
-            $totalCost += (float) ($decoded['total_cost_usd'] ?? 0);
-            $totalIn += (int) ($decoded['usage']['input_tokens'] ?? 0);
-            $totalOut += (int) ($decoded['usage']['output_tokens'] ?? 0);
-        }
-
-        if (! $found) {
-            return;
-        }
-
-        $phaseRun->update([
-            'cost_usd' => $totalCost,
-            'input_tokens' => $totalIn,
-            'output_tokens' => $totalOut,
-        ]);
-    }
-
-    /**
-     * Read the usage_limit.env file the worker writes when it detects a rate limit.
-     * Returns the reset timestamp if the file contained one, otherwise null.
-     */
-    private function readUsageLimitResetAt(Task $task): ?Carbon
-    {
-        $content = $this->volumeReader->readFile(
-            $task->volumeName(),
-            '/workspace/.agent/runtime/usage_limit.env'
-        );
-
-        if ($content === null) {
-            return null;
-        }
-
-        if (preg_match('/USAGE_LIMIT_RESET_AT=([^\s]+)/', $content, $m)) {
-            try {
-                return Carbon::parse(trim($m[1]));
-            } catch (\Throwable) {
-                // malformed timestamp — ignore
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * Persist the active usage-limit signal in the application cache.
-     * The banner component and RunPhaseJob both read this key.
-     */
-    public function storeUsageLimit(?Carbon $resetAt): void
-    {
-        $data = [
-            'active' => true,
-            'reset_at' => $resetAt?->toIso8601String(),
-            'detected_at' => now()->toIso8601String(),
-        ];
-
-        $ttl = ($resetAt !== null && $resetAt->isFuture())
-            ? $resetAt->clone()->addMinutes(5)
-            : now()->addHours(2);
-
-        Cache::put(self::CACHE_KEY_USAGE_LIMIT, $data, $ttl);
-
-        Log::channel('argos')->warning('Usage limit detected and stored', [
-            'reset_at' => $data['reset_at'],
-        ]);
     }
 }

@@ -17,6 +17,7 @@ use App\Models\User;
 use App\Services\Anthropic\CredentialStore;
 use App\Services\Workflow\PhaseResultSync;
 use App\Services\Workflow\PhaseRunner;
+use App\Services\Workflow\UsageLimitManager;
 use App\Services\Workflow\WorkerVolumeReader;
 use App\Workers\Compose\WorkerImageResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -200,10 +201,16 @@ class PhaseRunnerTest extends TestCase
         $recoveryProcess->shouldReceive('isSuccessful')->andReturn(true);
         $recoveryProcess->shouldReceive('getOutput')->andReturn($recoveryOutput);
 
-        $runner = $this->partialMock(PhaseRunner::class, function (MockInterface $mock) use ($phaseProcess, $recoveryProcess): void {
+        // Recovery now lives in UsageLimitManager — bind a partial mock whose
+        // newProcess returns the canned recovery docker run.
+        $usageManager = Mockery::mock(UsageLimitManager::class, [Mockery::mock(WorkerVolumeReader::class)])->makePartial();
+        $usageManager->shouldAllowMockingProtectedMethods();
+        $usageManager->shouldReceive('newProcess')->andReturn($recoveryProcess);
+        $this->app->instance(UsageLimitManager::class, $usageManager);
+
+        $runner = $this->partialMock(PhaseRunner::class, function (MockInterface $mock) use ($phaseProcess): void {
             $mock->shouldAllowMockingProtectedMethods();
-            // First newProcess call = phase docker run, second = recovery read.
-            $mock->shouldReceive('newProcess')->andReturn($phaseProcess, $recoveryProcess);
+            $mock->shouldReceive('newProcess')->andReturn($phaseProcess);
             $mock->shouldReceive('postPhaseSync')->andReturn(null);
             $mock->shouldReceive('writeNotesToVolume')->andReturn(null);
             $mock->shouldReceive('writeImplementNotesToVolume')->andReturn(null);

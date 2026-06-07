@@ -110,7 +110,6 @@ final class FakeWorkerProcess
         $phaseRunnerMock->shouldReceive('newProcess')->andReturn($processMock);
         $phaseRunnerMock->shouldReceive('writeNotesToVolume')->andReturn(null);
         $phaseRunnerMock->shouldReceive('postPhaseSync')->andReturn(null);
-        $phaseRunnerMock->shouldReceive('storeUsageLimit')->andReturn(null);
 
         app()->instance(PhaseRunner::class, $phaseRunnerMock);
     }
