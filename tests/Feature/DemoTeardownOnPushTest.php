@@ -8,7 +8,7 @@ use App\Enums\PhaseStatus;
 use App\Jobs\StopDemoJob;
 use App\Models\Demo;
 use App\Models\Task;
-use App\Services\Workflow\WorkflowService;
+use App\Services\Task\TaskService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Tests\TestCase;
@@ -32,7 +32,7 @@ final class DemoTeardownOnPushTest extends TestCase
         $task = Task::factory()->create();
         Demo::factory()->live()->create(['task_id' => $task->id]);
 
-        app(WorkflowService::class)->completePhase($task, 'push', PhaseStatus::Completed);
+        app(TaskService::class)->completePhase($task, 'push', PhaseStatus::Completed);
 
         Bus::assertDispatched(StopDemoJob::class, fn (StopDemoJob $j): bool => $j->taskId === $task->id);
     }
@@ -41,7 +41,7 @@ final class DemoTeardownOnPushTest extends TestCase
     {
         $task = Task::factory()->create();
 
-        app(WorkflowService::class)->completePhase($task, 'push', PhaseStatus::Completed);
+        app(TaskService::class)->completePhase($task, 'push', PhaseStatus::Completed);
 
         Bus::assertNotDispatched(StopDemoJob::class);
     }
@@ -51,7 +51,7 @@ final class DemoTeardownOnPushTest extends TestCase
         $task = Task::factory()->create();
         Demo::factory()->live()->create(['task_id' => $task->id]);
 
-        app(WorkflowService::class)->completePhase($task, 'push', PhaseStatus::Failed);
+        app(TaskService::class)->completePhase($task, 'push', PhaseStatus::Failed);
 
         Bus::assertNotDispatched(StopDemoJob::class);
     }
