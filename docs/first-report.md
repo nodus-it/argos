@@ -5,8 +5,8 @@ wie „DemoDeployer in 10 Micro-Services" verworfen). Vier Problemklassen:
 **A)** echte Duplikate, **B)** God-Classes / vermischte Logik, **C)** Logik in
 Filament & Views, **D)** Folge-Aktionen synchron statt über Events.
 
-> **Stand 2026-06-07** — Block **A**, **D** und **B3** erledigt (Branch
-> `feat/saloon-github-pilot`). Verbleibend: **B1, B2, B4, C-Rest**.
+> **Stand 2026-06-07** — Block **A**, **D**, **B3** und **C** erledigt (Branch
+> `feat/saloon-github-pilot`). Verbleibend: **B1, B2, B4**.
 
 ---
 
@@ -23,6 +23,7 @@ Filament & Views, **D)** Folge-Aktionen synchron statt über Events.
 | A6 | *(angeblich URL-Parsing 5×)* | **Fehlbefund** — `repoPathFromUrl` ist schon zentralisiert, die übrigen Stellen rufen sie nur auf | — |
 | D | Folge-Aktionen synchron inline statt über Events | 5 Listener in `app/Listeners/Task` an `PhaseCompleted`/`TaskCompleted`; `WorkflowService::completePhase` = reine State-Transition, `TaskService::markCompleted` = reiner DB-Write + Event (`docker volume rm` raus aus dem DB-Service) | `2f6f698` |
 | B3 | Presentation-Logik im Fat Model `Task.php` | `App\Presenters\TaskPresenter` (statusLabel/Color, badgeStatus, phaseRail + Helfer), erreichbar via `Task::presenter()`; Domain-Methoden bleiben im Model | `6637dce` |
+| C | Logik in Filament-Pages & Views | `TaskThreadBuilder` (Thread-Aufbau aus ViewTask), `DemoAccessConfigurator` (Passwort/Apply aus der Action), `App\Support\BadgeClass` + `DemoAccessMode::icon()` + Quality-Gate-`lastKeys` aus `view-task-thread` | `a32b480`, `ae92547`, `99d0969` |
 
 Außerdem teil-erledigt aus Block **C**: die Docker-Diff-Generierung verließ ViewTask/
 ViewTaskDiff (→ A1) und die Git-Provider-Form-Closures verließen RepoProfileResource/
@@ -47,33 +48,16 @@ HTTP-Setup (A4, erledigt) und den Orchestrierungs-Services (B4).
 
 ---
 
-## C) Logik in Filament-Pages & Blade-Views — teilweise offen
-
-Kein `app/View/Components/` vorhanden — alle Components sind anonyme Blade-Templates,
-d.h. strukturell kein Ort für getypte Props/Computed-Logik.
-
-**Verbleibend in Filament-Pages:**
-- `ViewTask.php`: `buildThread()`/`buildPhaseItem()` (~170 Z. Workflow-Historie +
-  Markdown + Status-Mapping) → `TaskThreadBuilder`. `Str::markdown()` direkt in der Page.
-- `ViewTask.php` `demoAccess`-Action: Passwort-Generierung + `DemoDeployer->applyAccessMode`
-  inline → dünner Service-Call.
-
-**Verbleibend in Views (`@php`-Blöcke):**
-- `view-task-thread.blade.php`: Demo-Status/Access-Badge-Mapping, Quality-Gate-URL-Bau
-  mit `TaskResource::getUrl(...)` → ins ViewModel/Presenter.
-- `onboarding.blade.php`: Step-State-Berechnung (done/active/reachable) + bedingtes
-  Daten-Laden → in die Livewire-Page (`#[Computed]`).
-
----
-
 ## Empfohlene Reihenfolge (Rest)
 
-1. **C-Rest** — `TaskThreadBuilder` (ViewTask `buildThread`/`buildPhaseItem`),
-   `demoAccess`-Service, View-`@php` ins ViewModel/Presenter (die Status-Badge-
-   Mappings in `view-task-thread` können nun auf `TaskPresenter` zeigen).
-2. **B4** — `IssueCommentNotifier`/`IssueIngestService` aufteilen.
-3. **B1 / B2** (`PhaseRunner` / `DemoDeployer`) — größter Aufwand, zuletzt, jede
+1. **B4** — `IssueCommentNotifier`/`IssueIngestService` aufteilen
+   (`CommentFormatter`, `IssueFilterMatcher`, `IssueSignature`).
+2. **B1 / B2** (`PhaseRunner` / `DemoDeployer`) — größter Aufwand, zuletzt, jede
    Extraktion mit eigenem Test.
+
+Kleiner C-Rest (optional, geringer Wert): `onboarding.blade.php` Step-State-
+Berechnung (done/active/reachable) → in die Livewire-Page (`#[Computed]`). Reine
+UI-Conditionals, kein dringender Schnitt.
 
 Optional als Querschnitt: **Provider-Descriptor** („neuer Provider = ein Ort") aus der
 Saloon-/Driver-Diskussion — eigenes Vorhaben.
