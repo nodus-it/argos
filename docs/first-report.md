@@ -50,10 +50,14 @@ HTTP-Setup (A4, erledigt) und den Orchestrierungs-Services (B4).
 
 ## Empfohlene Reihenfolge (Rest)
 
-1. **B1 (`PhaseRunner`)** — die echte God-Class (~1200 Z., 7 Verantwortlichkeiten).
-   Schrittweise: zuerst `postPhaseSync` (3 Phasen-Zweige) und der Env-/Command-Bau,
-   dann Config-Resolver, Volume-I/O, Cost-Recovery, Usage-Limit. Jede Extraktion
-   mit eigenem Test gegen die bestehende Backend-E2E-Abdeckung.
+1. **B1 (`PhaseRunner`)** — die echte God-Class (~1200 Z., 7 Verantwortlichkeiten),
+   schrittweise. **In Arbeit:**
+   - ✅ B1.1 `WorkerVolumeReader` (Volume-I/O + Gate-Log-Lesen) — `0f0513c`, jetzt 1047 Z.
+   - ⏳ B1.2 `PhaseCommandBuilder` (Env-/Command-Bau + `resolve*`-Config-Resolver)
+   - ⏳ B1.3 `postPhaseSync` (3 Phasen-Zweige) → Phase-Result-Sync
+   - ⏳ B1.4 Usage/Cost (`recoverUsageFromVolume`, Usage-Limit-Cache) → `UsageLimitManager`
+   Jede Extraktion einzeln mit Test (die partial-mock-Tests müssen pro Schnitt
+   mitwandern — die Test-Kopplung an die alte Struktur ist der eigentliche Aufwand).
 2. **B2 (`DemoDeployer`)** — `TraefikRouter` + `DemoComposeBuilder` raus, Rest bleibt
    lesbarer Orchestrator. Gut durch `DemoDeployerTest` abgedeckt.
 
