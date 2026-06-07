@@ -53,7 +53,10 @@ HTTP-Setup (A4, erledigt) und den Orchestrierungs-Services (B4).
 1. **B1 (`PhaseRunner`)** — die echte God-Class (~1200 Z., 7 Verantwortlichkeiten),
    schrittweise. **In Arbeit:**
    - ✅ B1.1 `WorkerVolumeReader` (Volume-I/O + Gate-Log-Lesen) — `0f0513c`, jetzt 1047 Z.
-   - ⏳ B1.2 `PhaseCommandBuilder` (Env-/Command-Bau + `resolve*`-Config-Resolver)
+   - ✅ B1.2 `PhaseCommandBuilder` (Env-/Command-Bau + `resolve*`-Config-Resolver) —
+     jetzt 753 Z.; per `app()` aufgelöst (nicht Konstruktor-injiziert), konsistent
+     mit dem bereits in `runBlocking` genutzten `app(WorkflowService::class)`-Muster,
+     hält alle `partialMock`-Tests stabil. `resolveModel`/`resolveAgentName` public.
    - ⏳ B1.3 `postPhaseSync` (3 Phasen-Zweige) → Phase-Result-Sync
    - ⏳ B1.4 Usage/Cost (`recoverUsageFromVolume`, Usage-Limit-Cache) → `UsageLimitManager`
    Jede Extraktion einzeln mit Test (die partial-mock-Tests müssen pro Schnitt

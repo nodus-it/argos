@@ -12,7 +12,7 @@ use App\Filament\Admin\Resources\TaskResource\Pages\CreateTask;
 use App\Models\RepoProfile;
 use App\Models\Task;
 use App\Models\User;
-use App\Services\Workflow\PhaseRunner;
+use App\Services\Workflow\PhaseCommandBuilder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Saloon\Http\Faking\MockResponse;
@@ -145,8 +145,7 @@ class ClaudeModelSelectionTest extends TestCase
             'workflow_status' => WorkflowStatus::ConceptReview,
         ]);
 
-        $runner = app(PhaseRunner::class);
-        $model = $this->callPrivateMethod($runner, 'resolveModel', [$task, AgentName::ClaudeCode, 'respond']);
+        $model = app(PhaseCommandBuilder::class)->resolveModel($task, AgentName::ClaudeCode, 'respond');
 
         $this->assertSame(ClaudeModel::Sonnet46->value, $model);
     }
@@ -162,8 +161,7 @@ class ClaudeModelSelectionTest extends TestCase
             'workflow_status' => WorkflowStatus::InReview,
         ]);
 
-        $runner = app(PhaseRunner::class);
-        $model = $this->callPrivateMethod($runner, 'resolveModel', [$task, AgentName::ClaudeCode, 'respond']);
+        $model = app(PhaseCommandBuilder::class)->resolveModel($task, AgentName::ClaudeCode, 'respond');
 
         $this->assertSame(ClaudeModel::Haiku45->value, $model);
     }
@@ -171,20 +169,8 @@ class ClaudeModelSelectionTest extends TestCase
     public function test_commit_message_always_uses_haiku(): void
     {
         $task = Task::factory()->create();
-        $runner = app(PhaseRunner::class);
-        $model = $this->callPrivateMethod($runner, 'resolveModel', [$task, AgentName::ClaudeCode, 'commit-message']);
+        $model = app(PhaseCommandBuilder::class)->resolveModel($task, AgentName::ClaudeCode, 'commit-message');
 
         $this->assertSame(ClaudeModel::Haiku45->value, $model);
-    }
-
-    /**
-     * @param  array<mixed>  $args
-     */
-    private function callPrivateMethod(object $object, string $method, array $args = []): mixed
-    {
-        $reflection = new \ReflectionMethod($object, $method);
-        $reflection->setAccessible(true);
-
-        return $reflection->invoke($object, ...$args);
     }
 }
