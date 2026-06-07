@@ -9,8 +9,10 @@ use App\Jobs\RunPhaseJob;
 use App\Models\PhaseRun;
 use App\Models\RepoProfile;
 use App\Models\Task;
+use App\Services\Anthropic\CredentialStore;
 use App\Services\Task\TaskService;
 use App\Services\Workflow\PhaseRunner;
+use App\Services\Workflow\WorkerVolumeReader;
 use App\Services\Workflow\WorkflowService;
 use App\Workers\Compose\WorkerImageResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -257,10 +259,17 @@ class FeedbackWorkflowTest extends TestCase
     {
         $processMock = $this->makeProcessMock($exitCode);
 
-        $this->partialMock(PhaseRunner::class, function (MockInterface $mock) use ($processMock): void {
-            $mock->shouldAllowMockingProtectedMethods();
-            $mock->shouldReceive('newProcess')->andReturn($processMock);
-        });
+        // Stub the volume reader so postPhaseSync runs (saving/clearing notes on
+        // the real DB) without shelling into Docker. The partial mock is built
+        // with constructor args so its readonly volumeReader is initialised.
+        $volumeReader = Mockery::mock(WorkerVolumeReader::class);
+        $volumeReader->shouldReceive('readFile')->andReturn(null);
+        $volumeReader->shouldReceive('readQualityGateLogs')->andReturn(null);
+
+        $runner = Mockery::mock(PhaseRunner::class, [app(CredentialStore::class), $volumeReader])->makePartial();
+        $runner->shouldAllowMockingProtectedMethods();
+        $runner->shouldReceive('newProcess')->andReturn($processMock);
+        $this->app->instance(PhaseRunner::class, $runner);
 
         (new RunPhaseJob($task->id, $phase))->handle(app(PhaseRunner::class), app(WorkflowService::class), app(TaskService::class));
     }

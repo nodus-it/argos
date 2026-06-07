@@ -16,6 +16,7 @@ use App\Models\Task;
 use App\Models\User;
 use App\Services\Anthropic\CredentialStore;
 use App\Services\Workflow\PhaseRunner;
+use App\Services\Workflow\WorkerVolumeReader;
 use App\Workers\Compose\WorkerImageResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
@@ -50,6 +51,24 @@ class PhaseRunnerTest extends TestCase
         $resolver = Mockery::mock(WorkerImageResolver::class);
         $resolver->shouldReceive('resolveOrBuild')->andReturn('argos-worker:test');
         $this->app->instance(WorkerImageResolver::class, $resolver);
+    }
+
+    /**
+     * Bind a stubbed WorkerVolumeReader so postPhaseSync/recovery read canned
+     * volume content. $files maps an absolute path to its content (missing →
+     * null); $gateLogs is what readQualityGateLogs returns.
+     *
+     * @param  array<string, string|null>  $files
+     * @param  array<string, string>|null  $gateLogs
+     */
+    private function fakeVolumeReader(array $files = [], ?array $gateLogs = null): void
+    {
+        $reader = Mockery::mock(WorkerVolumeReader::class);
+        $reader->shouldReceive('readFile')->andReturnUsing(
+            fn (string $volume, string $path): ?string => $files[$path] ?? null
+        );
+        $reader->shouldReceive('readQualityGateLogs')->andReturn($gateLogs);
+        $this->app->instance(WorkerVolumeReader::class, $reader);
     }
 
     protected function tearDown(): void
@@ -757,18 +776,10 @@ class PhaseRunnerTest extends TestCase
             'status' => 'failed',
         ]);
 
-        $runner = $this->partialMock(PhaseRunner::class, function (MockInterface $mock): void {
-            $mock->shouldAllowMockingProtectedMethods();
-            $mock->shouldReceive('readFileFromVolume')
-                ->andReturnUsing(function (string $volume, string $path): ?string {
-                    return match ($path) {
-                        '/workspace/.agent/concept.md' => null,
-                        '/workspace/.agent/state.json' => null,
-                        '/workspace/.agent/logs/clone.err' => "fatal: couldn't find remote ref main\n",
-                        default => null,
-                    };
-                });
-        });
+        $this->fakeVolumeReader([
+            '/workspace/.agent/logs/clone.err' => "fatal: couldn't find remote ref main\n",
+        ]);
+        $runner = app(PhaseRunner::class);
 
         $runner->postPhaseSync($task, $phaseRun, 'concept', null);
 
@@ -785,16 +796,10 @@ class PhaseRunnerTest extends TestCase
             'status' => 'completed',
         ]);
 
-        $runner = $this->partialMock(PhaseRunner::class, function (MockInterface $mock): void {
-            $mock->shouldAllowMockingProtectedMethods();
-            $mock->shouldReceive('readFileFromVolume')
-                ->andReturnUsing(function (string $volume, string $path): ?string {
-                    return match ($path) {
-                        '/workspace/.agent/concept.md' => "# Konzept\n\nInhalt.",
-                        default => null,
-                    };
-                });
-        });
+        $this->fakeVolumeReader([
+            '/workspace/.agent/concept.md' => "# Konzept\n\nInhalt.",
+        ]);
+        $runner = app(PhaseRunner::class);
 
         $runner->postPhaseSync($task, $phaseRun, 'concept', null);
 
@@ -817,19 +822,10 @@ class PhaseRunnerTest extends TestCase
             '{"type":"result","subtype":"error_max_turns","is_error":true,"num_turns":31}',
         ]);
 
-        $runner = $this->partialMock(PhaseRunner::class, function (MockInterface $mock) use ($streamLog): void {
-            $mock->shouldAllowMockingProtectedMethods();
-            $mock->shouldReceive('readFileFromVolume')
-                ->andReturnUsing(function (string $volume, string $path) use ($streamLog): ?string {
-                    return match ($path) {
-                        '/workspace/.agent/concept.md' => null,
-                        '/workspace/.agent/state.json' => null,
-                        '/workspace/.agent/logs/clone.err' => null,
-                        '/workspace/.agent/logs/concept.1.stream.log' => $streamLog,
-                        default => null,
-                    };
-                });
-        });
+        $this->fakeVolumeReader([
+            '/workspace/.agent/logs/concept.1.stream.log' => $streamLog,
+        ]);
+        $runner = app(PhaseRunner::class);
 
         $runner->postPhaseSync($task, $phaseRun, 'concept', null);
 
@@ -851,19 +847,10 @@ class PhaseRunnerTest extends TestCase
 
         $stderr = "Failed to authenticate. API Error: 401 Invalid authentication credentials\n";
 
-        $runner = $this->partialMock(PhaseRunner::class, function (MockInterface $mock) use ($stderr): void {
-            $mock->shouldAllowMockingProtectedMethods();
-            $mock->shouldReceive('readFileFromVolume')
-                ->andReturnUsing(function (string $volume, string $path) use ($stderr): ?string {
-                    return match ($path) {
-                        '/workspace/.agent/concept.md' => null,
-                        '/workspace/.agent/state.json' => null,
-                        '/workspace/.agent/logs/clone.err' => null,
-                        '/workspace/.agent/logs/concept.1.stderr.log' => $stderr,
-                        default => null,
-                    };
-                });
-        });
+        $this->fakeVolumeReader([
+            '/workspace/.agent/logs/concept.1.stderr.log' => $stderr,
+        ]);
+        $runner = app(PhaseRunner::class);
 
         $runner->postPhaseSync($task, $phaseRun, 'concept', null);
 
@@ -882,17 +869,10 @@ class PhaseRunnerTest extends TestCase
 
         $stderr = "Failed to authenticate. API Error: 401 Invalid authentication credentials\n";
 
-        $runner = $this->partialMock(PhaseRunner::class, function (MockInterface $mock) use ($stderr): void {
-            $mock->shouldAllowMockingProtectedMethods();
-            $mock->shouldReceive('readFileFromVolume')
-                ->andReturnUsing(function (string $volume, string $path) use ($stderr): ?string {
-                    return match ($path) {
-                        '/workspace/.agent/logs/implement.1.stream.log' => null,
-                        '/workspace/.agent/logs/implement.1.stderr.log' => $stderr,
-                        default => null,
-                    };
-                });
-        });
+        $this->fakeVolumeReader([
+            '/workspace/.agent/logs/implement.1.stderr.log' => $stderr,
+        ]);
+        $runner = app(PhaseRunner::class);
 
         $runner->postPhaseSync($task, $phaseRun, 'implement', null);
 
@@ -916,13 +896,8 @@ class PhaseRunnerTest extends TestCase
             'pest.fix1' => "FAIL  tests/Unit/Foo.php\nTests:  1 failed, 698 passed",
         ];
 
-        $runner = $this->partialMock(PhaseRunner::class, function (MockInterface $mock) use ($gateLogs): void {
-            $mock->shouldAllowMockingProtectedMethods();
-            $mock->shouldReceive('readFileFromVolume')->andReturn(null);
-            $mock->shouldReceive('readQualityGateLogsFromVolume')
-                ->once()
-                ->andReturn($gateLogs);
-        });
+        $this->fakeVolumeReader([], $gateLogs);
+        $runner = app(PhaseRunner::class);
 
         $runner->postPhaseSync($task, $phaseRun, 'implement', null);
 
@@ -941,14 +916,8 @@ class PhaseRunnerTest extends TestCase
 
         $gateLogs = ['phpstan' => 'Line 42: Method X has no return type'];
 
-        $runner = $this->partialMock(PhaseRunner::class, function (MockInterface $mock) use ($gateLogs): void {
-            $mock->shouldAllowMockingProtectedMethods();
-            $mock->shouldReceive('readFileFromVolume')->andReturn(null);
-            $mock->shouldReceive('readQualityGateLogsFromVolume')
-                ->with(Mockery::any(), 2)
-                ->once()
-                ->andReturn($gateLogs);
-        });
+        $this->fakeVolumeReader([], $gateLogs);
+        $runner = app(PhaseRunner::class);
 
         $runner->postPhaseSync($task, $phaseRun, 'respond', null);
 
@@ -965,11 +934,8 @@ class PhaseRunnerTest extends TestCase
             'status' => 'completed',
         ]);
 
-        $runner = $this->partialMock(PhaseRunner::class, function (MockInterface $mock): void {
-            $mock->shouldAllowMockingProtectedMethods();
-            $mock->shouldReceive('readFileFromVolume')->andReturn(null);
-            $mock->shouldReceive('readQualityGateLogsFromVolume')->never();
-        });
+        $this->fakeVolumeReader();
+        $runner = app(PhaseRunner::class);
 
         $runner->postPhaseSync($task, $phaseRun, 'concept', null);
 
@@ -986,11 +952,8 @@ class PhaseRunnerTest extends TestCase
             'status' => 'completed',
         ]);
 
-        $runner = $this->partialMock(PhaseRunner::class, function (MockInterface $mock): void {
-            $mock->shouldAllowMockingProtectedMethods();
-            $mock->shouldReceive('readFileFromVolume')->andReturn(null);
-            $mock->shouldReceive('readQualityGateLogsFromVolume')->andReturn([]);
-        });
+        $this->fakeVolumeReader([], []);
+        $runner = app(PhaseRunner::class);
 
         $runner->postPhaseSync($task, $phaseRun, 'implement', null);
 
@@ -1009,12 +972,12 @@ class PhaseRunnerTest extends TestCase
             ."boot error\n"
             ."###GATE-LOG-END###\n";
 
-        $runner = app(PhaseRunner::class);
-        $reflection = new \ReflectionMethod($runner, 'parseGateLogOutput');
+        $reader = app(WorkerVolumeReader::class);
+        $reflection = new \ReflectionMethod($reader, 'parseGateLogOutput');
         $reflection->setAccessible(true);
 
         /** @var array<string, string> $logs */
-        $logs = $reflection->invoke($runner, $output);
+        $logs = $reflection->invoke($reader, $output);
 
         $this->assertArrayHasKey('pest', $logs);
         $this->assertSame('Tests: 1 failed', $logs['pest']);
@@ -1026,11 +989,11 @@ class PhaseRunnerTest extends TestCase
 
     public function test_parse_gate_log_output_returns_empty_array_when_no_blocks(): void
     {
-        $runner = app(PhaseRunner::class);
-        $reflection = new \ReflectionMethod($runner, 'parseGateLogOutput');
+        $reader = app(WorkerVolumeReader::class);
+        $reflection = new \ReflectionMethod($reader, 'parseGateLogOutput');
         $reflection->setAccessible(true);
 
-        $logs = $reflection->invoke($runner, "noise without delimiters\n");
+        $logs = $reflection->invoke($reader, "noise without delimiters\n");
 
         $this->assertSame([], $logs);
     }
@@ -1048,16 +1011,8 @@ class PhaseRunnerTest extends TestCase
         $wrapped = "```markdown\n# Konzept: Foo\n\nInhalt mit ```bash\nls\n``` innerem Codeblock.\n```";
         $expected = "# Konzept: Foo\n\nInhalt mit ```bash\nls\n``` innerem Codeblock.";
 
-        $runner = $this->partialMock(PhaseRunner::class, function (MockInterface $mock) use ($wrapped): void {
-            $mock->shouldAllowMockingProtectedMethods();
-            $mock->shouldReceive('readFileFromVolume')
-                ->andReturnUsing(function (string $volume, string $path) use ($wrapped): ?string {
-                    return match ($path) {
-                        '/workspace/.agent/concept.md' => $wrapped,
-                        default => null,
-                    };
-                });
-        });
+        $this->fakeVolumeReader(['/workspace/.agent/concept.md' => $wrapped]);
+        $runner = app(PhaseRunner::class);
 
         $runner->postPhaseSync($task, $phaseRun, 'concept', null);
 
@@ -1077,16 +1032,8 @@ class PhaseRunnerTest extends TestCase
 
         $plain = "# Konzept: Bar\n\nKein Wrapper hier.\n";
 
-        $runner = $this->partialMock(PhaseRunner::class, function (MockInterface $mock) use ($plain): void {
-            $mock->shouldAllowMockingProtectedMethods();
-            $mock->shouldReceive('readFileFromVolume')
-                ->andReturnUsing(function (string $volume, string $path) use ($plain): ?string {
-                    return match ($path) {
-                        '/workspace/.agent/concept.md' => $plain,
-                        default => null,
-                    };
-                });
-        });
+        $this->fakeVolumeReader(['/workspace/.agent/concept.md' => $plain]);
+        $runner = app(PhaseRunner::class);
 
         $runner->postPhaseSync($task, $phaseRun, 'concept', null);
 
@@ -1108,17 +1055,11 @@ class PhaseRunnerTest extends TestCase
             '{"type":"result","subtype":"success","is_error":false,"num_turns":12}',
         ]);
 
-        $runner = $this->partialMock(PhaseRunner::class, function (MockInterface $mock) use ($streamLog): void {
-            $mock->shouldAllowMockingProtectedMethods();
-            $mock->shouldReceive('readFileFromVolume')
-                ->andReturnUsing(function (string $volume, string $path) use ($streamLog): ?string {
-                    return match ($path) {
-                        '/workspace/.agent/concept.md' => "# Konzept\n\nDone.",
-                        '/workspace/.agent/logs/concept.1.stream.log' => $streamLog,
-                        default => null,
-                    };
-                });
-        });
+        $this->fakeVolumeReader([
+            '/workspace/.agent/concept.md' => "# Konzept\n\nDone.",
+            '/workspace/.agent/logs/concept.1.stream.log' => $streamLog,
+        ]);
+        $runner = app(PhaseRunner::class);
 
         $runner->postPhaseSync($task, $phaseRun, 'concept', null);
 

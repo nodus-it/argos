@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Support;
 
+use App\Services\Anthropic\CredentialStore;
 use App\Services\Workflow\PhaseRunner;
+use App\Services\Workflow\WorkerVolumeReader;
 use Mockery;
 use Symfony\Component\Process\Process;
 
@@ -96,17 +98,18 @@ final class FakeWorkerProcess
         $processMock->shouldReceive('getIncrementalOutput')->andReturn('');
         $processMock->shouldReceive('wait')->andReturnUsing(fn (?callable $callback = null): int => $exitCode);
 
-        $phaseRunnerMock = Mockery::mock(PhaseRunner::class)->makePartial();
+        // The rate-limit branch (exit 7) reads a file from the worker volume via
+        // WorkerVolumeReader — stub it so we don't shell into Docker. Build the
+        // partial mock with constructor args so its readonly deps are set.
+        $volumeReader = Mockery::mock(WorkerVolumeReader::class);
+        $volumeReader->shouldReceive('readFile')->andReturn(null);
+        $volumeReader->shouldReceive('readQualityGateLogs')->andReturn(null);
+
+        $phaseRunnerMock = Mockery::mock(PhaseRunner::class, [app(CredentialStore::class), $volumeReader])->makePartial();
         $phaseRunnerMock->shouldAllowMockingProtectedMethods();
         $phaseRunnerMock->shouldReceive('newProcess')->andReturn($processMock);
         $phaseRunnerMock->shouldReceive('writeNotesToVolume')->andReturn(null);
         $phaseRunnerMock->shouldReceive('postPhaseSync')->andReturn(null);
-        // The rate-limit branch (exit 7) reads a file from the worker volume
-        // via a second docker process — short-circuit it so we don't have to
-        // mock the volume-read process separately. readUsageLimitResetAt is
-        // private and not mockable; the underlying readFileFromVolume is
-        // protected, so we mock that.
-        $phaseRunnerMock->shouldReceive('readFileFromVolume')->andReturn(null);
         $phaseRunnerMock->shouldReceive('storeUsageLimit')->andReturn(null);
 
         app()->instance(PhaseRunner::class, $phaseRunnerMock);
