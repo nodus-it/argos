@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace Tests\Feature\IssueTracker;
 
 use App\Services\IssueTracker\LinearIssueTracker;
-use Illuminate\Support\Facades\Http;
+use Saloon\Http\Faking\MockResponse;
+use Saloon\Http\Request;
+use Saloon\Laravel\Facades\Saloon;
 use Tests\TestCase;
 
 class LinearIssueTrackerTest extends TestCase
 {
     private LinearIssueTracker $tracker;
-
-    private const GRAPHQL_URL = 'https://api.linear.app/graphql';
 
     private const TEAM_KEY = 'ENG';
 
@@ -26,17 +26,16 @@ class LinearIssueTrackerTest extends TestCase
 
     public function test_close_issue_moves_to_completed_workflow_state(): void
     {
-        Http::fake([
-            self::GRAPHQL_URL => Http::sequence()
-                ->push(['data' => ['issue' => ['team' => ['states' => ['nodes' => [['id' => 'state-done-1']]]]]]])
-                ->push(['data' => ['issueUpdate' => ['success' => true]]]),
+        Saloon::fake([
+            MockResponse::make(['data' => ['issue' => ['team' => ['states' => ['nodes' => [['id' => 'state-done-1']]]]]]]),
+            MockResponse::make(['data' => ['issueUpdate' => ['success' => true]]]),
         ]);
 
         $this->tracker->closeIssue('', '', 'issue-uuid-1');
 
-        Http::assertSentCount(2);
-        Http::assertSent(function ($request): bool {
-            $body = json_decode($request->body(), true);
+        Saloon::assertSentCount(2);
+        Saloon::assertSent(function (Request $request): bool {
+            $body = $request->body()->all();
 
             return str_contains((string) ($body['query'] ?? ''), 'issueUpdate')
                 && ($body['variables']['id'] ?? null) === 'issue-uuid-1'
@@ -48,33 +47,32 @@ class LinearIssueTrackerTest extends TestCase
 
     public function test_list_issues_resolves_team_and_returns_normalized_issues(): void
     {
-        Http::fake([
-            self::GRAPHQL_URL => Http::sequence()
-                ->push($this->teamResponse())
-                ->push([
-                    'data' => [
-                        'issues' => [
-                            'nodes' => [
-                                [
-                                    'id' => 'issue-uuid-1',
-                                    'title' => 'Fix login bug',
-                                    'description' => 'Users cannot log in.',
-                                    'url' => 'https://linear.app/eng/issue/ENG-1',
-                                    'state' => ['name' => 'Todo'],
-                                    'labels' => ['nodes' => [['name' => 'bug']]],
-                                ],
-                                [
-                                    'id' => 'issue-uuid-2',
-                                    'title' => 'Add dark mode',
-                                    'description' => '',
-                                    'url' => 'https://linear.app/eng/issue/ENG-2',
-                                    'state' => ['name' => 'In Progress'],
-                                    'labels' => ['nodes' => []],
-                                ],
+        Saloon::fake([
+            MockResponse::make($this->teamResponse()),
+            MockResponse::make([
+                'data' => [
+                    'issues' => [
+                        'nodes' => [
+                            [
+                                'id' => 'issue-uuid-1',
+                                'title' => 'Fix login bug',
+                                'description' => 'Users cannot log in.',
+                                'url' => 'https://linear.app/eng/issue/ENG-1',
+                                'state' => ['name' => 'Todo'],
+                                'labels' => ['nodes' => [['name' => 'bug']]],
+                            ],
+                            [
+                                'id' => 'issue-uuid-2',
+                                'title' => 'Add dark mode',
+                                'description' => '',
+                                'url' => 'https://linear.app/eng/issue/ENG-2',
+                                'state' => ['name' => 'In Progress'],
+                                'labels' => ['nodes' => []],
                             ],
                         ],
                     ],
-                ]),
+                ],
+            ]),
         ]);
 
         $issues = $this->tracker->listIssues(self::TEAM_KEY, '');
@@ -94,38 +92,36 @@ class LinearIssueTrackerTest extends TestCase
 
     public function test_list_issues_sends_personal_api_key_without_bearer_prefix(): void
     {
-        Http::fake([
-            self::GRAPHQL_URL => Http::sequence()
-                ->push($this->teamResponse())
-                ->push(['data' => ['issues' => ['nodes' => []]]]),
+        Saloon::fake([
+            MockResponse::make($this->teamResponse()),
+            MockResponse::make(['data' => ['issues' => ['nodes' => []]]]),
         ]);
 
         $this->tracker->listIssues(self::TEAM_KEY, '');
 
         // Linear personal API keys (lin_api_…) are sent raw — a Bearer prefix
         // makes Linear reject the request with a 400.
-        Http::assertSent(fn ($r) => $r->hasHeader('Authorization', 'lin_api_test_token'));
+        Saloon::assertSent(fn (Request $r, $response): bool => $response->getPendingRequest()->headers()->get('Authorization') === 'lin_api_test_token');
     }
 
     public function test_oauth_access_token_uses_bearer_prefix(): void
     {
-        Http::fake([
-            self::GRAPHQL_URL => Http::sequence()
-                ->push($this->teamResponse())
-                ->push(['data' => ['issues' => ['nodes' => []]]]),
+        Saloon::fake([
+            MockResponse::make($this->teamResponse()),
+            MockResponse::make(['data' => ['issues' => ['nodes' => []]]]),
         ]);
 
         (new LinearIssueTracker('lin_oauth_access_token'))->listIssues(self::TEAM_KEY, '');
 
-        Http::assertSent(fn ($r) => $r->hasHeader('Authorization', 'Bearer lin_oauth_access_token'));
+        Saloon::assertSent(fn (Request $r, $response): bool => $response->getPendingRequest()->headers()->get('Authorization') === 'Bearer lin_oauth_access_token');
     }
 
     // ── listReferences ───────────────────────────────────────────────────────
 
     public function test_list_references_maps_team_keys_to_labelled_options(): void
     {
-        Http::fake([
-            self::GRAPHQL_URL => Http::response([
+        Saloon::fake([
+            'https://api.linear.app/graphql' => MockResponse::make([
                 'data' => [
                     'teams' => [
                         'nodes' => [
@@ -144,13 +140,13 @@ class LinearIssueTrackerTest extends TestCase
             'OPS' => 'OPS',
         ], $refs);
 
-        Http::assertSent(function ($request): bool {
-            $body = json_decode($request->body(), true);
+        Saloon::assertSent(function (Request $request, $response): bool {
+            $body = $request->body()->all();
 
             // Linear rejects `variables: []` — a variable-less query must omit the key.
             return str_contains((string) ($body['query'] ?? ''), 'teams')
                 && ! array_key_exists('variables', $body)
-                && $request->hasHeader('Authorization', 'lin_api_test_token');
+                && $response->getPendingRequest()->headers()->get('Authorization') === 'lin_api_test_token';
         });
     }
 
@@ -158,8 +154,8 @@ class LinearIssueTrackerTest extends TestCase
 
     public function test_get_issue_fetches_by_uuid(): void
     {
-        Http::fake([
-            self::GRAPHQL_URL => Http::response([
+        Saloon::fake([
+            'https://api.linear.app/graphql' => MockResponse::make([
                 'data' => [
                     'issue' => [
                         'id' => 'issue-uuid-99',
@@ -180,8 +176,8 @@ class LinearIssueTrackerTest extends TestCase
         $this->assertSame('Critical crash', $issue['title']);
         $this->assertSame([['name' => 'critical']], $issue['labels']);
 
-        Http::assertSent(function ($request): bool {
-            $body = json_decode($request->body(), true);
+        Saloon::assertSent(function (Request $request): bool {
+            $body = $request->body()->all();
 
             return str_contains((string) ($body['query'] ?? ''), 'GetIssue')
                 && ($body['variables']['id'] ?? '') === 'issue-uuid-99';
@@ -192,8 +188,8 @@ class LinearIssueTrackerTest extends TestCase
 
     public function test_create_comment_sends_comment_create_mutation(): void
     {
-        Http::fake([
-            self::GRAPHQL_URL => Http::response([
+        Saloon::fake([
+            'https://api.linear.app/graphql' => MockResponse::make([
                 'data' => [
                     'commentCreate' => [
                         'success' => true,
@@ -208,8 +204,8 @@ class LinearIssueTrackerTest extends TestCase
         $this->assertTrue($result['success']);
         $this->assertSame('comment-uuid-1', $result['comment']['id']);
 
-        Http::assertSent(function ($request): bool {
-            $body = json_decode($request->body(), true);
+        Saloon::assertSent(function (Request $request): bool {
+            $body = $request->body()->all();
             $input = $body['variables']['input'] ?? [];
 
             return str_contains((string) ($body['query'] ?? ''), 'commentCreate')
@@ -222,20 +218,19 @@ class LinearIssueTrackerTest extends TestCase
 
     public function test_register_webhook_posts_webhook_create_mutation(): void
     {
-        Http::fake([
-            self::GRAPHQL_URL => Http::sequence()
-                ->push($this->teamResponse())
-                ->push([
-                    'data' => [
-                        'webhookCreate' => [
-                            'success' => true,
-                            'webhook' => [
-                                'id' => 'webhook-uuid-42',
-                                'url' => 'https://example.com/webhooks/issues/linear/binding-id',
-                            ],
+        Saloon::fake([
+            MockResponse::make($this->teamResponse()),
+            MockResponse::make([
+                'data' => [
+                    'webhookCreate' => [
+                        'success' => true,
+                        'webhook' => [
+                            'id' => 'webhook-uuid-42',
+                            'url' => 'https://example.com/webhooks/issues/linear/binding-id',
                         ],
                     ],
-                ]),
+                ],
+            ]),
         ]);
 
         $result = $this->tracker->registerWebhook(
@@ -246,8 +241,8 @@ class LinearIssueTrackerTest extends TestCase
 
         $this->assertSame('webhook-uuid-42', $result['id']);
 
-        Http::assertSent(function ($request) use (&$called): bool {
-            $body = json_decode($request->body(), true);
+        Saloon::assertSent(function (Request $request): bool {
+            $body = $request->body()->all();
             $input = $body['variables']['input'] ?? [];
 
             if (! str_contains((string) ($body['query'] ?? ''), 'webhookCreate')) {
@@ -264,16 +259,16 @@ class LinearIssueTrackerTest extends TestCase
 
     public function test_unregister_webhook_sends_webhook_delete_mutation(): void
     {
-        Http::fake([
-            self::GRAPHQL_URL => Http::response([
+        Saloon::fake([
+            'https://api.linear.app/graphql' => MockResponse::make([
                 'data' => ['webhookDelete' => ['success' => true]],
             ]),
         ]);
 
         $this->tracker->unregisterWebhook('', '', 'webhook-uuid-42');
 
-        Http::assertSent(function ($request): bool {
-            $body = json_decode($request->body(), true);
+        Saloon::assertSent(function (Request $request): bool {
+            $body = $request->body()->all();
 
             return str_contains((string) ($body['query'] ?? ''), 'webhookDelete')
                 && ($body['variables']['id'] ?? '') === 'webhook-uuid-42';

@@ -17,7 +17,6 @@ use App\Events\Task\TaskCreated;
 use App\Events\Task\TaskDeleted;
 use App\Jobs\RunPhaseJob;
 use App\Models\Task;
-use App\Services\IssueTracker\IssueStatusSync;
 use App\Services\Workflow\PhaseRunner;
 use App\Services\Workflow\WorkflowService;
 use Illuminate\Support\Facades\Event;
@@ -188,13 +187,13 @@ class TaskService
     }
 
     /**
-     * Mark a task as completed, remove its Docker volume, and fire TaskCompleted.
+     * Mark a task as completed and fire TaskCompleted. The follow-ups — closing
+     * the source issue and removing the Docker volume — are handled by listeners
+     * so this stays a pure DB operation.
      */
     public function markCompleted(Task $task): void
     {
         $task->update(['workflow_status' => WorkflowStatus::Completed]);
-        app(IssueStatusSync::class)->closeSourceIssue($task);
-        Process::run(['docker', 'volume', 'rm', $task->volumeName()]);
         Event::dispatch(new TaskCompleted($task));
     }
 

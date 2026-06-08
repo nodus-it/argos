@@ -4,16 +4,20 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\GitProvider;
 
+use App\Integrations\Bitbucket\Requests\CommentOnPullRequest;
+use App\Integrations\Bitbucket\Requests\UpdatePullRequest;
 use App\Services\GitProvider\BitbucketGitService;
-use Illuminate\Support\Facades\Http;
+use Saloon\Http\Faking\MockResponse;
+use Saloon\Http\Request;
+use Saloon\Laravel\Facades\Saloon;
 use Tests\TestCase;
 
 class BitbucketGitServiceTest extends TestCase
 {
     public function test_get_default_branch_returns_api_value(): void
     {
-        Http::fake([
-            'https://api.bitbucket.org/2.0/repositories/acme/widget' => Http::response([
+        Saloon::fake([
+            'https://api.bitbucket.org/2.0/repositories/acme/widget' => MockResponse::make([
                 'full_name' => 'acme/widget',
                 'mainbranch' => ['name' => 'develop', 'type' => 'branch'],
             ]),
@@ -34,8 +38,8 @@ class BitbucketGitServiceTest extends TestCase
 
     public function test_get_default_branch_returns_null_on_http_failure(): void
     {
-        Http::fake([
-            'https://api.bitbucket.org/2.0/repositories/*' => Http::response(['type' => 'error'], 404),
+        Saloon::fake([
+            'https://api.bitbucket.org/2.0/repositories/*' => MockResponse::make(['type' => 'error'], 404),
         ]);
 
         $branch = (new BitbucketGitService('user:app_password'))->getDefaultBranch('acme/missing');
@@ -45,8 +49,8 @@ class BitbucketGitServiceTest extends TestCase
 
     public function test_get_default_branch_returns_null_when_mainbranch_missing(): void
     {
-        Http::fake([
-            'https://api.bitbucket.org/2.0/repositories/acme/widget' => Http::response([
+        Saloon::fake([
+            'https://api.bitbucket.org/2.0/repositories/acme/widget' => MockResponse::make([
                 'full_name' => 'acme/widget',
             ]),
         ]);
@@ -58,13 +62,13 @@ class BitbucketGitServiceTest extends TestCase
 
     public function test_get_repo_options_returns_keyed_array(): void
     {
-        Http::fake([
-            'https://api.bitbucket.org/2.0/user/workspaces*' => Http::response([
+        Saloon::fake([
+            'https://api.bitbucket.org/2.0/user/workspaces*' => MockResponse::make([
                 'values' => [
                     ['workspace' => ['slug' => 'acme']],
                 ],
             ]),
-            'https://api.bitbucket.org/2.0/repositories/acme*' => Http::response([
+            'https://api.bitbucket.org/2.0/repositories/acme*' => MockResponse::make([
                 'values' => [
                     ['full_name' => 'acme/alpha'],
                     ['full_name' => 'acme/beta'],
@@ -79,17 +83,17 @@ class BitbucketGitServiceTest extends TestCase
 
     public function test_list_repositories_merges_repos_across_workspaces(): void
     {
-        Http::fake([
-            'https://api.bitbucket.org/2.0/user/workspaces*' => Http::response([
+        Saloon::fake([
+            'https://api.bitbucket.org/2.0/user/workspaces*' => MockResponse::make([
                 'values' => [
                     ['workspace' => ['slug' => 'acme']],
                     ['workspace' => ['slug' => 'globex']],
                 ],
             ]),
-            'https://api.bitbucket.org/2.0/repositories/acme*' => Http::response([
+            'https://api.bitbucket.org/2.0/repositories/acme*' => MockResponse::make([
                 'values' => [['full_name' => 'acme/alpha']],
             ]),
-            'https://api.bitbucket.org/2.0/repositories/globex*' => Http::response([
+            'https://api.bitbucket.org/2.0/repositories/globex*' => MockResponse::make([
                 'values' => [['full_name' => 'globex/beta']],
             ]),
         ]);
@@ -103,15 +107,15 @@ class BitbucketGitServiceTest extends TestCase
 
     public function test_list_repositories_skips_workspace_entries_without_slug(): void
     {
-        Http::fake([
-            'https://api.bitbucket.org/2.0/user/workspaces*' => Http::response([
+        Saloon::fake([
+            'https://api.bitbucket.org/2.0/user/workspaces*' => MockResponse::make([
                 'values' => [
                     ['workspace' => ['slug' => '']],
                     ['workspace' => []],
                     ['workspace' => ['slug' => 'acme']],
                 ],
             ]),
-            'https://api.bitbucket.org/2.0/repositories/acme*' => Http::response([
+            'https://api.bitbucket.org/2.0/repositories/acme*' => MockResponse::make([
                 'values' => [['full_name' => 'acme/alpha']],
             ]),
         ]);
@@ -124,8 +128,8 @@ class BitbucketGitServiceTest extends TestCase
 
     public function test_get_branch_options_returns_keyed_array(): void
     {
-        Http::fake([
-            'https://api.bitbucket.org/2.0/repositories/acme/widget/refs/branches*' => Http::response([
+        Saloon::fake([
+            'https://api.bitbucket.org/2.0/repositories/acme/widget/refs/branches*' => MockResponse::make([
                 'values' => [
                     ['name' => 'main'],
                     ['name' => 'develop'],
@@ -148,38 +152,30 @@ class BitbucketGitServiceTest extends TestCase
 
     public function test_uses_basic_auth_for_pat_token(): void
     {
-        Http::fake([
-            'https://api.bitbucket.org/2.0/user/workspaces*' => Http::response(['values' => []]),
+        Saloon::fake([
+            'https://api.bitbucket.org/2.0/user/workspaces*' => MockResponse::make(['values' => []]),
         ]);
 
         (new BitbucketGitService('myuser:mysecret'))->listRepositories();
 
-        Http::assertSent(function ($request): bool {
-            $authHeader = $request->header('Authorization')[0] ?? '';
-
-            return str_starts_with($authHeader, 'Basic ');
-        });
+        Saloon::assertSent(fn (Request $request, $response): bool => str_starts_with((string) $response->getPendingRequest()->headers()->get('Authorization'), 'Basic '));
     }
 
     public function test_uses_bearer_auth_for_oauth_token(): void
     {
-        Http::fake([
-            'https://api.bitbucket.org/2.0/user/workspaces*' => Http::response(['values' => []]),
+        Saloon::fake([
+            'https://api.bitbucket.org/2.0/user/workspaces*' => MockResponse::make(['values' => []]),
         ]);
 
         (new BitbucketGitService('oauthtokenwithoutcolon'))->listRepositories();
 
-        Http::assertSent(function ($request): bool {
-            $authHeader = $request->header('Authorization')[0] ?? '';
-
-            return str_starts_with($authHeader, 'Bearer ');
-        });
+        Saloon::assertSent(fn (Request $request, $response): bool => str_starts_with((string) $response->getPendingRequest()->headers()->get('Authorization'), 'Bearer '));
     }
 
     public function test_comment_on_pull_request_wraps_body_in_content_raw(): void
     {
-        Http::fake([
-            'https://api.bitbucket.org/2.0/repositories/acme/widget/pullrequests/3/comments' => Http::response([
+        Saloon::fake([
+            'https://api.bitbucket.org/2.0/repositories/acme/widget/pullrequests/3/comments' => MockResponse::make([
                 'id' => 9001,
             ]),
         ]);
@@ -187,26 +183,31 @@ class BitbucketGitServiceTest extends TestCase
         $response = (new BitbucketGitService('user:pass'))->commentOnPullRequest('acme', 'widget', 3, 'hello');
 
         $this->assertSame(9001, $response['id']);
-        Http::assertSent(function ($request): bool {
-            return $request->method() === 'POST'
-                && str_contains($request->url(), '/pullrequests/3/comments')
-                && ($request->data()['content']['raw'] ?? null) === 'hello';
+        Saloon::assertSent(function (Request $request): bool {
+            $body = $request instanceof CommentOnPullRequest ? $request->body()->all() : [];
+
+            return $request instanceof CommentOnPullRequest
+                && str_contains($request->resolveEndpoint(), '/pullrequests/3/comments')
+                && ($body['content']['raw'] ?? null) === 'hello';
         });
     }
 
     public function test_update_pull_request_puts_title_and_description(): void
     {
-        Http::fake([
-            'https://api.bitbucket.org/2.0/repositories/acme/widget/pullrequests/3' => Http::response(['id' => 3]),
+        Saloon::fake([
+            'https://api.bitbucket.org/2.0/repositories/acme/widget/pullrequests/3' => MockResponse::make(['id' => 3]),
         ]);
 
         (new BitbucketGitService('user:pass'))->updatePullRequest('acme', 'widget', 3, 'new title', 'new body');
 
-        Http::assertSent(function ($request): bool {
-            return $request->method() === 'PUT'
-                && str_ends_with($request->url(), '/pullrequests/3')
-                && ($request->data()['title'] ?? null) === 'new title'
-                && ($request->data()['description'] ?? null) === 'new body';
+        Saloon::assertSent(function (Request $request, $response): bool {
+            $body = $request instanceof UpdatePullRequest ? $request->body()->all() : [];
+
+            return $request instanceof UpdatePullRequest
+                && $response->getPendingRequest()->getMethod()->value === 'PUT'
+                && str_ends_with($request->resolveEndpoint(), '/pullrequests/3')
+                && ($body['title'] ?? null) === 'new title'
+                && ($body['description'] ?? null) === 'new body';
         });
     }
 }

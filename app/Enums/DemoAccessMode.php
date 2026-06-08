@@ -44,6 +44,12 @@ enum DemoAccessMode: string
         };
     }
 
+    /** The lock glyph for the access badge: open for Public, closed otherwise. */
+    public function icon(): string
+    {
+        return $this === self::Public ? 'heroicon-o-lock-open' : 'heroicon-o-lock-closed';
+    }
+
     /**
      * Resolve `Inherit` against the stack-wide default into an effective mode
      * (never returns `Inherit`). The global default `none` maps to `Public`.

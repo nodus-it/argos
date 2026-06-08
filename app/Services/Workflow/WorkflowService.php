@@ -4,14 +4,10 @@ declare(strict_types=1);
 
 namespace App\Services\Workflow;
 
-use App\Enums\DemoStatus;
 use App\Enums\PhaseStatus;
 use App\Enums\WorkflowStatus;
-use App\Jobs\RunPhaseJob;
-use App\Jobs\StopDemoJob;
 use App\Models\PhaseRun;
 use App\Models\Task;
-use App\Services\IssueTracker\IssueCommentNotifier;
 
 class WorkflowService
 {
@@ -52,8 +48,10 @@ class WorkflowService
     }
 
     /**
-     * Advance workflow_status after a phase completes.
-     * Canonical implementation — Task::advanceWorkflow() delegates here.
+     * Advance workflow_status after a phase completes. Pure state transition —
+     * the follow-up side-effects (auto-push, demo teardown, issue notification)
+     * are carried out by listeners on the PhaseCompleted event that
+     * TaskService::completePhase fires right after this.
      */
     public function completePhase(Task $task, string $phase, PhaseStatus $phaseStatus): void
     {
@@ -61,29 +59,6 @@ class WorkflowService
         if ($next !== null) {
             $task->update(['workflow_status' => $next]);
         }
-
-        // After a successful implement, optionally chain into push. The
-        // workflow_status above already reflects ImplementCompleted; while
-        // push runs, current_phase/current_status carry the live progress
-        // and push completion will advance workflow_status to InReview.
-        if ($phase === 'implement'
-            && $phaseStatus === PhaseStatus::Completed
-            && $task->repoProfile?->auto_pr) {
-            RunPhaseJob::dispatch($task->id, 'push');
-        }
-
-        // Once the PR is created, tear the live demo down — it was a pre-PR
-        // preview. It stays restartable anytime from the detail view (M6).
-        if ($phase === 'push' && $phaseStatus === PhaseStatus::Completed) {
-            $demo = $task->currentDemo();
-            if ($demo !== null && in_array($demo->status, [DemoStatus::Building, DemoStatus::Live], true)) {
-                StopDemoJob::dispatch($task->id);
-            }
-        }
-
-        // Notify the external issue tracker (if this task was imported from one).
-        // Errors are swallowed inside the notifier — the workflow must never stall.
-        app(IssueCommentNotifier::class)->notifyPhaseCompletion($task, $phase, $phaseStatus->value);
     }
 
     /**

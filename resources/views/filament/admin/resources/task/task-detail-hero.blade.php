@@ -46,7 +46,7 @@
         <div class="th-id">
             <div class="th-title">
                 <h2>{{ $task->name }}</h2>
-                <x-argos.badge :status="$task->displayBadgeStatus()" :label="$task->displayStatusLabel()" />
+                <x-argos.badge :status="$task->presenter()->badgeStatus()" :label="$task->presenter()->statusLabel()" />
             </div>
             <div class="th-meta">
                 {{-- Agent --}}
@@ -69,7 +69,7 @@
                     <span class="sep" aria-hidden="true" style="color:var(--cr-border-strong)">·</span>
                     <span class="th-mi">
                         @svg('heroicon-m-currency-dollar')
-                        <span class="val">${{ number_format($totalCost, 4) }} · {{ number_format($totalTokens) }} tok</span>
+                        <span class="val">{{ \App\Support\CostFormatter::usd($totalCost) }} · {{ \App\Support\CostFormatter::tokens($totalTokens) }}</span>
                     </span>
                 @endif
             </div>

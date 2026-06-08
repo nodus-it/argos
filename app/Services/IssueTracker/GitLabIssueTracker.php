@@ -4,26 +4,32 @@ declare(strict_types=1);
 
 namespace App\Services\IssueTracker;
 
+use App\Integrations\GitLab\GitLabConnector;
+use App\Integrations\GitLab\Requests\CloseIssue;
+use App\Integrations\GitLab\Requests\CreateIssueNote;
+use App\Integrations\GitLab\Requests\GetIssue;
+use App\Integrations\GitLab\Requests\GetIssueAwardEmoji;
+use App\Integrations\GitLab\Requests\GetIssueNotes;
+use App\Integrations\GitLab\Requests\GetNoteAwardEmoji;
+use App\Integrations\GitLab\Requests\GetProjectMember;
+use App\Integrations\GitLab\Requests\ListIssues;
+use App\Integrations\GitLab\Requests\ListProjects;
+use App\Integrations\GitLab\Requests\RegisterWebhook;
+use App\Integrations\GitLab\Requests\UnregisterWebhook;
 use App\Services\IssueTracker\Contracts\IssueTrackerContract;
-use Illuminate\Http\Client\PendingRequest;
-use Illuminate\Http\Client\Response;
-use Illuminate\Support\Facades\Http;
 
 class GitLabIssueTracker implements IssueTrackerContract
 {
-    public function __construct(
-        private readonly string $token,
-        private readonly string $instanceUrl = 'https://gitlab.com',
-    ) {}
+    private readonly GitLabConnector $connector;
+
+    public function __construct(string $token, string $instanceUrl = 'https://gitlab.com')
+    {
+        $this->connector = new GitLabConnector($token, $instanceUrl);
+    }
 
     public function listReferences(): array
     {
-        $response = $this->http()->get('/projects', [
-            'membership' => true,
-            'simple' => true,
-            'per_page' => 100,
-            'order_by' => 'last_activity_at',
-        ])->throw();
+        $response = $this->connector->send(new ListProjects(simple: true))->throw();
 
         $refs = [];
         foreach ($response->json() as $project) {
@@ -45,37 +51,29 @@ class GitLabIssueTracker implements IssueTrackerContract
             ? $filters['state']
             : 'opened';
 
-        $projectPath = $this->encodePath($owner, $project);
         $issues = [];
-        $params = ['per_page' => 100, 'state' => $state];
+        $page = null;
 
         do {
-            $response = $this->http()
-                ->get("/projects/{$projectPath}/issues", $params)
-                ->throw();
+            $response = $this->connector->send(new ListIssues($owner, $project, $state, $page))->throw();
 
             $issues = array_merge($issues, $response->json());
 
-            $nextPage = $this->nextPageNumber($response);
-            if ($nextPage !== null) {
-                $params = ['per_page' => 100, 'page' => $nextPage, 'state' => $state];
-            }
-        } while ($nextPage !== null);
+            $header = $response->header('X-Next-Page');
+            $page = is_string($header) && $header !== '' ? (int) $header : null;
+        } while ($page !== null);
 
         return $issues;
     }
 
     public function getIssue(string $owner, string $project, int|string $issueNumber): array
     {
-        $projectPath = $this->encodePath($owner, $project);
-        $base = "/projects/{$projectPath}/issues/{$issueNumber}";
-
-        $issue = $this->http()->get($base)->throw()->json();
-        $notes = $this->http()->get("{$base}/notes", ['per_page' => 100])->throw()->json();
+        $issue = $this->connector->send(new GetIssue($owner, $project, $issueNumber))->throw()->json();
+        $notes = $this->connector->send(new GetIssueNotes($owner, $project, $issueNumber))->throw()->json();
 
         // Award emojis require a GitLab plan that supports them — treat 404/403 as empty.
         $awardEmojis = rescue(
-            fn () => $this->http()->get("{$base}/award_emoji", ['per_page' => 100])->throw()->json(),
+            fn () => $this->connector->send(new GetIssueAwardEmoji($owner, $project, $issueNumber))->throw()->json(),
             [],
         );
 
@@ -92,21 +90,15 @@ class GitLabIssueTracker implements IssueTrackerContract
         int|string $issueNumber,
         string $body,
     ): array {
-        $projectPath = $this->encodePath($owner, $project);
-
-        return $this->http()
-            ->post("/projects/{$projectPath}/issues/{$issueNumber}/notes", ['body' => $body])
+        return $this->connector
+            ->send(new CreateIssueNote($owner, $project, $issueNumber, $body))
             ->throw()
             ->json();
     }
 
     public function closeIssue(string $owner, string $project, int|string $issueNumber): void
     {
-        $projectPath = $this->encodePath($owner, $project);
-
-        $this->http()
-            ->put("/projects/{$projectPath}/issues/{$issueNumber}", ['state_event' => 'close'])
-            ->throw();
+        $this->connector->send(new CloseIssue($owner, $project, $issueNumber))->throw();
     }
 
     public function commentId(array $createResult): ?string
@@ -118,10 +110,8 @@ class GitLabIssueTracker implements IssueTrackerContract
 
     public function getCommentReactions(string $owner, string $project, int|string $issueId, int|string $commentId): array
     {
-        $projectPath = $this->encodePath($owner, $project);
-
-        $awards = $this->http()
-            ->get("/projects/{$projectPath}/issues/{$issueId}/notes/{$commentId}/award_emoji", ['per_page' => 100])
+        $awards = $this->connector
+            ->send(new GetNoteAwardEmoji($owner, $project, $issueId, $commentId))
             ->throw()
             ->json();
 
@@ -144,11 +134,9 @@ class GitLabIssueTracker implements IssueTrackerContract
             return false;
         }
 
-        $projectPath = $this->encodePath($owner, $project);
-
         try {
-            $member = $this->http()
-                ->get("/projects/{$projectPath}/members/all/{$userId}")
+            $member = $this->connector
+                ->send(new GetProjectMember($owner, $project, $userId))
                 ->throw()
                 ->json();
         } catch (\Throwable) {
@@ -170,28 +158,15 @@ class GitLabIssueTracker implements IssueTrackerContract
 
     public function registerWebhook(string $owner, string $project, string $url, string $secret): array
     {
-        $projectPath = $this->encodePath($owner, $project);
-
-        return $this->http()
-            ->post("/projects/{$projectPath}/hooks", [
-                'url' => $url,
-                'token' => $secret,
-                'issues_events' => true,
-                'confidential_issues_events' => true,
-                'note_events' => false,
-                'enable_ssl_verification' => true,
-            ])
+        return $this->connector
+            ->send(new RegisterWebhook($owner, $project, $url, $secret))
             ->throw()
             ->json();
     }
 
     public function unregisterWebhook(string $owner, string $project, int|string $webhookId): void
     {
-        $projectPath = $this->encodePath($owner, $project);
-
-        $this->http()
-            ->delete("/projects/{$projectPath}/hooks/{$webhookId}")
-            ->throw();
+        $this->connector->send(new UnregisterWebhook($owner, $project, $webhookId))->throw();
     }
 
     /**
@@ -221,28 +196,5 @@ class GitLabIssueTracker implements IssueTrackerContract
         }
 
         return $issue;
-    }
-
-    private function nextPageNumber(Response $response): ?int
-    {
-        $header = $response->header('X-Next-Page');
-        if ($header === null || $header === '') {
-            return null;
-        }
-
-        return (int) $header;
-    }
-
-    private function encodePath(string $owner, string $project): string
-    {
-        return urlencode("{$owner}/{$project}");
-    }
-
-    private function http(): PendingRequest
-    {
-        return Http::withHeaders([
-            'Authorization' => "Bearer {$this->token}",
-            'Content-Type' => 'application/json',
-        ])->baseUrl("{$this->instanceUrl}/api/v4");
     }
 }

@@ -16,6 +16,8 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
+use Saloon\Http\Faking\MockResponse;
+use Saloon\Laravel\Facades\Saloon;
 use Tests\TestCase;
 
 class OnboardingPageTest extends TestCase
@@ -46,9 +48,42 @@ class OnboardingPageTest extends TestCase
             ->assertSee('claude setup-token');
     }
 
+    public function test_steps_reflect_initial_state_without_agent(): void
+    {
+        $steps = Livewire::test(Onboarding::class)->instance()->steps();
+
+        // Step 1 is active and reachable; nothing is done yet.
+        $this->assertSame(1, $steps[0]['number']);
+        $this->assertTrue($steps[0]['active']);
+        $this->assertTrue($steps[0]['reachable']);
+        $this->assertFalse($steps[0]['done']);
+
+        // Steps 2 and 3 stay locked until an agent is configured.
+        $this->assertFalse($steps[1]['reachable']);
+        $this->assertFalse($steps[2]['reachable']);
+    }
+
+    public function test_steps_mark_step_one_done_when_agent_configured(): void
+    {
+        AgentCredential::factory()->create([
+            'agent_name' => AgentName::ClaudeCode,
+            'credentials' => ['token' => 'sk-configured'],
+            'status' => AgentCredentialStatus::Active,
+        ]);
+
+        // mount() resumes on the repository step once an agent exists.
+        $steps = Livewire::test(Onboarding::class)->instance()->steps();
+
+        $this->assertTrue($steps[0]['done']);
+        $this->assertFalse($steps[0]['active']);
+        $this->assertTrue($steps[1]['active']);
+        $this->assertTrue($steps[1]['reachable']);
+        $this->assertFalse($steps[2]['reachable']);
+    }
+
     public function test_save_claude_token_persists_and_updates_state(): void
     {
-        Http::fake(['api.anthropic.com/*' => Http::response(['data' => []], 200)]);
+        Saloon::fake(['https://api.anthropic.com/v1/models' => MockResponse::make(['data' => []], 200)]);
 
         Livewire::test(Onboarding::class)
             ->set('claudeToken', 'sk-ant-oat01-fake')
@@ -66,7 +101,7 @@ class OnboardingPageTest extends TestCase
 
     public function test_save_claude_token_rejects_invalid_token(): void
     {
-        Http::fake(['api.anthropic.com/*' => Http::response('', 401)]);
+        Saloon::fake(['https://api.anthropic.com/v1/models' => MockResponse::make(['error' => 'unauthorized'], 401)]);
 
         Livewire::test(Onboarding::class)
             ->set('claudeToken', 'sk-ant-bad')

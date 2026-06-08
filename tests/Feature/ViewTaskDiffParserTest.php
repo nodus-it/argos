@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Filament\Admin\Resources\TaskResource\Pages\ViewTaskDiff;
-use ReflectionClass;
+use App\Services\Git\DiffParser;
 use Tests\TestCase;
 
 class ViewTaskDiffParserTest extends TestCase
@@ -13,12 +12,7 @@ class ViewTaskDiffParserTest extends TestCase
     /** @return array<int, array{from_path: string, to_path: string, is_new: bool, is_deleted: bool, additions: int, deletions: int, hunks: list<mixed>}> */
     private function parse(string $content): array
     {
-        $page = new ViewTaskDiff;
-        $ref = new ReflectionClass($page);
-        $method = $ref->getMethod('parseDiffStructured');
-        $method->setAccessible(true);
-
-        return $method->invoke($page, $content);
+        return (new DiffParser)->parse($content);
     }
 
     public function test_empty_content_returns_empty_array(): void

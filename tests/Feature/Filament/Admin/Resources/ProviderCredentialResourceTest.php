@@ -13,8 +13,9 @@ use App\Models\ProviderCredential;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
+use Saloon\Http\Faking\MockResponse;
+use Saloon\Laravel\Facades\Saloon;
 use Tests\TestCase;
 
 class ProviderCredentialResourceTest extends TestCase
@@ -102,8 +103,8 @@ class ProviderCredentialResourceTest extends TestCase
 
     public function test_test_connection_marks_validated_on_success(): void
     {
-        Http::fake([
-            'api.github.com/user/repos*' => Http::response([['full_name' => 'acme/widget']]),
+        Saloon::fake([
+            'api.github.com/user/repos*' => MockResponse::make([['full_name' => 'acme/widget']]),
         ]);
 
         $cred = ProviderCredential::factory()->create([
@@ -120,8 +121,8 @@ class ProviderCredentialResourceTest extends TestCase
 
     public function test_test_connection_reports_failure(): void
     {
-        Http::fake([
-            'api.github.com/user/repos*' => Http::response('unauthorized', 401),
+        Saloon::fake([
+            'api.github.com/user/repos*' => MockResponse::make('unauthorized', 401),
         ]);
 
         $cred = ProviderCredential::factory()->create([

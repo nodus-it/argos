@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\Anthropic;
 
-use Illuminate\Support\Facades\Http;
+use App\Integrations\Anthropic\AnthropicConnector;
+use App\Integrations\Anthropic\Requests\ValidateToken;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -21,14 +22,7 @@ class AnthropicTokenValidator
     public function validate(string $token): ?bool
     {
         try {
-            $response = Http::withToken($token)
-                ->withHeaders([
-                    'anthropic-version' => '2023-06-01',
-                    'anthropic-beta' => 'oauth-2025-04-20',
-                    'User-Agent' => 'claude-code/2.0.31',
-                ])
-                ->timeout(5)
-                ->get('https://api.anthropic.com/v1/models');
+            $response = (new AnthropicConnector($token))->send(new ValidateToken);
 
             if ($response->status() === 401 || $response->status() === 403) {
                 return false;

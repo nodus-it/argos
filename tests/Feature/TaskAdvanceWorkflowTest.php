@@ -9,6 +9,7 @@ use App\Enums\WorkflowStatus;
 use App\Jobs\RunPhaseJob;
 use App\Models\RepoProfile;
 use App\Models\Task;
+use App\Services\Task\TaskService;
 use App\Services\Workflow\WorkflowService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
@@ -79,7 +80,9 @@ class TaskAdvanceWorkflowTest extends TestCase
             'workflow_status' => WorkflowStatus::ImplementRunning,
         ]);
 
-        $this->service->completePhase($task, 'implement', PhaseStatus::Completed);
+        // Through TaskService so PhaseCompleted fires and the DispatchAutoPush
+        // listener chains into push.
+        app(TaskService::class)->completePhase($task, 'implement', PhaseStatus::Completed);
 
         Bus::assertDispatched(RunPhaseJob::class, fn ($job) => $job->phase === 'push' && $job->taskId === $task->id);
         // workflow_status reflects implement done; current_phase/current_status

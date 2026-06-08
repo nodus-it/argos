@@ -4,18 +4,25 @@ declare(strict_types=1);
 
 namespace App\Services\GitProvider;
 
+use App\Integrations\GitHub\GitHubConnector;
+use App\Integrations\GitHub\Requests\CommentOnPullRequest;
+use App\Integrations\GitHub\Requests\CreatePullRequest;
+use App\Integrations\GitHub\Requests\GetFileContents;
+use App\Integrations\GitHub\Requests\GetRepository;
+use App\Integrations\GitHub\Requests\ListBranches;
+use App\Integrations\GitHub\Requests\ListRepositories;
+use App\Integrations\GitHub\Requests\UpdatePullRequest;
 use App\Services\GitProvider\Contracts\GitProviderContract;
-use Illuminate\Http\Client\PendingRequest;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class GitHubGitService implements GitProviderContract
 {
-    private const BASE_URL = 'https://api.github.com';
+    private readonly GitHubConnector $connector;
 
-    private const API_VERSION = '2022-11-28';
-
-    public function __construct(private readonly string $token) {}
+    public function __construct(string $token)
+    {
+        $this->connector = new GitHubConnector($token);
+    }
 
     public function getProviderKey(): string
     {
@@ -29,18 +36,12 @@ class GitHubGitService implements GitProviderContract
 
     public function listRepositories(): array
     {
-        return $this->http()
-            ->get('/user/repos', ['per_page' => 100, 'sort' => 'updated', 'affiliation' => 'owner,collaborator,organization_member'])
-            ->throw()
-            ->json();
+        return $this->connector->send(new ListRepositories)->throw()->json();
     }
 
     public function listBranches(string $owner, string $repo): array
     {
-        return $this->http()
-            ->get("/repos/{$owner}/{$repo}/branches", ['per_page' => 100])
-            ->throw()
-            ->json();
+        return $this->connector->send(new ListBranches($owner, $repo))->throw()->json();
     }
 
     /**
@@ -51,10 +52,7 @@ class GitHubGitService implements GitProviderContract
      */
     public function getRepository(string $owner, string $repo): array
     {
-        return $this->http()
-            ->get("/repos/{$owner}/{$repo}")
-            ->throw()
-            ->json();
+        return $this->connector->send(new GetRepository($owner, $repo))->throw()->json();
     }
 
     /**
@@ -95,10 +93,7 @@ class GitHubGitService implements GitProviderContract
         }
 
         try {
-            $response = $this->http()->get(
-                "/repos/{$owner}/{$repo}/contents/".ltrim($path, '/'),
-                ['ref' => $ref],
-            );
+            $response = $this->connector->send(new GetFileContents($owner, $repo, $path, $ref));
 
             if ($response->status() === 404) {
                 return null;
@@ -135,14 +130,8 @@ class GitHubGitService implements GitProviderContract
         string $baseBranch,
         array $options = [],
     ): array {
-        return $this->http()
-            ->post("/repos/{$owner}/{$repo}/pulls", [
-                'title' => $title,
-                'body' => $body,
-                'head' => $headBranch,
-                'base' => $baseBranch,
-                ...$options,
-            ])
+        return $this->connector
+            ->send(new CreatePullRequest($owner, $repo, $title, $body, $headBranch, $baseBranch, $options))
             ->throw()
             ->json();
     }
@@ -153,10 +142,8 @@ class GitHubGitService implements GitProviderContract
         int|string $pullRequestId,
         string $body,
     ): array {
-        // GitHub treats PRs as a special kind of issue; PR comments live on the
-        // issues/{number}/comments endpoint, with the PR number used as issue id.
-        return $this->http()
-            ->post("/repos/{$owner}/{$repo}/issues/{$pullRequestId}/comments", ['body' => $body])
+        return $this->connector
+            ->send(new CommentOnPullRequest($owner, $repo, $pullRequestId, $body))
             ->throw()
             ->json();
     }
@@ -168,11 +155,8 @@ class GitHubGitService implements GitProviderContract
         string $title,
         string $body,
     ): array {
-        return $this->http()
-            ->patch("/repos/{$owner}/{$repo}/pulls/{$pullRequestId}", [
-                'title' => $title,
-                'body' => $body,
-            ])
+        return $this->connector
+            ->send(new UpdatePullRequest($owner, $repo, $pullRequestId, $title, $body))
             ->throw()
             ->json();
     }
@@ -221,14 +205,5 @@ class GitHubGitService implements GitProviderContract
         }
 
         return $options;
-    }
-
-    private function http(): PendingRequest
-    {
-        return Http::withHeaders([
-            'Authorization' => "Bearer {$this->token}",
-            'Accept' => 'application/vnd.github+json',
-            'X-GitHub-Api-Version' => self::API_VERSION,
-        ])->baseUrl(self::BASE_URL);
     }
 }

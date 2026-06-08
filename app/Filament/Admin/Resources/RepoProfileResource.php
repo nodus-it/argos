@@ -19,9 +19,10 @@ use App\Models\ConnectedAccount;
 use App\Models\RepoProfile;
 use App\Models\User;
 use App\Models\WorkerStack;
-use App\Services\GitProvider\Contracts\GitServiceContract;
+use App\Services\Git\RepositoryFetcher;
 use App\Services\GitProvider\GitServiceFactory;
 use App\Services\OAuth\TokenRefresher;
+use App\Support\RepoUrlBuilder;
 use App\Workers\Agents\AgentRegistry;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
@@ -43,7 +44,6 @@ use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\HtmlString;
 
 class RepoProfileResource extends Resource
@@ -572,14 +572,21 @@ class RepoProfileResource extends Resource
      * Build the provider git service for an OAuth-connected account. GitLab
      * needs the account's self-hosted instance URL; the others ignore it.
      */
-    private static function gitServiceForConnected(string $platform, ConnectedAccount $account): GitServiceContract
+    /**
+     * Resolve the connected OAuth account into a git source for RepositoryFetcher.
+     * Refreshes an expiring token so the repo/branch dropdowns keep loading
+     * instead of failing once the token lapses.
+     *
+     * @return array{token: string, instance_url: string}
+     */
+    private static function sourceForConnected(string $platform, ConnectedAccount $account): array
     {
-        // Refresh an expiring OAuth token so the repo/branch dropdowns keep
-        // loading instead of failing once the token lapses.
         $account = app(TokenRefresher::class)->refreshIfNeeded($account);
-        $instanceUrl = $platform === 'gitlab' ? $account->getInstanceUrl() : '';
 
-        return app(GitServiceFactory::class)->forPlatform($platform, $account->token, $instanceUrl);
+        return [
+            'token' => $account->token,
+            'instance_url' => $platform === 'gitlab' ? $account->getInstanceUrl() : '',
+        ];
     }
 
     /**
@@ -600,17 +607,14 @@ class RepoProfileResource extends Resource
             return [];
         }
 
-        try {
-            return Cache::remember(
-                "git_repo_options:{$platform}:{$account->id}",
-                now()->addSeconds(60),
-                fn (): array => self::gitServiceForConnected($platform, $account)->getRepoOptions(),
-            );
-        } catch (\Throwable $e) {
-            report($e);
+        $source = self::sourceForConnected($platform, $account);
 
-            return [];
-        }
+        return app(RepositoryFetcher::class)->repoOptions(
+            $platform,
+            $source['token'],
+            $source['instance_url'],
+            "git_repo_options:{$platform}:{$account->id}",
+        );
     }
 
     /**
@@ -631,17 +635,15 @@ class RepoProfileResource extends Resource
             return [];
         }
 
-        try {
-            return Cache::remember(
-                "git_branch_options:{$platform}:{$account->id}:{$repo}",
-                now()->addSeconds(60),
-                fn (): array => self::gitServiceForConnected($platform, $account)->getBranchOptions($repo),
-            );
-        } catch (\Throwable $e) {
-            report($e);
+        $source = self::sourceForConnected($platform, $account);
 
-            return [];
-        }
+        return app(RepositoryFetcher::class)->branchOptions(
+            $platform,
+            $source['token'],
+            $source['instance_url'],
+            $repo,
+            "git_branch_options:{$platform}:{$account->id}:{$repo}",
+        );
     }
 
     /**
@@ -654,13 +656,9 @@ class RepoProfileResource extends Resource
             return null;
         }
 
-        try {
-            return self::gitServiceForConnected($platform, $account)->getDefaultBranch($repo);
-        } catch (\Throwable $e) {
-            report($e);
+        $source = self::sourceForConnected($platform, $account);
 
-            return null;
-        }
+        return app(RepositoryFetcher::class)->defaultBranch($platform, $source['token'], $source['instance_url'], $repo);
     }
 
     /**
@@ -670,12 +668,7 @@ class RepoProfileResource extends Resource
      */
     private static function connectedRepoUrl(string $platform, string $repo, ?ConnectedAccount $account): string
     {
-        return match ($platform) {
-            'github' => "https://github.com/{$repo}",
-            'gitlab' => ($account?->getInstanceUrl() ?? 'https://gitlab.com')."/{$repo}",
-            'bitbucket' => "https://bitbucket.org/{$repo}",
-            default => '',
-        };
+        return RepoUrlBuilder::build($platform, $repo, $account?->getInstanceUrl());
     }
 
     /**

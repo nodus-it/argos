@@ -4,7 +4,14 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Events\Task\PhaseCompleted;
+use App\Events\Task\TaskCompleted;
 use App\Jobs\RunPhaseJob;
+use App\Listeners\Task\CloseSourceIssue;
+use App\Listeners\Task\DispatchAutoPush;
+use App\Listeners\Task\NotifyIssueTrackerOfPhase;
+use App\Listeners\Task\RemoveTaskVolume;
+use App\Listeners\Task\StopDemoAfterPush;
 use App\Services\Anthropic\CredentialStore;
 use App\Services\GitProvider\BitbucketGitService;
 use App\Services\GitProvider\GitHubGitService;
@@ -121,6 +128,15 @@ class AppServiceProvider extends ServiceProvider
     {
         Event::listen(SocialiteWasCalled::class, GitLabExtendSocialite::class.'@handle');
         Event::listen(SocialiteWasCalled::class, BitbucketExtendSocialite::class.'@handle');
+
+        // Task workflow follow-up actions. The kernel services (WorkflowService,
+        // TaskService) just advance state and fire the event; these listeners
+        // carry out the side-effects so the services stay side-effect-free.
+        Event::listen(PhaseCompleted::class, DispatchAutoPush::class);
+        Event::listen(PhaseCompleted::class, StopDemoAfterPush::class);
+        Event::listen(PhaseCompleted::class, NotifyIssueTrackerOfPhase::class);
+        Event::listen(TaskCompleted::class, CloseSourceIssue::class);
+        Event::listen(TaskCompleted::class, RemoveTaskVolume::class);
 
         Queue::failing(function (JobFailed $event): void {
             if ($event->job->resolveName() === RunPhaseJob::class) {

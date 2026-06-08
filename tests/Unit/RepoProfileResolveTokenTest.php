@@ -8,8 +8,9 @@ use App\Models\ConnectedAccount;
 use App\Models\RepoProfile;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Http;
 use RuntimeException;
+use Saloon\Http\Faking\MockResponse;
+use Saloon\Laravel\Facades\Saloon;
 use Tests\TestCase;
 
 class RepoProfileResolveTokenTest extends TestCase
@@ -39,7 +40,7 @@ class RepoProfileResolveTokenTest extends TestCase
 
     public function test_oauth_token_with_no_expiry_is_returned_without_refresh(): void
     {
-        Http::fake();
+        Saloon::fake([]);
         $user = User::factory()->create();
         $account = ConnectedAccount::factory()->create([
             'user_id' => $user->id,
@@ -55,7 +56,7 @@ class RepoProfileResolveTokenTest extends TestCase
         ]);
 
         $this->assertSame('gho_long_lived', $profile->resolveToken());
-        Http::assertNothingSent();
+        Saloon::assertNothingSent();
     }
 
     public function test_oauth_token_close_to_expiry_is_refreshed(): void
@@ -63,8 +64,8 @@ class RepoProfileResolveTokenTest extends TestCase
         config()->set('services.bitbucket.client_id', 'bb-id');
         config()->set('services.bitbucket.client_secret', 'bb-secret');
 
-        Http::fake([
-            'https://bitbucket.org/site/oauth2/access_token' => Http::response([
+        Saloon::fake([
+            'https://bitbucket.org/site/oauth2/access_token' => MockResponse::make([
                 'access_token' => 'bb-fresh',
                 'refresh_token' => 'bb-rotated',
                 'expires_in' => 7200,

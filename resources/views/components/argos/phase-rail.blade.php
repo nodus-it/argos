@@ -5,15 +5,6 @@
 ])
 {{-- Horizontal phase progress over the 5 phases. Display only, not clickable.
      See docs/design/argos/ARGOS_REDESIGN.md §5.5. --}}
-@php
-    $phaseIcons = [
-        'draft' => 'heroicon-o-document-text',
-        'concept' => 'heroicon-o-light-bulb',
-        'implement' => 'heroicon-o-code-bracket',
-        'push' => 'heroicon-o-arrow-up-tray',
-        'review' => 'heroicon-o-chat-bubble-left-right',
-    ];
-@endphp
 <div class="rail">
     @foreach ($rail as $i => $node)
         @php
@@ -29,7 +20,7 @@
                     @case('done') @svg('heroicon-o-check') @break
                     @case('wait') @svg('heroicon-o-hand-raised') @break
                     @case('fail') @svg('heroicon-o-x-mark') @break
-                    @default @svg($phaseIcons[$phase] ?? $phaseIcons['draft'])
+                    @default @svg(\App\Support\PhaseGlyph::icon($phase))
                 @endswitch
             </div>
             <div class="rail-lbl">{{ $node['label'] ?? __('tasks.rail.'.$phase) }}</div>

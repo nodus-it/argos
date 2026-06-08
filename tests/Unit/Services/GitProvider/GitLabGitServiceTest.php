@@ -4,31 +4,34 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\GitProvider;
 
+use App\Integrations\GitLab\Requests\CommentOnMergeRequest;
+use App\Integrations\GitLab\Requests\CreateMergeRequest;
+use App\Integrations\GitLab\Requests\UpdateMergeRequest;
 use App\Services\GitProvider\GitLabGitService;
-use Illuminate\Support\Facades\Http;
+use Saloon\Http\Faking\MockResponse;
+use Saloon\Http\Request;
+use Saloon\Laravel\Facades\Saloon;
 use Tests\TestCase;
 
 class GitLabGitServiceTest extends TestCase
 {
     public function test_list_repositories_uses_bearer_auth(): void
     {
-        Http::fake([
-            'https://gitlab.com/api/v4/projects*' => Http::response([
+        Saloon::fake([
+            'https://gitlab.com/api/v4/projects*' => MockResponse::make([
                 ['id' => 1, 'path_with_namespace' => 'acme/widget'],
             ]),
         ]);
 
         (new GitLabGitService('glpat-test'))->listRepositories();
 
-        Http::assertSent(function ($request): bool {
-            return $request->hasHeader('Authorization', 'Bearer glpat-test');
-        });
+        Saloon::assertSent(fn (Request $request, $response): bool => $response->getPendingRequest()->headers()->get('Authorization') === 'Bearer glpat-test');
     }
 
     public function test_list_repositories_returns_array(): void
     {
-        Http::fake([
-            'https://gitlab.com/api/v4/projects*' => Http::response([
+        Saloon::fake([
+            'https://gitlab.com/api/v4/projects*' => MockResponse::make([
                 ['id' => 1, 'path_with_namespace' => 'acme/widget'],
                 ['id' => 2, 'path_with_namespace' => 'acme/other'],
             ]),
@@ -42,8 +45,8 @@ class GitLabGitServiceTest extends TestCase
 
     public function test_list_branches_encodes_project_path(): void
     {
-        Http::fake([
-            'https://gitlab.com/api/v4/projects/acme%2Fwidget/repository/branches*' => Http::response([
+        Saloon::fake([
+            'https://gitlab.com/api/v4/projects/acme%2Fwidget/repository/branches*' => MockResponse::make([
                 ['name' => 'main'],
                 ['name' => 'develop'],
             ]),
@@ -57,8 +60,8 @@ class GitLabGitServiceTest extends TestCase
 
     public function test_create_pull_request_creates_merge_request(): void
     {
-        Http::fake([
-            'https://gitlab.com/api/v4/projects/acme%2Fwidget/merge_requests' => Http::response([
+        Saloon::fake([
+            'https://gitlab.com/api/v4/projects/acme%2Fwidget/merge_requests' => MockResponse::make([
                 'id' => 1,
                 'web_url' => 'https://gitlab.com/acme/widget/-/merge_requests/1',
             ], 201),
@@ -70,17 +73,17 @@ class GitLabGitServiceTest extends TestCase
 
         $this->assertSame('https://gitlab.com/acme/widget/-/merge_requests/1', $result['web_url']);
 
-        Http::assertSent(function ($request): bool {
-            $body = json_decode($request->body(), true);
+        Saloon::assertSent(function (Request $request): bool {
+            $body = $request instanceof CreateMergeRequest ? $request->body()->all() : [];
 
-            return $body['source_branch'] === 'feature' && $body['target_branch'] === 'main';
+            return ($body['source_branch'] ?? null) === 'feature' && ($body['target_branch'] ?? null) === 'main';
         });
     }
 
     public function test_get_repo_options_returns_path_with_namespace_map(): void
     {
-        Http::fake([
-            'https://gitlab.com/api/v4/projects*' => Http::response([
+        Saloon::fake([
+            'https://gitlab.com/api/v4/projects*' => MockResponse::make([
                 ['id' => 1, 'path_with_namespace' => 'acme/widget'],
                 ['id' => 2, 'path_with_namespace' => 'acme/other'],
                 ['id' => 3],
@@ -94,8 +97,8 @@ class GitLabGitServiceTest extends TestCase
 
     public function test_get_branch_options_returns_branch_name_map(): void
     {
-        Http::fake([
-            'https://gitlab.com/api/v4/projects/acme%2Fwidget/repository/branches*' => Http::response([
+        Saloon::fake([
+            'https://gitlab.com/api/v4/projects/acme%2Fwidget/repository/branches*' => MockResponse::make([
                 ['name' => 'main'],
                 ['name' => 'develop'],
             ]),
@@ -117,36 +120,32 @@ class GitLabGitServiceTest extends TestCase
 
     public function test_self_hosted_uses_custom_instance_url(): void
     {
-        Http::fake([
-            'https://git.example.com/api/v4/projects*' => Http::response([
+        Saloon::fake([
+            'https://git.example.com/api/v4/projects*' => MockResponse::make([
                 ['id' => 1, 'path_with_namespace' => 'acme/widget'],
             ]),
         ]);
 
         (new GitLabGitService('tok', 'https://git.example.com'))->listRepositories();
 
-        Http::assertSent(function ($request): bool {
-            return str_starts_with((string) $request->url(), 'https://git.example.com/api/v4/');
-        });
+        Saloon::assertSent(fn (Request $request, $response): bool => str_starts_with((string) $response->getPendingRequest()->getUrl(), 'https://git.example.com/api/v4/'));
     }
 
     public function test_no_private_token_header_sent(): void
     {
-        Http::fake([
-            'https://gitlab.com/api/v4/projects*' => Http::response([]),
+        Saloon::fake([
+            'https://gitlab.com/api/v4/projects*' => MockResponse::make([]),
         ]);
 
         (new GitLabGitService('tok'))->listRepositories();
 
-        Http::assertSent(function ($request): bool {
-            return ! $request->hasHeader('PRIVATE-TOKEN');
-        });
+        Saloon::assertSent(fn (Request $request, $response): bool => $response->getPendingRequest()->headers()->get('PRIVATE-TOKEN') === null);
     }
 
     public function test_get_default_branch_returns_api_value(): void
     {
-        Http::fake([
-            'https://gitlab.com/api/v4/projects/acme%2Fwidget' => Http::response([
+        Saloon::fake([
+            'https://gitlab.com/api/v4/projects/acme%2Fwidget' => MockResponse::make([
                 'name' => 'widget',
                 'default_branch' => 'develop',
             ]),
@@ -167,8 +166,8 @@ class GitLabGitServiceTest extends TestCase
 
     public function test_get_default_branch_returns_null_on_http_failure(): void
     {
-        Http::fake([
-            'https://gitlab.com/api/v4/projects/*' => Http::response(['message' => 'Not Found'], 404),
+        Saloon::fake([
+            'https://gitlab.com/api/v4/projects/*' => MockResponse::make(['message' => 'Not Found'], 404),
         ]);
 
         $branch = (new GitLabGitService('tok'))->getDefaultBranch('acme/missing');
@@ -178,8 +177,8 @@ class GitLabGitServiceTest extends TestCase
 
     public function test_get_default_branch_returns_null_when_field_missing(): void
     {
-        Http::fake([
-            'https://gitlab.com/api/v4/projects/acme%2Fwidget' => Http::response(['name' => 'widget']),
+        Saloon::fake([
+            'https://gitlab.com/api/v4/projects/acme%2Fwidget' => MockResponse::make(['name' => 'widget']),
         ]);
 
         $branch = (new GitLabGitService('tok'))->getDefaultBranch('acme/widget');
@@ -189,8 +188,8 @@ class GitLabGitServiceTest extends TestCase
 
     public function test_get_default_branch_uses_self_hosted_instance_url(): void
     {
-        Http::fake([
-            'https://gitlab.firma.de/api/v4/projects/acme%2Fwidget' => Http::response([
+        Saloon::fake([
+            'https://gitlab.firma.de/api/v4/projects/acme%2Fwidget' => MockResponse::make([
                 'default_branch' => 'main',
             ]),
         ]);
@@ -202,8 +201,8 @@ class GitLabGitServiceTest extends TestCase
 
     public function test_comment_on_pull_request_posts_to_merge_request_notes(): void
     {
-        Http::fake([
-            'https://gitlab.com/api/v4/projects/acme%2Fwidget/merge_requests/7/notes' => Http::response([
+        Saloon::fake([
+            'https://gitlab.com/api/v4/projects/acme%2Fwidget/merge_requests/7/notes' => MockResponse::make([
                 'id' => 9001, 'body' => 'hello',
             ]),
         ]);
@@ -211,26 +210,31 @@ class GitLabGitServiceTest extends TestCase
         $response = (new GitLabGitService('tok'))->commentOnPullRequest('acme', 'widget', 7, 'hello');
 
         $this->assertSame(9001, $response['id']);
-        Http::assertSent(function ($request): bool {
-            return $request->method() === 'POST'
-                && str_contains($request->url(), '/merge_requests/7/notes')
-                && ($request->data()['body'] ?? null) === 'hello';
+        Saloon::assertSent(function (Request $request): bool {
+            $body = $request instanceof CommentOnMergeRequest ? $request->body()->all() : [];
+
+            return $request instanceof CommentOnMergeRequest
+                && str_contains($request->resolveEndpoint(), '/merge_requests/7/notes')
+                && ($body['body'] ?? null) === 'hello';
         });
     }
 
     public function test_update_pull_request_puts_title_and_description(): void
     {
-        Http::fake([
-            'https://gitlab.com/api/v4/projects/acme%2Fwidget/merge_requests/7' => Http::response(['iid' => 7]),
+        Saloon::fake([
+            'https://gitlab.com/api/v4/projects/acme%2Fwidget/merge_requests/7' => MockResponse::make(['iid' => 7]),
         ]);
 
         (new GitLabGitService('tok'))->updatePullRequest('acme', 'widget', 7, 'new title', 'new body');
 
-        Http::assertSent(function ($request): bool {
-            return $request->method() === 'PUT'
-                && str_contains($request->url(), '/merge_requests/7')
-                && ($request->data()['title'] ?? null) === 'new title'
-                && ($request->data()['description'] ?? null) === 'new body';
+        Saloon::assertSent(function (Request $request, $response): bool {
+            $body = $request instanceof UpdateMergeRequest ? $request->body()->all() : [];
+
+            return $request instanceof UpdateMergeRequest
+                && $response->getPendingRequest()->getMethod()->value === 'PUT'
+                && str_contains($request->resolveEndpoint(), '/merge_requests/7')
+                && ($body['title'] ?? null) === 'new title'
+                && ($body['description'] ?? null) === 'new body';
         });
     }
 }

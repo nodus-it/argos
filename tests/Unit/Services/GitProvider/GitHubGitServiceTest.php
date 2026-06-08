@@ -4,16 +4,21 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\GitProvider;
 
+use App\Integrations\GitHub\Requests\CommentOnPullRequest;
+use App\Integrations\GitHub\Requests\GetRepository;
+use App\Integrations\GitHub\Requests\UpdatePullRequest;
 use App\Services\GitProvider\GitHubGitService;
-use Illuminate\Support\Facades\Http;
+use Saloon\Http\Faking\MockResponse;
+use Saloon\Http\Request;
+use Saloon\Laravel\Facades\Saloon;
 use Tests\TestCase;
 
 class GitHubGitServiceTest extends TestCase
 {
     public function test_get_default_branch_returns_api_value(): void
     {
-        Http::fake([
-            'https://api.github.com/repos/acme/widget' => Http::response([
+        Saloon::fake([
+            GetRepository::class => MockResponse::make([
                 'name' => 'widget',
                 'default_branch' => 'develop',
             ]),
@@ -26,6 +31,8 @@ class GitHubGitServiceTest extends TestCase
 
     public function test_get_default_branch_returns_null_for_invalid_input(): void
     {
+        Saloon::fake([]);
+
         $service = new GitHubGitService('tok');
 
         $this->assertNull($service->getDefaultBranch(''));
@@ -34,8 +41,8 @@ class GitHubGitServiceTest extends TestCase
 
     public function test_get_default_branch_returns_null_on_http_failure(): void
     {
-        Http::fake([
-            'https://api.github.com/repos/*' => Http::response(['message' => 'Not Found'], 404),
+        Saloon::fake([
+            GetRepository::class => MockResponse::make(['message' => 'Not Found'], 404),
         ]);
 
         $branch = (new GitHubGitService('tok'))->getDefaultBranch('acme/missing');
@@ -45,8 +52,8 @@ class GitHubGitServiceTest extends TestCase
 
     public function test_get_default_branch_returns_null_when_field_missing(): void
     {
-        Http::fake([
-            'https://api.github.com/repos/acme/widget' => Http::response(['name' => 'widget']),
+        Saloon::fake([
+            GetRepository::class => MockResponse::make(['name' => 'widget']),
         ]);
 
         $branch = (new GitHubGitService('tok'))->getDefaultBranch('acme/widget');
@@ -56,35 +63,38 @@ class GitHubGitServiceTest extends TestCase
 
     public function test_comment_on_pull_request_posts_to_issues_endpoint(): void
     {
-        Http::fake([
-            'https://api.github.com/repos/acme/widget/issues/42/comments' => Http::response([
-                'id' => 9001, 'body' => 'hello',
-            ]),
+        Saloon::fake([
+            CommentOnPullRequest::class => MockResponse::make(['id' => 9001, 'body' => 'hello']),
         ]);
 
         $response = (new GitHubGitService('tok'))->commentOnPullRequest('acme', 'widget', 42, 'hello');
 
         $this->assertSame(9001, $response['id']);
-        Http::assertSent(function ($request): bool {
-            return $request->method() === 'POST'
-                && str_contains($request->url(), '/issues/42/comments')
-                && ($request->data()['body'] ?? null) === 'hello';
+        // The request class fixes method (POST) and endpoint
+        // (/issues/{id}/comments), so instanceof proves both; we only need to
+        // verify the body the service handed to it.
+        Saloon::assertSent(function (Request $request): bool {
+            return $request instanceof CommentOnPullRequest
+                && $request->resolveEndpoint() === '/repos/acme/widget/issues/42/comments'
+                && ($request->body()->all()['body'] ?? null) === 'hello';
         });
     }
 
     public function test_update_pull_request_patches_title_and_body(): void
     {
-        Http::fake([
-            'https://api.github.com/repos/acme/widget/pulls/42' => Http::response(['number' => 42]),
+        Saloon::fake([
+            UpdatePullRequest::class => MockResponse::make(['number' => 42]),
         ]);
 
         (new GitHubGitService('tok'))->updatePullRequest('acme', 'widget', 42, 'new title', 'new body');
 
-        Http::assertSent(function ($request): bool {
-            return $request->method() === 'PATCH'
-                && str_contains($request->url(), '/pulls/42')
-                && ($request->data()['title'] ?? null) === 'new title'
-                && ($request->data()['body'] ?? null) === 'new body';
+        Saloon::assertSent(function (Request $request): bool {
+            $body = $request instanceof UpdatePullRequest ? $request->body()->all() : [];
+
+            return $request instanceof UpdatePullRequest
+                && $request->resolveEndpoint() === '/repos/acme/widget/pulls/42'
+                && ($body['title'] ?? null) === 'new title'
+                && ($body['body'] ?? null) === 'new body';
         });
     }
 }

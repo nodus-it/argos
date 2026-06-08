@@ -9,12 +9,15 @@ use App\Enums\DemoStatus;
 use App\Models\Demo;
 use App\Models\RepoProfile;
 use App\Models\Task;
+use App\Services\Demo\DemoComposeBuilder;
 use App\Services\Demo\DemoDeployer;
 use App\Services\Demo\DemoImageBuilder;
+use App\Services\Demo\TraefikRouter;
 use App\Services\GitProvider\GitServiceFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Http;
 use RuntimeException;
+use Saloon\Http\Faking\MockResponse;
+use Saloon\Laravel\Facades\Saloon;
 use Symfony\Component\Process\Process;
 use Symfony\Component\Yaml\Yaml;
 use Tests\TestCase;
@@ -71,12 +74,12 @@ class DemoDeployerTest extends TestCase
           timeout: 30
         YAML;
 
-        Http::fake([
-            'api.github.com/repos/acme/widget/contents/.argos/demo.compose.yml*' => Http::response([
+        Saloon::fake([
+            'api.github.com/repos/acme/widget/contents/.argos/demo.compose.yml*' => MockResponse::make([
                 'content' => base64_encode("services:\n  app:\n    image: php:8.4\n"),
                 'encoding' => 'base64',
             ]),
-            'api.github.com/repos/acme/widget/contents/.argos/demo.yml*' => Http::response([
+            'api.github.com/repos/acme/widget/contents/.argos/demo.yml*' => MockResponse::make([
                 'content' => base64_encode($settings),
                 'encoding' => 'base64',
             ]),
@@ -93,14 +96,13 @@ class DemoDeployerTest extends TestCase
 
     public function test_override_mounts_volume_and_joins_edge_network(): void
     {
-        $deployer = app(DemoDeployer::class);
         $task = Task::factory()->create(['name' => 'feat1']);
 
-        $yaml = $deployer->buildOverrideYaml($task, 'demo-feat1', [
+        $yaml = app(DemoComposeBuilder::class)->buildOverrideYaml($task, 'demo-feat1', [
             'service' => 'app',
             'port' => 8000,
             'workspace_mount' => '/var/www/html',
-        ]);
+        ], 'http://demo-feat1.127.0.0.1.nip.io:8080');
 
         $this->assertStringContainsString($task->volumeName().':/var/www/html', $yaml);
         $this->assertStringContainsString('argos_edge', $yaml);
@@ -142,9 +144,7 @@ class DemoDeployerTest extends TestCase
 
     public function test_write_traefik_route_creates_file_and_returns_url_with_port(): void
     {
-        $deployer = app(DemoDeployer::class);
-
-        $url = $deployer->writeTraefikRoute('demo-feat1', 8000);
+        $url = app(TraefikRouter::class)->writeRoute('demo-feat1', 8000);
 
         $this->assertSame('http://demo-feat1.127.0.0.1.nip.io:8080', $url);
 
@@ -160,14 +160,14 @@ class DemoDeployerTest extends TestCase
         config()->set('argos.preview.scheme', 'https');
         config()->set('argos.preview.port', 443);
 
-        $url = app(DemoDeployer::class)->writeTraefikRoute('demo-x', 80);
+        $url = app(TraefikRouter::class)->writeRoute('demo-x', 80);
 
         $this->assertSame('https://demo-x.127.0.0.1.nip.io', $url);
     }
 
     public function test_public_mode_writes_no_auth_middleware(): void
     {
-        app(DemoDeployer::class)->writeTraefikRoute('demo-p', 8000, DemoAccessMode::Public);
+        app(TraefikRouter::class)->writeRoute('demo-p', 8000, DemoAccessMode::Public);
 
         $parsed = Yaml::parseFile($this->traefikDir.'/demo-p.yml');
         $this->assertArrayNotHasKey('middlewares', $parsed['http']);
@@ -178,7 +178,7 @@ class DemoDeployerTest extends TestCase
     {
         config()->set('argos.preview.auth_gate_url', 'http://nginx:80/_argos/demo-gate');
 
-        app(DemoDeployer::class)->writeTraefikRoute('demo-s', 8000, DemoAccessMode::Session);
+        app(TraefikRouter::class)->writeRoute('demo-s', 8000, DemoAccessMode::Session);
 
         $parsed = Yaml::parseFile($this->traefikDir.'/demo-s.yml');
         $this->assertSame(['demo-s-auth'], $parsed['http']['routers']['demo-s']['middlewares']);
@@ -192,7 +192,7 @@ class DemoDeployerTest extends TestCase
     {
         config()->set('argos.preview.basic_user', 'demo');
 
-        app(DemoDeployer::class)->writeTraefikRoute('demo-b', 8000, DemoAccessMode::Basic, 'secret-pw');
+        app(TraefikRouter::class)->writeRoute('demo-b', 8000, DemoAccessMode::Basic, 'secret-pw');
 
         $parsed = Yaml::parseFile($this->traefikDir.'/demo-b.yml');
         $users = $parsed['http']['middlewares']['demo-b-auth']['basicAuth']['users'];
@@ -208,7 +208,7 @@ class DemoDeployerTest extends TestCase
         config()->set('argos.preview.basic_password', null);
 
         $this->expectException(RuntimeException::class);
-        app(DemoDeployer::class)->writeTraefikRoute('demo-x', 8000, DemoAccessMode::Basic, null);
+        app(TraefikRouter::class)->writeRoute('demo-x', 8000, DemoAccessMode::Basic, null);
     }
 
     public function test_apply_access_mode_rewrites_live_route_in_place(): void
@@ -238,7 +238,7 @@ class DemoDeployerTest extends TestCase
 
         // An old route file written before the port column existed.
         $slug = $deployer->demoSlug($task);
-        $deployer->writeTraefikRoute($slug, 8000, DemoAccessMode::Public);
+        app(TraefikRouter::class)->writeRoute($slug, 8000, DemoAccessMode::Public);
 
         $deployer->applyAccessMode($task);
 
@@ -339,8 +339,8 @@ class DemoDeployerTest extends TestCase
     public function test_deploy_uses_default_contract_when_repo_has_none(): void
     {
         // Neither contract file exists → the built-in default runtime kicks in.
-        Http::fake([
-            'api.github.com/repos/*' => Http::response('', 404),
+        Saloon::fake([
+            'api.github.com/repos/*' => MockResponse::make('', 404),
         ]);
         $profile = $this->profile();
         $task = Task::factory()->for($profile, 'repoProfile')->create(['name' => 'feat-default']);
@@ -378,12 +378,12 @@ class DemoDeployerTest extends TestCase
           timeout: 30
         YAML;
 
-        Http::fake([
-            'api.github.com/repos/acme/widget/contents/.argos/demo.compose.yml*' => Http::response([
+        Saloon::fake([
+            'api.github.com/repos/acme/widget/contents/.argos/demo.compose.yml*' => MockResponse::make([
                 'content' => base64_encode("services:\n  app:\n    image: __ARGOS_DEMO_IMAGE__\n"),
                 'encoding' => 'base64',
             ]),
-            'api.github.com/repos/acme/widget/contents/.argos/demo.yml*' => Http::response([
+            'api.github.com/repos/acme/widget/contents/.argos/demo.yml*' => MockResponse::make([
                 'content' => base64_encode($settings),
                 'encoding' => 'base64',
             ]),
@@ -408,12 +408,12 @@ class DemoDeployerTest extends TestCase
     {
         // Exactly one file present is a mistake the author must see — no silent
         // fall-through to the default.
-        Http::fake([
-            'api.github.com/repos/acme/widget/contents/.argos/demo.compose.yml*' => Http::response([
+        Saloon::fake([
+            'api.github.com/repos/acme/widget/contents/.argos/demo.compose.yml*' => MockResponse::make([
                 'content' => base64_encode("services:\n  app:\n    image: php:8.4\n"),
                 'encoding' => 'base64',
             ]),
-            'api.github.com/repos/acme/widget/contents/.argos/demo.yml*' => Http::response('', 404),
+            'api.github.com/repos/acme/widget/contents/.argos/demo.yml*' => MockResponse::make('', 404),
         ]);
         $profile = $this->profile();
         $task = Task::factory()->for($profile, 'repoProfile')->create(['name' => 'feat-half']);

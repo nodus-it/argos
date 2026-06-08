@@ -209,7 +209,9 @@ class WorkflowEndToEndTest extends TestCase
             'workflow_status' => WorkflowStatus::ImplementRunning,
         ]);
 
-        app(WorkflowService::class)->completePhase($task, 'implement', PhaseStatus::Completed);
+        // Through TaskService so PhaseCompleted fires and the DispatchAutoPush
+        // listener chains into push.
+        app(TaskService::class)->completePhase($task, 'implement', PhaseStatus::Completed);
 
         Bus::assertDispatched(RunPhaseJob::class, fn ($job) => $job->phase === 'push' && $job->taskId === $task->id
         );

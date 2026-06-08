@@ -22,9 +22,10 @@ use App\Models\User;
 use Filament\Actions\CreateAction;
 use Filament\Actions\Testing\TestAction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Saloon\Http\Faking\MockResponse;
+use Saloon\Laravel\Facades\Saloon;
 use Tests\TestCase;
 
 class RepoProfileResourceTest extends TestCase
@@ -57,8 +58,8 @@ class RepoProfileResourceTest extends TestCase
 
     public function test_can_create_repo_profile(): void
     {
-        Http::fake([
-            'api.github.com/repos/org/repo/branches*' => Http::response([['name' => 'main']]),
+        Saloon::fake([
+            'api.github.com/repos/org/repo/branches*' => MockResponse::make([['name' => 'main']]),
         ]);
 
         Livewire::test(CreateRepoProfile::class)
@@ -83,8 +84,8 @@ class RepoProfileResourceTest extends TestCase
 
     public function test_can_set_per_project_max_turns(): void
     {
-        Http::fake([
-            'api.github.com/repos/test-org/test-repo/branches*' => Http::response([['name' => 'main']]),
+        Saloon::fake([
+            'api.github.com/repos/test-org/test-repo/branches*' => MockResponse::make([['name' => 'main']]),
         ]);
         $profile = RepoProfile::factory()->create(['default_branch' => 'main']);
 
@@ -188,8 +189,8 @@ class RepoProfileResourceTest extends TestCase
 
     public function test_can_edit_repo_profile(): void
     {
-        Http::fake([
-            'api.github.com/repos/test-org/test-repo/branches*' => Http::response([['name' => 'main']]),
+        Saloon::fake([
+            'api.github.com/repos/test-org/test-repo/branches*' => MockResponse::make([['name' => 'main']]),
         ]);
 
         $profile = RepoProfile::factory()->create();
@@ -220,16 +221,16 @@ class RepoProfileResourceTest extends TestCase
             'provider' => 'github',
         ]);
 
-        Http::fake([
-            'api.github.com/user/repos*' => Http::response([
+        Saloon::fake([
+            'api.github.com/user/repos*' => MockResponse::make([
                 ['full_name' => 'acme/widget'],
             ]),
-            'api.github.com/repos/acme/widget' => Http::response([
-                'default_branch' => 'main',
-            ]),
-            'api.github.com/repos/acme/widget/branches*' => Http::response([
+            'api.github.com/repos/acme/widget/branches*' => MockResponse::make([
                 ['name' => 'main'],
                 ['name' => 'develop'],
+            ]),
+            'api.github.com/repos/acme/widget' => MockResponse::make([
+                'default_branch' => 'main',
             ]),
         ]);
 
@@ -262,16 +263,16 @@ class RepoProfileResourceTest extends TestCase
             'provider' => 'gitlab',
         ]);
 
-        // More-specific patterns first; Http::fake matches in definition order.
-        Http::fake([
-            'gitlab.com/api/v4/projects/acme%2Fwidget/repository/branches*' => Http::response([
+        // More-specific patterns first; Saloon matches in definition order.
+        Saloon::fake([
+            'gitlab.com/api/v4/projects/acme%2Fwidget/repository/branches*' => MockResponse::make([
                 ['name' => 'main'],
                 ['name' => 'develop'],
             ]),
-            'gitlab.com/api/v4/projects/acme%2Fwidget' => Http::response([
+            'gitlab.com/api/v4/projects/acme%2Fwidget' => MockResponse::make([
                 'default_branch' => 'develop',
             ]),
-            'gitlab.com/api/v4/projects*' => Http::response([
+            'gitlab.com/api/v4/projects*' => MockResponse::make([
                 ['path_with_namespace' => 'acme/widget'],
             ]),
         ]);
@@ -297,11 +298,11 @@ class RepoProfileResourceTest extends TestCase
             'provider' => 'github',
         ]);
 
-        Http::fake([
-            'api.github.com/user/repos*' => Http::response([
+        Saloon::fake([
+            'api.github.com/user/repos*' => MockResponse::make([
                 ['full_name' => 'acme/widget'],
             ]),
-            'api.github.com/repos/acme/widget/branches*' => Http::response([
+            'api.github.com/repos/acme/widget/branches*' => MockResponse::make([
                 ['name' => 'main'],
                 ['name' => 'feature/php-app'],
             ]),
@@ -329,8 +330,8 @@ class RepoProfileResourceTest extends TestCase
 
     public function test_can_create_repo_profile_with_pat(): void
     {
-        Http::fake([
-            'api.github.com/repos/org/repo/branches*' => Http::response([['name' => 'main']]),
+        Saloon::fake([
+            'api.github.com/repos/org/repo/branches*' => MockResponse::make([['name' => 'main']]),
         ]);
 
         Livewire::test(CreateRepoProfile::class)
@@ -360,9 +361,9 @@ class RepoProfileResourceTest extends TestCase
             'provider' => 'github',
         ]);
 
-        Http::fake([
-            'api.github.com/user/repos*' => Http::response([['full_name' => 'org/repo']]),
-            'api.github.com/repos/org/repo/branches*' => Http::response([['name' => 'main']]),
+        Saloon::fake([
+            'api.github.com/user/repos*' => MockResponse::make([['full_name' => 'org/repo']]),
+            'api.github.com/repos/org/repo/branches*' => MockResponse::make([['name' => 'main']]),
         ]);
 
         Livewire::test(CreateRepoProfile::class)
@@ -389,8 +390,8 @@ class RepoProfileResourceTest extends TestCase
 
     public function test_switching_to_pat_clears_connected_account_id_on_save(): void
     {
-        Http::fake([
-            'api.github.com/repos/org/repo/branches*' => Http::response([['name' => 'main']]),
+        Saloon::fake([
+            'api.github.com/repos/org/repo/branches*' => MockResponse::make([['name' => 'main']]),
         ]);
 
         $account = ConnectedAccount::factory()->create([
@@ -467,8 +468,8 @@ class RepoProfileResourceTest extends TestCase
             'provider' => 'github',
         ]);
 
-        Http::fake([
-            'api.github.com/user/repos*' => Http::response([
+        Saloon::fake([
+            'api.github.com/user/repos*' => MockResponse::make([
                 ['full_name' => 'acme/widget'],
                 ['full_name' => 'acme/gadget'],
             ]),
@@ -503,8 +504,8 @@ class RepoProfileResourceTest extends TestCase
             'label' => 'CI PAT',
         ]);
 
-        Http::fake([
-            'api.github.com/user/repos*' => Http::response([
+        Saloon::fake([
+            'api.github.com/user/repos*' => MockResponse::make([
                 ['full_name' => 'acme/widget'],
             ]),
         ]);
@@ -606,8 +607,8 @@ class RepoProfileResourceTest extends TestCase
 
     public function test_can_create_bitbucket_repo_profile_with_pat(): void
     {
-        Http::fake([
-            'api.bitbucket.org/2.0/repositories/myworkspace/myrepo/refs/branches*' => Http::response([
+        Saloon::fake([
+            'api.bitbucket.org/2.0/repositories/myworkspace/myrepo/refs/branches*' => MockResponse::make([
                 'values' => [['name' => 'main']],
             ]),
         ]);
@@ -640,18 +641,18 @@ class RepoProfileResourceTest extends TestCase
             'provider' => 'bitbucket',
         ]);
 
-        // More-specific patterns must come first; Http::fake matches in definition order.
-        Http::fake([
-            'api.bitbucket.org/2.0/repositories/acme/widget/refs/branches*' => Http::response([
+        // More-specific patterns must come first; Saloon matches in definition order.
+        Saloon::fake([
+            'api.bitbucket.org/2.0/repositories/acme/widget/refs/branches*' => MockResponse::make([
                 'values' => [['name' => 'main'], ['name' => 'develop']],
             ]),
-            'api.bitbucket.org/2.0/repositories/acme/widget' => Http::response([
+            'api.bitbucket.org/2.0/repositories/acme/widget' => MockResponse::make([
                 'mainbranch' => ['name' => 'main'],
             ]),
-            'api.bitbucket.org/2.0/user/workspaces*' => Http::response([
+            'api.bitbucket.org/2.0/user/workspaces*' => MockResponse::make([
                 'values' => [['workspace' => ['slug' => 'acme']]],
             ]),
-            'api.bitbucket.org/2.0/repositories/acme*' => Http::response([
+            'api.bitbucket.org/2.0/repositories/acme*' => MockResponse::make([
                 'values' => [['full_name' => 'acme/widget']],
             ]),
         ]);

@@ -4,13 +4,11 @@ declare(strict_types=1);
 
 namespace App\Services\Demo;
 
-use App\Enums\DemoAccessMode;
 use App\Enums\DemoStatus;
 use App\Models\Demo;
 use App\Models\RepoProfile;
 use App\Models\Task;
 use App\Services\GitProvider\GitServiceFactory;
-use Illuminate\Encryption\Encrypter;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Symfony\Component\Process\Process;
@@ -87,14 +85,17 @@ class DemoDeployer
 
             $entry = $this->parseEntry($settings);
 
-            $workDir = $this->prepareWorkDir($slug, $composeYaml, $this->buildOverrideYaml($task, $slug, $entry));
+            $router = app(TraefikRouter::class);
+            $overrideYaml = app(DemoComposeBuilder::class)
+                ->buildOverrideYaml($task, $slug, $entry, $router->urlForSlug($slug));
+            $workDir = $this->prepareWorkDir($slug, $composeYaml, $overrideYaml);
 
             $log .= $this->enforceConcurrencyCap($task);
             $log .= $this->composeUp($project, $workDir);
             $log .= $this->runCommands($project, $entry['service'], $settings['commands'] ?? []);
             $log .= $this->probeHealth($project, $entry, $settings['health'] ?? null);
 
-            $url = $this->writeTraefikRoute(
+            $url = $router->writeRoute(
                 $slug,
                 $entry['port'],
                 $task->effectiveDemoAccessMode(),
@@ -188,10 +189,7 @@ class DemoDeployer
             // best-effort — nothing to tear down, or docker unavailable in tests
         }
 
-        $route = $this->routeFilePath($slug);
-        if (is_file($route)) {
-            @unlink($route);
-        }
+        app(TraefikRouter::class)->removeRoute($slug);
     }
 
     /**
@@ -267,111 +265,6 @@ class DemoDeployer
         }
 
         return ['service' => $service, 'port' => (int) $port, 'workspace_mount' => $mount];
-    }
-
-    /**
-     * Generate the per-task compose override: mounts the task workspace volume
-     * into the entry service, joins the Traefik edge network under a unique
-     * alias (so the file-provider route can target it by DNS), and caps
-     * resources. Deliberately carries NO Traefik labels — routing is done via
-     * the file provider, not the docker provider.
-     *
-     * @param  array{service: string, port: int, workspace_mount: string}  $entry
-     */
-    public function buildOverrideYaml(Task $task, string $slug, array $entry): string
-    {
-        $network = (string) config('argos.preview.network', 'argos_edge');
-
-        $override = [
-            'services' => [
-                $entry['service'] => [
-                    // The container only sees the internal port (80); it has no
-                    // idea Traefik publishes it on the external port. Without
-                    // this, Laravel/Vite generate asset URLs from the request
-                    // host WITHOUT the external port → the browser fetches CSS/JS
-                    // on :80 and fails. Pin the full external URL so asset()/
-                    // url()/Vite emit reachable links. (Harmless for non-Laravel
-                    // contracts — they ignore these env vars.)
-                    'environment' => [
-                        'APP_URL' => $this->demoUrlForSlug($slug),
-                        'ASSET_URL' => $this->demoUrlForSlug($slug),
-                        // Inject a throwaway app key so Laravel boots even when
-                        // the repo's .env.example ships no APP_KEY= line for
-                        // `key:generate` to fill (Argos itself is such a repo →
-                        // MissingAppKeyException → every request 500s). Laravel
-                        // reads real env over the repo .env, so this wins; a
-                        // fresh per-deploy key is fine for an ephemeral demo.
-                        'APP_KEY' => $this->generateAppKey(),
-                        // Per-demo session cookie name. Each demo runs on its own
-                        // subdomain under the shared parent domain; the parent app
-                        // sets a leading-dot `.{domain}` cookie (`argos_session`)
-                        // that spans the demo subdomain. If the demo is itself an
-                        // Argos instance it would otherwise reuse that name, the
-                        // browser would send the parent's cookie, the demo couldn't
-                        // decrypt it (different APP_KEY) and would reset the session
-                        // every request → login never persists. A per-slug name
-                        // sidesteps it; non-Laravel contracts ignore the var.
-                        'SESSION_COOKIE' => $this->demoCookieName($slug),
-                        // Mark this container as an Argos live demo. Argos' own
-                        // DatabaseSeeder reads it (config argos.demo.enabled) to
-                        // seed the full demo profile instead of the production-safe
-                        // admin-only seed. Harmless for any other repo.
-                        'ARGOS_DEMO' => '1',
-                    ],
-                    'volumes' => [
-                        $task->volumeName().':'.$entry['workspace_mount'],
-                    ],
-                    'networks' => [
-                        $network => [
-                            'aliases' => [$slug],
-                        ],
-                    ],
-                    'deploy' => [
-                        'resources' => [
-                            'limits' => [
-                                'cpus' => (string) config('argos.preview.cpu_limit', '1.0'),
-                                'memory' => (string) config('argos.preview.memory_limit', '1g'),
-                            ],
-                        ],
-                    ],
-                ],
-            ],
-            'networks' => [
-                $network => [
-                    'external' => true,
-                ],
-            ],
-            // The task workspace volume is created by the worker and pre-exists;
-            // declare it external so compose mounts it instead of erroring on an
-            // "undefined volume".
-            'volumes' => [
-                $task->volumeName() => [
-                    'external' => true,
-                ],
-            ],
-        ];
-
-        return Yaml::dump($override, 6, 2);
-    }
-
-    /**
-     * A valid throwaway Laravel APP_KEY for the demo container — mirrors what
-     * `php artisan key:generate` produces, but without depending on the repo
-     * shipping an APP_KEY= line in .env(.example).
-     */
-    private function generateAppKey(): string
-    {
-        return 'base64:'.base64_encode(Encrypter::generateKey((string) config('app.cipher')));
-    }
-
-    /**
-     * A demo-unique session cookie name derived from the DNS-safe slug. Stable
-     * across requests of one demo (so the session persists) and distinct from
-     * both the parent app's `argos_session` and every other demo's cookie.
-     */
-    private function demoCookieName(string $slug): string
-    {
-        return str_replace('-', '_', $slug).'_session';
     }
 
     private function prepareWorkDir(string $slug, string $composeYaml, string $overrideYaml): string
@@ -485,70 +378,6 @@ class DemoDeployer
     }
 
     /**
-     * Write the Traefik file-provider route for this demo into the shared dir
-     * and return the public URL. Traefik resolves the `{slug}` host alias on the
-     * edge network to the entry container. The access mode attaches an auth
-     * middleware (session forwardAuth / shared basic-auth) or none (public).
-     */
-    public function writeTraefikRoute(
-        string $slug,
-        int $port,
-        DemoAccessMode $mode = DemoAccessMode::Public,
-        ?string $basicPassword = null,
-    ): string {
-        $host = $slug.'.'.config('argos.preview.base_domain', '127.0.0.1.nip.io');
-
-        $router = [
-            'rule' => "Host(`{$host}`)",
-            'entryPoints' => ['web'],
-            'service' => $slug,
-        ];
-
-        $middlewares = $this->buildAuthMiddleware($slug, $mode, $basicPassword);
-        if ($middlewares !== []) {
-            $router['middlewares'] = array_keys($middlewares);
-        }
-
-        $http = [
-            'routers' => [$slug => $router],
-            'services' => [
-                $slug => [
-                    'loadBalancer' => [
-                        'servers' => [
-                            ['url' => "http://{$slug}:{$port}"],
-                        ],
-                    ],
-                ],
-            ],
-        ];
-        if ($middlewares !== []) {
-            $http['middlewares'] = $middlewares;
-        }
-
-        $dir = $this->traefikDir();
-        if (! is_dir($dir) && ! mkdir($dir, 0755, true) && ! is_dir($dir)) {
-            throw new RuntimeException("Traefik dynamic-config dir not writable: {$dir}");
-        }
-
-        // Write atomically (temp + rename). An in-place overwrite only emits a
-        // MODIFY event, which Traefik's file watcher misses when the write comes
-        // from another container over a shared volume — so a live access-mode
-        // change would not take effect until the next rebuild. A rename emits a
-        // CREATE/MOVED_TO event that the watcher reliably picks up, and Traefik
-        // never reads a half-written file. The `.tmp` extension is ignored by
-        // the file provider (it only loads .yml/.yaml/.toml/.json).
-        $path = $this->routeFilePath($slug);
-        $tmp = $path.'.tmp';
-        file_put_contents($tmp, Yaml::dump(['http' => $http], 8, 2));
-        if (! rename($tmp, $path)) {
-            @unlink($tmp);
-            throw new RuntimeException("Could not write Traefik route: {$path}");
-        }
-
-        return $this->demoUrl($host);
-    }
-
-    /**
      * Re-write the live demo's route for a task after its access mode (or basic
      * password) changed — applies the new protection without a full redeploy.
      * No-op when the task has no live demo with a known entry port.
@@ -561,10 +390,11 @@ class DemoDeployer
         }
 
         $slug = $this->demoSlug($task);
+        $router = app(TraefikRouter::class);
 
         // Demos deployed before the `port` column existed have a null port —
         // recover it from the live route file so the toggle still works.
-        $port = $demo->port ?? $this->existingRoutePort($slug);
+        $port = $demo->port ?? $router->existingRoutePort($slug);
         if ($port === null) {
             return;
         }
@@ -573,115 +403,12 @@ class DemoDeployer
             $demo->forceFill(['port' => $port])->save();
         }
 
-        $this->writeTraefikRoute(
+        $router->writeRoute(
             $slug,
             $port,
             $task->effectiveDemoAccessMode(),
             $task->demo_basic_password,
         );
-    }
-
-    /**
-     * Recover the upstream port from an existing route file's service URL
-     * (`http://{slug}:{port}`). Returns null when the file is missing or
-     * unparseable.
-     */
-    private function existingRoutePort(string $slug): ?int
-    {
-        $file = $this->routeFilePath($slug);
-        if (! is_file($file)) {
-            return null;
-        }
-
-        try {
-            $parsed = Yaml::parseFile($file);
-        } catch (Throwable) {
-            return null;
-        }
-
-        $url = $parsed['http']['services'][$slug]['loadBalancer']['servers'][0]['url'] ?? null;
-        if (! is_string($url) || preg_match('/:(\d+)$/', $url, $m) !== 1) {
-            return null;
-        }
-
-        return (int) $m[1];
-    }
-
-    /**
-     * Build the Traefik middleware definitions for the resolved access mode,
-     * keyed by middleware name (referenced from the router). Empty for public.
-     * Fails closed: basic mode without any password throws rather than shipping
-     * an unprotected demo.
-     *
-     * @return array<string, array<string, mixed>>
-     */
-    private function buildAuthMiddleware(string $slug, DemoAccessMode $mode, ?string $basicPassword): array
-    {
-        $name = $slug.'-auth';
-
-        return match ($mode->resolve()) {
-            DemoAccessMode::Session => [
-                $name => [
-                    'forwardAuth' => [
-                        'address' => (string) config('argos.preview.auth_gate_url', 'http://nginx:80/_argos/demo-gate'),
-                        'trustForwardHeader' => true,
-                    ],
-                ],
-            ],
-            DemoAccessMode::Basic => [
-                $name => [
-                    'basicAuth' => [
-                        'users' => [$this->basicAuthUserLine($basicPassword)],
-                    ],
-                ],
-            ],
-            default => [],
-        };
-    }
-
-    /**
-     * Render the `user:bcrypt-hash` line Traefik basicAuth expects. The password
-     * is the per-task one, falling back to the global config password.
-     */
-    private function basicAuthUserLine(?string $basicPassword): string
-    {
-        $password = $basicPassword ?: (string) config('argos.preview.basic_password', '');
-        if ($password === '') {
-            throw new RuntimeException(
-                'Demo basic-auth selected but no password set (task password or ARGOS_PREVIEW_BASIC_PASSWORD).'
-            );
-        }
-
-        $user = (string) config('argos.preview.basic_user', 'demo');
-
-        return $user.':'.password_hash($password, PASSWORD_BCRYPT);
-    }
-
-    /** Public URL for a demo slug (scheme + slug.base_domain + external port). */
-    private function demoUrlForSlug(string $slug): string
-    {
-        return $this->demoUrl($slug.'.'.config('argos.preview.base_domain', '127.0.0.1.nip.io'));
-    }
-
-    /** Public URL for a demo host, appending the external port unless it is 80/443. */
-    private function demoUrl(string $host): string
-    {
-        $scheme = (string) config('argos.preview.scheme', 'http');
-        $port = (int) config('argos.preview.port', 8080);
-
-        $needsPort = ! in_array($port, [80, 443], true);
-
-        return $scheme.'://'.$host.($needsPort ? ':'.$port : '');
-    }
-
-    private function routeFilePath(string $slug): string
-    {
-        return rtrim($this->traefikDir(), '/').'/'.$slug.'.yml';
-    }
-
-    private function traefikDir(): string
-    {
-        return (string) config('argos.preview.traefik_dir', '/data/traefik');
     }
 
     /**

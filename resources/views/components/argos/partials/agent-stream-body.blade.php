@@ -76,10 +76,10 @@
         @php
             $resultText = __('tasks.view.stream.completed');
             if (($event['cost'] ?? 0) > 0) {
-                $resultText .= ' · $'.number_format((float) $event['cost'], 4);
+                $resultText .= ' · '.\App\Support\CostFormatter::usd((float) $event['cost']);
             }
             if (($event['tokens'] ?? 0) > 0) {
-                $resultText .= ' · '.number_format((int) $event['tokens']).' tok';
+                $resultText .= ' · '.\App\Support\CostFormatter::tokens((int) $event['tokens']);
             }
         @endphp
         <div class="as-item as-result">

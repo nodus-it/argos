@@ -216,7 +216,6 @@ class WorkflowServiceTest extends TestCase
         $this->service->completePhase($task, 'implement', PhaseStatus::Completed);
 
         $this->assertSame(WorkflowStatus::ImplementCompleted, $task->fresh()->workflow_status);
-        Bus::assertNothingDispatched();
     }
 
     public function test_complete_phase_implement_completed_overrides_prior_failed_status(): void
@@ -235,8 +234,10 @@ class WorkflowServiceTest extends TestCase
         $this->assertSame(WorkflowStatus::ImplementCompleted, $task->fresh()->workflow_status);
     }
 
-    public function test_complete_phase_implement_completed_with_auto_pr_dispatches_push_and_advances_status(): void
+    public function test_complete_phase_implement_completed_advances_status_regardless_of_auto_pr(): void
     {
+        // WorkflowService only advances state now; the auto-push side-effect
+        // moved to the DispatchAutoPush listener (covered separately).
         $profile = RepoProfile::factory()->create(['auto_pr' => true]);
         $task = Task::factory()->create([
             'repo_profile_id' => $profile->id,
@@ -245,7 +246,6 @@ class WorkflowServiceTest extends TestCase
 
         $this->service->completePhase($task, 'implement', PhaseStatus::Completed);
 
-        Bus::assertDispatched(RunPhaseJob::class, fn ($j) => $j->phase === 'push' && $j->taskId === $task->id);
         $this->assertSame(WorkflowStatus::ImplementCompleted, $task->fresh()->workflow_status);
     }
 

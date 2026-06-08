@@ -14,9 +14,10 @@ use App\Workers\Compose\IncompatibleStackAgentException;
 use App\Workers\Compose\WorkerImageBuilder;
 use App\Workers\Compose\WorkerImageResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Http;
 use Mockery;
 use RuntimeException;
+use Saloon\Http\Faking\MockResponse;
+use Saloon\Laravel\Facades\Saloon;
 use Tests\TestCase;
 
 class WorkerImageResolverTest extends TestCase
@@ -76,8 +77,8 @@ class WorkerImageResolverTest extends TestCase
     public function test_byoi_materialises_repo_dockerfile_as_a_stack(): void
     {
         $dockerfile = "FROM php:8.4-cli\nRUN apt-get update && apt-get install -y jq git\n";
-        Http::fake([
-            'api.github.com/repos/acme/widget/contents/*' => Http::response([
+        Saloon::fake([
+            'api.github.com/repos/acme/widget/contents/*' => MockResponse::make([
                 'content' => base64_encode($dockerfile),
                 'encoding' => 'base64',
             ]),
@@ -105,8 +106,8 @@ class WorkerImageResolverTest extends TestCase
 
     public function test_byoi_throws_when_dockerfile_missing(): void
     {
-        Http::fake([
-            'api.github.com/repos/*/contents/*' => Http::response('', 404),
+        Saloon::fake([
+            'api.github.com/repos/*/contents/*' => MockResponse::make('', 404),
         ]);
 
         $profile = RepoProfile::factory()->create([

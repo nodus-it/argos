@@ -23,7 +23,7 @@
             :error="$banner['error']"
             :logsUrl="$banner['logsUrl']"
             :logsLabel="$banner['logsLabel']"
-            :rail="$task->phaseRail()" />
+            :rail="$task->presenter()->phaseRail()" />
     </div>
 
     {{-- Auto-reload while the worker is busy (running or queued). Poll only then
@@ -44,7 +44,7 @@
             <x-argos.meta-item label="{{ __('tasks.view.labels.agent') }}">{{ $agentLabel }}</x-argos.meta-item>
             <x-argos.meta-item label="{{ __('tasks.view.labels.stack') }}" :mono="true">{{ $stackName }}</x-argos.meta-item>
             @if ($totalCost > 0)
-                <x-argos.meta-item label="{{ __('tasks.view.labels.cost') }}" :mono="true">${{ number_format($totalCost, 4) }} · {{ number_format($totalTokens) }} tok</x-argos.meta-item>
+                <x-argos.meta-item label="{{ __('tasks.view.labels.cost') }}" :mono="true">{{ \App\Support\CostFormatter::usd($totalCost) }} · {{ \App\Support\CostFormatter::tokens($totalTokens) }}</x-argos.meta-item>
             @endif
 
             <x-slot:extra>
@@ -71,10 +71,10 @@
     @php
         $demoEnabled = (bool) config('argos.preview.enabled') && (bool) $task->repoProfile?->live_demo_enabled;
         $demoStatus = $demo?->status?->value;
-        $demoBadgeCls = ['building' => 'badge-running', 'live' => 'badge-success', 'failed' => 'badge-failed', 'stopped' => 'badge-draft'][$demoStatus] ?? 'badge-draft';
+        $demoBadgeCls = $demo?->status ? \App\Support\BadgeClass::for($demo->status->color()) : 'badge-draft';
         $accessMode = $task->effectiveDemoAccessMode();
-        $accessBadgeCls = ['success' => 'badge-success', 'warning' => 'badge-running', 'danger' => 'badge-failed', 'gray' => 'badge-draft'][$accessMode->color()] ?? 'badge-draft';
-        $accessIcon = $accessMode === \App\Enums\DemoAccessMode::Public ? 'heroicon-o-lock-open' : 'heroicon-o-lock-closed';
+        $accessBadgeCls = \App\Support\BadgeClass::for($accessMode->color());
+        $accessIcon = $accessMode->icon();
     @endphp
     @if ($demo || $demoEnabled)
         <div class="card card-pad demo-bar fade-in" style="margin-bottom:20px;" x-data="{ log: false }">
@@ -158,12 +158,7 @@
                             @foreach ($item['qualityGates'] as $gate => $result)
                                 @php
                                     $isFail = in_array($result, ['fail', 'advisory_fail'], true);
-                                    $matches = array_values(array_filter(
-                                        $item['qualityGateLogKeys'] ?? [],
-                                        fn (string $k): bool => $k === $gate || str_starts_with($k, $gate.'.')
-                                    ));
-                                    sort($matches);
-                                    $lastKey = $isFail && $matches !== [] ? end($matches) : null;
+                                    $lastKey = $item['qualityGateLastKeys'][$gate] ?? null;
                                     $gateUrl = $lastKey
                                         ? \App\Filament\Admin\Resources\TaskResource::getUrl('quality-gates', ['record' => $record, 'phase' => $item['phase'], 'key' => $lastKey])
                                         : null;
