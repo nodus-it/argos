@@ -11,9 +11,12 @@ use App\Filament\Admin\Resources\ProviderCredentialResource\Pages\EditProviderCr
 use App\Filament\Admin\Resources\ProviderCredentialResource\Pages\ListProviderCredentials;
 use App\Models\ProviderCredential;
 use App\Models\User;
+use App\Services\Credentials\CredentialVerification;
+use App\Services\Credentials\CredentialVerifier;
 use Filament\Actions\Testing\TestAction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Mockery;
 use Saloon\Http\Faking\MockResponse;
 use Saloon\Laravel\Facades\Saloon;
 use Tests\TestCase;
@@ -28,6 +31,17 @@ class ProviderCredentialResourceTest extends TestCase
         $this->actingAs(User::factory()->create());
     }
 
+    /**
+     * Stub the on-save verification (the live API probe) with a fixed result so
+     * these UI tests stay transport-agnostic and offline.
+     */
+    private function fakeVerifier(CredentialVerification $result): void
+    {
+        $verifier = Mockery::mock(CredentialVerifier::class);
+        $verifier->shouldReceive('verifyProvider')->andReturn($result);
+        $this->app->instance(CredentialVerifier::class, $verifier);
+    }
+
     public function test_list_page_renders(): void
     {
         ProviderCredential::factory()->count(2)->create();
@@ -38,6 +52,8 @@ class ProviderCredentialResourceTest extends TestCase
 
     public function test_create_persists_encrypted_pat(): void
     {
+        $this->fakeVerifier(CredentialVerification::valid());
+
         Livewire::test(CreateProviderCredential::class)
             ->fillForm([
                 'label' => 'GitHub acme org',
@@ -84,6 +100,8 @@ class ProviderCredentialResourceTest extends TestCase
 
     public function test_self_hosted_instance_url_persists(): void
     {
+        $this->fakeVerifier(CredentialVerification::valid());
+
         Livewire::test(CreateProviderCredential::class)
             ->fillForm([
                 'label' => 'Self-hosted GitLab',
@@ -140,6 +158,8 @@ class ProviderCredentialResourceTest extends TestCase
 
     public function test_edit_updates_token(): void
     {
+        $this->fakeVerifier(CredentialVerification::valid());
+
         $cred = ProviderCredential::factory()->create([
             'label' => 'Rotate me',
             'token' => 'old-token',
@@ -151,5 +171,63 @@ class ProviderCredentialResourceTest extends TestCase
             ->assertHasNoFormErrors();
 
         $this->assertSame('new-token', $cred->fresh()->token);
+    }
+
+    public function test_create_is_blocked_when_provider_rejects_the_token(): void
+    {
+        $this->fakeVerifier(CredentialVerification::rejected('remove the Bearer prefix'));
+
+        Livewire::test(CreateProviderCredential::class)
+            ->fillForm([
+                'label' => 'Bad token',
+                'provider' => IntegrationProvider::Linear->value,
+                'token' => 'lin_api_bad',
+                'status' => ProviderCredentialStatus::Active->value,
+            ])
+            ->call('create')
+            ->assertNotified();
+
+        // Rejected → halted → never persisted.
+        $this->assertDatabaseMissing('provider_credentials', ['label' => 'Bad token']);
+    }
+
+    public function test_create_stamps_validated_on_success(): void
+    {
+        $this->fakeVerifier(CredentialVerification::valid());
+
+        Livewire::test(CreateProviderCredential::class)
+            ->fillForm([
+                'label' => 'Good token',
+                'provider' => IntegrationProvider::GitHub->value,
+                'token' => 'ghp-ok',
+                'status' => ProviderCredentialStatus::Active->value,
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $cred = ProviderCredential::query()->where('label', 'Good token')->first();
+        $this->assertNotNull($cred);
+        $this->assertSame(ProviderCredentialStatus::Active, $cred->status);
+        $this->assertNotNull($cred->last_validated_at);
+    }
+
+    public function test_create_saves_unverified_when_provider_unreachable(): void
+    {
+        $this->fakeVerifier(CredentialVerification::unreachable('Could not resolve host'));
+
+        Livewire::test(CreateProviderCredential::class)
+            ->fillForm([
+                'label' => 'Offline check',
+                'provider' => IntegrationProvider::GitHub->value,
+                'token' => 'ghp-maybe',
+                'status' => ProviderCredentialStatus::Active->value,
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        // Unreachable → saved, but not marked validated.
+        $cred = ProviderCredential::query()->where('label', 'Offline check')->first();
+        $this->assertNotNull($cred);
+        $this->assertNull($cred->last_validated_at);
     }
 }

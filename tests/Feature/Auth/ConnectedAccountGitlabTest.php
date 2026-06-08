@@ -8,6 +8,8 @@ use App\Enums\IntegrationProvider;
 use App\Models\ConnectedAccount;
 use App\Models\ProviderOAuthConfig;
 use App\Models\User;
+use App\Services\Credentials\CredentialVerification;
+use App\Services\Credentials\CredentialVerifier;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Socialite\Contracts\Factory as SocialiteFactory;
 use Laravel\Socialite\Two\AbstractProvider;
@@ -26,6 +28,11 @@ class ConnectedAccountGitlabTest extends TestCase
         parent::setUp();
         $this->user = User::factory()->create();
         $this->actingAs($this->user);
+
+        // The OAuth callback re-verifies against the provider API — stub it offline.
+        $verifier = Mockery::mock(CredentialVerifier::class);
+        $verifier->shouldReceive('verifyProvider')->andReturn(CredentialVerification::valid());
+        $this->app->instance(CredentialVerifier::class, $verifier);
 
         config([
             'services.gitlab.client_id' => 'test-client-id',

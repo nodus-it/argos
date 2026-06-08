@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Auth;
 
+use App\Http\Controllers\Auth\Concerns\ReverifiesConnectedAccount;
 use App\Http\Controllers\Controller;
 use App\Models\ConnectedAccount;
 use App\Models\ProviderOAuthConfig;
@@ -17,6 +18,8 @@ use Laravel\Socialite\Two\User as SocialiteUser;
 
 final class ConnectedAccountController extends Controller
 {
+    use ReverifiesConnectedAccount;
+
     private const GITHUB_RETURN_SESSION_KEY = 'oauth.github.return';
 
     private const GITLAB_RETURN_SESSION_KEY = 'oauth.gitlab.return';
@@ -64,6 +67,7 @@ final class ConnectedAccountController extends Controller
         );
 
         $account->relinkOrphanedResources();
+        $this->reverifyConnectedAccount($account);
 
         $returnTo = $request->session()->pull(self::GITHUB_RETURN_SESSION_KEY);
 
@@ -136,6 +140,7 @@ final class ConnectedAccountController extends Controller
         );
 
         $account->relinkOrphanedResources();
+        $this->reverifyConnectedAccount($account);
 
         $returnTo = $request->session()->pull(self::GITLAB_RETURN_SESSION_KEY);
 

@@ -69,4 +69,12 @@ return [
             'manual_note' => 'Lege die OAuth-App in den Workspace-Einstellungen deines Providers an (OAuth-Consumer) und trage die Callback-URL oben als Redirect-URL ein.',
         ],
     ],
+
+    'verify' => [
+        'rejected_title' => 'Zugangsdaten abgelehnt',
+        'unreachable_title' => 'Zugangsdaten konnten nicht geprüft werden',
+        'oauth_scope_title' => 'Konto verbunden, aber die API hat es abgelehnt',
+        'token_rejected' => 'Der Provider hat dieses Token abgelehnt. Prüfe, ob es korrekt ist und die nötigen Scopes hat.',
+        'provider_unreachable' => 'Der Provider war nicht erreichbar — die Zugangsdaten wurden gespeichert, aber nicht verifiziert.',
+    ],
 ];

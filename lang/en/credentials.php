@@ -69,4 +69,12 @@ return [
             'manual_note' => 'Create the OAuth app under your provider workspace settings (OAuth consumer) and set the callback URL above as the redirect URL.',
         ],
     ],
+
+    'verify' => [
+        'rejected_title' => 'Credential rejected',
+        'unreachable_title' => 'Could not verify credential',
+        'oauth_scope_title' => 'Account connected, but the API rejected it',
+        'token_rejected' => 'The provider rejected this token. Check it is correct and has the required scopes.',
+        'provider_unreachable' => 'The provider could not be reached — the credential was saved but not verified.',
+    ],
 ];
