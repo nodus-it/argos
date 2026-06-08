@@ -59,17 +59,23 @@ next to the compose file — the installer never touches that.
 ### What this gets you
 
 - ✓ Tasks → automated pull requests on GitHub, GitLab, or Bitbucket
-- ✓ Authentication via Personal Access Token (paste a token per project)
+- ✓ Authentication via Personal Access Token, or full OAuth (repo/branch
+  pickers + per-user account binding) — OAuth apps are managed in the UI
+- ✓ Self-hosted GitLab (set the instance URL when you add the account / OAuth app)
 - ✓ Optimised for PHP / Laravel projects out of the box
 - ✓ Runs on your Claude Pro / Max / Team subscription
-- ✓ Drive Argos straight from Claude Code via the built-in [MCP server](docs/SETUP-MCP.md)
+- ✓ Drive Argos from Claude Code via the built-in [MCP server](docs/SETUP-MCP.md),
+  or programmatically via the **REST API v1** (Sanctum bearer tokens, `/api/v1`)
 - ✓ Import issues from GitHub / GitLab / Linear via [task providers](docs/SETUP-TASK-PROVIDERS.md)
+- ✓ Repo-defined worker images — drop a `.argos/worker.dockerfile` to control
+  the build environment (BYOI)
+- ✓ Ephemeral per-task live demo — preview the implemented branch in a
+  throwaway container before merging
 
-### What this does **not** get you
+### What this does **not** get you out of the box
 
-- ✗ Repository / branch dropdowns when creating a project (needs OAuth)
-- ✗ Per-user account binding (needs OAuth)
-- ✗ Self-hosted GitLab support (needs `GITLAB_INSTANCE_URL`)
+- ✗ Repository / branch dropdowns + per-user account binding until you connect
+  an OAuth app (Configuration → OAuth Apps)
 - ✗ Custom domain / TLS (terminate at your reverse proxy)
 
 For any of those: see **[Extended Setup](docs/SETUP.md)**.
@@ -98,6 +104,8 @@ Once the container is up:
 | Bitbucket setup | [docs/SETUP-BITBUCKET.md](docs/SETUP-BITBUCKET.md) |
 | Task-Provider / Issue-Tracker integration | [docs/SETUP-TASK-PROVIDERS.md](docs/SETUP-TASK-PROVIDERS.md) |
 | MCP server (drive Argos from Claude Code) | [docs/SETUP-MCP.md](docs/SETUP-MCP.md) |
+| Media library — file / image uploads (optional) | [docs/SETUP-MEDIA-LIBRARY.md](docs/SETUP-MEDIA-LIBRARY.md) |
+| Provider contract tests (local, real APIs) | [docs/PROVIDER-TEST-SETUP.md](docs/PROVIDER-TEST-SETUP.md) |
 | Local development & tests | [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) |
 
 ## Contributing

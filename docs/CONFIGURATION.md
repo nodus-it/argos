@@ -144,6 +144,17 @@ server.
 | `ARGOS_DB_SSL_CA` | – | Optional path to a TLS CA bundle. |
 | `ARGOS_DB_URL` | – | Full DSN — overrides the individual fields above. |
 
+## Media library (optional)
+
+File and image uploads attached to models go through
+[spatie/laravel-medialibrary](https://spatie.be/docs/laravel-medialibrary).
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `MEDIA_DISK` | `public` | Filesystem disk (from `config/filesystems.php`) uploads are stored on. Point at `s3` etc. for off-box storage. |
+
+See [Media library setup](SETUP-MEDIA-LIBRARY.md).
+
 ## Logging
 
 | Variable | Default | Purpose |

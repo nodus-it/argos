@@ -1,79 +1,82 @@
-# Task-Provider-Anbindung (Issue-Tracker)
+# Task Provider integration (issue trackers)
 
-Argos kann Issues aus externen Systemen (GitHub, GitLab, Linear) als Tasks importieren und bei Phasenabschluss automatisch einen Kommentar im Issue hinterlassen.
+Argos can import issues from external systems (GitHub, GitLab, Linear) as tasks
+and automatically leave a comment on the issue when a phase finishes.
 
-## Voraussetzungen
+## Prerequisites
 
-- Ein konfiguriertes **Connected Account** (OAuth) für GitHub, GitLab oder Linear
-  (siehe `docs/SETUP-GITHUB.md`, `docs/SETUP-GITLAB.md` bzw. `docs/SETUP-LINEAR.md`)
-- Das Projekt (Repo Profile) muss bereits in Argos angelegt sein
+- A configured **Connected Account** (OAuth) for GitHub, GitLab or Linear
+  (see `docs/SETUP-GITHUB.md`, `docs/SETUP-GITLAB.md` or `docs/SETUP-LINEAR.md`)
+- The project (Repo Profile) must already exist in Argos
 
-## Binding anlegen
+## Creating a binding
 
-1. Im Admin-Panel unter **Repo Profiles** das gewünschte Projekt öffnen
-2. Tab **Task Provider Bindings** wählen → **New Binding**
-3. Felder ausfüllen:
+1. In the admin panel open the project under **Repo Profiles**
+2. Select the **Task Provider Bindings** tab → **New Binding**
+3. Fill in the fields:
 
-| Feld | Beschreibung |
+| Field | Description |
 |---|---|
-| **Kind** | GitHub, GitLab oder Linear |
-| **Mode** | `Poll` (periodisches Abrufen alle 5 min) oder `Webhook` (Push-Events) |
-| **Connected Account** | Das OAuth-Konto mit API-Zugriff |
-| **External Project Ref** | GitHub/GitLab: `owner/repo` (z. B. `acme/widget`); Linear: Team-Key (z. B. `ENG`) |
-| **Labels** | Optional: nur Issues mit diesen Labels werden importiert |
+| **Kind** | GitHub, GitLab or Linear |
+| **Mode** | `Poll` (periodic fetch every 5 min) or `Webhook` (push events) |
+| **Connected Account** | The OAuth account with API access |
+| **External Project Ref** | GitHub/GitLab: `owner/repo` (e.g. `acme/widget`); Linear: team key (e.g. `ENG`) |
+| **Labels** | Optional: only issues carrying these labels are imported |
 
-4. Speichern → Binding ist im Status **Pending**
-5. Aktion **Setup** ausführen → Binding wird aktiviert (Status **Active**)
+4. Save → the binding is in status **Pending**
+5. Run the **Setup** action → the binding is activated (status **Active**)
 
-## Webhook-Modus (empfohlen für Echtzeit)
+## Webhook mode (recommended for real time)
 
-Beim Setup im Webhook-Modus generiert Argos automatisch ein Webhook-Secret und
-gibt die Webhook-URL aus. Diese URL muss im externen System eingetragen werden:
+When you run Setup in webhook mode, Argos generates a webhook secret and prints
+the webhook URL. Register that URL in the external system:
 
 **GitHub:** Repository → Settings → Webhooks → Add webhook
 - Payload URL: `https://<ARGOS_URL>/webhooks/issues/github/<binding-id>`
 - Content type: `application/json`
-- Secret: (das generierte Secret)
+- Secret: (the generated secret)
 - Events: **Issues**
 
-**GitLab:** Projekt → Settings → Webhooks
+**GitLab:** Project → Settings → Webhooks
 - URL: `https://<ARGOS_URL>/webhooks/issues/gitlab/<binding-id>`
-- Secret token: (das generierte Secret)
+- Secret token: (the generated secret)
 - Trigger: **Issues events**
 
-**Linear:** Wird automatisch beim Setup registriert — kein manueller Schritt im Linear-Interface erforderlich (OAuth-Scope `admin` ist Voraussetzung).
-- Webhook-URL: `https://<ARGOS_URL>/webhooks/issues/linear/<binding-id>`
-- Signatur: HMAC-SHA256 im `Linear-Signature`-Header
+**Linear:** Registered automatically during Setup — no manual step in the Linear
+interface required (the OAuth scope `admin` is a prerequisite).
+- Webhook URL: `https://<ARGOS_URL>/webhooks/issues/linear/<binding-id>`
+- Signature: HMAC-SHA256 in the `Linear-Signature` header
 
-## Poll-Modus
+## Poll mode
 
-Im Poll-Modus fragt Argos alle 5 Minuten aktiv neue Issues ab. Kein Webhook im
-externen System erforderlich. `APP_URL` muss dafür nicht öffentlich erreichbar sein.
+In poll mode Argos actively fetches new issues every 5 minutes. No webhook in
+the external system is required, and `APP_URL` does not need to be publicly
+reachable.
 
-## Filter
+## Filtering
 
-Über das Feld **Labels** lassen sich Issues filtern: nur Issues, die mindestens
-eines der angegebenen Labels tragen, werden als Tasks importiert. Ohne Filter
-werden alle offenen Issues importiert.
+The **Labels** field filters issues: only issues carrying at least one of the
+given labels are imported as tasks. Without a filter, all open issues are
+imported.
 
-## Umgebungsvariablen
+## Environment variables
 
-Keine zusätzlichen Variablen erforderlich. `APP_URL` wird als Basis der
-Webhook-URL verwendet und muss öffentlich erreichbar sein (nur Webhook-Modus).
+No additional variables are required. `APP_URL` is used as the base of the
+webhook URL and must be publicly reachable (webhook mode only).
 
 ```env
-# Basis-URL — muss öffentlich erreichbar sein wenn Webhook-Modus genutzt wird
+# Base URL — must be publicly reachable when webhook mode is used
 APP_URL=https://argos.example.com
 ```
 
-## Rückkommentierung
+## Comment-back
 
-Nach jedem Phasenabschluss postet Argos automatisch einen Kommentar im
-verknüpften Issue:
+After each phase finishes, Argos automatically posts a comment on the linked
+issue (the comment text is currently posted in German):
 
 ```
 **Argos** — Phase **implement** abgeschlossen mit Status: **success**
 ```
 
-Schlägt die Kommentierung fehl (z. B. wegen abgelaufenem Token), wird der
-Fehler geloggt aber der Workflow nicht unterbrochen.
+If commenting fails (e.g. because of an expired token), the error is logged but
+the workflow is not interrupted.
