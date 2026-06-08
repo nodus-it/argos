@@ -2,14 +2,34 @@
 
 <img src=".github/logo.svg" alt="Argos" width="640">
 
-**A web-first dev agent that turns a task description into a pull request.**
+### Every agent. One view.
+
+**From a task description to a reviewed pull request.** Argos drafts a concept,
+implements it in an isolated worker container, and opens the PR — all on your
+Claude subscription, not the API.
 
 [![License: AGPL-3.0](https://img.shields.io/github/license/nodus-it/argos?style=flat-square)](LICENSE)
 [![Version](https://img.shields.io/github/v/tag/nodus-it/argos?style=flat-square&label=version&include_prereleases&sort=semver)](https://github.com/nodus-it/argos/releases)
 [![GHCR](https://img.shields.io/badge/ghcr.io-argos--app-2496ED?style=flat-square&logo=docker&logoColor=white)](https://github.com/nodus-it/argos/pkgs/container/argos-app)
 [![CI](https://img.shields.io/github/actions/workflow/status/nodus-it/argos/ci.yml?branch=develop&style=flat-square&label=tests)](https://github.com/nodus-it/argos/actions/workflows/ci.yml)
 
+<br>
+
+<img src=".github/screenshots/login.png" alt="Argos — sign in to your control room" width="900">
+
 </div>
+
+<!--
+  Screenshot gallery — drop PNGs into .github/screenshots/ and uncomment.
+  Suggested shots: dashboard (control room), task-view (phase stepper),
+  task-logs-running (live agent stream), task-diff (review).
+
+<div align="center">
+<img src=".github/screenshots/dashboard.png" alt="Control room dashboard" width="49%">
+&nbsp;
+<img src=".github/screenshots/task-view.png" alt="Task phases — concept to PR" width="49%">
+</div>
+-->
 
 ---
 

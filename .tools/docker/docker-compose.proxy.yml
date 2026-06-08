@@ -1,0 +1,56 @@
+# Argos behind an EXTERNAL Traefik reverse proxy — optional dev overlay.
+#
+# Opt-in layer that attaches Argos' own internal Traefik to a pre-existing
+# external Traefik network and exposes the app (and the live-demo
+# subdomains) via hostnames instead of a published port. Used by
+# `composer dev` (the default dev flow); `composer dev:port` runs WITHOUT
+# this overlay and just publishes ${ARGOS_PORT} for a zero-config clone.
+#
+# It only adds metadata (labels) + an external network membership to the
+# internal Traefik — Argos' routing (file-provider: app catch-all + one
+# route per demo) is untouched. The internal Traefik already trusts
+# X-Forwarded-* (forwardedHeaders.insecure=true), so the upstream proxy
+# terminates TLS and Laravel emits https URLs. Set APP_URL to the https
+# host accordingly.
+#
+# Self-host installs never see this file (install.sh ships only
+# docker-compose.yml).
+#
+# Configure via .env:
+#   ARGOS_PROXY_HOST        app hostname (match APP_URL's host)   [argos.test]
+#   ARGOS_PROXY_NETWORK     name of the external Traefik network  [proxy]
+#   ARGOS_PROXY_ENTRYPOINT  Traefik entrypoint to bind            [websecure]
+#
+# Requires: the external network ${ARGOS_PROXY_NETWORK} already exists and a
+# Traefik instance watching it (with a cert covering the host and, for
+# demos, *.<host>).
+services:
+  traefik:
+    networks:
+      - default
+      - argos_edge
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      # App at the apex host.
+      - "traefik.http.routers.argos.rule=Host(`${ARGOS_PROXY_HOST:-argos.test}`)"
+      - "traefik.http.routers.argos.entrypoints=${ARGOS_PROXY_ENTRYPOINT:-websecure}"
+      - "traefik.http.routers.argos.tls=true"
+      - "traefik.http.routers.argos.service=argos"
+      # Live-demo subdomains (P6): <demo>.<host>. NB: `$$` so compose emits a
+      # literal `$` (regex end-anchor); dots are intentionally left loose.
+      - "traefik.http.routers.argos-demos.rule=HostRegexp(`^.+\\.${ARGOS_PROXY_HOST:-argos.test}$$`)"
+      - "traefik.http.routers.argos-demos.entrypoints=${ARGOS_PROXY_ENTRYPOINT:-websecure}"
+      - "traefik.http.routers.argos-demos.tls=true"
+      - "traefik.http.routers.argos-demos.service=argos"
+      # Both routers target the internal Traefik's :80 web entrypoint.
+      - "traefik.http.services.argos.loadbalancer.server.port=80"
+      # Optional gethomepage.dev tile.
+      - "homepage.group=Projekte"
+      - "homepage.name=Argos"
+      - "homepage.href=https://${ARGOS_PROXY_HOST:-argos.test}"
+
+networks:
+  proxy:
+    external: true
+    name: ${ARGOS_PROXY_NETWORK:-proxy}

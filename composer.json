@@ -60,6 +60,10 @@
 
         "dev": [
             "Composer\\Config::disableProcessTimeout",
+            "npx concurrently -c \"#93c5fd,#fb7185\" \"docker compose --env-file .env -f .tools/docker/docker-compose.yml -f .tools/docker/docker-compose.dev.yml -f .tools/docker/docker-compose.proxy.yml up --build --remove-orphans\" \"npm run dev\" --names=compose,vite --kill-others"
+        ],
+        "dev:port": [
+            "Composer\\Config::disableProcessTimeout",
             "npx concurrently -c \"#93c5fd,#fb7185\" \"docker compose --env-file .env -f .tools/docker/docker-compose.yml -f .tools/docker/docker-compose.dev.yml up --build --remove-orphans\" \"npm run dev\" --names=compose,vite --kill-others"
         ],
         "dev:stop": "docker compose --env-file .env -f .tools/docker/docker-compose.yml -f .tools/docker/docker-compose.dev.yml down",
