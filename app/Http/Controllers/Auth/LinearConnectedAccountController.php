@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Auth;
 
+use App\Http\Controllers\Auth\Concerns\ReverifiesConnectedAccount;
 use App\Http\Controllers\Controller;
 use App\Integrations\Linear\LinearConnector;
 use App\Integrations\Linear\Requests\GraphQLRequest;
@@ -16,6 +17,8 @@ use Illuminate\Support\Facades\Auth;
 
 final class LinearConnectedAccountController extends Controller
 {
+    use ReverifiesConnectedAccount;
+
     private const RETURN_SESSION_KEY = 'oauth.linear.return';
 
     private const STATE_SESSION_KEY = 'oauth.linear.state';
@@ -89,6 +92,7 @@ final class LinearConnectedAccountController extends Controller
         );
 
         $account->relinkOrphanedResources();
+        $this->reverifyConnectedAccount($account);
 
         $returnTo = $request->session()->pull(self::RETURN_SESSION_KEY);
 

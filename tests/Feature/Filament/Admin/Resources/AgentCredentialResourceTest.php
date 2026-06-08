@@ -11,8 +11,11 @@ use App\Filament\Admin\Resources\AgentCredentialResource\Pages\EditAgentCredenti
 use App\Filament\Admin\Resources\AgentCredentialResource\Pages\ListAgentCredentials;
 use App\Models\AgentCredential;
 use App\Models\User;
+use App\Services\Credentials\CredentialVerification;
+use App\Services\Credentials\CredentialVerifier;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Mockery;
 use Tests\TestCase;
 
 class AgentCredentialResourceTest extends TestCase
@@ -25,6 +28,14 @@ class AgentCredentialResourceTest extends TestCase
         $this->actingAs(User::factory()->create());
     }
 
+    /** Stub the on-save Claude token probe so these UI tests stay offline. */
+    private function fakeVerifier(CredentialVerification $result): void
+    {
+        $verifier = Mockery::mock(CredentialVerifier::class);
+        $verifier->shouldReceive('verifyClaudeToken')->andReturn($result);
+        $this->app->instance(CredentialVerifier::class, $verifier);
+    }
+
     public function test_list_page_renders(): void
     {
         AgentCredential::factory()->count(2)->create();
@@ -35,6 +46,8 @@ class AgentCredentialResourceTest extends TestCase
 
     public function test_create_persists_claude_token_credential(): void
     {
+        $this->fakeVerifier(CredentialVerification::valid());
+
         Livewire::test(CreateAgentCredential::class)
             ->fillForm([
                 'agent_name' => AgentName::ClaudeCode->value,
@@ -49,6 +62,24 @@ class AgentCredentialResourceTest extends TestCase
         $this->assertNotNull($cred);
         $this->assertSame(AgentName::ClaudeCode, $cred->agent_name);
         $this->assertSame('oat-secret-1234', $cred->credentials['token']);
+        $this->assertNotNull($cred->last_validated_at);
+    }
+
+    public function test_create_is_blocked_when_claude_token_rejected(): void
+    {
+        $this->fakeVerifier(CredentialVerification::rejected('invalid token'));
+
+        Livewire::test(CreateAgentCredential::class)
+            ->fillForm([
+                'agent_name' => AgentName::ClaudeCode->value,
+                'name' => 'Bad Claude',
+                'status' => AgentCredentialStatus::Active->value,
+                'credentials.token' => 'oat-bad',
+            ])
+            ->call('create')
+            ->assertNotified();
+
+        $this->assertDatabaseMissing('agent_credentials', ['name' => 'Bad Claude']);
     }
 
     public function test_create_persists_codex_auth_json_from_textarea(): void

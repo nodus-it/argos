@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Auth;
 
+use App\Http\Controllers\Auth\Concerns\ReverifiesConnectedAccount;
 use App\Http\Controllers\Controller;
 use App\Models\ConnectedAccount;
 use App\Models\User;
@@ -16,6 +17,8 @@ use Laravel\Socialite\Two\User as SocialiteUser;
 
 final class BitbucketConnectedAccountController extends Controller
 {
+    use ReverifiesConnectedAccount;
+
     private const RETURN_SESSION_KEY = 'oauth.bitbucket.return';
 
     public function redirect(Request $request): RedirectResponse
@@ -57,6 +60,7 @@ final class BitbucketConnectedAccountController extends Controller
         );
 
         $account->relinkOrphanedResources();
+        $this->reverifyConnectedAccount($account);
 
         $returnTo = $request->session()->pull(self::RETURN_SESSION_KEY);
 
