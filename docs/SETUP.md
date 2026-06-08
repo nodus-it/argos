@@ -113,6 +113,10 @@ want) overrides per task. Built-in stacks (`php-8.3`, `php-8.4`, …) are
 mirrored from the repo manifest into the DB on every `migrate`; you can add
 your own user stack in the same UI.
 
+To tailor a *target* repository to Argos — a custom build environment
+(`.argos/worker.dockerfile`) or a live-demo contract (`.argos/demo.*`) — see
+the agent-oriented guide in [PREPARE-PROJECT.md](PREPARE-PROJECT.md).
+
 ## Pre-release / develop builds
 
 Every push to the `develop` branch publishes the rolling manager image

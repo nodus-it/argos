@@ -92,10 +92,28 @@ Once the container is up:
 4. **Create a task** — describe what you want done. Argos drafts a concept,
    implements it, opens a pull request.
 
+## Prepare a project for Argos
+
+Most PHP / Laravel repos work out of the box. To check a specific project — and
+wire up a custom build environment or live-demo when the defaults don't fit —
+point your coding agent at the guide and let it do the work. Paste this into an
+agent running **inside the target repository**:
+
+> Prepare this repository for Argos, following
+> `https://github.com/nodus-it/argos/blob/master/docs/PREPARE-PROJECT.md`.
+> Decide whether it runs on Argos's defaults as-is; if not, show me the two
+> options (ship a `.argos/` contract vs. adjust the project) before changing
+> anything.
+
+The guide ([docs/PREPARE-PROJECT.md](docs/PREPARE-PROJECT.md)) is written for an
+AI agent and covers both the worker execution environment
+(`.argos/worker.dockerfile`) and the live-demo contract (`.argos/demo.*`).
+
 ## Documentation
 
 | Topic | Where |
 |---|---|
+| Prepare a repo for Argos (agent guide) | [docs/PREPARE-PROJECT.md](docs/PREPARE-PROJECT.md) |
 | Extended setup (production, custom workers, reverse proxy) | [docs/SETUP.md](docs/SETUP.md) |
 | All environment variables with defaults | [docs/CONFIGURATION.md](docs/CONFIGURATION.md) |
 | OAuth — when and why | [docs/OAUTH.md](docs/OAUTH.md) |
