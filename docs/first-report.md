@@ -112,14 +112,24 @@ PHP-Ebene grün:
    Quality-Gates **artisan + pest + phpstan = pass**. Der Seed-Task war bewusst inhaltslos
    → `changed_files=[]`, daher **kein Push, kein Remote-Branch (API 404), kein PR** —
    null Außen-Footprint. Push-Phase + ein konkreter Task bleiben für die Stage.
-3. ⏳ **Ein echter Demo-Deploy** (`live_demo_enabled`), um `TraefikRouter` (Route-Datei im
-   echten `traefik_dir` + Reachability) und `DemoComposeBuilder` (echtes `compose up`)
-   end-to-end zu prüfen. Beim lokalen Lauf bewusst deaktiviert (Scope-Schutz) — manuell
-   auf der Stage.
+3. ✅ **Echter Demo-Deploy** — **Stand 2026-06-08**, lokal gegen den `Live demo task`
+   (Default-Laravel-Contract, da `nodus-it/argos` kein `.argos/demo.*` mitbringt).
+   `DemoImageBuilder` → `DemoComposeBuilder` (Override-YAML + APP_KEY-Inject) →
+   echtes `compose up` (`app` + `mariadb`) → in-Container `composer install` +
+   `migrate --seed` + `npm build` → `TraefikRouter` schrieb
+   `/data/traefik/demo-live-demo-task.yml` → Health `ready after 0s`. Demo war unter
+   `http://demo-live-demo-task.127.0.0.1.nip.io:8080` erreichbar (**HTTP 302 → /admin**,
+   argos bootet durch Traefik). Teardown entfernte Container + Route-Datei sauber.
 
-Schritte 1 + 2 sind grün (Browser-E2E + echter concept/implement-Lauf) → der Branch ist
-merge-reif; nur Schritt 3 (Demo-Deploy) und ein Push-Phasen-Lauf mit konkretem Task
-bleiben für die Stage (`argos-stage`).
+Alle drei Schritte sind grün (Browser-E2E + echter concept/implement-Lauf + echter
+Demo-Deploy, alle lokal) → der Branch ist verifiziert merge-reif. Offen bleibt nur ein
+Push-Phasen-Lauf mit *konkretem* Task (erzeugt dann einen echten PR) — sinnvoll als
+einmaliger Stage-Smoke (`argos-stage`).
+
+> **Hinweis (kein Bug):** `DemoDeployer::teardown()` baut nur die Infra ab; den
+> `status=Stopped`-Write macht der Aufrufer (`StopDemoJob`) — direkt aufgerufen bleibt
+> der Demo-Status daher `live`. In den realen Pfaden (Push-Listener, Concurrency-
+> Eviction) ist es konsistent.
 
 > **Hinweis Doku-Drift**: Die CLAUDE.md beschreibt Browser-E2E als „Playwright bootet
 > `php artisan serve` selbst — kein laufender Stack nötig". Die tatsächliche
