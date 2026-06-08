@@ -9,7 +9,6 @@ use App\Jobs\RunPhaseJob;
 use App\Models\PhaseRun;
 use App\Models\RepoProfile;
 use App\Models\Task;
-use App\Services\Anthropic\CredentialStore;
 use App\Services\Task\TaskService;
 use App\Services\Workflow\PhaseRunner;
 use App\Services\Workflow\WorkerVolumeReader;
@@ -266,7 +265,7 @@ class FeedbackWorkflowTest extends TestCase
         $volumeReader->shouldReceive('readFile')->andReturn(null);
         $volumeReader->shouldReceive('readQualityGateLogs')->andReturn(null);
 
-        $runner = Mockery::mock(PhaseRunner::class, [app(CredentialStore::class), $volumeReader])->makePartial();
+        $runner = Mockery::mock(PhaseRunner::class, [$volumeReader])->makePartial();
         $runner->shouldAllowMockingProtectedMethods();
         $runner->shouldReceive('newProcess')->andReturn($processMock);
         $this->app->instance(PhaseRunner::class, $runner);

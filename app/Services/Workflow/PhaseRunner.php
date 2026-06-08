@@ -9,14 +9,12 @@ use App\Jobs\DeployDemoJob;
 use App\Jobs\RunPhaseJob;
 use App\Models\PhaseRun;
 use App\Models\Task;
-use App\Services\Anthropic\CredentialStore;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\Process\Process;
 
 class PhaseRunner
 {
     public function __construct(
-        private readonly CredentialStore $credentials,
         private readonly WorkerVolumeReader $volumeReader,
     ) {}
 

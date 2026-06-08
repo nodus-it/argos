@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Support;
 
-use App\Services\Anthropic\CredentialStore;
 use App\Services\Workflow\PhaseRunner;
 use App\Services\Workflow\WorkerVolumeReader;
 use Mockery;
@@ -105,7 +104,7 @@ final class FakeWorkerProcess
         $volumeReader->shouldReceive('readFile')->andReturn(null);
         $volumeReader->shouldReceive('readQualityGateLogs')->andReturn(null);
 
-        $phaseRunnerMock = Mockery::mock(PhaseRunner::class, [app(CredentialStore::class), $volumeReader])->makePartial();
+        $phaseRunnerMock = Mockery::mock(PhaseRunner::class, [$volumeReader])->makePartial();
         $phaseRunnerMock->shouldAllowMockingProtectedMethods();
         $phaseRunnerMock->shouldReceive('newProcess')->andReturn($processMock);
         $phaseRunnerMock->shouldReceive('writeNotesToVolume')->andReturn(null);
