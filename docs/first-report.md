@@ -93,30 +93,34 @@ konkreten neuen Provider (z.B. Gitea/Forgejo).
 
 ## Vor dem Merge: vollständiger Testlauf nötig
 
-Die bisherige Verifikation deckt nur die **PHP-Ebene** ab und ist grün:
+PHP-Ebene grün:
 
-- ✅ `vendor/bin/pest` — volle Suite **1256 Tests / 2859 Assertions / 0 Fehler**
+- ✅ `vendor/bin/pest` — volle Suite **1269 Tests / 2886 Assertions / 0 Fehler**
 - ✅ `vendor/bin/phpstan analyse` — **0 errors**
 - ✅ `vendor/bin/pint` — clean
 
-**Noch ausstehend** und vor dem Merge zwingend, weil B1 den Kern-Workflow
-(`PhaseRunner`) und B2 den Demo-Deploy umgebaut haben — beides Pfade, die die
-Pest-Suite nur gemockt durchläuft:
-
-1. **Browser-E2E (Playwright)** gegen den Compose-Stack — `composer test:browser`
-   (gemockt, `ARGOS_E2E_FAKE=1`). Deckt Login → Onboarding → Projekt → Task →
-   Concept/Implement über die 4-Run-Matrix ab. Läuft heute nur lokal, nicht in CI —
-   also die eigentliche Absicherung des umgebauten Workflows.
-2. **Mindestens ein echter Phasen-Lauf** (`concept` → `implement` → `push`) gegen ein
+1. ✅ **Browser-E2E (Playwright)** gegen den Compose-Stack — `composer test:browser`
+   (gemockt, `ARGOS_E2E_FAKE=1`). **Stand 2026-06-08: 7 passed, 1 skipped** (Real-Flow).
+   Deckt Login → Onboarding → Projekt → Task → Concept/Implement über die 4-Run-Matrix
+   (GitHub/Claude/OAuth · GitLab/Codex/PAT · Bitbucket/Claude/PAT · GitLab-self-hosted/
+   Codex/OAuth) ab, plus Settings-Walk + View-Task. Läuft nur lokal, nicht in CI.
+2. ⏳ **Mindestens ein echter Phasen-Lauf** (`concept` → `implement` → `push`) gegen ein
    Test-Repo, um den neuen `PhaseCommandBuilder`/`PhaseResultSync`/`UsageLimitManager`-
    Pfad mit echtem Worker-Container + Volume-I/O zu bestätigen (die Pest-Tests mocken
-   `newProcess`/`WorkerVolumeReader`).
-3. **Ein echter Demo-Deploy** (`live_demo_enabled`), um `TraefikRouter` (Route-Datei im
+   `newProcess`/`WorkerVolumeReader`). Braucht echte Tokens — manuell auf der Stage.
+3. ⏳ **Ein echter Demo-Deploy** (`live_demo_enabled`), um `TraefikRouter` (Route-Datei im
    echten `traefik_dir` + Reachability) und `DemoComposeBuilder` (echtes `compose up`)
-   end-to-end zu prüfen.
+   end-to-end zu prüfen. Manuell auf der Stage.
 
-Erst nach grünem Schritt 1 (mindestens) ist der Branch merge-reif; Schritte 2–3
+Schritt 1 (die eigentliche Absicherung des umgebauten Workflows) ist grün → der Branch
+ist aus PHP- + Browser-Sicht merge-reif; Schritte 2–3 brauchen echte Tokens und laufen
 idealerweise einmal manuell auf der Stage (`argos-stage`).
+
+> **Hinweis Doku-Drift**: Die CLAUDE.md beschreibt Browser-E2E als „Playwright bootet
+> `php artisan serve` selbst — kein laufender Stack nötig". Die tatsächliche
+> `playwright.config.ts` braucht aber den **laufenden Compose-Stack** (nginx auf
+> `ARGOS_PORT`, inkl. Queue/Redis, `ARGOS_E2E_FAKE=1`), weil der Full-Flow die Queue
+> braucht. Vor dem nächsten E2E-Lauf die CLAUDE.md angleichen (per `/retro`).
 
 ---
 
