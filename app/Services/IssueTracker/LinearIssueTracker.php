@@ -360,7 +360,12 @@ class LinearIssueTracker implements IssueTrackerContract
     private function http(): PendingRequest
     {
         return Http::withHeaders([
-            'Authorization' => "Bearer {$this->token}",
+            // Linear personal API keys (lin_api_…) are sent raw — they must NOT
+            // carry a Bearer prefix (the API rejects that with a 400). Only
+            // OAuth2 access tokens use "Bearer".
+            'Authorization' => str_starts_with($this->token, 'lin_api_')
+                ? $this->token
+                : "Bearer {$this->token}",
             'Content-Type' => 'application/json',
         ]);
     }
