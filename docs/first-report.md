@@ -8,6 +8,14 @@ Filament & Views, **D)** Folge-Aktionen synchron statt über Events.
 > **Stand 2026-06-07** — **alle Befunde abgearbeitet**: Block **A**, **B** (B1–B4),
 > **C** und **D** erledigt (Branch `feat/saloon-github-pilot`). Es verbleibt nur
 > noch optionaler Kleinkram (siehe unten).
+>
+> **Nachtrag 2026-06-08** — A4-Nachprüfung ergab, dass der Saloon-Rollout nur
+> Git-Provider + Issue-Tracker abdeckte; 4 Raw-`Http::`-Calls (OAuth-Refresh,
+> Linear-OAuth-Callback, Anthropic Token-Validierung + Usage) liefen noch an
+> Saloon vorbei. Alle vier sind jetzt auf Connectoren in `app/Integrations/`
+> umgestellt; ein zweiter Arch-Test (`no raw http client outside integrations`)
+> verbietet `Http`-Facade/Guzzle außerhalb `app/Integrations`. Socialite bleibt
+> die bewusste Ausnahme für den OAuth-**Login** (eigene Abstraktion).
 
 ---
 
@@ -15,7 +23,7 @@ Filament & Views, **D)** Folge-Aktionen synchron statt über Events.
 
 | Ref | Was | Lösung | Commit |
 | --- | --- | --- | --- |
-| A4 | HTTP-Setup 7× dupliziert (`http()` in allen Provider-Services) | **Saloon-Rollout**: alle 4 Provider × GitService+Tracker hinter Connectoren in `app/Integrations/`; Arch-Regel bewacht die Grenze | `a9bf775`…`5373db3` |
+| A4 | HTTP-Setup 7× dupliziert (`http()` in allen Provider-Services) | **Saloon-Rollout**: alle 4 Provider × GitService+Tracker hinter Connectoren in `app/Integrations/`; Arch-Regel bewacht die Grenze. **Nachtrag 06-08**: restliche 4 Raw-`Http::`-Calls (TokenRefresher, Linear-OAuth-Callback, Anthropic Validate+Usage) → `Anthropic`-/`OAuth`-Connector; zweiter Arch-Test verbietet Raw-HTTP außerhalb `app/Integrations` | `a9bf775`…`5373db3` |
 | A1 | `parseDiffStructured` 2× + Docker-Diff-Shell-out 2× | `App\Services\Git\DiffParser` + `WorkspaceDiffService` | `5959e4f` |
 | A2 | `parseRef` 4× identisch | `ParsesExternalProjectRef`-Trait | `43a3f8f` |
 | A3 | Phase→Icon-Mapping 3× in Views | `App\Support\PhaseGlyph` | `0403618` |
@@ -65,16 +73,21 @@ HTTP-Setup (A4) und den Orchestrierungs-Services (B4).
 
 ---
 
-## Optionaler Rest (nicht eingeplant)
+## Optionaler Rest
 
-Keiner dieser Punkte ist ein Blocker — alle Pflicht-Befunde (A/B/C/D) sind erledigt.
-Aufgeführt als bewusst offen gelassene Möglichkeiten, nicht als offene Schuld.
+> **Stand 2026-06-08** — O1 und O3 erledigt; O2 auf die konkreten Duplikate
+> reduziert (siehe unten). Der volle Provider-Descriptor bleibt bewusst
+> aufgeschoben, bis ein echter neuer Provider ihn validiert.
 
-| # | Was | Wo | Aufwand / Wert | Warum offen gelassen |
-| --- | --- | --- | --- | --- |
-| O1 | Onboarding Step-State (`done`/`active`/`reachable`) aus dem Blade in die Livewire-Page ziehen (`#[Computed]`) | `resources/views/livewire/onboarding.blade.php` + zugehörige Livewire-Page | klein / gering | Reine UI-Conditionals, kein echter Logik-Schnitt. Kosten > Nutzen, solange das Blade übersichtlich bleibt. |
-| O2 | Provider-Descriptor („neuer Provider = ein Ort": URL-Pattern, Token-Scopes, Capabilities zentral) | `app/Services/GitProvider/` + `app/Services/IssueTracker/` | mittel / mittel | Eigenständiges Vorhaben aus der Saloon-/Driver-Diskussion, kein God-Class-Symptom. Erst sinnvoll, wenn ein **neuer** Provider tatsächlich ansteht. |
-| O3 | `CredentialStore` ist nach B1 eine tote Konstruktor-Dependency in `PhaseRunner` (nur noch von den Tests gemockt) | `app/Services/Workflow/PhaseRunner.php` | klein / gering | Während B1 bewusst nicht angefasst, um den Diff fokussiert zu halten. Sauberer Folge-Cleanup: prüfen, ob der Claude-Token-Pfad noch über den Store läuft, sonst Parameter entfernen. |
+| # | Was | Wo | Status |
+| --- | --- | --- | --- |
+| O1 | Onboarding Step-State (`done`/`active`/`reachable`) aus dem Blade in die Page ziehen | `app/Filament/Admin/Pages/Onboarding.php` + `resources/views/filament/admin/pages/onboarding.blade.php` | ✅ **erledigt** — `Onboarding::steps()` liefert die Step-Deskriptoren, das Blade iteriert nur noch (kein inline-`@php`-Branching). Konvention der Datei (plain public method, kein `#[Computed]`) gefolgt. Tests in `OnboardingPageTest`. |
+| O2 | Provider-Descriptor („neuer Provider = ein Ort") | `app/Services/GitProvider/` + `app/Services/IssueTracker/` u.v.m. | ⚠️ **teilweise** — der **volle** Descriptor (Enums verschmelzen, Factories generieren, ~15–20 Stellen) bleibt aufgeschoben: spekulative Abstraktion ohne konkreten neuen Provider als Validierung. **Erledigt** wurden die konkreten Duplikate darin: Clone-URL-Bau (`repoUrl`-`match`) aus `Onboarding` **und** `RepoProfileResource` → `App\Support\RepoUrlBuilder`; GitLab-Default als `RepoUrlBuilder::DEFAULT_GITLAB_INSTANCE`. |
+| O3 | `CredentialStore` als tote Konstruktor-Dependency in `PhaseRunner` | `app/Services/Workflow/PhaseRunner.php` | ✅ **erledigt** — Parameter entfernt. Der Claude-Token-Pfad läuft worker-seitig über `ClaudeCodeRunner` (`app(CredentialStore::class)`), nicht über PhaseRunner. Die zwei Mockery-Test-Helfer (`FakeWorkerProcess`, `FeedbackWorkflowTest`) wurden mitgezogen. |
+
+**Bleibt offen** (bewusst, kein Blocker): der volle Provider-Descriptor (O2) — die
+Fundkarte der ~15–20 betroffenen Stellen liegt vor, Umsetzung erst mit einem
+konkreten neuen Provider (z.B. Gitea/Forgejo).
 
 ---
 
