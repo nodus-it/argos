@@ -25,6 +25,13 @@
 # of the latest stable release. Also used automatically as fallback when no
 # stable release exists yet.
 #
+# Stage channel (rolling :stage images from the develop branch):
+#   curl … | bash -s -- --stage
+#   ARGOS_STAGE=1 curl … | bash
+# Installs the develop manifests and pins ARGOS_APP_IMAGE to the :stage tag
+# that CI publishes on every develop push. Tracks unreleased work and may
+# break — not for production. Re-pass --stage on update to keep tracking it.
+#
 # Reset (DESTRUCTIVE — wipes DB + all named volumes):
 #   bash .tools/install.sh --reset            # interactive: prompts for "yes"
 #   curl … | bash -s -- --reset --force        # non-interactive: --force is required
@@ -47,6 +54,15 @@ ARGOS_VERSION="${ARGOS_VERSION:-}"
 # of the latest stable-only tag. Off by default; also activates automatically
 # when no stable release exists yet (transparent fallback, with a warning).
 BETA="${ARGOS_BETA:-0}"
+
+# Stage channel: track the rolling :stage images CI publishes on every push to
+# develop. Implies installing the develop manifests and pinning ARGOS_APP_IMAGE
+# to the :stage tag. Off by default — tracks unreleased work and may break.
+STAGE="${ARGOS_STAGE:-0}"
+
+# The rolling pre-release image tag the stage channel pins. Derived from the
+# repo so a fork's installer points at the fork's own registry.
+STAGE_IMAGE="ghcr.io/${ARGOS_REPO}-app:stage"
 
 # Files the installer owns inside INSTALL_DIR.
 COMPOSE_FILE="docker-compose.yml"
@@ -97,6 +113,11 @@ Options:
                        Useful before the first stable release ships or to
                        track RC builds. Also activates automatically as a
                        transparent fallback when no stable release exists yet.
+  -s, --stage          Track the rolling ':stage' images CI builds on every
+                       push to the develop branch. Installs the develop
+                       manifests and pins ARGOS_APP_IMAGE to the :stage tag.
+                       Tracks unreleased work and may break — not for
+                       production. Re-pass on update to keep tracking it.
   -r, --reset          DESTRUCTIVE: tear down the existing stack, wipe the
                        compose volumes (DB included!) and the local .env /
                        state, then run a fresh install. Requires --force when
@@ -109,6 +130,7 @@ Environment overrides:
   ARGOS_INSTALL_DIR    Same as --dir
   ARGOS_VERSION        Same as --version
   ARGOS_BETA=1         Same as --beta
+  ARGOS_STAGE=1        Same as --stage
   ARGOS_REPO           GitHub repo (default: nodus-it/argos)
 USAGE
 }
@@ -119,6 +141,7 @@ while [[ $# -gt 0 ]]; do
         -d|--dir)     INSTALL_DIR="$2"; shift 2;;
         -v|--version) ARGOS_VERSION="$2"; shift 2;;
         -b|--beta)    BETA=1; shift;;
+        -s|--stage)   STAGE=1; shift;;
         -r|--reset)   RESET=1; shift;;
         -f|--force)   FORCE=1; shift;;
         -h|--help)    usage; exit 0;;
@@ -369,6 +392,17 @@ backfill_missing_secrets() {
     fi
 }
 
+# apply_stage_image: Pin ARGOS_APP_IMAGE in $ENV_FILE to the rolling :stage
+# tag so `docker compose pull` fetches the develop image instead of the release
+# default. Called only on the stage channel; like --beta the choice is
+# per-invocation — re-pass --stage on update to keep tracking it.
+# Args: none (writes $ENV_FILE, reads $STAGE_IMAGE)
+# Returns: 0
+apply_stage_image() {
+    set_env_value "$ENV_FILE" ARGOS_APP_IMAGE "$STAGE_IMAGE"
+    log "Pinned ARGOS_APP_IMAGE=$STAGE_IMAGE (stage channel)."
+}
+
 # reset_stack: Tear down the compose stack (containers + named volumes),
 # remove the local .env and state files, and clean up legacy artefacts so the
 # next install path is "fresh". Idempotent — runs cleanly even when nothing
@@ -440,6 +474,7 @@ print_summary() {
     [[ -z "$url" ]] && url="http://localhost:${port:-8080}"
     channel="release"
     [[ "$BETA"  -eq 1 ]] && channel="beta (pre-release)"
+    [[ "$STAGE" -eq 1 ]] && channel="stage (rolling develop)"
 
     local b0="" b1=""
     if [[ -t 1 && "${TERM:-dumb}" != "dumb" ]]; then
@@ -483,7 +518,10 @@ main() {
     preflight
 
     if [[ -z "$ARGOS_VERSION" ]]; then
-        if [[ "$BETA" -eq 1 ]]; then
+        if [[ "$STAGE" -eq 1 ]]; then
+            log "Stage channel: tracking the rolling :stage images from develop."
+            ARGOS_VERSION="develop"
+        elif [[ "$BETA" -eq 1 ]]; then
             log "Beta channel: resolving latest release including pre-releases …"
             ARGOS_VERSION="$(resolve_beta_version)"
             if [[ -z "$ARGOS_VERSION" ]]; then
@@ -562,6 +600,10 @@ MSG
         download_install_files
         merge_env_keys "$ENV_EXAMPLE_FILE" "$ENV_FILE"
         backfill_missing_secrets
+    fi
+
+    if [[ "$STAGE" -eq 1 ]]; then
+        apply_stage_image
     fi
 
     remove_legacy_artefacts

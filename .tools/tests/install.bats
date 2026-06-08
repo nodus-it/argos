@@ -181,6 +181,31 @@ EOF
     [ "$(sha256_of "$ENV_FILE")" = "$before" ]
 }
 
+# ── apply_stage_image ─────────────────────────────────────────────────────────
+
+@test "apply_stage_image pins ARGOS_APP_IMAGE to the stage tag (appends when missing)" {
+    ENV_FILE="$TEST_DIR/.env"
+    STAGE_IMAGE="ghcr.io/nodus-it/argos-app:stage"
+    printf 'APP_KEY=base64:x\n' > "$ENV_FILE"
+
+    apply_stage_image >/dev/null
+
+    [ "$(get_env_value "$ENV_FILE" ARGOS_APP_IMAGE)" = "ghcr.io/nodus-it/argos-app:stage" ]
+    [ "$(get_env_value "$ENV_FILE" APP_KEY)" = "base64:x" ]
+}
+
+@test "apply_stage_image overrides an existing ARGOS_APP_IMAGE in place" {
+    ENV_FILE="$TEST_DIR/.env"
+    STAGE_IMAGE="ghcr.io/nodus-it/argos-app:stage"
+    printf 'ARGOS_APP_IMAGE=ghcr.io/nodus-it/argos-app:latest\n' > "$ENV_FILE"
+
+    apply_stage_image >/dev/null
+
+    [ "$(get_env_value "$ENV_FILE" ARGOS_APP_IMAGE)" = "ghcr.io/nodus-it/argos-app:stage" ]
+    run grep -c '^ARGOS_APP_IMAGE=' "$ENV_FILE"
+    [ "$output" = "1" ]
+}
+
 # ── reset_stack ─────────────────────────────────────────────────────────────
 
 @test "reset_stack wipes env, state and legacy artefacts (no compose file)" {
