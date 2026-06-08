@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Integrations\Linear;
 
 use Saloon\Contracts\Authenticator;
+use Saloon\Http\Auth\HeaderAuthenticator;
 use Saloon\Http\Auth\TokenAuthenticator;
 use Saloon\Http\Connector;
 
@@ -29,6 +30,15 @@ class LinearConnector extends Connector
 
     protected function defaultAuth(): ?Authenticator
     {
-        return $this->token !== null ? new TokenAuthenticator($this->token) : null;
+        if ($this->token === null) {
+            return null;
+        }
+
+        // Linear personal API keys (lin_api_…) are sent raw — a Bearer prefix
+        // makes Linear reject the request with a 400. Only OAuth2 access tokens
+        // use "Bearer".
+        return str_starts_with($this->token, 'lin_api_')
+            ? new HeaderAuthenticator($this->token)
+            : new TokenAuthenticator($this->token);
     }
 }

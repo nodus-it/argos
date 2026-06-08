@@ -4,8 +4,9 @@ Argos supports two ways of authenticating against your Git host:
 
 1. **Personal Access Token (PAT)** — paste a token per project. Works
    immediately, no server-side configuration.
-2. **OAuth** — register an OAuth App on the provider, set client ID/secret in
-   the Argos environment, and let users connect their own accounts.
+2. **OAuth** — register an OAuth App on the provider, add its client ID/secret
+   in the Argos UI (Configuration → OAuth Apps), and let users connect their
+   own accounts.
 
 ## Which one should I pick?
 
@@ -45,25 +46,22 @@ PAT projects keep working alongside OAuth projects — switching is per-project.
 - [GitLab Setup](SETUP-GITLAB.md) — supports self-hosted instances
 - [Bitbucket Setup](SETUP-BITBUCKET.md)
 
-## Required environment variables
+## Registering the OAuth app in Argos
 
-For each provider you enable OAuth on, set client ID and secret. The callback
-URL is fixed at `${APP_URL}/auth/<provider>/callback` — register exactly that
-URL in the provider's OAuth app, no further config needed.
+OAuth apps are managed **in the UI** — there are no `*_CLIENT_ID` /
+`*_CLIENT_SECRET` environment variables. After creating the OAuth App on the
+provider side:
 
-```env
-GITHUB_CLIENT_ID=...
-GITHUB_CLIENT_SECRET=...
+1. Open **Configuration → OAuth Apps** in the Argos admin.
+2. Add an app for the provider, paste its **client ID** and **client secret**,
+   and enable it. For self-hosted GitLab, set the instance URL on the app
+   itself (no `GITLAB_INSTANCE_URL` environment variable needed).
+3. The callback URL is fixed at `${APP_URL}/auth/<provider>/callback` —
+   register exactly that URL in the provider's OAuth app.
 
-GITLAB_CLIENT_ID=...
-GITLAB_CLIENT_SECRET=...
-# GITLAB_INSTANCE_URL=https://gitlab.example.com  # optional, for self-hosted
-
-BITBUCKET_CLIENT_ID=...
-BITBUCKET_CLIENT_SECRET=...
-```
-
-See [Configuration Reference](CONFIGURATION.md) for the full list.
+Credentials are stored in the database (`provider_oauth_configs`) and take
+effect without a restart. See [Configuration Reference](CONFIGURATION.md) for
+environment variables that *are* still ENV-based.
 
 ## After OAuth is configured
 

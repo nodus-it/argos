@@ -90,7 +90,7 @@ class LinearIssueTrackerTest extends TestCase
         $this->assertSame([], $issues[1]['labels']);
     }
 
-    public function test_list_issues_sends_bearer_auth(): void
+    public function test_list_issues_sends_personal_api_key_without_bearer_prefix(): void
     {
         Saloon::fake([
             MockResponse::make($this->teamResponse()),
@@ -99,7 +99,21 @@ class LinearIssueTrackerTest extends TestCase
 
         $this->tracker->listIssues(self::TEAM_KEY, '');
 
-        Saloon::assertSent(fn (Request $r, $response): bool => $response->getPendingRequest()->headers()->get('Authorization') === 'Bearer lin_api_test_token');
+        // Linear personal API keys (lin_api_…) are sent raw — a Bearer prefix
+        // makes Linear reject the request with a 400.
+        Saloon::assertSent(fn (Request $r, $response): bool => $response->getPendingRequest()->headers()->get('Authorization') === 'lin_api_test_token');
+    }
+
+    public function test_oauth_access_token_uses_bearer_prefix(): void
+    {
+        Saloon::fake([
+            MockResponse::make($this->teamResponse()),
+            MockResponse::make(['data' => ['issues' => ['nodes' => []]]]),
+        ]);
+
+        (new LinearIssueTracker('lin_oauth_access_token'))->listIssues(self::TEAM_KEY, '');
+
+        Saloon::assertSent(fn (Request $r, $response): bool => $response->getPendingRequest()->headers()->get('Authorization') === 'Bearer lin_oauth_access_token');
     }
 
     // ── listReferences ───────────────────────────────────────────────────────
@@ -132,7 +146,7 @@ class LinearIssueTrackerTest extends TestCase
             // Linear rejects `variables: []` — a variable-less query must omit the key.
             return str_contains((string) ($body['query'] ?? ''), 'teams')
                 && ! array_key_exists('variables', $body)
-                && $response->getPendingRequest()->headers()->get('Authorization') === 'Bearer lin_api_test_token';
+                && $response->getPendingRequest()->headers()->get('Authorization') === 'lin_api_test_token';
         });
     }
 

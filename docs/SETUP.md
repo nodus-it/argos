@@ -81,22 +81,24 @@ docker compose -f /srv/argos/docker-compose.yml exec app \
 
 ## Pre-seeding the Claude token
 
-Skip the in-app onboarding step by setting the token in your `.env`:
+The token lives **per agent in the database**. The normal path is the in-app
+onboarding step, or **Worker → Agent Credentials** in the admin — a DB
+credential always wins (there is no `CLAUDE_CODE_OAUTH_TOKEN` env-var path
+anymore).
 
-```
-CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-...
-```
-
-Generate the token with the Claude Code CLI (signed in to your Pro / Max /
-Team plan):
+Generate a token with the Claude Code CLI (signed in to your Pro / Max / Team
+plan):
 
 ```bash
 claude setup-token
 ```
 
-The token is read on every boot and takes precedence over what the UI shows.
-Tokens expire after a few weeks — re-run `claude setup-token` and update the
-env var (or paste the new token in the UI).
+Paste it into onboarding / Agent Credentials. For an unattended local-dev
+seed you can instead drop the raw token into a file at
+`$ARGOS_CONFIG_DIR/claude_token` (default `~/.config/argos/claude_token`): the
+worker reads it as a last-resort fallback, and the next `migrate` imports it
+into an Agent Credential. Tokens expire after a few weeks — refresh them in the
+UI (or update the file) and re-run `claude setup-token`.
 
 ## Choosing a worker stack and agent
 
