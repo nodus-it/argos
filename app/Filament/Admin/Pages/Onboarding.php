@@ -156,6 +156,36 @@ class Onboarding extends Page
         return 3;
     }
 
+    /**
+     * The wizard steps with their display state, derived from the current step
+     * and how far the user has unlocked. Keeps the stepper view free of the
+     * per-step done/active/reachable branching.
+     *
+     * @return list<array{number: int, label: string, done: bool, active: bool, reachable: bool}>
+     */
+    public function steps(): array
+    {
+        $furthest = $this->furthestUnlockedStep();
+        $labels = [
+            1 => __('onboarding.steps.agents'),
+            2 => __('onboarding.steps.repository'),
+            3 => __('onboarding.steps.done'),
+        ];
+
+        $steps = [];
+        foreach ($labels as $number => $label) {
+            $steps[] = [
+                'number' => $number,
+                'label' => (string) $label,
+                'done' => $number < $this->currentStep,
+                'active' => $number === $this->currentStep,
+                'reachable' => $number <= $furthest,
+            ];
+        }
+
+        return $steps;
+    }
+
     public function goToStep(int $step): void
     {
         $step = max(1, min(self::TOTAL_STEPS, $step));

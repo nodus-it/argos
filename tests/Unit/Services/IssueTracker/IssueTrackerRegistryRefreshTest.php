@@ -11,7 +11,9 @@ use App\Models\User;
 use App\Services\IssueTracker\IssueTrackerRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Http;
+use Saloon\Http\Faking\MockResponse;
+use Saloon\Http\Request;
+use Saloon\Laravel\Facades\Saloon;
 use Tests\TestCase;
 
 class IssueTrackerRegistryRefreshTest extends TestCase
@@ -45,8 +47,8 @@ class IssueTrackerRegistryRefreshTest extends TestCase
 
     public function test_make_refreshes_an_expired_oauth_token(): void
     {
-        Http::fake([
-            'https://gitlab.com/oauth/token' => Http::response([
+        Saloon::fake([
+            'https://gitlab.com/oauth/token' => MockResponse::make([
                 'access_token' => 'fresh-token',
                 'refresh_token' => 'rotated-refresh',
                 'expires_in' => 7200,
@@ -57,18 +59,18 @@ class IssueTrackerRegistryRefreshTest extends TestCase
 
         app(IssueTrackerRegistry::class)->make(TaskProviderKind::GitLab, $binding->fresh());
 
-        Http::assertSent(fn ($request): bool => str_contains($request->url(), 'gitlab.com/oauth/token'));
+        Saloon::assertSent(fn (Request $r, $response): bool => str_contains($response->getPendingRequest()->getUrl(), 'gitlab.com/oauth/token'));
         $this->assertSame('fresh-token', $binding->connectedAccount->fresh()->token);
     }
 
     public function test_make_does_not_refresh_a_token_far_from_expiry(): void
     {
-        Http::fake();
+        Saloon::fake([]);
 
         $binding = $this->gitlabBinding(now()->addHours(8));
 
         app(IssueTrackerRegistry::class)->make(TaskProviderKind::GitLab, $binding->fresh());
 
-        Http::assertNotSent(fn ($request): bool => str_contains($request->url(), '/oauth/token'));
+        Saloon::assertNothingSent();
     }
 }

@@ -8,10 +8,11 @@ use App\Models\ConnectedAccount;
 use App\Models\User;
 use App\Services\OAuth\TokenRefresher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\Client\Request as ClientRequest;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Http;
 use RuntimeException;
+use Saloon\Http\Faking\MockResponse;
+use Saloon\Http\Request;
+use Saloon\Laravel\Facades\Saloon;
 use Tests\TestCase;
 
 class TokenRefresherTest extends TestCase
@@ -59,7 +60,7 @@ class TokenRefresherTest extends TestCase
 
     public function test_refresh_if_needed_is_a_noop_when_token_is_fresh(): void
     {
-        Http::fake();
+        Saloon::fake([]);
         $account = $this->makeAccount(
             'bitbucket',
             token: 'old-token',
@@ -69,7 +70,7 @@ class TokenRefresherTest extends TestCase
         $result = app(TokenRefresher::class)->refreshIfNeeded($account);
 
         $this->assertSame('old-token', $result->token);
-        Http::assertNothingSent();
+        Saloon::assertNothingSent();
     }
 
     public function test_refresh_if_needed_throws_when_no_refresh_token_present(): void
@@ -88,8 +89,8 @@ class TokenRefresherTest extends TestCase
 
     public function test_refresh_calls_github_endpoint_and_persists_new_tokens(): void
     {
-        Http::fake([
-            'https://github.com/login/oauth/access_token' => Http::response([
+        Saloon::fake([
+            'https://github.com/login/oauth/access_token' => MockResponse::make([
                 'access_token' => 'gh-new-access',
                 'refresh_token' => 'gh-new-refresh',
                 'expires_in' => 28800,
@@ -111,12 +112,14 @@ class TokenRefresherTest extends TestCase
         $this->assertNotNull($result->expires_at);
         $this->assertGreaterThan(now()->addHours(7), $result->expires_at);
 
-        Http::assertSent(function (ClientRequest $request): bool {
-            $this->assertSame('https://github.com/login/oauth/access_token', $request->url());
-            $this->assertSame('refresh_token', $request['grant_type']);
-            $this->assertSame('gh-old-refresh', $request['refresh_token']);
-            $this->assertSame('gh-client-id', $request['client_id']);
-            $this->assertSame('gh-client-secret', $request['client_secret']);
+        Saloon::assertSent(function (Request $request, $response): bool {
+            $body = $request->body()->all();
+
+            $this->assertSame('https://github.com/login/oauth/access_token', $response->getPendingRequest()->getUrl());
+            $this->assertSame('refresh_token', $body['grant_type']);
+            $this->assertSame('gh-old-refresh', $body['refresh_token']);
+            $this->assertSame('gh-client-id', $body['client_id']);
+            $this->assertSame('gh-client-secret', $body['client_secret']);
 
             return true;
         });
@@ -127,8 +130,8 @@ class TokenRefresherTest extends TestCase
 
     public function test_refresh_calls_bitbucket_endpoint(): void
     {
-        Http::fake([
-            'https://bitbucket.org/site/oauth2/access_token' => Http::response([
+        Saloon::fake([
+            'https://bitbucket.org/site/oauth2/access_token' => MockResponse::make([
                 'access_token' => 'bb-new-access',
                 'refresh_token' => 'bb-rotated-refresh',
                 'expires_in' => 7200,
@@ -143,17 +146,17 @@ class TokenRefresherTest extends TestCase
 
         app(TokenRefresher::class)->refreshIfNeeded($account);
 
-        Http::assertSent(fn (ClientRequest $r): bool => $r->url() === 'https://bitbucket.org/site/oauth2/access_token'
-            && $r['grant_type'] === 'refresh_token'
-            && $r['client_id'] === 'bb-client-id'
+        Saloon::assertSent(fn (Request $r, $response): bool => $response->getPendingRequest()->getUrl() === 'https://bitbucket.org/site/oauth2/access_token'
+            && $r->body()->all()['grant_type'] === 'refresh_token'
+            && $r->body()->all()['client_id'] === 'bb-client-id'
         );
         $this->assertSame('bb-rotated-refresh', $account->fresh()->refresh_token);
     }
 
     public function test_refresh_uses_account_instance_url_for_self_hosted_gitlab(): void
     {
-        Http::fake([
-            'https://gitlab.example.com/oauth/token' => Http::response([
+        Saloon::fake([
+            'https://gitlab.example.com/oauth/token' => MockResponse::make([
                 'access_token' => 'gl-new',
                 'refresh_token' => 'gl-rotated',
                 'expires_in' => 7200,
@@ -169,15 +172,15 @@ class TokenRefresherTest extends TestCase
 
         app(TokenRefresher::class)->refreshIfNeeded($account);
 
-        Http::assertSent(
-            fn (ClientRequest $r): bool => $r->url() === 'https://gitlab.example.com/oauth/token',
+        Saloon::assertSent(
+            fn (Request $r, $response): bool => $response->getPendingRequest()->getUrl() === 'https://gitlab.example.com/oauth/token',
         );
     }
 
     public function test_refresh_keeps_existing_refresh_token_when_provider_omits_it(): void
     {
-        Http::fake([
-            'https://github.com/login/oauth/access_token' => Http::response([
+        Saloon::fake([
+            'https://github.com/login/oauth/access_token' => MockResponse::make([
                 'access_token' => 'gh-rotated',
                 'expires_in' => 28800,
             ]),
@@ -196,8 +199,8 @@ class TokenRefresherTest extends TestCase
 
     public function test_refresh_throws_when_provider_returns_4xx(): void
     {
-        Http::fake([
-            'https://bitbucket.org/site/oauth2/access_token' => Http::response([
+        Saloon::fake([
+            'https://bitbucket.org/site/oauth2/access_token' => MockResponse::make([
                 'error' => 'invalid_grant',
                 'error_description' => 'refresh_token revoked',
             ], 401),
@@ -217,8 +220,8 @@ class TokenRefresherTest extends TestCase
 
     public function test_refresh_throws_when_response_lacks_access_token(): void
     {
-        Http::fake([
-            'https://github.com/login/oauth/access_token' => Http::response([
+        Saloon::fake([
+            'https://github.com/login/oauth/access_token' => MockResponse::make([
                 'note' => 'malformed but 200 OK',
             ]),
         ]);

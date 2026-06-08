@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Services\OAuth;
 
+use App\Integrations\OAuth\OAuthTokenConnector;
+use App\Integrations\OAuth\Requests\RefreshAccessToken;
 use App\Models\ConnectedAccount;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
@@ -81,14 +82,11 @@ class TokenRefresher
     {
         [$endpoint, $clientId, $clientSecret] = $this->endpointAndCredentials($account);
 
-        $response = Http::asForm()
-            ->acceptJson()
-            ->post($endpoint, [
-                'grant_type' => 'refresh_token',
-                'refresh_token' => $account->refresh_token,
-                'client_id' => $clientId,
-                'client_secret' => $clientSecret,
-            ]);
+        $response = (new OAuthTokenConnector($endpoint))->send(new RefreshAccessToken(
+            refreshToken: (string) $account->refresh_token,
+            clientId: $clientId,
+            clientSecret: $clientSecret,
+        ));
 
         if ($response->failed()) {
             // Body may carry an `error_description` from the provider but never

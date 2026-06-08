@@ -27,6 +27,15 @@ arch('saloon is confined to integrations')
     ->expect('Saloon')
     ->toOnlyBeUsedIn('App\Integrations');
 
+// The flip side of the Saloon rule: no raw HTTP client may bypass it. Every
+// outbound API call goes through a Saloon connector in app/Integrations, so the
+// Laravel HTTP facade and Guzzle must not appear in domain code. (Socialite is
+// the one accepted exception for the OAuth *login* flow — it has its own
+// abstraction and never touches these symbols.)
+arch('no raw http client outside integrations')
+    ->expect(['Illuminate\Support\Facades\Http', 'GuzzleHttp\Client'])
+    ->toOnlyBeUsedIn('App\Integrations');
+
 // Integrations are pure transport — they must not reach into the UI layer.
 arch('integrations are UI-isolated')
     ->expect('App\Integrations')

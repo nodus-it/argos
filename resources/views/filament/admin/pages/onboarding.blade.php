@@ -1,12 +1,6 @@
 <x-filament-panels::page>
 
     @php
-        $steps = [
-            1 => __('onboarding.steps.agents'),
-            2 => __('onboarding.steps.repository'),
-            3 => __('onboarding.steps.done'),
-        ];
-        $furthest = $this->furthestUnlockedStep();
         $sources = $this->repoSourceOptions();
         $repoOptions = $this->currentStep === 2 ? $this->repoOptions() : [];
         $branchOptions = $this->currentStep === 2 ? $this->branchOptions() : [];
@@ -16,48 +10,42 @@
 
         {{-- ── Stepper header ──────────────────────────────────────────── --}}
         <nav class="flex items-center justify-between" aria-label="Progress">
-            @foreach ($steps as $number => $label)
-                @php
-                    $isDone = $number < $this->currentStep;
-                    $isActive = $number === $this->currentStep;
-                    $isReachable = $number <= $furthest;
-                @endphp
-
+            @foreach ($this->steps() as $step)
                 <button
                     type="button"
-                    @if ($isReachable) wire:click="goToStep({{ $number }})" @endif
+                    @if ($step['reachable']) wire:click="goToStep({{ $step['number'] }})" @endif
                     @class([
                         'flex flex-col items-center gap-2 group',
-                        'cursor-pointer' => $isReachable,
-                        'cursor-default' => ! $isReachable,
+                        'cursor-pointer' => $step['reachable'],
+                        'cursor-default' => ! $step['reachable'],
                     ])
-                    @if (! $isReachable) disabled @endif
+                    @if (! $step['reachable']) disabled @endif
                 >
                     <span @class([
                         'flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold ring-2 transition',
-                        'bg-primary-600 text-white ring-primary-600' => $isActive,
-                        'bg-emerald-500 text-white ring-emerald-500' => $isDone,
-                        'bg-white dark:bg-gray-900 text-gray-400 ring-gray-300 dark:ring-gray-600' => ! $isActive && ! $isDone,
+                        'bg-primary-600 text-white ring-primary-600' => $step['active'],
+                        'bg-emerald-500 text-white ring-emerald-500' => $step['done'],
+                        'bg-white dark:bg-gray-900 text-gray-400 ring-gray-300 dark:ring-gray-600' => ! $step['active'] && ! $step['done'],
                     ])>
-                        @if ($isDone)
+                        @if ($step['done'])
                             <x-heroicon-s-check class="h-5 w-5" />
                         @else
-                            {{ $number }}
+                            {{ $step['number'] }}
                         @endif
                     </span>
                     <span @class([
                         'text-xs font-medium',
-                        'text-primary-600 dark:text-primary-400' => $isActive,
-                        'text-gray-700 dark:text-gray-300' => $isDone,
-                        'text-gray-400 dark:text-gray-500' => ! $isActive && ! $isDone,
-                    ])>{{ $label }}</span>
+                        'text-primary-600 dark:text-primary-400' => $step['active'],
+                        'text-gray-700 dark:text-gray-300' => $step['done'],
+                        'text-gray-400 dark:text-gray-500' => ! $step['active'] && ! $step['done'],
+                    ])>{{ $step['label'] }}</span>
                 </button>
 
                 @if (! $loop->last)
                     <div @class([
                         'flex-1 h-0.5 mx-2 -mt-5 rounded',
-                        'bg-emerald-500' => $number < $this->currentStep,
-                        'bg-gray-200 dark:bg-gray-700' => $number >= $this->currentStep,
+                        'bg-emerald-500' => $step['done'],
+                        'bg-gray-200 dark:bg-gray-700' => ! $step['done'],
                     ])></div>
                 @endif
             @endforeach
