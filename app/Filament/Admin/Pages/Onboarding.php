@@ -16,6 +16,7 @@ use App\Models\User;
 use App\Services\Anthropic\AnthropicTokenValidator;
 use App\Services\Git\RepositoryFetcher;
 use App\Services\OAuth\TokenRefresher;
+use App\Support\RepoUrlBuilder;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Auth;
@@ -664,7 +665,7 @@ class Onboarding extends Page
 
         $profile = RepoProfile::create([
             'name' => $name,
-            'url' => $this->repoUrl($source['platform'], $this->selectedRepo, $source['instance_url']),
+            'url' => RepoUrlBuilder::build($source['platform'], $this->selectedRepo, $source['instance_url']),
             'platform' => $source['platform'],
             'default_branch' => $branch,
             'auth_method' => $source['auth_method'],
@@ -677,17 +678,6 @@ class Onboarding extends Page
         $this->currentStep = 3;
 
         Notification::make()->title(__('onboarding.notifications.project_created'))->success()->send();
-    }
-
-    /** Build the canonical clone URL for an "owner/repo" path on a platform. */
-    private function repoUrl(string $platform, string $repo, string $instanceUrl): string
-    {
-        return match ($platform) {
-            'github' => "https://github.com/{$repo}",
-            'gitlab' => ($instanceUrl !== '' ? $instanceUrl : 'https://gitlab.com')."/{$repo}",
-            'bitbucket' => "https://bitbucket.org/{$repo}",
-            default => '',
-        };
     }
 
     /** The agent the user configured during onboarding, to pre-set on the profile. */

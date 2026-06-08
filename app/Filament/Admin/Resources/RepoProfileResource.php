@@ -22,6 +22,7 @@ use App\Models\WorkerStack;
 use App\Services\Git\RepositoryFetcher;
 use App\Services\GitProvider\GitServiceFactory;
 use App\Services\OAuth\TokenRefresher;
+use App\Support\RepoUrlBuilder;
 use App\Workers\Agents\AgentRegistry;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
@@ -667,12 +668,7 @@ class RepoProfileResource extends Resource
      */
     private static function connectedRepoUrl(string $platform, string $repo, ?ConnectedAccount $account): string
     {
-        return match ($platform) {
-            'github' => "https://github.com/{$repo}",
-            'gitlab' => ($account?->getInstanceUrl() ?? 'https://gitlab.com')."/{$repo}",
-            'bitbucket' => "https://bitbucket.org/{$repo}",
-            default => '',
-        };
+        return RepoUrlBuilder::build($platform, $repo, $account?->getInstanceUrl());
     }
 
     /**
