@@ -104,17 +104,22 @@ PHP-Ebene grün:
    Deckt Login → Onboarding → Projekt → Task → Concept/Implement über die 4-Run-Matrix
    (GitHub/Claude/OAuth · GitLab/Codex/PAT · Bitbucket/Claude/PAT · GitLab-self-hosted/
    Codex/OAuth) ab, plus Settings-Walk + View-Task. Läuft nur lokal, nicht in CI.
-2. ⏳ **Mindestens ein echter Phasen-Lauf** (`concept` → `implement` → `push`) gegen ein
-   Test-Repo, um den neuen `PhaseCommandBuilder`/`PhaseResultSync`/`UsageLimitManager`-
-   Pfad mit echtem Worker-Container + Volume-I/O zu bestätigen (die Pest-Tests mocken
-   `newProcess`/`WorkerVolumeReader`). Braucht echte Tokens — manuell auf der Stage.
+2. ✅ **Echter Phasen-Lauf** (`concept` + `implement`) — **Stand 2026-06-08**, lokal über
+   `composer dev:live` (LiveReadySeeder, echte Tokens aus `.env`) gegen `nodus-it/argos`.
+   Beide Phasen real durch den umgebauten `PhaseCommandBuilder`/`PhaseResultSync`-Pfad
+   (echter Worker-Container, echtes clone + composer install, echte Claude-Sessions,
+   Volume-I/O): Concept `exit_code=0` / $0.169, Implement `exit_code=0` / $0.164,
+   Quality-Gates **artisan + pest + phpstan = pass**. Der Seed-Task war bewusst inhaltslos
+   → `changed_files=[]`, daher **kein Push, kein Remote-Branch (API 404), kein PR** —
+   null Außen-Footprint. Push-Phase + ein konkreter Task bleiben für die Stage.
 3. ⏳ **Ein echter Demo-Deploy** (`live_demo_enabled`), um `TraefikRouter` (Route-Datei im
    echten `traefik_dir` + Reachability) und `DemoComposeBuilder` (echtes `compose up`)
-   end-to-end zu prüfen. Manuell auf der Stage.
+   end-to-end zu prüfen. Beim lokalen Lauf bewusst deaktiviert (Scope-Schutz) — manuell
+   auf der Stage.
 
-Schritt 1 (die eigentliche Absicherung des umgebauten Workflows) ist grün → der Branch
-ist aus PHP- + Browser-Sicht merge-reif; Schritte 2–3 brauchen echte Tokens und laufen
-idealerweise einmal manuell auf der Stage (`argos-stage`).
+Schritte 1 + 2 sind grün (Browser-E2E + echter concept/implement-Lauf) → der Branch ist
+merge-reif; nur Schritt 3 (Demo-Deploy) und ein Push-Phasen-Lauf mit konkretem Task
+bleiben für die Stage (`argos-stage`).
 
 > **Hinweis Doku-Drift**: Die CLAUDE.md beschreibt Browser-E2E als „Playwright bootet
 > `php artisan serve` selbst — kein laufender Stack nötig". Die tatsächliche
