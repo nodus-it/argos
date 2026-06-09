@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Demo;
 
 use App\Models\Task;
+use App\Services\Project\ProjectEnvironmentResolver;
 use Illuminate\Encryption\Encrypter;
 use Symfony\Component\Yaml\Yaml;
 
@@ -30,6 +31,14 @@ class DemoComposeBuilder
     {
         $network = (string) config('argos.preview.network', 'argos_edge');
 
+        // Project-level secrets (COMPOSER_AUTH for private registries, DB creds,
+        // API keys, …) so the demo's `composer install` + boot see the same env
+        // as the worker. Argos-owned keys below win via array_merge order, so
+        // the project can't override APP_URL / APP_KEY / SESSION_COOKIE here.
+        $projectEnv = $task->repoProfile !== null
+            ? app(ProjectEnvironmentResolver::class)->resolve($task->repoProfile)
+            : [];
+
         $override = [
             'services' => [
                 $entry['service'] => [
@@ -40,7 +49,7 @@ class DemoComposeBuilder
                     // on :80 and fails. Pin the full external URL so asset()/
                     // url()/Vite emit reachable links. (Harmless for non-Laravel
                     // contracts — they ignore these env vars.)
-                    'environment' => [
+                    'environment' => array_merge($projectEnv, [
                         'APP_URL' => $demoUrl,
                         'ASSET_URL' => $demoUrl,
                         // Inject a throwaway app key so Laravel boots even when
@@ -65,7 +74,7 @@ class DemoComposeBuilder
                         // seed the full demo profile instead of the production-safe
                         // admin-only seed. Harmless for any other repo.
                         'ARGOS_DEMO' => '1',
-                    ],
+                    ]),
                     'volumes' => [
                         $task->volumeName().':'.$entry['workspace_mount'],
                     ],

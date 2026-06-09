@@ -35,6 +35,8 @@ use Laravel\Sanctum\HasApiTokens;
  * @property string|null $worker_stack_id
  * @property AgentName|null $worker_agent_name
  * @property array<string, mixed>|null $worker_config
+ * @property array<int, array{host: string, username?: string|null, token: string}>|null $composer_registries
+ * @property array<int, array{name: string, value: string}>|null $worker_env
  * @property string|null $model_concept
  * @property string|null $model_implement
  * @property int|null $max_turns_concept
@@ -69,6 +71,8 @@ class RepoProfile extends Model implements HasApiTokensContract
         'worker_stack_id',
         'worker_agent_name',
         'worker_config',
+        'composer_registries',
+        'worker_env',
         'model_concept',
         'model_implement',
         'max_turns_concept',
@@ -87,6 +91,8 @@ class RepoProfile extends Model implements HasApiTokensContract
             'worker_source' => WorkerSource::class,
             'worker_agent_name' => AgentName::class,
             'worker_config' => 'array',
+            'composer_registries' => 'encrypted:array',
+            'worker_env' => 'encrypted:array',
             'max_turns_concept' => 'integer',
             'max_turns_implement' => 'integer',
             'auto_concept' => 'boolean',

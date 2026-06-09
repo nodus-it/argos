@@ -703,4 +703,29 @@ class RepoProfileResourceTest extends TestCase
         Livewire::test(ListRepoProfiles::class)
             ->assertSee('Bitbucket Repo');
     }
+
+    public function test_env_secrets_round_trip_via_edit_form(): void
+    {
+        Saloon::fake([
+            'api.github.com/repos/test-org/test-repo/branches*' => MockResponse::make([['name' => 'main']]),
+        ]);
+
+        $profile = RepoProfile::factory()->create(['platform' => 'github']);
+
+        Livewire::test(EditRepoProfile::class, ['record' => $profile->getKey()])
+            ->fillForm([
+                'composer_registries' => [
+                    ['host' => 'packages.filamentphp.com', 'username' => 'u', 'token' => 'sek'],
+                ],
+                'worker_env' => [
+                    ['name' => 'MEILI_KEY', 'value' => 'abc'],
+                ],
+            ])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $fresh = $profile->fresh();
+        $this->assertSame('packages.filamentphp.com', $fresh->composer_registries[0]['host']);
+        $this->assertSame('abc', $fresh->worker_env[0]['value']);
+    }
 }

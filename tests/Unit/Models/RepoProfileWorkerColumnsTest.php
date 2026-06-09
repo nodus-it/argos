@@ -9,6 +9,7 @@ use App\Enums\WorkerSource;
 use App\Models\RepoProfile;
 use App\Models\WorkerStack;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class RepoProfileWorkerColumnsTest extends TestCase
@@ -61,5 +62,28 @@ class RepoProfileWorkerColumnsTest extends TestCase
         $profile = RepoProfile::factory()->create();
 
         $this->assertNull($profile->fresh()->worker_agent_name);
+    }
+
+    public function test_composer_registries_round_trip_encrypted(): void
+    {
+        $data = [['host' => 'packages.filamentphp.com', 'username' => 'u', 'token' => 'sekret']];
+        $profile = RepoProfile::factory()->create(['composer_registries' => $data]);
+
+        $this->assertSame($data, $profile->fresh()->composer_registries);
+
+        $raw = (string) DB::table('repo_profiles')->where('id', $profile->id)->value('composer_registries');
+        $this->assertStringNotContainsString('packages.filamentphp.com', $raw);
+        $this->assertStringNotContainsString('sekret', $raw);
+    }
+
+    public function test_worker_env_round_trip_encrypted(): void
+    {
+        $data = [['name' => 'MEILI_KEY', 'value' => 'sekret']];
+        $profile = RepoProfile::factory()->create(['worker_env' => $data]);
+
+        $this->assertSame($data, $profile->fresh()->worker_env);
+
+        $raw = (string) DB::table('repo_profiles')->where('id', $profile->id)->value('worker_env');
+        $this->assertStringNotContainsString('sekret', $raw);
     }
 }

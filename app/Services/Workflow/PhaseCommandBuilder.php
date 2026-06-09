@@ -10,6 +10,7 @@ use App\Enums\WorkflowStatus;
 use App\Models\AgentCredential;
 use App\Models\RepoProfile;
 use App\Models\Task;
+use App\Services\Project\ProjectEnvironmentResolver;
 use App\Workers\Agents\MaterializedAgentCredential;
 use App\Workers\Compose\WorkerImageResolver;
 use Illuminate\Support\Facades\Log;
@@ -77,6 +78,14 @@ class PhaseCommandBuilder
         ];
 
         foreach ($materializedCredential->envVars as $key => $value) {
+            $cmd[] = '-e';
+            $cmd[] = "{$key}={$value}";
+        }
+
+        // Project-level secrets (COMPOSER_AUTH for private registries, plus any
+        // raw env the project declared). Reserved Argos keys are already
+        // stripped by the resolver, so this can't clobber REPO_TOKEN et al.
+        foreach (app(ProjectEnvironmentResolver::class)->resolve($profile) as $key => $value) {
             $cmd[] = '-e';
             $cmd[] = "{$key}={$value}";
         }

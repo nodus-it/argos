@@ -27,6 +27,7 @@ use App\Workers\Agents\AgentRegistry;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -462,6 +463,61 @@ class RepoProfileResource extends Resource
                                         ->color('info')
                                         ->icon('heroicon-o-information-circle')
                                         ->description(__('projects.fields.live_demo_hint_body')),
+                                ]),
+
+                            // ── Environment & Secrets ──────────────────────────────────────
+                            Section::make(__('projects.sections.env_secrets'))
+                                ->description(__('projects.sections.env_secrets_description'))
+                                ->icon('heroicon-o-key')
+                                ->aside()
+                                ->visible(fn (Get $get): bool => self::platformChosen($get))
+                                ->schema([
+                                    Repeater::make('composer_registries')
+                                        ->label(__('projects.fields.composer_registries_label'))
+                                        ->helperText(__('projects.fields.composer_registries_helper'))
+                                        ->schema([
+                                            TextInput::make('host')
+                                                ->label(__('projects.fields.composer_registry_host_label'))
+                                                ->placeholder('packages.filamentphp.com')
+                                                ->required()
+                                                ->columnSpan(2),
+                                            TextInput::make('username')
+                                                ->label(__('projects.fields.composer_registry_username_label'))
+                                                ->placeholder('token')
+                                                ->columnSpan(1),
+                                            TextInput::make('token')
+                                                ->label(__('projects.fields.composer_registry_token_label'))
+                                                ->password()
+                                                ->revealable()
+                                                ->required()
+                                                ->columnSpan(2),
+                                        ])
+                                        ->columns(5)
+                                        ->addActionLabel(__('projects.fields.composer_registries_add'))
+                                        ->itemLabel(fn (array $state): ?string => $state['host'] ?? null)
+                                        ->collapsible()
+                                        ->defaultItems(0),
+
+                                    Repeater::make('worker_env')
+                                        ->label(__('projects.fields.worker_env_label'))
+                                        ->helperText(__('projects.fields.worker_env_helper'))
+                                        ->schema([
+                                            TextInput::make('name')
+                                                ->label(__('projects.fields.worker_env_name_label'))
+                                                ->placeholder('MEILISEARCH_KEY')
+                                                ->required()
+                                                ->columnSpan(2),
+                                            TextInput::make('value')
+                                                ->label(__('projects.fields.worker_env_value_label'))
+                                                ->password()
+                                                ->revealable()
+                                                ->columnSpan(3),
+                                        ])
+                                        ->columns(5)
+                                        ->addActionLabel(__('projects.fields.worker_env_add'))
+                                        ->itemLabel(fn (array $state): ?string => $state['name'] ?? null)
+                                        ->collapsible()
+                                        ->defaultItems(0),
                                 ]),
 
                             // ── Modelle ─────────────────────────────────────────────────────
