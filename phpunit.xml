@@ -44,6 +44,9 @@
             .env that enabled it for browser testing.
         -->
         <env name="ARGOS_E2E_FAKE" value="false" force="true"/>
+        <!-- Previews ship on by default; pin off here so tests never deploy
+             demos. Tests that exercise demo dispatch set it true via config(). -->
+        <env name="ARGOS_PREVIEW_ENABLED" value="false" force="true"/>
 
         <server name="APP_ENV" value="testing" force="true"/>
         <server name="APP_KEY" value="base64:zTobRxr7TepBXVjM/E3kjKGAwnxWQ7QWMMXaInQYKKg=" force="true"/>
@@ -56,5 +59,6 @@
         <server name="TELESCOPE_ENABLED" value="false" force="true"/>
         <server name="NIGHTWATCH_ENABLED" value="false" force="true"/>
         <server name="ARGOS_E2E_FAKE" value="false" force="true"/>
+        <server name="ARGOS_PREVIEW_ENABLED" value="false" force="true"/>
     </php>
 </phpunit>

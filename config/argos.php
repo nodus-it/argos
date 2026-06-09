@@ -111,7 +111,11 @@ return [
     // Live-Demo (P6): ephemeral per-task demo deployments, routed by Traefik
     // under their own subdomain. See docs/backlog/live-demo-concept.md.
     'preview' => [
-        'enabled' => (bool) env('ARGOS_PREVIEW_ENABLED', false),
+        // On by default — a project's own `live_demo_enabled` toggle is the real
+        // per-project gate, so this only governs whether the platform *can*
+        // deploy demos at all. Operators without preview infra (Traefik +
+        // argos_edge + a base domain) can opt out with ARGOS_PREVIEW_ENABLED=false.
+        'enabled' => (bool) env('ARGOS_PREVIEW_ENABLED', true),
         // Demos live at demo-{task}.{base_domain}. Defaults to the APP_URL host
         // (demos as subdomains of the app); locally that host has no wildcard
         // DNS, so fall back to nip.io (*.127.0.0.1.nip.io → 127.0.0.1).

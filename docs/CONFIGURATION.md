@@ -106,7 +106,7 @@ resolving to this host.
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `ARGOS_PREVIEW_ENABLED` | `false` | Master switch — turns the live-demo infrastructure on. |
+| `ARGOS_PREVIEW_ENABLED` | `true` | Master switch for the live-demo infrastructure. On by default; the per-project *Live-Demo* toggle is the real gate. Set `false` to disable platform-wide (e.g. no Traefik/preview infra). |
 | `ARGOS_PREVIEW_BASE_DOMAIN` | derived from `APP_URL` (nip.io locally) | Demos live at `demo-<task>.<base_domain>`. |
 | `ARGOS_PREVIEW_SCHEME` | derived from `APP_URL` | `http` or `https` used in the demo URL. |
 | `ARGOS_PREVIEW_TTL_HOURS` | `24` | Hours before an idle demo is torn down. |

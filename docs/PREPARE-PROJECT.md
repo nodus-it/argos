@@ -208,8 +208,9 @@ chown/chmod storage bootstrap/cache
 ### Is my project ready as-is?
 
 If **all** are yes, the bundled default works — you only need to **enable** the
-demo (toggle *Live-Demo* on the repo profile; the operator must have
-`ARGOS_PREVIEW_ENABLED=true`). Do not add `.argos/demo.*`.
+demo (toggle *Live-Demo* on the repo profile). Previews are on by default
+platform-side; an operator can disable them with `ARGOS_PREVIEW_ENABLED=false`.
+Do not add `.argos/demo.*`.
 
 - [ ] It's a Laravel app served over HTTP on port 80.
 - [ ] It boots with `composer install` + `php artisan migrate --force --seed`,
@@ -329,8 +330,8 @@ If the project is *almost* a standard Laravel app, fix the gaps instead:
 3. If you created `.argos/` files, verify they are committed to the **default
    branch** (that's the only ref Argos reads them from).
 4. Tell the user which toggles to flip in the Argos UI: *Worker Source = BYOI*
-   (Part A) and/or *Live-Demo enabled* (Part B), and that Live-Demo also needs
-   the operator-side `ARGOS_PREVIEW_ENABLED=true`.
+   (Part A) and/or *Live-Demo enabled* (Part B). Previews are on platform-side
+   by default (an operator can disable them with `ARGOS_PREVIEW_ENABLED=false`).
 5. Never put secrets in `.argos/` files — they live in the repo. Tokens come
    from Argos credentials; private-registry auth and any extra env go in the
    repo profile's **Worker → Environment & secrets** (Part A), not these
