@@ -728,4 +728,20 @@ class RepoProfileResourceTest extends TestCase
         $this->assertSame('packages.filamentphp.com', $fresh->composer_registries[0]['host']);
         $this->assertSame('abc', $fresh->worker_env[0]['value']);
     }
+
+    public function test_worker_services_round_trip_via_edit_form(): void
+    {
+        Saloon::fake([
+            'api.github.com/repos/test-org/test-repo/branches*' => MockResponse::make([['name' => 'main']]),
+        ]);
+
+        $profile = RepoProfile::factory()->create(['platform' => 'github']);
+
+        Livewire::test(EditRepoProfile::class, ['record' => $profile->getKey()])
+            ->fillForm(['worker_services' => ['mysql', 'redis']])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $this->assertEqualsCanonicalizing(['mysql', 'redis'], $profile->fresh()->worker_services);
+    }
 }

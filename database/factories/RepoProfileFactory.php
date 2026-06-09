@@ -52,4 +52,12 @@ class RepoProfileFactory extends Factory
     {
         return $this->state(['worker_env' => $env]);
     }
+
+    /**
+     * @param  array<int, string>  $services
+     */
+    public function withBackingServices(array $services): static
+    {
+        return $this->state(['worker_services' => $services]);
+    }
 }

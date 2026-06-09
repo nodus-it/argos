@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Enums\AgentName;
 use App\Enums\AuthMethod;
+use App\Enums\BackingService;
 use App\Enums\ClaudeModel;
 use App\Enums\GitProvider;
 use App\Enums\WorkerSource;
@@ -37,6 +38,7 @@ use Laravel\Sanctum\HasApiTokens;
  * @property array<string, mixed>|null $worker_config
  * @property array<int, array{host: string, username?: string|null, token: string}>|null $composer_registries
  * @property array<int, array{name: string, value: string}>|null $worker_env
+ * @property array<int, string>|null $worker_services
  * @property string|null $model_concept
  * @property string|null $model_implement
  * @property int|null $max_turns_concept
@@ -73,6 +75,7 @@ class RepoProfile extends Model implements HasApiTokensContract
         'worker_config',
         'composer_registries',
         'worker_env',
+        'worker_services',
         'model_concept',
         'model_implement',
         'max_turns_concept',
@@ -93,6 +96,7 @@ class RepoProfile extends Model implements HasApiTokensContract
             'worker_config' => 'array',
             'composer_registries' => 'encrypted:array',
             'worker_env' => 'encrypted:array',
+            'worker_services' => 'array',
             'max_turns_concept' => 'integer',
             'max_turns_implement' => 'integer',
             'auto_concept' => 'boolean',
@@ -145,6 +149,20 @@ class RepoProfile extends Model implements HasApiTokensContract
     public function workerStack(): BelongsTo
     {
         return $this->belongsTo(WorkerStack::class);
+    }
+
+    /**
+     * The backing services this project opts into for its worker test runs,
+     * as resolved enum cases (unknown stored values are dropped).
+     *
+     * @return list<BackingService>
+     */
+    public function backingServices(): array
+    {
+        return array_values(array_filter(array_map(
+            static fn (string $value): ?BackingService => BackingService::tryFrom($value),
+            $this->worker_services ?? [],
+        )));
     }
 
     /**

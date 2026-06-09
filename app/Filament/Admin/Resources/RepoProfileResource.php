@@ -6,6 +6,7 @@ namespace App\Filament\Admin\Resources;
 
 use App\Enums\AgentName;
 use App\Enums\AuthMethod;
+use App\Enums\BackingService;
 use App\Enums\GitProvider;
 use App\Enums\WorkerImageEntityStatus;
 use App\Enums\WorkerSource;
@@ -27,6 +28,7 @@ use App\Workers\Agents\AgentRegistry;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
+use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -446,6 +448,15 @@ class RepoProfileResource extends Resource
                                             $set('model_implement', null);
                                         })
                                         ->native(false),
+
+                                    CheckboxList::make('worker_services')
+                                        ->label(__('projects.fields.worker_services_label'))
+                                        ->helperText(__('projects.fields.worker_services_helper'))
+                                        ->options([
+                                            BackingService::Mysql->value => BackingService::Mysql->label(),
+                                            BackingService::Redis->value => BackingService::Redis->label(),
+                                        ])
+                                        ->columns(2),
                                 ]),
 
                             // ── Live-Demo ───────────────────────────────────────────────────

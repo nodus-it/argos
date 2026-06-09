@@ -62,6 +62,8 @@ return [
         'worker_agent_label' => 'Agent',
         'worker_agent_helper' => 'Which agent runs the phases. Leave empty for Claude Code.',
         'worker_agent_placeholder' => 'Default :agent',
+        'worker_services_label' => 'Backing services for tests',
+        'worker_services_helper' => 'Argos boots the selected services ephemerally per implement run (own network, removed afterwards) and injects their credentials. Reachable at db (MySQL) and redis — the tests must read DB_HOST/REDIS_HOST from the env.',
         'auth_method_label' => 'Authentication method',
         'auth_method_pat' => 'Personal Access Token (PAT)',
         'auth_method_oauth' => 'OAuth (GitHub)',

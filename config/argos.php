@@ -81,6 +81,24 @@ return [
         'cpu_limit' => env('ARGOS_CPU_LIMIT', '2'),
     ],
     /*
+     * Backing services Argos can boot alongside a worker phase run as ephemeral
+     * sidecars (one private network per run, torn down afterwards) so a
+     * project's tests can talk to a real MySQL/Redis. A repo profile opts in per
+     * service; only the test-running phases start them. See
+     * App\Enums\BackingService and App\Services\Workflow\WorkerSidecarManager.
+     */
+    'worker' => [
+        'services' => [
+            'startup_timeout' => (int) env('ARGOS_WORKER_SERVICE_TIMEOUT', 60),
+            'mysql' => [
+                'image' => env('ARGOS_WORKER_MYSQL_IMAGE', 'mariadb:11'),
+            ],
+            'redis' => [
+                'image' => env('ARGOS_WORKER_REDIS_IMAGE', 'redis:7-alpine'),
+            ],
+        ],
+    ],
+    /*
      * Compose-pipeline settings. The WorkerImageResolver consults
      * `compose.default_stack` when neither the task nor the repo profile
      * pins a stack; this is the slug of a row in `worker_stacks`, populated

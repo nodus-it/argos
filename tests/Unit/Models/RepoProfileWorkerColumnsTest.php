@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Models;
 
 use App\Enums\AgentName;
+use App\Enums\BackingService;
 use App\Enums\WorkerSource;
 use App\Models\RepoProfile;
 use App\Models\WorkerStack;
@@ -85,5 +86,15 @@ class RepoProfileWorkerColumnsTest extends TestCase
 
         $raw = (string) DB::table('repo_profiles')->where('id', $profile->id)->value('worker_env');
         $this->assertStringNotContainsString('sekret', $raw);
+    }
+
+    public function test_worker_services_round_trip_and_resolve_enums(): void
+    {
+        $profile = RepoProfile::factory()->withBackingServices(['mysql', 'redis', 'bogus'])->create();
+        $fresh = $profile->fresh();
+
+        $this->assertSame(['mysql', 'redis', 'bogus'], $fresh->worker_services);
+        // backingServices() drops the unknown value.
+        $this->assertEquals([BackingService::Mysql, BackingService::Redis], $fresh->backingServices());
     }
 }
