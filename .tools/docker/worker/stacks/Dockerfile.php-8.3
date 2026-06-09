@@ -15,6 +15,10 @@ ENV DEBIAN_FRONTEND=noninteractive
 #   git/gh        — repo operations + PR creation
 #   jq            — JSON parsing in phase scripts
 #   curl/gnupg    — PECL/GH-CLI installation, runtime HTTP
+#   default-mysql-client — `mysql`/`mysqldump` for MySQL-backed testing
+#                 (schema:load / "fast refresh" dumps, parallel test DBs); the
+#                 PHP pdo_mysql ext only connects, the CLI does dumps/loads.
+#                 Pairs with the MySQL backing service.
 #   unzip/coreutils/vim/nano/less — interactive `agent shell` ergonomics
 #   PHP build deps (libzip-dev, libicu-dev, ...) — needed for the extensions below.
 RUN set -eux; \
@@ -26,6 +30,7 @@ RUN set -eux; \
         git \
         unzip \
         jq \
+        default-mysql-client \
         coreutils \
         vim \
         nano \
