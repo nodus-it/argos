@@ -32,6 +32,7 @@ use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Support\Env;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\ServiceProvider;
@@ -167,6 +168,12 @@ class AppServiceProvider extends ServiceProvider
         // DB-stored OAuth apps win over ENV (config/services.php). Runs after
         // the DB connection is chosen so the table probe targets the right one.
         app(OAuthConfigHydrator::class)->hydrate();
+
+        // Scramble serves the API docs UI (/docs/api) and the OpenAPI document
+        // (/docs/api.json). Its RestrictedDocsAccess middleware only opens up
+        // outside local without this gate; combined with the `auth` middleware
+        // (see config/scramble.php) it limits the docs to signed-in Argos users.
+        Gate::define('viewApiDocs', fn ($user): bool => $user !== null);
     }
 
     /**

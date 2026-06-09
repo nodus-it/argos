@@ -14,10 +14,12 @@ use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
+use Filament\Navigation\NavigationItem;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
 use Filament\Support\Enums\Width;
+use Filament\Support\Icons\Heroicon;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
@@ -64,6 +66,19 @@ class AdminPanelProvider extends PanelProvider
             ->navigationGroups([
                 __('navigation.groups.worker'),
                 __('navigation.groups.configuration'),
+                // Kept last so the Help section sits at the bottom of the sidebar.
+                __('navigation.groups.help'),
+            ])
+            ->navigationItems([
+                // Link to the auto-generated REST API docs (Scramble, served at
+                // /docs/api). Lives outside the Filament panel, so it opens in a
+                // new tab rather than as a panel page.
+                NavigationItem::make('api-docs')
+                    ->label(fn (): string => __('navigation.pages.api_docs'))
+                    ->icon(Heroicon::OutlinedCodeBracket)
+                    ->group(__('navigation.groups.help'))
+                    ->url(fn (): string => url('docs/api'), shouldOpenInNewTab: true)
+                    ->sort(99),
             ])
             ->login(Login::class)
             ->profile(Profile::class)
