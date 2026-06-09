@@ -55,6 +55,9 @@ RUN set -eux; \
 # mbstring, sodium and OPcache ship with the php:8.x base image already.
 # pcntl  — Horizon, queue workers, Pail.
 # exif   — spatie/image, spatie/laravel-medialibrary.
+# sockets — required by common packages (Pest browser plugin, ReactPHP, …);
+#           a hard composer platform requirement, so its absence breaks
+#           `composer install`, not just runtime. Core ext, cheap to bundle.
 # pdo_pgsql — Postgres-backed projects (needs libpq-dev, installed above).
 RUN set -eux; \
     docker-php-ext-configure intl; \
@@ -68,6 +71,7 @@ RUN set -eux; \
         bcmath \
         gd \
         pcntl \
+        sockets \
         exif; \
     pecl install redis; \
     docker-php-ext-enable redis

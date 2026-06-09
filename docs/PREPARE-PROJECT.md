@@ -59,7 +59,8 @@ container. Inside it the agent:
 
 The default image is the built-in **`php-8.4`** stack: PHP 8.4 CLI with the
 common extensions (`pdo_mysql`, `pdo_pgsql`, `pdo_sqlite`, `intl`, `zip`,
-`bcmath`, `gd`, `pcntl`, `redis`, …), Composer, Git, `gh`, `jq`, and Node 22.
+`bcmath`, `gd`, `pcntl`, `sockets`, `redis`, …), Composer, Git, `gh`, `jq`, and
+Node 22.
 A `php-8.3` stack exists too.
 
 > The worker container is single-image, but Argos can boot **backing
