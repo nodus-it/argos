@@ -25,9 +25,12 @@ class PhaseCommandBuilder
 {
     /**
      * @param  array<string, mixed>  $flags
+     * @param  WorkerSidecars|null  $sidecars  ephemeral backing services for this
+     *                                         run; their network + connection env
+     *                                         get attached to the worker container
      * @return list<string>
      */
-    public function build(Task $task, string $phase, array $flags = []): array
+    public function build(Task $task, string $phase, array $flags = [], ?WorkerSidecars $sidecars = null): array
     {
         $profile = $task->repoProfile;
 
@@ -80,6 +83,19 @@ class PhaseCommandBuilder
         foreach ($materializedCredential->envVars as $key => $value) {
             $cmd[] = '-e';
             $cmd[] = "{$key}={$value}";
+        }
+
+        // Ephemeral backing services (MySQL/Redis): join their private network
+        // and hand the worker the conventional connection env (DB_HOST=db, …).
+        // Injected before the project env below so a project's worker_env can
+        // still override e.g. DB_DATABASE.
+        if ($sidecars !== null && $sidecars->network !== null) {
+            $cmd[] = '--network';
+            $cmd[] = $sidecars->network;
+            foreach ($sidecars->env as $key => $value) {
+                $cmd[] = '-e';
+                $cmd[] = "{$key}={$value}";
+            }
         }
 
         // Project-level secrets (COMPOSER_AUTH for private registries, plus any

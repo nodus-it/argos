@@ -62,9 +62,13 @@ common extensions (`pdo_mysql`, `pdo_pgsql`, `pdo_sqlite`, `intl`, `zip`,
 `bcmath`, `gd`, `pcntl`, `redis`, …), Composer, Git, `gh`, `jq`, and Node 22.
 A `php-8.3` stack exists too.
 
-> The container is **single-image** — there is no database server running
-> alongside it. Tests must run self-contained (e.g. SQLite / in-memory), or
-> spin up what they need inside the same image.
+> The worker container is single-image, but Argos can boot **backing
+> services** alongside it for the test run: toggle **MySQL/MariaDB** and/or
+> **Redis** in the project's Worker tab. They come up on a private network per
+> run (and are torn down afterwards), reachable at `db` / `redis`; Argos hands
+> the worker the matching `DB_HOST` / `REDIS_HOST` env. Your tests must read
+> those from `env()`. Need a service Argos doesn't offer yet → run it inside a
+> custom worker image (Option 1).
 
 ### Is my project ready as-is?
 
@@ -74,9 +78,11 @@ Answer these. If **all** are yes, the built-in stack works — do nothing.
       needs is PHP, Composer, and/or Node 22, nothing else.
 - [ ] `composer install` (and `npm ci`, if there's a lockfile) succeeds with no
       system packages beyond the list above.
-- [ ] The test suite runs **offline** and **without external services** — no
-      real database server, no network calls. (Laravel: tests use the `sqlite`
-      / `:memory:` connection, not a live MySQL.)
+- [ ] The test suite runs **offline** (no network calls) and either uses
+      `sqlite` / `:memory:`, **or** talks only to MySQL/Redis — which you can
+      enable as backing services (Worker tab) and reach at `DB_HOST=db` /
+      `REDIS_HOST=redis`. Anything else (a real Postgres, external APIs) → not
+      ready as-is.
 - [ ] No exotic runtime (Python, Go, Ruby, a native toolchain, a private
       package registry needing credentials).
 

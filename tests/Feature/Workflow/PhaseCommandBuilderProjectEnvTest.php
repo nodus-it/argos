@@ -10,6 +10,7 @@ use App\Models\AgentCredential;
 use App\Models\RepoProfile;
 use App\Models\Task;
 use App\Services\Workflow\PhaseCommandBuilder;
+use App\Services\Workflow\WorkerSidecars;
 use App\Workers\Compose\WorkerImageResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -43,5 +44,31 @@ class PhaseCommandBuilderProjectEnvTest extends TestCase
 
         $this->assertStringContainsString('MEILI_KEY=abc', $joined);
         $this->assertStringContainsString('COMPOSER_AUTH=', $joined);
+    }
+
+    public function test_build_attaches_sidecar_network_and_connection_env(): void
+    {
+        $this->mock(WorkerImageResolver::class, function ($mock): void {
+            $mock->shouldReceive('resolveOrBuild')->andReturn('argos-worker:test');
+        });
+
+        AgentCredential::create([
+            'agent_name' => AgentName::ClaudeCode->value,
+            'name' => 'test',
+            'credentials' => ['token' => 'claude-token'],
+            'status' => AgentCredentialStatus::Active->value,
+        ]);
+
+        $profile = RepoProfile::factory()->create();
+        $task = Task::factory()->create(['repo_profile_id' => $profile->id]);
+
+        $sidecars = new WorkerSidecars('argos-run-net', ['DB_HOST' => 'db', 'REDIS_HOST' => 'redis'], ['c-db']);
+
+        $cmd = app(PhaseCommandBuilder::class)->build($task, 'implement', [], $sidecars);
+        $joined = implode(' ', $cmd);
+
+        $this->assertStringContainsString('--network argos-run-net', $joined);
+        $this->assertStringContainsString('DB_HOST=db', $joined);
+        $this->assertStringContainsString('REDIS_HOST=redis', $joined);
     }
 }

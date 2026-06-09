@@ -139,40 +139,49 @@ class PhaseRunner
         };
 
         $builder = app(PhaseCommandBuilder::class);
-        $cmd = $builder->build($task, $phase, $flags);
-        $logPath = $this->getPhaseLogPath($task->name, $phase);
 
-        $logDir = dirname($logPath);
-        if (! is_dir($logDir)) {
-            mkdir($logDir, 0755, true);
-        }
+        // Boot the project's backing services (if any) before the worker so its
+        // tests can reach a real DB/Redis; tear them down no matter what.
+        $sidecars = app(WorkerSidecarManager::class)->start($task, $phase);
 
-        file_put_contents($logPath, '');
+        try {
+            $cmd = $builder->build($task, $phase, $flags, $sidecars);
+            $logPath = $this->getPhaseLogPath($task->name, $phase);
 
-        $resolvedModel = $builder->resolveModel($task, $builder->resolveAgentName($task), $phase);
-        $phaseRun = app(WorkflowService::class)->startPhase($task, $phase, $resolvedModel);
-
-        Log::channel('argos')->info('Phase started', $this->safeContext($task, $phase, ['iteration' => $phaseRun->iteration]));
-
-        $startedAt = microtime(true);
-        $logHandle = fopen($logPath, 'a');
-        $stdout = '';
-
-        $process = $this->newProcess($cmd);
-        $process->setTimeout(null);
-        $process->setIdleTimeout(null);
-
-        $process->run(function (string $type, string $chunk) use ($logHandle, $output, &$stdout): void {
-            fwrite($logHandle, $chunk);
-            $output($chunk);
-            if ($type === Process::OUT) {
-                $stdout .= $chunk;
+            $logDir = dirname($logPath);
+            if (! is_dir($logDir)) {
+                mkdir($logDir, 0755, true);
             }
-        });
 
-        fclose($logHandle);
+            file_put_contents($logPath, '');
 
-        $exitCode = $process->getExitCode() ?? 1;
+            $resolvedModel = $builder->resolveModel($task, $builder->resolveAgentName($task), $phase);
+            $phaseRun = app(WorkflowService::class)->startPhase($task, $phase, $resolvedModel);
+
+            Log::channel('argos')->info('Phase started', $this->safeContext($task, $phase, ['iteration' => $phaseRun->iteration]));
+
+            $startedAt = microtime(true);
+            $logHandle = fopen($logPath, 'a');
+            $stdout = '';
+
+            $process = $this->newProcess($cmd);
+            $process->setTimeout(null);
+            $process->setIdleTimeout(null);
+
+            $process->run(function (string $type, string $chunk) use ($logHandle, $output, &$stdout): void {
+                fwrite($logHandle, $chunk);
+                $output($chunk);
+                if ($type === Process::OUT) {
+                    $stdout .= $chunk;
+                }
+            });
+
+            fclose($logHandle);
+
+            $exitCode = $process->getExitCode() ?? 1;
+        } finally {
+            app(WorkerSidecarManager::class)->stop($sidecars);
+        }
         $status = $this->exitCodeToStatus($exitCode);
         $duration = round(microtime(true) - $startedAt, 2);
 
@@ -220,39 +229,48 @@ class PhaseRunner
         };
 
         $builder = app(PhaseCommandBuilder::class);
-        $cmd = $builder->build($task, $phase, $flags);
-        $logPath = $this->getPhaseLogPath($task->name, $phase);
 
-        $logDir = dirname($logPath);
-        if (! is_dir($logDir)) {
-            mkdir($logDir, 0755, true);
-        }
+        // Boot the project's backing services (if any) before the worker so its
+        // tests can reach a real DB/Redis; tear them down no matter what.
+        $sidecars = app(WorkerSidecarManager::class)->start($task, $phase);
 
-        file_put_contents($logPath, '');
+        try {
+            $cmd = $builder->build($task, $phase, $flags, $sidecars);
+            $logPath = $this->getPhaseLogPath($task->name, $phase);
 
-        $resolvedModel = $builder->resolveModel($task, $builder->resolveAgentName($task), $phase);
-        $phaseRun = app(WorkflowService::class)->startPhase($task, $phase, $resolvedModel);
-
-        Log::channel('argos')->info('Phase started', $this->safeContext($task, $phase, ['iteration' => $phaseRun->iteration]));
-
-        $startedAt = microtime(true);
-        $logHandle = fopen($logPath, 'a');
-        $stdout = '';
-
-        $process = $this->newProcess($cmd);
-        $process->setTimeout(null);
-        $process->setIdleTimeout(null);
-
-        $process->run(function (string $type, string $chunk) use ($logHandle, &$stdout): void {
-            fwrite($logHandle, $chunk);
-            if ($type === Process::OUT) {
-                $stdout .= $chunk;
+            $logDir = dirname($logPath);
+            if (! is_dir($logDir)) {
+                mkdir($logDir, 0755, true);
             }
-        });
 
-        fclose($logHandle);
+            file_put_contents($logPath, '');
 
-        $exitCode = $process->getExitCode() ?? 1;
+            $resolvedModel = $builder->resolveModel($task, $builder->resolveAgentName($task), $phase);
+            $phaseRun = app(WorkflowService::class)->startPhase($task, $phase, $resolvedModel);
+
+            Log::channel('argos')->info('Phase started', $this->safeContext($task, $phase, ['iteration' => $phaseRun->iteration]));
+
+            $startedAt = microtime(true);
+            $logHandle = fopen($logPath, 'a');
+            $stdout = '';
+
+            $process = $this->newProcess($cmd);
+            $process->setTimeout(null);
+            $process->setIdleTimeout(null);
+
+            $process->run(function (string $type, string $chunk) use ($logHandle, &$stdout): void {
+                fwrite($logHandle, $chunk);
+                if ($type === Process::OUT) {
+                    $stdout .= $chunk;
+                }
+            });
+
+            fclose($logHandle);
+
+            $exitCode = $process->getExitCode() ?? 1;
+        } finally {
+            app(WorkerSidecarManager::class)->stop($sidecars);
+        }
         $status = $this->exitCodeToStatus($exitCode);
         $duration = round(microtime(true) - $startedAt, 2);
 
