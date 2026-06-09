@@ -9,7 +9,7 @@ declare(strict_types=1);
  * matches the git tag that ships the same commit. Local/develop builds keep
  * '0.0.0-dev' and use floating worker tags (no version pinning).
  */
-$argosVersion = '0.1.0-beta.4';
+$argosVersion = '0.2.0-beta.1';
 
 // APP_URL is the single source of truth for host + scheme; the live-demo
 // base domain and scheme derive from it (override only for an exotic setup
