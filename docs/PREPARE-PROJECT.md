@@ -199,6 +199,11 @@ php artisan storage:link || true
 chown/chmod storage bootstrap/cache
 ```
 
+> The bundled default is **unified with the backing services** (Part A): the
+> demo DB uses the same MySQL credentials you configure there, and a **Redis**
+> service is added to the demo when you enable Redis. A custom
+> `.argos/demo.compose.yml` is never auto-modified — there you're in full control.
+
 ### Is my project ready as-is?
 
 If **all** are yes, the bundled default works — you only need to **enable** the

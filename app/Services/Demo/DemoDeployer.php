@@ -208,8 +208,9 @@ class DemoDeployer
         $settingsYaml = $service->getFileContents($ownerRepo, DemoConfigLocator::SETTINGS_PATH, $ref);
 
         if ($composeYaml === null && $settingsYaml === null) {
-            // No contract at all → built-in default runtime.
-            [$composeYaml, $settingsYaml] = $this->defaultContract();
+            // No contract at all → built-in default runtime, unified with the
+            // project's backing-service config (creds + Redis toggle).
+            [$composeYaml, $settingsYaml] = $this->defaultContract($profile);
         } elseif ($composeYaml === null || $settingsYaml === null) {
             // A half-written contract is a mistake the author must see, not a
             // silent fall-through to the generic demo.
@@ -228,18 +229,15 @@ class DemoDeployer
     }
 
     /**
-     * Read the bundled default Laravel demo contract (compose + settings).
+     * Build the bundled default Laravel demo contract (compose + settings),
+     * unified with the profile's backing-service config (DB credentials + an
+     * optional Redis service).
      *
      * @return array{0: string, 1: string} [composeYaml, settingsYaml]
      */
-    private function defaultContract(): array
+    private function defaultContract(RepoProfile $profile): array
     {
-        $dir = resource_path('stubs/demo/laravel');
-
-        return [
-            (string) file_get_contents($dir.'/demo.compose.yml'),
-            (string) file_get_contents($dir.'/demo.yml'),
-        ];
+        return app(DemoContractBuilder::class)->buildDefault($profile);
     }
 
     /**
