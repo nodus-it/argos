@@ -21,9 +21,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # PHP extensions via the de-facto standard installer (handles apt deps for us).
+# Kept in parity with the worker stack (.tools/docker/worker/stacks/*) so the
+# SAME `composer install` the worker ran also passes in the demo — notably
+# `sockets` (hard platform req of pest-plugin-browser, fails composer install
+# otherwise) and `redis` (projects that use phpredis at runtime).
 COPY --from=mlocati/php-extension-installer:2 /usr/bin/install-php-extensions /usr/bin/
 RUN install-php-extensions \
         pdo_mysql \
+        pdo_pgsql \
+        pdo_sqlite \
         mbstring \
         bcmath \
         gd \
@@ -31,7 +37,13 @@ RUN install-php-extensions \
         zip \
         exif \
         pcntl \
+        sockets \
+        redis \
         opcache
+
+# Lift the CLI memory_limit (base caps it at 128M) so `composer install` and
+# `migrate --seed` on large apps don't OOM. Bounded by the demo's container cap.
+RUN echo 'memory_limit = -1' > /usr/local/etc/php/conf.d/zz-argos-memory.ini
 
 # Composer (binary only).
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
