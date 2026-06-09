@@ -136,6 +136,7 @@ AI agent and covers both the worker execution environment
 | Prepare a repo for Argos (agent guide) | [docs/PREPARE-PROJECT.md](docs/PREPARE-PROJECT.md) |
 | Extended setup (production, custom workers, reverse proxy) | [docs/SETUP.md](docs/SETUP.md) |
 | All environment variables with defaults | [docs/CONFIGURATION.md](docs/CONFIGURATION.md) |
+| What Argos runs (worker & demo commands) | [docs/EXECUTION-COMMANDS.md](docs/EXECUTION-COMMANDS.md) |
 | OAuth — when and why | [docs/OAUTH.md](docs/OAUTH.md) |
 | GitHub setup (PAT + OAuth) | [docs/SETUP-GITHUB.md](docs/SETUP-GITHUB.md) |
 | GitLab setup (incl. self-hosted) | [docs/SETUP-GITLAB.md](docs/SETUP-GITLAB.md) |
