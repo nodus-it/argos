@@ -83,8 +83,9 @@ Answer these. If **all** are yes, the built-in stack works — do nothing.
       enable as backing services (Worker tab) and reach at `DB_HOST=db` /
       `REDIS_HOST=redis`. Anything else (a real Postgres, external APIs) → not
       ready as-is.
-- [ ] No exotic runtime (Python, Go, Ruby, a native toolchain, a private
-      package registry needing credentials).
+- [ ] No exotic runtime (Python, Go, Ruby, a native toolchain). A **private
+      Composer registry** is fine on its own — it needs no custom image; see
+      *Private registries & secrets* below.
 
 Any "no" → pick one of the two options.
 
@@ -137,6 +138,26 @@ Often cheaper than a custom image: make the project fit the default stack.
   gate the affected tests).
 - If a single extra system package is all that's missing, prefer Option 1 — a
   three-line Dockerfile beats contorting the project.
+
+### Private registries & secrets (no contract file)
+
+Auth-protected Composer registries (Private Packagist, Satis, Flux Pro,
+Filament plugins, Scramble Pro, …) and any other secret the build or tests
+need do **not** belong in `.argos/` — those files live in the repo. Configure
+them on the repo profile in the Argos UI, under **Worker → Environment &
+secrets**:
+
+- **Private Composer registries** — host + username + token per row. Argos
+  builds a `COMPOSER_AUTH` blob from them, so `composer install` reaches them
+  in **both** the worker and the live demo.
+- **Environment variables** — arbitrary `NAME` / value pairs (credentials for
+  an external service, API keys, or a hand-written `COMPOSER_AUTH`, …), stored
+  encrypted and injected into the worker and the demo. Argos-owned keys
+  (`REPO_TOKEN`, `APP_KEY`, `DB_HOST`, …) cannot be overridden.
+
+So a project with private dependencies needs **no** custom worker image just
+for the registry auth — reach for Option 1 only when it also needs an exotic
+runtime or a system package.
 
 ---
 
@@ -305,4 +326,6 @@ If the project is *almost* a standard Laravel app, fix the gaps instead:
    (Part A) and/or *Live-Demo enabled* (Part B), and that Live-Demo also needs
    the operator-side `ARGOS_PREVIEW_ENABLED=true`.
 5. Never put secrets in `.argos/` files — they live in the repo. Tokens come
-   from Argos credentials, not from these contracts.
+   from Argos credentials; private-registry auth and any extra env go in the
+   repo profile's **Worker → Environment & secrets** (Part A), not these
+   contracts.
