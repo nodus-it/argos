@@ -59,7 +59,7 @@ container. Inside it the agent:
 
 The default image is the built-in **`php-8.4`** stack: PHP 8.4 CLI with the
 common extensions (`pdo_mysql`, `pdo_pgsql`, `pdo_sqlite`, `intl`, `zip`,
-`bcmath`, `gd`, `pcntl`, `redis`, …), Composer, Git, `gh`, `jq`, and Node 20.
+`bcmath`, `gd`, `pcntl`, `redis`, …), Composer, Git, `gh`, `jq`, and Node 22.
 A `php-8.3` stack exists too.
 
 > The container is **single-image** — there is no database server running
@@ -71,7 +71,7 @@ A `php-8.3` stack exists too.
 Answer these. If **all** are yes, the built-in stack works — do nothing.
 
 - [ ] It's a PHP project (8.3/8.4) **or** a Node project — the toolchain it
-      needs is PHP, Composer, and/or Node 20, nothing else.
+      needs is PHP, Composer, and/or Node 22, nothing else.
 - [ ] `composer install` (and `npm ci`, if there's a lockfile) succeeds with no
       system packages beyond the list above.
 - [ ] The test suite runs **offline** and **without external services** — no
@@ -106,7 +106,7 @@ FROM python:3.12-bookworm
 # Tools the worker harness requires, plus Node for the agent CLI.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         git jq curl ca-certificates gnupg \
-    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/*
 
