@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\Anthropic;
 
-use Illuminate\Support\Facades\Http;
+use App\Integrations\Anthropic\AnthropicConnector;
+use App\Integrations\Anthropic\Requests\ValidateToken;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -12,20 +13,16 @@ use Throwable;
  * Validates a Claude OAuth token against the Anthropic API.
  *
  * Returns true (valid), false (rejected by API), or null (unreachable).
+ *
+ * Not final: the browser-E2E fake mode (E2eFakeServiceProvider) binds a
+ * subclass that always returns valid, so no Anthropic call happens offline.
  */
-final class AnthropicTokenValidator
+class AnthropicTokenValidator
 {
     public function validate(string $token): ?bool
     {
         try {
-            $response = Http::withToken($token)
-                ->withHeaders([
-                    'anthropic-version' => '2023-06-01',
-                    'anthropic-beta' => 'oauth-2025-04-20',
-                    'User-Agent' => 'claude-code/2.0.31',
-                ])
-                ->timeout(5)
-                ->get('https://api.anthropic.com/v1/models');
+            $response = (new AnthropicConnector($token))->send(new ValidateToken);
 
             if ($response->status() === 401 || $response->status() === 403) {
                 return false;

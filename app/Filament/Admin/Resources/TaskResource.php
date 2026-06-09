@@ -50,14 +50,16 @@ class TaskResource extends Resource
         return 'heroicon-o-queue-list';
     }
 
-    public static function getNavigationGroup(): ?string
+    // Tasks is the primary surface — it sits ungrouped at the top of the
+    // sidebar, right under the dashboard (sort -2), ahead of every group.
+    public static function getNavigationSort(): ?int
     {
-        return __('tasks.navigation_group');
+        return -1;
     }
 
     public static function getNavigationLabel(): string
     {
-        return 'Tasks';
+        return __('tasks.navigation_label');
     }
 
     public static function form(Schema $schema): Schema
@@ -368,7 +370,7 @@ class TaskResource extends Resource
             ]);
     }
 
-    public static function getRelationManagers(): array
+    public static function getRelations(): array
     {
         return [
             PhaseRunsRelationManager::class,

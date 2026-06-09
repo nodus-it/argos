@@ -63,6 +63,8 @@ _ep_load_libs() {
     # shellcheck disable=SC1091
     source "$LIB_DIR/logging.sh"
     # shellcheck disable=SC1091
+    source "$LIB_DIR/agent_stream.sh"
+    # shellcheck disable=SC1091
     source "$LIB_DIR/error.sh"
     # shellcheck disable=SC1091
     source "$LIB_DIR/result.sh"

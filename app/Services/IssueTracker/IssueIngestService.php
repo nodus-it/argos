@@ -9,11 +9,14 @@ use App\Models\ExternalIssueLink;
 use App\Models\Task;
 use App\Models\TaskProviderBinding;
 use App\Services\Task\TaskService;
-use Illuminate\Support\Arr;
 
 final class IssueIngestService
 {
-    public function __construct(private readonly TaskService $taskService) {}
+    public function __construct(
+        private readonly TaskService $taskService,
+        private readonly IssueFilterMatcher $filters,
+        private readonly IssueSignature $signatures,
+    ) {}
 
     /**
      * Process a raw issue payload for the given binding.
@@ -28,7 +31,7 @@ final class IssueIngestService
     {
         $externalId = $this->resolveExternalId($issue, $binding->kind);
 
-        if (! $this->passesFilters($issue, $binding)) {
+        if (! $this->filters->passes($issue, $binding)) {
             $link = ExternalIssueLink::firstOrNew([
                 'task_provider_binding_id' => $binding->id,
                 'external_id' => $externalId,
@@ -36,13 +39,13 @@ final class IssueIngestService
 
             $link->external_url = (string) ($issue['html_url'] ?? $issue['web_url'] ?? '');
             $link->last_synced_at = now();
-            $link->signature = $this->computeSignature($issue);
+            $link->signature = $this->signatures->for($issue);
             $link->save();
 
             return $link;
         }
 
-        $signature = $this->computeSignature($issue);
+        $signature = $this->signatures->for($issue);
 
         $link = ExternalIssueLink::firstOrNew([
             'task_provider_binding_id' => $binding->id,
@@ -90,51 +93,6 @@ final class IssueIngestService
     /**
      * @param  array<string, mixed>  $issue
      */
-    private function passesFilters(array $issue, TaskProviderBinding $binding): bool
-    {
-        $filters = $binding->filters ?? [];
-
-        $requiredState = Arr::get($filters, 'state');
-        if ($requiredState !== null && $requiredState !== '') {
-            $issueState = (string) ($issue['state'] ?? $issue['status'] ?? '');
-            if ($issueState !== $requiredState) {
-                return false;
-            }
-        }
-
-        $requiredLabels = Arr::get($filters, 'labels');
-        if (is_array($requiredLabels) && count($requiredLabels) > 0) {
-            // OR semantics: the issue must carry at least one of the configured
-            // labels (matches the documented behaviour in SETUP-TASK-PROVIDERS.md).
-            $issueLabels = $this->extractLabels($issue);
-            if (count(array_intersect($requiredLabels, $issueLabels)) === 0) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    /**
-     * @param  array<string, mixed>  $issue
-     * @return list<string>
-     */
-    private function extractLabels(array $issue): array
-    {
-        $raw = $issue['labels'] ?? [];
-        if (! is_array($raw)) {
-            return [];
-        }
-
-        return array_map(
-            fn (mixed $l): string => is_array($l) ? (string) ($l['name'] ?? '') : (string) $l,
-            $raw,
-        );
-    }
-
-    /**
-     * @param  array<string, mixed>  $issue
-     */
     private function createTaskFromIssue(array $issue, TaskProviderBinding $binding): Task
     {
         $title = (string) ($issue['title'] ?? 'Imported issue');
@@ -149,18 +107,5 @@ final class IssueIngestService
             'repo_profile_id' => $binding->repo_profile_id,
             'auto_concept' => $autoConcept,
         ]);
-    }
-
-    /**
-     * @param  array<string, mixed>  $issue
-     */
-    private function computeSignature(array $issue): string
-    {
-        return hash('sha256', serialize([
-            $issue['title'] ?? '',
-            $issue['body'] ?? $issue['description'] ?? '',
-            $issue['state'] ?? $issue['status'] ?? '',
-            $issue['labels'] ?? [],
-        ]));
     }
 }

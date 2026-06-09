@@ -6,9 +6,11 @@ namespace App\Models;
 
 use App\Enums\AgentName;
 use App\Enums\AuthMethod;
+use App\Enums\BackingService;
 use App\Enums\ClaudeModel;
 use App\Enums\GitProvider;
 use App\Enums\WorkerSource;
+use App\Enums\WorkflowStatus;
 use App\Services\OAuth\TokenRefresher;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Collection;
@@ -18,6 +20,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
+use Laravel\Sanctum\Contracts\HasApiTokens as HasApiTokensContract;
+use Laravel\Sanctum\HasApiTokens;
 
 /**
  * @property string $id
@@ -32,10 +36,17 @@ use Illuminate\Support\Carbon;
  * @property string|null $worker_stack_id
  * @property AgentName|null $worker_agent_name
  * @property array<string, mixed>|null $worker_config
+ * @property array<int, array{host: string, username?: string|null, token: string}>|null $composer_registries
+ * @property array<int, array{name: string, value: string}>|null $worker_env
+ * @property array<int, string>|null $worker_services
+ * @property array<string, array<string, string>>|null $worker_service_config
  * @property string|null $model_concept
  * @property string|null $model_implement
+ * @property int|null $max_turns_concept
+ * @property int|null $max_turns_implement
  * @property bool $auto_concept
  * @property bool $auto_pr
+ * @property bool $live_demo_enabled
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read Collection<int, Task> $tasks
@@ -43,8 +54,11 @@ use Illuminate\Support\Carbon;
  * @property-read WorkerStack|null $workerStack
  * @property-read Collection<int, TaskProviderBinding> $taskProviderBindings
  */
-class RepoProfile extends Model
+class RepoProfile extends Model implements HasApiTokensContract
 {
+    // Project-bound Sanctum API tokens: one token = one project, fine-scoped
+    // (e.g. CI). $repoProfile->createToken('ci', ['tasks:write']).
+    use HasApiTokens;
     use HasFactory;
     use HasUlids;
 
@@ -60,10 +74,17 @@ class RepoProfile extends Model
         'worker_stack_id',
         'worker_agent_name',
         'worker_config',
+        'composer_registries',
+        'worker_env',
+        'worker_services',
+        'worker_service_config',
         'model_concept',
         'model_implement',
+        'max_turns_concept',
+        'max_turns_implement',
         'auto_concept',
         'auto_pr',
+        'live_demo_enabled',
     ];
 
     protected function casts(): array
@@ -75,8 +96,15 @@ class RepoProfile extends Model
             'worker_source' => WorkerSource::class,
             'worker_agent_name' => AgentName::class,
             'worker_config' => 'array',
+            'composer_registries' => 'encrypted:array',
+            'worker_env' => 'encrypted:array',
+            'worker_services' => 'array',
+            'worker_service_config' => 'array',
+            'max_turns_concept' => 'integer',
+            'max_turns_implement' => 'integer',
             'auto_concept' => 'boolean',
             'auto_pr' => 'boolean',
+            'live_demo_enabled' => 'boolean',
         ];
     }
 
@@ -86,6 +114,20 @@ class RepoProfile extends Model
     public function tasks(): HasMany
     {
         return $this->hasMany(Task::class);
+    }
+
+    /**
+     * Tasks that are not in a terminal workflow state — drives the API's
+     * "open_tasks" count.
+     *
+     * @return HasMany<Task, $this>
+     */
+    public function openTasks(): HasMany
+    {
+        return $this->tasks()->whereNotIn('workflow_status', [
+            WorkflowStatus::Completed->value,
+            WorkflowStatus::Failed->value,
+        ]);
     }
 
     /**
@@ -110,6 +152,20 @@ class RepoProfile extends Model
     public function workerStack(): BelongsTo
     {
         return $this->belongsTo(WorkerStack::class);
+    }
+
+    /**
+     * The backing services this project opts into for its worker test runs,
+     * as resolved enum cases (unknown stored values are dropped).
+     *
+     * @return list<BackingService>
+     */
+    public function backingServices(): array
+    {
+        return array_values(array_filter(array_map(
+            static fn (string $value): ?BackingService => BackingService::tryFrom($value),
+            $this->worker_services ?? [],
+        )));
     }
 
     /**

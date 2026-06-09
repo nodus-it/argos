@@ -4,33 +4,26 @@ declare(strict_types=1);
 
 namespace App\Services\GitProvider;
 
+use App\Integrations\Bitbucket\BitbucketConnector;
+use App\Integrations\Bitbucket\Requests\CommentOnPullRequest;
+use App\Integrations\Bitbucket\Requests\CreatePullRequest;
+use App\Integrations\Bitbucket\Requests\GetRepository;
+use App\Integrations\Bitbucket\Requests\GetSourceFile;
+use App\Integrations\Bitbucket\Requests\ListBranches;
+use App\Integrations\Bitbucket\Requests\ListUserWorkspaces;
+use App\Integrations\Bitbucket\Requests\ListWorkspaceRepositories;
+use App\Integrations\Bitbucket\Requests\UpdatePullRequest;
 use App\Services\GitProvider\Contracts\GitProviderContract;
-use Illuminate\Http\Client\PendingRequest;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class BitbucketGitService implements GitProviderContract
 {
-    private const BASE_URL = 'https://api.bitbucket.org/2.0';
+    private readonly BitbucketConnector $connector;
 
-    private readonly string $username;
-
-    private readonly string $appPassword;
-
-    private readonly bool $isOAuth;
-
-    public function __construct(private readonly string $token)
+    public function __construct(string $token)
     {
-        // Colon = Basic auth (Atlassian API Token "email:api_token" or legacy App Password).
-        // No colon = Repository Access Token (Bearer) or OAuth token.
-        if (str_contains($token, ':')) {
-            [$this->username, $this->appPassword] = explode(':', $token, 2);
-            $this->isOAuth = false;
-        } else {
-            $this->username = '';
-            $this->appPassword = '';
-            $this->isOAuth = true;
-        }
+        // Auth (Basic vs. Bearer) is resolved by the connector from the token shape.
+        $this->connector = new BitbucketConnector($token);
     }
 
     public function getProviderKey(): string
@@ -50,10 +43,7 @@ class BitbucketGitService implements GitProviderContract
         // gone. /2.0/user/workspaces is the surviving (and explicitly announced)
         // replacement — values are workspace_access records with the slug
         // nested under .workspace.slug.
-        $workspaces = $this->http()
-            ->get('/user/workspaces', ['pagelen' => 100])
-            ->throw()
-            ->json('values', []);
+        $workspaces = $this->connector->send(new ListUserWorkspaces)->throw()->json('values', []);
 
         $repos = [];
         foreach ($workspaces as $access) {
@@ -62,8 +52,8 @@ class BitbucketGitService implements GitProviderContract
                 continue;
             }
 
-            $values = $this->http()
-                ->get("/repositories/{$slug}", ['role' => 'member', 'pagelen' => 100])
+            $values = $this->connector
+                ->send(new ListWorkspaceRepositories($slug))
                 ->throw()
                 ->json('values', []);
 
@@ -77,11 +67,7 @@ class BitbucketGitService implements GitProviderContract
 
     public function listBranches(string $owner, string $repo): array
     {
-        $response = $this->http()
-            ->get("/repositories/{$owner}/{$repo}/refs/branches", ['pagelen' => 100]);
-        $response->throw();
-
-        return $response->json('values', []);
+        return $this->connector->send(new ListBranches($owner, $repo))->throw()->json('values', []);
     }
 
     public function createPullRequest(
@@ -93,14 +79,8 @@ class BitbucketGitService implements GitProviderContract
         string $baseBranch,
         array $options = [],
     ): array {
-        return $this->http()
-            ->post("/repositories/{$owner}/{$repo}/pullrequests", [
-                'title' => $title,
-                'description' => $body,
-                'source' => ['branch' => ['name' => $headBranch]],
-                'destination' => ['branch' => ['name' => $baseBranch]],
-                ...$options,
-            ])
+        return $this->connector
+            ->send(new CreatePullRequest($owner, $repo, $title, $body, $headBranch, $baseBranch, $options))
             ->throw()
             ->json();
     }
@@ -111,11 +91,8 @@ class BitbucketGitService implements GitProviderContract
         int|string $pullRequestId,
         string $body,
     ): array {
-        // Bitbucket nests the body under content.raw, unlike GitHub/GitLab.
-        return $this->http()
-            ->post("/repositories/{$owner}/{$repo}/pullrequests/{$pullRequestId}/comments", [
-                'content' => ['raw' => $body],
-            ])
+        return $this->connector
+            ->send(new CommentOnPullRequest($owner, $repo, $pullRequestId, $body))
             ->throw()
             ->json();
     }
@@ -127,11 +104,8 @@ class BitbucketGitService implements GitProviderContract
         string $title,
         string $body,
     ): array {
-        return $this->http()
-            ->put("/repositories/{$owner}/{$repo}/pullrequests/{$pullRequestId}", [
-                'title' => $title,
-                'description' => $body,
-            ])
+        return $this->connector
+            ->send(new UpdatePullRequest($owner, $repo, $pullRequestId, $title, $body))
             ->throw()
             ->json();
     }
@@ -194,10 +168,7 @@ class BitbucketGitService implements GitProviderContract
         }
 
         try {
-            $data = $this->http()
-                ->get("/repositories/{$owner}/{$repo}")
-                ->throw()
-                ->json();
+            $data = $this->connector->send(new GetRepository($owner, $repo))->throw()->json();
         } catch (\Throwable $e) {
             Log::channel('argos')->warning('Bitbucket getDefaultBranch failed', [
                 'owner_repo' => "{$owner}/{$repo}",
@@ -213,17 +184,31 @@ class BitbucketGitService implements GitProviderContract
         return is_string($branch) && $branch !== '' ? $branch : null;
     }
 
-    private function http(): PendingRequest
+    public function getFileContents(string $ownerRepo, string $path, string $ref): ?string
     {
-        if ($this->isOAuth) {
-            return Http::withHeaders([
-                'Authorization' => "Bearer {$this->token}",
-                'Accept' => 'application/json',
-            ])->baseUrl(self::BASE_URL);
+        [$owner, $repo] = explode('/', $ownerRepo, 2) + ['', ''];
+
+        if ($owner === '' || $repo === '') {
+            return null;
         }
 
-        return Http::withBasicAuth($this->username, $this->appPassword)
-            ->withHeaders(['Accept' => 'application/json'])
-            ->baseUrl(self::BASE_URL);
+        try {
+            $response = $this->connector->send(new GetSourceFile($owner, $repo, $path, $ref));
+
+            if ($response->status() === 404) {
+                return null;
+            }
+
+            return $response->throw()->body();
+        } catch (\Throwable $e) {
+            Log::channel('argos')->warning('Bitbucket getFileContents failed', [
+                'owner_repo' => "{$owner}/{$repo}",
+                'path' => $path,
+                'error' => $e->getMessage(),
+                'class' => $e::class,
+            ]);
+
+            return null;
+        }
     }
 }

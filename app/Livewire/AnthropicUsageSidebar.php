@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Integrations\Anthropic\AnthropicConnector;
+use App\Integrations\Anthropic\Requests\GetUsage;
 use App\Services\Anthropic\CredentialStore;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Livewire\Component;
 
@@ -39,21 +40,14 @@ class AnthropicUsageSidebar extends Component
             return;
         }
 
-        $token = config('argos.claude_token')
-            ?? app(CredentialStore::class)->getClaudeToken();
+        $token = app(CredentialStore::class)->getClaudeToken();
 
         if (empty($token)) {
             return;
         }
 
         try {
-            $response = Http::withToken($token)
-                ->withHeaders([
-                    'anthropic-beta' => 'oauth-2025-04-20',
-                    'User-Agent' => 'claude-code/2.0.31',
-                ])
-                ->timeout(5)
-                ->get('https://api.anthropic.com/api/oauth/usage');
+            $response = (new AnthropicConnector($token))->send(new GetUsage);
 
             if ($response->status() === 429) {
                 Cache::put('anthropic_usage_backoff', true, 600);

@@ -8,7 +8,8 @@ class CredentialStore
 {
     /**
      * Returns the Claude OAuth token from the config-dir file, or null if not set.
-     * Falls back for local dev — in production, use CLAUDE_CODE_OAUTH_TOKEN env var.
+     * Legacy local-dev fallback only; the authoritative path is a per-agent
+     * AgentCredential row created via the onboarding/credentials UI.
      */
     public function getClaudeToken(): ?string
     {
@@ -54,30 +55,19 @@ class CredentialStore
     }
 
     /**
-     * True if a token is available either via env config or the on-disk file.
+     * True if a token is available via the on-disk file.
      */
     public function hasClaudeToken(): bool
     {
-        return $this->envToken() !== null || $this->getClaudeToken() !== null;
+        return $this->getClaudeToken() !== null;
     }
 
     /**
-     * Where the token comes from: 'env', 'file', or 'none'.
+     * Where the token comes from: 'file' or 'none'.
      */
     public function claudeTokenSource(): string
     {
-        if ($this->envToken() !== null) {
-            return 'env';
-        }
-
         return $this->getClaudeToken() !== null ? 'file' : 'none';
-    }
-
-    private function envToken(): ?string
-    {
-        $value = config('argos.claude_token');
-
-        return is_string($value) && $value !== '' ? $value : null;
     }
 
     private function configDir(): string

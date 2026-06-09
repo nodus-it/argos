@@ -6,10 +6,15 @@ namespace Tests\Feature;
 
 use App\Livewire\AnthropicUsageSidebar;
 use App\Models\User;
+use App\Services\Anthropic\CredentialStore;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Livewire\Livewire;
 use ReflectionMethod;
+use Saloon\Http\Faking\MockResponse;
+use Saloon\Http\Request;
+use Saloon\Laravel\Facades\Saloon;
 use Tests\TestCase;
 
 class AnthropicUsageSidebarTest extends TestCase
@@ -35,6 +40,32 @@ class AnthropicUsageSidebarTest extends TestCase
         $component->assertSet('error', false);
         $component->assertSet('fiveHour', null);
         $component->assertSet('sevenDay', null);
+    }
+
+    public function test_lädt_usage_über_saloon_und_füllt_perioden(): void
+    {
+        Cache::flush();
+        $this->mock(CredentialStore::class, function ($mock): void {
+            $mock->shouldReceive('getClaudeToken')->andReturn('claude-oauth-token');
+        });
+
+        Saloon::fake([
+            'https://api.anthropic.com/api/oauth/usage' => MockResponse::make([
+                'five_hour' => ['utilization' => 42.0, 'resets_at' => null],
+                'seven_day' => ['utilization' => 7.0, 'resets_at' => null],
+            ]),
+        ]);
+
+        Livewire::test(AnthropicUsageSidebar::class)
+            ->assertSet('fiveHour.utilization', 42)
+            ->assertSet('sevenDay.utilization', 7);
+
+        Saloon::assertSent(function (Request $request, $response): bool {
+            $pending = $response->getPendingRequest();
+
+            return $pending->getUrl() === 'https://api.anthropic.com/api/oauth/usage'
+                && $pending->headers()->get('Authorization') === 'Bearer claude-oauth-token';
+        });
     }
 
     public function test_format_interval_fuer_minuten(): void

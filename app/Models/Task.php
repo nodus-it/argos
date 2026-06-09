@@ -6,9 +6,11 @@ namespace App\Models;
 
 use App\Enums\AgentName;
 use App\Enums\ClaudeModel;
+use App\Enums\DemoAccessMode;
 use App\Enums\Phase;
 use App\Enums\PhaseStatus;
 use App\Enums\WorkflowStatus;
+use App\Presenters\TaskPresenter;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -83,6 +85,8 @@ class Task extends Model
         'worker_stack_id_override',
         'worker_agent_name_override',
         'worker_config_override',
+        'demo_access_mode',
+        'demo_basic_password',
         'agent_credential_id',
         'agent_config',
     ];
@@ -98,8 +102,18 @@ class Task extends Model
             'max_turns_implement' => 'integer',
             'worker_agent_name_override' => AgentName::class,
             'worker_config_override' => 'array',
+            'demo_access_mode' => DemoAccessMode::class,
             'agent_config' => 'array',
         ];
+    }
+
+    /**
+     * The effective demo access mode, resolving `Inherit` against the
+     * stack-wide default (config argos.preview.auth).
+     */
+    public function effectiveDemoAccessMode(): DemoAccessMode
+    {
+        return ($this->demo_access_mode ?? DemoAccessMode::Inherit)->resolve();
     }
 
     /**
@@ -194,6 +208,22 @@ class Task extends Model
     }
 
     /**
+     * Live-demo deployments for this task (latest is the current one).
+     *
+     * @return HasMany<Demo, $this>
+     */
+    public function demos(): HasMany
+    {
+        return $this->hasMany(Demo::class);
+    }
+
+    /** The most recent demo for this task, if any. */
+    public function currentDemo(): ?Demo
+    {
+        return $this->demos()->latest()->first();
+    }
+
+    /**
      * Returns the started_at timestamp of the most recently started PhaseRun,
      * or null if no PhaseRun has been started yet.
      */
@@ -207,30 +237,24 @@ class Task extends Model
             ?->started_at;
     }
 
-    public function isWaitingForWorker(): bool
+    /**
+     * Whether a phase has hit the turn limit repeatedly (default ≥2 runs ended
+     * with error_max_turns). A signal that the agent is not converging — the
+     * task is likely too broad or the budget too small — so the UI can nudge
+     * the user to narrow the task / raise max-turns instead of blindly
+     * resuming again.
+     */
+    public function hasRepeatedMaxTurns(string $phase, int $threshold = 2): bool
     {
-        return $this->current_status === PhaseStatus::Pending
-            && in_array($this->workflow_status, [WorkflowStatus::ConceptRunning, WorkflowStatus::ImplementRunning], true);
+        return $this->phaseRuns()
+            ->where('phase', $phase)
+            ->where('stop_reason', 'error_max_turns')
+            ->count() >= $threshold;
     }
 
-    public function displayStatusLabel(): string
+    /** Display-layer derivations (status label/colour, badge, phase rail). */
+    public function presenter(): TaskPresenter
     {
-        if ($this->isWaitingForWorker()) {
-            return match ($this->workflow_status) {
-                WorkflowStatus::ConceptRunning => __('tasks.statuses.waiting.concept'),
-                default => __('tasks.statuses.waiting.implement'),
-            };
-        }
-
-        return $this->workflow_status->label();
-    }
-
-    public function displayStatusColor(): string
-    {
-        if ($this->isWaitingForWorker()) {
-            return 'info';
-        }
-
-        return $this->workflow_status->color();
+        return new TaskPresenter($this);
     }
 }

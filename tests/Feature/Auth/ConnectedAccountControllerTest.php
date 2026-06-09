@@ -7,6 +7,8 @@ namespace Tests\Feature\Auth;
 use App\Models\ConnectedAccount;
 use App\Models\RepoProfile;
 use App\Models\User;
+use App\Services\Credentials\CredentialVerification;
+use App\Services\Credentials\CredentialVerifier;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Socialite\Contracts\Factory as SocialiteFactory;
 use Laravel\Socialite\Two\GithubProvider;
@@ -25,6 +27,12 @@ class ConnectedAccountControllerTest extends TestCase
         parent::setUp();
         $this->user = User::factory()->create();
         $this->actingAs($this->user);
+
+        // The OAuth callback re-verifies the freshly connected account against
+        // the provider API — stub it so these tests stay offline.
+        $verifier = Mockery::mock(CredentialVerifier::class);
+        $verifier->shouldReceive('verifyProvider')->andReturn(CredentialVerification::valid());
+        $this->app->instance(CredentialVerifier::class, $verifier);
     }
 
     public function test_redirect_requires_auth(): void
@@ -61,6 +69,24 @@ class ConnectedAccountControllerTest extends TestCase
             'provider' => 'github',
             'provider_id' => '12345678',
             'nickname' => 'testuser',
+        ]);
+    }
+
+    public function test_callback_still_connects_when_reverify_is_rejected(): void
+    {
+        // The API probe says no (e.g. insufficient OAuth scopes) — but the OAuth
+        // grant itself succeeded, so the account must still be connected.
+        $verifier = Mockery::mock(CredentialVerifier::class);
+        $verifier->shouldReceive('verifyProvider')->andReturn(CredentialVerification::rejected('insufficient scopes'));
+        $this->app->instance(CredentialVerifier::class, $verifier);
+
+        $this->mockSocialiteCallback($this->makeSocialiteUser());
+
+        $this->get(route('auth.github.callback'))->assertRedirect();
+
+        $this->assertDatabaseHas(ConnectedAccount::class, [
+            'user_id' => $this->user->id,
+            'provider' => 'github',
         ]);
     }
 

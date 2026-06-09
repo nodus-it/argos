@@ -3,7 +3,9 @@
 #
 # Default: --fresh (git reset --hard origin/$BASE_BRANCH, git clean -fd
 # without -x so vendor/ and node_modules/ survive), composer install / npm ci
-# if a manifest exists, then a Claude session. Quality gates (Pint,
+# if a manifest exists, then a Claude session. --refine skips the reset and
+# re-runs on top of the previous iteration's working tree (used when the user
+# refines a reviewed implementation from the UI). Quality gates (Pint,
 # Pest/PHPUnit, PHPStan when configured) are re-run by the worker AFTER the
 # Claude session as a verification step — Claude is expected to have made
 # them pass already. All four are blocking.
@@ -76,10 +78,17 @@ _implement_setup_toolchain() {
             return 1
         fi
     fi
+
+    # Snapshot which tests are already red on the pristine checkout (before the
+    # agent edits anything) so the quality gate only blocks on regressions, not
+    # on the target repo's pre-existing failures. Idempotent across iterations.
+    quality_pest_baseline_capture
+
     return 0
 }
 
 # _implement_build_user_prompt: produce the user prompt for the Claude implement session.
+# shellcheck disable=SC2016  # printf prompt text contains literal `backticks`/$ by design
 _implement_build_user_prompt() {
     local concept_file=/workspace/.agent/concept.md
     local notes_file=/workspace/.agent/implement.notes.md
@@ -107,6 +116,7 @@ _implement_build_user_prompt() {
 # Used when the previous run hit max-turns; the conversation history is
 # already in the resumed session, so we just need to nudge Claude to keep
 # going and finish the quality gates.
+# shellcheck disable=SC2016  # printf prompt text contains literal `backticks`/$ by design
 _implement_build_continue_prompt() {
     {
         printf '# Implement-Phase fortsetzen\n\n'
@@ -137,12 +147,16 @@ phase_implement_run() {
     }
     mkdir -p /workspace/.agent/logs
 
-    local fresh continue_run
+    local fresh continue_run refine
     fresh="$(echo "${PHASE_FLAGS:-}" | jq -r '.fresh // false' 2>/dev/null || echo false)"
     continue_run="$(echo "${PHASE_FLAGS:-}" | jq -r '.continue // false' 2>/dev/null || echo false)"
+    refine="$(echo "${PHASE_FLAGS:-}" | jq -r '.refine // false' 2>/dev/null || echo false)"
 
-    # Default to fresh=true when neither --fresh nor --continue is set.
-    if [[ "$fresh" == "false" && "$continue_run" == "false" ]]; then
+    # Default to fresh=true unless this is a --continue resume or a --refine run.
+    # --refine re-runs implement on top of the previous iteration's working
+    # tree (incorporating the user's review notes) instead of discarding it —
+    # so it must NOT reset to the base branch.
+    if [[ "$fresh" == "false" && "$continue_run" == "false" && "$refine" == "false" ]]; then
         fresh="true"
     fi
 
@@ -198,19 +212,7 @@ phase_implement_run() {
         --include-partial \
         "${resume_args[@]}" \
       | log_scrub \
-      | tee "$stream_log" \
-      | tee >(jq -rj '
-            if .type == "assistant" then
-                (.message.content[]? |
-                    if .type == "text" then (.text // "")
-                    elif .type == "tool_use" then
-                        "\n[tool:" + .name + "] " +
-                        (.input.file_path // .input.command // (.input | tostring)[0:120]) + "\n"
-                    else empty end
-                )
-            elif .type == "result" then "\n"
-            else empty end
-          ' >&2 2>/dev/null) \
+      | agent_stream_tee "$stream_log" \
       | jq -c 'select(.type == "result")' \
       > "$result_json"
     local agent_exit=${PIPESTATUS[0]}
@@ -328,19 +330,7 @@ phase_implement_run() {
             --max-turns "${GATE_FIX_MAX_TURNS:-30}" \
             --include-partial \
           | log_scrub \
-          | tee "$fix_stream_log" \
-          | tee >(jq -rj '
-                if .type == "assistant" then
-                    (.message.content[]? |
-                        if .type == "text" then (.text // "")
-                        elif .type == "tool_use" then
-                            "\n[fix] " +
-                            (.input.file_path // .input.command // (.input | tostring)[0:80]) + "\n"
-                        else empty end
-                    )
-                elif .type == "result" then "\n"
-                else empty end
-              ' >&2 2>/dev/null) \
+          | agent_stream_tee "$fix_stream_log" \
           | jq -c 'select(.type == "result")' \
           > "$fix_result_json"
         local fix_exit=${PIPESTATUS[0]}

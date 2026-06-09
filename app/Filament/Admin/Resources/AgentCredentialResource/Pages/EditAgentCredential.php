@@ -5,12 +5,19 @@ declare(strict_types=1);
 namespace App\Filament\Admin\Resources\AgentCredentialResource\Pages;
 
 use App\Enums\AgentName;
+use App\Filament\Admin\Concerns\HasArgosEditHeading;
+use App\Filament\Admin\Concerns\VerifiesCredentialOnSave;
 use App\Filament\Admin\Resources\AgentCredentialResource;
+use App\Models\AgentCredential;
+use App\Services\Credentials\CredentialVerifier;
 use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
 
 class EditAgentCredential extends EditRecord
 {
+    use HasArgosEditHeading;
+    use VerifiesCredentialOnSave;
+
     protected static string $resource = AgentCredentialResource::class;
 
     protected function getHeaderActions(): array
@@ -18,6 +25,17 @@ class EditAgentCredential extends EditRecord
         return [
             DeleteAction::make(),
         ];
+    }
+
+    /**
+     * @return array{icon?: string, label: string}|null
+     */
+    protected function argosHeadingChip(): ?array
+    {
+        /** @var AgentCredential $record */
+        $record = $this->getRecord();
+
+        return ['icon' => 'heroicon-o-cpu-chip', 'label' => $record->agent_name->value];
     }
 
     /**
@@ -44,6 +62,14 @@ class EditAgentCredential extends EditRecord
      */
     protected function mutateFormDataBeforeSave(array $data): array
     {
-        return CreateAgentCredential::normaliseCredentials($data);
+        $data = CreateAgentCredential::normaliseCredentials($data);
+
+        if (($data['agent_name'] ?? null) === AgentName::ClaudeCode->value) {
+            $verification = app(CredentialVerifier::class)
+                ->verifyClaudeToken((string) ($data['credentials']['token'] ?? ''));
+            $data = $this->applyVerification($verification, $data);
+        }
+
+        return $data;
     }
 }

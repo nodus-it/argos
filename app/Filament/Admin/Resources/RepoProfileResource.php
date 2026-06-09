@@ -6,26 +6,30 @@ namespace App\Filament\Admin\Resources;
 
 use App\Enums\AgentName;
 use App\Enums\AuthMethod;
+use App\Enums\BackingService;
 use App\Enums\GitProvider;
 use App\Enums\WorkerImageEntityStatus;
+use App\Enums\WorkerSource;
+use App\Filament\Admin\RelationManagers\ApiTokensRelationManager;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\CreateRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\EditRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\ListRepoProfiles;
-use App\Filament\Admin\Resources\RepoProfileResource\Pages\ViewRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\RelationManagers\TaskProviderBindingsRelationManager;
 use App\Filament\Admin\Resources\RepoProfileResource\RelationManagers\TasksRelationManager;
 use App\Models\ConnectedAccount;
 use App\Models\RepoProfile;
 use App\Models\User;
 use App\Models\WorkerStack;
-use App\Services\GitProvider\Contracts\GitServiceContract;
+use App\Services\Git\RepositoryFetcher;
 use App\Services\GitProvider\GitServiceFactory;
 use App\Services\OAuth\TokenRefresher;
+use App\Support\RepoUrlBuilder;
 use App\Workers\Agents\AgentRegistry;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
-use Filament\Actions\EditAction;
+use Filament\Forms\Components\CheckboxList;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -43,7 +47,6 @@ use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\HtmlString;
 
 class RepoProfileResource extends Resource
@@ -57,7 +60,7 @@ class RepoProfileResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return __('projects.navigation_group');
+        return null;
     }
 
     public static function getNavigationLabel(): string
@@ -67,7 +70,7 @@ class RepoProfileResource extends Resource
 
     public static function getNavigationSort(): ?int
     {
-        return 1;
+        return 2;
     }
 
     public static function getModelLabel(): string
@@ -92,6 +95,8 @@ class RepoProfileResource extends Resource
                             // ── Block 1 ─ Plattform (gates everything below) ────────────────
                             Section::make(__('projects.sections.platform'))
                                 ->description(__('projects.sections.platform_description'))
+                                ->icon('heroicon-o-globe-alt')
+                                ->aside()
                                 ->schema([
                                     Select::make('platform')
                                         ->label(__('projects.fields.platform'))
@@ -118,6 +123,9 @@ class RepoProfileResource extends Resource
 
                             // ── Block 3a ─ Authentifizierung (GitHub/GitLab mit OAuth-Account) ─
                             Section::make(__('projects.sections.authentication'))
+                                ->description(__('projects.sections.authentication_description'))
+                                ->icon('heroicon-o-key')
+                                ->aside()
                                 ->visible(fn (Get $get): bool => self::hasOAuthAccount($get))
                                 ->schema([
                                     Select::make('auth_method')
@@ -168,6 +176,9 @@ class RepoProfileResource extends Resource
 
                             // ── Block 3b ─ Authentifizierung (Bitbucket mit OAuth-Account) ─
                             Section::make(__('projects.sections.authentication'))
+                                ->description(__('projects.sections.authentication_description'))
+                                ->icon('heroicon-o-key')
+                                ->aside()
                                 ->visible(fn (Get $get): bool => $get('platform') === 'bitbucket' && self::bitbucketAccount() !== null)
                                 ->schema([
                                     Select::make('auth_method')
@@ -216,11 +227,14 @@ class RepoProfileResource extends Resource
                                         ->dehydrated(),
                                 ]),
 
-                            // ── Block 2 + Block 4 nebeneinander (Allgemein + Repository) ─────
-                            Grid::make(2)
+                            // ── Block 2 + Block 4 gestapelt (Allgemein + Repository) ─────────
+                            Grid::make(1)
                                 ->columnSpanFull()
                                 ->schema([
                                     Section::make(__('projects.sections.general'))
+                                        ->description(__('projects.sections.general_description'))
+                                        ->icon('heroicon-o-adjustments-horizontal')
+                                        ->aside()
                                         ->visible(fn (Get $get): bool => self::platformChosen($get))
                                         ->columnSpan(1)
                                         ->schema([
@@ -239,6 +253,9 @@ class RepoProfileResource extends Resource
                                         ]),
 
                                     Section::make(__('projects.sections.repository'))
+                                        ->description(__('projects.sections.repository_description'))
+                                        ->icon('heroicon-o-code-bracket-square')
+                                        ->aside()
                                         ->visible(fn (Get $get): bool => self::platformChosen($get))
                                         ->columnSpan(1)
                                         ->schema([
@@ -384,15 +401,37 @@ class RepoProfileResource extends Resource
                             // ── Worker (Stack & Agent) ──────────────────────────────────────
                             Section::make(__('projects.sections.worker'))
                                 ->description(__('projects.sections.worker_description'))
+                                ->icon('heroicon-o-cpu-chip')
+                                ->aside()
                                 ->visible(fn (Get $get): bool => self::platformChosen($get))
                                 ->schema([
+                                    Select::make('worker_source')
+                                        ->label(__('projects.fields.worker_source_label'))
+                                        ->helperText(__('projects.fields.worker_source_helper'))
+                                        ->options([
+                                            WorkerSource::Standard->value => __('projects.fields.worker_source_standard'),
+                                            WorkerSource::Byoi->value => __('projects.fields.worker_source_byoi'),
+                                        ])
+                                        ->default(WorkerSource::Standard->value)
+                                        ->required()
+                                        ->live()
+                                        ->native(false),
+
+                                    Callout::make(__('projects.fields.worker_byoi_hint_heading'))
+                                        ->visible(fn (Get $get): bool => $get('worker_source') === WorkerSource::Byoi->value)
+                                        ->color('info')
+                                        ->icon('heroicon-o-information-circle')
+                                        ->description(__('projects.fields.worker_byoi_hint_body')),
+
                                     Select::make('worker_stack_id')
                                         ->label(__('projects.fields.worker_stack_label'))
                                         ->helperText(__('projects.fields.worker_stack_helper'))
                                         ->options(fn (): array => self::stackOptions())
                                         ->placeholder(__('projects.fields.worker_stack_placeholder', ['stack' => (string) config('argos.compose.default_stack', 'php-8.4')]))
                                         ->searchable()
-                                        ->native(false),
+                                        ->native(false)
+                                        // Hidden for BYOI — the repo defines its own image.
+                                        ->visible(fn (Get $get): bool => $get('worker_source') !== WorkerSource::Byoi->value),
 
                                     Select::make('worker_agent_name')
                                         ->label(__('projects.fields.worker_agent_label'))
@@ -409,10 +448,126 @@ class RepoProfileResource extends Resource
                                             $set('model_implement', null);
                                         })
                                         ->native(false),
+
+                                    CheckboxList::make('worker_services')
+                                        ->label(__('projects.fields.worker_services_label'))
+                                        ->helperText(__('projects.fields.worker_services_helper'))
+                                        ->options([
+                                            BackingService::Mysql->value => BackingService::Mysql->label(),
+                                            BackingService::Redis->value => BackingService::Redis->label(),
+                                        ])
+                                        ->live()
+                                        ->columns(2),
+
+                                    // MySQL credentials — configurable so the
+                                    // worker AND demo can match a name the
+                                    // project hardcodes. Empty = the argos
+                                    // defaults.
+                                    Grid::make(3)
+                                        ->visible(fn (Get $get): bool => in_array('mysql', (array) $get('worker_services'), true))
+                                        ->schema([
+                                            TextInput::make('worker_service_config.mysql.database')
+                                                ->label(__('projects.fields.mysql_database_label'))
+                                                ->placeholder('argos'),
+                                            TextInput::make('worker_service_config.mysql.username')
+                                                ->label(__('projects.fields.mysql_username_label'))
+                                                ->placeholder('argos'),
+                                            TextInput::make('worker_service_config.mysql.password')
+                                                ->label(__('projects.fields.mysql_password_label'))
+                                                ->placeholder('argos')
+                                                ->password()
+                                                ->revealable(),
+                                        ]),
+                                ]),
+
+                            // ── Live-Demo ───────────────────────────────────────────────────
+                            Section::make(__('projects.sections.live_demo'))
+                                ->visible(fn (Get $get): bool => self::platformChosen($get))
+                                ->schema([
+                                    Toggle::make('live_demo_enabled')
+                                        ->label(__('projects.fields.live_demo_label'))
+                                        ->helperText(__('projects.fields.live_demo_helper'))
+                                        ->default(false)
+                                        ->live(),
+
+                                    Callout::make(__('projects.fields.live_demo_hint_heading'))
+                                        ->visible(fn (Get $get): bool => (bool) $get('live_demo_enabled'))
+                                        ->color('info')
+                                        ->icon('heroicon-o-information-circle')
+                                        ->description(__('projects.fields.live_demo_hint_body')),
+                                ]),
+
+                            // ── Environment & Secrets ──────────────────────────────────────
+                            Section::make(__('projects.sections.env_secrets'))
+                                ->description(__('projects.sections.env_secrets_description'))
+                                ->icon('heroicon-o-key')
+                                ->aside()
+                                ->visible(fn (Get $get): bool => self::platformChosen($get))
+                                ->schema([
+                                    Repeater::make('composer_registries')
+                                        ->label(__('projects.fields.composer_registries_label'))
+                                        ->helperText(__('projects.fields.composer_registries_helper'))
+                                        ->schema([
+                                            TextInput::make('host')
+                                                ->label(__('projects.fields.composer_registry_host_label'))
+                                                ->placeholder('packages.filamentphp.com')
+                                                ->required()
+                                                ->columnSpan(2),
+                                            TextInput::make('username')
+                                                ->label(__('projects.fields.composer_registry_username_label'))
+                                                ->placeholder('token')
+                                                ->columnSpan(1),
+                                            TextInput::make('token')
+                                                ->label(__('projects.fields.composer_registry_token_label'))
+                                                ->password()
+                                                ->revealable()
+                                                ->required()
+                                                ->columnSpan(2),
+                                        ])
+                                        ->columns(5)
+                                        ->addActionLabel(__('projects.fields.composer_registries_add'))
+                                        ->itemLabel(fn (array $state): ?string => $state['host'] ?? null)
+                                        ->collapsible()
+                                        ->defaultItems(0),
+
+                                    // Discoverability for the ${service.key}
+                                    // placeholders — reactive to which backing
+                                    // services are enabled, so a non-standard
+                                    // project knows exactly what it can reference
+                                    // in the values below.
+                                    Callout::make(__('projects.fields.env_placeholders_heading'))
+                                        ->visible(fn (Get $get): bool => self::availablePlaceholders($get) !== [])
+                                        ->color('gray')
+                                        ->icon('heroicon-o-code-bracket')
+                                        ->description(fn (Get $get): string => __('projects.fields.env_placeholders_body').' '.implode('   ', self::availablePlaceholders($get))),
+
+                                    Repeater::make('worker_env')
+                                        ->label(__('projects.fields.worker_env_label'))
+                                        ->helperText(__('projects.fields.worker_env_helper'))
+                                        ->schema([
+                                            TextInput::make('name')
+                                                ->label(__('projects.fields.worker_env_name_label'))
+                                                ->placeholder('MEILISEARCH_KEY')
+                                                ->required()
+                                                ->columnSpan(2),
+                                            TextInput::make('value')
+                                                ->label(__('projects.fields.worker_env_value_label'))
+                                                ->password()
+                                                ->revealable()
+                                                ->columnSpan(3),
+                                        ])
+                                        ->columns(5)
+                                        ->addActionLabel(__('projects.fields.worker_env_add'))
+                                        ->itemLabel(fn (array $state): ?string => $state['name'] ?? null)
+                                        ->collapsible()
+                                        ->defaultItems(0),
                                 ]),
 
                             // ── Modelle ─────────────────────────────────────────────────────
                             Section::make(__('projects.sections.models'))
+                                ->description(__('projects.sections.models_description'))
+                                ->icon('heroicon-o-sparkles')
+                                ->aside()
                                 ->visible(fn (Get $get): bool => self::platformChosen($get))
                                 ->schema([
                                     // The default-model hint lives in helperText (text inside a
@@ -441,10 +596,52 @@ class RepoProfileResource extends Resource
                                         ))
                                         ->live()
                                         ->native(false),
+
+                                    TextInput::make('max_turns_concept')
+                                        ->label(__('projects.fields.max_turns_concept_label'))
+                                        ->helperText(__('projects.fields.max_turns_concept_helper', [
+                                            'default' => (int) config('argos.concept.max_turns_default', 50),
+                                        ]))
+                                        ->numeric()
+                                        ->minValue(10)
+                                        ->maxValue(1000)
+                                        ->nullable(),
+
+                                    TextInput::make('max_turns_implement')
+                                        ->label(__('projects.fields.max_turns_implement_label'))
+                                        ->helperText(__('projects.fields.max_turns_implement_helper', [
+                                            'default' => (int) config('argos.implement.max_turns_default', 200),
+                                        ]))
+                                        ->numeric()
+                                        ->minValue(10)
+                                        ->maxValue(1000)
+                                        ->nullable(),
                                 ]),
                         ]),  // ↑ end of "Worker" tab
                 ]),  // ↑ end of Tabs::make()
         ]);
+    }
+
+    /**
+     * The `${service.key}` placeholders available given the currently-enabled
+     * backing services — drives the reactive hint in the secrets section.
+     *
+     * @return list<string>
+     */
+    private static function availablePlaceholders(Get $get): array
+    {
+        $tokens = [];
+        foreach ((array) $get('worker_services') as $value) {
+            $service = BackingService::tryFrom((string) $value);
+            if ($service === null) {
+                continue;
+            }
+            foreach (array_keys($service->defaultCoordinates()) as $coordKey) {
+                $tokens[] = '${'.$service->value.'.'.$coordKey.'}';
+            }
+        }
+
+        return $tokens;
     }
 
     private static function githubAccount(): ?ConnectedAccount
@@ -496,14 +693,21 @@ class RepoProfileResource extends Resource
      * Build the provider git service for an OAuth-connected account. GitLab
      * needs the account's self-hosted instance URL; the others ignore it.
      */
-    private static function gitServiceForConnected(string $platform, ConnectedAccount $account): GitServiceContract
+    /**
+     * Resolve the connected OAuth account into a git source for RepositoryFetcher.
+     * Refreshes an expiring token so the repo/branch dropdowns keep loading
+     * instead of failing once the token lapses.
+     *
+     * @return array{token: string, instance_url: string}
+     */
+    private static function sourceForConnected(string $platform, ConnectedAccount $account): array
     {
-        // Refresh an expiring OAuth token so the repo/branch dropdowns keep
-        // loading instead of failing once the token lapses.
         $account = app(TokenRefresher::class)->refreshIfNeeded($account);
-        $instanceUrl = $platform === 'gitlab' ? $account->getInstanceUrl() : '';
 
-        return app(GitServiceFactory::class)->forPlatform($platform, $account->token, $instanceUrl);
+        return [
+            'token' => $account->token,
+            'instance_url' => $platform === 'gitlab' ? $account->getInstanceUrl() : '',
+        ];
     }
 
     /**
@@ -524,17 +728,14 @@ class RepoProfileResource extends Resource
             return [];
         }
 
-        try {
-            return Cache::remember(
-                "git_repo_options:{$platform}:{$account->id}",
-                now()->addSeconds(60),
-                fn (): array => self::gitServiceForConnected($platform, $account)->getRepoOptions(),
-            );
-        } catch (\Throwable $e) {
-            report($e);
+        $source = self::sourceForConnected($platform, $account);
 
-            return [];
-        }
+        return app(RepositoryFetcher::class)->repoOptions(
+            $platform,
+            $source['token'],
+            $source['instance_url'],
+            "git_repo_options:{$platform}:{$account->id}",
+        );
     }
 
     /**
@@ -555,17 +756,15 @@ class RepoProfileResource extends Resource
             return [];
         }
 
-        try {
-            return Cache::remember(
-                "git_branch_options:{$platform}:{$account->id}:{$repo}",
-                now()->addSeconds(60),
-                fn (): array => self::gitServiceForConnected($platform, $account)->getBranchOptions($repo),
-            );
-        } catch (\Throwable $e) {
-            report($e);
+        $source = self::sourceForConnected($platform, $account);
 
-            return [];
-        }
+        return app(RepositoryFetcher::class)->branchOptions(
+            $platform,
+            $source['token'],
+            $source['instance_url'],
+            $repo,
+            "git_branch_options:{$platform}:{$account->id}:{$repo}",
+        );
     }
 
     /**
@@ -578,13 +777,9 @@ class RepoProfileResource extends Resource
             return null;
         }
 
-        try {
-            return self::gitServiceForConnected($platform, $account)->getDefaultBranch($repo);
-        } catch (\Throwable $e) {
-            report($e);
+        $source = self::sourceForConnected($platform, $account);
 
-            return null;
-        }
+        return app(RepositoryFetcher::class)->defaultBranch($platform, $source['token'], $source['instance_url'], $repo);
     }
 
     /**
@@ -594,12 +789,7 @@ class RepoProfileResource extends Resource
      */
     private static function connectedRepoUrl(string $platform, string $repo, ?ConnectedAccount $account): string
     {
-        return match ($platform) {
-            'github' => "https://github.com/{$repo}",
-            'gitlab' => ($account?->getInstanceUrl() ?? 'https://gitlab.com')."/{$repo}",
-            'bitbucket' => "https://bitbucket.org/{$repo}",
-            default => '',
-        };
+        return RepoUrlBuilder::build($platform, $repo, $account?->getInstanceUrl());
     }
 
     /**
@@ -882,9 +1072,8 @@ class RepoProfileResource extends Resource
                     ->label(__('projects.columns.tasks'))
                     ->counts('tasks'),
             ])
-            ->recordUrl(fn (RepoProfile $record): string => static::getUrl('view', ['record' => $record]))
+            ->recordUrl(fn (RepoProfile $record): string => static::getUrl('edit', ['record' => $record]))
             ->actions([
-                EditAction::make(),
                 DeleteAction::make(),
             ])
             ->bulkActions([
@@ -899,6 +1088,7 @@ class RepoProfileResource extends Resource
         return [
             TasksRelationManager::class,
             TaskProviderBindingsRelationManager::class,
+            ApiTokensRelationManager::class,
         ];
     }
 
@@ -907,8 +1097,9 @@ class RepoProfileResource extends Resource
         return [
             'index' => ListRepoProfiles::route('/'),
             'create' => CreateRepoProfile::route('/create'),
-            'view' => ViewRepoProfile::route('/{record}'),
-            'edit' => EditRepoProfile::route('/{record}/edit'),
+            // Detail = edit (no separate read-only view); relation managers
+            // render on the edit page.
+            'edit' => EditRepoProfile::route('/{record}'),
         ];
     }
 }

@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Auth;
 
+use App\Enums\IntegrationProvider;
 use App\Models\ConnectedAccount;
+use App\Models\ProviderOAuthConfig;
 use App\Models\User;
+use App\Services\Credentials\CredentialVerification;
+use App\Services\Credentials\CredentialVerifier;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Socialite\Contracts\Factory as SocialiteFactory;
 use Laravel\Socialite\Two\AbstractProvider;
@@ -24,6 +28,11 @@ class ConnectedAccountGitlabTest extends TestCase
         parent::setUp();
         $this->user = User::factory()->create();
         $this->actingAs($this->user);
+
+        // The OAuth callback re-verifies against the provider API — stub it offline.
+        $verifier = Mockery::mock(CredentialVerifier::class);
+        $verifier->shouldReceive('verifyProvider')->andReturn(CredentialVerification::valid());
+        $this->app->instance(CredentialVerifier::class, $verifier);
 
         config([
             'services.gitlab.client_id' => 'test-client-id',
@@ -67,10 +76,9 @@ class ConnectedAccountGitlabTest extends TestCase
         ]);
     }
 
-    public function test_callback_stores_null_instance_url_for_gitlab_com(): void
+    public function test_callback_stores_public_instance_sentinel_for_gitlab_com(): void
     {
-        config(['services.gitlab.instance_uri' => 'https://gitlab.com']);
-
+        // No instance selected → public-instance sentinel ('').
         $socialiteUser = $this->makeSocialiteUser();
         $this->mockSocialiteCallback($socialiteUser);
 
@@ -81,12 +89,14 @@ class ConnectedAccountGitlabTest extends TestCase
             ->first();
 
         $this->assertNotNull($account);
-        $this->assertNull($account->instance_url);
+        $this->assertSame('', $account->instance_url);
+        $this->assertSame('https://gitlab.com', $account->getInstanceUrl());
     }
 
     public function test_callback_stores_instance_url_for_self_hosted(): void
     {
-        config(['services.gitlab.instance_uri' => 'https://git.example.com']);
+        // The redirect remembers which self-hosted instance was chosen.
+        session(['oauth.gitlab.instance' => 'https://git.example.com']);
 
         $socialiteUser = $this->makeSocialiteUser();
         $this->mockSocialiteCallback($socialiteUser);
@@ -95,10 +105,29 @@ class ConnectedAccountGitlabTest extends TestCase
 
         $account = ConnectedAccount::where('user_id', $this->user->id)
             ->where('provider', 'gitlab')
+            ->where('instance_url', 'https://git.example.com')
             ->first();
 
         $this->assertNotNull($account);
         $this->assertSame('https://git.example.com', $account->instance_url);
+    }
+
+    public function test_public_and_self_hosted_gitlab_accounts_coexist(): void
+    {
+        ConnectedAccount::factory()->create([
+            'user_id' => $this->user->id,
+            'provider' => 'gitlab',
+            'instance_url' => '',
+        ]);
+
+        session(['oauth.gitlab.instance' => 'https://git.example.com']);
+        $this->mockSocialiteCallback($this->makeSocialiteUser());
+
+        $this->get(route('auth.gitlab.callback'));
+
+        $this->assertSame(2, ConnectedAccount::where('user_id', $this->user->id)
+            ->where('provider', 'gitlab')
+            ->count());
     }
 
     public function test_callback_updates_existing_account(): void
@@ -190,6 +219,20 @@ class ConnectedAccountGitlabTest extends TestCase
         $this->get(route('auth.gitlab.redirect', ['return' => 'onboarding']));
 
         $this->assertSame('onboarding', session('oauth.gitlab.return'));
+    }
+
+    public function test_redirect_with_instance_param_applies_self_hosted_config(): void
+    {
+        $config = ProviderOAuthConfig::factory()
+            ->provider(IntegrationProvider::GitLab)
+            ->instance('https://git.example.com')
+            ->create(['client_id' => 'sh-cid', 'client_secret' => 'sh-sec']);
+
+        $this->get(route('auth.gitlab.redirect', ['instance' => $config->id]));
+
+        $this->assertSame('https://git.example.com', session('oauth.gitlab.instance'));
+        $this->assertSame('sh-cid', config('services.gitlab.client_id'));
+        $this->assertSame('https://git.example.com/', config('services.gitlab.instance_uri'));
     }
 
     private function makeSocialiteUser(): SocialiteUser

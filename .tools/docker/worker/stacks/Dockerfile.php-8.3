@@ -15,6 +15,10 @@ ENV DEBIAN_FRONTEND=noninteractive
 #   git/gh        — repo operations + PR creation
 #   jq            — JSON parsing in phase scripts
 #   curl/gnupg    — PECL/GH-CLI installation, runtime HTTP
+#   default-mysql-client — `mysql`/`mysqldump` for MySQL-backed testing
+#                 (schema:load / "fast refresh" dumps, parallel test DBs); the
+#                 PHP pdo_mysql ext only connects, the CLI does dumps/loads.
+#                 Pairs with the MySQL backing service.
 #   unzip/coreutils/vim/nano/less — interactive `agent shell` ergonomics
 #   PHP build deps (libzip-dev, libicu-dev, ...) — needed for the extensions below.
 RUN set -eux; \
@@ -26,6 +30,7 @@ RUN set -eux; \
         git \
         unzip \
         jq \
+        default-mysql-client \
         coreutils \
         vim \
         nano \
@@ -46,7 +51,7 @@ RUN set -eux; \
     chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg; \
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
         > /etc/apt/sources.list.d/github-cli.list; \
-    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -; \
+    curl -fsSL https://deb.nodesource.com/setup_22.x | bash -; \
     apt-get update; \
     apt-get install -y --no-install-recommends gh nodejs; \
     rm -rf /var/lib/apt/lists/*
@@ -55,6 +60,9 @@ RUN set -eux; \
 # mbstring, sodium and OPcache ship with the php:8.x base image already.
 # pcntl  — Horizon, queue workers, Pail.
 # exif   — spatie/image, spatie/laravel-medialibrary.
+# sockets — required by common packages (Pest browser plugin, ReactPHP, …);
+#           a hard composer platform requirement, so its absence breaks
+#           `composer install`, not just runtime. Core ext, cheap to bundle.
 # pdo_pgsql — Postgres-backed projects (needs libpq-dev, installed above).
 RUN set -eux; \
     docker-php-ext-configure intl; \
@@ -68,9 +76,16 @@ RUN set -eux; \
         bcmath \
         gd \
         pcntl \
+        sockets \
         exif; \
     pecl install redis; \
     docker-php-ext-enable redis
+
+# Lift the CLI memory_limit: the base image's php.ini-production caps it at
+# 128M, which OOMs PHPStan/Pest on large projects (e.g. Filament). The worker
+# is an ephemeral container bounded by its --memory cap, so -1 is safe and
+# spares every project a per-command --memory-limit flag.
+RUN echo 'memory_limit = -1' > /usr/local/etc/php/conf.d/zz-argos-memory.ini
 
 # Composer (latest stable) from the official image.
 COPY --from=composer:latest /usr/bin/composer /usr/local/bin/composer

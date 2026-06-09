@@ -6,6 +6,7 @@ namespace Tests\Unit\Workers\Compose;
 
 use App\Enums\AgentName;
 use App\Enums\WorkerImageEntityStatus;
+use App\Enums\WorkerSource;
 use App\Models\RepoProfile;
 use App\Models\Task;
 use App\Models\WorkerStack;
@@ -15,6 +16,8 @@ use App\Workers\Compose\WorkerImageResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
 use RuntimeException;
+use Saloon\Http\Faking\MockResponse;
+use Saloon\Laravel\Facades\Saloon;
 use Tests\TestCase;
 
 class WorkerImageResolverTest extends TestCase
@@ -69,6 +72,54 @@ class WorkerImageResolverTest extends TestCase
         $resolved = $this->resolver->resolve($task);
 
         $this->assertSame($defaultStack->id, $resolved->stack->id);
+    }
+
+    public function test_byoi_materialises_repo_dockerfile_as_a_stack(): void
+    {
+        $dockerfile = "FROM php:8.4-cli\nRUN apt-get update && apt-get install -y jq git\n";
+        Saloon::fake([
+            'api.github.com/repos/acme/widget/contents/*' => MockResponse::make([
+                'content' => base64_encode($dockerfile),
+                'encoding' => 'base64',
+            ]),
+        ]);
+
+        $profile = RepoProfile::factory()->create([
+            'platform' => 'github',
+            'url' => 'https://github.com/acme/widget',
+            'token' => 'ghp-test',
+            'worker_source' => WorkerSource::Byoi,
+            'worker_stack_id' => null,
+        ]);
+        $task = Task::factory()->create(['repo_profile_id' => $profile->id, 'base_branch' => 'main']);
+
+        $resolved = $this->resolver->resolve($task);
+
+        $this->assertSame("byoi-{$profile->id}", $resolved->stack->name);
+        $this->assertSame($dockerfile, $resolved->stack->dockerfile_body);
+        $this->assertSame('php:8.4-cli', $resolved->stack->base_image);
+        // Capabilities mirror the agent's requirements so the compatibility
+        // pre-check passes; the build's validate step enforces reality.
+        $this->assertSame(AgentName::ClaudeCode->spec()->requiresStackCapabilities, $resolved->stack->capabilities);
+        $this->assertDatabaseHas(WorkerStack::class, ['name' => "byoi-{$profile->id}", 'is_builtin' => false]);
+    }
+
+    public function test_byoi_throws_when_dockerfile_missing(): void
+    {
+        Saloon::fake([
+            'api.github.com/repos/*/contents/*' => MockResponse::make('', 404),
+        ]);
+
+        $profile = RepoProfile::factory()->create([
+            'platform' => 'github',
+            'url' => 'https://github.com/acme/widget',
+            'token' => 'ghp-test',
+            'worker_source' => WorkerSource::Byoi,
+        ]);
+        $task = Task::factory()->create(['repo_profile_id' => $profile->id, 'base_branch' => 'main']);
+
+        $this->expectException(RuntimeException::class);
+        $this->resolver->resolve($task);
     }
 
     public function test_default_agent_is_claude_code(): void
@@ -192,6 +243,30 @@ class WorkerImageResolverTest extends TestCase
             @unlink($abs.'/lib/mcp.sh');
             @rmdir($abs.'/lib');
             @rmdir($abs);
+        }
+    }
+
+    public function test_default_worker_lib_paths_all_exist(): void
+    {
+        // Guards against the fingerprint hashing a stale path (e.g. a removed
+        // dockerfile): a missing path contributes nothing to the hash, so a
+        // typo silently disables cache invalidation for the file it meant to
+        // track. Every default path must resolve to a real file or directory.
+        $resolver = new class($this->builder) extends WorkerImageResolver
+        {
+            /** @return list<string> */
+            public function exposedWorkerLibPaths(): array
+            {
+                return $this->workerLibPaths();
+            }
+        };
+
+        foreach ($resolver->exposedWorkerLibPaths() as $rel) {
+            $abs = base_path($rel);
+            $this->assertTrue(
+                is_file($abs) || is_dir($abs),
+                "workerLibPaths() references a non-existent path: {$rel}"
+            );
         }
     }
 

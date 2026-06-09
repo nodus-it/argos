@@ -49,13 +49,12 @@ final class ClaudeCodeRunner implements AgentRunner
         $token = $credential?->credentials['token'] ?? null;
 
         if ($token === null || $token === '') {
-            // Legacy fallback for installations without a per-agent
-            // AgentCredential row yet — keeps the pre-Step-5.5 behaviour
-            // working until the UI lets users create one.
-            $legacy = config('argos.claude_token') ?: app(CredentialStore::class)->getClaudeToken();
+            // Legacy local-dev fallback (on-disk token file) for installations
+            // without a per-agent AgentCredential row yet.
+            $legacy = app(CredentialStore::class)->getClaudeToken();
             if ($legacy === null || $legacy === '') {
                 throw new RuntimeException(
-                    'Kein Claude OAuth Token konfiguriert. Bitte CLAUDE_CODE_OAUTH_TOKEN setzen oder einen AgentCredential für claude-code anlegen.'
+                    'Kein Claude OAuth Token konfiguriert. Bitte einen AgentCredential für claude-code anlegen.'
                 );
             }
             $token = $legacy;

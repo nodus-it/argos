@@ -1,26 +1,32 @@
 import { test, expect } from '@playwright/test';
+import { resetDatabase } from './helpers/reset';
+import { login } from './helpers/auth';
 
 /**
- * Smoke-Test 2: nach Login die Task-Liste öffnen, ersten Task anschauen,
- * Status-Badge prüfen. Greift gegen das vom DemoSeeder erzeugte Draft-Task.
+ * Smoke 2: after login, open the task list, drill into a known task and assert
+ * its status badge renders. Anchored on the FullDemoSeeder task
+ * "Demo · Live deployment", which is pinned to workflow_status = InReview
+ * ("In Review"). The list is paginated, so we use the searchable name column to
+ * locate the row instead of relying on it being on the first page.
  */
+test.beforeEach(() => {
+  resetDatabase('FullDemoSeeder');
+});
+
 test('view task page renders status badge', async ({ page }) => {
-  // Login
-  await page.goto('/admin/login');
-  await page.getByRole('textbox', { name: /email/i }).fill('admin@argos.local');
-  await page.getByRole('textbox', { name: /password/i }).fill('12345');
-  await page.getByRole('button', { name: /sign in/i }).click();
-  await page.waitForURL(/\/admin/);
-  await page.waitForLoadState('networkidle');
+  await login(page);
 
-  // Task-Liste
   await page.goto('/admin/tasks');
-  await expect(page.locator('body')).toContainText('Demo task');
 
-  // Ersten Task öffnen (DemoSeeder legt genau einen an, Status Draft)
-  await page.getByRole('link', { name: 'Demo task' }).first().click();
+  // Narrow the (paginated) table down to the anchor task via the search box.
+  const search = page.getByRole('searchbox').first();
+  await search.fill('Demo · Live deployment');
+  const row = page.getByRole('link', { name: 'Demo · Live deployment' });
+  await expect(row.first()).toBeVisible();
+
+  await row.first().click();
   await expect(page).toHaveURL(/\/admin\/tasks\/[^/]+/);
 
-  // Draft-Badge sichtbar (Default-Locale ist en)
-  await expect(page.locator('body')).toContainText('Draft');
+  // The InReview status badge is rendered on the task detail (default locale en).
+  await expect(page.locator('body')).toContainText('In Review');
 });

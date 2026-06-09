@@ -6,8 +6,12 @@ namespace Tests\Feature\Auth;
 
 use App\Models\ConnectedAccount;
 use App\Models\User;
+use App\Services\Credentials\CredentialVerification;
+use App\Services\Credentials\CredentialVerifier;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Http;
+use Mockery;
+use Saloon\Http\Faking\MockResponse;
+use Saloon\Laravel\Facades\Saloon;
 use Tests\TestCase;
 
 class LinearConnectedAccountControllerTest extends TestCase
@@ -28,6 +32,11 @@ class LinearConnectedAccountControllerTest extends TestCase
 
         $this->user = User::factory()->create();
         $this->actingAs($this->user);
+
+        // The OAuth callback re-verifies against the Linear API — stub it offline.
+        $verifier = Mockery::mock(CredentialVerifier::class);
+        $verifier->shouldReceive('verifyProvider')->andReturn(CredentialVerification::valid());
+        $this->app->instance(CredentialVerifier::class, $verifier);
     }
 
     // ── redirect ─────────────────────────────────────────────────────────────
@@ -215,13 +224,13 @@ class LinearConnectedAccountControllerTest extends TestCase
 
     private function fakeLinearOAuth(): void
     {
-        Http::fake([
-            'https://api.linear.app/oauth/token' => Http::response([
+        Saloon::fake([
+            'https://api.linear.app/oauth/token' => MockResponse::make([
                 'access_token' => 'lin_oauth_access_token',
                 'token_type' => 'Bearer',
                 'scope' => 'read write',
             ]),
-            'https://api.linear.app/graphql' => Http::response([
+            'https://api.linear.app/graphql' => MockResponse::make([
                 'data' => [
                     'viewer' => [
                         'id' => 'linear-viewer-uuid',

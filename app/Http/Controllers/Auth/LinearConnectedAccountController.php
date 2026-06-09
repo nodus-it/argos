@@ -4,16 +4,21 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Auth;
 
+use App\Http\Controllers\Auth\Concerns\ReverifiesConnectedAccount;
 use App\Http\Controllers\Controller;
+use App\Integrations\Linear\LinearConnector;
+use App\Integrations\Linear\Requests\GraphQLRequest;
+use App\Integrations\Linear\Requests\OAuthTokenExchange;
 use App\Models\ConnectedAccount;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Http;
 
 final class LinearConnectedAccountController extends Controller
 {
+    use ReverifiesConnectedAccount;
+
     private const RETURN_SESSION_KEY = 'oauth.linear.return';
 
     private const STATE_SESSION_KEY = 'oauth.linear.state';
@@ -54,28 +59,18 @@ final class LinearConnectedAccountController extends Controller
             abort(400, 'Missing OAuth code');
         }
 
-        $tokenResponse = Http::asForm()
-            ->post('https://api.linear.app/oauth/token', [
-                'client_id' => config('services.linear.client_id'),
-                'client_secret' => config('services.linear.client_secret'),
-                'code' => $code,
-                'redirect_uri' => url((string) config('services.linear.redirect')),
-                'grant_type' => 'authorization_code',
-            ])
-            ->throw()
-            ->json();
+        $tokenResponse = (new LinearConnector)->send(new OAuthTokenExchange(
+            clientId: (string) config('services.linear.client_id'),
+            clientSecret: (string) config('services.linear.client_secret'),
+            code: $code,
+            redirectUri: url((string) config('services.linear.redirect')),
+        ))->throw()->json();
 
         $accessToken = (string) $tokenResponse['access_token'];
 
-        $viewerResponse = Http::withHeaders([
-            'Authorization' => "Bearer {$accessToken}",
-            'Content-Type' => 'application/json',
-        ])
-            ->post('https://api.linear.app/graphql', [
-                'query' => '{ viewer { id name email avatarUrl } }',
-            ])
-            ->throw()
-            ->json();
+        $viewerResponse = (new LinearConnector($accessToken))->send(
+            new GraphQLRequest('{ viewer { id name email avatarUrl } }'),
+        )->throw()->json();
 
         /** @var array<string, mixed> $viewer */
         $viewer = $viewerResponse['data']['viewer'];
@@ -97,6 +92,7 @@ final class LinearConnectedAccountController extends Controller
         );
 
         $account->relinkOrphanedResources();
+        $this->reverifyConnectedAccount($account);
 
         $returnTo = $request->session()->pull(self::RETURN_SESSION_KEY);
 

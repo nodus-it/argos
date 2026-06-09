@@ -1,0 +1,97 @@
+# Argos — local development overlay
+#
+# Layered on top of docker-compose.yml for local work:
+#   docker compose -f .tools/docker/docker-compose.yml \
+#                  -f .tools/docker/docker-compose.dev.yml up --build
+# (the `.tools/bin/dev-*.sh` scripts and `composer dev` do this for you).
+#
+# It carries ONLY the dev deltas — everything else (services, networks, named
+# volumes, the full env) comes from the canonical base file:
+#   • build argos-app:local from source instead of pulling a registry image
+#   • bind-mount the working tree into app/queue/scheduler for hot reload
+#   • non-secret dev defaults baked in (APP_NAME/ENV/DEBUG/KEY, LOG_LEVEL,
+#     ADMIN_PASSWORD, ARGOS_PREVIEW_ENABLED, SEED_REPO_URL/BRANCH) so the repo
+#     root .env only needs to carry REAL credentials (the SEED_* OAuth tokens,
+#     read by the seeder via the bind-mounted /app/.env). Every value stays
+#     `${VAR:-default}`, so a key in .env still overrides the baked default.
+#   • phpMyAdmin on ${ARGOS_PMA_PORT:-8081}
+#
+# The APP_KEY below is a throwaway LOCAL dev key — it only encrypts demo data
+# in the local stack and is never used in staging/production (the installer
+# generates its own). Committing it is intentional so `composer dev` works
+# zero-config.
+#
+# Production never sees this file (the installer ships only docker-compose.yml),
+# so the two can't drift on anything but these deltas.
+
+services:
+
+  app:
+    build:
+      context: ../..
+      dockerfile: .tools/docker/app/Dockerfile
+      target: app
+    environment:
+      APP_NAME:              "${APP_NAME:-Argos}"
+      APP_ENV:               "${APP_ENV:-local}"
+      APP_DEBUG:             "${APP_DEBUG:-true}"
+      APP_KEY:               "${APP_KEY:-base64:28CjcHgVoyT5B9N4+XGZuGrahXj6KrALGKEbrbgm+JY=}"
+      LOG_LEVEL:             "${LOG_LEVEL:-debug}"
+      ADMIN_PASSWORD:        "${ADMIN_PASSWORD:-12345}"
+      ARGOS_PREVIEW_ENABLED: "${ARGOS_PREVIEW_ENABLED:-true}"
+      # Demo seeder (composer dev:live) — non-secret repo target only. The
+      # GitHub/Claude/Codex OAuth tokens stay in the bind-mounted /app/.env.
+      SEED_REPO_URL:         "${SEED_REPO_URL:-https://github.com/nodus-it/argos}"
+      SEED_REPO_BRANCH:      "${SEED_REPO_BRANCH:-develop}"
+    volumes:
+      # Bind mount for hot reload without rebuilding the image. vendor/ is
+      # shared with the host — composer require on the host propagates
+      # immediately, and the entrypoint runs `composer install` when
+      # composer.lock drifts. The anonymous volumes mask host artefacts that
+      # would otherwise shadow the image-built ones.
+      - ../..:/app
+      - /app/node_modules
+      - /app/public/build
+      - /app/bootstrap/cache
+
+  queue:
+    environment:
+      APP_NAME:              "${APP_NAME:-Argos}"
+      APP_ENV:               "${APP_ENV:-local}"
+      APP_DEBUG:             "${APP_DEBUG:-true}"
+      APP_KEY:               "${APP_KEY:-base64:28CjcHgVoyT5B9N4+XGZuGrahXj6KrALGKEbrbgm+JY=}"
+      LOG_LEVEL:             "${LOG_LEVEL:-debug}"
+      ARGOS_PREVIEW_ENABLED: "${ARGOS_PREVIEW_ENABLED:-true}"
+    volumes:
+      - ../..:/app
+      - /app/node_modules
+      - /app/public/build
+      - /app/bootstrap/cache
+
+  scheduler:
+    environment:
+      APP_NAME:  "${APP_NAME:-Argos}"
+      APP_ENV:   "${APP_ENV:-local}"
+      APP_DEBUG: "${APP_DEBUG:-true}"
+      APP_KEY:   "${APP_KEY:-base64:28CjcHgVoyT5B9N4+XGZuGrahXj6KrALGKEbrbgm+JY=}"
+      LOG_LEVEL: "${LOG_LEVEL:-debug}"
+    volumes:
+      - ../..:/app
+      - /app/node_modules
+      - /app/public/build
+      - /app/bootstrap/cache
+
+  # phpMyAdmin on port 8081 (override via ARGOS_PMA_PORT) — dev only.
+  phpmyadmin:
+    image: phpmyadmin:5
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${ARGOS_PMA_PORT:-8081}:80"
+    environment:
+      PMA_HOST: db
+      PMA_USER: "${ARGOS_DB_USERNAME:-argos}"
+      PMA_PASSWORD: "${ARGOS_DB_PASSWORD:-argos}"
+      UPLOAD_LIMIT: 256M

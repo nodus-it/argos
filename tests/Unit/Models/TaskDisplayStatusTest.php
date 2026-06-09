@@ -23,7 +23,7 @@ class TaskDisplayStatusTest extends TestCase
             'current_status' => PhaseStatus::Pending,
         ]);
 
-        $this->assertTrue($task->isWaitingForWorker());
+        $this->assertTrue($task->presenter()->isWaitingForWorker());
     }
 
     public function test_is_waiting_when_implement_running_and_pending(): void
@@ -33,7 +33,7 @@ class TaskDisplayStatusTest extends TestCase
             'current_status' => PhaseStatus::Pending,
         ]);
 
-        $this->assertTrue($task->isWaitingForWorker());
+        $this->assertTrue($task->presenter()->isWaitingForWorker());
     }
 
     public function test_not_waiting_when_concept_running_and_running(): void
@@ -43,7 +43,7 @@ class TaskDisplayStatusTest extends TestCase
             'current_status' => PhaseStatus::Running,
         ]);
 
-        $this->assertFalse($task->isWaitingForWorker());
+        $this->assertFalse($task->presenter()->isWaitingForWorker());
     }
 
     public function test_not_waiting_when_implement_running_and_running(): void
@@ -53,7 +53,7 @@ class TaskDisplayStatusTest extends TestCase
             'current_status' => PhaseStatus::Running,
         ]);
 
-        $this->assertFalse($task->isWaitingForWorker());
+        $this->assertFalse($task->presenter()->isWaitingForWorker());
     }
 
     public function test_not_waiting_when_draft_and_pending(): void
@@ -63,7 +63,7 @@ class TaskDisplayStatusTest extends TestCase
             'current_status' => PhaseStatus::Pending,
         ]);
 
-        $this->assertFalse($task->isWaitingForWorker());
+        $this->assertFalse($task->presenter()->isWaitingForWorker());
     }
 
     public function test_not_waiting_when_completed_and_pending(): void
@@ -73,7 +73,7 @@ class TaskDisplayStatusTest extends TestCase
             'current_status' => PhaseStatus::Pending,
         ]);
 
-        $this->assertFalse($task->isWaitingForWorker());
+        $this->assertFalse($task->presenter()->isWaitingForWorker());
     }
 
     public function test_not_waiting_when_current_status_is_null(): void
@@ -83,7 +83,7 @@ class TaskDisplayStatusTest extends TestCase
             'current_status' => null,
         ]);
 
-        $this->assertFalse($task->isWaitingForWorker());
+        $this->assertFalse($task->presenter()->isWaitingForWorker());
     }
 
     // --- displayStatusLabel ---
@@ -95,7 +95,7 @@ class TaskDisplayStatusTest extends TestCase
             'current_status' => PhaseStatus::Pending,
         ]);
 
-        $this->assertSame(__('tasks.statuses.waiting.concept'), $task->displayStatusLabel());
+        $this->assertSame(__('tasks.statuses.waiting.concept'), $task->presenter()->statusLabel());
     }
 
     public function test_label_is_implement_waiting_when_implement_running_and_pending(): void
@@ -105,7 +105,7 @@ class TaskDisplayStatusTest extends TestCase
             'current_status' => PhaseStatus::Pending,
         ]);
 
-        $this->assertSame(__('tasks.statuses.waiting.implement'), $task->displayStatusLabel());
+        $this->assertSame(__('tasks.statuses.waiting.implement'), $task->presenter()->statusLabel());
     }
 
     public function test_label_delegates_to_workflow_status_when_not_waiting(): void
@@ -115,7 +115,7 @@ class TaskDisplayStatusTest extends TestCase
             'current_status' => PhaseStatus::Running,
         ]);
 
-        $this->assertSame(WorkflowStatus::ConceptRunning->label(), $task->displayStatusLabel());
+        $this->assertSame(WorkflowStatus::ConceptRunning->label(), $task->presenter()->statusLabel());
     }
 
     public function test_label_delegates_for_draft(): void
@@ -125,7 +125,7 @@ class TaskDisplayStatusTest extends TestCase
             'current_status' => null,
         ]);
 
-        $this->assertSame(WorkflowStatus::Draft->label(), $task->displayStatusLabel());
+        $this->assertSame(WorkflowStatus::Draft->label(), $task->presenter()->statusLabel());
     }
 
     // --- displayStatusColor ---
@@ -137,7 +137,7 @@ class TaskDisplayStatusTest extends TestCase
             'current_status' => PhaseStatus::Pending,
         ]);
 
-        $this->assertSame('info', $task->displayStatusColor());
+        $this->assertSame('info', $task->presenter()->statusColor());
     }
 
     public function test_color_delegates_to_workflow_status_when_not_waiting(): void
@@ -147,7 +147,7 @@ class TaskDisplayStatusTest extends TestCase
             'current_status' => PhaseStatus::Running,
         ]);
 
-        $this->assertSame(WorkflowStatus::ConceptRunning->color(), $task->displayStatusColor());
+        $this->assertSame(WorkflowStatus::ConceptRunning->color(), $task->presenter()->statusColor());
     }
 
     public function test_color_is_info_for_implement_running_and_pending(): void
@@ -157,7 +157,7 @@ class TaskDisplayStatusTest extends TestCase
             'current_status' => PhaseStatus::Pending,
         ]);
 
-        $this->assertSame('info', $task->displayStatusColor());
+        $this->assertSame('info', $task->presenter()->statusColor());
     }
 
     public function test_color_is_success_for_completed(): void
@@ -167,6 +167,6 @@ class TaskDisplayStatusTest extends TestCase
             'current_status' => null,
         ]);
 
-        $this->assertSame('success', $task->displayStatusColor());
+        $this->assertSame('success', $task->presenter()->statusColor());
     }
 }

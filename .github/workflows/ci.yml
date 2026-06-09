@@ -30,8 +30,8 @@ jobs:
             worker/tests/run-bats.sh \
             worker/lib/*.sh \
             worker/phases/*.sh \
-            install.sh \
-            installer/tests/run-bats.sh \
+            .tools/install.sh \
+            .tools/tests/run-bats.sh \
             .tools/bin/dev-reload.sh \
             .tools/bin/dev-reset.sh \
             .claude/scripts/boost-freshness-check.sh \
@@ -49,7 +49,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: bats unit tests for install.sh (via Docker)
-        run: bash installer/tests/run-bats.sh
+        run: bash .tools/tests/run-bats.sh
 
   secret-scan:
     runs-on: ubuntu-latest
@@ -121,6 +121,98 @@ jobs:
 
       - name: PHPUnit (feature + unit)
         run: php artisan test --compact
+
+  docker-images:
+    # build-app (below) only builds on develop/tags and pushes — so on a PR the
+    # Dockerfiles were never exercised. Validate them here on every PR (no push):
+    #   - app image: Dockerfile + the Vite frontend build baked into it
+    #   - worker image: the two-stage build the WorkerImageResolver does at
+    #     runtime (stack php-8.4 → Dockerfile.compose + the claude-code agent)
+    # Plain `docker build` (not buildx) so the compose stage sees the locally
+    # built stack image as its FROM.
+    needs: [shellcheck, app-quality]
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build app image (target app, no push)
+        run: docker build -t argos-app:ci -f .tools/docker/app/Dockerfile --target app .
+
+      - name: Build worker stack image (php-8.4)
+        run: docker build -t argos-stack:php-8.4 -f .tools/docker/worker/stacks/Dockerfile.php-8.4 .
+
+      - name: Build final worker image (stack + claude-code agent)
+        run: |
+          docker build \
+            --build-arg STACK_IMAGE=argos-stack:php-8.4 \
+            --build-arg AGENT_INSTALL_SCRIPT=.tools/docker/worker/agents/install-claude-code.sh \
+            -f .tools/docker/worker/Dockerfile.compose \
+            -t argos-worker:ci .
+
+  browser-e2e:
+    # Gemockt Playwright suite against an ephemeral fake-mode stack. This was
+    # "deliberately not built" while the only stack was the developer's live one
+    # (the suite runs migrate:fresh) — on a throwaway runner that risk is gone.
+    needs: [app-quality]
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build app image (used by app/queue/nginx/scheduler)
+        run: docker build -t argos-app:local -f .tools/docker/app/Dockerfile --target app .
+
+      - name: Write the fake-mode stack env
+        # APP_ENV=local + ARGOS_E2E_FAKE=1 boots E2eFakeServiceProvider; the
+        # APP_KEY is the throwaway test key from phpunit.xml. ADMIN_PASSWORD
+        # matches the seeded login the specs use (admin@argos.local / 12345).
+        run: |
+          cat > .env <<'EOF'
+          APP_ENV=local
+          APP_DEBUG=true
+          APP_KEY=base64:zTobRxr7TepBXVjM/E3kjKGAwnxWQ7QWMMXaInQYKKg=
+          APP_URL=http://localhost:8080
+          ARGOS_PORT=8080
+          ADMIN_PASSWORD=12345
+          ARGOS_E2E_FAKE=1
+          EOF
+
+      - name: Bring up the stack (db, redis, app, queue, nginx, traefik)
+        run: |
+          docker compose --env-file .env -f .tools/docker/docker-compose.yml \
+            up -d --wait db redis app queue nginx traefik
+
+      - name: Seed the full demo profile
+        run: |
+          docker compose --env-file .env -f .tools/docker/docker-compose.yml \
+            exec -T app php artisan db:seed --class='Database\Seeders\FullDemoSeeder' --force
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+
+      - name: Run the gemockt browser-E2E suite
+        # full-flow.real self-skips unless ARGOS_E2E_REAL=1, so a plain run
+        # covers exactly the deterministic fake specs.
+        run: npx playwright test
+
+      - name: Dump container logs on failure
+        if: failure()
+        run: |
+          docker compose --env-file .env -f .tools/docker/docker-compose.yml \
+            logs --tail=200 app queue
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
 
   build-app:
     needs: [shellcheck, worker-unit, app-quality, installer-unit, secret-scan]

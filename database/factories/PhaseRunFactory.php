@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
+use App\Enums\ClaudeModel;
 use App\Models\PhaseRun;
 use App\Models\Task;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -25,6 +26,7 @@ class PhaseRunFactory extends Factory
             'exit_code' => 0,
             'input_tokens' => fake()->numberBetween(100, 5000),
             'output_tokens' => fake()->numberBetween(50, 2000),
+            'model' => fake()->randomElement(ClaudeModel::cases())->value,
         ];
     }
 

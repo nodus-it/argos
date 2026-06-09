@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace Tests\Unit\Models;
 
 use App\Enums\AgentName;
+use App\Enums\BackingService;
 use App\Enums\WorkerSource;
 use App\Models\RepoProfile;
 use App\Models\WorkerStack;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class RepoProfileWorkerColumnsTest extends TestCase
@@ -61,5 +63,46 @@ class RepoProfileWorkerColumnsTest extends TestCase
         $profile = RepoProfile::factory()->create();
 
         $this->assertNull($profile->fresh()->worker_agent_name);
+    }
+
+    public function test_composer_registries_round_trip_encrypted(): void
+    {
+        $data = [['host' => 'packages.filamentphp.com', 'username' => 'u', 'token' => 'sekret']];
+        $profile = RepoProfile::factory()->create(['composer_registries' => $data]);
+
+        $this->assertSame($data, $profile->fresh()->composer_registries);
+
+        $raw = (string) DB::table('repo_profiles')->where('id', $profile->id)->value('composer_registries');
+        $this->assertStringNotContainsString('packages.filamentphp.com', $raw);
+        $this->assertStringNotContainsString('sekret', $raw);
+    }
+
+    public function test_worker_env_round_trip_encrypted(): void
+    {
+        $data = [['name' => 'MEILI_KEY', 'value' => 'sekret']];
+        $profile = RepoProfile::factory()->create(['worker_env' => $data]);
+
+        $this->assertSame($data, $profile->fresh()->worker_env);
+
+        $raw = (string) DB::table('repo_profiles')->where('id', $profile->id)->value('worker_env');
+        $this->assertStringNotContainsString('sekret', $raw);
+    }
+
+    public function test_worker_services_round_trip_and_resolve_enums(): void
+    {
+        $profile = RepoProfile::factory()->withBackingServices(['mysql', 'redis', 'bogus'])->create();
+        $fresh = $profile->fresh();
+
+        $this->assertSame(['mysql', 'redis', 'bogus'], $fresh->worker_services);
+        // backingServices() drops the unknown value.
+        $this->assertEquals([BackingService::Mysql, BackingService::Redis], $fresh->backingServices());
+    }
+
+    public function test_worker_service_config_round_trips(): void
+    {
+        $config = ['mysql' => ['database' => 'shop', 'username' => 'sa', 'password' => 'pw']];
+        $profile = RepoProfile::factory()->create(['worker_service_config' => $config]);
+
+        $this->assertSame($config, $profile->fresh()->worker_service_config);
     }
 }

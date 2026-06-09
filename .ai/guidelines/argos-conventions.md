@@ -62,9 +62,9 @@ ask before introducing patterns.
 All Bash files must be `shellcheck`-clean (severity `error`/`warning`).
 `info` and `style` are optional.
 
-CI runs `shellcheck` over `agent`, `worker/lib/`, `worker/phases/`,
-`.tools/docker/worker/worker-entrypoint.sh`, and
-`worker/tests/integration/*.sh`.
+CI runs `shellcheck` (via `worker/tests/run-tests.sh`) over `worker/lib/`,
+`worker/phases/`, `.tools/docker/worker/worker-entrypoint.sh`, and the test
+runners (`run-tests.sh`, `run-bats.sh`).
 
 ### File layout
 
@@ -100,9 +100,8 @@ CI runs `shellcheck` over `agent`, `worker/lib/`, `worker/phases/`,
 ### Tests
 
 - Bash unit tests with `bats-core` under `worker/tests/bats/`. One test file
-  per lib file.
-- Integration tests under `worker/tests/integration/`. Mock Claude and
-  fake-remote-repo as fixtures.
+  per lib file. They run in a Docker image (bats + jq) via
+  `worker/tests/run-bats.sh`, so tests that need a real `/workspace` work.
 - Laravel (PHP) tests live under `tests/` at the repo root.
 - For bug fixes: write a test that reproduces the bug first, then fix.
 - Tests must run offline — no real GitHub, no real Claude API.
@@ -139,10 +138,10 @@ notice a missing row during a patch, add it.
 
 | When you change… | …also check |
 | --- | --- |
-| New enum case | DB migration (`enum()` values) — `EnumPersistenceTest` catches drift, but you must write the migration yourself; `lang/{de,en}/enums.php`; `color()` / `label()` / other `match` paths on the enum; Filament filter options / `SelectFilter::options()` |
-| New DB column | Model `$fillable` / `$casts`; **factory** (otherwise `factory()->create()` silently breaks on NOT-NULL); Filament form field + table column if relevant; JSON schema in `worker/schemas/` if the worker reads/writes the field |
+| New enum case | DB migration (`enum()` values) — `EnumPersistenceTest` catches drift, but you must write the migration yourself; `lang/{de,en}/enums.php`; `color()` / `label()` / other `match` paths on the enum; Filament filter options / `SelectFilter::options()`; if a demo profile should showcase the case, add it to the relevant `database/seeders/Support/*Builder` and assert it in `tests/Feature/Seeders/` |
+| New DB column | Model `$fillable` / `$casts`; **factory** (otherwise `factory()->create()` silently breaks on NOT-NULL); Filament form field + table column if relevant; JSON schema in `worker/schemas/` if the worker reads/writes the field; if a demo seeder writes the model via raw `create()`/`updateOrCreate()`, set the new NOT-NULL column there too — the `tests/Feature/Seeders/*` tests run the seeders against MariaDB in CI and fail on the missing value |
 | New Filament page (Resource or Page) | `RedirectToOnboarding` whitelist if reachable pre-onboarding; `getNavigationGroup` / Heroicon; **wiring test via the embedding page** (`Livewire::test(ViewFooPage::class, [...])->assertSeeLivewire(FooRelationManager::class)`) — isolated RelationManager test alone is not enough; locale strings `de` + `en` |
-| New phase helper | `worker/lib/<module>.sh` with docstring; `bats` test in `worker/tests/bats/`; `shellcheck`-clean; sourced by the `agent` entrypoint; which phase script calls the helper |
+| New phase helper | `worker/lib/<module>.sh` with docstring; `bats` test in `worker/tests/bats/`; `shellcheck`-clean; sourced by `worker-entrypoint.sh`; which phase script calls the helper |
 | UI hint claiming a behavior | The backend implements it **for every relevant path** — every agent, every provider, every status. Helper text that's only true for the default path is a lie. |
 
 ## Test levels
@@ -157,11 +156,20 @@ fit into exactly one of these levels; when in doubt, pick the narrower one.
 | Integration | Pest + MariaDB sidecar (CI) | DB schema, migrations, enum persistence, queue lifecycle | ✅ (retro M2) |
 | Backend-E2E | Pest + `FakeWorkerProcess` (`tests/Support/`) | Workflow phase run incl. recovery paths — RunPhaseJob → PhaseRunner → DB state | ✅ (retro M7) |
 | UI smoke | `Livewire::test(ViewTask::class, ['record' => …])` | UI renders correct status string per phase, action wiring | ✅ (retro M10) |
-| Browser-E2E | Playwright locally via `php artisan serve` | Real browser render, JS/Alpine reactivity, login flow, multi-page navigation. Run: `npx playwright test` (see "Common commands"). | ✅ (retro M11) |
+| Browser-E2E | Playwright against the compose stack | Full flow (login → onboarding → project → task → concept/implement) over the 4-run matrix + a mask smoke walk. Run: `npx playwright test` (see "Common commands"). | ✅ (retro M11) |
 
 Browser-E2E runs locally only today — the discipline of running
 `npx playwright test` before a commit is the first line of defense. CI
 integration deliberately not built (effort vs. value not justified yet).
+
+Two layers: **gemockt** (default, deterministic) runs the stack's `app`
+container with `ARGOS_E2E_FAKE=1`, which boots `E2eFakeServiceProvider` —
+offline fakes for the Anthropic validator, the git providers, and the worker
+run (`FakePhaseRunner`), so no tokens, API calls, or `docker run` are needed.
+The provider is double-gated (`ARGOS_E2E_FAKE` **and** not-production) and
+throws if it ever boots in production; an arch test keeps `App\Testing` out of
+production code paths. The **echt** layer (`full-flow.real.spec.ts`) is opt-in
+via `ARGOS_E2E_REAL=1` against a real stack + test repo — never in CI.
 
 ## Architecture tests
 
@@ -194,6 +202,7 @@ need to rebuild or something?".
 | `worker/lib/*.sh` or `worker/phases/*.sh` | Worker image | nothing — `libHash` triggers a rebuild on the next phase run |
 | `.tools/docker/app/Dockerfile` | App image | `docker compose -f .tools/docker/docker-compose.yml build app` + restart |
 | `.tools/docker/worker/Dockerfile` | Worker image (all variants) | `.tools/bin/dev-reset.sh` removes tags, the next phase run rebuilds |
+| Frontend CSS/JS (`resources/css/app.css`, `resources/js/*`) | `public/build` is an **anonymous volume** in the dev override (`docker-compose.dev.yml`), so a host `npm run build` does **not** reach the running stack | `docker exec argos-app-1 npm run build && docker restart argos-app-1` (the entrypoint re-syncs `/app/public` → the served `argos-public` volume on boot). For live work use `npm run dev` (HMR). |
 
 ## Common pitfalls
 
@@ -219,6 +228,14 @@ recur without an anchor — not a garbage dump).
   must use `getenv('HOME')` as a fallback, otherwise the SQLite default
   path lands at `/root/...` and `artisan serve` throws 500. Affects every
   "works in CLI, not in server" bug. (`9b1046f`)
+- **`phase_runs.stream_log` holds the full `.bg.log`, not just agent JSON.**
+  The worker mirrors the whole token-scrubbed stream (orchestration `[INFO]`
+  lines + agent stream-json) via `agent_stream_tee`; `postPhaseSync` persists
+  that `.bg.log` per iteration so the historical log view is as rich as the
+  live one. `AgentStreamParser` is the single renderer for both. Consequence:
+  parsers reading `stream_log` must skip non-JSON lines and **must not assume
+  line 1 is the agent's system/init event** — scan for the first `session_id`
+  instead (see `extractSessionIdFromStreamLog`).
 
 ## Things you do NOT do without checking back
 
@@ -287,22 +304,30 @@ php artisan test
 php artisan serve
 
 # Full dev reset (DB + task_ws_* volumes + argos-worker/stack images +
-# optimize:clear + queue restart). Seeds DemoSeeder with 1 admin, 1
-# RepoProfile (against nodus-it/argos), and 1 Draft task. Credentials are
-# only created if SEED_CLAUDE_OAUTH_TOKEN / SEED_CODEX_AUTH_JSON_B64 are set
-# in the environment (see .env.example).
-bash .tools/bin/dev-reset.sh
+# optimize:clear + queue restart) with a chosen demo profile (default full):
+#   composer dev:basic — admin user only; onboarding starts from scratch
+#   composer dev:full  — every view filled with all variants (FullDemoSeeder)
+#   composer dev:live  — real OAuth from .env, one real task startklar (local only)
+# Live-Ready reads SEED_GITHUB_OAUTH_TOKEN / SEED_REPO_URL / SEED_CLAUDE_OAUTH_TOKEN
+# (+ optional SEED_GITHUB_USER / SEED_GITHUB_REFRESH_TOKEN / SEED_REPO_BRANCH) from
+# the root .env. The composer scripts wrap `.tools/bin/dev-reset.sh [basic|full|live]`.
+composer dev:full
 
 # Fast reload after manager PHP changes (optimize:clear + queue restart,
 # without DB/volume/image cleanup). Addresses OPCache + queue worker
 # staleness.
 bash .tools/bin/dev-reload.sh
 
-# Browser-E2E (Playwright) — local self-check that the UI still loads.
+# Browser-E2E (Playwright) — runs against the running compose stack.
 # One-time prereq: `npm install` + `npx playwright install chromium`.
-# Data prereq: DemoSeeder has run (e.g. via dev-reset.sh).
-# Playwright boots `php artisan serve` itself — no running stack needed.
+# Stack prereq: `docker compose -f .tools/docker/docker-compose.yml up -d`,
+# with the app/queue containers started with ARGOS_E2E_FAKE=1 for the gemockt
+# suite (the reset helper re-seeds via migrate:fresh per test). baseURL follows
+# ARGOS_PORT (default 8080).
 composer test:browser
+
+# Real (opt-in) flow: real worker, real credentials, real test repo. Not in CI.
+ARGOS_E2E_REAL=1 composer test:browser:real
 ```
 
 ## Output language

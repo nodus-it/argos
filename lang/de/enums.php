@@ -48,6 +48,7 @@ return [
             'input' => 'Input',
             'output' => 'Output',
             'cost' => 'Kosten',
+            'model' => 'Modell',
         ],
     ],
 
@@ -74,5 +75,24 @@ return [
         'active' => 'Aktiv',
         'expired' => 'Abgelaufen',
         'revoked' => 'Widerrufen',
+    ],
+
+    'provider_credential_status' => [
+        'active' => 'Aktiv',
+        'expired' => 'Abgelaufen',
+        'revoked' => 'Widerrufen',
+    ],
+
+    'demo_status' => [
+        'building' => 'Wird gebaut',
+        'live' => 'Live',
+        'failed' => 'Fehlgeschlagen',
+        'stopped' => 'Gestoppt',
+    ],
+    'demo_access_mode' => [
+        'inherit' => 'Standard',
+        'session' => 'Argos-Login',
+        'basic' => 'Passwortschutz',
+        'public' => 'Öffentlich',
     ],
 ];

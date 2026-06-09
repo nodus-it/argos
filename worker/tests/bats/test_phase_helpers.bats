@@ -127,6 +127,40 @@ teardown() {
     [ -z "$output" ]
 }
 
+# --- quality_pest_new_failures ---
+
+@test "quality_pest_new_failures: nur neue Failures vs. Baseline werden gemeldet" {
+    command -v php >/dev/null 2>&1 || skip "php not available in bats env (the worker image has it)"
+    cat > /workspace/.agent/base.xml <<'X'
+<testsuites><testsuite name="s">
+<testcase name="old fails" classname="OldTest"><failure>x</failure></testcase>
+</testsuite></testsuites>
+X
+    cat > /workspace/.agent/cur.xml <<'X'
+<testsuites><testsuite name="s">
+<testcase name="old fails" classname="OldTest"><failure>x</failure></testcase>
+<testcase name="new fails" classname="NewTest"><failure>y</failure></testcase>
+</testsuite></testsuites>
+X
+    run quality_pest_new_failures /workspace/.agent/base.xml /workspace/.agent/cur.xml
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"NewTest::new fails"* ]]
+    [[ "$output" != *"OldTest::old fails"* ]]
+    rm -f /workspace/.agent/base.xml /workspace/.agent/cur.xml
+}
+
+@test "quality_pest_new_failures: fehlende Baseline → alle Failures (strict)" {
+    command -v php >/dev/null 2>&1 || skip "php not available in bats env (the worker image has it)"
+    cat > /workspace/.agent/cur.xml <<'X'
+<testsuites><testsuite name="s">
+<testcase name="a fails" classname="AT"><failure>x</failure></testcase>
+</testsuite></testsuites>
+X
+    run quality_pest_new_failures /workspace/.agent/nope.xml /workspace/.agent/cur.xml
+    [[ "$output" == *"AT::a fails"* ]]
+    rm -f /workspace/.agent/cur.xml
+}
+
 # --- quality_ensure_vite_hot ---
 
 @test "quality_ensure_vite_hot: kein public/hot → wird mit Stub-URL angelegt" {

@@ -98,15 +98,7 @@
             @if(empty($lines))
                 <p class="text-slate-600 italic">{{ __('tasks.view.logs.no_log', ['phase' => $phase]) }}</p>
             @else
-                @foreach($lines as $line)
-                    <div class="whitespace-pre-wrap break-all {{ $line['class'] }}">{{ $line['text'] ?: '&nbsp;' }}</div>
-                @endforeach
-
-                @if($isRunning)
-                    <div class="text-slate-400 mt-1">
-                        <span class="animate-pulse">▋</span>
-                    </div>
-                @endif
+                <x-argos.agent-stream :events="$lines" :live="$isRunning" :chrome="false" />
             @endif
         </div>
 
@@ -137,7 +129,7 @@
 
     {{-- Poll while running OR pending (so the worker pickup is reflected live). --}}
     @if($isRunning || ($task->current_status === 'pending' && $task->current_phase === $phase))
-        <div wire:poll.1500ms="poll" class="hidden"></div>
+        <div wire:poll.1000ms="poll" class="hidden"></div>
     @endif
 
 </x-filament-panels::page>

@@ -7,17 +7,24 @@
     "license": "AGPL-3.0-or-later",
     "require": {
         "php": "^8.3",
+        "dedoc/scramble": "^0.13.26",
         "dutchcodingcompany/filament-developer-logins": "^2.1",
         "filament/filament": "^5.0",
         "laravel/framework": "^13.0",
         "laravel/horizon": "^5.46",
         "laravel/passport": "^13",
+        "laravel/sanctum": "^4.0",
         "laravel/socialite": "^5.27",
         "laravel/tinker": "^3.0",
         "predis/predis": "^3.4",
+        "saloonphp/laravel-plugin": "^4.3",
+        "saloonphp/pagination-plugin": "^2.3",
+        "saloonphp/saloon": "^4.0",
         "socialiteproviders/bitbucket": "^4.1",
         "socialiteproviders/gitlab": "^4.1",
-        "symfony/process": "^8.0"
+        "spatie/laravel-medialibrary": "^11.23",
+        "symfony/process": "^8.0",
+        "symfony/yaml": "^8.0"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
@@ -54,16 +61,19 @@
 
         "dev": [
             "Composer\\Config::disableProcessTimeout",
-            "npx concurrently -c \"#93c5fd,#fb7185\" \"docker compose --env-file .env -f .tools/docker/docker-compose.yml up --build --remove-orphans\" \"npm run dev\" --names=compose,vite --kill-others"
+            "npx concurrently -c \"#93c5fd,#fb7185\" \"docker compose --env-file .env -f .tools/docker/docker-compose.yml -f .tools/docker/docker-compose.dev.yml -f .tools/docker/docker-compose.proxy.yml up --build --remove-orphans\" \"npm run dev\" --names=compose,vite --kill-others"
         ],
-        "dev:stop": "docker compose --env-file .env -f .tools/docker/docker-compose.yml down",
-        "dev:logs": "docker compose --env-file .env -f .tools/docker/docker-compose.yml logs -f",
-        "dev:exec": "docker compose --env-file .env -f .tools/docker/docker-compose.yml exec app bash",
+        "dev:port": [
+            "Composer\\Config::disableProcessTimeout",
+            "npx concurrently -c \"#93c5fd,#fb7185\" \"docker compose --env-file .env -f .tools/docker/docker-compose.yml -f .tools/docker/docker-compose.dev.yml up --build --remove-orphans\" \"npm run dev\" --names=compose,vite --kill-others"
+        ],
+        "dev:stop": "docker compose --env-file .env -f .tools/docker/docker-compose.yml -f .tools/docker/docker-compose.dev.yml down",
+        "dev:logs": "docker compose --env-file .env -f .tools/docker/docker-compose.yml -f .tools/docker/docker-compose.dev.yml logs -f",
+        "dev:exec": "docker compose --env-file .env -f .tools/docker/docker-compose.yml -f .tools/docker/docker-compose.dev.yml exec app bash",
 
-        "stage": "bash .tools/bash/start-stage.sh",
-        "stage:stop": "docker compose -p argos-stage -f .tools/docker/docker-compose.yml down",
-        "stage:logs": "docker compose -p argos-stage -f .tools/docker/docker-compose.yml logs -f",
-        "stage:exec": "docker compose -p argos-stage -f .tools/docker/docker-compose.yml exec app bash",
+        "dev:basic": "bash .tools/bin/dev-reset.sh basic",
+        "dev:full": "bash .tools/bin/dev-reset.sh full",
+        "dev:live": "bash .tools/bin/dev-reset.sh live",
 
         "pint": "vendor/bin/pint --format agent",
         "pint:test": "vendor/bin/pint --test --format agent",
@@ -74,6 +84,7 @@
         ],
         "test:external": "@php artisan test --compact --configuration=phpunit.external.xml",
         "test:browser": "npx playwright test",
+        "test:browser:real": "npx playwright test full-flow.real",
 
         "qa": [
             "@pint:test",

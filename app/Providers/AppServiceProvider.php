@@ -4,7 +4,14 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Events\Task\PhaseCompleted;
+use App\Events\Task\TaskCompleted;
 use App\Jobs\RunPhaseJob;
+use App\Listeners\Task\CloseSourceIssue;
+use App\Listeners\Task\DispatchAutoPush;
+use App\Listeners\Task\NotifyIssueTrackerOfPhase;
+use App\Listeners\Task\RemoveTaskVolume;
+use App\Listeners\Task\StopDemoAfterPush;
 use App\Services\Anthropic\CredentialStore;
 use App\Services\GitProvider\BitbucketGitService;
 use App\Services\GitProvider\GitHubGitService;
@@ -15,6 +22,7 @@ use App\Services\IssueTracker\GitHubIssueTracker;
 use App\Services\IssueTracker\GitLabIssueTracker;
 use App\Services\IssueTracker\IssueTrackerRegistry;
 use App\Services\IssueTracker\LinearIssueTracker;
+use App\Services\OAuth\OAuthConfigHydrator;
 use App\Workers\Agents\AgentRegistry;
 use App\Workers\Agents\ClaudeCodeRunner;
 use App\Workers\Agents\CodexRunner;
@@ -24,6 +32,7 @@ use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Support\Env;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\ServiceProvider;
@@ -105,12 +114,30 @@ class AppServiceProvider extends ServiceProvider
 
             return $registry;
         });
+
+        // Browser-E2E test mode: deterministic, offline replacements for the
+        // worker run and external validations (Anthropic, Git providers).
+        // Double-gated — only when ARGOS_E2E_FAKE is set AND not in production —
+        // so the production autoload path is never touched. Registered last so
+        // its bindings override the real ones above.
+        if (Env::get('ARGOS_E2E_FAKE') && ! $this->app->isProduction()) {
+            $this->app->register(E2eFakeServiceProvider::class);
+        }
     }
 
     public function boot(): void
     {
         Event::listen(SocialiteWasCalled::class, GitLabExtendSocialite::class.'@handle');
         Event::listen(SocialiteWasCalled::class, BitbucketExtendSocialite::class.'@handle');
+
+        // Task workflow follow-up actions. The kernel services (WorkflowService,
+        // TaskService) just advance state and fire the event; these listeners
+        // carry out the side-effects so the services stay side-effect-free.
+        Event::listen(PhaseCompleted::class, DispatchAutoPush::class);
+        Event::listen(PhaseCompleted::class, StopDemoAfterPush::class);
+        Event::listen(PhaseCompleted::class, NotifyIssueTrackerOfPhase::class);
+        Event::listen(TaskCompleted::class, CloseSourceIssue::class);
+        Event::listen(TaskCompleted::class, RemoveTaskVolume::class);
 
         Queue::failing(function (JobFailed $event): void {
             if ($event->job->resolveName() === RunPhaseJob::class) {
@@ -137,6 +164,16 @@ class AppServiceProvider extends ServiceProvider
 
         $this->configureDatabase();
         $this->configurePassport();
+
+        // DB-stored OAuth apps win over ENV (config/services.php). Runs after
+        // the DB connection is chosen so the table probe targets the right one.
+        app(OAuthConfigHydrator::class)->hydrate();
+
+        // Scramble serves the API docs UI (/docs/api) and the OpenAPI document
+        // (/docs/api.json). Its RestrictedDocsAccess middleware only opens up
+        // outside local without this gate; combined with the `auth` middleware
+        // (see config/scramble.php) it limits the docs to signed-in Argos users.
+        Gate::define('viewApiDocs', fn ($user): bool => $user !== null);
     }
 
     /**

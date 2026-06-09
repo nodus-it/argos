@@ -48,6 +48,7 @@ return [
             'input' => 'Input',
             'output' => 'Output',
             'cost' => 'Cost',
+            'model' => 'Model',
         ],
     ],
 
@@ -74,5 +75,24 @@ return [
         'active' => 'Active',
         'expired' => 'Expired',
         'revoked' => 'Revoked',
+    ],
+
+    'provider_credential_status' => [
+        'active' => 'Active',
+        'expired' => 'Expired',
+        'revoked' => 'Revoked',
+    ],
+
+    'demo_status' => [
+        'building' => 'Building',
+        'live' => 'Live',
+        'failed' => 'Failed',
+        'stopped' => 'Stopped',
+    ],
+    'demo_access_mode' => [
+        'inherit' => 'Default',
+        'session' => 'Argos login',
+        'basic' => 'Password',
+        'public' => 'Public',
     ],
 ];

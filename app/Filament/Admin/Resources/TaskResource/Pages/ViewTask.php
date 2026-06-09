@@ -4,20 +4,33 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\TaskResource\Pages;
 
+use App\Enums\DemoAccessMode;
+use App\Enums\DemoStatus;
 use App\Enums\Phase;
 use App\Enums\PhaseStatus;
 use App\Filament\Admin\Resources\TaskResource;
+use App\Jobs\DeployDemoJob;
+use App\Jobs\StopDemoJob;
 use App\Models\PhaseRun;
 use App\Models\Task;
+use App\Presenters\TaskThreadBuilder;
+use App\Services\Demo\DemoAccessConfigurator;
+use App\Services\Git\WorkspaceDiffService;
 use App\Services\Task\TaskService;
+use App\Services\Workflow\AgentStreamParser;
 use App\Services\Workflow\StateReader;
-use App\Support\ConceptMarkdown;
+use App\Support\LogTail;
+use App\Support\Workflow\TaskStage;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
-use Illuminate\Support\Facades\Process;
+use Filament\Schemas\Components\Utilities\Get;
+use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\Str;
+use Illuminate\View\View;
 
 class ViewTask extends ViewRecord
 {
@@ -30,7 +43,8 @@ class ViewTask extends ViewRecord
 
     public bool $diffLoaded = false;
 
-    public int $diffLoadedForIteration = 0;
+    /** Set when the diff command failed (e.g. timed out) so the UI can surface it instead of 500ing. */
+    public ?string $diffError = null;
 
     public string $notes = '';
 
@@ -55,8 +69,6 @@ class ViewTask extends ViewRecord
 
         $this->notes = $task->concept_notes ?? '';
         $this->implementNotes = $task->implement_notes ?? '';
-
-        $this->maybeAutoLoadDiff($task);
     }
 
     public function startEditingNotes(): void
@@ -115,13 +127,13 @@ class ViewTask extends ViewRecord
         Notification::make()->title(__('tasks.view.actions.feedback_saved'))->success()->send();
     }
 
-    public function saveImplementNotesAndRevise(): void
+    public function saveImplementNotesAndRevise(bool $refine = false): void
     {
         /** @var Task $task */
         $task = $this->getRecord();
 
         try {
-            app(TaskService::class)->saveImplementNotesAndRevise($task, $this->implementNotes);
+            app(TaskService::class)->saveImplementNotesAndRevise($task, $this->implementNotes, $refine);
         } catch (\RuntimeException) {
             Notification::make()->title(__('tasks.view.actions.phase_already_running'))->warning()->send();
 
@@ -141,6 +153,40 @@ class ViewTask extends ViewRecord
         $this->editingImplementNotes = false;
     }
 
+    /**
+     * Advance the workflow from the respond dock (M4). The phase-start
+     * controls live in the dock at the bottom, not in the page header.
+     */
+    public function startPhaseFromDock(string $phase): void
+    {
+        /** @var Task $task */
+        $task = $this->getRecord();
+
+        try {
+            app(TaskService::class)->startPhase($task, Phase::from($phase));
+        } catch (\RuntimeException) {
+            Notification::make()->title(__('tasks.view.actions.phase_already_running'))->warning()->send();
+
+            return;
+        }
+
+        $title = match ($phase) {
+            'concept' => __('tasks.view.actions.concept_started'),
+            'implement' => __('tasks.view.actions.implement_started'),
+            'push' => __('tasks.view.actions.push_started'),
+            default => $phase,
+        };
+        Notification::make()->title($title)->success()->send();
+        $this->redirect(TaskResource::getUrl('view', ['record' => $task]));
+    }
+
+    public function startConceptFromDock(): void
+    {
+        // Saves the (optional) concept notes, then runs the concept phase —
+        // used for the initial draft start and for retry-after-failure.
+        $this->saveNotesAndRevise();
+    }
+
     public function poll(): void
     {
         /** @var Task $task */
@@ -151,61 +197,33 @@ class ViewTask extends ViewRecord
         $task->refresh();
         $this->notes = $task->concept_notes ?? '';
         $this->implementNotes = $task->implement_notes ?? '';
-        $this->maybeAutoLoadDiff($task);
     }
 
     public function loadDiff(): void
     {
         /** @var Task $task */
         $task = $this->getRecord();
-        $branch = $task->repoProfile?->default_branch ?? 'main';
-        // alpine/git is the smallest image with `git` + `sh` available; keeps
-        // the diff view agent-/stack-agnostic so it works the same regardless
-        // of which worker image the task ran on. The container runs as root
-        // while the volume is owned by the worker uid (1000) — without
-        // `-c safe.directory='*'` git refuses every read with "dubious
-        // ownership", which silently fell through to a useless --no-index
-        // path until 2026-05.
-        $image = 'alpine/git';
-        $vol = $task->volumeName();
-        $g = "git -c safe.directory='*' -C /workspace";
 
-        $statResult = Process::timeout(15)->run([
-            'docker', 'run', '--rm',
-            '-v', "{$vol}:/workspace:ro",
-            '--entrypoint', 'sh', $image,
-            '-c',
-            "{$g} diff --stat origin/{$branch} 2>/dev/null; "
-            .$g.' ls-files --others --exclude-standard 2>/dev/null | while IFS= read -r f; do echo " (neu) $f"; done; '
-            ."echo ''; "
-            .$g.' status --short 2>/dev/null',
-        ]);
-        $this->diffStat = trim($statResult->output());
-
-        $diffResult = Process::timeout(15)->run([
-            'docker', 'run', '--rm',
-            '-v', "{$vol}:/workspace:ro",
-            '--entrypoint', 'sh', $image,
-            '-c',
-            "{ {$g} diff origin/{$branch} 2>/dev/null; "
-            .$g.' ls-files --others --exclude-standard 2>/dev/null | while IFS= read -r f; do '
-            .$g.' diff --no-index -- /dev/null "$f" 2>/dev/null || true; '
-            .'done; } | head -c 131072',
-        ]);
-        $this->diffFiles = $this->parseDiffStructured($diffResult->output());
-        $this->diffLoaded = true;
-    }
-
-    private function maybeAutoLoadDiff(Task $task): void
-    {
-        $latestCompleted = (int) ($task->phaseRuns()
-            ->where('phase', 'implement')
-            ->where('status', 'completed')
-            ->max('iteration') ?? 0);
-
-        if ($latestCompleted > 0 && $latestCompleted > $this->diffLoadedForIteration) {
-            $this->loadDiff();
-            $this->diffLoadedForIteration = $latestCompleted;
+        // The diff shells out to `docker run` against the task volume. That can
+        // be slow or hang (huge/polluted workspace, daemon pressure) and is
+        // auto-triggered on mount — so a failure must degrade to an inline
+        // notice, never 500 the whole page.
+        try {
+            $result = app(WorkspaceDiffService::class)->forTask($task);
+            $this->diffStat = $result['stat'];
+            $this->diffFiles = $result['files'];
+            $this->diffError = null;
+        } catch (\Throwable $e) {
+            $this->diffStat = '';
+            $this->diffFiles = [];
+            $this->diffError = __('tasks.view.diff.error');
+            // report() routes through the exception handler (default log
+            // stack) and never throws — unlike Log::channel('argos'), whose
+            // file may be unwritable, which would re-escalate a handled
+            // timeout into a 500.
+            report($e);
+        } finally {
+            $this->diffLoaded = true;
         }
     }
 
@@ -225,85 +243,92 @@ class ViewTask extends ViewRecord
         /** @var Task $task */
         $task = $this->getRecord();
         $task->loadMissing(['externalIssueLink.binding']);
-        $reader = app(StateReader::class);
 
-        $phaseRuns = $task->phaseRuns()->orderBy('iteration')->get()->groupBy('phase');
+        $stage = TaskStage::for($task);
 
-        $currentConceptIter = ($phaseRuns['concept'] ?? collect())->last()?->iteration;
-        $currentImplementIter = ($phaseRuns['implement'] ?? collect())->last()?->iteration;
-
-        $lastConceptRun = ($phaseRuns['concept'] ?? collect())->last();
-        $lastImplementRun = ($phaseRuns['implement'] ?? collect())->last();
-
-        // Defense-in-depth: rows persisted before PhaseRunner started
-        // stripping the outer ```markdown wrapper still have it. Strip on
-        // render so the UI heals old data without a backfill migration.
-        $conceptMd = $task->concept_md !== null
-            ? ConceptMarkdown::stripOuterCodeFence($task->concept_md)
-            : null;
+        // Live log of the currently-running phase, streamed from the .bg.log
+        // file (the stream_log column is only populated post-phase).
+        $liveLog = ($stage->isRunning() && $task->current_phase !== null)
+            ? app(AgentStreamParser::class)->parse($this->readLogFile($task->current_phase->value))
+            : [];
 
         return [
-            'phaseRuns' => $phaseRuns,
-            'conceptHtml' => $conceptMd !== null ? Str::markdown($conceptMd) : null,
-            'conceptError' => $lastConceptRun?->status !== PhaseStatus::Completed
-                ? $lastConceptRun?->error_log
-                : null,
-            'conceptLog' => $this->parseLogLines($this->readLogFile('concept')),
-            'implementLog' => $this->parseLogLines($this->readLogFile('implement')),
-            'pushLog' => $this->parseLogLines($this->readLogFile('push')),
-            'notesHistory' => $reader->readNotesHistory($task),
-            'conceptHistory' => $reader->readConceptHistory($task, $currentConceptIter),
-            'implementSummaryNontechnicalHtml' => $task->implement_summary_nontechnical
-                ? Str::markdown($task->implement_summary_nontechnical)
-                : null,
-            'implementSummaryTechnicalHtml' => $task->implement_summary_technical
-                ? Str::markdown($task->implement_summary_technical)
-                : null,
-            'implementHistory' => $reader->readImplementHistory($task, $currentImplementIter),
-            'implementNotesHistory' => $reader->readImplementNotesHistory($task),
-            'implementQualityGates' => $lastImplementRun?->result_json['quality_gates'] ?? null,
-            'implementQualityGateLogKeys' => array_keys($lastImplementRun?->quality_gate_logs ?? []),
-            'conceptLogIterations' => array_values(array_filter(
-                $reader->listLogIterations($task, 'concept'),
-                fn (int $i) => $i !== $currentConceptIter
-            )),
-            'implementLogIterations' => array_values(array_filter(
-                $reader->listLogIterations($task, 'implement'),
-                fn (int $i) => $i !== $currentImplementIter
-            )),
+            'stage' => $stage,
+            'banner' => $this->bannerData($task, $stage),
+            'thread' => app(TaskThreadBuilder::class)->build($task, $stage),
+            'liveLog' => $liveLog,
+            'phaseRuns' => $task->phaseRuns()->orderBy('iteration')->get()->groupBy('phase'),
+            'demo' => $task->currentDemo(),
         ];
+    }
+
+    public function getHeader(): ?View
+    {
+        $task = $this->task();
+        $stage = TaskStage::for($task);
+
+        return view('filament.admin.resources.task.task-detail-hero', [
+            'task' => $task,
+            'stage' => $stage,
+            'headerActions' => $this->getCachedHeaderActions(),
+            'logTail' => $stage->isRunning() ? $this->phaseLogTail() : [],
+            'breadcrumbs' => filament()->hasBreadcrumbs() ? $this->getBreadcrumbs() : [],
+        ]);
+    }
+
+    public function getHeading(): string|Htmlable
+    {
+        return '';
+    }
+
+    /** @return array<int, array{text: string, class: string}> Last 2 lines of the current running phase log. */
+    public function phaseLogTail(): array
+    {
+        $task = $this->task();
+
+        if ($task->current_phase === null) {
+            return [];
+        }
+
+        $events = app(AgentStreamParser::class)->parse($this->readLogFile($task->current_phase->value));
+
+        $lines = [];
+        foreach ($events as $event) {
+            $text = match ($event['kind']) {
+                'tool_use' => trim(($event['tool'] ?? '').' '.($event['summary'] ?? '')),
+                'result' => '',
+                default => trim($event['text'] ?? ''),
+            };
+            if ($text !== '') {
+                $lines[] = ['text' => $text, 'class' => $event['kind']];
+            }
+        }
+
+        return array_slice($lines, -2);
     }
 
     public function getView(): string
     {
-        return 'filament.admin.resources.task.view-task';
+        // Chronological thread layout — the per-iteration workflow view (M3).
+        return 'filament.admin.resources.task.view-task-thread';
     }
 
     protected function getHeaderActions(): array
     {
-        return [
-            $this->makePhaseAction('concept', __('tasks.view.actions.concept_create'), 'heroicon-o-light-bulb')
-                ->label(fn (): string => $this->task()->phaseRuns()->where('phase', 'concept')->where('status', 'completed')->exists()
-                    ? __('tasks.view.actions.concept_update')
-                    : __('tasks.view.actions.concept_create'))
-                ->visible(fn (): bool => $this->task()->workflow_status->value !== 'completed'
-                    && $this->lastConceptRun()?->status !== PhaseStatus::Paused),
+        // Phase advancement (start/refine/retry) lives in the respond dock at
+        // the bottom now (M4). The header carries only the contextual primary
+        // for states the dock doesn't own (resume a paused phase, unlock,
+        // complete after PR) plus auxiliary actions in the ⋯ dropdown.
+        $stage = TaskStage::for($this->task());
 
-            $this->makeContinueConceptAction()
+        $actions = [
+            'continueConcept' => $this->makeContinueConceptAction()
                 ->visible(fn (): bool => $this->lastConceptRun()?->status === PhaseStatus::Paused),
 
-            $this->makePhaseAction('implement', __('tasks.view.actions.implement'), 'heroicon-o-code-bracket')
-                ->visible(fn (): bool => $this->task()->workflow_status->value !== 'completed'
-                    && $this->task()->phaseRuns()->where('phase', 'concept')->where('status', 'completed')->exists()),
-
-            $this->makeContinueImplementAction()
+            'continueImplement' => $this->makeContinueImplementAction()
                 ->visible(fn (): bool => $this->lastImplementRun()?->status === PhaseStatus::Paused),
 
-            $this->makePhaseAction('push', __('tasks.view.actions.push_pr'), 'heroicon-o-arrow-up-tray')
-                ->visible(fn (): bool => $this->task()->workflow_status->value !== 'completed'
-                    && $this->task()->phaseRuns()->where('phase', 'implement')->where('status', 'completed')->exists()),
-
-            Action::make('forceUnlockImplement')
+            'forceUnlockImplement' => Action::make('forceUnlockImplement')
                 ->label(__('tasks.view.actions.force_unlock_label'))
                 ->icon('heroicon-o-lock-open')
                 ->color('danger')
@@ -325,13 +350,110 @@ class ViewTask extends ViewRecord
                 })
                 ->visible(fn (): bool => $this->task()->current_status === PhaseStatus::LockBlocked),
 
-            Action::make('logsDownload')
+            'rebuildDemo' => Action::make('rebuildDemo')
+                ->label(__('tasks.view.demo.rebuild'))
+                ->icon('heroicon-o-arrow-path')
+                ->color('gray')
+                ->requiresConfirmation()
+                ->modalHeading(__('tasks.view.demo.rebuild_heading'))
+                ->modalDescription(__('tasks.view.demo.rebuild_description'))
+                ->action(function (): void {
+                    $task = $this->task();
+                    DeployDemoJob::dispatch($task->id);
+                    Notification::make()->title(__('tasks.view.demo.rebuild_queued'))->success()->send();
+                    $this->redirect(TaskResource::getUrl('view', ['record' => $task]));
+                })
+                ->visible(fn (): bool => (bool) config('argos.preview.enabled')
+                    && (bool) $this->task()->repoProfile?->live_demo_enabled
+                    && $this->task()->phaseRuns()->where('phase', 'implement')->where('status', 'completed')->exists()),
+
+            'demoAccess' => Action::make('demoAccess')
+                ->label(__('tasks.view.demo.access.label'))
+                ->icon('heroicon-o-lock-closed')
+                ->color('gray')
+                ->modalHeading(__('tasks.view.demo.access.heading'))
+                ->modalDescription(__('tasks.view.demo.access.description'))
+                ->schema([
+                    Select::make('access_mode')
+                        ->label(__('tasks.view.demo.access.mode_label'))
+                        ->options([
+                            DemoAccessMode::Inherit->value => __('tasks.view.demo.access.mode_inherit', [
+                                'default' => DemoAccessMode::Inherit->resolve()->label(),
+                            ]),
+                            DemoAccessMode::Session->value => DemoAccessMode::Session->label(),
+                            DemoAccessMode::Basic->value => DemoAccessMode::Basic->label(),
+                            DemoAccessMode::Public->value => DemoAccessMode::Public->label(),
+                        ])
+                        ->required()
+                        ->live(),
+                    TextInput::make('basic_password')
+                        ->label(__('tasks.view.demo.access.password_label'))
+                        ->helperText(__('tasks.view.demo.access.password_hint'))
+                        ->password()
+                        ->revealable()
+                        ->visible(fn (Get $get): bool => $get('access_mode') === DemoAccessMode::Basic->value),
+                ])
+                ->fillForm(fn (): array => [
+                    'access_mode' => ($this->task()->demo_access_mode ?? DemoAccessMode::Inherit)->value,
+                    'basic_password' => $this->task()->demo_basic_password,
+                ])
+                ->action(function (array $data): void {
+                    $task = $this->task();
+                    $mode = DemoAccessMode::from($data['access_mode']);
+
+                    try {
+                        $password = app(DemoAccessConfigurator::class)->apply($task, $mode, $data['basic_password'] ?? null);
+                    } catch (\RuntimeException $e) {
+                        Notification::make()
+                            ->title(__('tasks.view.demo.access.apply_failed'))
+                            ->body($e->getMessage())
+                            ->danger()
+                            ->send();
+
+                        return;
+                    }
+
+                    $note = Notification::make()->title(__('tasks.view.demo.access.saved'))->success();
+                    if ($mode->resolve() === DemoAccessMode::Basic) {
+                        $note->body(__('tasks.view.demo.access.basic_credentials', [
+                            'user' => (string) config('argos.preview.basic_user', 'demo'),
+                            'password' => (string) $password,
+                        ]));
+                    }
+                    $note->send();
+
+                    $this->redirect(TaskResource::getUrl('view', ['record' => $task]));
+                })
+                ->visible(fn (): bool => (bool) config('argos.preview.enabled')
+                    && (bool) $this->task()->repoProfile?->live_demo_enabled
+                    && $this->task()->phaseRuns()->where('phase', 'implement')->where('status', 'completed')->exists()),
+
+            'stopDemo' => Action::make('stopDemo')
+                ->label(__('tasks.view.demo.stop'))
+                ->icon('heroicon-o-stop-circle')
+                ->color('danger')
+                ->requiresConfirmation()
+                ->modalHeading(__('tasks.view.demo.stop_heading'))
+                ->modalDescription(__('tasks.view.demo.stop_description'))
+                ->action(function (): void {
+                    $task = $this->task();
+                    StopDemoJob::dispatch($task->id);
+                    Notification::make()->title(__('tasks.view.demo.stop_queued'))->success()->send();
+                    $this->redirect(TaskResource::getUrl('view', ['record' => $task]));
+                })
+                ->visible(fn (): bool => in_array(
+                    $this->task()->currentDemo()?->status,
+                    [DemoStatus::Building, DemoStatus::Live],
+                    true,
+                )),
+
+            'logsDownload' => Action::make('logsDownload')
                 ->label(__('tasks.view.actions.logs_download'))
                 ->icon('heroicon-o-arrow-down-tray')
                 ->color('gray')
                 ->url(fn (): string => TaskResource::getUrl('logs', ['record' => $this->task()])),
 
-            Action::make('markCompleted')
+            'markCompleted' => Action::make('markCompleted')
                 ->label(__('tasks.view.actions.mark_completed'))
                 ->icon('heroicon-o-check-circle')
                 ->color('success')
@@ -345,55 +467,51 @@ class ViewTask extends ViewRecord
                 })
                 ->visible(fn (): bool => $this->task()->workflow_status->value !== 'completed'),
         ];
+
+        // During a running/queued phase, the header collapses to nothing but
+        // the ⋯ menu (recovery + logs) — see the status banner above for the
+        // live indicator. No phase controls while the worker is busy.
+        $primaryKey = $stage->isBusy() ? null : $this->primaryActionKey($stage);
+        $primary = ($primaryKey !== null && isset($actions[$primaryKey]))
+            ? $actions[$primaryKey]->color('primary')
+            : null;
+
+        $rest = collect($actions)
+            ->reject(fn ($action, string $key): bool => $key === $primaryKey)
+            ->values()
+            ->all();
+
+        return array_values(array_filter([
+            $primary,
+            ActionGroup::make($rest)
+                ->label(__('tasks.view.actions.more_label'))
+                ->icon('heroicon-o-ellipsis-vertical')
+                ->color('gray'),
+        ]));
+    }
+
+    /**
+     * The single contextual header primary, for states the respond dock does
+     * not own: resume a paused phase, release a lock, or complete after PR.
+     * Phase start/refine/retry live in the dock.
+     */
+    private function primaryActionKey(TaskStage $stage): ?string
+    {
+        return match ($stage) {
+            TaskStage::ConceptPaused => 'continueConcept',
+            TaskStage::ImplementPaused => 'continueImplement',
+            TaskStage::ImplementFailed => $this->task()->current_status === PhaseStatus::LockBlocked
+                ? 'forceUnlockImplement'
+                : null,
+            TaskStage::Review => 'markCompleted',
+            default => null,
+        };
     }
 
     private function task(): Task
     {
         /** @var Task */
         return $this->getRecord();
-    }
-
-    public function reviseConcept(): void
-    {
-        /** @var Task $task */
-        $task = $this->getRecord();
-
-        try {
-            app(TaskService::class)->startPhase($task, Phase::Concept);
-        } catch (\RuntimeException) {
-            Notification::make()->title(__('tasks.view.actions.phase_already_running'))->warning()->send();
-
-            return;
-        }
-
-        Notification::make()->title(__('tasks.view.actions.concept_started'))->success()->send();
-        $this->redirect(TaskResource::getUrl('view', ['record' => $task]));
-    }
-
-    private function makePhaseAction(string $phase, string $label, string $icon): Action
-    {
-        return Action::make($phase)
-            ->label($label)
-            ->icon($icon)
-            ->disabled(fn (): bool => $this->task()->current_status === PhaseStatus::Running)
-            ->action(function () use ($phase): void {
-                $task = $this->task();
-                try {
-                    app(TaskService::class)->startPhase($task, Phase::from($phase));
-                } catch (\RuntimeException) {
-                    Notification::make()->title(__('tasks.view.actions.phase_already_running'))->warning()->send();
-
-                    return;
-                }
-                $notificationTitle = match ($phase) {
-                    'concept' => __('tasks.view.actions.concept_started'),
-                    'implement' => __('tasks.view.actions.implement_started'),
-                    'push' => __('tasks.view.actions.push_started'),
-                    default => $phase,
-                };
-                Notification::make()->title($notificationTitle)->success()->send();
-                $this->redirect(TaskResource::getUrl('view', ['record' => $task]));
-            });
     }
 
     public function lastImplementRun(): ?PhaseRun
@@ -414,6 +532,70 @@ class ViewTask extends ViewRecord
             ->first();
     }
 
+    public function lastPushRun(): ?PhaseRun
+    {
+        return $this->task()
+            ->phaseRuns()
+            ->where('phase', 'push')
+            ->orderByDesc('iteration')
+            ->first();
+    }
+
+    /**
+     * Build the status-banner payload for the current stage — the single
+     * "what is the system doing right now" header. See <x-argos.status-banner>.
+     *
+     * @return array{state: string, title: string, hint: string|null, startedAt: int|null, error: string|null, logsUrl: string|null, logsLabel: string|null}
+     */
+    private function bannerData(Task $task, TaskStage $stage): array
+    {
+        $hint = null;
+        $error = null;
+        $startedAt = null;
+        $logsUrl = null;
+
+        if ($stage->isRunning()) {
+            $startedAt = $task->currentPhaseStartedAt()?->timestamp;
+        } elseif ($stage->isQueued()) {
+            $hint = __('tasks.view.banner.queued_hint');
+        } elseif ($stage->isPaused()) {
+            $hint = __('tasks.view.banner.paused_hint');
+        } else {
+            $hint = match ($stage) {
+                TaskStage::ConceptReview => __('tasks.view.banner.concept_review_hint'),
+                TaskStage::ImplementReview => __('tasks.view.banner.implement_review_hint'),
+                TaskStage::Review => __('tasks.view.banner.review_hint'),
+                default => null,
+            };
+        }
+
+        if ($stage->isFailed()) {
+            $run = match ($stage->phase()?->value) {
+                'implement' => $this->lastImplementRun(),
+                'push' => $this->lastPushRun(),
+                default => $this->lastConceptRun(),
+            };
+            $raw = $run?->error_log;
+            $error = ($raw !== null && trim($raw) !== '')
+                ? Str::limit(trim($raw), 1200)
+                : __('tasks.view.banner.failed_generic');
+            $hint = $task->current_status === PhaseStatus::LockBlocked
+                ? __('tasks.view.banner.lock_blocked_hint')
+                : __('tasks.view.banner.failed_hint');
+            $logsUrl = TaskResource::getUrl('logs', ['record' => $task]);
+        }
+
+        return [
+            'state' => $stage->bannerState(),
+            'title' => $stage->label(),
+            'hint' => $hint,
+            'startedAt' => $startedAt,
+            'error' => $error,
+            'logsUrl' => $logsUrl,
+            'logsLabel' => null,
+        ];
+    }
+
     private function makeContinueImplementAction(): Action
     {
         return Action::make('continueImplement')
@@ -422,7 +604,10 @@ class ViewTask extends ViewRecord
             ->color('warning')
             ->disabled(fn (): bool => $this->task()->current_status === PhaseStatus::Running)
             ->modalHeading(__('tasks.view.actions.continue_heading'))
-            ->modalDescription(__('tasks.view.actions.continue_description'))
+            ->modalDescription(fn (): string => __('tasks.view.actions.continue_description')
+                .($this->task()->hasRepeatedMaxTurns('implement')
+                    ? "\n\n".__('tasks.view.actions.max_turns_repeated_hint')
+                    : ''))
             ->modalSubmitActionLabel(__('tasks.view.actions.continue'))
             ->schema([
                 TextInput::make('max_turns')
@@ -433,6 +618,7 @@ class ViewTask extends ViewRecord
                     ->maxValue(1000)
                     ->required()
                     ->default(fn (): int => $this->task()->max_turns_implement
+                        ?? $this->task()->repoProfile?->max_turns_implement
                         ?? (int) config('argos.implement.max_turns_default', 200)),
             ])
             ->action(function (array $data): void {
@@ -462,7 +648,10 @@ class ViewTask extends ViewRecord
             ->color('warning')
             ->disabled(fn (): bool => $this->task()->current_status === PhaseStatus::Running)
             ->modalHeading(__('tasks.view.actions.continue_concept_heading'))
-            ->modalDescription(__('tasks.view.actions.continue_concept_description'))
+            ->modalDescription(fn (): string => __('tasks.view.actions.continue_concept_description')
+                .($this->task()->hasRepeatedMaxTurns('concept')
+                    ? "\n\n".__('tasks.view.actions.max_turns_repeated_hint')
+                    : ''))
             ->modalSubmitActionLabel(__('tasks.view.actions.continue_concept'))
             ->schema([
                 TextInput::make('max_turns')
@@ -473,7 +662,8 @@ class ViewTask extends ViewRecord
                     ->maxValue(1000)
                     ->required()
                     ->default(fn (): int => $this->task()->max_turns_concept
-                        ?? (int) config('argos.concept.max_turns_default', 30)),
+                        ?? $this->task()->repoProfile?->max_turns_concept
+                        ?? (int) config('argos.concept.max_turns_default', 50)),
             ])
             ->action(function (array $data): void {
                 $task = $this->task();
@@ -501,164 +691,6 @@ class ViewTask extends ViewRecord
         $configDir = config('argos.config_dir');
         $path = "{$configDir}/tasks/{$task->name}/{$phase}.bg.log";
 
-        if (! file_exists($path)) {
-            return '';
-        }
-
-        $content = file_get_contents($path) ?: '';
-        $lines = explode("\n", $content);
-        if (count($lines) > 500) {
-            $lines = array_slice($lines, -500);
-            array_unshift($lines, __('tasks.view.logs.truncated'));
-        }
-
-        return implode("\n", $lines);
-    }
-
-    /** @return array<int, array{text: string, class: string}> */
-    private function parseLogLines(string $content): array
-    {
-        if ($content === '') {
-            return [];
-        }
-
-        $result = [];
-        foreach (explode("\n", $content) as $raw) {
-            $line = (string) preg_replace('/\033\[[0-9;]*[mGKHFABCDJsu]/', '', $raw);
-            $class = match (true) {
-                str_contains($line, '[ERROR]'), str_contains($line, 'FAILED') => 'text-red-400',
-                str_contains($line, '[WARN]') => 'text-amber-400',
-                str_contains($line, '[INFO]') => 'text-slate-300',
-                str_starts_with($line, '[tool:') => 'text-sky-400',
-                str_contains($line, 'completed'), str_contains($line, ': OK') => 'text-emerald-400',
-                str_starts_with(ltrim($line), '+') => 'text-emerald-500',
-                str_starts_with(ltrim($line), '-') => 'text-red-500',
-                $line === '' => 'text-slate-700',
-                default => 'text-slate-400',
-            };
-            $result[] = ['text' => $line, 'class' => $class];
-        }
-
-        return $result;
-    }
-
-    /**
-     * Parse a unified diff into a structured representation for GitHub-style rendering.
-     *
-     * @return array<int, array{from_path: string, to_path: string, is_new: bool, is_deleted: bool, additions: int, deletions: int, hunks: list<array{header: string, context_hint: string, lines: list<array{type: string, old_num: int|null, new_num: int|null, text: string}>}>}>
-     */
-    private function parseDiffStructured(string $content): array
-    {
-        if (trim($content) === '') {
-            return [];
-        }
-
-        $files = [];
-        $currentFile = null;
-        $currentHunk = null;
-        $oldLine = 0;
-        $newLine = 0;
-
-        foreach (explode("\n", $content) as $raw) {
-            $line = (string) preg_replace('/\033\[[0-9;]*[mGKHFABCDJsu]/', '', $raw);
-
-            if (str_starts_with($line, 'diff --git ')) {
-                if ($currentFile !== null) {
-                    if ($currentHunk !== null) {
-                        $currentFile['hunks'][] = $currentHunk;
-                        $currentHunk = null;
-                    }
-                    $files[] = $currentFile;
-                }
-                preg_match('/^diff --git a\/(.+) b\/(.+)$/', $line, $m);
-                $currentFile = [
-                    'from_path' => $m[1] ?? '',
-                    'to_path' => $m[2] ?? '',
-                    'is_new' => false,
-                    'is_deleted' => false,
-                    'additions' => 0,
-                    'deletions' => 0,
-                    'hunks' => [],
-                ];
-
-                continue;
-            }
-
-            if ($currentFile === null) {
-                continue;
-            }
-
-            if (str_starts_with($line, 'new file')) {
-                $currentFile['is_new'] = true;
-
-                continue;
-            }
-
-            if (str_starts_with($line, 'deleted file')) {
-                $currentFile['is_deleted'] = true;
-
-                continue;
-            }
-
-            if (str_starts_with($line, '--- ') || str_starts_with($line, '+++ ') || str_starts_with($line, 'index ')) {
-                continue;
-            }
-
-            if (str_starts_with($line, '@@')) {
-                if ($currentHunk !== null) {
-                    $currentFile['hunks'][] = $currentHunk;
-                }
-                preg_match('/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@(.*)$/', $line, $m);
-                $oldLine = isset($m[1]) ? (int) $m[1] : 1;
-                $newLine = isset($m[2]) ? (int) $m[2] : 1;
-                $currentHunk = [
-                    'header' => $line,
-                    'context_hint' => trim($m[3] ?? ''),
-                    'lines' => [],
-                ];
-
-                continue;
-            }
-
-            if ($currentHunk === null) {
-                continue;
-            }
-
-            $firstChar = $line !== '' ? $line[0] : ' ';
-
-            if ($firstChar === '+') {
-                $currentHunk['lines'][] = [
-                    'type' => 'add',
-                    'old_num' => null,
-                    'new_num' => $newLine++,
-                    'text' => substr($line, 1),
-                ];
-                $currentFile['additions']++;
-            } elseif ($firstChar === '-') {
-                $currentHunk['lines'][] = [
-                    'type' => 'del',
-                    'old_num' => $oldLine++,
-                    'new_num' => null,
-                    'text' => substr($line, 1),
-                ];
-                $currentFile['deletions']++;
-            } else {
-                $currentHunk['lines'][] = [
-                    'type' => 'context',
-                    'old_num' => $oldLine++,
-                    'new_num' => $newLine++,
-                    'text' => substr($line, 1),
-                ];
-            }
-        }
-
-        if ($currentHunk !== null && $currentFile !== null) {
-            $currentFile['hunks'][] = $currentHunk;
-        }
-        if ($currentFile !== null) {
-            $files[] = $currentFile;
-        }
-
-        return $files;
+        return LogTail::read($path);
     }
 }

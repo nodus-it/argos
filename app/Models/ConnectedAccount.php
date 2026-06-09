@@ -56,12 +56,28 @@ class ConnectedAccount extends Model
         ];
     }
 
+    protected static function booted(): void
+    {
+        // Pre-multi-instance code (and callers) used null for "public instance";
+        // the column is now NOT NULL with '' as that sentinel. Normalize on the
+        // way in so every write path stays safe.
+        static::saving(function (ConnectedAccount $account): void {
+            if ($account->instance_url === null) {
+                $account->instance_url = '';
+            }
+        });
+    }
+
     /**
      * Returns the GitLab instance URL, defaulting to https://gitlab.com for public GitLab.
      */
     public function getInstanceUrl(): string
     {
-        return $this->instance_url ?? 'https://gitlab.com';
+        // '' is the public-instance sentinel (was null before the multi-instance
+        // migration); both map to the public GitLab host.
+        return ($this->instance_url === null || $this->instance_url === '')
+            ? 'https://gitlab.com'
+            : $this->instance_url;
     }
 
     /**

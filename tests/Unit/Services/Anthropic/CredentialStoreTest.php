@@ -108,18 +108,8 @@ class CredentialStoreTest extends TestCase
         $this->assertFileDoesNotExist($this->tmpDir.'/claude_token');
     }
 
-    public function test_has_claude_token_uses_env_when_set(): void
+    public function test_has_claude_token_reads_the_on_disk_file(): void
     {
-        config(['argos.claude_token' => 'env-tok']);
-        $store = new CredentialStore;
-
-        $this->assertTrue($store->hasClaudeToken());
-        $this->assertSame('env', $store->claudeTokenSource());
-    }
-
-    public function test_has_claude_token_falls_back_to_file(): void
-    {
-        config(['argos.claude_token' => null]);
         file_put_contents($this->tmpDir.'/claude_token', 'file-tok');
         $store = new CredentialStore;
 
@@ -127,34 +117,12 @@ class CredentialStoreTest extends TestCase
         $this->assertSame('file', $store->claudeTokenSource());
     }
 
-    public function test_has_claude_token_returns_false_when_neither_set(): void
+    public function test_has_claude_token_returns_false_when_no_file(): void
     {
-        config(['argos.claude_token' => null]);
         $store = new CredentialStore;
 
         $this->assertFalse($store->hasClaudeToken());
         $this->assertSame('none', $store->claudeTokenSource());
-    }
-
-    public function test_empty_string_env_token_is_treated_as_unset(): void
-    {
-        // CLAUDE_CODE_OAUTH_TOKEN= (declared but empty in .env) lands as "" —
-        // must not lock the Settings UI into "env-managed" mode.
-        config(['argos.claude_token' => '']);
-        $store = new CredentialStore;
-
-        $this->assertFalse($store->hasClaudeToken());
-        $this->assertSame('none', $store->claudeTokenSource());
-    }
-
-    public function test_empty_string_env_token_falls_back_to_file(): void
-    {
-        config(['argos.claude_token' => '']);
-        file_put_contents($this->tmpDir.'/claude_token', 'file-tok');
-        $store = new CredentialStore;
-
-        $this->assertTrue($store->hasClaudeToken());
-        $this->assertSame('file', $store->claudeTokenSource());
     }
 
     public function test_set_claude_token_creates_config_dir_if_missing(): void

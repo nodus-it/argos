@@ -35,7 +35,7 @@ compose file:
 
 ```bash
 mkdir -p /srv/argos
-curl -fsSL https://raw.githubusercontent.com/nodus-it/argos/develop/install.sh \
+curl -fsSL https://raw.githubusercontent.com/nodus-it/argos/develop/.tools/install.sh \
     | bash -s -- --dir /srv/argos
 ```
 
@@ -81,22 +81,24 @@ docker compose -f /srv/argos/docker-compose.yml exec app \
 
 ## Pre-seeding the Claude token
 
-Skip the in-app onboarding step by setting the token in your `.env`:
+The token lives **per agent in the database**. The normal path is the in-app
+onboarding step, or **Worker → Agent Credentials** in the admin — a DB
+credential always wins (there is no `CLAUDE_CODE_OAUTH_TOKEN` env-var path
+anymore).
 
-```
-CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-...
-```
-
-Generate the token with the Claude Code CLI (signed in to your Pro / Max /
-Team plan):
+Generate a token with the Claude Code CLI (signed in to your Pro / Max / Team
+plan):
 
 ```bash
 claude setup-token
 ```
 
-The token is read on every boot and takes precedence over what the UI shows.
-Tokens expire after a few weeks — re-run `claude setup-token` and update the
-env var (or paste the new token in the UI).
+Paste it into onboarding / Agent Credentials. For an unattended local-dev
+seed you can instead drop the raw token into a file at
+`$ARGOS_CONFIG_DIR/claude_token` (default `~/.config/argos/claude_token`): the
+worker reads it as a last-resort fallback, and the next `migrate` imports it
+into an Agent Credential. Tokens expire after a few weeks — refresh them in the
+UI (or update the file) and re-run `claude setup-token`.
 
 ## Choosing a worker stack and agent
 
@@ -111,28 +113,29 @@ want) overrides per task. Built-in stacks (`php-8.3`, `php-8.4`, …) are
 mirrored from the repo manifest into the DB on every `migrate`; you can add
 your own user stack in the same UI.
 
-## Pre-release / stage builds
+To tailor a *target* repository to Argos — a custom build environment
+(`.argos/worker.dockerfile`) or a live-demo contract (`.argos/demo.*`) — see
+the agent-oriented guide in [PREPARE-PROJECT.md](PREPARE-PROJECT.md).
 
-Every push to the `develop` branch publishes the manager image:
+## Pre-release / develop builds
 
-- `ghcr.io/nodus-it/argos-app:stage`
+Every push to the `develop` branch publishes the rolling manager image
+`ghcr.io/nodus-it/argos-app:stage`. It tracks unreleased work and may break —
+useful for previewing fixes, **not** for production.
 
-This tag tracks unreleased work and may break — useful for previewing
-fixes, **not** for production. To install the stage stack, point the
-installer at the develop branch:
+To track it, install from the develop branch and pin `ARGOS_APP_IMAGE` to the
+rolling tag in your `.env`:
 
 ```bash
 ARGOS_VERSION=develop \
-    curl -fsSL https://raw.githubusercontent.com/nodus-it/argos/develop/install.sh \
-    | bash -s -- --dir ./argos-stage --stage
+    curl -fsSL https://raw.githubusercontent.com/nodus-it/argos/develop/.tools/install.sh \
+    | bash -s -- --dir ./argos-develop
 
-docker compose -f ./argos-stage/docker-compose.yml pull
-docker compose -f ./argos-stage/docker-compose.yml up -d
+# in ./argos-develop/.env:
+#   ARGOS_APP_IMAGE=ghcr.io/nodus-it/argos-app:stage
+docker compose -f ./argos-develop/docker-compose.yml pull
+docker compose -f ./argos-develop/docker-compose.yml up -d
 ```
-
-When working on Argos itself (developing against a checkout of the repo),
-`composer run stage` wraps this flow against `.tools/bash/.env.stage` instead
-of using the installer.
 
 For stable use, stick with `:latest` or a `vX.Y.Z` tag.
 

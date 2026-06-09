@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Enums\AuthMethod;
+use App\Enums\IntegrationProvider;
 use App\Filament\Admin\Resources\RepoProfileResource;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\CreateRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\EditRepoProfile;
@@ -12,6 +14,7 @@ use App\Filament\Admin\Resources\RepoProfileResource\Pages\ViewRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\RelationManagers\TaskProviderBindingsRelationManager;
 use App\Filament\Admin\Resources\RepoProfileResource\RelationManagers\TasksRelationManager;
 use App\Models\ConnectedAccount;
+use App\Models\ProviderCredential;
 use App\Models\RepoProfile;
 use App\Models\Task;
 use App\Models\TaskProviderBinding;
@@ -19,9 +22,10 @@ use App\Models\User;
 use Filament\Actions\CreateAction;
 use Filament\Actions\Testing\TestAction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Saloon\Http\Faking\MockResponse;
+use Saloon\Laravel\Facades\Saloon;
 use Tests\TestCase;
 
 class RepoProfileResourceTest extends TestCase
@@ -54,8 +58,8 @@ class RepoProfileResourceTest extends TestCase
 
     public function test_can_create_repo_profile(): void
     {
-        Http::fake([
-            'api.github.com/repos/org/repo/branches*' => Http::response([['name' => 'main']]),
+        Saloon::fake([
+            'api.github.com/repos/org/repo/branches*' => MockResponse::make([['name' => 'main']]),
         ]);
 
         Livewire::test(CreateRepoProfile::class)
@@ -75,6 +79,28 @@ class RepoProfileResourceTest extends TestCase
         $this->assertDatabaseHas(RepoProfile::class, [
             'name' => 'Test Projekt',
             'platform' => 'github',
+        ]);
+    }
+
+    public function test_can_set_per_project_max_turns(): void
+    {
+        Saloon::fake([
+            'api.github.com/repos/test-org/test-repo/branches*' => MockResponse::make([['name' => 'main']]),
+        ]);
+        $profile = RepoProfile::factory()->create(['default_branch' => 'main']);
+
+        Livewire::test(EditRepoProfile::class, ['record' => $profile->getKey()])
+            ->fillForm([
+                'max_turns_concept' => 80,
+                'max_turns_implement' => 300,
+            ])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $this->assertDatabaseHas(RepoProfile::class, [
+            'id' => $profile->id,
+            'max_turns_concept' => 80,
+            'max_turns_implement' => 300,
         ]);
     }
 
@@ -163,8 +189,8 @@ class RepoProfileResourceTest extends TestCase
 
     public function test_can_edit_repo_profile(): void
     {
-        Http::fake([
-            'api.github.com/repos/test-org/test-repo/branches*' => Http::response([['name' => 'main']]),
+        Saloon::fake([
+            'api.github.com/repos/test-org/test-repo/branches*' => MockResponse::make([['name' => 'main']]),
         ]);
 
         $profile = RepoProfile::factory()->create();
@@ -195,16 +221,16 @@ class RepoProfileResourceTest extends TestCase
             'provider' => 'github',
         ]);
 
-        Http::fake([
-            'api.github.com/user/repos*' => Http::response([
+        Saloon::fake([
+            'api.github.com/user/repos*' => MockResponse::make([
                 ['full_name' => 'acme/widget'],
             ]),
-            'api.github.com/repos/acme/widget' => Http::response([
-                'default_branch' => 'main',
-            ]),
-            'api.github.com/repos/acme/widget/branches*' => Http::response([
+            'api.github.com/repos/acme/widget/branches*' => MockResponse::make([
                 ['name' => 'main'],
                 ['name' => 'develop'],
+            ]),
+            'api.github.com/repos/acme/widget' => MockResponse::make([
+                'default_branch' => 'main',
             ]),
         ]);
 
@@ -237,16 +263,16 @@ class RepoProfileResourceTest extends TestCase
             'provider' => 'gitlab',
         ]);
 
-        // More-specific patterns first; Http::fake matches in definition order.
-        Http::fake([
-            'gitlab.com/api/v4/projects/acme%2Fwidget/repository/branches*' => Http::response([
+        // More-specific patterns first; Saloon matches in definition order.
+        Saloon::fake([
+            'gitlab.com/api/v4/projects/acme%2Fwidget/repository/branches*' => MockResponse::make([
                 ['name' => 'main'],
                 ['name' => 'develop'],
             ]),
-            'gitlab.com/api/v4/projects/acme%2Fwidget' => Http::response([
+            'gitlab.com/api/v4/projects/acme%2Fwidget' => MockResponse::make([
                 'default_branch' => 'develop',
             ]),
-            'gitlab.com/api/v4/projects*' => Http::response([
+            'gitlab.com/api/v4/projects*' => MockResponse::make([
                 ['path_with_namespace' => 'acme/widget'],
             ]),
         ]);
@@ -272,11 +298,11 @@ class RepoProfileResourceTest extends TestCase
             'provider' => 'github',
         ]);
 
-        Http::fake([
-            'api.github.com/user/repos*' => Http::response([
+        Saloon::fake([
+            'api.github.com/user/repos*' => MockResponse::make([
                 ['full_name' => 'acme/widget'],
             ]),
-            'api.github.com/repos/acme/widget/branches*' => Http::response([
+            'api.github.com/repos/acme/widget/branches*' => MockResponse::make([
                 ['name' => 'main'],
                 ['name' => 'feature/php-app'],
             ]),
@@ -304,8 +330,8 @@ class RepoProfileResourceTest extends TestCase
 
     public function test_can_create_repo_profile_with_pat(): void
     {
-        Http::fake([
-            'api.github.com/repos/org/repo/branches*' => Http::response([['name' => 'main']]),
+        Saloon::fake([
+            'api.github.com/repos/org/repo/branches*' => MockResponse::make([['name' => 'main']]),
         ]);
 
         Livewire::test(CreateRepoProfile::class)
@@ -335,9 +361,9 @@ class RepoProfileResourceTest extends TestCase
             'provider' => 'github',
         ]);
 
-        Http::fake([
-            'api.github.com/user/repos*' => Http::response([['full_name' => 'org/repo']]),
-            'api.github.com/repos/org/repo/branches*' => Http::response([['name' => 'main']]),
+        Saloon::fake([
+            'api.github.com/user/repos*' => MockResponse::make([['full_name' => 'org/repo']]),
+            'api.github.com/repos/org/repo/branches*' => MockResponse::make([['name' => 'main']]),
         ]);
 
         Livewire::test(CreateRepoProfile::class)
@@ -364,8 +390,8 @@ class RepoProfileResourceTest extends TestCase
 
     public function test_switching_to_pat_clears_connected_account_id_on_save(): void
     {
-        Http::fake([
-            'api.github.com/repos/org/repo/branches*' => Http::response([['name' => 'main']]),
+        Saloon::fake([
+            'api.github.com/repos/org/repo/branches*' => MockResponse::make([['name' => 'main']]),
         ]);
 
         $account = ConnectedAccount::factory()->create([
@@ -407,58 +433,31 @@ class RepoProfileResourceTest extends TestCase
             ->assertSee('GitLab Repo');
     }
 
-    public function test_view_page_renders(): void
+    public function test_edit_page_renders(): void
     {
+        // Detail = edit (the view page was removed in the redesign).
         $profile = RepoProfile::factory()->create();
 
-        Livewire::test(ViewRepoProfile::class, ['record' => $profile->getKey()])
+        Livewire::test(EditRepoProfile::class, ['record' => $profile->getKey()])
             ->assertSuccessful()
             ->assertSee($profile->name);
     }
 
-    public function test_view_page_masks_token(): void
-    {
-        $profile = RepoProfile::factory()->create(['token' => 'secret-pat-token']);
-
-        Livewire::test(ViewRepoProfile::class, ['record' => $profile->getKey()])
-            ->assertSuccessful()
-            ->assertSee('••••••••')
-            ->assertDontSee('secret-pat-token');
-    }
-
-    public function test_view_page_shows_no_token_placeholder_when_empty(): void
-    {
-        $profile = RepoProfile::factory()->create(['token' => null]);
-
-        Livewire::test(ViewRepoProfile::class, ['record' => $profile->getKey()])
-            ->assertSuccessful()
-            ->assertDontSee('••••••••');
-    }
-
-    public function test_view_page_includes_tasks_relation_manager(): void
+    public function test_edit_page_includes_tasks_relation_manager(): void
     {
         $profile = RepoProfile::factory()->create();
 
-        Livewire::test(ViewRepoProfile::class, ['record' => $profile->getKey()])
+        Livewire::test(EditRepoProfile::class, ['record' => $profile->getKey()])
             ->assertSuccessful()
             ->assertSeeLivewire(TasksRelationManager::class);
     }
 
-    public function test_view_page_includes_task_provider_bindings_relation_manager(): void
+    public function test_resource_registers_task_provider_bindings_relation_manager(): void
     {
-        $profile = RepoProfile::factory()->create();
-
-        // The bindings manager is the second relation manager tab; it loads
-        // lazily, so assertSeeLivewire cannot match the mounted component.
-        // Assert the resource registers it and the tab is rendered instead.
         $this->assertContains(
             TaskProviderBindingsRelationManager::class,
             RepoProfileResource::getRelations(),
         );
-
-        Livewire::test(ViewRepoProfile::class, ['record' => $profile->getKey()])
-            ->assertSuccessful()
-            ->assertSee('Task-Provider');
     }
 
     public function test_binding_create_form_loads_project_refs_from_provider(): void
@@ -469,8 +468,8 @@ class RepoProfileResourceTest extends TestCase
             'provider' => 'github',
         ]);
 
-        Http::fake([
-            'api.github.com/user/repos*' => Http::response([
+        Saloon::fake([
+            'api.github.com/user/repos*' => MockResponse::make([
                 ['full_name' => 'acme/widget'],
                 ['full_name' => 'acme/gadget'],
             ]),
@@ -483,7 +482,7 @@ class RepoProfileResourceTest extends TestCase
             ->callAction(TestAction::make(CreateAction::class)->table(), [
                 'kind' => 'github',
                 'mode' => 'poll',
-                'connected_account_id' => $account->id,
+                'credential_ref' => "oauth:{$account->id}",
                 'external_project_ref' => 'acme/widget',
             ])
             ->assertHasNoActionErrors();
@@ -491,8 +490,68 @@ class RepoProfileResourceTest extends TestCase
         $this->assertDatabaseHas(TaskProviderBinding::class, [
             'repo_profile_id' => $profile->id,
             'kind' => 'github',
+            'auth_method' => 'oauth',
+            'connected_account_id' => $account->id,
             'external_project_ref' => 'acme/widget',
         ]);
+    }
+
+    public function test_binding_create_form_persists_pat_credential(): void
+    {
+        $profile = RepoProfile::factory()->create();
+        $credential = ProviderCredential::factory()->create([
+            'provider' => IntegrationProvider::GitHub,
+            'label' => 'CI PAT',
+        ]);
+
+        Saloon::fake([
+            'api.github.com/user/repos*' => MockResponse::make([
+                ['full_name' => 'acme/widget'],
+            ]),
+        ]);
+
+        Livewire::test(TaskProviderBindingsRelationManager::class, [
+            'ownerRecord' => $profile,
+            'pageClass' => EditRepoProfile::class,
+        ])
+            ->callAction(TestAction::make(CreateAction::class)->table(), [
+                'kind' => 'github',
+                'mode' => 'poll',
+                'credential_ref' => "pat:{$credential->id}",
+                'external_project_ref' => 'acme/widget',
+            ])
+            ->assertHasNoActionErrors();
+
+        $this->assertDatabaseHas(TaskProviderBinding::class, [
+            'repo_profile_id' => $profile->id,
+            'kind' => 'github',
+            'auth_method' => 'pat',
+            'connected_account_id' => null,
+            'provider_credential_id' => $credential->id,
+        ]);
+    }
+
+    public function test_binding_edit_prefills_credential_ref_for_pat(): void
+    {
+        $profile = RepoProfile::factory()->create();
+        $credential = ProviderCredential::factory()->create([
+            'provider' => IntegrationProvider::GitHub,
+        ]);
+        $binding = TaskProviderBinding::factory()->pat($credential)->create([
+            'repo_profile_id' => $profile->id,
+            'kind' => 'github',
+        ]);
+
+        Livewire::test(TaskProviderBindingsRelationManager::class, [
+            'ownerRecord' => $profile,
+            'pageClass' => EditRepoProfile::class,
+        ])
+            ->mountAction(TestAction::make('edit')->table($binding))
+            ->assertActionDataSet([
+                'credential_ref' => "pat:{$credential->id}",
+            ]);
+
+        $this->assertSame(AuthMethod::Pat, $binding->fresh()->auth_method);
     }
 
     public function test_binding_account_options_are_filtered_by_provider(): void
@@ -512,9 +571,9 @@ class RepoProfileResourceTest extends TestCase
             ->callAction(TestAction::make(CreateAction::class)->table(), [
                 'kind' => 'linear',
                 'mode' => 'poll',
-                'connected_account_id' => $githubAccount->id,
+                'credential_ref' => "oauth:{$githubAccount->id}",
             ])
-            ->assertHasActionErrors(['connected_account_id']);
+            ->assertHasActionErrors(['credential_ref']);
     }
 
     public function test_tasks_relation_manager_shows_tasks(): void
@@ -548,8 +607,8 @@ class RepoProfileResourceTest extends TestCase
 
     public function test_can_create_bitbucket_repo_profile_with_pat(): void
     {
-        Http::fake([
-            'api.bitbucket.org/2.0/repositories/myworkspace/myrepo/refs/branches*' => Http::response([
+        Saloon::fake([
+            'api.bitbucket.org/2.0/repositories/myworkspace/myrepo/refs/branches*' => MockResponse::make([
                 'values' => [['name' => 'main']],
             ]),
         ]);
@@ -582,18 +641,18 @@ class RepoProfileResourceTest extends TestCase
             'provider' => 'bitbucket',
         ]);
 
-        // More-specific patterns must come first; Http::fake matches in definition order.
-        Http::fake([
-            'api.bitbucket.org/2.0/repositories/acme/widget/refs/branches*' => Http::response([
+        // More-specific patterns must come first; Saloon matches in definition order.
+        Saloon::fake([
+            'api.bitbucket.org/2.0/repositories/acme/widget/refs/branches*' => MockResponse::make([
                 'values' => [['name' => 'main'], ['name' => 'develop']],
             ]),
-            'api.bitbucket.org/2.0/repositories/acme/widget' => Http::response([
+            'api.bitbucket.org/2.0/repositories/acme/widget' => MockResponse::make([
                 'mainbranch' => ['name' => 'main'],
             ]),
-            'api.bitbucket.org/2.0/user/workspaces*' => Http::response([
+            'api.bitbucket.org/2.0/user/workspaces*' => MockResponse::make([
                 'values' => [['workspace' => ['slug' => 'acme']]],
             ]),
-            'api.bitbucket.org/2.0/repositories/acme*' => Http::response([
+            'api.bitbucket.org/2.0/repositories/acme*' => MockResponse::make([
                 'values' => [['full_name' => 'acme/widget']],
             ]),
         ]);
@@ -643,5 +702,71 @@ class RepoProfileResourceTest extends TestCase
 
         Livewire::test(ListRepoProfiles::class)
             ->assertSee('Bitbucket Repo');
+    }
+
+    public function test_env_secrets_round_trip_via_edit_form(): void
+    {
+        Saloon::fake([
+            'api.github.com/repos/test-org/test-repo/branches*' => MockResponse::make([['name' => 'main']]),
+        ]);
+
+        $profile = RepoProfile::factory()->create(['platform' => 'github']);
+
+        Livewire::test(EditRepoProfile::class, ['record' => $profile->getKey()])
+            ->fillForm([
+                'composer_registries' => [
+                    ['host' => 'packages.filamentphp.com', 'username' => 'u', 'token' => 'sek'],
+                ],
+                'worker_env' => [
+                    ['name' => 'MEILI_KEY', 'value' => 'abc'],
+                ],
+            ])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $fresh = $profile->fresh();
+        $this->assertSame('packages.filamentphp.com', $fresh->composer_registries[0]['host']);
+        $this->assertSame('abc', $fresh->worker_env[0]['value']);
+    }
+
+    public function test_worker_services_round_trip_via_edit_form(): void
+    {
+        Saloon::fake([
+            'api.github.com/repos/test-org/test-repo/branches*' => MockResponse::make([['name' => 'main']]),
+        ]);
+
+        $profile = RepoProfile::factory()->create(['platform' => 'github']);
+
+        Livewire::test(EditRepoProfile::class, ['record' => $profile->getKey()])
+            ->fillForm(['worker_services' => ['mysql', 'redis']])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $this->assertEqualsCanonicalizing(['mysql', 'redis'], $profile->fresh()->worker_services);
+    }
+
+    public function test_mysql_credentials_round_trip_via_edit_form(): void
+    {
+        Saloon::fake([
+            'api.github.com/repos/test-org/test-repo/branches*' => MockResponse::make([['name' => 'main']]),
+        ]);
+
+        $profile = RepoProfile::factory()->create(['platform' => 'github']);
+
+        Livewire::test(EditRepoProfile::class, ['record' => $profile->getKey()])
+            ->fillForm([
+                'worker_services' => ['mysql'],
+                'worker_service_config' => ['mysql' => [
+                    'database' => 'shop',
+                    'username' => 'sa',
+                    'password' => 'pw',
+                ]],
+            ])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $config = $profile->fresh()->worker_service_config;
+        $this->assertSame('shop', $config['mysql']['database']);
+        $this->assertSame('sa', $config['mysql']['username']);
     }
 }

@@ -17,17 +17,21 @@ All Argos configuration is controlled via environment variables passed to the
 | `APP_KEY` | auto-generated, persisted to `/data/app-key` | Laravel encryption key. Pin only when restoring backups. |
 | `APP_PREVIOUS_KEYS` | – | Comma-separated list of past `APP_KEY` values, kept available for decrypting old data after a key rotation. |
 | `APP_DEBUG` | `false` | Enable detailed error pages. **Never enable in production.** |
-| `APP_URL` | `http://localhost` | Base URL of the Argos instance. **Must match the public URL** for OAuth callbacks. |
+| `APP_URL` | `http://localhost` | Base URL of the Argos instance and the **single source of truth** for host + scheme. OAuth callbacks, the session cookie domain and the live-demo subdomains all derive from it. **Must match the public URL.** |
 | `APP_LOCALE` | `en` | Default UI language (`en` or `de`). |
 | `ADMIN_PASSWORD` | `12345` | Password for the auto-created admin user. **Change before exposing the instance.** |
-| `CLAUDE_CODE_OAUTH_TOKEN` | – | Pre-seed the Claude OAuth token instead of pasting it into the UI. |
+
+> The Claude OAuth token is **not** an environment variable. Add it in the
+> onboarding wizard / credentials UI — it is stored per agent in the database.
 
 ## Sessions (reverse proxy / HTTPS)
 
+Both values **derive from `APP_URL`** and rarely need setting:
+
 | Variable | Default | Purpose |
 |---|---|---|
-| `SESSION_DOMAIN` | – | Cookie domain. Set when sharing a session across subdomains. |
-| `SESSION_SECURE_COOKIE` | auto | Force `Secure` on the session cookie. Set `true` when terminating TLS at a proxy that doesn't forward `X-Forwarded-Proto`. |
+| `SESSION_DOMAIN` | derived: `.<APP_URL host>` for a real domain, host-only for localhost/IP/nip.io | Cookie domain. The leading dot lets the session span demo subdomains (`demo-<task>.<host>`). Override only when demos live on a domain different from the app. |
+| `SESSION_SECURE_COOKIE` | derived: `true` when `APP_URL` is `https://` | Force `Secure` on the session cookie. Set explicitly only when terminating TLS at a proxy that rewrites the scheme. |
 
 ## Worker
 
@@ -92,34 +96,35 @@ access to Boost tools (e.g. `search-docs`, `database-schema`) scoped to the
 target project. To opt out, set `"mcp": false` in `boost.json` or remove the
 file.
 
-## OAuth (optional)
+## Live demos (optional)
 
-Enables repo and branch dropdowns when creating a project. The callback path
-is fixed at `${APP_URL}/auth/<provider>/callback` — register that URL in the
-provider's OAuth app and Argos resolves the rest from `APP_URL`. See
-[OAuth Overview](OAUTH.md) and the per-provider setup guides.
-
-### GitHub — see [GitHub Setup](SETUP-GITHUB.md)
-
-| Variable | Default | Purpose |
-|---|---|---|
-| `GITHUB_CLIENT_ID` | – | OAuth App client ID. |
-| `GITHUB_CLIENT_SECRET` | – | OAuth App client secret. |
-
-### GitLab — see [GitLab Setup](SETUP-GITLAB.md)
+Ephemeral per-task demo deployments, routed by Traefik under their own
+subdomain. Off by default; a per-project toggle (`live_demo_enabled`) then opts
+each project in. Base domain + scheme **derive from `APP_URL`** — override only
+for a demo domain different from the app. Requires wildcard DNS `*.<host>`
+resolving to this host.
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `GITLAB_CLIENT_ID` | – | OAuth App ID. |
-| `GITLAB_CLIENT_SECRET` | – | OAuth App secret. |
-| `GITLAB_INSTANCE_URL` | `https://gitlab.com` | Override for self-hosted GitLab (no trailing slash). |
+| `ARGOS_PREVIEW_ENABLED` | `true` | Master switch for the live-demo infrastructure. On by default; the per-project *Live-Demo* toggle is the real gate. Set `false` to disable platform-wide (e.g. no Traefik/preview infra). |
+| `ARGOS_PREVIEW_BASE_DOMAIN` | derived from `APP_URL` (nip.io locally) | Demos live at `demo-<task>.<base_domain>`. |
+| `ARGOS_PREVIEW_SCHEME` | derived from `APP_URL` | `http` or `https` used in the demo URL. |
+| `ARGOS_PREVIEW_TTL_HOURS` | `24` | Hours before an idle demo is torn down. |
+| `ARGOS_PREVIEW_AUTH` | `none` | Default access protection (`none` / `session` / `basic`); per-task overrides win. |
+| `ARGOS_PREVIEW_MAX_CONCURRENT` | `10` | Cap on concurrently running demos (`0` = unlimited). |
+| `ARGOS_PREVIEW_CPU_LIMIT` / `_MEM_LIMIT` | `1.0` / `1g` | Per-demo resource limits. |
 
-### Bitbucket — see [Bitbucket Setup](SETUP-BITBUCKET.md)
+## OAuth (UI-managed)
 
-| Variable | Default | Purpose |
-|---|---|---|
-| `BITBUCKET_CLIENT_ID` | – | OAuth Consumer key. |
-| `BITBUCKET_CLIENT_SECRET` | – | OAuth Consumer secret. |
+OAuth apps for GitHub / GitLab / Bitbucket / Linear are **managed in the UI**
+(Configuration → OAuth Apps) and stored in the database — there are no
+`*_CLIENT_ID` / `*_CLIENT_SECRET` environment variables anymore. Self-hosted
+GitLab instances are configured per app via the `instance_url` field.
+
+The callback path is fixed at `${APP_URL}/auth/<provider>/callback` — register
+that URL in the provider's OAuth app. See [OAuth Overview](OAUTH.md) and the
+per-provider setup guides ([GitHub](SETUP-GITHUB.md), [GitLab](SETUP-GITLAB.md),
+[Bitbucket](SETUP-BITBUCKET.md)).
 
 ## Database
 
@@ -138,6 +143,17 @@ server.
 | `ARGOS_DB_PASSWORD` | – | Database password. |
 | `ARGOS_DB_SSL_CA` | – | Optional path to a TLS CA bundle. |
 | `ARGOS_DB_URL` | – | Full DSN — overrides the individual fields above. |
+
+## Media library (optional)
+
+File and image uploads attached to models go through
+[spatie/laravel-medialibrary](https://spatie.be/docs/laravel-medialibrary).
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `MEDIA_DISK` | `public` | Filesystem disk (from `config/filesystems.php`) uploads are stored on. Point at `s3` etc. for off-box storage. |
+
+See [Media library setup](SETUP-MEDIA-LIBRARY.md).
 
 ## Logging
 

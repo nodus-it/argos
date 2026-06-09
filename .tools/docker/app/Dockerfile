@@ -39,11 +39,15 @@ RUN set -eux; \
     bash /tmp/nodesource_setup.sh; \
     rm -f /tmp/nodesource_setup.sh; \
     apt-get update; \
-    apt-get install -y --no-install-recommends docker-ce-cli nodejs; \
+    # docker-compose-plugin provides `docker compose` (v2), used by DemoDeployer
+    # to bring live-demo stacks up/down via the host socket.
+    apt-get install -y --no-install-recommends docker-ce-cli docker-compose-plugin nodejs; \
     rm -rf /var/lib/apt/lists/*; \
-    # Guard: fail loudly if npm is missing rather than caching a broken layer.
+    # Guard: fail loudly if npm or the compose plugin is missing rather than
+    # caching a broken layer.
     node --version; \
-    npm --version
+    npm --version; \
+    docker compose version
 
 # PHP extensions
 RUN set -eux; \
@@ -55,6 +59,7 @@ RUN set -eux; \
         pdo_sqlite \
         zip \
         bcmath \
+        exif \
         gd \
         pcntl \
         posix \
@@ -86,10 +91,14 @@ RUN mkdir -p bootstrap/cache \
         storage/framework/sessions \
         storage/framework/views
 
-# Finish install + frontend build
+# Finish install + frontend build. `filament:assets` publishes Filament's
+# CSS/JS/fonts into public/{css,js,fonts}/filament — these are generated, not
+# committed, so the image must regenerate them. Explicit (not relying on the
+# composer post-autoload-dump hook) so a future --no-scripts can't drop them.
 RUN composer install --no-dev --optimize-autoloader --no-interaction \
     && npm ci \
     && npm run build \
+    && php artisan filament:assets \
     && chown -R www-data:www-data storage bootstrap/cache
 
 # Make /var/www writable for www-data so the docker CLI (called from

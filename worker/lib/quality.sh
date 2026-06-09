@@ -65,6 +65,65 @@ quality_changed_php_files() {
     } | sort -uz)
 }
 
+# quality_pest_baseline_capture: record which tests are ALREADY red on the
+# pristine checkout, so the gate can ignore pre-existing failures and only block
+# on regressions the agent actually introduces. Without this, any red test in
+# the target repo (e.g. a SQLite-incompatible query, an unrelated flaky test)
+# makes every implement → PR unwinnable. Run once, before the agent edits
+# anything; idempotent so re-runs on later iterations reuse the first capture.
+# Best-effort — a missing/failed baseline falls back to strict gating.
+quality_pest_baseline_capture() {
+    [[ -f /workspace/.agent/pest-baseline.xml ]] && return 0
+    if [[ -x /workspace/vendor/bin/pest ]]; then
+        log_info "quality: capturing pest baseline (pre-existing failures) on the clean checkout"
+        (cd /workspace && vendor/bin/pest --no-coverage --log-junit /workspace/.agent/pest-baseline.xml) \
+            &> /workspace/.agent/logs/pest-baseline.log || true
+    elif [[ -x /workspace/vendor/bin/phpunit ]]; then
+        log_info "quality: capturing phpunit baseline (pre-existing failures) on the clean checkout"
+        (cd /workspace && vendor/bin/phpunit --log-junit /workspace/.agent/pest-baseline.xml) \
+            &> /workspace/.agent/logs/pest-baseline.log || true
+    fi
+    return 0
+}
+
+# quality_pest_new_failures: print test ids that fail in the CURRENT JUnit
+# report ($2) but were NOT already failing in the BASELINE report ($1) — i.e.
+# regressions introduced by the agent. Parsing is done in PHP (SimpleXML),
+# which is far more robust than grepping XML in bash. When the baseline file is
+# missing/empty every current failure counts as new → strict gating (the safe
+# default). Args: =baseline_junit, =current_junit
+quality_pest_new_failures() {
+    local baseline="$1" current="$2" parser
+    parser="$(mktemp)"
+    cat > "$parser" <<'PHP'
+<?php
+function failing(string $f): array {
+    $out = [];
+    if (! is_file($f)) {
+        return $out;
+    }
+    $xml = @simplexml_load_file($f);
+    if ($xml === false) {
+        return $out;
+    }
+    foreach ($xml->xpath('//testcase') as $tc) {
+        if (isset($tc->failure) || isset($tc->error)) {
+            $out[((string) $tc['classname']).'::'.((string) $tc['name'])] = true;
+        }
+    }
+    return $out;
+}
+$base = failing($argv[1] ?? '');
+foreach (array_keys(failing($argv[2] ?? '')) as $id) {
+    if (! isset($base[$id])) {
+        echo $id, "\n";
+    }
+}
+PHP
+    php "$parser" "$baseline" "$current"
+    rm -f "$parser"
+}
+
 # quality_gates_run: run all quality gates and return the gates JSON.
 # Args: $1=iteration (used in log filenames)
 # Output: JSON object on stdout.
@@ -106,19 +165,43 @@ quality_gates_run() {
     fi
 
     # ── 3. Pest / PHPUnit ────────────────────────────────────────────────
+    # Run with --log-junit so a red suite can be diffed against the baseline
+    # captured on the clean checkout: only failures the agent NEWLY introduced
+    # block the gate; pre-existing red tests in the target repo are reported but
+    # never block (otherwise every implement → PR is unwinnable on a repo that
+    # is not 100% green). No baseline → every failure counts (strict).
+    local new_failures
     if [[ -x /workspace/vendor/bin/pest ]]; then
-        if (cd /workspace && vendor/bin/pest --no-coverage) \
+        if (cd /workspace && vendor/bin/pest --no-coverage --log-junit "/workspace/.agent/logs/pest.${iteration}.xml") \
                 &> "/workspace/.agent/logs/pest.${iteration}.log"; then
             gates="$(printf '%s' "$gates" | jq '.pest = "pass"')"
         else
-            gates="$(printf '%s' "$gates" | jq '.pest = "fail"')"
+            new_failures="$(quality_pest_new_failures /workspace/.agent/pest-baseline.xml "/workspace/.agent/logs/pest.${iteration}.xml")"
+            if [[ -n "$new_failures" ]]; then
+                gates="$(printf '%s' "$gates" | jq '.pest = "fail"')"
+                { printf '\n── New failures vs. baseline (these block the gate) ──\n'; printf '%s\n' "$new_failures"; } \
+                    >> "/workspace/.agent/logs/pest.${iteration}.log"
+            else
+                gates="$(printf '%s' "$gates" | jq '.pest = "pass"')"
+                printf '\n── Pest red only with pre-existing failures (no new regressions) — gate passes ──\n' \
+                    >> "/workspace/.agent/logs/pest.${iteration}.log"
+            fi
         fi
     elif [[ -x /workspace/vendor/bin/phpunit ]]; then
-        if (cd /workspace && vendor/bin/phpunit) \
+        if (cd /workspace && vendor/bin/phpunit --log-junit "/workspace/.agent/logs/phpunit.${iteration}.xml") \
                 &> "/workspace/.agent/logs/phpunit.${iteration}.log"; then
             gates="$(printf '%s' "$gates" | jq '.phpunit = "pass"')"
         else
-            gates="$(printf '%s' "$gates" | jq '.phpunit = "fail"')"
+            new_failures="$(quality_pest_new_failures /workspace/.agent/pest-baseline.xml "/workspace/.agent/logs/phpunit.${iteration}.xml")"
+            if [[ -n "$new_failures" ]]; then
+                gates="$(printf '%s' "$gates" | jq '.phpunit = "fail"')"
+                { printf '\n── New failures vs. baseline (these block the gate) ──\n'; printf '%s\n' "$new_failures"; } \
+                    >> "/workspace/.agent/logs/phpunit.${iteration}.log"
+            else
+                gates="$(printf '%s' "$gates" | jq '.phpunit = "pass"')"
+                printf '\n── PHPUnit red only with pre-existing failures (no new regressions) — gate passes ──\n' \
+                    >> "/workspace/.agent/logs/phpunit.${iteration}.log"
+            fi
         fi
     fi
 
@@ -286,6 +369,7 @@ quality_gate_verdict() {
 # output. A plain head() truncation hides the actual failures behind hundreds
 # of "PASS"/progress lines and tricks the agent into thinking the gate is
 # green when it isn't.
+# shellcheck disable=SC2016  # printf prompt text contains literal `backticks`/$ by design
 quality_gate_fix_prompt() {
     local gate="$1"
     local log_file="${2:-}"

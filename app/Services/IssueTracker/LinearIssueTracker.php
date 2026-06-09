@@ -4,16 +4,19 @@ declare(strict_types=1);
 
 namespace App\Services\IssueTracker;
 
+use App\Integrations\Linear\LinearConnector;
+use App\Integrations\Linear\Requests\GraphQLRequest;
 use App\Services\IssueTracker\Contracts\IssueTrackerContract;
-use Illuminate\Http\Client\PendingRequest;
-use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
 class LinearIssueTracker implements IssueTrackerContract
 {
-    private const GRAPHQL_URL = 'https://api.linear.app/graphql';
+    private readonly LinearConnector $connector;
 
-    public function __construct(private readonly string $token) {}
+    public function __construct(string $token)
+    {
+        $this->connector = new LinearConnector($token);
+    }
 
     public function listReferences(): array
     {
@@ -343,25 +346,9 @@ class LinearIssueTracker implements IssueTrackerContract
      */
     private function graphql(string $query, array $variables = []): array
     {
-        $payload = ['query' => $query];
-
-        // Linear rejects `variables: []` (an empty PHP array encodes to a JSON
-        // array, not an object) — omit the key entirely for variable-less queries.
-        if ($variables !== []) {
-            $payload['variables'] = $variables;
-        }
-
-        return $this->http()
-            ->post(self::GRAPHQL_URL, $payload)
+        return $this->connector
+            ->send(new GraphQLRequest($query, $variables))
             ->throw()
             ->json();
-    }
-
-    private function http(): PendingRequest
-    {
-        return Http::withHeaders([
-            'Authorization' => "Bearer {$this->token}",
-            'Content-Type' => 'application/json',
-        ]);
     }
 }

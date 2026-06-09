@@ -6,6 +6,7 @@ namespace App\Services\IssueTracker;
 
 use App\Models\ExternalIssueLink;
 use App\Models\Task;
+use App\Services\IssueTracker\Concerns\ParsesExternalProjectRef;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -17,6 +18,8 @@ use Illuminate\Support\Facades\Log;
  */
 class IssueStatusSync
 {
+    use ParsesExternalProjectRef;
+
     public function __construct(private readonly IssueTrackerRegistry $registry) {}
 
     /**
@@ -27,7 +30,7 @@ class IssueStatusSync
     {
         $link = ExternalIssueLink::query()
             ->where('task_id', $task->id)
-            ->with('binding.connectedAccount')
+            ->with(['binding.connectedAccount', 'binding.providerCredential'])
             ->first();
 
         if (! $link instanceof ExternalIssueLink) {
@@ -80,10 +83,4 @@ class IssueStatusSync
      *
      * @return array{0: string, 1: string}
      */
-    private function parseRef(string $ref): array
-    {
-        $parts = explode('/', $ref, 2);
-
-        return [$parts[0] ?? '', $parts[1] ?? ''];
-    }
 }

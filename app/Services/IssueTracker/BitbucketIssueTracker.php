@@ -4,39 +4,28 @@ declare(strict_types=1);
 
 namespace App\Services\IssueTracker;
 
+use App\Integrations\Bitbucket\BitbucketConnector;
+use App\Integrations\Bitbucket\Requests\CloseIssue;
+use App\Integrations\Bitbucket\Requests\CreateIssueComment;
+use App\Integrations\Bitbucket\Requests\GetIssue;
+use App\Integrations\Bitbucket\Requests\GetIssueComments;
+use App\Integrations\Bitbucket\Requests\ListIssues;
+use App\Integrations\Bitbucket\Requests\ListRepositories;
 use App\Services\IssueTracker\Contracts\IssueTrackerContract;
-use Illuminate\Http\Client\PendingRequest;
-use Illuminate\Support\Facades\Http;
 
 class BitbucketIssueTracker implements IssueTrackerContract
 {
-    private const BASE_URL = 'https://api.bitbucket.org/2.0';
+    private readonly BitbucketConnector $connector;
 
-    private readonly string $username;
-
-    private readonly string $appPassword;
-
-    private readonly bool $isOAuth;
-
-    public function __construct(private readonly string $token)
+    public function __construct(string $token)
     {
-        if (str_contains($token, ':')) {
-            [$this->username, $this->appPassword] = explode(':', $token, 2);
-            $this->isOAuth = false;
-        } else {
-            $this->username = '';
-            $this->appPassword = '';
-            $this->isOAuth = true;
-        }
+        // Auth (Basic vs. Bearer) is resolved by the connector from the token shape.
+        $this->connector = new BitbucketConnector($token);
     }
 
     public function listReferences(): array
     {
-        $response = $this->http()->get('/repositories', [
-            'role' => 'member',
-            'pagelen' => 100,
-            'sort' => '-updated_on',
-        ]);
+        $response = $this->connector->send(new ListRepositories);
 
         if ($response->status() === 403 || $response->status() === 404) {
             return [];
@@ -60,8 +49,7 @@ class BitbucketIssueTracker implements IssueTrackerContract
         // Bitbucket returns 403 when the issue tracker is disabled — treat as empty.
         // Labels are filtered locally (OR) by IssueIngestService; Bitbucket
         // filters via a `q` BBQL string, so the raw filter array is not forwarded.
-        $response = $this->http()
-            ->get("/repositories/{$owner}/{$project}/issues", ['pagelen' => 100]);
+        $response = $this->connector->send(new ListIssues($owner, $project));
 
         if ($response->status() === 403 || $response->status() === 404) {
             return [];
@@ -74,10 +62,8 @@ class BitbucketIssueTracker implements IssueTrackerContract
 
     public function getIssue(string $owner, string $project, int|string $issueNumber): array
     {
-        $base = "/repositories/{$owner}/{$project}/issues/{$issueNumber}";
-
-        $issue = $this->http()->get($base)->throw()->json();
-        $comments = $this->http()->get("{$base}/comments", ['pagelen' => 100])->throw()->json();
+        $issue = $this->connector->send(new GetIssue($owner, $project, $issueNumber))->throw()->json();
+        $comments = $this->connector->send(new GetIssueComments($owner, $project, $issueNumber))->throw()->json();
 
         return [
             ...$issue,
@@ -92,19 +78,15 @@ class BitbucketIssueTracker implements IssueTrackerContract
         int|string $issueNumber,
         string $body,
     ): array {
-        return $this->http()
-            ->post("/repositories/{$owner}/{$project}/issues/{$issueNumber}/comments", [
-                'content' => ['raw' => $body],
-            ])
+        return $this->connector
+            ->send(new CreateIssueComment($owner, $project, $issueNumber, $body))
             ->throw()
             ->json();
     }
 
     public function closeIssue(string $owner, string $project, int|string $issueNumber): void
     {
-        $this->http()
-            ->put("/repositories/{$owner}/{$project}/issues/{$issueNumber}", ['state' => 'resolved'])
-            ->throw();
+        $this->connector->send(new CloseIssue($owner, $project, $issueNumber))->throw();
     }
 
     // Bitbucket is not wired as a task issue-provider (no TaskProviderKind),
@@ -151,19 +133,5 @@ class BitbucketIssueTracker implements IssueTrackerContract
     public function normalizeWebhookPayload(array $envelope, ?string $eventType): array
     {
         return $envelope;
-    }
-
-    private function http(): PendingRequest
-    {
-        if ($this->isOAuth) {
-            return Http::withHeaders([
-                'Authorization' => "Bearer {$this->token}",
-                'Accept' => 'application/json',
-            ])->baseUrl(self::BASE_URL);
-        }
-
-        return Http::withBasicAuth($this->username, $this->appPassword)
-            ->withHeaders(['Accept' => 'application/json'])
-            ->baseUrl(self::BASE_URL);
     }
 }

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Providers\Filament;
 
+use App\Filament\Admin\Pages\Dashboard;
+use App\Filament\Admin\Pages\Login;
 use App\Filament\Admin\Pages\Profile;
-use App\Filament\Admin\Widgets\CurrentTasksWidget;
-use App\Filament\Admin\Widgets\StatsOverviewWidget;
 use App\Http\Middleware\RedirectToOnboarding;
 use App\Http\Middleware\SetUserLocale;
 use DutchCodingCompany\FilamentDeveloperLogins\FilamentDeveloperLoginsPlugin;
@@ -14,11 +14,12 @@ use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
-use Filament\Pages\Dashboard;
+use Filament\Navigation\NavigationItem;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
 use Filament\Support\Enums\Width;
+use Filament\Support\Icons\Heroicon;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
@@ -42,25 +43,44 @@ class AdminPanelProvider extends PanelProvider
             ->brandLogoHeight('1.75rem')
             ->favicon(asset('favicon.svg'))
             ->colors([
-                'primary' => Color::Slate,
+                // Terracotta primary + warm-sand gray ("Warm Paper" redesign;
+                // see docs/design/argos/ARGOS_REDESIGN.md §2.3).
+                'primary' => [
+                    50 => '251,243,239', 100 => '246,228,218', 200 => '238,199,180',
+                    300 => '227,164,134', 400 => '217,128,95', 500 => '207,100,70',
+                    600 => '187,80,52', 700 => '154,64,43', 800 => '124,55,39',
+                    900 => '104,47,35', 950 => '58,22,16',
+                ],
+                'gray' => Color::hex('#7d7565'),
             ])
-            ->maxContentWidth(Width::Full)
+            ->maxContentWidth(Width::SevenExtraLarge)
+            ->sidebarWidth('14rem')
+            ->collapsibleNavigationGroups(false)
             ->discoverResources(in: app_path('Filament/Admin/Resources'), for: 'App\Filament\Admin\Resources')
             ->discoverPages(in: app_path('Filament/Admin/Pages'), for: 'App\Filament\Admin\Pages')
             ->pages([
                 Dashboard::class,
             ])
             ->discoverWidgets(in: app_path('Filament/Admin/Widgets'), for: 'App\Filament\Admin\Widgets')
-            ->widgets([
-                StatsOverviewWidget::class,
-                CurrentTasksWidget::class,
-            ])
+            ->widgets([])
             ->navigationGroups([
-                __('navigation.groups.tasks'),
                 __('navigation.groups.worker'),
                 __('navigation.groups.configuration'),
+                // Kept last so the Help section sits at the bottom of the sidebar.
+                __('navigation.groups.help'),
             ])
-            ->login()
+            ->navigationItems([
+                // Link to the auto-generated REST API docs (Scramble, served at
+                // /docs/api). Lives outside the Filament panel, so it opens in a
+                // new tab rather than as a panel page.
+                NavigationItem::make('api-docs')
+                    ->label(fn (): string => __('navigation.pages.api_docs'))
+                    ->icon(Heroicon::OutlinedCodeBracket)
+                    ->group(__('navigation.groups.help'))
+                    ->url(fn (): string => url('docs/api'), shouldOpenInNewTab: true)
+                    ->sort(99),
+            ])
+            ->login(Login::class)
             ->profile(Profile::class)
             ->plugins([
                 // One-click developer login on the login screen. Hard-gated to
@@ -93,6 +113,13 @@ class AdminPanelProvider extends PanelProvider
                         return new HtmlString('');
                     }
                 }
+            )
+            ->renderHook(
+                // Slot the page breadcrumbs teleport into (see the overridden
+                // filament-panels::components.header view) — moves them from the
+                // content header into the topbar, matching the design.
+                PanelsRenderHook::TOPBAR_START,
+                fn (): string => '<div id="argos-topbar-breadcrumbs" class="fi-argos-topbar-breadcrumbs"></div>',
             )
             ->renderHook(
                 PanelsRenderHook::CONTENT_START,

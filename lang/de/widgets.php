@@ -18,6 +18,20 @@ return [
         'worker_updates_clean' => 'Alles aktuell',
     ],
 
+    'hero' => [
+        'chips' => [
+            'run' => 'laufen',
+            'wait' => 'warten',
+            'ok' => 'gesamt',
+            'projects' => 'Projekte',
+            'active_tasks' => 'aktive Tasks',
+        ],
+        'tasks_sub' => 'Alle laufenden, wartenden und abgeschlossenen Aufgaben.',
+        'projects_sub' => 'Repository-Profile und Worker-Konfiguration.',
+        'new_task' => 'Neuer Task',
+        'new_project' => 'Neues Projekt',
+    ],
+
     'current_tasks' => [
         'heading' => 'Aktuelle Tasks',
         'columns' => [

@@ -334,19 +334,7 @@ phase_concept_run() {
         --max-turns "$max_turns" \
         "${resume_args[@]}" \
       | log_scrub \
-      | tee "$stream_log" \
-      | tee >(jq -rj '
-            if .type == "assistant" then
-                (.message.content[]? |
-                    if .type == "text" then (.text // "")
-                    elif .type == "tool_use" then
-                        "\n[tool:" + .name + "] " +
-                        (.input.file_path // .input.command // (.input | tostring)[0:120]) + "\n"
-                    else empty end
-                )
-            elif .type == "result" then "\n"
-            else empty end
-          ' >&2 2>/dev/null) \
+      | agent_stream_tee "$stream_log" \
       | jq -c 'select(.type == "result")' \
       > "$result_json"
     local agent_exit=${PIPESTATUS[0]}

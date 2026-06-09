@@ -11,6 +11,10 @@ public/hot
 .env.*
 !.env.example
 storage/logs/*.log
+# Ephemeral test scratch dirs — never belong in the image build context and
+# may be root-owned (created by tests running in containers), which breaks the
+# build context tar on local builds.
+storage/framework/testing/
 
 # CI / VCS
 .git/

@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Enums\ClaudeModel;
 use App\Enums\Phase;
 use App\Enums\PhaseStatus;
 use App\Enums\WorkflowStatus;
 use App\Filament\Admin\Resources\TaskResource\Pages\CreateTask;
 use App\Filament\Admin\Resources\TaskResource\Pages\ListTasks;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewTask;
+use App\Filament\Admin\Resources\TaskResource\RelationManagers\PhaseRunsRelationManager;
 use App\Jobs\RunPhaseJob;
 use App\Models\ExternalIssueLink;
 use App\Models\RepoProfile;
@@ -244,5 +246,23 @@ class TaskResourceTest extends TestCase
         Livewire::test(ListTasks::class)
             ->assertSuccessful()
             ->assertCanSeeTableRecords([$task]);
+    }
+
+    public function test_phase_runs_relation_manager_renders_and_shows_resolved_model(): void
+    {
+        $task = Task::factory()->create();
+        $run = $task->phaseRuns()->create([
+            'phase' => 'implement',
+            'iteration' => 1,
+            'status' => 'completed',
+            'started_at' => now()->subMinute(),
+            'finished_at' => now(),
+            'model' => ClaudeModel::Sonnet46->value,
+        ]);
+
+        Livewire::test(PhaseRunsRelationManager::class, ['ownerRecord' => $task, 'pageClass' => ViewTask::class])
+            ->assertSuccessful()
+            ->assertCanSeeTableRecords([$run])
+            ->assertSee(ClaudeModel::Sonnet46->label());
     }
 }

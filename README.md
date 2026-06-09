@@ -2,14 +2,34 @@
 
 <img src=".github/logo.svg" alt="Argos" width="640">
 
-**A web-first dev agent that turns a task description into a pull request.**
+### Every agent. One view.
+
+**From a task description to a reviewed pull request.** Argos drafts a concept,
+implements it in an isolated worker container, and opens the PR — all on your
+Claude subscription, not the API.
 
 [![License: AGPL-3.0](https://img.shields.io/github/license/nodus-it/argos?style=flat-square)](LICENSE)
 [![Version](https://img.shields.io/github/v/tag/nodus-it/argos?style=flat-square&label=version&include_prereleases&sort=semver)](https://github.com/nodus-it/argos/releases)
 [![GHCR](https://img.shields.io/badge/ghcr.io-argos--app-2496ED?style=flat-square&logo=docker&logoColor=white)](https://github.com/nodus-it/argos/pkgs/container/argos-app)
 [![CI](https://img.shields.io/github/actions/workflow/status/nodus-it/argos/ci.yml?branch=develop&style=flat-square&label=tests)](https://github.com/nodus-it/argos/actions/workflows/ci.yml)
 
+<br>
+
+<img src=".github/screenshots/login.png" alt="Argos — sign in to your control room" width="900">
+
 </div>
+
+<!--
+  Screenshot gallery — drop PNGs into .github/screenshots/ and uncomment.
+  Suggested shots: dashboard (control room), task-view (phase stepper),
+  task-logs-running (live agent stream), task-diff (review).
+
+<div align="center">
+<img src=".github/screenshots/dashboard.png" alt="Control room dashboard" width="49%">
+&nbsp;
+<img src=".github/screenshots/task-view.png" alt="Task phases — concept to PR" width="49%">
+</div>
+-->
 
 ---
 
@@ -28,7 +48,7 @@ request you can review.
 ## Quick Start
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/nodus-it/argos/master/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/nodus-it/argos/master/.tools/install.sh | bash
 ```
 
 That installs Argos into the **current directory** — drops a `docker-compose.yml`,
@@ -59,17 +79,23 @@ next to the compose file — the installer never touches that.
 ### What this gets you
 
 - ✓ Tasks → automated pull requests on GitHub, GitLab, or Bitbucket
-- ✓ Authentication via Personal Access Token (paste a token per project)
+- ✓ Authentication via Personal Access Token, or full OAuth (repo/branch
+  pickers + per-user account binding) — OAuth apps are managed in the UI
+- ✓ Self-hosted GitLab (set the instance URL when you add the account / OAuth app)
 - ✓ Optimised for PHP / Laravel projects out of the box
 - ✓ Runs on your Claude Pro / Max / Team subscription
-- ✓ Drive Argos straight from Claude Code via the built-in [MCP server](docs/SETUP-MCP.md)
+- ✓ Drive Argos from Claude Code via the built-in [MCP server](docs/SETUP-MCP.md),
+  or programmatically via the **REST API v1** (Sanctum bearer tokens, `/api/v1`)
 - ✓ Import issues from GitHub / GitLab / Linear via [task providers](docs/SETUP-TASK-PROVIDERS.md)
+- ✓ Repo-defined worker images — drop a `.argos/worker.dockerfile` to control
+  the build environment (BYOI)
+- ✓ Ephemeral per-task live demo — preview the implemented branch in a
+  throwaway container before merging
 
-### What this does **not** get you
+### What this does **not** get you out of the box
 
-- ✗ Repository / branch dropdowns when creating a project (needs OAuth)
-- ✗ Per-user account binding (needs OAuth)
-- ✗ Self-hosted GitLab support (needs `GITLAB_INSTANCE_URL`)
+- ✗ Repository / branch dropdowns + per-user account binding until you connect
+  an OAuth app (Configuration → OAuth Apps)
 - ✗ Custom domain / TLS (terminate at your reverse proxy)
 
 For any of those: see **[Extended Setup](docs/SETUP.md)**.
@@ -86,18 +112,39 @@ Once the container is up:
 4. **Create a task** — describe what you want done. Argos drafts a concept,
    implements it, opens a pull request.
 
+## Prepare a project for Argos
+
+Most PHP / Laravel repos work out of the box. To check a specific project — and
+wire up a custom build environment or live-demo when the defaults don't fit —
+point your coding agent at the guide and let it do the work. Paste this into an
+agent running **inside the target repository**:
+
+> Prepare this repository for Argos, following
+> `https://github.com/nodus-it/argos/blob/master/docs/PREPARE-PROJECT.md`.
+> Decide whether it runs on Argos's defaults as-is; if not, show me the two
+> options (ship a `.argos/` contract vs. adjust the project) before changing
+> anything.
+
+The guide ([docs/PREPARE-PROJECT.md](docs/PREPARE-PROJECT.md)) is written for an
+AI agent and covers both the worker execution environment
+(`.argos/worker.dockerfile`) and the live-demo contract (`.argos/demo.*`).
+
 ## Documentation
 
 | Topic | Where |
 |---|---|
+| Prepare a repo for Argos (agent guide) | [docs/PREPARE-PROJECT.md](docs/PREPARE-PROJECT.md) |
 | Extended setup (production, custom workers, reverse proxy) | [docs/SETUP.md](docs/SETUP.md) |
 | All environment variables with defaults | [docs/CONFIGURATION.md](docs/CONFIGURATION.md) |
+| What Argos runs (worker & demo commands) | [docs/EXECUTION-COMMANDS.md](docs/EXECUTION-COMMANDS.md) |
 | OAuth — when and why | [docs/OAUTH.md](docs/OAUTH.md) |
 | GitHub setup (PAT + OAuth) | [docs/SETUP-GITHUB.md](docs/SETUP-GITHUB.md) |
 | GitLab setup (incl. self-hosted) | [docs/SETUP-GITLAB.md](docs/SETUP-GITLAB.md) |
 | Bitbucket setup | [docs/SETUP-BITBUCKET.md](docs/SETUP-BITBUCKET.md) |
 | Task-Provider / Issue-Tracker integration | [docs/SETUP-TASK-PROVIDERS.md](docs/SETUP-TASK-PROVIDERS.md) |
 | MCP server (drive Argos from Claude Code) | [docs/SETUP-MCP.md](docs/SETUP-MCP.md) |
+| Media library — file / image uploads (optional) | [docs/SETUP-MEDIA-LIBRARY.md](docs/SETUP-MEDIA-LIBRARY.md) |
+| Provider contract tests (local, real APIs) | [docs/PROVIDER-TEST-SETUP.md](docs/PROVIDER-TEST-SETUP.md) |
 | Local development & tests | [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) |
 
 ## Contributing

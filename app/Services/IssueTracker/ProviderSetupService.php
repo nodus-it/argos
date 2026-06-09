@@ -6,11 +6,13 @@ namespace App\Services\IssueTracker;
 
 use App\Enums\TaskProviderMode;
 use App\Enums\TaskProviderSyncStatus;
-use App\Models\ConnectedAccount;
 use App\Models\TaskProviderBinding;
+use App\Services\IssueTracker\Concerns\ParsesExternalProjectRef;
 
 final class ProviderSetupService
 {
+    use ParsesExternalProjectRef;
+
     public function __construct(private readonly IssueTrackerRegistry $registry) {}
 
     /**
@@ -23,11 +25,13 @@ final class ProviderSetupService
      * GitHub and GitLab OAuth scopes ('repo' / 'api') already cover webhook
      * management — no additional OAuth scopes are required when calling setup().
      *
+     * The binding's credential (OAuth account or PAT) is resolved by the
+     * registry from the binding itself, so no token source is passed here.
+     *
      * @throws \Throwable when registerWebhook fails; the caller should catch and store last_error.
      */
-    public function setup(TaskProviderBinding $binding, ConnectedAccount $account): void
+    public function setup(TaskProviderBinding $binding): void
     {
-        $binding->connected_account_id = $account->id;
         $binding->last_error = null;
 
         if ($binding->mode === TaskProviderMode::Disabled) {
@@ -71,10 +75,4 @@ final class ProviderSetupService
     /**
      * @return array{string, string}
      */
-    private function parseRef(string $ref): array
-    {
-        $parts = explode('/', $ref, 2);
-
-        return [$parts[0] ?? '', $parts[1] ?? ''];
-    }
 }

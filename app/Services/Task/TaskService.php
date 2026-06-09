@@ -17,10 +17,8 @@ use App\Events\Task\TaskCreated;
 use App\Events\Task\TaskDeleted;
 use App\Jobs\RunPhaseJob;
 use App\Models\Task;
-use App\Services\IssueTracker\IssueStatusSync;
 use App\Services\Workflow\PhaseRunner;
 use App\Services\Workflow\WorkflowService;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Process;
 
@@ -99,6 +97,12 @@ class TaskService
     {
         if ($task->phaseRuns()->where('status', 'running')->exists()) {
             throw new \RuntimeException('A phase is already running for this task.');
+        }
+
+        // Order is strict: once the implement phase has run, the concept is
+        // locked — there is no going back to it (M5).
+        if ($phase === Phase::Concept && $task->phaseRuns()->where('phase', 'implement')->exists()) {
+            throw new \RuntimeException('The concept is locked once implementation has started.');
         }
 
         $task->update([
@@ -183,13 +187,13 @@ class TaskService
     }
 
     /**
-     * Mark a task as completed, remove its Docker volume, and fire TaskCompleted.
+     * Mark a task as completed and fire TaskCompleted. The follow-ups — closing
+     * the source issue and removing the Docker volume — are handled by listeners
+     * so this stays a pure DB operation.
      */
     public function markCompleted(Task $task): void
     {
         $task->update(['workflow_status' => WorkflowStatus::Completed]);
-        app(IssueStatusSync::class)->closeSourceIssue($task);
-        Process::run(['docker', 'volume', 'rm', $task->volumeName()]);
         Event::dispatch(new TaskCompleted($task));
     }
 
@@ -225,12 +229,18 @@ class TaskService
     /**
      * Persist implement notes and immediately re-run the implement phase.
      *
+     * When $refine is true (the "refine implementation" action in the review
+     * dock) the re-run builds on the previous iteration's working tree instead
+     * of resetting to the base branch — otherwise the reviewed work would be
+     * discarded. The default (false) is a clean reset, used when retrying a
+     * failed implement run.
+     *
      * @throws \RuntimeException when a phase is already running
      */
-    public function saveImplementNotesAndRevise(Task $task, string $notes): void
+    public function saveImplementNotesAndRevise(Task $task, string $notes, bool $refine = false): void
     {
         $this->saveImplementNotes($task, $notes);
-        $this->startPhase($task, Phase::Implement);
+        $this->startPhase($task, Phase::Implement, $refine ? ['refine' => true] : []);
     }
 
     /**
@@ -255,29 +265,12 @@ class TaskService
         Event::dispatch(new PhaseCompleted($task, Phase::from($phase), $status));
     }
 
-    // ── Legacy methods kept for backward compatibility (CLI, MCP) ─────────────
-
-    public function create(array $data): Task
-    {
-        return Task::create([
-            'name' => $data['name'],
-            'repo_profile_id' => $data['repo_profile_id'] ?? null,
-            'description' => $data['description'],
-        ]);
-    }
-
-    public function list(): Collection
-    {
-        return Task::with('repoProfile')->get();
-    }
-
+    /**
+     * Resolve a task by its name or ULID. Used by the MCP tools via
+     * InteractsWithTasks to turn a user-supplied reference into a Task.
+     */
     public function find(string $nameOrId): ?Task
     {
         return Task::where('name', $nameOrId)->orWhere('id', $nameOrId)->first();
-    }
-
-    public function delete(Task $task): void
-    {
-        $task->delete();
     }
 }

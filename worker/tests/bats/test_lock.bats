@@ -61,15 +61,3 @@ teardown() {
     [ ! -f "$LOCK_FILE" ]
 }
 
-@test "lock_info ohne Lock liefert nichts" {
-    run lock_info
-    [ "$status" -eq 0 ]
-    [ -z "$output" ]
-}
-
-@test "lock_info mit Lock liefert tab-separierte Felder" {
-    lock_acquire concept
-    run lock_info
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"concept"* ]]
-}

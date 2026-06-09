@@ -406,7 +406,19 @@ class TaskServiceTest extends TestCase
         $task = Task::factory()->create();
         $this->service->saveImplementNotesAndRevise($task, 'Impl notes');
 
-        Bus::assertDispatched(RunPhaseJob::class, fn ($j) => $j->phase === 'implement');
+        // Default (retry): clean reset — no refine flag.
+        Bus::assertDispatched(RunPhaseJob::class, fn ($j) => $j->phase === 'implement' && $j->flags === []);
+    }
+
+    public function test_save_implement_notes_and_revise_with_refine_passes_refine_flag(): void
+    {
+        Event::fake();
+
+        $task = Task::factory()->create();
+        $this->service->saveImplementNotesAndRevise($task, 'Impl notes', refine: true);
+
+        // Refine: re-run on top of the existing working tree, no base reset.
+        Bus::assertDispatched(RunPhaseJob::class, fn ($j) => $j->phase === 'implement' && $j->flags === ['refine' => true]);
     }
 
     public function test_save_implement_notes_and_revise_throws_when_running(): void
@@ -488,5 +500,32 @@ class TaskServiceTest extends TestCase
         $this->service->completePhase($task, 'concept', PhaseStatus::Failed);
 
         Event::assertDispatched(PhaseCompleted::class, fn ($e) => $e->status === PhaseStatus::Failed);
+    }
+
+    // ── find (used by MCP via InteractsWithTasks) ──────────────────────────────
+
+    public function test_find_by_name(): void
+    {
+        $task = Task::factory()->create(['name' => 'search-me']);
+
+        $found = $this->service->find('search-me');
+
+        $this->assertNotNull($found);
+        $this->assertSame($task->id, $found->id);
+    }
+
+    public function test_find_by_id(): void
+    {
+        $task = Task::factory()->create();
+
+        $found = $this->service->find($task->id);
+
+        $this->assertNotNull($found);
+        $this->assertSame($task->id, $found->id);
+    }
+
+    public function test_find_returns_null_for_unknown(): void
+    {
+        $this->assertNull($this->service->find('nonexistent'));
     }
 }

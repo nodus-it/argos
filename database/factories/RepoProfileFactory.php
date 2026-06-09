@@ -36,4 +36,36 @@ class RepoProfileFactory extends Factory
     {
         return $this->state(['auto_pr' => true]);
     }
+
+    /**
+     * @param  array<int, array{host: string, username?: string|null, token: string}>  $registries
+     */
+    public function withComposerRegistries(array $registries): static
+    {
+        return $this->state(['composer_registries' => $registries]);
+    }
+
+    /**
+     * @param  array<int, array{name: string, value: string}>  $env
+     */
+    public function withWorkerEnv(array $env): static
+    {
+        return $this->state(['worker_env' => $env]);
+    }
+
+    /**
+     * @param  array<int, string>  $services
+     */
+    public function withBackingServices(array $services): static
+    {
+        return $this->state(['worker_services' => $services]);
+    }
+
+    /**
+     * @param  array<string, array<string, string>>  $config
+     */
+    public function withServiceConfig(array $config): static
+    {
+        return $this->state(['worker_service_config' => $config]);
+    }
 }

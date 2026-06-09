@@ -4,8 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\Feature\IssueTracker;
 
+use App\Integrations\GitHub\Requests\CloseIssue;
+use App\Integrations\GitHub\Requests\ListIssues;
+use App\Integrations\GitHub\Requests\ListRepositories;
+use App\Integrations\GitHub\Requests\RegisterWebhook;
+use App\Integrations\GitHub\Requests\UnregisterWebhook;
 use App\Services\IssueTracker\GitHubIssueTracker;
-use Illuminate\Support\Facades\Http;
+use Saloon\Http\Faking\MockResponse;
+use Saloon\Http\Request;
+use Saloon\Laravel\Facades\Saloon;
 use Tests\TestCase;
 
 class GitHubIssueTrackerTest extends TestCase
@@ -20,24 +27,29 @@ class GitHubIssueTrackerTest extends TestCase
 
     public function test_close_issue_patches_state_to_closed_completed(): void
     {
-        Http::fake([
-            'https://api.github.com/repos/acme/widget/issues/42' => Http::response([], 200),
+        Saloon::fake([
+            CloseIssue::class => MockResponse::make([], 200),
         ]);
 
         $this->tracker->closeIssue('acme', 'widget', 42);
 
-        Http::assertSent(fn ($r): bool => $r->method() === 'PATCH'
-            && str_starts_with($r->url(), 'https://api.github.com/repos/acme/widget/issues/42')
-            && $r['state'] === 'closed'
-            && $r['state_reason'] === 'completed');
+        Saloon::assertSent(function (Request $request, $response): bool {
+            $body = $request instanceof CloseIssue ? $request->body()->all() : [];
+
+            return $request instanceof CloseIssue
+                && $response->getPendingRequest()->getMethod()->value === 'PATCH'
+                && $request->resolveEndpoint() === '/repos/acme/widget/issues/42'
+                && ($body['state'] ?? null) === 'closed'
+                && ($body['state_reason'] ?? null) === 'completed';
+        });
     }
 
     // ── listReferences ───────────────────────────────────────────────────────
 
     public function test_list_references_maps_full_names_to_ref_options(): void
     {
-        Http::fake([
-            'https://api.github.com/user/repos*' => Http::response([
+        Saloon::fake([
+            ListRepositories::class => MockResponse::make([
                 ['full_name' => 'acme/widget'],
                 ['full_name' => 'acme/gadget'],
             ]),
@@ -50,13 +62,13 @@ class GitHubIssueTrackerTest extends TestCase
             'acme/gadget' => 'acme/gadget',
         ], $refs);
 
-        Http::assertSent(fn ($r) => $r->hasHeader('Authorization', 'Bearer ghp_test_token')
-            && str_starts_with($r->url(), 'https://api.github.com/user/repos'));
+        Saloon::assertSent(fn (Request $request, $response): bool => $request instanceof ListRepositories
+            && $response->getPendingRequest()->headers()->get('Authorization') === 'Bearer ghp_test_token');
     }
 
     public function test_list_references_returns_empty_when_no_repos(): void
     {
-        Http::fake(['https://api.github.com/user/repos*' => Http::response([])]);
+        Saloon::fake([ListRepositories::class => MockResponse::make([])]);
 
         $this->assertSame([], $this->tracker->listReferences());
     }
@@ -65,8 +77,8 @@ class GitHubIssueTrackerTest extends TestCase
 
     public function test_register_webhook_posts_to_github_hooks_endpoint(): void
     {
-        Http::fake([
-            'https://api.github.com/repos/acme/widget/hooks' => Http::response([
+        Saloon::fake([
+            RegisterWebhook::class => MockResponse::make([
                 'id' => 42,
                 'type' => 'Repository',
                 'active' => true,
@@ -81,11 +93,12 @@ class GitHubIssueTrackerTest extends TestCase
 
         $this->assertSame(42, $result['id']);
 
-        Http::assertSent(function ($request): bool {
-            $body = json_decode($request->body(), true);
+        Saloon::assertSent(function (Request $request, $response): bool {
+            $body = $request instanceof RegisterWebhook ? $request->body()->all() : [];
 
-            return $request->url() === 'https://api.github.com/repos/acme/widget/hooks'
-                && $request->method() === 'POST'
+            return $request instanceof RegisterWebhook
+                && $request->resolveEndpoint() === '/repos/acme/widget/hooks'
+                && $response->getPendingRequest()->getMethod()->value === 'POST'
                 && $body['name'] === 'web'
                 && $body['active'] === true
                 && in_array('issues', $body['events'], true)
@@ -97,52 +110,48 @@ class GitHubIssueTrackerTest extends TestCase
 
     public function test_register_webhook_sends_bearer_auth(): void
     {
-        Http::fake([
-            'https://api.github.com/repos/acme/widget/hooks' => Http::response(['id' => 1], 201),
+        Saloon::fake([
+            RegisterWebhook::class => MockResponse::make(['id' => 1], 201),
         ]);
 
         $this->tracker->registerWebhook('acme', 'widget', 'https://example.com', 'secret');
 
-        Http::assertSent(fn ($r) => $r->hasHeader('Authorization', 'Bearer ghp_test_token'));
+        Saloon::assertSent(fn (Request $request, $response): bool => $response->getPendingRequest()->headers()->get('Authorization') === 'Bearer ghp_test_token');
     }
 
     // ── unregisterWebhook ────────────────────────────────────────────────────
 
     public function test_unregister_webhook_sends_delete_request(): void
     {
-        Http::fake([
-            'https://api.github.com/repos/acme/widget/hooks/42' => Http::response(null, 204),
+        Saloon::fake([
+            UnregisterWebhook::class => MockResponse::make('', 204),
         ]);
 
         $this->tracker->unregisterWebhook('acme', 'widget', 42);
 
-        Http::assertSent(function ($request): bool {
-            return $request->url() === 'https://api.github.com/repos/acme/widget/hooks/42'
-                && $request->method() === 'DELETE';
-        });
+        Saloon::assertSent(fn (Request $request, $response): bool => $request instanceof UnregisterWebhook
+            && $request->resolveEndpoint() === '/repos/acme/widget/hooks/42'
+            && $response->getPendingRequest()->getMethod()->value === 'DELETE');
     }
 
     // ── listIssues ───────────────────────────────────────────────────────────
 
     public function test_list_issues_defaults_state_to_open(): void
     {
-        Http::fake([
-            'https://api.github.com/repos/acme/widget/issues*' => Http::response([]),
+        Saloon::fake([
+            ListIssues::class => MockResponse::make([]),
         ]);
 
         $this->tracker->listIssues('acme', 'widget');
 
-        Http::assertSent(function ($request): bool {
-            parse_str(parse_url((string) $request->url(), PHP_URL_QUERY) ?? '', $query);
-
-            return ($query['state'] ?? '') === 'open';
-        });
+        Saloon::assertSent(fn (Request $request): bool => $request instanceof ListIssues
+            && ($request->query()->all()['state'] ?? '') === 'open');
     }
 
     public function test_list_issues_filters_out_pull_requests(): void
     {
-        Http::fake([
-            'https://api.github.com/repos/acme/widget/issues*' => Http::response([
+        Saloon::fake([
+            ListIssues::class => MockResponse::make([
                 ['id' => 1, 'title' => 'Real issue', 'state' => 'open'],
                 ['id' => 2, 'title' => 'A pull request', 'state' => 'open', 'pull_request' => ['url' => 'https://github.com/…']],
                 ['id' => 3, 'title' => 'Another issue', 'state' => 'open'],
@@ -158,17 +167,18 @@ class GitHubIssueTrackerTest extends TestCase
 
     public function test_list_issues_paginates_via_link_header(): void
     {
-        Http::fake([
-            'https://api.github.com/repos/acme/widget/issues*' => Http::sequence()
-                ->push(
-                    [['id' => 1, 'title' => 'Issue 1', 'state' => 'open']],
-                    200,
-                    ['Link' => '<https://api.github.com/repos/acme/widget/issues?page=2&per_page=100>; rel="next"'],
-                )
-                ->push(
-                    [['id' => 2, 'title' => 'Issue 2', 'state' => 'open']],
-                    200,
-                ),
+        // Sequence: first send returns a Link header pointing at page 2, second
+        // send returns the final page without a Link header.
+        Saloon::fake([
+            MockResponse::make(
+                [['id' => 1, 'title' => 'Issue 1', 'state' => 'open']],
+                200,
+                ['Link' => '<https://api.github.com/repos/acme/widget/issues?page=2&per_page=100>; rel="next"'],
+            ),
+            MockResponse::make(
+                [['id' => 2, 'title' => 'Issue 2', 'state' => 'open']],
+                200,
+            ),
         ]);
 
         $issues = $this->tracker->listIssues('acme', 'widget');
@@ -180,20 +190,19 @@ class GitHubIssueTrackerTest extends TestCase
 
     public function test_list_issues_pagination_also_filters_prs(): void
     {
-        Http::fake([
-            'https://api.github.com/repos/acme/widget/issues*' => Http::sequence()
-                ->push(
-                    [
-                        ['id' => 10, 'title' => 'Issue 10', 'state' => 'open'],
-                        ['id' => 11, 'title' => 'PR 11', 'state' => 'open', 'pull_request' => ['url' => 'x']],
-                    ],
-                    200,
-                    ['Link' => '<https://api.github.com/repos/acme/widget/issues?page=2>; rel="next"'],
-                )
-                ->push(
-                    [['id' => 12, 'title' => 'Issue 12', 'state' => 'open']],
-                    200,
-                ),
+        Saloon::fake([
+            MockResponse::make(
+                [
+                    ['id' => 10, 'title' => 'Issue 10', 'state' => 'open'],
+                    ['id' => 11, 'title' => 'PR 11', 'state' => 'open', 'pull_request' => ['url' => 'x']],
+                ],
+                200,
+                ['Link' => '<https://api.github.com/repos/acme/widget/issues?page=2>; rel="next"'],
+            ),
+            MockResponse::make(
+                [['id' => 12, 'title' => 'Issue 12', 'state' => 'open']],
+                200,
+            ),
         ]);
 
         $issues = $this->tracker->listIssues('acme', 'widget');
@@ -305,8 +314,8 @@ class GitHubIssueTrackerTest extends TestCase
 
     public function test_get_comment_reactions_maps_content_and_user(): void
     {
-        Http::fake([
-            'https://api.github.com/repos/acme/widget/issues/comments/555/reactions*' => Http::response([
+        Saloon::fake([
+            'https://api.github.com/repos/acme/widget/issues/comments/555/reactions*' => MockResponse::make([
                 ['content' => '+1', 'user' => ['id' => 7, 'login' => 'maintainer']],
                 ['content' => 'heart', 'user' => ['id' => 8, 'login' => 'fan']],
             ]),
@@ -322,9 +331,9 @@ class GitHubIssueTrackerTest extends TestCase
 
     public function test_user_can_approve_only_with_write_or_admin_permission(): void
     {
-        Http::fake([
-            'https://api.github.com/repos/acme/widget/collaborators/maintainer/permission' => Http::response(['permission' => 'write']),
-            'https://api.github.com/repos/acme/widget/collaborators/reader/permission' => Http::response(['permission' => 'read']),
+        Saloon::fake([
+            'https://api.github.com/repos/acme/widget/collaborators/maintainer/permission' => MockResponse::make(['permission' => 'write']),
+            'https://api.github.com/repos/acme/widget/collaborators/reader/permission' => MockResponse::make(['permission' => 'read']),
         ]);
 
         $this->assertTrue($this->tracker->userCanApprove('acme', 'widget', ['emoji' => '+1', 'user_id' => '7', 'user_login' => 'maintainer']));
@@ -333,8 +342,8 @@ class GitHubIssueTrackerTest extends TestCase
 
     public function test_user_can_approve_is_false_when_permission_lookup_fails(): void
     {
-        Http::fake([
-            'https://api.github.com/repos/acme/widget/collaborators/*/permission' => Http::response(['message' => 'Not Found'], 404),
+        Saloon::fake([
+            'https://api.github.com/repos/acme/widget/collaborators/*/permission' => MockResponse::make(['message' => 'Not Found'], 404),
         ]);
 
         $this->assertFalse($this->tracker->userCanApprove('acme', 'widget', ['emoji' => '+1', 'user_id' => '9', 'user_login' => 'stranger']));

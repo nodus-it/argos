@@ -37,6 +37,7 @@ phase_respond_preconditions() {
 }
 
 # _respond_build_user_prompt: produce the user prompt for the Claude respond session.
+# shellcheck disable=SC2016  # printf prompt text contains literal `backticks`/$ by design
 _respond_build_user_prompt() {
     local feedback_file=/workspace/.agent/respond.feedback.md
     local concept_file=/workspace/.agent/concept.md
@@ -86,13 +87,7 @@ phase_respond_run() {
         --max-turns "$max_turns" \
         --include-partial \
       | log_scrub \
-      | tee "$stream_log" \
-      | tee >(jq -rj '
-            if .type == "assistant" then
-                (.message.content[]? | select(.type == "text") | .text // "")
-            elif .type == "result" then "\n"
-            else empty end
-          ' 2>/dev/null >&2) \
+      | agent_stream_tee "$stream_log" \
       | jq -c 'select(.type == "result")' \
       > "$result_json"
     local agent_exit=${PIPESTATUS[0]}
@@ -194,19 +189,7 @@ phase_respond_run() {
             --max-turns "${GATE_FIX_MAX_TURNS:-30}" \
             --include-partial \
           | log_scrub \
-          | tee "$fix_stream_log" \
-          | tee >(jq -rj '
-                if .type == "assistant" then
-                    (.message.content[]? |
-                        if .type == "text" then (.text // "")
-                        elif .type == "tool_use" then
-                            "\n[fix] " +
-                            (.input.file_path // .input.command // (.input | tostring)[0:80]) + "\n"
-                        else empty end
-                    )
-                elif .type == "result" then "\n"
-                else empty end
-              ' >&2 2>/dev/null) \
+          | agent_stream_tee "$fix_stream_log" \
           | jq -c 'select(.type == "result")' \
           > "$fix_result_json"
         local fix_exit=${PIPESTATUS[0]}
