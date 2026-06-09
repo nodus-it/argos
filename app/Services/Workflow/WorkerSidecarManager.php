@@ -6,6 +6,7 @@ namespace App\Services\Workflow;
 
 use App\Enums\BackingService;
 use App\Models\Task;
+use App\Services\Project\BackingServiceResolver;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Symfony\Component\Process\Process;
@@ -37,10 +38,13 @@ class WorkerSidecarManager
             return new WorkerSidecars;
         }
 
-        $services = $task->repoProfile?->backingServices() ?? [];
-        if ($services === []) {
+        $profile = $task->repoProfile;
+        $services = $profile?->backingServices() ?? [];
+        if ($profile === null || $services === []) {
             return new WorkerSidecars;
         }
+
+        $coordinates = app(BackingServiceResolver::class)->coordinates($profile);
 
         $network = $this->networkName($task, $phase);
         $this->mustRun(['docker', 'network', 'create', $network], 30);
@@ -50,14 +54,16 @@ class WorkerSidecarManager
 
         try {
             foreach ($services as $service) {
-                $container = $network.'-'.$service->host();
+                $coords = $coordinates[$service->value];
+                $alias = $coords['host'];
+                $container = $network.'-'.$alias;
                 $cmd = [
                     'docker', 'run', '-d',
                     '--name', $container,
                     '--network', $network,
-                    '--network-alias', $service->host(),
+                    '--network-alias', $alias,
                 ];
-                foreach ($service->containerEnv() as $key => $value) {
+                foreach ($service->containerEnv($coords) as $key => $value) {
                     $cmd[] = '-e';
                     $cmd[] = "{$key}={$value}";
                 }
@@ -65,7 +71,7 @@ class WorkerSidecarManager
 
                 $this->mustRun($cmd, 60);
                 $containers[] = $container;
-                $env = array_merge($env, $service->workerEnv());
+                $env = array_merge($env, $service->connectionEnv($coords));
             }
 
             $this->awaitReadiness($services, $containers);

@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace App\Enums;
 
 /**
- * Backing services Argos can boot as ephemeral sidecars for a worker phase run,
- * so a project's test suite can talk to a real MySQL/Redis instead of
- * sqlite/in-memory. One private network per run, torn down afterwards.
+ * Backing services Argos can boot for a project — as ephemeral sidecars for a
+ * worker phase run AND (unified) for the live demo. One private network per
+ * run, torn down afterwards.
  *
- * Each case knows its image, the network alias the worker reaches it under (the
- * conventional Laravel host: db / redis), the env the service container itself
- * needs, the connection env handed to the worker, and a readiness probe run via
- * `docker exec`.
+ * The enum is the *catalog*: image, readiness probe, the fixed network alias,
+ * and the env-key shapes. The concrete coordinate VALUES (host, port,
+ * credentials) are resolved per profile by BackingServiceResolver — credentials
+ * are configurable, host/port are fixed.
  */
 enum BackingService: string
 {
@@ -36,55 +36,83 @@ enum BackingService: string
     }
 
     /**
-     * Network alias / hostname the worker reaches this service under.
+     * Default coordinates. `host`/`port` are fixed (the network alias the
+     * service is reached under); the credential keys are overridable per
+     * profile — see configurableKeys().
+     *
+     * @return array<string, string>
      */
-    public function host(): string
+    public function defaultCoordinates(): array
     {
         return match ($this) {
-            self::Mysql => 'db',
-            self::Redis => 'redis',
+            self::Mysql => [
+                'host' => 'db',
+                'port' => '3306',
+                'database' => 'argos',
+                'username' => 'argos',
+                'password' => 'argos',
+            ],
+            self::Redis => [
+                'host' => 'redis',
+                'port' => '6379',
+            ],
         };
     }
 
     /**
-     * Env the service container itself needs to initialise.
+     * Coordinate keys a profile may override (host/port stay fixed).
      *
-     * @return array<string, string>
+     * @return list<string>
      */
-    public function containerEnv(): array
+    public function configurableKeys(): array
     {
         return match ($this) {
-            self::Mysql => [
-                'MARIADB_DATABASE' => 'argos',
-                'MARIADB_USER' => 'argos',
-                'MARIADB_PASSWORD' => 'argos',
-                'MARIADB_ROOT_PASSWORD' => 'argos',
-            ],
+            self::Mysql => ['database', 'username', 'password'],
             self::Redis => [],
         };
     }
 
     /**
-     * Connection env handed to the worker so the project's tests reach this
-     * service. Standard Laravel keys — the project's phpunit.xml / .env must
-     * read them via env().
+     * Connection env handed to the worker / demo app so it reaches the service.
+     * Standard Laravel keys — read via env().
      *
+     * @param  array<string, string>  $c  resolved coordinates
      * @return array<string, string>
      */
-    public function workerEnv(): array
+    public function connectionEnv(array $c): array
     {
         return match ($this) {
             self::Mysql => [
-                'DB_HOST' => 'db',
-                'DB_PORT' => '3306',
-                'DB_DATABASE' => 'argos',
-                'DB_USERNAME' => 'argos',
-                'DB_PASSWORD' => 'argos',
+                'DB_HOST' => $c['host'],
+                'DB_PORT' => $c['port'],
+                'DB_DATABASE' => $c['database'],
+                'DB_USERNAME' => $c['username'],
+                'DB_PASSWORD' => $c['password'],
             ],
             self::Redis => [
-                'REDIS_HOST' => 'redis',
-                'REDIS_PORT' => '6379',
+                'REDIS_HOST' => $c['host'],
+                'REDIS_PORT' => $c['port'],
             ],
+        };
+    }
+
+    /**
+     * Env the service container itself needs to initialise, from the resolved
+     * coordinates (so a custom database/user/password actually takes effect).
+     *
+     * @param  array<string, string>  $c  resolved coordinates
+     * @return array<string, string>
+     */
+    public function containerEnv(array $c): array
+    {
+        return match ($this) {
+            self::Mysql => [
+                'MARIADB_DATABASE' => $c['database'],
+                'MARIADB_USER' => $c['username'],
+                'MARIADB_PASSWORD' => $c['password'],
+                'MARIADB_ROOT_PASSWORD' => $c['password'],
+            ],
+            self::Redis => [],
         };
     }
 

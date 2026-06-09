@@ -456,7 +456,28 @@ class RepoProfileResource extends Resource
                                             BackingService::Mysql->value => BackingService::Mysql->label(),
                                             BackingService::Redis->value => BackingService::Redis->label(),
                                         ])
+                                        ->live()
                                         ->columns(2),
+
+                                    // MySQL credentials — configurable so the
+                                    // worker AND demo can match a name the
+                                    // project hardcodes. Empty = the argos
+                                    // defaults.
+                                    Grid::make(3)
+                                        ->visible(fn (Get $get): bool => in_array('mysql', (array) $get('worker_services'), true))
+                                        ->schema([
+                                            TextInput::make('worker_service_config.mysql.database')
+                                                ->label(__('projects.fields.mysql_database_label'))
+                                                ->placeholder('argos'),
+                                            TextInput::make('worker_service_config.mysql.username')
+                                                ->label(__('projects.fields.mysql_username_label'))
+                                                ->placeholder('argos'),
+                                            TextInput::make('worker_service_config.mysql.password')
+                                                ->label(__('projects.fields.mysql_password_label'))
+                                                ->placeholder('argos')
+                                                ->password()
+                                                ->revealable(),
+                                        ]),
                                 ]),
 
                             // ── Live-Demo ───────────────────────────────────────────────────
@@ -508,6 +529,17 @@ class RepoProfileResource extends Resource
                                         ->itemLabel(fn (array $state): ?string => $state['host'] ?? null)
                                         ->collapsible()
                                         ->defaultItems(0),
+
+                                    // Discoverability for the ${service.key}
+                                    // placeholders — reactive to which backing
+                                    // services are enabled, so a non-standard
+                                    // project knows exactly what it can reference
+                                    // in the values below.
+                                    Callout::make(__('projects.fields.env_placeholders_heading'))
+                                        ->visible(fn (Get $get): bool => self::availablePlaceholders($get) !== [])
+                                        ->color('gray')
+                                        ->icon('heroicon-o-code-bracket')
+                                        ->description(fn (Get $get): string => __('projects.fields.env_placeholders_body').' '.implode('   ', self::availablePlaceholders($get))),
 
                                     Repeater::make('worker_env')
                                         ->label(__('projects.fields.worker_env_label'))
@@ -588,6 +620,28 @@ class RepoProfileResource extends Resource
                         ]),  // ↑ end of "Worker" tab
                 ]),  // ↑ end of Tabs::make()
         ]);
+    }
+
+    /**
+     * The `${service.key}` placeholders available given the currently-enabled
+     * backing services — drives the reactive hint in the secrets section.
+     *
+     * @return list<string>
+     */
+    private static function availablePlaceholders(Get $get): array
+    {
+        $tokens = [];
+        foreach ((array) $get('worker_services') as $value) {
+            $service = BackingService::tryFrom((string) $value);
+            if ($service === null) {
+                continue;
+            }
+            foreach (array_keys($service->defaultCoordinates()) as $coordKey) {
+                $tokens[] = '${'.$service->value.'.'.$coordKey.'}';
+            }
+        }
+
+        return $tokens;
     }
 
     private static function githubAccount(): ?ConnectedAccount

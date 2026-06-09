@@ -82,6 +82,25 @@ class ProjectEnvironmentResolverTest extends TestCase
         $this->assertSame('{"http-basic":{}}', $this->resolve($profile)['COMPOSER_AUTH']);
     }
 
+    public function test_expands_backing_service_placeholders(): void
+    {
+        $profile = RepoProfile::factory()
+            ->withBackingServices(['mysql'])
+            ->withServiceConfig(['mysql' => ['database' => 'shop']])
+            ->withWorkerEnv([
+                ['name' => 'TESTING_DB_HOST', 'value' => '${mysql.host}'],
+                ['name' => 'TESTING_DB_DATABASE', 'value' => '${mysql.database}'],
+                ['name' => 'TESTING_DSN', 'value' => '${mysql.host}:${mysql.port}'],
+            ])
+            ->create();
+
+        $env = $this->resolve($profile);
+
+        $this->assertSame('db', $env['TESTING_DB_HOST']);
+        $this->assertSame('shop', $env['TESTING_DB_DATABASE']);
+        $this->assertSame('db:3306', $env['TESTING_DSN']);
+    }
+
     public function test_reserved_keys_are_dropped(): void
     {
         $profile = RepoProfile::factory()->withWorkerEnv([

@@ -744,4 +744,29 @@ class RepoProfileResourceTest extends TestCase
 
         $this->assertEqualsCanonicalizing(['mysql', 'redis'], $profile->fresh()->worker_services);
     }
+
+    public function test_mysql_credentials_round_trip_via_edit_form(): void
+    {
+        Saloon::fake([
+            'api.github.com/repos/test-org/test-repo/branches*' => MockResponse::make([['name' => 'main']]),
+        ]);
+
+        $profile = RepoProfile::factory()->create(['platform' => 'github']);
+
+        Livewire::test(EditRepoProfile::class, ['record' => $profile->getKey()])
+            ->fillForm([
+                'worker_services' => ['mysql'],
+                'worker_service_config' => ['mysql' => [
+                    'database' => 'shop',
+                    'username' => 'sa',
+                    'password' => 'pw',
+                ]],
+            ])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $config = $profile->fresh()->worker_service_config;
+        $this->assertSame('shop', $config['mysql']['database']);
+        $this->assertSame('sa', $config['mysql']['username']);
+    }
 }

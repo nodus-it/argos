@@ -60,4 +60,12 @@ class RepoProfileFactory extends Factory
     {
         return $this->state(['worker_services' => $services]);
     }
+
+    /**
+     * @param  array<string, array<string, string>>  $config
+     */
+    public function withServiceConfig(array $config): static
+    {
+        return $this->state(['worker_service_config' => $config]);
+    }
 }

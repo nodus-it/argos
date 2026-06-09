@@ -94,6 +94,27 @@ class WorkerSidecarManagerTest extends TestCase
         );
     }
 
+    public function test_custom_mysql_credentials_reach_container_and_connection_env(): void
+    {
+        $profile = RepoProfile::factory()
+            ->withBackingServices(['mysql'])
+            ->withServiceConfig(['mysql' => ['database' => 'shop', 'username' => 'sa', 'password' => 'pw']])
+            ->create();
+        $task = Task::factory()->create(['repo_profile_id' => $profile->id, 'name' => 'cust']);
+
+        $manager = new RecordingSidecarManager;
+        $sidecars = $manager->start($task, 'implement');
+
+        $this->assertSame('shop', $sidecars->env['DB_DATABASE']);
+        $this->assertSame('sa', $sidecars->env['DB_USERNAME']);
+
+        $joined = array_map(static fn (array $c): string => implode(' ', $c), $manager->commands);
+        $this->assertTrue(
+            (bool) array_filter($joined, static fn (string $c): bool => str_contains($c, 'MARIADB_DATABASE=shop')),
+            'expected the mariadb container to use the custom database name',
+        );
+    }
+
     public function test_stop_removes_containers_and_network(): void
     {
         $manager = new RecordingSidecarManager;

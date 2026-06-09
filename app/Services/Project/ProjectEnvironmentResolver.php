@@ -59,6 +59,16 @@ class ProjectEnvironmentResolver
             $env[$name] = (string) ($row['value'] ?? '');
         }
 
+        // Expand backing-service placeholders (`${mysql.host}`, …) in the values
+        // so a project with non-standard env names bridges to the sidecars
+        // without hardcoding internal hosts/credentials.
+        $placeholders = app(BackingServiceResolver::class)->placeholders($profile);
+        if ($placeholders !== []) {
+            foreach ($env as $key => $value) {
+                $env[$key] = strtr($value, $placeholders);
+            }
+        }
+
         foreach (self::RESERVED as $reserved) {
             unset($env[$reserved]);
         }

@@ -97,4 +97,12 @@ class RepoProfileWorkerColumnsTest extends TestCase
         // backingServices() drops the unknown value.
         $this->assertEquals([BackingService::Mysql, BackingService::Redis], $fresh->backingServices());
     }
+
+    public function test_worker_service_config_round_trips(): void
+    {
+        $config = ['mysql' => ['database' => 'shop', 'username' => 'sa', 'password' => 'pw']];
+        $profile = RepoProfile::factory()->create(['worker_service_config' => $config]);
+
+        $this->assertSame($config, $profile->fresh()->worker_service_config);
+    }
 }
