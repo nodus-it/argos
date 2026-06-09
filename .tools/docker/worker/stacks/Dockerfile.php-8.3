@@ -76,6 +76,12 @@ RUN set -eux; \
     pecl install redis; \
     docker-php-ext-enable redis
 
+# Lift the CLI memory_limit: the base image's php.ini-production caps it at
+# 128M, which OOMs PHPStan/Pest on large projects (e.g. Filament). The worker
+# is an ephemeral container bounded by its --memory cap, so -1 is safe and
+# spares every project a per-command --memory-limit flag.
+RUN echo 'memory_limit = -1' > /usr/local/etc/php/conf.d/zz-argos-memory.ini
+
 # Composer (latest stable) from the official image.
 COPY --from=composer:latest /usr/bin/composer /usr/local/bin/composer
 
