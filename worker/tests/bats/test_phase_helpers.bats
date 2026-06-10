@@ -486,3 +486,40 @@ EOF
     run _implement_sum_fix_costs 1.00 1
     [ "$output" = "1.00" ]
 }
+
+@test "quality_is_infra_crash: exit 137 (OOM-kill) → crash" {
+    run quality_is_infra_crash /nonexistent 137
+    [ "$status" -eq 0 ]
+}
+
+@test "quality_is_infra_crash: PHP OOM fatal im Log → crash" {
+    log="$(mktemp)"
+    printf 'PHP Fatal error:  Allowed memory size of 134217728 bytes exhausted\n' > "$log"
+    run quality_is_infra_crash "$log" 255
+    rm -f "$log"
+    [ "$status" -eq 0 ]
+}
+
+@test "quality_is_infra_crash: kaputte Config → crash" {
+    log="$(mktemp)"
+    printf 'Invalid configuration: Unexpected item under phpstan\n' > "$log"
+    run quality_is_infra_crash "$log" 1
+    rm -f "$log"
+    [ "$status" -eq 0 ]
+}
+
+@test "quality_is_infra_crash: echtes PHPStan-Finding → kein crash" {
+    log="$(mktemp)"
+    printf ' [ERROR] Found 3 errors\n\nLine app/Foo.php\n  12  Method bar() has no return type\n' > "$log"
+    run quality_is_infra_crash "$log" 1
+    rm -f "$log"
+    [ "$status" -eq 1 ]
+}
+
+@test "quality_is_infra_crash: normaler Pest-Failure → kein crash" {
+    log="$(mktemp)"
+    printf 'FAILED  Tests\\Feature\\FooTest > it works\nExpected true, got false\n' > "$log"
+    run quality_is_infra_crash "$log" 1
+    rm -f "$log"
+    [ "$status" -eq 1 ]
+}
