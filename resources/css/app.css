@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@custom-variant dark (&:where(.dark, .dark *));
 @plugin '@tailwindcss/typography';
 
 /* Self-hosted fonts (offline-robust, no CDN). */
