@@ -140,6 +140,38 @@ _implement_changed_php_files() { quality_changed_php_files; }
 _implement_run_quality_gates() { quality_gates_run "$@"; }
 _implement_quality_gate_verdict() { quality_gate_verdict "$@"; }
 
+# _implement_fix_max_turns: turn budget for a gate fix session.
+# A flat 30 was too low for large repos — a single fix could hit
+# error_max_turns mid-edit and only pass by luck. Default to half the main
+# agent's budget (floored at 60); GATE_FIX_MAX_TURNS overrides explicitly.
+# Args: =main_max_turns
+# Returns: turn budget on stdout
+_implement_fix_max_turns() {
+    local main="${1:-200}" turns
+    if [[ -n "${GATE_FIX_MAX_TURNS:-}" ]]; then
+        printf '%s' "$GATE_FIX_MAX_TURNS"
+        return 0
+    fi
+    turns=$(( main / 2 ))
+    (( turns < 60 )) && turns=60
+    printf '%s' "$turns"
+}
+
+# _implement_sum_fix_costs: main agent cost + every gate fix session's cost for
+# the iteration. Fix sessions run as separate agent invocations with their own
+# result.json; without this their spend is dropped from the phase cost.
+# Args: =main_cost =iteration
+# Returns: summed cost on stdout
+_implement_sum_fix_costs() {
+    local cost="${1:-0}" iteration="${2:-}" fix_rj fix_cost
+    for fix_rj in /workspace/.agent/logs/implement."${iteration}".fix*.result.json; do
+        [[ -e "$fix_rj" ]] || continue
+        fix_cost="$(jq -r '.total_cost_usd // 0' "$fix_rj")"
+        cost="$(awk -v a="$cost" -v b="$fix_cost" 'BEGIN { printf "%.10g", a + b }')"
+    done
+    printf '%s' "$cost"
+}
+
 phase_implement_run() {
     cd /workspace 2>/dev/null || {
         echo "implement: /workspace not mounted" >&2
@@ -263,12 +295,15 @@ phase_implement_run() {
     fi
 
     # Quality gate verification with remediation loop.
-    # If a gate fails the worker builds a focused fix prompt and runs a short
-    # Claude session (~30 turns) to correct the specific issue, then re-checks.
+    # If a gate fails the worker builds a focused fix prompt and runs a Claude
+    # session to correct the specific issue, then re-checks.
     # Capped at GATE_RETRY_LIMIT attempts (default 3) to bound cost and time.
     local max_gate_retries="${GATE_RETRY_LIMIT:-3}"
     local gate_retry=0
     local gates="" failed_gate="" gate_exit=0
+
+    local fix_max_turns
+    fix_max_turns="$(_implement_fix_max_turns "$max_turns")"
 
     while true; do
         local log_suffix="$ITERATION"
@@ -327,7 +362,7 @@ phase_implement_run() {
         agent_run \
             --system-prompt-file "$sysprompt" \
             --user-prompt-file "$fix_prompt_path" \
-            --max-turns "${GATE_FIX_MAX_TURNS:-30}" \
+            --max-turns "$fix_max_turns" \
             --include-partial \
           | log_scrub \
           | agent_stream_tee "$fix_stream_log" \
@@ -370,6 +405,10 @@ phase_implement_run() {
     cost="$(jq -r '.total_cost_usd // 0' "$result_json")"
     input_tokens="$(jq -r '.usage.input_tokens // 0' "$result_json")"
     output_tokens="$(jq -r '.usage.output_tokens // 0' "$result_json")"
+
+    # Gate fix sessions run as separate agent invocations with their own
+    # result.json — add their cost so the phase cost reflects the real spend.
+    cost="$(_implement_sum_fix_costs "$cost" "$ITERATION")"
 
     local emit_args=(
         phase implement

@@ -23,7 +23,11 @@ class TrustProxiesTest extends TestCase
 
     public function test_x_forwarded_proto_https_is_honoured(): void
     {
-        $response = $this->get('/__trust-proxies-probe', [
+        // Absolute http:// base so the probe starts from plain HTTP regardless
+        // of the ambient APP_URL (a developer's local .env may pin an https
+        // APP_URL). That makes the X-Forwarded-Proto the thing that flips the
+        // request to https — i.e. an actual test of the trusted-proxy header.
+        $response = $this->get('http://localhost/__trust-proxies-probe', [
             'X-Forwarded-Proto' => 'https',
             'X-Forwarded-Host' => 'argos.example.com',
         ]);
@@ -37,7 +41,10 @@ class TrustProxiesTest extends TestCase
 
     public function test_request_without_forwarded_proto_stays_http(): void
     {
-        $response = $this->get('/__trust-proxies-probe');
+        // Absolute http:// base (see the note above) — without it an https
+        // APP_URL in the local .env makes the request secure before the
+        // middleware even runs, and this assertion flaps.
+        $response = $this->get('http://localhost/__trust-proxies-probe');
 
         $response->assertOk();
         $response->assertJsonPath('secure', false);
