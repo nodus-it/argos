@@ -2,7 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [develop]
+    # next is included so the auto-synced (merged) integration state gets the
+    # same push-CI as develop; build-app stays develop/tags-only via its `if`.
+    branches: [develop, next]
     # SemVer-style tags without v-prefix (e.g. 0.2.0, 0.2.0-beta.1).
     tags: ['[0-9]+.[0-9]+.[0-9]+*']
   pull_request:

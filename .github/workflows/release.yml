@@ -183,12 +183,18 @@ jobs:
           if [ ! -f CHANGELOG.md ]; then
             printf "# Changelog\n\n" > CHANGELOG.md
           fi
-          {
-            head -n 2 CHANGELOG.md
-            cat /tmp/entry.md
-            tail -n +3 CHANGELOG.md
-          } > CHANGELOG.md.new
-          mv CHANGELOG.md.new CHANGELOG.md
+          # Idempotent: if a partial earlier run already prepended this
+          # version's heading, don't prepend it again on re-run.
+          if grep -qF "## [${{ steps.tag.outputs.name }}]" CHANGELOG.md; then
+            echo "CHANGELOG.md already carries ${{ steps.tag.outputs.name }} — skipping prepend."
+          else
+            {
+              head -n 2 CHANGELOG.md
+              cat /tmp/entry.md
+              tail -n +3 CHANGELOG.md
+            } > CHANGELOG.md.new
+            mv CHANGELOG.md.new CHANGELOG.md
+          fi
 
       - name: Commit version bump on develop
         run: |
@@ -196,8 +202,15 @@ jobs:
           if [ "${{ steps.tag.outputs.is_prerelease }}" = "false" ]; then
             git add CHANGELOG.md
           fi
-          git commit -m "chore(release): ${{ steps.tag.outputs.name }}"
-          git push origin develop
+          # Idempotent: a re-run after a partial failure (bump landed, tag not
+          # yet pushed) finds nothing staged — skip the commit/push instead of
+          # failing on "nothing to commit".
+          if git diff --cached --quiet; then
+            echo "config/argos.php already at ${{ steps.tag.outputs.name }} — skipping bump commit (idempotent re-run)."
+          else
+            git commit -m "chore(release): ${{ steps.tag.outputs.name }}"
+            git push origin develop
+          fi
 
       - name: Merge develop into master, pin installer app image tag, and tag
         run: |
