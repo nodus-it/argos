@@ -206,6 +206,31 @@ EOF
     [ "$output" = "1" ]
 }
 
+# ── apply_next_image ──────────────────────────────────────────────────────────
+
+@test "apply_next_image pins ARGOS_APP_IMAGE to the next tag (appends when missing)" {
+    ENV_FILE="$TEST_DIR/.env"
+    NEXT_IMAGE="ghcr.io/nodus-it/argos-app:next"
+    printf 'APP_KEY=base64:x\n' > "$ENV_FILE"
+
+    apply_next_image >/dev/null
+
+    [ "$(get_env_value "$ENV_FILE" ARGOS_APP_IMAGE)" = "ghcr.io/nodus-it/argos-app:next" ]
+    [ "$(get_env_value "$ENV_FILE" APP_KEY)" = "base64:x" ]
+}
+
+@test "apply_next_image overrides an existing ARGOS_APP_IMAGE in place" {
+    ENV_FILE="$TEST_DIR/.env"
+    NEXT_IMAGE="ghcr.io/nodus-it/argos-app:next"
+    printf 'ARGOS_APP_IMAGE=ghcr.io/nodus-it/argos-app:latest\n' > "$ENV_FILE"
+
+    apply_next_image >/dev/null
+
+    [ "$(get_env_value "$ENV_FILE" ARGOS_APP_IMAGE)" = "ghcr.io/nodus-it/argos-app:next" ]
+    run grep -c '^ARGOS_APP_IMAGE=' "$ENV_FILE"
+    [ "$output" = "1" ]
+}
+
 # ── reset_stack ─────────────────────────────────────────────────────────────
 
 @test "reset_stack wipes env, state and legacy artefacts (no compose file)" {

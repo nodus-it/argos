@@ -117,27 +117,32 @@ To tailor a *target* repository to Argos — a custom build environment
 (`.argos/worker.dockerfile`) or a live-demo contract (`.argos/demo.*`) — see
 the agent-oriented guide in [PREPARE-PROJECT.md](PREPARE-PROJECT.md).
 
-## Pre-release / develop builds
+## Pre-release builds: stage and next
 
-Every push to the `develop` branch publishes the rolling manager image
-`ghcr.io/nodus-it/argos-app:stage`. It tracks unreleased work and may break —
-useful for previewing fixes, **not** for production.
+Two rolling channels track unreleased work — useful for previewing fixes,
+**not** for production:
 
-To track it, install from the develop branch and pin `ARGOS_APP_IMAGE` to the
-rolling tag in your `.env`:
+| Channel | Flag | Branch | Image tag | When to use |
+|---|---|---|---|---|
+| **stage** | `--stage` | `develop` | `:stage` | Preview the next release line (fixes + finished features) |
+| **next** | `--next` | `next` | `:next` | Preview the upcoming version's integration line — ahead of develop, less stable |
+
+Each flag installs that branch's manifests **and** pins `ARGOS_APP_IMAGE` to
+the matching rolling tag CI publishes on every push to that branch. The choice
+is per-invocation — re-pass the flag on update to keep tracking it:
 
 ```bash
-ARGOS_VERSION=develop \
-    curl -fsSL https://raw.githubusercontent.com/nodus-it/argos/develop/.tools/install.sh \
-    | bash -s -- --dir ./argos-develop
+# stage (rolling develop)
+curl -fsSL https://raw.githubusercontent.com/nodus-it/argos/develop/.tools/install.sh \
+    | bash -s -- --dir ./argos-stage --stage
 
-# in ./argos-develop/.env:
-#   ARGOS_APP_IMAGE=ghcr.io/nodus-it/argos-app:stage
-docker compose -f ./argos-develop/docker-compose.yml pull
-docker compose -f ./argos-develop/docker-compose.yml up -d
+# next (rolling integration line)
+curl -fsSL https://raw.githubusercontent.com/nodus-it/argos/next/.tools/install.sh \
+    | bash -s -- --dir ./argos-next --next
 ```
 
-For stable use, stick with `:latest` or a `vX.Y.Z` tag.
+For stable use, stick with the default channel (`:latest` / a `vX.Y.Z` tag) or
+`--beta` for the newest pre-release.
 
 ## OAuth setup (optional)
 

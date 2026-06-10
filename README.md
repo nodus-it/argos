@@ -62,6 +62,7 @@ the admin password.
 | `--dir PATH` | `ARGOS_INSTALL_DIR` | Install into `PATH` instead of `$PWD` |
 | `--version REF` | `ARGOS_VERSION` | Pin a specific Git tag or branch |
 | `--stage` | `ARGOS_STAGE=1` | Use rolling `:stage` images from `develop` |
+| `--next` | `ARGOS_NEXT=1` | Use rolling `:next` images from the `next` integration branch |
 | `--beta` | `ARGOS_BETA=1` | Use the latest release including pre-releases |
 | `--reset` | — | Tear down the stack and wipe all data (destructive) |
 | `--force` | — | Skip safety prompts (required for `--reset` in non-interactive shells) |
