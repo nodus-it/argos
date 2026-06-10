@@ -448,3 +448,41 @@ EOF
     run _concept_branch_slug "Über Straße Öl Ärger"
     [ "$output" = "Ueber-Strasse-Oel-Aerger" ]
 }
+
+@test "_implement_fix_max_turns: Default = halbe Haupt-Turns" {
+    unset GATE_FIX_MAX_TURNS
+    run _implement_fix_max_turns 200
+    [ "$output" = "100" ]
+}
+
+@test "_implement_fix_max_turns: Boden 60 bei kleinem Haupt-Budget" {
+    unset GATE_FIX_MAX_TURNS
+    run _implement_fix_max_turns 50
+    [ "$output" = "60" ]
+}
+
+@test "_implement_fix_max_turns: GATE_FIX_MAX_TURNS überschreibt explizit" {
+    GATE_FIX_MAX_TURNS=20 run _implement_fix_max_turns 200
+    [ "$output" = "20" ]
+}
+
+@test "_implement_sum_fix_costs: addiert alle fix*.result.json der Iteration" {
+    mkdir -p /workspace/.agent/logs
+    printf '{"total_cost_usd":1.28}' > /workspace/.agent/logs/implement.1.fix1.result.json
+    printf '{"total_cost_usd":0.5}'  > /workspace/.agent/logs/implement.1.fix2.result.json
+    run _implement_sum_fix_costs 5.69 1
+    [ "$output" = "7.47" ]
+}
+
+@test "_implement_sum_fix_costs: keine fix-Logs → Hauptkosten unverändert" {
+    mkdir -p /workspace/.agent/logs
+    run _implement_sum_fix_costs 5.69 1
+    [ "$output" = "5.69" ]
+}
+
+@test "_implement_sum_fix_costs: ignoriert andere Iterationen" {
+    mkdir -p /workspace/.agent/logs
+    printf '{"total_cost_usd":9.99}' > /workspace/.agent/logs/implement.2.fix1.result.json
+    run _implement_sum_fix_costs 1.00 1
+    [ "$output" = "1.00" ]
+}
