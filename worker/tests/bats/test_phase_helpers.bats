@@ -428,3 +428,23 @@ EOF
     output="$(_concept_build_continue_prompt)"
     [[ "$output" == *"KEINE Datei"* ]]
 }
+
+@test "_concept_branch_slug: transliteriert deutsche Umlaute (ä→ae, ö→oe, ü→ue, ß→ss)" {
+    run _concept_branch_slug "Neuabschluss bei abgelaufenen Verträgen"
+    [ "$output" = "Neuabschluss-bei-abgelaufenen-Vertraegen" ]
+}
+
+@test "_concept_branch_slug: Leerzeichen und Slashes werden zu Bindestrichen" {
+    run _concept_branch_slug "feature/foo bar"
+    [ "$output" = "feature-foo-bar" ]
+}
+
+@test "_concept_branch_slug: nicht erlaubte Zeichen werden gestrippt, ._- bleiben" {
+    run _concept_branch_slug "Fix: (a) b@c_d.e-f!"
+    [ "$output" = "Fix-a-bc_d.e-f" ]
+}
+
+@test "_concept_branch_slug: Groß-Umlaute und ß" {
+    run _concept_branch_slug "Über Straße Öl Ärger"
+    [ "$output" = "Ueber-Strasse-Oel-Aerger" ]
+}

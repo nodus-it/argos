@@ -75,6 +75,19 @@ _concept_classify_fetch_err() {
     echo "unknown"
 }
 
+# _concept_branch_slug: Turn a task name into a git-safe branch slug.
+# German umlauts are transliterated to digraphs (ä→ae, ö→oe, ü→ue, ß→ss) BEFORE
+# the non-[A-Za-z0-9._-] strip, so they survive as letters instead of being
+# dropped (e.g. "Verträgen" → "Vertraegen", not "Vertrgen").
+# Args: =task_name
+# Returns: slug on stdout
+_concept_branch_slug() {
+    printf '%s' "${1:-}" \
+        | sed -e 's/ä/ae/g; s/ö/oe/g; s/ü/ue/g; s/Ä/Ae/g; s/Ö/Oe/g; s/Ü/Ue/g; s/ß/ss/g' \
+        | tr ' /' '-' \
+        | tr -cd 'a-zA-Z0-9._-'
+}
+
 # _concept_initial_clone: clone the repo into the volume and create the feature branch.
 _concept_initial_clone() {
     set +x
@@ -82,7 +95,7 @@ _concept_initial_clone() {
     auth_header="$(git_auth_header "$REPO_TOKEN")"
 
     local feature_branch slug
-    slug="$(printf '%s' "${TASK_ID}" | tr ' /' '-' | tr -cd 'a-zA-Z0-9._-')"
+    slug="$(_concept_branch_slug "$TASK_ID")"
     feature_branch="${CONCEPT_BRANCH_PREFIX}/${slug}"
 
     # `git clone` refuses to clone into a non-empty /workspace
