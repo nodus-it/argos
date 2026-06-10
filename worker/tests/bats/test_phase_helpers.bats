@@ -429,6 +429,64 @@ EOF
     [[ "$output" == *"KEINE Datei"* ]]
 }
 
+@test "_concept_branch_slug: transliteriert deutsche Umlaute (ä→ae, ö→oe, ü→ue, ß→ss)" {
+    run _concept_branch_slug "Neuabschluss bei abgelaufenen Verträgen"
+    [ "$output" = "Neuabschluss-bei-abgelaufenen-Vertraegen" ]
+}
+
+@test "_concept_branch_slug: Leerzeichen und Slashes werden zu Bindestrichen" {
+    run _concept_branch_slug "feature/foo bar"
+    [ "$output" = "feature-foo-bar" ]
+}
+
+@test "_concept_branch_slug: nicht erlaubte Zeichen werden gestrippt, ._- bleiben" {
+    run _concept_branch_slug "Fix: (a) b@c_d.e-f!"
+    [ "$output" = "Fix-a-bc_d.e-f" ]
+}
+
+@test "_concept_branch_slug: Groß-Umlaute und ß" {
+    run _concept_branch_slug "Über Straße Öl Ärger"
+    [ "$output" = "Ueber-Strasse-Oel-Aerger" ]
+}
+
+@test "_implement_fix_max_turns: Default = halbe Haupt-Turns" {
+    unset GATE_FIX_MAX_TURNS
+    run _implement_fix_max_turns 200
+    [ "$output" = "100" ]
+}
+
+@test "_implement_fix_max_turns: Boden 60 bei kleinem Haupt-Budget" {
+    unset GATE_FIX_MAX_TURNS
+    run _implement_fix_max_turns 50
+    [ "$output" = "60" ]
+}
+
+@test "_implement_fix_max_turns: GATE_FIX_MAX_TURNS überschreibt explizit" {
+    GATE_FIX_MAX_TURNS=20 run _implement_fix_max_turns 200
+    [ "$output" = "20" ]
+}
+
+@test "_implement_sum_fix_costs: addiert alle fix*.result.json der Iteration" {
+    mkdir -p /workspace/.agent/logs
+    printf '{"total_cost_usd":1.28}' > /workspace/.agent/logs/implement.1.fix1.result.json
+    printf '{"total_cost_usd":0.5}'  > /workspace/.agent/logs/implement.1.fix2.result.json
+    run _implement_sum_fix_costs 5.69 1
+    [ "$output" = "7.47" ]
+}
+
+@test "_implement_sum_fix_costs: keine fix-Logs → Hauptkosten unverändert" {
+    mkdir -p /workspace/.agent/logs
+    run _implement_sum_fix_costs 5.69 1
+    [ "$output" = "5.69" ]
+}
+
+@test "_implement_sum_fix_costs: ignoriert andere Iterationen" {
+    mkdir -p /workspace/.agent/logs
+    printf '{"total_cost_usd":9.99}' > /workspace/.agent/logs/implement.2.fix1.result.json
+    run _implement_sum_fix_costs 1.00 1
+    [ "$output" = "1.00" ]
+}
+
 @test "quality_is_infra_crash: exit 137 (OOM-kill) → crash" {
     run quality_is_infra_crash /nonexistent 137
     [ "$status" -eq 0 ]
