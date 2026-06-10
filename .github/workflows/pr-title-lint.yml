@@ -1,0 +1,36 @@
+name: PR title lint
+
+# With squash-only merges the PR title becomes the squash-commit subject on
+# develop/next, and the release notes are generated from exactly those subjects
+# (git log --no-merges). So the title must be a Conventional Commit, otherwise
+# the changelog turns to noise. This check is required on develop/next.
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+    branches: [develop, next]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  lint-title:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate Conventional Commit title
+        # PR title comes in via env (never inline) to avoid script injection.
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          types="feat|fix|chore|docs|refactor|test|perf|build|ci|style|revert"
+          if [[ ! "$PR_TITLE" =~ ^($types)(\([a-z0-9_.-]+\))?(!)?:\ .+ ]]; then
+            echo "::error::PR title is not a Conventional Commit: '$PR_TITLE'"
+            echo "Expected: <type>[(scope)][!]: <subject>   e.g. 'feat(worker): add retry backoff'"
+            echo "Allowed types: ${types//|/, }"
+            exit 1
+          fi
+          if (( ${#PR_TITLE} > 72 )); then
+            echo "::error::PR title too long (${#PR_TITLE} > 72 chars). Keep the squash subject lean."
+            exit 1
+          fi
+          echo "PR title OK: $PR_TITLE"
