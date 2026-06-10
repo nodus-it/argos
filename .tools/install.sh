@@ -32,6 +32,14 @@
 # that CI publishes on every develop push. Tracks unreleased work and may
 # break — not for production. Re-pass --stage on update to keep tracking it.
 #
+# Next channel (rolling :next images from the next branch):
+#   curl … | bash -s -- --next
+#   ARGOS_NEXT=1 curl … | bash
+# Installs the next manifests and pins ARGOS_APP_IMAGE to the :next tag that CI
+# publishes on every next push. `next` is the integration line for the upcoming
+# version — ahead of develop, even less stable than stage. Re-pass --next on
+# update to keep tracking it.
+#
 # Reset (DESTRUCTIVE — wipes DB + all named volumes):
 #   bash .tools/install.sh --reset            # interactive: prompts for "yes"
 #   curl … | bash -s -- --reset --force        # non-interactive: --force is required
@@ -63,6 +71,15 @@ STAGE="${ARGOS_STAGE:-0}"
 # The rolling pre-release image tag the stage channel pins. Derived from the
 # repo so a fork's installer points at the fork's own registry.
 STAGE_IMAGE="ghcr.io/${ARGOS_REPO}-app:stage"
+
+# Next channel: track the rolling :next images CI publishes on every push to
+# the next branch (the integration line for the upcoming version). Implies
+# installing the next manifests and pinning ARGOS_APP_IMAGE to the :next tag.
+# Off by default — ahead of develop, even less stable than stage.
+NEXT="${ARGOS_NEXT:-0}"
+
+# The rolling image tag the next channel pins.
+NEXT_IMAGE="ghcr.io/${ARGOS_REPO}-app:next"
 
 # Files the installer owns inside INSTALL_DIR.
 COMPOSE_FILE="docker-compose.yml"
@@ -118,6 +135,11 @@ Options:
                        manifests and pins ARGOS_APP_IMAGE to the :stage tag.
                        Tracks unreleased work and may break — not for
                        production. Re-pass on update to keep tracking it.
+  -n, --next           Track the rolling ':next' images CI builds on every
+                       push to the next branch (the upcoming version's
+                       integration line). Installs the next manifests and pins
+                       ARGOS_APP_IMAGE to the :next tag. Ahead of develop, even
+                       less stable than --stage. Re-pass on update to keep it.
   -r, --reset          DESTRUCTIVE: tear down the existing stack, wipe the
                        compose volumes (DB included!) and the local .env /
                        state, then run a fresh install. Requires --force when
@@ -131,6 +153,7 @@ Environment overrides:
   ARGOS_VERSION        Same as --version
   ARGOS_BETA=1         Same as --beta
   ARGOS_STAGE=1        Same as --stage
+  ARGOS_NEXT=1         Same as --next
   ARGOS_REPO           GitHub repo (default: nodus-it/argos)
 USAGE
 }
@@ -142,12 +165,19 @@ while [[ $# -gt 0 ]]; do
         -v|--version) ARGOS_VERSION="$2"; shift 2;;
         -b|--beta)    BETA=1; shift;;
         -s|--stage)   STAGE=1; shift;;
+        -n|--next)    NEXT=1; shift;;
         -r|--reset)   RESET=1; shift;;
         -f|--force)   FORCE=1; shift;;
         -h|--help)    usage; exit 0;;
         *)            fail "Unknown argument: $1 (try --help)";;
     esac
 done
+
+# Stage and next both pin ARGOS_APP_IMAGE to a different rolling tag and select
+# a different branch — picking both is ambiguous. Reject it early.
+if [[ "$STAGE" -eq 1 && "$NEXT" -eq 1 ]]; then
+    fail "Choose only one rolling channel: --stage (develop) or --next (next)."
+fi
 
 # Where the installer manifests live. Defaults to the GitHub raw URL; tests
 # (and air-gapped installs) can point this at a local directory via file://.
@@ -403,6 +433,17 @@ apply_stage_image() {
     log "Pinned ARGOS_APP_IMAGE=$STAGE_IMAGE (stage channel)."
 }
 
+# apply_next_image: Pin ARGOS_APP_IMAGE in $ENV_FILE to the rolling :next tag so
+# `docker compose pull` fetches the next image instead of the release default.
+# Called only on the next channel; like --stage the choice is per-invocation —
+# re-pass --next on update to keep tracking it.
+# Args: none (writes $ENV_FILE, reads $NEXT_IMAGE)
+# Returns: 0
+apply_next_image() {
+    set_env_value "$ENV_FILE" ARGOS_APP_IMAGE "$NEXT_IMAGE"
+    log "Pinned ARGOS_APP_IMAGE=$NEXT_IMAGE (next channel)."
+}
+
 # reset_stack: Tear down the compose stack (containers + named volumes),
 # remove the local .env and state files, and clean up legacy artefacts so the
 # next install path is "fresh". Idempotent — runs cleanly even when nothing
@@ -475,6 +516,7 @@ print_summary() {
     channel="release"
     [[ "$BETA"  -eq 1 ]] && channel="beta (pre-release)"
     [[ "$STAGE" -eq 1 ]] && channel="stage (rolling develop)"
+    [[ "$NEXT"  -eq 1 ]] && channel="next (rolling integration)"
 
     local b0="" b1=""
     if [[ -t 1 && "${TERM:-dumb}" != "dumb" ]]; then
@@ -521,6 +563,9 @@ main() {
         if [[ "$STAGE" -eq 1 ]]; then
             log "Stage channel: tracking the rolling :stage images from develop."
             ARGOS_VERSION="develop"
+        elif [[ "$NEXT" -eq 1 ]]; then
+            log "Next channel: tracking the rolling :next images from next."
+            ARGOS_VERSION="next"
         elif [[ "$BETA" -eq 1 ]]; then
             log "Beta channel: resolving latest release including pre-releases …"
             ARGOS_VERSION="$(resolve_beta_version)"
@@ -604,6 +649,8 @@ MSG
 
     if [[ "$STAGE" -eq 1 ]]; then
         apply_stage_image
+    elif [[ "$NEXT" -eq 1 ]]; then
+        apply_next_image
     fi
 
     remove_legacy_artefacts

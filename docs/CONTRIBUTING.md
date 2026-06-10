@@ -164,7 +164,7 @@ status documents — those belong in PR descriptions.
 
 Open an issue on <https://github.com/nodus-it/argos/issues>. Include:
 
-- Argos image tag (`:latest`, `:stage`, `vX.Y.Z`)
+- Argos image tag (`:latest`, `:stage`, `:next`, `vX.Y.Z`)
 - Worker image tag if relevant
 - Provider (GitHub / GitLab / Bitbucket) + auth mode (PAT / OAuth)
 - Reproduction steps and any logs from the affected task
