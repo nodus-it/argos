@@ -59,4 +59,7 @@ it('keeps write calls out of the migrated presentation files', function (string 
     'app/Filament/Admin/Resources/ProviderCredentialResource/Pages/EditProviderCredential.php',
     'app/Filament/Admin/Resources/RepoProfileResource/Pages/CreateRepoProfile.php',
     'app/Filament/Admin/Resources/RepoProfileResource/Pages/EditRepoProfile.php',
+    'app/Filament/Admin/Resources/WorkerStackResource.php',
+    'app/Filament/Admin/Resources/WorkerStackResource/Pages/CreateWorkerStack.php',
+    'app/Filament/Admin/Resources/WorkerStackResource/Pages/EditWorkerStack.php',
 ]);
