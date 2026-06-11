@@ -6,14 +6,21 @@ namespace App\Filament\Admin\Resources\ProviderCredentialResource\Pages;
 
 use App\Filament\Admin\Concerns\VerifiesCredentialOnSave;
 use App\Filament\Admin\Resources\ProviderCredentialResource;
+use App\Filament\Admin\Support\Pages\CreateRecord;
 use App\Services\Credentials\CredentialVerifier;
-use Filament\Resources\Pages\CreateRecord;
+use App\Services\Credentials\ProviderCredentialService;
+use App\Services\EntityService;
 
 class CreateProviderCredential extends CreateRecord
 {
     use VerifiesCredentialOnSave;
 
     protected static string $resource = ProviderCredentialResource::class;
+
+    protected function service(): EntityService
+    {
+        return app(ProviderCredentialService::class);
+    }
 
     /** Set when reached from the onboarding wizard (?return=onboarding). */
     public ?string $returnTo = null;

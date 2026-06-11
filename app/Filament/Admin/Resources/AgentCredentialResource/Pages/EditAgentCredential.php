@@ -8,10 +8,12 @@ use App\Enums\AgentName;
 use App\Filament\Admin\Concerns\HasArgosEditHeading;
 use App\Filament\Admin\Concerns\VerifiesCredentialOnSave;
 use App\Filament\Admin\Resources\AgentCredentialResource;
+use App\Filament\Admin\Support\Pages\EditRecord;
 use App\Models\AgentCredential;
+use App\Services\Credentials\AgentCredentialService;
 use App\Services\Credentials\CredentialVerifier;
+use App\Services\EntityService;
 use Filament\Actions\DeleteAction;
-use Filament\Resources\Pages\EditRecord;
 
 class EditAgentCredential extends EditRecord
 {
@@ -19,6 +21,11 @@ class EditAgentCredential extends EditRecord
     use VerifiesCredentialOnSave;
 
     protected static string $resource = AgentCredentialResource::class;
+
+    protected function service(): EntityService
+    {
+        return app(AgentCredentialService::class);
+    }
 
     protected function getHeaderActions(): array
     {

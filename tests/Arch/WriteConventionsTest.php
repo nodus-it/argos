@@ -52,4 +52,9 @@ it('keeps write calls out of the migrated presentation files', function (string 
     'app/Filament/Admin/Resources/ApiClientResource.php',
     'app/Filament/Admin/Resources/ApiClientResource/Pages/CreateApiClient.php',
     'app/Filament/Admin/Resources/ApiClientResource/Pages/EditApiClient.php',
+    'app/Filament/Admin/Resources/AgentCredentialResource.php',
+    'app/Filament/Admin/Resources/AgentCredentialResource/Pages/CreateAgentCredential.php',
+    'app/Filament/Admin/Resources/AgentCredentialResource/Pages/EditAgentCredential.php',
+    'app/Filament/Admin/Resources/ProviderCredentialResource/Pages/CreateProviderCredential.php',
+    'app/Filament/Admin/Resources/ProviderCredentialResource/Pages/EditProviderCredential.php',
 ]);
