@@ -324,9 +324,6 @@ class TaskProviderBindingsRelationManager extends RelationManager
                                 ->success()
                                 ->send();
                         } catch (\Throwable $e) {
-                            $record->last_error = $e->getMessage();
-                            $record->save();
-
                             Notification::make()
                                 ->title('Einrichtung fehlgeschlagen')
                                 ->body($e->getMessage())

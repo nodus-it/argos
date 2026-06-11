@@ -62,4 +62,5 @@ it('keeps write calls out of the migrated presentation files', function (string 
     'app/Filament/Admin/Resources/WorkerStackResource.php',
     'app/Filament/Admin/Resources/WorkerStackResource/Pages/CreateWorkerStack.php',
     'app/Filament/Admin/Resources/WorkerStackResource/Pages/EditWorkerStack.php',
+    'app/Filament/Admin/Resources/RepoProfileResource/RelationManagers/TaskProviderBindingsRelationManager.php',
 ]);
