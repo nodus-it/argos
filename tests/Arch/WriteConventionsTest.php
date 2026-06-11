@@ -63,4 +63,7 @@ it('keeps write calls out of the migrated presentation files', function (string 
     'app/Filament/Admin/Resources/WorkerStackResource/Pages/CreateWorkerStack.php',
     'app/Filament/Admin/Resources/WorkerStackResource/Pages/EditWorkerStack.php',
     'app/Filament/Admin/Resources/RepoProfileResource/RelationManagers/TaskProviderBindingsRelationManager.php',
+    'app/Http/Controllers/Auth/ConnectedAccountController.php',
+    'app/Http/Controllers/Auth/BitbucketConnectedAccountController.php',
+    'app/Http/Controllers/Auth/LinearConnectedAccountController.php',
 ]);

@@ -9,8 +9,8 @@ use App\Http\Controllers\Controller;
 use App\Integrations\Linear\LinearConnector;
 use App\Integrations\Linear\Requests\GraphQLRequest;
 use App\Integrations\Linear\Requests\OAuthTokenExchange;
-use App\Models\ConnectedAccount;
 use App\Models\User;
+use App\Services\OAuth\ConnectedAccountService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -78,20 +78,15 @@ final class LinearConnectedAccountController extends Controller
         /** @var User $user */
         $user = Auth::user();
 
-        $account = ConnectedAccount::updateOrCreate(
-            ['user_id' => $user->id, 'provider' => 'linear'],
-            [
-                'provider_id' => (string) $viewer['id'],
-                'token' => $accessToken,
-                'refresh_token' => isset($tokenResponse['refresh_token']) ? (string) $tokenResponse['refresh_token'] : null,
-                'expires_at' => null,
-                'name' => (string) ($viewer['name'] ?? ''),
-                'nickname' => (string) ($viewer['email'] ?? ''),
-                'avatar' => isset($viewer['avatarUrl']) ? (string) $viewer['avatarUrl'] : null,
-            ]
-        );
-
-        $account->relinkOrphanedResources();
+        $account = app(ConnectedAccountService::class)->upsert($user, 'linear', [
+            'provider_id' => (string) $viewer['id'],
+            'token' => $accessToken,
+            'refresh_token' => isset($tokenResponse['refresh_token']) ? (string) $tokenResponse['refresh_token'] : null,
+            'expires_at' => null,
+            'name' => (string) ($viewer['name'] ?? ''),
+            'nickname' => (string) ($viewer['email'] ?? ''),
+            'avatar' => isset($viewer['avatarUrl']) ? (string) $viewer['avatarUrl'] : null,
+        ]);
         $this->reverifyConnectedAccount($account);
 
         $returnTo = $request->session()->pull(self::RETURN_SESSION_KEY);
@@ -108,7 +103,7 @@ final class LinearConnectedAccountController extends Controller
         /** @var User $user */
         $user = Auth::user();
 
-        $user->connectedAccounts()->where('provider', 'linear')->delete();
+        app(ConnectedAccountService::class)->disconnect($user, 'linear');
 
         return redirect()->route('filament.admin.pages.connected-accounts');
     }
