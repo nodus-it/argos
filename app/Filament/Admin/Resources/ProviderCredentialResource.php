@@ -10,8 +10,8 @@ use App\Filament\Admin\Resources\ProviderCredentialResource\Pages\CreateProvider
 use App\Filament\Admin\Resources\ProviderCredentialResource\Pages\EditProviderCredential;
 use App\Filament\Admin\Resources\ProviderCredentialResource\Pages\ListProviderCredentials;
 use App\Models\ProviderCredential;
+use App\Services\Credentials\ProviderCredentialService;
 use App\Services\Integrations\ProviderSetupGuide;
-use App\Services\IssueTracker\IssueTrackerRegistry;
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
@@ -188,27 +188,22 @@ class ProviderCredentialResource extends Resource
             ->label(__('credentials.pat.actions.test'))
             ->icon('heroicon-o-signal')
             ->action(function (ProviderCredential $record): void {
-                try {
-                    app(IssueTrackerRegistry::class)
-                        ->makeRaw($record->provider->value, $record->token, $record->getInstanceUrl())
-                        ->listReferences();
+                $result = app(ProviderCredentialService::class)->testAndActivate($record);
 
-                    $record->forceFill([
-                        'status' => ProviderCredentialStatus::Active,
-                        'last_validated_at' => now(),
-                    ])->save();
-
+                if ($result->isValid()) {
                     Notification::make()
                         ->title(__('credentials.pat.notifications.test_ok'))
                         ->success()
                         ->send();
-                } catch (\Throwable $e) {
-                    Notification::make()
-                        ->title(__('credentials.pat.notifications.test_failed'))
-                        ->body($e->getMessage())
-                        ->danger()
-                        ->send();
+
+                    return;
                 }
+
+                Notification::make()
+                    ->title(__('credentials.pat.notifications.test_failed'))
+                    ->body($result->message)
+                    ->danger()
+                    ->send();
             });
     }
 
