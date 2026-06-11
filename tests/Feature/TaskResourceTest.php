@@ -248,6 +248,30 @@ class TaskResourceTest extends TestCase
             ->assertCanSeeTableRecords([$task]);
     }
 
+    public function test_create_form_shows_project_default_branch_in_helper_text(): void
+    {
+        $profile = RepoProfile::factory()->create(['default_branch' => 'develop']);
+
+        Livewire::test(CreateTask::class)
+            ->set('data.repo_profile_id', $profile->id)
+            ->assertSee('develop');
+    }
+
+    public function test_create_form_shows_no_project_hint_when_no_project_selected(): void
+    {
+        Livewire::test(CreateTask::class)
+            ->assertSee('Select a project first to see the default');
+    }
+
+    public function test_create_form_shows_agent_default_after_project_selected(): void
+    {
+        $profile = RepoProfile::factory()->create();
+
+        Livewire::test(CreateTask::class)
+            ->set('data.repo_profile_id', $profile->id)
+            ->assertSee('claude-code');
+    }
+
     public function test_phase_runs_relation_manager_renders_and_shows_resolved_model(): void
     {
         $task = Task::factory()->create();
