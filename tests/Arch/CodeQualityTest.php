@@ -14,6 +14,13 @@ arch('workers are UI-isolated')
     ->expect('App\Workers')
     ->not->toUse('App\Filament');
 
+// Services hold the business logic and must never reach back up into the
+// presentation layer — Filament pages/resources, HTTP controllers or Livewire
+// components. Delegation goes one way: presentation → service.
+arch('services do not depend on presentation')
+    ->expect('App\Services')
+    ->not->toUse(['App\Filament', 'App\Http', 'App\Livewire']);
+
 // The browser-E2E fakes must never be wired into production code paths — only
 // the (env-gated, prod-throwing) E2eFakeServiceProvider may reference them.
 arch('e2e fakes are not used by production code')

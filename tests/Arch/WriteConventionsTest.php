@@ -39,7 +39,7 @@ arch('migrated oauth-config edit page routes writes through the base page')
 // surface; later this widens to all of app/ outside app/Services.
 
 it('keeps write calls out of the migrated presentation files', function (string $relativePath): void {
-    $source = (string) file_get_contents(base_path($relativePath));
+    $source = (string) file_get_contents(dirname(__DIR__, 2).'/'.$relativePath);
 
     expect($source)
         ->not->toMatch('/->\s*(save|update|delete|forceFill|forceDelete)\s*\(/')
@@ -49,4 +49,7 @@ it('keeps write calls out of the migrated presentation files', function (string 
     'app/Filament/Admin/Resources/ProviderCredentialResource.php',
     'app/Filament/Admin/Resources/ProviderOAuthConfigResource/Pages/CreateProviderOAuthConfig.php',
     'app/Filament/Admin/Resources/ProviderOAuthConfigResource/Pages/EditProviderOAuthConfig.php',
+    'app/Filament/Admin/Resources/ApiClientResource.php',
+    'app/Filament/Admin/Resources/ApiClientResource/Pages/CreateApiClient.php',
+    'app/Filament/Admin/Resources/ApiClientResource/Pages/EditApiClient.php',
 ]);
