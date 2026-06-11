@@ -6,15 +6,22 @@ namespace App\Filament\Admin\Resources\RepoProfileResource\Pages;
 
 use App\Filament\Admin\Concerns\HasArgosEditHeading;
 use App\Filament\Admin\Resources\RepoProfileResource;
+use App\Filament\Admin\Support\Pages\EditRecord;
 use App\Models\RepoProfile;
+use App\Services\EntityService;
+use App\Services\Project\RepoProfileService;
 use Filament\Actions\DeleteAction;
-use Filament\Resources\Pages\EditRecord;
 
 class EditRepoProfile extends EditRecord
 {
     use HasArgosEditHeading;
 
     protected static string $resource = RepoProfileResource::class;
+
+    protected function service(): EntityService
+    {
+        return app(RepoProfileService::class);
+    }
 
     protected function getHeaderActions(): array
     {

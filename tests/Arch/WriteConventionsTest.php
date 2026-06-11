@@ -57,4 +57,6 @@ it('keeps write calls out of the migrated presentation files', function (string 
     'app/Filament/Admin/Resources/AgentCredentialResource/Pages/EditAgentCredential.php',
     'app/Filament/Admin/Resources/ProviderCredentialResource/Pages/CreateProviderCredential.php',
     'app/Filament/Admin/Resources/ProviderCredentialResource/Pages/EditProviderCredential.php',
+    'app/Filament/Admin/Resources/RepoProfileResource/Pages/CreateRepoProfile.php',
+    'app/Filament/Admin/Resources/RepoProfileResource/Pages/EditRepoProfile.php',
 ]);
