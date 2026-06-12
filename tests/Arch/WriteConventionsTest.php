@@ -13,13 +13,14 @@ const PRESENTATION_NAMESPACES = ['App\Filament', 'App\Http', 'App\Livewire'];
 // --- Base-class anchors -----------------------------------------------------
 // The base classes turn conventions into structural rules: a domain event that
 // forgets to extend the base, an entity service that bypasses it, or a resource
-// page that does not route through a service, fails here. (Spike scope: the
-// existing app/Events/Task/* events are migrated to DomainEvent later, then the
-// event anchor widens to all of App\Events.)
+// page that does not route through a service, fails here.
 
-arch('credential domain events extend the domain event base')
-    ->expect('App\Events\Credentials')
-    ->toExtend(DomainEvent::class);
+// Every domain event extends the base, so each one carries occurredAt + actorId
+// — a new event can't silently skip that. The base itself is exempt.
+arch('domain events extend the domain event base')
+    ->expect('App\Events')
+    ->toExtend(DomainEvent::class)
+    ->ignoring(DomainEvent::class);
 
 arch('migrated entity services extend the base entity service')
     ->expect([
