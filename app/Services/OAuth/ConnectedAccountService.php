@@ -6,6 +6,7 @@ namespace App\Services\OAuth;
 
 use App\Models\ConnectedAccount;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Laravel\Socialite\Two\User as SocialiteUser;
 
@@ -55,6 +56,26 @@ class ConnectedAccountService
             'nickname' => $socialUser->getNickname(),
             'avatar' => $socialUser->getAvatar(),
         ];
+    }
+
+    /**
+     * The connected accounts a user may pick as a repo/issue source, optionally
+     * narrowed to specific providers. Single visibility seam for account
+     * listings: a later auth layer scopes which accounts surface here, and every
+     * picker inherits it. Callers format their own labels.
+     *
+     * @param  list<string>  $providers  empty = every provider
+     * @return Collection<int, ConnectedAccount>
+     */
+    public function selectableFor(User $user, array $providers = []): Collection
+    {
+        $query = $user->connectedAccounts();
+
+        if ($providers !== []) {
+            $query->whereIn('provider', $providers);
+        }
+
+        return $query->get();
     }
 
     public function disconnect(User $user, string $provider, ?string $instanceUrl = null): void

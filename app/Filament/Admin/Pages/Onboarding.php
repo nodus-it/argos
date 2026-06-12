@@ -482,9 +482,8 @@ class Onboarding extends Page
         if ($user !== null) {
             // Every connected git account — including multiple GitLab instances
             // (public + self-hosted), which connectedAccount() would collapse to one.
-            $accounts = $user->connectedAccounts()
-                ->whereIn('provider', array_keys(self::OAUTH_PROVIDERS))
-                ->get();
+            $accounts = app(ConnectedAccountService::class)
+                ->selectableFor($user, array_keys(self::OAUTH_PROVIDERS));
             foreach ($accounts as $account) {
                 $label = $account->name ?? $account->nickname ?? "#{$account->id}";
                 $host = ($account->instance_url !== null && $account->instance_url !== '')
