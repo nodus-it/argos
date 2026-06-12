@@ -1,0 +1,54 @@
+# Argos — browser-E2E overlay (gemockt suite)
+#
+# Layered ON TOP of the base + dev overlay to put the stack into a
+# deterministic, offline E2E mode that the Playwright suite (tests/e2e/) can
+# drive over plain http://127.0.0.1:${ARGOS_PORT}:
+#
+#   docker compose -f .tools/docker/docker-compose.yml \
+#                  -f .tools/docker/docker-compose.dev.yml \
+#                  -f .tools/docker/docker-compose.e2e.yml up -d
+#   (wrapped by `.tools/bin/e2e-up.sh` / `composer test:browser:up`)
+#
+# Why this exists — the suite kept breaking when the developer's personal .env
+# was tuned for domain dev (APP_URL=https://argos.dev.test, a leading-dot
+# SESSION_DOMAIN and SESSION_SECURE_COOKIE=true for the live-demo / proxy
+# overlay). Over plain http://127.0.0.1 the browser then never gets the secure,
+# domain-scoped session cookie back, so the Filament login bounces straight back
+# to /admin/login and every spec times out at the login helper. This overlay
+# pins the handful of env keys the suite depends on, INDEPENDENT of .env, so the
+# run is reproducible no matter how the personal .env is configured:
+#
+#   • ARGOS_E2E_FAKE=1   → boots E2eFakeServiceProvider (FakePhaseRunner + the
+#                          offline Anthropic / git-provider fakes) AND registers
+#                          the gated `argos:e2e:connect-account` command the
+#                          OAuth runs shell into. Without it concept/implement
+#                          would try to run real worker containers offline and
+#                          the OAuth runs fail with "no commands in argos:e2e".
+#   • APP_URL=http://127.0.0.1 → config/session.php derives a host-only,
+#                          non-secure cookie from it (127.0.0.1 is a bare host),
+#                          which is exactly what the browser needs over http.
+#   • SESSION_SECURE_COOKIE/SESSION_DOMAIN forced back to the derived defaults
+#                          so an explicit .env value can't re-break the cookie.
+#   • ARGOS_PREVIEW_ENABLED=false → no live-demo Traefik routing during tests.
+#
+# Same compose project (`argos`) as base/dev, so this REPLACES a running domain
+# dev stack while the suite runs; bring the domain stack back up afterwards.
+
+x-e2e-env: &e2e-env
+  ARGOS_E2E_FAKE:        "1"
+  APP_ENV:               "local"
+  APP_DEBUG:             "true"
+  APP_URL:               "http://127.0.0.1:${ARGOS_PORT:-8080}"
+  SESSION_SECURE_COOKIE: "false"
+  SESSION_DOMAIN:        ""
+  ARGOS_PREVIEW_ENABLED: "false"
+
+services:
+
+  app:
+    environment:
+      <<: *e2e-env
+
+  queue:
+    environment:
+      <<: *e2e-env
