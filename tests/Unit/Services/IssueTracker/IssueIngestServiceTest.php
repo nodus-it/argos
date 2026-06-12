@@ -7,12 +7,14 @@ namespace Tests\Unit\Services\IssueTracker;
 use App\Enums\TaskProviderKind;
 use App\Enums\TaskProviderMode;
 use App\Enums\TaskProviderSyncStatus;
+use App\Events\Integration\NewIssueFoundEvent;
 use App\Models\ExternalIssueLink;
 use App\Models\Task;
 use App\Models\TaskProviderBinding;
 use App\Services\IssueTracker\DTO\ExternalIssue;
 use App\Services\IssueTracker\IssueIngestService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 use Tests\TestCase;
 
 class IssueIngestServiceTest extends TestCase
@@ -246,5 +248,44 @@ class IssueIngestServiceTest extends TestCase
         $link = $this->ingest($issue, $binding);
 
         $this->assertNull($link->task_id, 'No configured label present → no task');
+    }
+
+    public function test_fires_new_issue_found_event_on_first_import(): void
+    {
+        Event::fake([NewIssueFoundEvent::class]);
+
+        $binding = $this->makeBinding();
+        $link = $this->ingest($this->sampleIssue(5), $binding);
+
+        Event::assertDispatched(
+            NewIssueFoundEvent::class,
+            fn (NewIssueFoundEvent $e): bool => $e->task->id === $link->task_id
+                && $e->binding->id === $binding->id
+                && $e->issue->externalId === '5',
+        );
+    }
+
+    public function test_does_not_fire_event_on_reimport(): void
+    {
+        $binding = $this->makeBinding();
+        $issue = $this->sampleIssue(5);
+        $this->ingest($issue, $binding);
+
+        // Only the second ingest is observed: an already-imported issue must not
+        // re-fire the seam.
+        Event::fake([NewIssueFoundEvent::class]);
+        $this->ingest($issue, $binding);
+
+        Event::assertNotDispatched(NewIssueFoundEvent::class);
+    }
+
+    public function test_does_not_fire_event_for_filtered_issue(): void
+    {
+        Event::fake([NewIssueFoundEvent::class]);
+
+        $binding = $this->makeBinding(['filters' => ['labels' => ['argos']]]);
+        $this->ingest($this->sampleIssue(6, ['labels' => []]), $binding);
+
+        Event::assertNotDispatched(NewIssueFoundEvent::class);
     }
 }

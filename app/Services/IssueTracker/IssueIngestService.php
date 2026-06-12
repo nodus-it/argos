@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Services\IssueTracker;
 
+use App\Events\Integration\NewIssueFoundEvent;
 use App\Models\ExternalIssueLink;
 use App\Models\Task;
 use App\Models\TaskProviderBinding;
 use App\Services\IssueTracker\DTO\ExternalIssue;
 use App\Services\Task\TaskService;
+use Illuminate\Support\Facades\Event;
 
 final class IssueIngestService
 {
@@ -48,13 +50,20 @@ final class IssueIngestService
         // issue first seen NOT matching, then labelled later, still imports;
         // but a task the user deleted (task_id nulled, marker kept) is never
         // silently re-imported on the next poll.
+        $importedTask = null;
         if ($link->task_imported_at === null) {
-            $task = $this->createTaskFromIssue($issue, $binding);
-            $link->task_id = $task->id;
+            $importedTask = $this->createTaskFromIssue($issue, $binding);
+            $link->task_id = $importedTask->id;
             $link->task_imported_at = now();
         }
 
         $link->save();
+
+        // Fan-out/audit seam — fired only on the first import, after the link is
+        // persisted, so the core ingest stays idempotent regardless of listeners.
+        if ($importedTask !== null) {
+            Event::dispatch(new NewIssueFoundEvent($binding, $issue, $importedTask));
+        }
 
         return $link;
     }
