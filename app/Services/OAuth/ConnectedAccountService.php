@@ -57,8 +57,14 @@ class ConnectedAccountService
         ];
     }
 
-    public function disconnect(User $user, string $provider): void
+    public function disconnect(User $user, string $provider, ?string $instanceUrl = null): void
     {
-        $user->connectedAccounts()->where('provider', $provider)->delete();
+        $query = $user->connectedAccounts()->where('provider', $provider);
+
+        if ($instanceUrl !== null) {
+            $query->where('instance_url', $instanceUrl);
+        }
+
+        $query->delete();
     }
 }

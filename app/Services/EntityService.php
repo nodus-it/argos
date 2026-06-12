@@ -53,6 +53,19 @@ abstract class EntityService
         });
     }
 
+    /**
+     * @param  array<string, mixed>  $identity
+     * @param  array<string, mixed>  $values
+     */
+    public function upsert(array $identity, array $values): Model
+    {
+        return DB::transaction(function () use ($identity, $values): Model {
+            $model = $this->model();
+
+            return $model::updateOrCreate($identity, $values);
+        });
+    }
+
     protected function emit(object $event): void
     {
         event($event);

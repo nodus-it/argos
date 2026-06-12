@@ -7,6 +7,9 @@ use App\Filament\Admin\Support\Pages\CreateRecord;
 use App\Filament\Admin\Support\Pages\EditRecord;
 use App\Services\EntityService;
 
+/** The three presentation namespaces the purity rules below apply to. */
+const PRESENTATION_NAMESPACES = ['App\Filament', 'App\Http', 'App\Livewire'];
+
 // --- Base-class anchors -----------------------------------------------------
 // The base classes turn conventions into structural rules: a domain event that
 // forgets to extend the base, an entity service that bypasses it, or a resource
@@ -33,37 +36,94 @@ arch('migrated oauth-config edit page routes writes through the base page')
     ->expect('App\Filament\Admin\Resources\ProviderOAuthConfigResource\Pages\EditProviderOAuthConfig')
     ->toExtend(EditRecord::class);
 
-// --- R3' (scoped) : no direct model mutations in the presentation layer -----
+// --- R3' : no direct model mutations in the presentation layer --------------
 // Native arch() can't see method calls like ->save() on a model, so the
-// "writes only in services" rule is a source scan. Scoped here to the spike
-// surface; later this widens to all of app/ outside app/Services.
+// "writes only in services" rule is a source scan. It now covers the whole
+// presentation layer (Filament, Http, Livewire); the only exemption is the
+// base Create/Edit pages, which legitimately delegate to $this->service().
+// Persistence belongs in app/Services — add a service method, not a write here.
 
-it('keeps write calls out of the migrated presentation files', function (string $relativePath): void {
+/**
+ * Every PHP file in the presentation layer, relative to the repo root, minus
+ * the base pages that route writes through a service by design. Enumerated
+ * from disk (not the booted app) so the scan also runs in isolated arch runs.
+ *
+ * @return array<string, array{string}>
+ */
+function presentationSourceFiles(): array
+{
+    $root = dirname(__DIR__, 2);
+    $exempt = [
+        'app/Filament/Admin/Support/Pages/CreateRecord.php',
+        'app/Filament/Admin/Support/Pages/EditRecord.php',
+    ];
+
+    $files = [];
+    foreach (['app/Filament', 'app/Http', 'app/Livewire'] as $dir) {
+        $base = $root.'/'.$dir;
+        if (! is_dir($base)) {
+            continue;
+        }
+
+        /** @var iterable<SplFileInfo> $iterator */
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($base, FilesystemIterator::SKIP_DOTS),
+        );
+        foreach ($iterator as $file) {
+            if ($file->getExtension() !== 'php') {
+                continue;
+            }
+
+            $relative = ltrim(str_replace($root, '', $file->getPathname()), '/');
+            if (in_array($relative, $exempt, true)) {
+                continue;
+            }
+
+            $files[$relative] = [$relative];
+        }
+    }
+
+    ksort($files);
+
+    return $files;
+}
+
+it('keeps write calls out of the presentation layer', function (string $relativePath): void {
     $source = (string) file_get_contents(dirname(__DIR__, 2).'/'.$relativePath);
 
     expect($source)
         ->not->toMatch('/->\s*(save|update|delete|forceFill|forceDelete)\s*\(/')
         ->and($source)->not->toMatch('/::\s*(create|updateOrCreate|firstOrCreate)\s*\(/');
-})->with([
-    'app/Filament/Admin/Resources/ProviderOAuthConfigResource.php',
-    'app/Filament/Admin/Resources/ProviderCredentialResource.php',
-    'app/Filament/Admin/Resources/ProviderOAuthConfigResource/Pages/CreateProviderOAuthConfig.php',
-    'app/Filament/Admin/Resources/ProviderOAuthConfigResource/Pages/EditProviderOAuthConfig.php',
-    'app/Filament/Admin/Resources/ApiClientResource.php',
-    'app/Filament/Admin/Resources/ApiClientResource/Pages/CreateApiClient.php',
-    'app/Filament/Admin/Resources/ApiClientResource/Pages/EditApiClient.php',
-    'app/Filament/Admin/Resources/AgentCredentialResource.php',
-    'app/Filament/Admin/Resources/AgentCredentialResource/Pages/CreateAgentCredential.php',
-    'app/Filament/Admin/Resources/AgentCredentialResource/Pages/EditAgentCredential.php',
-    'app/Filament/Admin/Resources/ProviderCredentialResource/Pages/CreateProviderCredential.php',
-    'app/Filament/Admin/Resources/ProviderCredentialResource/Pages/EditProviderCredential.php',
-    'app/Filament/Admin/Resources/RepoProfileResource/Pages/CreateRepoProfile.php',
-    'app/Filament/Admin/Resources/RepoProfileResource/Pages/EditRepoProfile.php',
-    'app/Filament/Admin/Resources/WorkerStackResource.php',
-    'app/Filament/Admin/Resources/WorkerStackResource/Pages/CreateWorkerStack.php',
-    'app/Filament/Admin/Resources/WorkerStackResource/Pages/EditWorkerStack.php',
-    'app/Filament/Admin/Resources/RepoProfileResource/RelationManagers/TaskProviderBindingsRelationManager.php',
-    'app/Http/Controllers/Auth/ConnectedAccountController.php',
-    'app/Http/Controllers/Auth/BitbucketConnectedAccountController.php',
-    'app/Http/Controllers/Auth/LinearConnectedAccountController.php',
-]);
+})->with(presentationSourceFiles());
+
+// --- R2 : no process / shell execution in the presentation layer ------------
+// Spawning processes and running shell commands is worker/job territory. The
+// presentation layer asks a service; it never reaches the OS itself.
+arch('no process or shell execution in the presentation layer')
+    ->expect(PRESENTATION_NAMESPACES)
+    ->not->toUse([
+        'Illuminate\Support\Facades\Process',
+        'Symfony\Component\Process\Process',
+        'exec',
+        'shell_exec',
+        'proc_open',
+        'popen',
+        'passthru',
+        'system',
+    ]);
+
+// --- R4 : no filesystem IO in the presentation layer ------------------------
+// Reading or writing domain artifacts (worker state, logs, stored files) goes
+// through a service, so the presentation layer stays free of raw filesystem IO.
+arch('no filesystem io in the presentation layer')
+    ->expect(PRESENTATION_NAMESPACES)
+    ->not->toUse([
+        'Illuminate\Support\Facades\Storage',
+        'Illuminate\Support\Facades\File',
+        'file_get_contents',
+        'file_put_contents',
+        'fopen',
+        'fwrite',
+        'unlink',
+        'mkdir',
+    ]);
