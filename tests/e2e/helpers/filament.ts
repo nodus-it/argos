@@ -1,6 +1,17 @@
 import { type Page, expect } from '@playwright/test';
 
 /**
+ * How long to wait for a conditionally-revealed field to appear. Filament
+ * `->live()` fields are unlocked by a Livewire round-trip (e.g. blurring the
+ * repo URL fires the fake branch fetch that reveals `default_branch`); under CI
+ * load that round-trip routinely exceeds Playwright's 5s default, which was the
+ * sole cause of the full-flow suite's "element(s) not found" flakes. The happy
+ * path (field already visible) returns immediately, so a generous ceiling only
+ * costs wall-clock on a genuine failure.
+ */
+const REVEAL_TIMEOUT = 15_000;
+
+/**
  * Navigate robustly. Filament uses Livewire SPA navigation (wire:navigate), so a
  * page.goto issued while a previous navigation is still in flight aborts with
  * net::ERR_ABORTED. Retry a couple of times, then settle on networkidle.
@@ -39,7 +50,7 @@ export async function chooseSelect(
   const wrapper = page.locator('div.fi-fo-field', {
     has: page.locator(`label[for="form.${field}"]`),
   });
-  await expect(wrapper).toBeVisible();
+  await expect(wrapper).toBeVisible({ timeout: REVEAL_TIMEOUT });
 
   // Filament Selects come in two flavours: native (a real <select>, the v5
   // default) and `->native(false)` (a button that opens a teleported listbox).
@@ -76,6 +87,6 @@ export async function chooseSelect(
  */
 export async function fillField(page: Page, field: string, value: string): Promise<void> {
   const input = page.locator(`#form\\.${field.replace(/\./g, '\\.')}`);
-  await expect(input).toBeVisible();
+  await expect(input).toBeVisible({ timeout: REVEAL_TIMEOUT });
   await input.fill(value);
 }
