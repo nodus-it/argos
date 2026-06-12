@@ -6,6 +6,7 @@ use App\Events\DomainEvent;
 use App\Filament\Admin\Support\Pages\CreateRecord;
 use App\Filament\Admin\Support\Pages\EditRecord;
 use App\Services\EntityService;
+use App\Support\Dto;
 
 /** The three presentation namespaces the purity rules below apply to. */
 const PRESENTATION_NAMESPACES = ['App\Filament', 'App\Http', 'App\Livewire'];
@@ -21,6 +22,14 @@ arch('domain events extend the domain event base')
     ->expect('App\Events')
     ->toExtend(DomainEvent::class)
     ->ignoring(DomainEvent::class);
+
+// Inbound DTOs live in a `…\DTO` namespace and extend the Dto base, so external
+// payloads are normalized to one typed shape at the port instead of `??`-juggled
+// as raw arrays through the domain. A new `…\DTO` namespace adds a line here
+// (mirrors the per-provider request/tracker anchors in CodeQualityTest).
+arch('inbound DTOs extend the DTO base')
+    ->expect('App\Services\IssueTracker\DTO')
+    ->toExtend(Dto::class);
 
 arch('migrated entity services extend the base entity service')
     ->expect([

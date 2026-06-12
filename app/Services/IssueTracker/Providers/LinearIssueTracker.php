@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services\IssueTracker;
+namespace App\Services\IssueTracker\Providers;
 
 use App\Integrations\Linear\LinearConnector;
 use App\Integrations\Linear\Requests\GraphQLRequest;

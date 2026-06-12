@@ -9,7 +9,7 @@ use App\Integrations\GitHub\Requests\ListIssues;
 use App\Integrations\GitHub\Requests\ListRepositories;
 use App\Integrations\GitHub\Requests\RegisterWebhook;
 use App\Integrations\GitHub\Requests\UnregisterWebhook;
-use App\Services\IssueTracker\GitHubIssueTracker;
+use App\Services\IssueTracker\Providers\GitHubIssueTracker;
 use Saloon\Http\Faking\MockResponse;
 use Saloon\Http\Request;
 use Saloon\Laravel\Facades\Saloon;
