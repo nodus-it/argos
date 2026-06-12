@@ -14,8 +14,11 @@ use App\Models\ProviderOAuthConfig;
 use App\Models\RepoProfile;
 use App\Models\User;
 use App\Services\Anthropic\AnthropicTokenValidator;
+use App\Services\Credentials\AgentCredentialService;
 use App\Services\Git\RepositoryFetcher;
+use App\Services\OAuth\ConnectedAccountService;
 use App\Services\OAuth\TokenRefresher;
+use App\Services\Project\RepoProfileService;
 use App\Support\RepoUrlBuilder;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -229,7 +232,7 @@ class Onboarding extends Page
             return;
         }
 
-        $user->connectedAccounts()->where('provider', $provider)->delete();
+        app(ConnectedAccountService::class)->disconnect($user, $provider);
         $this->resetRepoSelection();
         $this->refreshState();
 
@@ -261,7 +264,7 @@ class Onboarding extends Page
             return;
         }
 
-        AgentCredential::updateOrCreate(
+        app(AgentCredentialService::class)->upsert(
             [
                 'agent_name' => AgentName::ClaudeCode->value,
                 'name' => self::ONBOARDING_CREDENTIAL_NAME,
@@ -308,7 +311,7 @@ class Onboarding extends Page
             return;
         }
 
-        AgentCredential::updateOrCreate(
+        app(AgentCredentialService::class)->upsert(
             [
                 'agent_name' => AgentName::Codex->value,
                 'name' => self::ONBOARDING_CREDENTIAL_NAME,
@@ -455,10 +458,7 @@ class Onboarding extends Page
             return;
         }
 
-        $user->connectedAccounts()
-            ->where('provider', $provider)
-            ->where('instance_url', $instanceUrl)
-            ->delete();
+        app(ConnectedAccountService::class)->disconnect($user, $provider, $instanceUrl);
         $this->resetRepoSelection();
 
         Notification::make()
@@ -663,7 +663,8 @@ class Onboarding extends Page
             return;
         }
 
-        $profile = RepoProfile::create([
+        /** @var RepoProfile $profile */
+        $profile = app(RepoProfileService::class)->create([
             'name' => $name,
             'url' => RepoUrlBuilder::build($source['platform'], $this->selectedRepo, $source['instance_url']),
             'platform' => $source['platform'],

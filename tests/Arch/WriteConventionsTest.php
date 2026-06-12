@@ -45,6 +45,7 @@ it('keeps write calls out of the migrated presentation files', function (string 
         ->not->toMatch('/->\s*(save|update|delete|forceFill|forceDelete)\s*\(/')
         ->and($source)->not->toMatch('/::\s*(create|updateOrCreate|firstOrCreate)\s*\(/');
 })->with([
+    'app/Filament/Admin/Pages/Onboarding.php',
     'app/Filament/Admin/Resources/ProviderOAuthConfigResource.php',
     'app/Filament/Admin/Resources/ProviderCredentialResource.php',
     'app/Filament/Admin/Resources/ProviderOAuthConfigResource/Pages/CreateProviderOAuthConfig.php',
