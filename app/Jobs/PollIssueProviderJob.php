@@ -7,6 +7,7 @@ namespace App\Jobs;
 use App\Enums\TaskProviderMode;
 use App\Enums\TaskProviderSyncStatus;
 use App\Models\TaskProviderBinding;
+use App\Services\IssueTracker\DTO\ExternalIssue;
 use App\Services\IssueTracker\IssueIngestService;
 use App\Services\IssueTracker\IssueTrackerRegistry;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -58,7 +59,7 @@ final class PollIssueProviderJob implements ShouldQueue
             $issues = $tracker->listIssues($owner, $project, $filters);
 
             foreach ($issues as $issue) {
-                $ingestService->ingest($issue, $binding);
+                $ingestService->ingest(ExternalIssue::fromProvider($issue, $binding->kind), $binding);
             }
 
             $binding->last_polled_at = now();

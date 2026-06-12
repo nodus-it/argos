@@ -10,6 +10,7 @@ use App\Enums\TaskProviderSyncStatus;
 use App\Models\ExternalIssueLink;
 use App\Models\Task;
 use App\Models\TaskProviderBinding;
+use App\Services\IssueTracker\DTO\ExternalIssue;
 use App\Services\IssueTracker\IssueIngestService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -50,12 +51,23 @@ class IssueIngestServiceTest extends TestCase
         ], $overrides);
     }
 
+    /**
+     * Wrap a raw payload into the inbound DTO at the binding's provider kind —
+     * exactly what the poll/webhook jobs do at the port — and ingest it.
+     *
+     * @param  array<string, mixed>  $issue
+     */
+    private function ingest(array $issue, TaskProviderBinding $binding): ExternalIssueLink
+    {
+        return $this->service->ingest(ExternalIssue::fromProvider($issue, $binding->kind), $binding);
+    }
+
     public function test_ingest_creates_external_issue_link(): void
     {
         $binding = $this->makeBinding();
         $issue = $this->sampleIssue(42);
 
-        $link = $this->service->ingest($issue, $binding);
+        $link = $this->ingest($issue, $binding);
 
         $this->assertDatabaseHas(ExternalIssueLink::class, [
             'task_provider_binding_id' => $binding->id,
@@ -73,7 +85,7 @@ class IssueIngestServiceTest extends TestCase
         $binding = $this->makeBinding(['kind' => TaskProviderKind::GitHub]);
         $issue = $this->sampleIssue(4554618939, ['number' => 19]);
 
-        $link = $this->service->ingest($issue, $binding);
+        $link = $this->ingest($issue, $binding);
 
         $this->assertSame('19', $link->external_id);
     }
@@ -83,7 +95,7 @@ class IssueIngestServiceTest extends TestCase
         $binding = $this->makeBinding(['kind' => TaskProviderKind::GitLab]);
         $issue = $this->sampleIssue(987654, ['iid' => 3, 'web_url' => 'https://gitlab.com/acme/widget/-/issues/3']);
 
-        $link = $this->service->ingest($issue, $binding);
+        $link = $this->ingest($issue, $binding);
 
         $this->assertSame('3', $link->external_id);
     }
@@ -93,7 +105,7 @@ class IssueIngestServiceTest extends TestCase
         $binding = $this->makeBinding(['kind' => TaskProviderKind::Linear]);
         $issue = $this->sampleIssue(1, ['id' => 'lin_abc123']);
 
-        $link = $this->service->ingest($issue, $binding);
+        $link = $this->ingest($issue, $binding);
 
         $this->assertSame('lin_abc123', $link->external_id);
     }
@@ -103,8 +115,8 @@ class IssueIngestServiceTest extends TestCase
         $binding = $this->makeBinding();
         $issue = $this->sampleIssue(7);
 
-        $this->service->ingest($issue, $binding);
-        $this->service->ingest($issue, $binding);
+        $this->ingest($issue, $binding);
+        $this->ingest($issue, $binding);
 
         $this->assertDatabaseCount(ExternalIssueLink::class, 1);
     }
@@ -114,11 +126,11 @@ class IssueIngestServiceTest extends TestCase
         $binding = $this->makeBinding();
         $issue = $this->sampleIssue(7, ['body' => 'v1']);
 
-        $link1 = $this->service->ingest($issue, $binding);
+        $link1 = $this->ingest($issue, $binding);
         $signatureAfterV1 = $link1->signature;
 
         $updatedIssue = array_merge($issue, ['body' => 'v2']);
-        $link2 = $this->service->ingest($updatedIssue, $binding);
+        $link2 = $this->ingest($updatedIssue, $binding);
 
         $this->assertNotSame($signatureAfterV1, $link2->signature);
     }
@@ -128,7 +140,7 @@ class IssueIngestServiceTest extends TestCase
         $binding = $this->makeBinding();
         $issue = $this->sampleIssue(5);
 
-        $link = $this->service->ingest($issue, $binding);
+        $link = $this->ingest($issue, $binding);
 
         $this->assertNotNull($link->task_id);
         $this->assertDatabaseHas('tasks', [
@@ -142,8 +154,8 @@ class IssueIngestServiceTest extends TestCase
         $binding = $this->makeBinding();
         $issue = $this->sampleIssue(5);
 
-        $link1 = $this->service->ingest($issue, $binding);
-        $link2 = $this->service->ingest($issue, $binding);
+        $link1 = $this->ingest($issue, $binding);
+        $link2 = $this->ingest($issue, $binding);
 
         $this->assertSame($link1->task_id, $link2->task_id);
         $this->assertDatabaseCount('tasks', 1);
@@ -154,7 +166,7 @@ class IssueIngestServiceTest extends TestCase
         $binding = $this->makeBinding(['filters' => ['state' => 'open']]);
         $issue = $this->sampleIssue(3, ['state' => 'closed']);
 
-        $link = $this->service->ingest($issue, $binding);
+        $link = $this->ingest($issue, $binding);
 
         $this->assertNull($link->task_id, 'Closed issue should not create a task when filter=open');
     }
@@ -164,7 +176,7 @@ class IssueIngestServiceTest extends TestCase
         $binding = $this->makeBinding(['filters' => ['labels' => ['argos']]]);
         $issue = $this->sampleIssue(9, ['labels' => [['name' => 'bug']]]);
 
-        $link = $this->service->ingest($issue, $binding);
+        $link = $this->ingest($issue, $binding);
 
         $this->assertNull($link->task_id, 'Issue without required label should not create a task');
     }
@@ -174,7 +186,7 @@ class IssueIngestServiceTest extends TestCase
         $binding = $this->makeBinding(['filters' => ['labels' => ['argos']]]);
         $issue = $this->sampleIssue(10, ['labels' => [['name' => 'argos'], ['name' => 'bug']]]);
 
-        $link = $this->service->ingest($issue, $binding);
+        $link = $this->ingest($issue, $binding);
 
         $this->assertNotNull($link->task_id);
     }
@@ -185,7 +197,7 @@ class IssueIngestServiceTest extends TestCase
         $binding = $this->makeBinding(['filters' => ['labels' => ['argos', 'ready']]]);
         $issue = $this->sampleIssue(11, ['labels' => [['name' => 'argos'], ['name' => 'bug']]]);
 
-        $link = $this->service->ingest($issue, $binding);
+        $link = $this->ingest($issue, $binding);
 
         $this->assertNotNull($link->task_id, 'OR semantics: one of the configured labels should be enough');
     }
@@ -196,12 +208,12 @@ class IssueIngestServiceTest extends TestCase
 
         // First seen without the label → filtered: link exists, no task.
         $issue = $this->sampleIssue(7, ['labels' => []]);
-        $link = $this->service->ingest($issue, $binding);
+        $link = $this->ingest($issue, $binding);
         $this->assertNull($link->task_id);
 
         // Label added later → now matches → a task is created on the same link.
         $issue['labels'] = [['name' => 'argos']];
-        $link = $this->service->ingest($issue, $binding);
+        $link = $this->ingest($issue, $binding);
         $this->assertNotNull($link->task_id);
         $this->assertDatabaseCount('tasks', 1);
     }
@@ -211,7 +223,7 @@ class IssueIngestServiceTest extends TestCase
         $binding = $this->makeBinding(['filters' => ['labels' => ['argos']]]);
         $issue = $this->sampleIssue(8, ['labels' => [['name' => 'argos']]]);
 
-        $link = $this->service->ingest($issue, $binding);
+        $link = $this->ingest($issue, $binding);
         $this->assertNotNull($link->task_id);
 
         // User deletes the Argos task → link.task_id is nulled (nullOnDelete),
@@ -220,7 +232,7 @@ class IssueIngestServiceTest extends TestCase
         $this->assertNull($link->fresh()->task_id);
 
         // Next poll must NOT recreate a task.
-        $this->service->ingest($issue, $binding);
+        $this->ingest($issue, $binding);
 
         $this->assertDatabaseCount('tasks', 0);
         $this->assertNull($link->fresh()->task_id);
@@ -231,7 +243,7 @@ class IssueIngestServiceTest extends TestCase
         $binding = $this->makeBinding(['filters' => ['labels' => ['argos', 'ready']]]);
         $issue = $this->sampleIssue(12, ['labels' => [['name' => 'bug'], ['name' => 'wontfix']]]);
 
-        $link = $this->service->ingest($issue, $binding);
+        $link = $this->ingest($issue, $binding);
 
         $this->assertNull($link->task_id, 'No configured label present → no task');
     }

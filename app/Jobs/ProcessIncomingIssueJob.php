@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Jobs;
 
 use App\Models\TaskProviderBinding;
+use App\Services\IssueTracker\DTO\ExternalIssue;
 use App\Services\IssueTracker\IssueIngestService;
 use App\Services\IssueTracker\IssueTrackerRegistry;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -53,6 +54,6 @@ final class ProcessIncomingIssueJob implements ShouldQueue
             return;
         }
 
-        $ingestService->ingest($issue, $binding);
+        $ingestService->ingest(ExternalIssue::fromProvider($issue, $binding->kind), $binding);
     }
 }
