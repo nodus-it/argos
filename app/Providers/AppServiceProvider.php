@@ -12,6 +12,7 @@ use App\Listeners\Task\DispatchAutoPush;
 use App\Listeners\Task\NotifyIssueTrackerOfPhase;
 use App\Listeners\Task\RemoveTaskVolume;
 use App\Listeners\Task\StopDemoAfterPush;
+use App\Models\User;
 use App\Services\Anthropic\CredentialStore;
 use App\Services\GitProvider\BitbucketGitService;
 use App\Services\GitProvider\GitHubGitService;
@@ -174,6 +175,11 @@ class AppServiceProvider extends ServiceProvider
         // outside local without this gate; combined with the `auth` middleware
         // (see config/scramble.php) it limits the docs to signed-in Argos users.
         Gate::define('viewApiDocs', fn ($user): bool => $user !== null);
+
+        // Single authorization point for reaching the admin panel. Open to every
+        // authenticated user by default; redefine this gate to restrict access
+        // (e.g. role-based) without touching the User model or the panel.
+        Gate::define('access-argos-panel', fn (User $user): bool => true);
     }
 
     /**
