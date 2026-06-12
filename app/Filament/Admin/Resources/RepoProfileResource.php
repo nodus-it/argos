@@ -22,6 +22,7 @@ use App\Models\User;
 use App\Models\WorkerStack;
 use App\Services\Git\RepositoryFetcher;
 use App\Services\GitProvider\GitServiceFactory;
+use App\Services\OAuth\ConnectedAccountService;
 use App\Services\OAuth\TokenRefresher;
 use App\Support\RepoUrlBuilder;
 use App\Workers\Agents\AgentRegistry;
@@ -160,9 +161,8 @@ class RepoProfileResource extends Resource
                                             }
                                             $provider = is_string($get('platform')) ? $get('platform') : 'github';
 
-                                            return $user->connectedAccounts()
-                                                ->where('provider', $provider)
-                                                ->get()
+                                            return app(ConnectedAccountService::class)
+                                                ->selectableFor($user, [$provider])
                                                 ->mapWithKeys(fn (ConnectedAccount $account): array => [
                                                     $account->id => $account->name ?? $account->nickname ?? ucfirst($provider)." #{$account->id}",
                                                 ])
@@ -213,9 +213,8 @@ class RepoProfileResource extends Resource
                                                 return [];
                                             }
 
-                                            return $user->connectedAccounts()
-                                                ->where('provider', 'bitbucket')
-                                                ->get()
+                                            return app(ConnectedAccountService::class)
+                                                ->selectableFor($user, ['bitbucket'])
                                                 ->mapWithKeys(fn (ConnectedAccount $account): array => [
                                                     $account->id => $account->name ?? $account->nickname ?? "Bitbucket #{$account->id}",
                                                 ])

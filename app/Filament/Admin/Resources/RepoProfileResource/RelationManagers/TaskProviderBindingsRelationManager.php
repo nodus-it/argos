@@ -15,6 +15,7 @@ use App\Models\User;
 use App\Services\IssueTracker\Contracts\IssueTrackerContract;
 use App\Services\IssueTracker\IssueTrackerRegistry;
 use App\Services\IssueTracker\ProviderSetupService;
+use App\Services\OAuth\ConnectedAccountService;
 use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
@@ -114,12 +115,8 @@ class TaskProviderBindingsRelationManager extends RelationManager
         /** @var User|null $user */
         $user = Auth::user();
         if ($user !== null) {
-            $oauth = $user->connectedAccounts()
-                ->when(
-                    $kind !== null,
-                    fn ($query) => $query->where('provider', $kind->providerKey()),
-                )
-                ->get()
+            $oauth = app(ConnectedAccountService::class)
+                ->selectableFor($user, $kind !== null ? [$kind->providerKey()] : [])
                 ->mapWithKeys(fn (ConnectedAccount $account): array => [
                     "oauth:{$account->id}" => $account->name ?? $account->nickname ?? "#{$account->id}",
                 ])
