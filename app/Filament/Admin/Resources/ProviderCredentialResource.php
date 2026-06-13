@@ -151,7 +151,8 @@ class ProviderCredentialResource extends Resource
                     ->label(__('credentials.pat.fields.last_validated_at'))
                     ->dateTime()
                     ->since()
-                    ->placeholder('—'),
+                    ->placeholder('—')
+                    ->visibleFrom('md'),
 
                 TextColumn::make('updated_at')
                     ->dateTime()

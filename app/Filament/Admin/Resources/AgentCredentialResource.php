@@ -141,7 +141,8 @@ class AgentCredentialResource extends Resource
                     ->label(__('worker.credentials.fields.last_validated_at'))
                     ->dateTime()
                     ->since()
-                    ->placeholder('—'),
+                    ->placeholder('—')
+                    ->visibleFrom('md'),
 
                 TextColumn::make('updated_at')
                     ->dateTime()

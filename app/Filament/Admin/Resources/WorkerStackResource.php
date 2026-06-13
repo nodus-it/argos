@@ -160,7 +160,8 @@ class WorkerStackResource extends Resource
 
                 TextColumn::make('label')
                     ->label(__('worker.stacks.fields.label'))
-                    ->searchable(),
+                    ->searchable()
+                    ->visibleFrom('md'),
 
                 IconColumn::make('is_builtin')
                     ->label(__('worker.stacks.fields.is_builtin'))
@@ -182,13 +183,15 @@ class WorkerStackResource extends Resource
                 TextColumn::make('capabilities')
                     ->label(__('worker.stacks.fields.capabilities'))
                     ->state(fn (WorkerStack $r): string => implode(', ', $r->capabilities ?? []))
-                    ->limit(40),
+                    ->limit(40)
+                    ->visibleFrom('md'),
 
                 TextColumn::make('last_built_at')
                     ->label(__('worker.stacks.fields.last_built_at'))
                     ->dateTime()
                     ->since()
-                    ->placeholder('—'),
+                    ->placeholder('—')
+                    ->visibleFrom('md'),
             ])
             ->filters([
                 TernaryFilter::make('is_builtin')

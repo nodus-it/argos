@@ -1064,7 +1064,8 @@ class RepoProfileResource extends Resource
                     ->formatStateUsing(fn (GitProvider $state): string => $state->label()),
 
                 TextColumn::make('default_branch')
-                    ->label(__('projects.columns.branch')),
+                    ->label(__('projects.columns.branch'))
+                    ->visibleFrom('md'),
 
                 TextColumn::make('url')
                     ->copyable()
@@ -1073,7 +1074,8 @@ class RepoProfileResource extends Resource
 
                 TextColumn::make('tasks_count')
                     ->label(__('projects.columns.tasks'))
-                    ->counts('tasks'),
+                    ->counts('tasks')
+                    ->visibleFrom('md'),
             ])
             ->recordUrl(fn (RepoProfile $record): string => static::getUrl('edit', ['record' => $record]))
             ->actions([
