@@ -25,6 +25,8 @@ final class DocsLinkAction
             ->icon('heroicon-o-book-open')
             ->color('gray')
             ->link()
-            ->url(DocLink::url($slug, $anchor));
+            // Open in a new tab so the user never loses their current context
+            // (a half-filled create form, a task view, …).
+            ->url(DocLink::url($slug, $anchor), shouldOpenInNewTab: true);
     }
 }

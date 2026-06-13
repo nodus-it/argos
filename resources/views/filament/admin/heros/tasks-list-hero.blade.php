@@ -33,7 +33,7 @@
     :sub="__('widgets.hero.tasks_sub')"
     :chips="$chips"
 >
-    <a href="{{ \App\Support\DocLink::url('tasks') }}" wire:navigate
+    <a href="{{ \App\Support\DocLink::url('tasks') }}" target="_blank" rel="noopener"
        class="btn btn-ghost" style="white-space:nowrap;">
         {{ __('navigation.pages.documentation') }}
     </a>

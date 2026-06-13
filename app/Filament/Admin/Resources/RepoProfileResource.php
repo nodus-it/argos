@@ -119,7 +119,7 @@ class RepoProfileResource extends Resource
                                         ->description(fn (Get $get): HtmlString => new HtmlString(
                                             (string) __('projects.platform_hints.'.($get('platform') ?: 'github').'.body')
                                             .' <a href="'.e(DocLink::url($get('platform') ?: 'github'))
-                                            .'" wire:navigate class="underline">'
+                                            .'" target="_blank" rel="noopener" class="underline">'
                                             .e((string) __('projects.platform_hints.docs_link')).'</a>'
                                         )),
                                 ]),

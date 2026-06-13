@@ -46,7 +46,7 @@
                     >
                         {{ __('accounts.blade.create_oauth_app') }}
                     </x-filament::button>
-                    <a href="{{ \App\Support\DocLink::url('github') }}" wire:navigate class="text-xs underline text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200">
+                    <a href="{{ \App\Support\DocLink::url('github') }}" target="_blank" rel="noopener" class="text-xs underline text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200">
                         {{ __('accounts.blade.setup_link') }}
                     </a>
                 </div>
@@ -113,7 +113,7 @@
                     >
                         {{ __('accounts.blade.create_oauth_app') }}
                     </x-filament::button>
-                    <a href="{{ \App\Support\DocLink::url('gitlab') }}" wire:navigate class="text-xs underline text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200">
+                    <a href="{{ \App\Support\DocLink::url('gitlab') }}" target="_blank" rel="noopener" class="text-xs underline text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200">
                         {{ __('accounts.blade.setup_link') }}
                     </a>
                 </div>
@@ -177,7 +177,7 @@
                     >
                         {{ __('accounts.blade.create_oauth_app') }}
                     </x-filament::button>
-                    <a href="{{ \App\Support\DocLink::url('bitbucket') }}" wire:navigate class="text-xs underline text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200">
+                    <a href="{{ \App\Support\DocLink::url('bitbucket') }}" target="_blank" rel="noopener" class="text-xs underline text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200">
                         {{ __('accounts.blade.setup_link') }}
                     </a>
                 </div>
@@ -241,7 +241,7 @@
                     >
                         {{ __('accounts.blade.create_oauth_app') }}
                     </x-filament::button>
-                    <a href="{{ \App\Support\DocLink::url('linear') }}" wire:navigate class="text-xs underline text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200">
+                    <a href="{{ \App\Support\DocLink::url('linear') }}" target="_blank" rel="noopener" class="text-xs underline text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200">
                         {{ __('accounts.blade.setup_link') }}
                     </a>
                 </div>

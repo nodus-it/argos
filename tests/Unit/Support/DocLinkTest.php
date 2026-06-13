@@ -42,4 +42,10 @@ class DocLinkTest extends TestCase
 
         $this->assertSame(DocLink::url('setup', 'reverse-proxy'), $action->getUrl());
     }
+
+    public function test_docs_link_action_opens_in_a_new_tab(): void
+    {
+        // Doc links must not pull the user out of their current context.
+        $this->assertTrue(DocsLinkAction::make('oauth')->shouldOpenUrlInNewTab());
+    }
 }

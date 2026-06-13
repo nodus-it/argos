@@ -27,10 +27,6 @@
         return $value;
     };
 
-    // In-app doc links (relative path) open in the same tab; external links
-    // open in a new tab.
-    $isInternal = static fn (?string $url): bool => is_string($url) && str_starts_with($url, '/');
-
     $linkLabel = $hasTitle && trans($tkey.'.link_label') !== $tkey.'.link_label'
         ? trans($tkey.'.link_label') : null;
     $linkUrl = $linkLabel !== null
@@ -79,13 +75,13 @@
                 @if ($linkUrl || $docUrl)
                     <p class="pt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs">
                         @if ($linkUrl)
-                            <a href="{{ $linkUrl }}" @if ($isInternal($linkUrl)) wire:navigate @else target="_blank" rel="noopener" @endif class="underline {{ $palette['link'] }}">
-                                {{ $linkLabel }} @unless ($isInternal($linkUrl)) ↗ @endunless
+                            <a href="{{ $linkUrl }}" target="_blank" rel="noopener" class="underline {{ $palette['link'] }}">
+                                {{ $linkLabel }} ↗
                             </a>
                         @endif
                         @if ($docUrl)
-                            <a href="{{ $docUrl }}" @if ($isInternal($docUrl)) wire:navigate @else target="_blank" rel="noopener" @endif class="underline {{ $palette['link'] }}">
-                                {{ $docLabel }} @unless ($isInternal($docUrl)) ↗ @endunless
+                            <a href="{{ $docUrl }}" target="_blank" rel="noopener" class="underline {{ $palette['link'] }}">
+                                {{ $docLabel }} ↗
                             </a>
                         @endif
                     </p>
