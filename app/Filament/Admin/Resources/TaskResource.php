@@ -22,6 +22,7 @@ use App\Models\RepoProfile;
 use App\Models\Task;
 use App\Models\WorkerStack;
 use App\Services\GitProvider\GitServiceFactory;
+use App\Support\DocsLinkAction;
 use App\Workers\Agents\AgentRegistry;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
@@ -89,6 +90,7 @@ class TaskResource extends Resource
 
                             Textarea::make('description')
                                 ->label(__('tasks.fields.description_label'))
+                                ->hintAction(DocsLinkAction::make('tasks'))
                                 ->rows(8)
                                 ->helperText(__('tasks.fields.description_helper'))
                                 ->columnSpanFull(),

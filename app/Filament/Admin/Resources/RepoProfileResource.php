@@ -24,6 +24,8 @@ use App\Services\Git\RepositoryFetcher;
 use App\Services\GitProvider\GitServiceFactory;
 use App\Services\OAuth\ConnectedAccountService;
 use App\Services\OAuth\TokenRefresher;
+use App\Support\DocLink;
+use App\Support\DocsLinkAction;
 use App\Support\RepoUrlBuilder;
 use App\Workers\Agents\AgentRegistry;
 use Filament\Actions\BulkActionGroup;
@@ -116,7 +118,7 @@ class RepoProfileResource extends Resource
                                         ->icon('heroicon-o-information-circle')
                                         ->description(fn (Get $get): HtmlString => new HtmlString(
                                             (string) __('projects.platform_hints.'.($get('platform') ?: 'github').'.body')
-                                            .' <a href="'.e((string) config('argos.docs.setup_'.($get('platform') ?: 'github')))
+                                            .' <a href="'.e(DocLink::url($get('platform') ?: 'github'))
                                             .'" target="_blank" rel="noopener" class="underline">'
                                             .e((string) __('projects.platform_hints.docs_link')).'</a>'
                                         )),
@@ -131,6 +133,7 @@ class RepoProfileResource extends Resource
                                 ->schema([
                                     Select::make('auth_method')
                                         ->label(__('projects.fields.auth_method_label'))
+                                        ->hintAction(DocsLinkAction::make('credentials'))
                                         ->options(fn (Get $get): array => self::authMethodOptions($get))
                                         ->default('pat')
                                         ->required()
@@ -407,6 +410,7 @@ class RepoProfileResource extends Resource
                                     Select::make('worker_source')
                                         ->label(__('projects.fields.worker_source_label'))
                                         ->helperText(__('projects.fields.worker_source_helper'))
+                                        ->hintAction(DocsLinkAction::make('byoi'))
                                         ->options([
                                             WorkerSource::Standard->value => __('projects.fields.worker_source_standard'),
                                             WorkerSource::Byoi->value => __('projects.fields.worker_source_byoi'),
