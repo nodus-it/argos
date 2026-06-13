@@ -1,4 +1,5 @@
 includes:
+    - vendor/nodus-it/dev-tools/config/phpstan.neon
     - vendor/larastan/larastan/extension.neon
 
 parameters:

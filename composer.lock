@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "a7a13a530bc34108fad3d5ae9c65ef6d",
+    "content-hash": "3d0fe58308a1bb7e1639fd259bab0997",
     "packages": [
         {
             "name": "blade-ui-kit/blade-heroicons",
@@ -11928,6 +11928,74 @@
             "time": "2024-05-16T03:13:13+00:00"
         },
         {
+            "name": "nodus-it/dev-tools",
+            "version": "dev-main",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/nodus-it/dev-tools.git",
+                "reference": "461b614d4af4762e24082a80fba9d89d41d48884"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/nodus-it/dev-tools/zipball/461b614d4af4762e24082a80fba9d89d41d48884",
+                "reference": "461b614d4af4762e24082a80fba9d89d41d48884",
+                "shasum": ""
+            },
+            "require": {
+                "composer-plugin-api": "^2.0",
+                "laravel/pint": "^1.18",
+                "php": "^8.2",
+                "phpstan/phpstan": "^2.1"
+            },
+            "require-dev": {
+                "composer/composer": "^2.7"
+            },
+            "default-branch": true,
+            "bin": [
+                "bin/nd"
+            ],
+            "type": "composer-plugin",
+            "extra": {
+                "class": "Nodus\\DevTools\\Plugin",
+                "branch-alias": {
+                    "dev-main": "1.x-dev"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Nodus\\DevTools\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Bastian Schur",
+                    "email": "b.schur@nodus-it.de",
+                    "homepage": "https://www.nodus-it.de",
+                    "role": "Developer"
+                }
+            ],
+            "description": "Einheitliche Dev-Befehle fuer Nodus-Projekte via Composer (d:* Docker, qa:* Lint/Analyse/Test) und bin/nd.",
+            "homepage": "https://github.com/nodus-it/dev-tools",
+            "keywords": [
+                "PHPStan",
+                "Pint",
+                "composer-plugin",
+                "developer-tools",
+                "docker",
+                "docker-compose",
+                "nodus-it"
+            ],
+            "support": {
+                "issues": "https://github.com/nodus-it/dev-tools/issues",
+                "source": "https://github.com/nodus-it/dev-tools"
+            },
+            "time": "2026-06-13T22:08:48+00:00"
+        },
+        {
             "name": "nunomaduro/collision",
             "version": "v8.9.4",
             "source": {
@@ -14346,7 +14414,9 @@
     ],
     "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": {},
+    "stability-flags": {
+        "nodus-it/dev-tools": 20
+    },
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {
