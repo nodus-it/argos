@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Jobs;
 
 use App\Enums\PhaseStatus;
+use App\Enums\WorkflowStatus;
 use App\Models\Task;
 use App\Services\Task\TaskService;
 use App\Services\Workflow\PhaseRunner;
@@ -117,6 +118,13 @@ class RunPhaseJob implements ShouldQueue
         // show no signal that the run failed.
         try {
             $task = Task::find($this->taskId);
+
+            // A deliberate abort already reaped the container (which is why the
+            // job throws) and set the terminal Aborted state — don't clobber it
+            // back to Failed here.
+            if ($task !== null && $task->workflow_status === WorkflowStatus::Aborted) {
+                return;
+            }
 
             if ($task !== null) {
                 // Close any PhaseRun records still in 'running' state — the

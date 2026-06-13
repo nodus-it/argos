@@ -78,7 +78,21 @@ class WorkerSidecarManagerTest extends TestCase
 
         $joined = array_map(static fn (array $c): string => implode(' ', $c), $manager->commands);
 
-        $this->assertContains('docker network create '.$sidecars->network, $joined);
+        // The run network is created with the run labels so the orphan sweep
+        // and abort can find it again.
+        $this->assertTrue(
+            (bool) array_filter($joined, static fn (string $c): bool => str_starts_with($c, 'docker network create')
+                && str_contains($c, (string) $sidecars->network)
+                && str_contains($c, 'argos.role=network')
+                && str_contains($c, 'argos.task=')),
+            'expected the run network to be created with run labels',
+        );
+        // Sidecar containers carry the run labels too.
+        $this->assertTrue(
+            (bool) array_filter($joined, static fn (string $c): bool => str_contains($c, 'mariadb:11')
+                && str_contains($c, 'argos.role=sidecar')),
+            'expected a mariadb container to be started with run labels',
+        );
         $this->assertTrue(
             (bool) array_filter($joined, static fn (string $c): bool => str_contains($c, 'mariadb:11')),
             'expected a mariadb container to be started',

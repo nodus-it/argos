@@ -53,6 +53,7 @@ class PhaseCommandBuilder
 
         $cmd = [
             'docker', 'run', '--rm',
+            ...WorkerRunLabels::args(WorkerRunLabels::ROLE_WORKER, $task->id, $phase),
             '-v', $task->volumeName().':/workspace',
             '-v', 'composer_cache:/home/agent/.composer/cache',
             '-v', 'npm_cache:/home/agent/.npm',

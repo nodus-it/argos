@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Enums\DemoAccessMode;
+use App\Enums\PhaseStatus;
 use App\Enums\WorkflowStatus;
 use App\Filament\Admin\Resources\TaskResource;
 use App\Filament\Admin\Resources\TaskResource\Pages\ViewQualityGateLog;
@@ -22,6 +23,7 @@ use App\Models\RepoProfile;
 use App\Models\Task;
 use App\Models\User;
 use App\Services\Workflow\PhaseRunner;
+use App\Services\Workflow\RunResourceReaper;
 use App\Services\Workflow\StateReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
@@ -265,6 +267,44 @@ class TaskPagesTest extends TestCase
 
         Livewire::test(ViewTask::class, ['record' => $task->getKey()])
             ->assertActionHidden('stopDemo');
+    }
+
+    public function test_view_task_abort_action_aborts_a_running_task(): void
+    {
+        $this->mock(RunResourceReaper::class)->shouldReceive('reapTask');
+
+        $task = Task::factory()->create([
+            'workflow_status' => WorkflowStatus::ImplementRunning,
+            'current_status' => PhaseStatus::Running,
+        ]);
+
+        Livewire::test(ViewTask::class, ['record' => $task->getKey()])
+            ->callAction('abortTask')
+            ->assertNotified();
+
+        $this->assertSame(WorkflowStatus::Aborted, $task->fresh()->workflow_status);
+    }
+
+    public function test_abort_action_hidden_when_not_busy(): void
+    {
+        $task = Task::factory()->inReview()->create();
+
+        Livewire::test(ViewTask::class, ['record' => $task->getKey()])
+            ->assertActionHidden('abortTask');
+    }
+
+    public function test_view_task_renders_an_aborted_task(): void
+    {
+        // Guards the terminal Aborted path through TaskStage / primaryActionKey /
+        // banner / dock — none of which may throw an unhandled-match for it.
+        $task = Task::factory()->create([
+            'workflow_status' => WorkflowStatus::Aborted,
+            'current_status' => PhaseStatus::Failed,
+        ]);
+
+        Livewire::test(ViewTask::class, ['record' => $task->getKey()])
+            ->assertSuccessful()
+            ->assertSee($task->name);
     }
 
     public function test_view_task_mark_completed_action(): void

@@ -58,7 +58,7 @@ class DemoDeployer
 
         // A task has exactly one current demo — tear the old one down first so
         // a re-implement cleanly replaces it (containers, volumes, route).
-        $this->teardownExisting($task, $slug);
+        $this->teardownBySlug($slug);
 
         $demo = Demo::query()->create([
             'task_id' => $task->id,
@@ -116,7 +116,7 @@ class DemoDeployer
             ]);
 
             // Best-effort cleanup so a failed build leaves nothing running.
-            $this->teardownExisting($task, $slug);
+            $this->teardownBySlug($slug);
 
             $demo->forceFill([
                 'status' => DemoStatus::Failed,
@@ -133,7 +133,26 @@ class DemoDeployer
      */
     public function teardown(Task $task): void
     {
-        $this->teardownExisting($task, $this->demoSlug($task));
+        $this->teardownBySlug($this->demoSlug($task));
+    }
+
+    /**
+     * Tear a demo stack down by its slug alone — no Task row required, so this
+     * still works after the task (and its demo row) has been deleted. The slug
+     * is derived deterministically from the task name (demoSlug), so a deleted
+     * task's stack stays addressable.
+     */
+    public function teardownBySlug(string $slug): void
+    {
+        $down = $this->newProcess(['docker', 'compose', '-p', $slug, 'down', '-v', '--remove-orphans']);
+        $down->setTimeout($this->composeTimeoutSeconds);
+        try {
+            $down->run();
+        } catch (Throwable) {
+            // best-effort — nothing to tear down, or docker unavailable in tests
+        }
+
+        app(TraefikRouter::class)->removeRoute($slug);
     }
 
     /**
@@ -164,7 +183,7 @@ class DemoDeployer
         foreach ($active->take($overflow) as $demo) {
             $task = $demo->task;
             if ($task !== null) {
-                $this->teardownExisting($task, $this->demoSlug($task));
+                $this->teardownBySlug($this->demoSlug($task));
             }
             $demo->update(['status' => DemoStatus::Stopped, 'url' => null]);
 
@@ -177,19 +196,6 @@ class DemoDeployer
         }
 
         return $log;
-    }
-
-    private function teardownExisting(Task $task, string $slug): void
-    {
-        $down = $this->newProcess(['docker', 'compose', '-p', $slug, 'down', '-v', '--remove-orphans']);
-        $down->setTimeout($this->composeTimeoutSeconds);
-        try {
-            $down->run();
-        } catch (Throwable) {
-            // best-effort — nothing to tear down, or docker unavailable in tests
-        }
-
-        app(TraefikRouter::class)->removeRoute($slug);
     }
 
     /**

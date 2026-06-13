@@ -13,6 +13,7 @@ return [
         'in_review' => 'In Review',
         'completed' => 'Completed',
         'failed' => 'Failed',
+        'aborted' => 'Aborted',
     ],
 
     'phase_status' => [

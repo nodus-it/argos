@@ -20,6 +20,7 @@ use App\Models\PhaseRun;
 use App\Models\Task;
 use App\Services\Task\TaskService;
 use App\Services\Workflow\PhaseRunner;
+use App\Services\Workflow\RunResourceReaper;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Event;
@@ -319,6 +320,58 @@ class TaskServiceTest extends TestCase
         $this->service->markCompleted($task);
 
         Event::assertDispatched(TaskCompleted::class, fn ($e) => $e->task->id === $task->id);
+    }
+
+    // ── abortTask ─────────────────────────────────────────────────────────────
+
+    public function test_abort_task_sets_aborted_status(): void
+    {
+        $this->mock(RunResourceReaper::class)->shouldReceive('reapTask')->once();
+        $service = app(TaskService::class);
+
+        $task = Task::factory()->create([
+            'workflow_status' => WorkflowStatus::ImplementRunning,
+            'current_status' => PhaseStatus::Running,
+        ]);
+        $service->abortTask($task);
+
+        $this->assertSame(WorkflowStatus::Aborted, $task->fresh()->workflow_status);
+        $this->assertSame(PhaseStatus::Failed, $task->fresh()->current_status);
+    }
+
+    public function test_abort_task_reaps_the_run_containers(): void
+    {
+        $task = Task::factory()->create([
+            'workflow_status' => WorkflowStatus::ImplementRunning,
+            'current_status' => PhaseStatus::Running,
+        ]);
+
+        $this->mock(RunResourceReaper::class)
+            ->shouldReceive('reapTask')->once()
+            ->with($task->id);
+        $service = app(TaskService::class);
+
+        $service->abortTask($task);
+    }
+
+    public function test_abort_task_closes_the_running_phase_run(): void
+    {
+        $this->mock(RunResourceReaper::class)->shouldReceive('reapTask');
+        $service = app(TaskService::class);
+
+        $task = Task::factory()->create([
+            'workflow_status' => WorkflowStatus::ImplementRunning,
+            'current_status' => PhaseStatus::Running,
+        ]);
+        $run = PhaseRun::factory()->running()->create([
+            'task_id' => $task->id,
+            'phase' => 'implement',
+        ]);
+
+        $service->abortTask($task);
+
+        $this->assertSame(PhaseStatus::Failed, $run->fresh()->status);
+        $this->assertNotNull($run->fresh()->finished_at);
     }
 
     // ── saveConceptNotes ──────────────────────────────────────────────────────
