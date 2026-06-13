@@ -24,6 +24,7 @@ use App\Services\Git\RepositoryFetcher;
 use App\Services\GitProvider\GitServiceFactory;
 use App\Services\OAuth\ConnectedAccountService;
 use App\Services\OAuth\TokenRefresher;
+use App\Support\DocsLinkAction;
 use App\Support\RepoUrlBuilder;
 use App\Workers\Agents\AgentRegistry;
 use Filament\Actions\BulkActionGroup;
@@ -407,6 +408,7 @@ class RepoProfileResource extends Resource
                                     Select::make('worker_source')
                                         ->label(__('projects.fields.worker_source_label'))
                                         ->helperText(__('projects.fields.worker_source_helper'))
+                                        ->hintAction(DocsLinkAction::make('byoi'))
                                         ->options([
                                             WorkerSource::Standard->value => __('projects.fields.worker_source_standard'),
                                             WorkerSource::Byoi->value => __('projects.fields.worker_source_byoi'),

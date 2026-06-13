@@ -28,6 +28,7 @@ return [
             'pages' => [
                 ['slug' => 'setup', 'title' => 'Setup', 'file' => 'SETUP.md'],
                 ['slug' => 'prepare-project', 'title' => 'Preparing a Project', 'file' => 'PREPARE-PROJECT.md'],
+                ['slug' => 'byoi', 'title' => 'Custom Worker Image (BYOI)', 'file' => 'BYOI.md'],
             ],
         ],
         [
@@ -39,7 +40,13 @@ return [
                 ['slug' => 'bitbucket', 'title' => 'Bitbucket', 'file' => 'SETUP-BITBUCKET.md'],
                 ['slug' => 'linear', 'title' => 'Linear', 'file' => 'SETUP-LINEAR.md'],
                 ['slug' => 'task-providers', 'title' => 'Task Providers', 'file' => 'SETUP-TASK-PROVIDERS.md'],
+            ],
+        ],
+        [
+            'title' => 'Automation',
+            'pages' => [
                 ['slug' => 'mcp', 'title' => 'MCP Server', 'file' => 'SETUP-MCP.md'],
+                ['slug' => 'rest-api', 'title' => 'REST API', 'file' => 'REST-API.md'],
             ],
         ],
         [

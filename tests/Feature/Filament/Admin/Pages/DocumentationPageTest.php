@@ -7,6 +7,7 @@ namespace Tests\Feature\Filament\Admin\Pages;
 use App\Filament\Admin\Pages\Documentation;
 use App\Models\RepoProfile;
 use App\Models\User;
+use App\Services\Docs\DocManifest;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -37,6 +38,18 @@ class DocumentationPageTest extends TestCase
         $this->get(route('filament.admin.pages.docs', ['slug' => 'configuration']))
             ->assertSuccessful()
             ->assertSee('Configuration Reference');
+    }
+
+    /**
+     * Smoke per manifest entry: every documented page renders without error.
+     * Catches a broken/missing doc file or a Markdown that trips the renderer.
+     */
+    public function test_every_manifest_page_renders(): void
+    {
+        foreach (app(DocManifest::class)->pages() as $page) {
+            $this->get(route('filament.admin.pages.docs', ['slug' => $page['slug']]))
+                ->assertSuccessful();
+        }
     }
 
     public function test_unknown_slug_is_404(): void

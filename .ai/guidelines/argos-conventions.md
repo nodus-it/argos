@@ -92,7 +92,20 @@ runners (`run-tests.sh`, `run-bats.sh`).
 ### Documentation
 
 - Every new function in `worker/lib/` needs a docstring.
-- User-facing docs (setup, configuration, provider howtos) live in `docs/`.
+- User-facing docs (setup, configuration, provider howtos) live in `docs/`,
+  **English only**. They are one source, two surfaces: readable on GitHub and
+  rendered in-app by the Documentation viewer (`/admin/docs`).
+- The in-app viewer shows the **curated** set listed in `config/docs.php`
+  (operator/user docs). Contributor/architecture docs (`CONTRIBUTING.md`,
+  `PROVIDER-TEST-SETUP.md`, `docs/backlog/…`) stay repo-only — keep them out of
+  the manifest.
+- **New user-facing feature → write/refresh its `docs/<NAME>.md` operator page
+  and add (or confirm) a `config/docs.php` manifest entry.** Verify claims
+  against the code; `DocManifestIntegrityTest` catches a manifest entry whose
+  file is missing.
+- Link high-value UI to the docs with `DocsLinkAction::make('slug#anchor')`
+  (header actions / form-field `->hintAction()`); build URLs with
+  `App\Support\DocLink`. New relevant UI place → matching doc link.
 - Architecture notes live inline with the code (class/method PHPDoc, a
   README per module folder if needed). Do not maintain a parallel concept
   document.
@@ -141,6 +154,7 @@ notice a missing row during a patch, add it.
 | New enum case | DB migration (`enum()` values) — `EnumPersistenceTest` catches drift, but you must write the migration yourself; `lang/{de,en}/enums.php`; `color()` / `label()` / other `match` paths on the enum; Filament filter options / `SelectFilter::options()`; if a demo profile should showcase the case, add it to the relevant `database/seeders/Support/*Builder` and assert it in `tests/Feature/Seeders/` |
 | New DB column | Model `$fillable` / `$casts`; **factory** (otherwise `factory()->create()` silently breaks on NOT-NULL); Filament form field + table column if relevant; JSON schema in `worker/schemas/` if the worker reads/writes the field; if a demo seeder writes the model via raw `create()`/`updateOrCreate()`, set the new NOT-NULL column there too — the `tests/Feature/Seeders/*` tests run the seeders against MariaDB in CI and fail on the missing value |
 | New Filament page (Resource or Page) | `RedirectToOnboarding` whitelist if reachable pre-onboarding; `getNavigationGroup` / Heroicon; **wiring test via the embedding page** (`Livewire::test(ViewFooPage::class, [...])->assertSeeLivewire(FooRelationManager::class)`) — isolated RelationManager test alone is not enough; locale strings `de` + `en` |
+| New user-facing feature / UI surface | An operator doc page under `docs/` (English) + a `config/docs.php` manifest entry so it shows in the in-app viewer; a `DocsLinkAction` deep-link from the relevant screen; keep claims verified against the code |
 | New phase helper | `worker/lib/<module>.sh` with docstring; `bats` test in `worker/tests/bats/`; `shellcheck`-clean; sourced by `worker-entrypoint.sh`; which phase script calls the helper |
 | UI hint claiming a behavior | The backend implements it **for every relevant path** — every agent, every provider, every status. Helper text that's only true for the default path is a lie. |
 

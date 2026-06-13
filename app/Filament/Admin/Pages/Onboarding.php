@@ -19,7 +19,9 @@ use App\Services\Git\RepositoryFetcher;
 use App\Services\OAuth\ConnectedAccountService;
 use App\Services\OAuth\TokenRefresher;
 use App\Services\Project\RepoProfileService;
+use App\Support\DocsLinkAction;
 use App\Support\RepoUrlBuilder;
+use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Auth;
@@ -51,6 +53,18 @@ class Onboarding extends Page
     protected string $view = 'filament.admin.pages.onboarding';
 
     public int $currentStep = 1;
+
+    /**
+     * @return array<int, Action>
+     */
+    protected function getHeaderActions(): array
+    {
+        // Contextual help: the setup docs are reachable here even pre-onboarding
+        // (Documentation page is on the RedirectToOnboarding whitelist).
+        return [
+            DocsLinkAction::make('setup'),
+        ];
+    }
 
     // ── Step 1: agents ──────────────────────────────────────────────────────
 
