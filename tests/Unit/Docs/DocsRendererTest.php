@@ -67,6 +67,16 @@ class DocsRendererTest extends TestCase
         );
     }
 
+    public function test_app_url_placeholder_is_substituted_with_the_real_url(): void
+    {
+        config(['app.url' => 'https://argos.example.com/']);
+
+        $doc = $this->render('Connect your client to `${APP_URL}/mcp`.');
+
+        $this->assertStringContainsString('https://argos.example.com/mcp', $doc->html);
+        $this->assertStringNotContainsString('${APP_URL}', $doc->html);
+    }
+
     public function test_external_and_repo_only_links_are_left_untouched(): void
     {
         $doc = $this->render('[ext](https://example.com) [repo](CONTRIBUTING.md)');

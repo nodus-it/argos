@@ -116,7 +116,7 @@ session-less route; the request is authenticated by the provider's signature,
 verified in the controller:
 
 ```
-POST  https://<APP_URL>/webhooks/issues/{provider}/{binding-id}
+POST  ${APP_URL}/webhooks/issues/{provider}/{binding-id}
 ```
 
 `{provider}` is `github`, `gitlab`, or `linear`; `{binding-id}` is the binding's
@@ -133,7 +133,7 @@ stored on the binding.
 
 **GitHub** — Repository → Settings → Webhooks → Add webhook:
 
-- Payload URL: `https://<APP_URL>/webhooks/issues/github/<binding-id>`
+- Payload URL: `${APP_URL}/webhooks/issues/github/<binding-id>`
 - Content type: `application/json`
 - Secret: the generated secret (verified via the `X-Hub-Signature-256`
   HMAC-SHA256 header)
@@ -142,14 +142,14 @@ stored on the binding.
 
 **GitLab** — Project → Settings → Webhooks:
 
-- URL: `https://<APP_URL>/webhooks/issues/gitlab/<binding-id>`
+- URL: `${APP_URL}/webhooks/issues/gitlab/<binding-id>`
 - Secret token: the generated secret (sent back in, and matched against, the
   `X-Gitlab-Token` header)
 - Trigger: **Issues events**
 
 **Linear** — registered automatically during Setup; no manual step required:
 
-- URL: `https://<APP_URL>/webhooks/issues/linear/<binding-id>`
+- URL: `${APP_URL}/webhooks/issues/linear/<binding-id>`
 - Signature: raw HMAC-SHA256 hex digest in the `Linear-Signature` header
 
 Deliveries are deduplicated by the provider's delivery id

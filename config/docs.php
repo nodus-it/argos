@@ -24,17 +24,34 @@ return [
 
     'sections' => [
         [
+            'title' => 'Introduction',
+            'pages' => [
+                ['slug' => 'overview', 'title' => 'How Argos Works', 'file' => 'OVERVIEW.md'],
+            ],
+        ],
+        [
             'title' => 'Getting Started',
             'pages' => [
                 ['slug' => 'setup', 'title' => 'Setup', 'file' => 'SETUP.md'],
                 ['slug' => 'prepare-project', 'title' => 'Preparing a Project', 'file' => 'PREPARE-PROJECT.md'],
+            ],
+        ],
+        [
+            'title' => 'Concepts',
+            'pages' => [
+                ['slug' => 'projects', 'title' => 'Projects', 'file' => 'PROJECTS.md'],
+                ['slug' => 'tasks', 'title' => 'Tasks & Workflow', 'file' => 'TASKS.md'],
+                ['slug' => 'worker-stacks', 'title' => 'Worker Stacks', 'file' => 'WORKER-STACKS.md'],
+                ['slug' => 'agents', 'title' => 'Agents', 'file' => 'AGENTS.md'],
+                ['slug' => 'live-demos', 'title' => 'Live Demos', 'file' => 'LIVE-DEMOS.md'],
                 ['slug' => 'byoi', 'title' => 'Custom Worker Image (BYOI)', 'file' => 'BYOI.md'],
             ],
         ],
         [
-            'title' => 'Integrations',
+            'title' => 'Integrations & Credentials',
             'pages' => [
                 ['slug' => 'oauth', 'title' => 'OAuth', 'file' => 'OAUTH.md'],
+                ['slug' => 'credentials', 'title' => 'Access Tokens (PAT)', 'file' => 'CREDENTIALS.md'],
                 ['slug' => 'github', 'title' => 'GitHub', 'file' => 'SETUP-GITHUB.md'],
                 ['slug' => 'gitlab', 'title' => 'GitLab', 'file' => 'SETUP-GITLAB.md'],
                 ['slug' => 'bitbucket', 'title' => 'Bitbucket', 'file' => 'SETUP-BITBUCKET.md'],

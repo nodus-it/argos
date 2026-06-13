@@ -24,6 +24,7 @@ use App\Services\Git\RepositoryFetcher;
 use App\Services\GitProvider\GitServiceFactory;
 use App\Services\OAuth\ConnectedAccountService;
 use App\Services\OAuth\TokenRefresher;
+use App\Support\DocLink;
 use App\Support\DocsLinkAction;
 use App\Support\RepoUrlBuilder;
 use App\Workers\Agents\AgentRegistry;
@@ -117,8 +118,8 @@ class RepoProfileResource extends Resource
                                         ->icon('heroicon-o-information-circle')
                                         ->description(fn (Get $get): HtmlString => new HtmlString(
                                             (string) __('projects.platform_hints.'.($get('platform') ?: 'github').'.body')
-                                            .' <a href="'.e((string) config('argos.docs.setup_'.($get('platform') ?: 'github')))
-                                            .'" target="_blank" rel="noopener" class="underline">'
+                                            .' <a href="'.e(DocLink::url($get('platform') ?: 'github'))
+                                            .'" wire:navigate class="underline">'
                                             .e((string) __('projects.platform_hints.docs_link')).'</a>'
                                         )),
                                 ]),

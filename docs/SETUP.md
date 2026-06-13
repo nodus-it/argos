@@ -170,7 +170,7 @@ the cached image.
 
 Open the admin UI:
 
-- `http://localhost:8080/admin` (or your `APP_URL` + `/admin`). Visiting `/`
+- `http://localhost:8080/admin` (or `${APP_URL}/admin`). Visiting `/`
   redirects to `/admin`.
 
 Log in with the credentials from the installer summary:

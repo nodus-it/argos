@@ -49,8 +49,8 @@ credential must have permission to create a webhook on the target team (see
    `https://linear.app/settings/api/applications/new`).
 2. Fill in:
    - **Name**: e.g. `Argos`
-   - **Callback URL**: `{APP_URL}/auth/linear/callback`
-     (replace `{APP_URL}` with your Argos instance URL, e.g.
+   - **Callback URL**: `${APP_URL}/auth/linear/callback`
+     (replace `${APP_URL}` with your Argos instance URL, e.g.
      `https://argos.example.com`)
 3. Create the app, then copy the **Client ID** and **Client Secret**.
 
@@ -142,7 +142,7 @@ ignored.
 The inbound endpoint (shared across all providers) is:
 
 ```
-POST  https://<APP_URL>/webhooks/issues/linear/<binding-id>
+POST  ${APP_URL}/webhooks/issues/linear/<binding-id>
 ```
 
 `APP_URL` must be publicly reachable for Linear to deliver. Argos generates a
@@ -229,7 +229,7 @@ configuration is needed.
 | Symptom | Likely cause |
 |---|---|
 | "Linear team not found for key: …" during Setup | The team key behind **Projekt / Team** is wrong or the credential can't see that team — pick it again from the loaded list, or check the key under Linear Settings → Teams |
-| OAuth redirect fails / "Invalid OAuth state" | The callback URL on the Linear OAuth app must exactly match `{APP_URL}/auth/linear/callback`; mismatched or expired session state also triggers this |
+| OAuth redirect fails / "Invalid OAuth state" | The callback URL on the Linear OAuth app must exactly match `${APP_URL}/auth/linear/callback`; mismatched or expired session state also triggers this |
 | Setup fails in webhook mode | The credential lacks permission to create a webhook on the team — use an OAuth account with the `admin` scope, or an API-key owner who is a team admin. The exact error is in **Letzter Fehler** |
 | Webhook deliveries rejected (401) | Signature/secret mismatch, or no secret stored. Re-run **Einrichten** to regenerate and re-register the secret |
 | No tasks appear in poll mode | The scheduler isn't running, the binding isn't **Active**, or the **Labels-Filter** excludes the issues. Check the **Letzter Poll** column |

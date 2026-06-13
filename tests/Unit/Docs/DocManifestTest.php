@@ -29,7 +29,7 @@ class DocManifestTest extends TestCase
 
     public function test_default_slug_is_the_first_manifest_page(): void
     {
-        $this->assertSame('setup', $this->manifest()->defaultSlug());
+        $this->assertSame('overview', $this->manifest()->defaultSlug());
     }
 
     public function test_slug_for_file_maps_back(): void

@@ -180,7 +180,7 @@ stored per agent in the database.
 
 ## MCP server (Argos API)
 
-Argos exposes a built-in [MCP server](SETUP-MCP.md) at `<APP_URL>/mcp` so an
+Argos exposes a built-in [MCP server](SETUP-MCP.md) at `${APP_URL}/mcp` so an
 external client like Claude Code can drive it. Auth is OAuth 2.1 via Laravel
 Passport (scope `mcp:use`).
 

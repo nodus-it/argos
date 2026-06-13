@@ -27,7 +27,7 @@ chat-client front door, the REST API is the scripting front door.
 
 ## How it works
 
-- The server is mounted at **`<APP_URL>/mcp`** and is part of the `app`
+- The server is mounted at **`${APP_URL}/mcp`** and is part of the `app`
   service — no extra container. It is built on `laravel/mcp` and speaks the
   streamable-HTTP transport.
 - Auth is **OAuth 2.1** via Laravel Passport. Every request must carry an
@@ -46,7 +46,7 @@ chat-client front door, the REST API is the scripting front door.
 | Requirement | Why |
 |---|---|
 | `APP_URL` set to the **public** URL | It doubles as the OAuth issuer and redirect base. It must be reachable from where the MCP client runs, otherwise registration and login fail. |
-| Stack reachable over the network | The MCP client talks HTTP to `<APP_URL>/mcp`. Behind a reverse proxy, terminate TLS there and forward to the `nginx` service. |
+| Stack reachable over the network | The MCP client talks HTTP to `${APP_URL}/mcp`. Behind a reverse proxy, terminate TLS there and forward to the `nginx` service. |
 | Passport keys persisted | Handled automatically — generated once into `PASSPORT_KEYS_PATH` (`/data/passport` in compose) on the persistent volume, so issued tokens survive image rebuilds. |
 
 No flags to flip: the MCP server is always on. It is reachable only with a
@@ -61,7 +61,7 @@ claude mcp add --transport http argos https://your-argos.example.com/mcp
 ```
 
 Then, inside Claude Code, run `/mcp`, pick `argos`, and choose **Authenticate**.
-A browser opens at `<APP_URL>/oauth/authorize`; sign in as your Argos admin
+A browser opens at `${APP_URL}/oauth/authorize`; sign in as your Argos admin
 user and approve the `mcp:use` scope. The status flips to **connected** and the
 tools below become available.
 

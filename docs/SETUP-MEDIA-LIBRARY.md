@@ -41,7 +41,7 @@ The disk is selected by `MEDIA_DISK` (default `public`), read into
 | `public` | local | `storage/app/public` | public |
 
 With the default `public` disk, files land under `storage/app/public/` and are
-served from `APP_URL` + `/storage` via the `public/storage` symlink (see
+served from `${APP_URL}/storage` via the `public/storage` symlink (see
 [One-time setup](#one-time-setup)). The `public` disk's `url` is derived from
 `APP_URL`, so a correct `APP_URL` is required for upload URLs to resolve.
 

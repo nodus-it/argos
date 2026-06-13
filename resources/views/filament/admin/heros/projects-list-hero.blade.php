@@ -24,6 +24,10 @@
     :sub="__('widgets.hero.projects_sub')"
     :chips="$chips"
 >
+    <a href="{{ \App\Support\DocLink::url('projects') }}" wire:navigate
+       class="btn btn-ghost" style="white-space:nowrap;">
+        {{ __('navigation.pages.documentation') }}
+    </a>
     <a href="{{ \App\Filament\Admin\Resources\RepoProfileResource::getUrl('create') }}"
        class="btn btn-primary" style="white-space:nowrap;">
         {{ __('widgets.hero.new_project') }}

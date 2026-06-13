@@ -29,8 +29,8 @@ class DocumentationPageTest extends TestCase
     {
         $this->get(route('filament.admin.pages.docs'))
             ->assertSuccessful()
-            ->assertSee('Getting Started')   // sidebar section
-            ->assertSee('Setup Guide');      // SETUP.md H1 → page title
+            ->assertSee('Getting Started')    // sidebar section
+            ->assertSee('How Argos Works');   // OVERVIEW.md H1 → page title (default landing)
     }
 
     public function test_a_specific_slug_renders(): void
@@ -71,7 +71,7 @@ class DocumentationPageTest extends TestCase
         // rather than bouncing to the onboarding page (which would be a 302).
         RepoProfile::query()->delete();
 
-        $this->get(route('filament.admin.pages.docs'))
+        $this->get(route('filament.admin.pages.docs', ['slug' => 'setup']))
             ->assertSuccessful()
             ->assertSee('Setup Guide');
     }

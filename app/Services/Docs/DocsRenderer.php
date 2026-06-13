@@ -38,6 +38,8 @@ class DocsRenderer
     /** The core: render raw Markdown (kept separate so it is unit-testable). */
     public function renderMarkdown(string $markdown): RenderedDoc
     {
+        $markdown = $this->substitutePlaceholders($markdown);
+
         $environment = new Environment;
         $environment->addExtension(new CommonMarkCoreExtension);
         $environment->addExtension(new GithubFlavoredMarkdownExtension);
@@ -73,6 +75,16 @@ class DocsRenderer
         $html = (string) (new HtmlRenderer($environment))->renderDocument($document);
 
         return new RenderedDoc($resolvedTitle, $html, $toc);
+    }
+
+    /**
+     * Replace doc placeholder tokens with their live values so the in-app
+     * reader gets copy-paste-ready URLs. The Markdown source keeps the generic
+     * `${APP_URL}` token so it stays portable on GitHub.
+     */
+    private function substitutePlaceholders(string $markdown): string
+    {
+        return str_replace('${APP_URL}', rtrim((string) config('app.url'), '/'), $markdown);
     }
 
     /** Concatenated literal text of every descendant Text node. */
