@@ -22,6 +22,13 @@ return [
     // Directory the MD files live under, relative to the application base path.
     'path' => 'docs',
 
+    // Locales that ship a FULL translation under docs/<locale>/. English is
+    // always the reference source; translations are kept in sync from it (never
+    // the other way around). A missing translation falls back to English.
+    // DocTranslationFreshnessTest enforces that each listed locale has an
+    // up-to-date copy of every manifest page.
+    'translations' => ['de'],
+
     'sections' => [
         [
             'title' => 'Introduction',

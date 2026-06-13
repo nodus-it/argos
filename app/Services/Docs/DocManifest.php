@@ -76,9 +76,28 @@ class DocManifest
         return null;
     }
 
-    /** Absolute path to a doc file under the configured docs directory. */
+    /** Absolute path to the canonical (English) doc file. */
     public function absolutePath(string $file): string
     {
         return base_path((string) config('docs.path', 'docs').'/'.$file);
+    }
+
+    /**
+     * Absolute path to the doc file for a locale: the translated copy under
+     * `docs/<locale>/` when it exists, otherwise the English source. English is
+     * always the reference; a missing translation falls back to it.
+     */
+    public function localizedPath(string $file, ?string $locale = null): string
+    {
+        $locale ??= app()->getLocale();
+
+        if ($locale !== 'en' && $locale !== '') {
+            $translated = base_path((string) config('docs.path', 'docs').'/'.$locale.'/'.$file);
+            if (is_file($translated)) {
+                return $translated;
+            }
+        }
+
+        return $this->absolutePath($file);
     }
 }

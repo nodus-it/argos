@@ -67,6 +67,21 @@ class DocsRendererTest extends TestCase
         );
     }
 
+    public function test_render_uses_the_localized_doc_when_locale_is_translated(): void
+    {
+        $renderer = app(DocsRenderer::class);
+
+        $this->app->setLocale('en');
+        $en = $renderer->render('SETUP.md');
+
+        $this->app->setLocale('de');
+        $de = $renderer->render('SETUP.md');
+
+        // The German translation exists, so the rendered HTML differs from EN.
+        $this->assertNotSame('', $de->html);
+        $this->assertNotSame($en->html, $de->html);
+    }
+
     public function test_app_url_placeholder_is_substituted_with_the_real_url(): void
     {
         config(['app.url' => 'https://argos.example.com/']);

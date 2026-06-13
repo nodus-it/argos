@@ -26,10 +26,13 @@ class DocsRenderer
 {
     public function __construct(private readonly DocManifest $manifest) {}
 
-    /** Render a manifest doc file. The title is the doc's leading H1 (or empty). */
+    /**
+     * Render a manifest doc file in the current locale (translated copy when
+     * present, English otherwise). The title is the doc's leading H1 (or empty).
+     */
     public function render(string $file): RenderedDoc
     {
-        $path = $this->manifest->absolutePath($file);
+        $path = $this->manifest->localizedPath($file);
         $markdown = is_file($path) ? (string) file_get_contents($path) : '';
 
         return $this->renderMarkdown($markdown);

@@ -102,10 +102,21 @@ runners (`run-tests.sh`, `run-bats.sh`).
 - **New user-facing feature → write/refresh its `docs/<NAME>.md` operator page
   and add (or confirm) a `config/docs.php` manifest entry.** Verify claims
   against the code; `DocManifestIntegrityTest` catches a manifest entry whose
-  file is missing.
+  file is missing, and `DocCoverageTest` fails when a new enum case / API
+  ability / endpoint is undocumented (the enforced layer — prose is covered by
+  the periodic drift audit and the `docs-reminder` CI nudge).
 - Link high-value UI to the docs with `DocsLinkAction::make('slug#anchor')`
   (header actions / form-field `->hintAction()`); build URLs with
   `App\Support\DocLink`. New relevant UI place → matching doc link.
+- **Translations: English is the source of truth — the direction is one-way.**
+  Translated locales live under `docs/<locale>/` (today `docs/de/`), listed in
+  `config('docs.translations')`. Update the **English first**; once it's final,
+  re-translate the affected pages and run
+  `php artisan argos:docs:stamp-translations`. **NEVER** edit a translation and
+  back-port it to English. `DocTranslationFreshnessTest` fails when a translation
+  is missing or stale (its recorded English-source hash drifted).
+- **Before a release**, run the `release-docs-check` skill: it walks the doc
+  tests + a prose skim + the translation re-sync in the correct order.
 - Architecture notes live inline with the code (class/method PHPDoc, a
   README per module folder if needed). Do not maintain a parallel concept
   document.
@@ -155,6 +166,7 @@ notice a missing row during a patch, add it.
 | New DB column | Model `$fillable` / `$casts`; **factory** (otherwise `factory()->create()` silently breaks on NOT-NULL); Filament form field + table column if relevant; JSON schema in `worker/schemas/` if the worker reads/writes the field; if a demo seeder writes the model via raw `create()`/`updateOrCreate()`, set the new NOT-NULL column there too — the `tests/Feature/Seeders/*` tests run the seeders against MariaDB in CI and fail on the missing value |
 | New Filament page (Resource or Page) | `RedirectToOnboarding` whitelist if reachable pre-onboarding; `getNavigationGroup` / Heroicon; **wiring test via the embedding page** (`Livewire::test(ViewFooPage::class, [...])->assertSeeLivewire(FooRelationManager::class)`) — isolated RelationManager test alone is not enough; locale strings `de` + `en` |
 | New user-facing feature / UI surface | An operator doc page under `docs/` (English) + a `config/docs.php` manifest entry so it shows in the in-app viewer; a `DocsLinkAction` deep-link from the relevant screen; keep claims verified against the code |
+| An English doc page (`docs/*.md`) | Re-translate the changed page into every `config('docs.translations')` locale (`docs/<locale>/`), then run `php artisan argos:docs:stamp-translations` — `DocTranslationFreshnessTest` fails otherwise. English first, translation after; never the reverse. |
 | New phase helper | `worker/lib/<module>.sh` with docstring; `bats` test in `worker/tests/bats/`; `shellcheck`-clean; sourced by `worker-entrypoint.sh`; which phase script calls the helper |
 | UI hint claiming a behavior | The backend implements it **for every relevant path** — every agent, every provider, every status. Helper text that's only true for the default path is a lie. |
 

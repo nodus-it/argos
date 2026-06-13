@@ -133,6 +133,7 @@ class RepoProfileResource extends Resource
                                 ->schema([
                                     Select::make('auth_method')
                                         ->label(__('projects.fields.auth_method_label'))
+                                        ->hintAction(DocsLinkAction::make('credentials'))
                                         ->options(fn (Get $get): array => self::authMethodOptions($get))
                                         ->default('pat')
                                         ->required()

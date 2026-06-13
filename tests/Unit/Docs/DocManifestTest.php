@@ -37,4 +37,27 @@ class DocManifestTest extends TestCase
         $this->assertSame('setup', $this->manifest()->slugForFile('SETUP.md'));
         $this->assertNull($this->manifest()->slugForFile('CONTRIBUTING.md'));
     }
+
+    public function test_localized_path_prefers_the_translation_when_present(): void
+    {
+        $this->assertSame(
+            base_path('docs/de/SETUP.md'),
+            $this->manifest()->localizedPath('SETUP.md', 'de'),
+        );
+    }
+
+    public function test_localized_path_falls_back_to_english(): void
+    {
+        // English locale always uses the canonical source.
+        $this->assertSame(
+            base_path('docs/SETUP.md'),
+            $this->manifest()->localizedPath('SETUP.md', 'en'),
+        );
+
+        // A locale without a translated file falls back to English too.
+        $this->assertSame(
+            base_path('docs/SETUP.md'),
+            $this->manifest()->localizedPath('SETUP.md', 'xx'),
+        );
+    }
 }
