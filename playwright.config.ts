@@ -43,6 +43,24 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+      // The mobile gate runs as its own project below; keep it out of the
+      // desktop run so the heavy full-flow matrix isn't re-executed on a phone.
+      testIgnore: /mobile\.spec\.ts/,
+    },
+    {
+      // P9 mobile verification gate. Pinned to the 375px design target on
+      // chromium (the only browser installed in this repo's setup — an
+      // `iPhone SE` webkit device would need `playwright install webkit`).
+      // `isMobile`/`hasTouch` give the touch UA + pointer the UI keys off.
+      // Runs ONLY *.mobile.spec.ts.
+      name: 'mobile',
+      testMatch: /mobile\.spec\.ts/,
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 375, height: 720 },
+        isMobile: true,
+        hasTouch: true,
+      },
     },
   ],
   // Reuse the already-running compose stack. If it is not up, the command

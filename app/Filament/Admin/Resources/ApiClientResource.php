@@ -78,7 +78,8 @@ class ApiClientResource extends Resource
 
                 TextColumn::make('tokens_count')
                     ->label(__('api_tokens.client.tokens'))
-                    ->counts('tokens'),
+                    ->counts('tokens')
+                    ->visibleFrom('md'),
 
                 TextColumn::make('created_at')
                     ->dateTime()
