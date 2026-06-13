@@ -90,6 +90,7 @@ return [
         'push_failed' => 'Push fehlgeschlagen',
         'review' => 'Pull Request erstellt',
         'done' => 'Abgeschlossen',
+        'aborted' => 'Abgebrochen',
     ],
 
     'rail' => [
@@ -372,6 +373,11 @@ return [
             'logs_download' => 'Logs Download',
             'mark_completed' => 'Abschließen',
             'mark_completed_description' => 'Task abschließen und Docker-Workspace löschen? Beide Aktionen sind nicht rückgängig zu machen.',
+            'abort' => 'Abbrechen',
+            'abort_heading' => 'Laufende Phase abbrechen',
+            'abort_description' => 'Den laufenden Worker-Container sofort stoppen und den Task auf „Abgebrochen" setzen? Der Workspace bleibt erhalten (wird erst beim Löschen entfernt).',
+            'abort_submit' => 'Phase abbrechen',
+            'task_aborted' => 'Task abgebrochen',
             'run_concept' => 'Konzept neu ausführen',
             'run_concept_description' => 'Startet einen neuen Konzept-Lauf. Vorhandene Notes werden als Feedback übergeben.',
             'start_implement' => 'Implement starten',

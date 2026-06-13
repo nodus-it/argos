@@ -90,6 +90,7 @@ return [
         'push_failed' => 'Push failed',
         'review' => 'Pull request created',
         'done' => 'Completed',
+        'aborted' => 'Aborted',
     ],
 
     'rail' => [
@@ -373,6 +374,11 @@ return [
             'logs_download' => 'Logs Download',
             'mark_completed' => 'Complete',
             'mark_completed_description' => 'Complete the task and delete the Docker workspace? Both actions cannot be undone.',
+            'abort' => 'Abort',
+            'abort_heading' => 'Abort running phase',
+            'abort_description' => 'Stop the running worker container immediately and mark the task as Aborted? The workspace is kept (removed only on delete).',
+            'abort_submit' => 'Abort phase',
+            'task_aborted' => 'Task aborted',
             'run_concept' => 'Re-run Concept',
             'run_concept_description' => 'Starts a new concept run. Existing notes will be passed as feedback.',
             'start_implement' => 'Start Implement',

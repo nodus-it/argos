@@ -6,10 +6,12 @@ namespace App\Providers;
 
 use App\Events\Task\PhaseCompleted;
 use App\Events\Task\TaskCompleted;
+use App\Events\Task\TaskDeleted;
 use App\Jobs\RunPhaseJob;
 use App\Listeners\Task\CloseSourceIssue;
 use App\Listeners\Task\DispatchAutoPush;
 use App\Listeners\Task\NotifyIssueTrackerOfPhase;
+use App\Listeners\Task\PurgeTaskResources;
 use App\Listeners\Task\RemoveTaskVolume;
 use App\Listeners\Task\StopDemoAfterPush;
 use App\Models\User;
@@ -139,6 +141,7 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(PhaseCompleted::class, NotifyIssueTrackerOfPhase::class);
         Event::listen(TaskCompleted::class, CloseSourceIssue::class);
         Event::listen(TaskCompleted::class, RemoveTaskVolume::class);
+        Event::listen(TaskDeleted::class, PurgeTaskResources::class);
 
         Queue::failing(function (JobFailed $event): void {
             if ($event->job->resolveName() === RunPhaseJob::class) {
