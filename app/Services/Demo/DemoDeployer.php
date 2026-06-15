@@ -71,6 +71,11 @@ class DemoDeployer
 
         $log = '';
         try {
+            // Pull external commits a user pushed to the feature branch into the
+            // volume first, so the demo reflects the current remote state (I2).
+            // No-op on a dirty tree — see DemoWorkspaceSync.
+            app(DemoWorkspaceSync::class)->syncToRemote($task);
+
             [$composeYaml, $settings] = $this->readContract($profile);
 
             // Resolve the built-in runtime-image placeholder to the content-

@@ -28,6 +28,7 @@ erledigt, siehe [AGENTS.md](AGENTS.md).
   - [Implement](#implement)
   - [Push & Pull Request](#push--pull-request)
   - [Respond (Review-Feedback)](#respond-review-feedback)
+- [Selbst am Branch arbeiten](#working-on-the-branch-yourself)
 - [Status & Stufen](#statuses--stages)
 - [Pausieren & Fortsetzen (das Turn-Limit)](#pausing--resuming-the-turn-limit)
 - [Eine fehlgeschlagene Phase erneut versuchen](#retrying-a-failed-phase)
@@ -188,6 +189,26 @@ Feature-Branch einarbeitet — kein unverbundenes Refactoring — und der Pull
 Request wird aktualisiert. Der Task kehrt nach **In review** zurück, sodass Sie
 das Ergebnis lesen und bei Bedarf weiteres Feedback senden können. Wiederholen
 Sie dies, bis Sie zufrieden sind, und schließen Sie dann den Task ab.
+
+## Selbst am Branch arbeiten
+
+Sobald der Feature-Branch auf dem Remote liegt (nach einem **Push**), können Sie
+ihn auschecken, bearbeiten und eigene Commits pushen — wie jeden Branch. Wenn Sie
+den Task danach fortsetzen (ein **Refine**-Implement oder **Review
+feedback**/Respond), **pullt Argos den Branch zuerst** und arbeitet auf Ihren
+Commits weiter, sodass Ihre manuellen Änderungen erhalten bleiben und darauf
+aufgebaut wird. Ein **Neuaufbau der Live-Demo** spiegelt ebenso den gepushten
+Remote-Stand.
+
+Zwei Dinge sind wichtig:
+
+- Das gilt für die **fortsetzenden** Läufe (Refine, Respond). Ein bewusstes
+  **Fresh-Re-Implement** baut die Änderung von der Base neu auf und würde externe
+  Commits ersetzen — nutzen Sie Refine/Respond, wenn Ihre manuelle Arbeit
+  weitergetragen werden soll.
+- Pushen Sie auf den Branch, *während* eine Phase läuft, verweigert dieser Lauf
+  das Überschreiben Ihrer Commits und scheitert mit einer klaren Meldung —
+  starten Sie den Task einfach erneut, dann werden Ihre Änderungen übernommen.
 
 ## Status & Stufen
 

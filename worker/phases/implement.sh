@@ -194,6 +194,12 @@ phase_implement_run() {
 
     if [[ "$fresh" == "true" ]]; then
         _implement_reset_branch || return 1
+    elif [[ "$refine" == "true" ]]; then
+        # Continue on the feature branch: pull external commits the user may
+        # have pushed to it before refining on top (I2). --continue (resume
+        # after a turn-limit) deliberately skips this — it resumes the exact
+        # in-progress working tree.
+        git_sync_feature_branch || return 1
     fi
     _implement_setup_toolchain || return 1
 

@@ -26,6 +26,7 @@ the agent/model that does the work, see [AGENTS.md](AGENTS.md).
   - [Implement](#implement)
   - [Push & Pull Request](#push--pull-request)
   - [Respond (review feedback)](#respond-review-feedback)
+- [Working on the branch yourself](#working-on-the-branch-yourself)
 - [Statuses & stages](#statuses--stages)
 - [Pausing & resuming (the turn limit)](#pausing--resuming-the-turn-limit)
 - [Retrying a failed phase](#retrying-a-failed-phase)
@@ -179,6 +180,25 @@ incorporates *only the addressed points* into the existing feature branch — no
 unrelated refactoring — and the pull request is brought up to date. The task
 returns to **In review** so you can read the result and, if needed, send more
 feedback. Repeat until you're satisfied, then complete the task.
+
+## Working on the branch yourself
+
+Once the feature branch is on the remote (after a **Push**), you can check it
+out, edit it, and push your own commits — just like any branch. When you next
+continue the task (a **refine** implement, or **Review feedback**/Respond),
+Argos **pulls the branch first** and works on top of your commits, so your
+manual changes are kept and built upon. A **rebuild of the live demo** likewise
+reflects the pushed remote state.
+
+Two things to know:
+
+- This applies to the **continuing** runs (refine, respond). A deliberate
+  **fresh re-implement** rebuilds the change from the base branch and would
+  supersede external commits — use refine/respond when you want your manual work
+  carried forward.
+- If you push to the branch *while* a phase is running, that run will refuse to
+  push over your commits and fail with a clear message — just start the task
+  again and it picks up your changes.
 
 ## Statuses & stages
 

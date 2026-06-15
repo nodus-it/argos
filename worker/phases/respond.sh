@@ -64,6 +64,10 @@ phase_respond_run() {
     }
     mkdir -p /workspace/.agent/logs
 
+    # Continue on the feature branch: pull external commits the user may have
+    # pushed before responding to review feedback on top (I2 — remote-wins).
+    git_sync_feature_branch || return 1
+
     local started_at finished_at started_epoch finished_epoch
     started_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
     started_epoch=$(date -u +%s)
