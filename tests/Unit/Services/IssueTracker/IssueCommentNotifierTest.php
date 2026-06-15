@@ -45,8 +45,8 @@ class IssueCommentNotifierTest extends TestCase
         $tracker->shouldReceive('createComment')
             ->once()
             ->with('acme', 'widget', 42, Mockery::on(
-                fn (string $body): bool => str_contains($body, 'Phase **Implement**')
-                    && str_contains($body, '[Task in Argos öffnen](')
+                fn (string $body): bool => str_contains($body, 'phase **Implement**')
+                    && str_contains($body, '[Open task in Argos](')
                     && str_contains($body, (string) $task->id),
             ));
 
@@ -85,7 +85,7 @@ class IssueCommentNotifierTest extends TestCase
         $tracker->shouldReceive('createComment')
             ->once()
             ->with('acme', 'widget', 7, Mockery::on(
-                fn (string $body): bool => str_contains($body, 'Phase **Concept**')
+                fn (string $body): bool => str_contains($body, 'phase **Concept**')
                     && str_contains($body, "/admin/tasks/{$task->getKey()}"),
             ));
         $tracker->shouldReceive('commentId')->andReturn('cmt-panel');
@@ -115,7 +115,7 @@ class IssueCommentNotifierTest extends TestCase
         $tracker->shouldReceive('createComment')
             ->once()
             ->with('acme', 'widget', 5, Mockery::on(
-                fn (string $body): bool => str_contains($body, 'Phase **Concept**')
+                fn (string $body): bool => str_contains($body, 'phase **Concept**')
                     && str_contains($body, '## Plan')
                     && str_contains($body, 'Write the README.'),
             ));
@@ -149,7 +149,7 @@ class IssueCommentNotifierTest extends TestCase
         $tracker->shouldReceive('createComment')
             ->once()
             ->with('acme', 'widget', 5, Mockery::on(
-                fn (string $body): bool => str_contains($body, 'Phase **Implement**')
+                fn (string $body): bool => str_contains($body, 'phase **Implement**')
                     && ! str_contains($body, 'DO NOT LEAK THIS INTO IMPLEMENT'),
             ));
 
@@ -181,7 +181,7 @@ class IssueCommentNotifierTest extends TestCase
         $tracker->shouldReceive('createComment')
             ->once()
             ->with('acme', 'widget', 5, Mockery::on(
-                fn (string $body): bool => str_contains($body, 'Phase **Implement**')
+                fn (string $body): bool => str_contains($body, 'phase **Implement**')
                     && str_contains($body, 'Added a README with usage examples.')
                     && str_contains($body, 'New README.md (40 lines)'),
             ));
@@ -211,7 +211,7 @@ class IssueCommentNotifierTest extends TestCase
         $tracker->shouldReceive('createComment')
             ->once()
             ->with('acme', 'widget', 5, Mockery::on(
-                fn (string $body): bool => str_contains($body, 'Phase **Push**')
+                fn (string $body): bool => str_contains($body, 'phase **Push**')
                     && str_contains($body, 'Pull Request')
                     && str_contains($body, 'https://github.com/acme/widget/pull/7'),
             ));
