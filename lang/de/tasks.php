@@ -284,6 +284,11 @@ return [
         ],
 
         'logs' => [
+            'title' => 'Logs — :name',
+            'breadcrumb_tasks' => 'Tasks',
+            'breadcrumb_self' => 'Logs',
+            'download' => 'Log herunterladen',
+            'download_bundle' => 'Log-Bundle (ZIP)',
             'status_live' => 'Live',
             'status_idle' => 'Beendet',
             'status_paused' => '⏸ pausiert (Turn-Limit)',
@@ -317,6 +322,10 @@ return [
         ],
 
         'diff' => [
+            'title' => 'Diff — :name',
+            'breadcrumb_tasks' => 'Tasks',
+            'breadcrumb_self' => 'Diff',
+            'refresh' => 'Aktualisieren',
             'not_loaded' => 'Diff wird nicht automatisch geladen.',
             'load_button' => 'Diff laden',
             'loading' => 'Lade…',

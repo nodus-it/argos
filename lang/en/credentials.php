@@ -68,6 +68,12 @@ return [
             'callback_note' => 'Register the callback URL above as the redirect URL in the OAuth app.',
             'manual_note' => 'Create the OAuth app under your provider workspace settings (OAuth consumer) and set the callback URL above as the redirect URL.',
         ],
+        'refresh' => [
+            'expired_no_refresh_token' => 'The OAuth token for :provider has expired and no refresh_token is available — please reconnect the account.',
+            'failed' => 'OAuth token refresh for :provider failed (HTTP :status) — please reconnect the account.',
+            'no_access_token' => 'OAuth token refresh for :provider returned no access_token — please reconnect the account.',
+            'unknown_provider' => 'Unknown OAuth provider for token refresh: :provider',
+        ],
     ],
 
     'verify' => [
