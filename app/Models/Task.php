@@ -24,6 +24,7 @@ use Illuminate\Support\Carbon;
  * @property string $id
  * @property int|null $user_id
  * @property string $name
+ * @property string $slug
  * @property string|null $repo_profile_id
  * @property string $description
  * @property string|null $base_branch
@@ -64,6 +65,7 @@ class Task extends Model
     protected $fillable = [
         'user_id',
         'name',
+        'slug',
         'repo_profile_id',
         'description',
         'base_branch',
@@ -149,12 +151,61 @@ class Task extends Model
 
     public function volumeName(): string
     {
-        return 'task_ws_'.self::slugifyName($this->name);
+        return 'task_ws_'.self::slugifyName($this->slug);
     }
 
     public static function slugifyName(string $name): string
     {
         return preg_replace('/[^a-zA-Z0-9_.-]/', '_', $name) ?? $name;
+    }
+
+    /**
+     * Turn a free-text task name into a git-/path-safe slug. Mirrors the
+     * worker's `_concept_branch_slug` (transliterate umlauts, space/slash → '-',
+     * strip the rest, keep case) so that slug == branch suffix == volume key.
+     */
+    public static function slugifyForBranch(string $value): string
+    {
+        $value = strtr($value, [
+            'ä' => 'ae', 'ö' => 'oe', 'ü' => 'ue',
+            'Ä' => 'Ae', 'Ö' => 'Oe', 'Ü' => 'Ue', 'ß' => 'ss',
+        ]);
+        $value = str_replace([' ', '/'], '-', $value);
+        $value = preg_replace('/[^a-zA-Z0-9._-]/', '', $value) ?? '';
+
+        return trim($value, '-_.');
+    }
+
+    /**
+     * Build a unique, frozen slug from a name (slugify + numeric suffix on
+     * collision). Falls back to 'task' when the name slugifies to empty.
+     */
+    public static function generateSlug(string $name): string
+    {
+        $base = self::slugifyForBranch($name);
+        if ($base === '') {
+            $base = 'task';
+        }
+
+        $slug = $base;
+        $suffix = 2;
+        while (self::query()->where('slug', $slug)->exists()) {
+            $slug = $base.'-'.$suffix++;
+        }
+
+        return $slug;
+    }
+
+    protected static function booted(): void
+    {
+        // The slug is the frozen operational identity (volume/branch/log paths).
+        // Auto-derive it from the name on create when not set explicitly; it is
+        // never regenerated on rename.
+        static::creating(function (Task $task): void {
+            if (($task->slug ?? '') === '') {
+                $task->slug = self::generateSlug((string) $task->name);
+            }
+        });
     }
 
     /**

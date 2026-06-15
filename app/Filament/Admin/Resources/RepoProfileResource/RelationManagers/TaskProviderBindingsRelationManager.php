@@ -42,14 +42,14 @@ class TaskProviderBindingsRelationManager extends RelationManager
 
     public static function getTitle(Model $ownerRecord, string $pageClass): string
     {
-        return 'Task-Provider';
+        return __('task_providers.title');
     }
 
     public function form(Schema $schema): Schema
     {
         return $schema->components([
             Select::make('kind')
-                ->label('Provider')
+                ->label(__('task_providers.form.provider'))
                 ->options(collect(TaskProviderKind::cases())
                     ->mapWithKeys(fn (TaskProviderKind $k): array => [$k->value => $k->label()])
                     ->all())
@@ -59,7 +59,7 @@ class TaskProviderBindingsRelationManager extends RelationManager
                 ->native(false),
 
             Select::make('mode')
-                ->label('Modus')
+                ->label(__('task_providers.form.mode'))
                 ->options(collect(TaskProviderMode::cases())
                     ->mapWithKeys(fn (TaskProviderMode $m): array => [$m->value => $m->label()])
                     ->all())
@@ -71,30 +71,30 @@ class TaskProviderBindingsRelationManager extends RelationManager
             // option encodes both the auth method and the source id (see
             // applyCredentialRef / mutateRecordDataUsing).
             Select::make('credential_ref')
-                ->label('Zugang')
+                ->label(__('task_providers.form.credential'))
                 ->options(fn (Get $get): array => $this->credentialRefOptions($get))
                 ->required()
                 ->live()
                 ->afterStateUpdated(fn (Set $set): mixed => $set('external_project_ref', null))
                 ->native(false)
-                ->helperText('OAuth-Account oder gespeichertes Access-Token (PAT) für diesen Provider.'),
+                ->helperText(__('task_providers.form.credential_help')),
 
             Select::make('external_project_ref')
-                ->label('Projekt / Team')
+                ->label(__('task_providers.form.project'))
                 ->options(fn (Get $get): array => $this->loadProjectRefOptions($get))
                 ->searchable()
                 ->native(false)
-                ->placeholder('Erst Provider und Zugang wählen')
-                ->helperText('Wird automatisch aus dem gewählten Zugang geladen.')
+                ->placeholder(__('task_providers.form.project_placeholder'))
+                ->helperText(__('task_providers.form.project_help'))
                 ->nullable(),
 
             TagsInput::make('filters.labels')
-                ->label('Labels-Filter')
+                ->label(__('task_providers.form.labels_filter'))
                 ->nullable(),
 
             Toggle::make('filters.close_on_complete')
-                ->label('Issue schließen bei Task-Abschluss')
-                ->helperText('Schließt/resolved das Quell-Issue, sobald der Argos-Task als erledigt markiert wird.')
+                ->label(__('task_providers.form.close_on_complete'))
+                ->helperText(__('task_providers.form.close_on_complete_help'))
                 ->default(false),
         ]);
     }
@@ -123,7 +123,7 @@ class TaskProviderBindingsRelationManager extends RelationManager
                 ->all();
 
             if ($oauth !== []) {
-                $groups['OAuth-Accounts'] = $oauth;
+                $groups[__('task_providers.form.groups.oauth')] = $oauth;
             }
         }
 
@@ -139,7 +139,7 @@ class TaskProviderBindingsRelationManager extends RelationManager
             ->all();
 
         if ($pats !== []) {
-            $groups['Access-Tokens (PAT)'] = $pats;
+            $groups[__('task_providers.form.groups.pat')] = $pats;
         }
 
         return $groups;
@@ -262,30 +262,30 @@ class TaskProviderBindingsRelationManager extends RelationManager
         return $table
             ->columns([
                 TextColumn::make('kind')
-                    ->label('Provider')
+                    ->label(__('task_providers.columns.provider'))
                     ->formatStateUsing(fn (TaskProviderKind $state): string => $state->label()),
 
                 TextColumn::make('mode')
-                    ->label('Modus')
+                    ->label(__('task_providers.columns.mode'))
                     ->formatStateUsing(fn (TaskProviderMode $state): string => $state->label()),
 
                 TextColumn::make('sync_status')
-                    ->label('Status')
+                    ->label(__('task_providers.columns.status'))
                     ->badge()
                     ->color(fn (TaskProviderSyncStatus $state): string => $state->color())
                     ->formatStateUsing(fn (TaskProviderSyncStatus $state): string => $state->label()),
 
                 TextColumn::make('external_project_ref')
-                    ->label('Projekt')
+                    ->label(__('task_providers.columns.project'))
                     ->placeholder('—'),
 
                 TextColumn::make('last_polled_at')
-                    ->label('Letzter Poll')
+                    ->label(__('task_providers.columns.last_poll'))
                     ->since()
                     ->placeholder('—'),
 
                 TextColumn::make('last_error')
-                    ->label('Letzter Fehler')
+                    ->label(__('task_providers.columns.last_error'))
                     ->limit(60)
                     ->placeholder('—')
                     ->toggleable(isToggledHiddenByDefault: true),
@@ -300,13 +300,13 @@ class TaskProviderBindingsRelationManager extends RelationManager
                     ->mutateDataUsing(fn (array $data): array => $this->applyCredentialRef($data)),
 
                 Action::make('setup')
-                    ->label('Einrichten')
+                    ->label(__('task_providers.actions.setup'))
                     ->icon('heroicon-o-arrow-path')
                     ->action(function (TaskProviderBinding $record): void {
                         if ($record->connected_account_id === null && $record->provider_credential_id === null) {
                             Notification::make()
-                                ->title('Kein Zugang verknüpft')
-                                ->body('Bitte zuerst einen OAuth-Account oder ein Access-Token im Binding auswählen.')
+                                ->title(__('task_providers.notifications.no_credential_title'))
+                                ->body(__('task_providers.notifications.no_credential_body'))
                                 ->danger()
                                 ->send();
 
@@ -317,12 +317,12 @@ class TaskProviderBindingsRelationManager extends RelationManager
                             app(ProviderSetupService::class)->setup($record);
 
                             Notification::make()
-                                ->title('Provider eingerichtet')
+                                ->title(__('task_providers.notifications.setup_ok'))
                                 ->success()
                                 ->send();
                         } catch (\Throwable $e) {
                             Notification::make()
-                                ->title('Einrichtung fehlgeschlagen')
+                                ->title(__('task_providers.notifications.setup_failed'))
                                 ->body($e->getMessage())
                                 ->danger()
                                 ->send();

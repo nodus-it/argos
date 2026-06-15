@@ -189,7 +189,7 @@ class WorkerSidecarManager
 
     private function networkName(Task $task, string $phase): string
     {
-        $base = strtolower((string) preg_replace('/[^a-zA-Z0-9]+/', '-', $task->name));
+        $base = strtolower((string) preg_replace('/[^a-zA-Z0-9]+/', '-', $task->slug));
         $base = trim($base, '-');
 
         return 'argos-run-'.($base !== '' ? $base : 'task').'-'.$phase;

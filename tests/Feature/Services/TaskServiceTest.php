@@ -557,11 +557,11 @@ class TaskServiceTest extends TestCase
 
     // ── find (used by MCP via InteractsWithTasks) ──────────────────────────────
 
-    public function test_find_by_name(): void
+    public function test_find_by_slug(): void
     {
-        $task = Task::factory()->create(['name' => 'search-me']);
+        $task = Task::factory()->create(['name' => 'Search me please']);
 
-        $found = $this->service->find('search-me');
+        $found = $this->service->find($task->slug);
 
         $this->assertNotNull($found);
         $this->assertSame($task->id, $found->id);
@@ -575,6 +575,15 @@ class TaskServiceTest extends TestCase
 
         $this->assertNotNull($found);
         $this->assertSame($task->id, $found->id);
+    }
+
+    public function test_find_does_not_resolve_by_display_name(): void
+    {
+        // The display name is non-unique and is NOT a lookup key. A name that
+        // differs from its derived slug (e.g. spaces) must not resolve.
+        Task::factory()->create(['name' => 'Some Display Name']);
+
+        $this->assertNull($this->service->find('Some Display Name'));
     }
 
     public function test_find_returns_null_for_unknown(): void

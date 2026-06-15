@@ -79,7 +79,7 @@ class TaskLogBundleBuilder
 
         // 4) Host-side phase bg.log files
         $configDir = (string) config('argos.config_dir');
-        $taskLogDir = "{$configDir}/tasks/{$task->name}";
+        $taskLogDir = "{$configDir}/tasks/{$task->slug}";
         if (is_dir($taskLogDir)) {
             foreach (glob("{$taskLogDir}/*.bg.log") ?: [] as $logFile) {
                 $base = basename($logFile);

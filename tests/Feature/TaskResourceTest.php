@@ -215,18 +215,28 @@ class TaskResourceTest extends TestCase
         $this->assertSame($this->user->id, $task->user_id);
     }
 
-    public function test_create_with_duplicate_name_shows_validation_error(): void
+    public function test_create_with_duplicate_name_is_allowed_and_gets_distinct_slug(): void
     {
+        // I3: the display name is non-unique. A second task with the same name
+        // is allowed and receives a distinct, frozen slug.
         $profile = RepoProfile::factory()->create();
-        Task::factory()->create(['name' => 'Existing Task']);
+        $existing = Task::factory()->create(['name' => 'Existing Task']);
 
         Livewire::test(CreateTask::class)
             ->fillForm([
                 'name' => 'Existing Task',
                 'repo_profile_id' => $profile->id,
+                'description' => 'Test',
+                'auto_concept' => false,
             ])
             ->call('create')
-            ->assertHasFormErrors(['name']);
+            ->assertHasNoFormErrors()
+            ->assertRedirect();
+
+        $tasks = Task::where('name', 'Existing Task')->get();
+        $this->assertCount(2, $tasks);
+        $this->assertCount(2, $tasks->pluck('slug')->unique());
+        $this->assertContains($existing->slug, $tasks->pluck('slug')->all());
     }
 
     public function test_list_renders_task_with_phase_runs(): void

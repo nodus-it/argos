@@ -8,7 +8,7 @@ return [
 
     'fields' => [
         'name_label' => 'Name',
-        'name_helper' => 'Unique slug for this task — surfaces in URLs, volume names, and the branch prefix.',
+        'name_helper' => 'Display name for this task — free-form and renameable later. The immutable slug (branch prefix, volume) is derived from it once on creation.',
         'project' => 'Project',
         'project_helper' => 'Which repo profile. Stack/agent/models inherit the project default; you can override per task in the Worker tab.',
         'description_label' => 'Description',
@@ -285,6 +285,11 @@ return [
         ],
 
         'logs' => [
+            'title' => 'Logs — :name',
+            'breadcrumb_tasks' => 'Tasks',
+            'breadcrumb_self' => 'Logs',
+            'download' => 'Download log',
+            'download_bundle' => 'Log bundle (ZIP)',
             'status_live' => 'Live',
             'status_idle' => 'Ended',
             'status_paused' => '⏸ paused (turn limit)',
@@ -318,6 +323,10 @@ return [
         ],
 
         'diff' => [
+            'title' => 'Diff — :name',
+            'breadcrumb_tasks' => 'Tasks',
+            'breadcrumb_self' => 'Diff',
+            'refresh' => 'Refresh',
             'not_loaded' => 'Diff not loaded automatically.',
             'load_button' => 'Load diff',
             'loading' => 'Loading…',

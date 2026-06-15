@@ -13,9 +13,9 @@ enum TaskProviderMode: string
     public function label(): string
     {
         return match ($this) {
-            self::Webhook => 'Webhook (Push)',
-            self::Poll => 'Polling',
-            self::Disabled => 'Deaktiviert',
+            self::Webhook => __('enums.task_provider_mode.webhook'),
+            self::Poll => __('enums.task_provider_mode.poll'),
+            self::Disabled => __('enums.task_provider_mode.disabled'),
         };
     }
 }

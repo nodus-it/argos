@@ -54,7 +54,7 @@ class ViewTaskLogs extends Page
     {
         return [
             Action::make('downloadLog')
-                ->label('Log herunterladen')
+                ->label(__('tasks.view.logs.download'))
                 ->icon('heroicon-o-arrow-down-tray')
                 ->color('gray')
                 ->url(fn () => route('tasks.logs.download', ['task' => $this->task->id, 'phase' => $this->phase]))
@@ -62,14 +62,14 @@ class ViewTaskLogs extends Page
                 ->visible(fn () => $this->currentLogExists()),
 
             Action::make('downloadBundle')
-                ->label('Log-Bundle (ZIP)')
+                ->label(__('tasks.view.logs.download_bundle'))
                 ->icon('heroicon-o-archive-box-arrow-down')
                 ->color('gray')
                 ->url(fn () => route('tasks.logs.bundle', ['task' => $this->task->id]))
                 ->openUrlInNewTab(),
 
             Action::make('back')
-                ->label('← Zurück zur Task')
+                ->label(__('tasks.view.actions.back'))
                 ->color('gray')
                 ->url(fn () => TaskResource::getUrl('view', ['record' => $this->task])),
         ];
@@ -77,15 +77,15 @@ class ViewTaskLogs extends Page
 
     public function getTitle(): string
     {
-        return "Logs — {$this->task->name}";
+        return __('tasks.view.logs.title', ['name' => $this->task->name]);
     }
 
     public function getBreadcrumbs(): array
     {
         return [
-            TaskResource::getUrl() => 'Tasks',
+            TaskResource::getUrl() => __('tasks.view.logs.breadcrumb_tasks'),
             TaskResource::getUrl('view', ['record' => $this->task]) => $this->task->name,
-            '#' => 'Logs',
+            '#' => __('tasks.view.logs.breadcrumb_self'),
         ];
     }
 
@@ -111,13 +111,13 @@ class ViewTaskLogs extends Page
     {
         $configDir = config('argos.config_dir');
 
-        return file_exists("{$configDir}/tasks/{$this->task->name}/{$this->phase}.bg.log");
+        return file_exists("{$configDir}/tasks/{$this->task->slug}/{$this->phase}.bg.log");
     }
 
     private function readLogFile(): string
     {
         $configDir = config('argos.config_dir');
-        $logPath = "{$configDir}/tasks/{$this->task->name}/{$this->phase}.bg.log";
+        $logPath = "{$configDir}/tasks/{$this->task->slug}/{$this->phase}.bg.log";
 
         return LogTail::read($logPath);
     }
