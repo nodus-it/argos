@@ -5,6 +5,21 @@ curated highlights, not a per-commit log — see the [GitHub Releases](https://g
 for the full commit list of each tag. Versions follow SemVer; pre-1.0 betas
 may carry breaking changes between releases.
 
+## [0.3.0-beta.1] - 2026-06-15
+
+A consolidation release: a service-layer architecture pass, in-app docs, a
+mobile-ready UI, and three workflow/quality improvements (localization, task
+identity, external branch collaboration).
+
+- **Architecture pass:** resource writes routed through entity services (Task / RepoProfile / credentials / ApiClient), presentation-layer write/IO purity, Task domain events unified under `DomainEvent`, the integration ingest path split into providers + an inbound DTO + an ingest event, and EE-seams prepared (gate-panel access, account-listing) — verified by new Pest architecture rules. No behavior change for self-hosters.
+- **In-app documentation viewer:** the curated operator/user docs render at `/admin/docs` (with deep-links from relevant screens), including a German variant; integrity, coverage, and translation-freshness are test-enforced.
+- **Mobile-ready UI:** the control-room and key task screens are responsive at 375px with ≥44px tap targets, guarded by a Playwright mobile gate.
+- **Task identity:** a task's **name** is now a free, renameable, non-unique display label; a frozen **slug** carries the operational identity (workspace volume, feature-branch prefix, log paths). Existing tasks keep their exact keys (the slug backfills from the name) and the branch naming scheme is unchanged.
+- **External branch collaboration:** you can check out a task's feature branch, push your own commits, and Argos pulls them before continuing (remote-wins on refine/respond). Pushing over external commits fails with a clear message instead of a cryptic git error, and a demo rebuild reflects the pushed remote state.
+- **Localization:** user-facing German strings that were hardcoded (task-provider bindings, log/diff screens, issue write-back comments, OAuth token-refresh errors) moved into `lang/{de,en}` — the app honours the configured locale consistently.
+- **Teardown:** task resource cleanup (containers, volumes, networks) centralized and triggered on delete / abort / orphan sweep, with an explicit aborted status.
+- **Fixes & tooling:** quality gate skipped on worker infra crashes (no wasted remediation), helper text shows the inherited defaults on task override fields, Tailwind dark utilities aligned with Filament's `.dark` toggle, adopted `nodus-it/dev-tools` for commands/QA, and added the `--next` installer channel tracking the rolling `:next` images.
+
 ## [0.2.0-beta.1] - 2026-06-09
 
 A large release: the full live-demo system, the REST API, BYOI worker images,
