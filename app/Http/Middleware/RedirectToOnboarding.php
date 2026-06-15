@@ -15,6 +15,9 @@ class RedirectToOnboarding
     {
         if ($request->routeIs(
             'filament.admin.pages.onboarding',
+            // The in-app docs (setup/operations) must be reachable before the
+            // first RepoProfile exists, so onboarding can link into them.
+            'filament.admin.pages.docs',
             'filament.admin.resources.repo-profiles.create',
             // Onboarding links into agent-credentials/create for the Codex
             // setup flow — both create and the post-save edit route must be

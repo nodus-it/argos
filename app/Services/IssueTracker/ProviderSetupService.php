@@ -28,7 +28,7 @@ final class ProviderSetupService
      * The binding's credential (OAuth account or PAT) is resolved by the
      * registry from the binding itself, so no token source is passed here.
      *
-     * @throws \Throwable when registerWebhook fails; the caller should catch and store last_error.
+     * @throws \Throwable when registerWebhook fails; last_error is recorded before the rethrow.
      */
     public function setup(TaskProviderBinding $binding): void
     {
@@ -53,18 +53,25 @@ final class ProviderSetupService
         }
 
         // Webhook mode
-        $tracker = $this->registry->make($binding->kind, $binding);
-        [$owner, $project] = $this->parseRef($binding->external_project_ref ?? '');
+        try {
+            $tracker = $this->registry->make($binding->kind, $binding);
+            [$owner, $project] = $this->parseRef($binding->external_project_ref ?? '');
 
-        $secret = bin2hex(random_bytes(20));
-        $webhookUrl = $this->buildWebhookUrl($binding);
+            $secret = bin2hex(random_bytes(20));
+            $webhookUrl = $this->buildWebhookUrl($binding);
 
-        $result = $tracker->registerWebhook($owner, $project, $webhookUrl, $secret);
+            $result = $tracker->registerWebhook($owner, $project, $webhookUrl, $secret);
 
-        $binding->webhook_id = (string) ($result['id'] ?? '');
-        $binding->webhook_secret = $secret;
-        $binding->sync_status = TaskProviderSyncStatus::Active;
-        $binding->save();
+            $binding->webhook_id = (string) ($result['id'] ?? '');
+            $binding->webhook_secret = $secret;
+            $binding->sync_status = TaskProviderSyncStatus::Active;
+            $binding->save();
+        } catch (\Throwable $e) {
+            $binding->last_error = $e->getMessage();
+            $binding->save();
+
+            throw $e;
+        }
     }
 
     private function buildWebhookUrl(TaskProviderBinding $binding): string

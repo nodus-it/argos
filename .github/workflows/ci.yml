@@ -71,6 +71,27 @@ jobs:
           fi
           echo "Secret scan clean."
 
+  docs-reminder:
+    # Non-blocking nudge: if a PR changes user-facing logic but no docs, remind
+    # the author to check the operator docs. Never fails the build.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Remind to update docs on user-facing changes
+        run: |
+          base="origin/${{ github.base_ref }}"
+          changed="$(git diff --name-only "$base"...HEAD)"
+          sensitive="$(printf '%s\n' "$changed" | grep -E '^(app/Enums/|app/Filament/|app/Mcp/|app/Http/Controllers/Api/|routes/|config/)' || true)"
+          docs="$(printf '%s\n' "$changed" | grep -E '^docs/' || true)"
+          if [ -n "$sensitive" ] && [ -z "$docs" ]; then
+            echo "::warning::This PR touches user-facing logic (app/Enums, app/Filament, app/Mcp, app/Http/Controllers/Api, routes/, config/) but changes no docs/. Check whether the operator docs + config/docs.php manifest need an update. Workflow: update the ENGLISH source first, then re-translate the affected pages and run \`php artisan argos:docs:stamp-translations\` — never translate the other way."
+          else
+            echo "Docs reminder: nothing to flag."
+          fi
+
   app-quality:
     runs-on: ubuntu-latest
     # Tests run against MariaDB (matching production) so DB-only constraints

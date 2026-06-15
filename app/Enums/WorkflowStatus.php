@@ -15,6 +15,7 @@ enum WorkflowStatus: string
     case InReview = 'in_review';
     case Completed = 'completed';
     case Failed = 'failed';
+    case Aborted = 'aborted';
 
     public function label(): string
     {
@@ -28,6 +29,7 @@ enum WorkflowStatus: string
             self::InReview => __('enums.workflow_status.in_review'),
             self::Completed => __('enums.workflow_status.completed'),
             self::Failed => __('enums.workflow_status.failed'),
+            self::Aborted => __('enums.workflow_status.aborted'),
         };
     }
 
@@ -43,6 +45,7 @@ enum WorkflowStatus: string
             self::InReview => 'primary',
             self::Completed => 'success',
             self::Failed => 'danger',
+            self::Aborted => 'gray',
         };
     }
 

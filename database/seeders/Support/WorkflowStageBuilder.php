@@ -108,6 +108,10 @@ final class WorkflowStageBuilder
 
             TaskStage::Review => [WorkflowStatus::InReview, PhaseStatus::Completed, Phase::Push],
             TaskStage::Done => [WorkflowStatus::Completed, PhaseStatus::Completed, Phase::Push],
+
+            // Terminal: manually aborted mid-implement. phase() is null, so
+            // seedRuns lays down no active run for it.
+            TaskStage::Aborted => [WorkflowStatus::Aborted, PhaseStatus::Failed, Phase::Implement],
         };
     }
 

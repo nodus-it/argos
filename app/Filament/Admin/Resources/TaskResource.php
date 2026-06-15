@@ -22,6 +22,7 @@ use App\Models\RepoProfile;
 use App\Models\Task;
 use App\Models\WorkerStack;
 use App\Services\GitProvider\GitServiceFactory;
+use App\Support\DocsLinkAction;
 use App\Workers\Agents\AgentRegistry;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
@@ -37,7 +38,6 @@ use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Validation\Rule;
 
 class TaskResource extends Resource
 {
@@ -74,8 +74,7 @@ class TaskResource extends Resource
                                 ->label(__('tasks.fields.name_label'))
                                 ->helperText(__('tasks.fields.name_helper'))
                                 ->required()
-                                ->maxLength(255)
-                                ->rules([Rule::unique('tasks', 'name')]),
+                                ->maxLength(255),
 
                             Select::make('repo_profile_id')
                                 ->label(__('tasks.fields.project'))
@@ -89,6 +88,7 @@ class TaskResource extends Resource
 
                             Textarea::make('description')
                                 ->label(__('tasks.fields.description_label'))
+                                ->hintAction(DocsLinkAction::make('tasks'))
                                 ->rows(8)
                                 ->helperText(__('tasks.fields.description_helper'))
                                 ->columnSpanFull(),

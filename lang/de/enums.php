@@ -13,6 +13,7 @@ return [
         'in_review' => 'In Review',
         'completed' => 'Abgeschlossen',
         'failed' => 'Fehlgeschlagen',
+        'aborted' => 'Abgebrochen',
     ],
 
     'phase_status' => [
@@ -94,5 +95,17 @@ return [
         'session' => 'Argos-Login',
         'basic' => 'Passwortschutz',
         'public' => 'Öffentlich',
+    ],
+
+    'task_provider_mode' => [
+        'webhook' => 'Webhook (Push)',
+        'poll' => 'Polling',
+        'disabled' => 'Deaktiviert',
+    ],
+
+    'task_provider_sync_status' => [
+        'pending' => 'Ausstehend',
+        'active' => 'Aktiv',
+        'error' => 'Fehler',
     ],
 ];

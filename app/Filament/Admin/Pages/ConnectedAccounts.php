@@ -7,6 +7,7 @@ namespace App\Filament\Admin\Pages;
 use App\Models\ConnectedAccount;
 use App\Models\ProviderOAuthConfig;
 use App\Models\User;
+use App\Services\OAuth\ConnectedAccountService;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -162,7 +163,7 @@ class ConnectedAccounts extends Page
         /** @var User $user */
         $user = Auth::user();
 
-        $user->connectedAccounts()->where('provider', 'github')->delete();
+        app(ConnectedAccountService::class)->disconnect($user, 'github');
 
         Notification::make()
             ->title(__('accounts.notifications.github_disconnected'))
@@ -175,7 +176,7 @@ class ConnectedAccounts extends Page
         /** @var User $user */
         $user = Auth::user();
 
-        $user->connectedAccounts()->where('provider', 'gitlab')->delete();
+        app(ConnectedAccountService::class)->disconnect($user, 'gitlab');
 
         Notification::make()
             ->title(__('accounts.notifications.gitlab_disconnected'))
@@ -188,7 +189,7 @@ class ConnectedAccounts extends Page
         /** @var User $user */
         $user = Auth::user();
 
-        $user->connectedAccounts()->where('provider', 'bitbucket')->delete();
+        app(ConnectedAccountService::class)->disconnect($user, 'bitbucket');
 
         Notification::make()
             ->title(__('accounts.notifications.bitbucket_disconnected'))
@@ -201,7 +202,7 @@ class ConnectedAccounts extends Page
         /** @var User $user */
         $user = Auth::user();
 
-        $user->connectedAccounts()->where('provider', 'linear')->delete();
+        app(ConnectedAccountService::class)->disconnect($user, 'linear');
 
         Notification::make()
             ->title(__('accounts.notifications.linear_disconnected'))

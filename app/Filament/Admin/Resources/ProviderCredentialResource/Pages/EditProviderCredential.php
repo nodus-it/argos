@@ -7,10 +7,12 @@ namespace App\Filament\Admin\Resources\ProviderCredentialResource\Pages;
 use App\Filament\Admin\Concerns\HasArgosEditHeading;
 use App\Filament\Admin\Concerns\VerifiesCredentialOnSave;
 use App\Filament\Admin\Resources\ProviderCredentialResource;
+use App\Filament\Admin\Support\Pages\EditRecord;
 use App\Models\ProviderCredential;
 use App\Services\Credentials\CredentialVerifier;
+use App\Services\Credentials\ProviderCredentialService;
+use App\Services\EntityService;
 use Filament\Actions\DeleteAction;
-use Filament\Resources\Pages\EditRecord;
 
 class EditProviderCredential extends EditRecord
 {
@@ -18,6 +20,11 @@ class EditProviderCredential extends EditRecord
     use VerifiesCredentialOnSave;
 
     protected static string $resource = ProviderCredentialResource::class;
+
+    protected function service(): EntityService
+    {
+        return app(ProviderCredentialService::class);
+    }
 
     /**
      * @param  array<string, mixed>  $data

@@ -36,3 +36,11 @@ Schedule::command('argos:check-concept-approvals')
 Schedule::command('argos:cleanup-demos')
     ->everyFifteenMinutes()
     ->withoutOverlapping();
+
+// Reap orphaned worker/sidecar run resources left by a hard-killed phase job
+// (skipped finally-block teardown). Dispatches ReapOrphanedRunsJob to the
+// queue (the scheduler has no docker socket).
+// Manual trigger: `php artisan argos:cleanup-orphans`.
+Schedule::command('argos:cleanup-orphans')
+    ->everyFifteenMinutes()
+    ->withoutOverlapping();

@@ -6,22 +6,25 @@ namespace App\Providers;
 
 use App\Events\Task\PhaseCompleted;
 use App\Events\Task\TaskCompleted;
+use App\Events\Task\TaskDeleted;
 use App\Jobs\RunPhaseJob;
 use App\Listeners\Task\CloseSourceIssue;
 use App\Listeners\Task\DispatchAutoPush;
 use App\Listeners\Task\NotifyIssueTrackerOfPhase;
+use App\Listeners\Task\PurgeTaskResources;
 use App\Listeners\Task\RemoveTaskVolume;
 use App\Listeners\Task\StopDemoAfterPush;
+use App\Models\User;
 use App\Services\Anthropic\CredentialStore;
 use App\Services\GitProvider\BitbucketGitService;
 use App\Services\GitProvider\GitHubGitService;
 use App\Services\GitProvider\GitLabGitService;
 use App\Services\GitProvider\GitProviderRegistry;
-use App\Services\IssueTracker\BitbucketIssueTracker;
-use App\Services\IssueTracker\GitHubIssueTracker;
-use App\Services\IssueTracker\GitLabIssueTracker;
 use App\Services\IssueTracker\IssueTrackerRegistry;
-use App\Services\IssueTracker\LinearIssueTracker;
+use App\Services\IssueTracker\Providers\BitbucketIssueTracker;
+use App\Services\IssueTracker\Providers\GitHubIssueTracker;
+use App\Services\IssueTracker\Providers\GitLabIssueTracker;
+use App\Services\IssueTracker\Providers\LinearIssueTracker;
 use App\Services\OAuth\OAuthConfigHydrator;
 use App\Workers\Agents\AgentRegistry;
 use App\Workers\Agents\ClaudeCodeRunner;
@@ -138,6 +141,7 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(PhaseCompleted::class, NotifyIssueTrackerOfPhase::class);
         Event::listen(TaskCompleted::class, CloseSourceIssue::class);
         Event::listen(TaskCompleted::class, RemoveTaskVolume::class);
+        Event::listen(TaskDeleted::class, PurgeTaskResources::class);
 
         Queue::failing(function (JobFailed $event): void {
             if ($event->job->resolveName() === RunPhaseJob::class) {
@@ -174,6 +178,11 @@ class AppServiceProvider extends ServiceProvider
         // outside local without this gate; combined with the `auth` middleware
         // (see config/scramble.php) it limits the docs to signed-in Argos users.
         Gate::define('viewApiDocs', fn ($user): bool => $user !== null);
+
+        // Single authorization point for reaching the admin panel. Open to every
+        // authenticated user by default; redefine this gate to restrict access
+        // (e.g. role-based) without touching the User model or the panel.
+        Gate::define('access-argos-panel', fn (User $user): bool => true);
     }
 
     /**

@@ -45,10 +45,9 @@ class TokenRefresher
         }
 
         if ($account->refresh_token === null || $account->refresh_token === '') {
-            throw new RuntimeException(sprintf(
-                'OAuth-Token für %s ist abgelaufen und es liegt kein refresh_token vor — bitte Account neu verbinden.',
-                $account->provider,
-            ));
+            throw new RuntimeException((string) __('credentials.oauth.refresh.expired_no_refresh_token', [
+                'provider' => $account->provider,
+            ]));
         }
 
         return Cache::lock("oauth.refresh.{$account->id}", 30)->block(
@@ -97,19 +96,17 @@ class TokenRefresher
                 'account_id' => $account->id,
                 'status' => $response->status(),
             ]);
-            throw new RuntimeException(sprintf(
-                'OAuth-Token-Refresh für %s fehlgeschlagen (HTTP %d) — bitte Account neu verbinden.',
-                $account->provider,
-                $response->status(),
-            ));
+            throw new RuntimeException((string) __('credentials.oauth.refresh.failed', [
+                'provider' => $account->provider,
+                'status' => $response->status(),
+            ]));
         }
 
         $body = $response->json();
         if (! is_array($body) || ! isset($body['access_token']) || ! is_string($body['access_token'])) {
-            throw new RuntimeException(sprintf(
-                'OAuth-Token-Refresh für %s lieferte kein access_token — bitte Account neu verbinden.',
-                $account->provider,
-            ));
+            throw new RuntimeException((string) __('credentials.oauth.refresh.no_access_token', [
+                'provider' => $account->provider,
+            ]));
         }
 
         // Some providers (Bitbucket, GitLab) rotate the refresh_token on every
@@ -160,10 +157,9 @@ class TokenRefresher
                 (string) config('services.bitbucket.client_id'),
                 (string) config('services.bitbucket.client_secret'),
             ],
-            default => throw new RuntimeException(sprintf(
-                'Unbekannter OAuth-Provider für Token-Refresh: %s',
-                $account->provider,
-            )),
+            default => throw new RuntimeException((string) __('credentials.oauth.refresh.unknown_provider', [
+                'provider' => $account->provider,
+            ])),
         };
     }
 }

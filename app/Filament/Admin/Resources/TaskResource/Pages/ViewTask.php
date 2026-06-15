@@ -466,6 +466,22 @@ class ViewTask extends ViewRecord
                     $this->redirect(TaskResource::getUrl('view', ['record' => $task]));
                 })
                 ->visible(fn (): bool => $this->task()->workflow_status->value !== 'completed'),
+
+            'abortTask' => Action::make('abortTask')
+                ->label(__('tasks.view.actions.abort'))
+                ->icon('heroicon-o-no-symbol')
+                ->color('danger')
+                ->requiresConfirmation()
+                ->modalHeading(__('tasks.view.actions.abort_heading'))
+                ->modalDescription(__('tasks.view.actions.abort_description'))
+                ->modalSubmitActionLabel(__('tasks.view.actions.abort_submit'))
+                ->action(function (): void {
+                    $task = $this->task();
+                    app(TaskService::class)->abortTask($task);
+                    Notification::make()->title(__('tasks.view.actions.task_aborted'))->success()->send();
+                    $this->redirect(TaskResource::getUrl('view', ['record' => $task]));
+                })
+                ->visible(fn (): bool => TaskStage::for($this->task())->isBusy()),
         ];
 
         // During a running/queued phase, the header collapses to nothing but
@@ -689,7 +705,7 @@ class ViewTask extends ViewRecord
         /** @var Task $task */
         $task = $this->getRecord();
         $configDir = config('argos.config_dir');
-        $path = "{$configDir}/tasks/{$task->name}/{$phase}.bg.log";
+        $path = "{$configDir}/tasks/{$task->slug}/{$phase}.bg.log";
 
         return LogTail::read($path);
     }

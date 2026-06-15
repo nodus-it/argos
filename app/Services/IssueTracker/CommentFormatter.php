@@ -26,8 +26,8 @@ class CommentFormatter
         // current, and getUrl() throws "No default Filament panel is set" there.
         $taskUrl = route('filament.admin.resources.tasks.view', ['record' => $task->getKey()]);
 
-        $header = "**Argos** — Phase **{$phaseLabel}** abgeschlossen mit Status: **{$statusLabel}**";
-        $link = "[Task in Argos öffnen]({$taskUrl})";
+        $header = __('integrations.comment.header', ['phase' => $phaseLabel, 'status' => $statusLabel]);
+        $link = __('integrations.comment.open_in_argos', ['url' => $taskUrl]);
 
         $extra = $this->phaseExtra($task, $phase, $status);
         if ($extra !== null) {
@@ -70,12 +70,12 @@ class CommentFormatter
 
         $nonTechnical = trim((string) $task->implement_summary_nontechnical);
         if ($nonTechnical !== '') {
-            $sections[] = "**Ergebnis**\n\n".$nonTechnical;
+            $sections[] = __('integrations.comment.result')."\n\n".$nonTechnical;
         }
 
         $technical = trim((string) $task->implement_summary_technical);
         if ($technical !== '') {
-            $sections[] = "**Technische Details**\n\n".$technical;
+            $sections[] = __('integrations.comment.technical_details')."\n\n".$technical;
         }
 
         return $sections === [] ? null : $this->cap(implode("\n\n", $sections));
@@ -99,7 +99,7 @@ class CommentFormatter
         }
 
         if (mb_strlen($markdown) > self::MAX_BODY) {
-            return mb_substr($markdown, 0, self::MAX_BODY)."\n\n_… gekürzt — vollständig in Argos._";
+            return mb_substr($markdown, 0, self::MAX_BODY)."\n\n_".__('integrations.comment.truncated').'_';
         }
 
         return $markdown;

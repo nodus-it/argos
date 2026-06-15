@@ -26,7 +26,7 @@ class TaskImplement extends Tool
     public function schema(JsonSchema $schema): array
     {
         return [
-            'task' => $schema->string()->description('Task id (ULID) or exact name')->required(),
+            'task' => $schema->string()->description('Task id (ULID) or slug')->required(),
             'max_turns' => $schema->integer()->description('Turn budget when resuming a paused Implement run (defaults to the task/project setting)')->nullable(),
         ];
     }

@@ -24,7 +24,7 @@ class TaskFeedback extends Tool
     public function schema(JsonSchema $schema): array
     {
         return [
-            'task' => $schema->string()->description('Task id (ULID) or exact name')->required(),
+            'task' => $schema->string()->description('Task id (ULID) or slug')->required(),
             'feedback' => $schema->string()->description('The feedback for the agent to act on (Markdown)')->required(),
         ];
     }

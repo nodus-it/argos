@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Admin\Resources\AgentCredentialResource\Pages;
 
 use App\Filament\Admin\Resources\AgentCredentialResource;
+use App\Support\DocsLinkAction;
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
 
@@ -15,6 +16,7 @@ class ListAgentCredentials extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
+            DocsLinkAction::make('agents'),
             CreateAction::make(),
         ];
     }

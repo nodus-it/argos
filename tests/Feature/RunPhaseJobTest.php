@@ -147,6 +147,27 @@ class RunPhaseJobTest extends TestCase
         $this->assertSame(PhaseStatus::Failed, $task->fresh()->current_status);
     }
 
+    public function test_failed_yields_to_an_aborted_task_and_does_not_overwrite_it(): void
+    {
+        // A deliberate abort already reaped the container (hence the job throws)
+        // and set Aborted — the dying job must not clobber it back to Failed.
+        $task = Task::factory()->create([
+            'workflow_status' => WorkflowStatus::Aborted,
+            'current_status' => PhaseStatus::Failed,
+        ]);
+        $run = PhaseRun::factory()->running()->create([
+            'task_id' => $task->id,
+            'phase' => 'implement',
+        ]);
+
+        $job = new RunPhaseJob($task->id, 'implement');
+        $job->failed(new \RuntimeException('container killed by abort'));
+
+        $this->assertSame(WorkflowStatus::Aborted, $task->fresh()->workflow_status);
+        // The abort already closed the run; failed() left it untouched.
+        $this->assertSame(PhaseStatus::Running, $run->fresh()->status);
+    }
+
     public function test_failed_does_not_close_phase_runs_of_other_phases(): void
     {
         $task = Task::factory()->create([

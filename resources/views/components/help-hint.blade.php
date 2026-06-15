@@ -17,7 +17,11 @@
             return null;
         }
         if (str_starts_with($value, ':')) {
-            return config('argos.docs.'.substr($value, 1));
+            $key = substr($value, 1);
+
+            // Our own docs resolve to the in-app viewer; external keys (PAT
+            // settings pages, claude_setup_token, …) fall back to config.
+            return \App\Support\DocLink::forDocKey($key) ?? config('argos.docs.'.$key);
         }
 
         return $value;

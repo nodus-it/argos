@@ -6,14 +6,21 @@ namespace App\Filament\Admin\Resources\ApiClientResource\Pages;
 
 use App\Filament\Admin\Concerns\HasArgosEditHeading;
 use App\Filament\Admin\Resources\ApiClientResource;
+use App\Filament\Admin\Support\Pages\EditRecord;
+use App\Services\Api\ApiClientService;
+use App\Services\EntityService;
 use Filament\Actions\DeleteAction;
-use Filament\Resources\Pages\EditRecord;
 
 class EditApiClient extends EditRecord
 {
     use HasArgosEditHeading;
 
     protected static string $resource = ApiClientResource::class;
+
+    protected function service(): EntityService
+    {
+        return app(ApiClientService::class);
+    }
 
     protected function getHeaderActions(): array
     {

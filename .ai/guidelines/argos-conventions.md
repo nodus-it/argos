@@ -92,7 +92,31 @@ runners (`run-tests.sh`, `run-bats.sh`).
 ### Documentation
 
 - Every new function in `worker/lib/` needs a docstring.
-- User-facing docs (setup, configuration, provider howtos) live in `docs/`.
+- User-facing docs (setup, configuration, provider howtos) live in `docs/`,
+  **English only**. They are one source, two surfaces: readable on GitHub and
+  rendered in-app by the Documentation viewer (`/admin/docs`).
+- The in-app viewer shows the **curated** set listed in `config/docs.php`
+  (operator/user docs). Contributor/architecture docs (`CONTRIBUTING.md`,
+  `PROVIDER-TEST-SETUP.md`, `docs/backlog/…`) stay repo-only — keep them out of
+  the manifest.
+- **New user-facing feature → write/refresh its `docs/<NAME>.md` operator page
+  and add (or confirm) a `config/docs.php` manifest entry.** Verify claims
+  against the code; `DocManifestIntegrityTest` catches a manifest entry whose
+  file is missing, and `DocCoverageTest` fails when a new enum case / API
+  ability / endpoint is undocumented (the enforced layer — prose is covered by
+  the periodic drift audit and the `docs-reminder` CI nudge).
+- Link high-value UI to the docs with `DocsLinkAction::make('slug#anchor')`
+  (header actions / form-field `->hintAction()`); build URLs with
+  `App\Support\DocLink`. New relevant UI place → matching doc link.
+- **Translations: English is the source of truth — the direction is one-way.**
+  Translated locales live under `docs/<locale>/` (today `docs/de/`), listed in
+  `config('docs.translations')`. Update the **English first**; once it's final,
+  re-translate the affected pages and run
+  `php artisan argos:docs:stamp-translations`. **NEVER** edit a translation and
+  back-port it to English. `DocTranslationFreshnessTest` fails when a translation
+  is missing or stale (its recorded English-source hash drifted).
+- **Before a release**, run the `release-docs-check` skill: it walks the doc
+  tests + a prose skim + the translation re-sync in the correct order.
 - Architecture notes live inline with the code (class/method PHPDoc, a
   README per module folder if needed). Do not maintain a parallel concept
   document.
@@ -141,6 +165,9 @@ notice a missing row during a patch, add it.
 | New enum case | DB migration (`enum()` values) — `EnumPersistenceTest` catches drift, but you must write the migration yourself; `lang/{de,en}/enums.php`; `color()` / `label()` / other `match` paths on the enum; Filament filter options / `SelectFilter::options()`; if a demo profile should showcase the case, add it to the relevant `database/seeders/Support/*Builder` and assert it in `tests/Feature/Seeders/` |
 | New DB column | Model `$fillable` / `$casts`; **factory** (otherwise `factory()->create()` silently breaks on NOT-NULL); Filament form field + table column if relevant; JSON schema in `worker/schemas/` if the worker reads/writes the field; if a demo seeder writes the model via raw `create()`/`updateOrCreate()`, set the new NOT-NULL column there too — the `tests/Feature/Seeders/*` tests run the seeders against MariaDB in CI and fail on the missing value |
 | New Filament page (Resource or Page) | `RedirectToOnboarding` whitelist if reachable pre-onboarding; `getNavigationGroup` / Heroicon; **wiring test via the embedding page** (`Livewire::test(ViewFooPage::class, [...])->assertSeeLivewire(FooRelationManager::class)`) — isolated RelationManager test alone is not enough; locale strings `de` + `en` |
+| New user-facing feature / UI surface | An operator doc page under `docs/` (English) + a `config/docs.php` manifest entry so it shows in the in-app viewer; a `DocsLinkAction` deep-link from the relevant screen; keep claims verified against the code |
+| New custom UI surface (control-room view / `components/argos/*`) or a new admin screen | Mobile-tauglich @375px (no horizontal page overflow; key actions ≥44px tap target) **and** extend the mobile gate (`tests/e2e/mobile.spec.ts`, `--project=mobile`) to walk it. Filament tables: hide non-essential columns with `->visibleFrom('md')`. Rule from `concepts/mobile.md` (P9). |
+| An English doc page (`docs/*.md`) | Re-translate the changed page into every `config('docs.translations')` locale (`docs/<locale>/`), then run `php artisan argos:docs:stamp-translations` — `DocTranslationFreshnessTest` fails otherwise. English first, translation after; never the reverse. |
 | New phase helper | `worker/lib/<module>.sh` with docstring; `bats` test in `worker/tests/bats/`; `shellcheck`-clean; sourced by `worker-entrypoint.sh`; which phase script calls the helper |
 | UI hint claiming a behavior | The backend implements it **for every relevant path** — every agent, every provider, every status. Helper text that's only true for the default path is a lie. |
 
@@ -156,7 +183,7 @@ fit into exactly one of these levels; when in doubt, pick the narrower one.
 | Integration | Pest + MariaDB sidecar (CI) | DB schema, migrations, enum persistence, queue lifecycle | ✅ (retro M2) |
 | Backend-E2E | Pest + `FakeWorkerProcess` (`tests/Support/`) | Workflow phase run incl. recovery paths — RunPhaseJob → PhaseRunner → DB state | ✅ (retro M7) |
 | UI smoke | `Livewire::test(ViewTask::class, ['record' => …])` | UI renders correct status string per phase, action wiring | ✅ (retro M10) |
-| Browser-E2E | Playwright against the compose stack | Full flow (login → onboarding → project → task → concept/implement) over the 4-run matrix + a mask smoke walk. Run: `npx playwright test` (see "Common commands"). | ✅ (retro M11) |
+| Browser-E2E | Playwright against the compose stack | Full flow (login → onboarding → project → task → concept/implement) over the 4-run matrix + a mask smoke walk (`chromium` project). Plus the **P9 mobile gate** (`mobile` project, 375px touch viewport, `tests/e2e/mobile.spec.ts`): high-value screens have no horizontal overflow + key actions ≥44px. Run: `npx playwright test` (both) or `--project=mobile`. | ✅ (retro M11) |
 
 Browser-E2E runs locally only today — the discipline of running
 `npx playwright test` before a commit is the first line of defense. CI

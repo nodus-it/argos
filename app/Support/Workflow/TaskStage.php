@@ -48,6 +48,9 @@ enum TaskStage: string
 
     case Done = 'done';
 
+    /** Manually aborted — terminal, read-only (no dock, no phase controls). */
+    case Aborted = 'aborted';
+
     /**
      * Resolve the presentation stage for a task from its persisted state.
      */
@@ -59,6 +62,7 @@ enum TaskStage: string
 
         return match ($ws) {
             WorkflowStatus::Completed => self::Done,
+            WorkflowStatus::Aborted => self::Aborted,
             WorkflowStatus::InReview => self::Review,
             WorkflowStatus::ConceptReview => self::ConceptReview,
             WorkflowStatus::ImplementCompleted => self::ImplementReview,
@@ -109,7 +113,7 @@ enum TaskStage: string
             self::ImplementQueued, self::ImplementRunning, self::ImplementPaused,
             self::ImplementReview, self::ImplementFailed => Phase::Implement,
             self::PushQueued, self::PushRunning, self::PushFailed => Phase::Push,
-            self::Draft, self::Review, self::Done => null,
+            self::Draft, self::Review, self::Done, self::Aborted => null,
         };
     }
 
@@ -193,6 +197,7 @@ enum TaskStage: string
             $this->isPaused() => 'paused',
             $this === self::ConceptReview, $this === self::ImplementReview, $this === self::Review => 'waiting',
             $this === self::Done => 'done',
+            $this === self::Aborted => 'aborted',
             default => 'draft',
         };
     }

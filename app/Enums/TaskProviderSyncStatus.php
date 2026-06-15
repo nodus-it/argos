@@ -13,9 +13,9 @@ enum TaskProviderSyncStatus: string
     public function label(): string
     {
         return match ($this) {
-            self::Pending => 'Ausstehend',
-            self::Active => 'Aktiv',
-            self::Error => 'Fehler',
+            self::Pending => __('enums.task_provider_sync_status.pending'),
+            self::Active => __('enums.task_provider_sync_status.active'),
+            self::Error => __('enums.task_provider_sync_status.error'),
         };
     }
 

@@ -14,6 +14,13 @@ arch('workers are UI-isolated')
     ->expect('App\Workers')
     ->not->toUse('App\Filament');
 
+// Services hold the business logic and must never reach back up into the
+// presentation layer — Filament pages/resources, HTTP controllers or Livewire
+// components. Delegation goes one way: presentation → service.
+arch('services do not depend on presentation')
+    ->expect('App\Services')
+    ->not->toUse(['App\Filament', 'App\Http', 'App\Livewire']);
+
 // The browser-E2E fakes must never be wired into production code paths — only
 // the (env-gated, prod-throwing) E2eFakeServiceProvider may reference them.
 arch('e2e fakes are not used by production code')
@@ -72,12 +79,32 @@ arch('concrete git services stay behind the registry')
 
 arch('concrete issue trackers stay behind the registry')
     ->expect([
-        'App\Services\IssueTracker\GitHubIssueTracker',
-        'App\Services\IssueTracker\GitLabIssueTracker',
-        'App\Services\IssueTracker\BitbucketIssueTracker',
-        'App\Services\IssueTracker\LinearIssueTracker',
+        'App\Services\IssueTracker\Providers\GitHubIssueTracker',
+        'App\Services\IssueTracker\Providers\GitLabIssueTracker',
+        'App\Services\IssueTracker\Providers\BitbucketIssueTracker',
+        'App\Services\IssueTracker\Providers\LinearIssueTracker',
     ])
     ->toOnlyBeUsedIn(['App\Services\IssueTracker', 'App\Providers']);
+
+// R8: the IssueTracker providers are outbound-only adapters — they translate the
+// Argos port (Contracts + DTOs) to/from a provider's transport (App\Integrations)
+// and back, and must not reach into the Argos domain (models) or orchestration
+// (jobs, events, presentation). The Argos-side ingest/sync services own that.
+// App\Services is deliberately NOT forbidden wholesale: the providers legitimately
+// depend on their own Contracts (the port) and inbound DTO namespace.
+arch('issue tracker providers are outbound-only adapters')
+    ->expect('App\Services\IssueTracker\Providers')
+    ->not->toUse([
+        'App\Models',
+        'App\Jobs',
+        'App\Workers',
+        'App\Listeners',
+        'App\Events',
+        'App\Http',
+        'App\Console',
+        'App\Filament',
+        'App\Livewire',
+    ]);
 
 // Saloon request classes are real Saloon requests, so a new request can't
 // accidentally be a plain class that bypasses the connector's auth/base-URL.

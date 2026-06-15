@@ -53,13 +53,14 @@ class PhaseCommandBuilder
 
         $cmd = [
             'docker', 'run', '--rm',
+            ...WorkerRunLabels::args(WorkerRunLabels::ROLE_WORKER, $task->id, $phase),
             '-v', $task->volumeName().':/workspace',
             '-v', 'composer_cache:/home/agent/.composer/cache',
             '-v', 'npm_cache:/home/agent/.npm',
             '--memory', (string) config('argos.docker.memory_limit'),
             '--cpus',   (string) config('argos.docker.cpu_limit'),
             '-e', "PHASE={$phase}",
-            '-e', "TASK_ID={$task->name}",
+            '-e', "TASK_ID={$task->slug}",
             '-e', "REPO_URL={$profile->url}",
             '-e', "REPO_TOKEN={$this->resolveRepoToken($profile)}",
             '-e', "REPO_PLATFORM={$profile->platform->value}",
@@ -126,7 +127,7 @@ class PhaseCommandBuilder
 
         $cmd[] = $workerImage;
         $cmd[] = $phase;
-        $cmd[] = $task->name;
+        $cmd[] = $task->slug;
 
         return $cmd;
     }

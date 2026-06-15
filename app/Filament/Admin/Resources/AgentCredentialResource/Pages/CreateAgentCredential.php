@@ -7,14 +7,21 @@ namespace App\Filament\Admin\Resources\AgentCredentialResource\Pages;
 use App\Enums\AgentName;
 use App\Filament\Admin\Concerns\VerifiesCredentialOnSave;
 use App\Filament\Admin\Resources\AgentCredentialResource;
+use App\Filament\Admin\Support\Pages\CreateRecord;
+use App\Services\Credentials\AgentCredentialService;
 use App\Services\Credentials\CredentialVerifier;
-use Filament\Resources\Pages\CreateRecord;
+use App\Services\EntityService;
 
 class CreateAgentCredential extends CreateRecord
 {
     use VerifiesCredentialOnSave;
 
     protected static string $resource = AgentCredentialResource::class;
+
+    protected function service(): EntityService
+    {
+        return app(AgentCredentialService::class);
+    }
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {

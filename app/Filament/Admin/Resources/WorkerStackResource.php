@@ -10,6 +10,7 @@ use App\Filament\Admin\Resources\WorkerStackResource\Pages\EditWorkerStack;
 use App\Filament\Admin\Resources\WorkerStackResource\Pages\ListWorkerStacks;
 use App\Filament\Admin\Resources\WorkerStackResource\Pages\ViewWorkerStack;
 use App\Models\WorkerStack;
+use App\Services\Worker\WorkerStackService;
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
@@ -159,7 +160,8 @@ class WorkerStackResource extends Resource
 
                 TextColumn::make('label')
                     ->label(__('worker.stacks.fields.label'))
-                    ->searchable(),
+                    ->searchable()
+                    ->visibleFrom('md'),
 
                 IconColumn::make('is_builtin')
                     ->label(__('worker.stacks.fields.is_builtin'))
@@ -181,13 +183,15 @@ class WorkerStackResource extends Resource
                 TextColumn::make('capabilities')
                     ->label(__('worker.stacks.fields.capabilities'))
                     ->state(fn (WorkerStack $r): string => implode(', ', $r->capabilities ?? []))
-                    ->limit(40),
+                    ->limit(40)
+                    ->visibleFrom('md'),
 
                 TextColumn::make('last_built_at')
                     ->label(__('worker.stacks.fields.last_built_at'))
                     ->dateTime()
                     ->since()
-                    ->placeholder('—'),
+                    ->placeholder('—')
+                    ->visibleFrom('md'),
             ])
             ->filters([
                 TernaryFilter::make('is_builtin')
@@ -225,19 +229,7 @@ class WorkerStackResource extends Resource
             ->icon('heroicon-o-document-duplicate')
             ->color('gray')
             ->action(function (WorkerStack $record): void {
-                $copy = $record->replicate([
-                    'is_builtin',
-                    'last_builtin_hash',
-                    'last_built_at',
-                    'last_checked_at',
-                    'installed_version',
-                    'upstream_version',
-                    'has_update',
-                ]);
-                $copy->name = self::uniqueStackName($record->name.'-copy');
-                $copy->label = $record->label.' (Kopie)';
-                $copy->is_builtin = false;
-                $copy->save();
+                $copy = app(WorkerStackService::class)->duplicate($record);
 
                 Notification::make()
                     ->title(__('worker.stacks.notifications.duplicated', ['name' => $copy->name]))
@@ -246,26 +238,6 @@ class WorkerStackResource extends Resource
 
                 redirect(static::getUrl('edit', ['record' => $copy]));
             });
-    }
-
-    /**
-     * Append a numeric suffix to keep the slug unique against the
-     * existing rows. Stops at -copy-99 to avoid runaway collisions.
-     */
-    private static function uniqueStackName(string $candidate): string
-    {
-        if (! WorkerStack::query()->where('name', $candidate)->exists()) {
-            return $candidate;
-        }
-
-        for ($i = 2; $i <= 99; $i++) {
-            $next = $candidate.'-'.$i;
-            if (! WorkerStack::query()->where('name', $next)->exists()) {
-                return $next;
-            }
-        }
-
-        return $candidate.'-'.uniqid();
     }
 
     public static function canEdit(Model $record): bool

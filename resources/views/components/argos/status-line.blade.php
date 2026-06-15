@@ -21,6 +21,7 @@
         'paused'  => ['cls' => 'callout-warn', 'icon' => 'heroicon-o-pause-circle'],
         'failed'  => ['cls' => 'callout-danger', 'icon' => 'heroicon-o-exclamation-triangle'],
         'done'    => ['cls' => 'callout-ok', 'icon' => 'heroicon-o-check-circle'],
+        'aborted' => ['cls' => 'callout-warn', 'icon' => 'heroicon-o-no-symbol'],
         'draft'   => ['cls' => 'callout-info', 'icon' => 'heroicon-o-document-text'],
     ];
     $m = $map[$state] ?? $map['draft'];

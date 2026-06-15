@@ -50,6 +50,6 @@ class User extends Authenticatable implements FilamentUser, OAuthenticatable
 
     public function canAccessPanel(Panel $panel): bool
     {
-        return true;
+        return $this->can('access-argos-panel');
     }
 }

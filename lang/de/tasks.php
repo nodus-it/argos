@@ -8,7 +8,7 @@ return [
 
     'fields' => [
         'name_label' => 'Name',
-        'name_helper' => 'Eindeutiger Slug für diesen Task — taucht in URLs, Volume-Namen und Branch-Präfix auf.',
+        'name_helper' => 'Anzeigename für diesen Task — frei wählbar und später änderbar. Aus ihm wird beim Anlegen einmalig der unveränderliche Slug (Branch-Präfix, Volume) abgeleitet.',
         'project' => 'Projekt',
         'project_helper' => 'Welches Repo-Profil. Stack/Agent/Modelle erben den Default vom Projekt; im Worker-Tab kannst du sie pro Task überschreiben.',
         'description_label' => 'Beschreibung',
@@ -90,6 +90,7 @@ return [
         'push_failed' => 'Push fehlgeschlagen',
         'review' => 'Pull Request erstellt',
         'done' => 'Abgeschlossen',
+        'aborted' => 'Abgebrochen',
     ],
 
     'rail' => [
@@ -283,6 +284,11 @@ return [
         ],
 
         'logs' => [
+            'title' => 'Logs — :name',
+            'breadcrumb_tasks' => 'Tasks',
+            'breadcrumb_self' => 'Logs',
+            'download' => 'Log herunterladen',
+            'download_bundle' => 'Log-Bundle (ZIP)',
             'status_live' => 'Live',
             'status_idle' => 'Beendet',
             'status_paused' => '⏸ pausiert (Turn-Limit)',
@@ -316,6 +322,10 @@ return [
         ],
 
         'diff' => [
+            'title' => 'Diff — :name',
+            'breadcrumb_tasks' => 'Tasks',
+            'breadcrumb_self' => 'Diff',
+            'refresh' => 'Aktualisieren',
             'not_loaded' => 'Diff wird nicht automatisch geladen.',
             'load_button' => 'Diff laden',
             'loading' => 'Lade…',
@@ -372,6 +382,11 @@ return [
             'logs_download' => 'Logs Download',
             'mark_completed' => 'Abschließen',
             'mark_completed_description' => 'Task abschließen und Docker-Workspace löschen? Beide Aktionen sind nicht rückgängig zu machen.',
+            'abort' => 'Abbrechen',
+            'abort_heading' => 'Laufende Phase abbrechen',
+            'abort_description' => 'Den laufenden Worker-Container sofort stoppen und den Task auf „Abgebrochen" setzen? Der Workspace bleibt erhalten (wird erst beim Löschen entfernt).',
+            'abort_submit' => 'Phase abbrechen',
+            'task_aborted' => 'Task abgebrochen',
             'run_concept' => 'Konzept neu ausführen',
             'run_concept_description' => 'Startet einen neuen Konzept-Lauf. Vorhandene Notes werden als Feedback übergeben.',
             'start_implement' => 'Implement starten',

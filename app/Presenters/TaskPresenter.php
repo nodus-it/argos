@@ -67,7 +67,7 @@ class TaskPresenter
             WorkflowStatus::ConceptRunning, WorkflowStatus::ImplementRunning => 'running',
             WorkflowStatus::ConceptReview, WorkflowStatus::ImplementPaused, WorkflowStatus::InReview => 'waiting',
             WorkflowStatus::ImplementCompleted, WorkflowStatus::Completed => 'success',
-            WorkflowStatus::Failed => 'failed',
+            WorkflowStatus::Failed, WorkflowStatus::Aborted => 'failed',
         };
     }
 
@@ -108,6 +108,10 @@ class TaskPresenter
 
             TaskStage::Review => [['draft', 'concept', 'implement', 'push'], 'review', 'wait'],
             TaskStage::Done => [$nodes, '', ''],
+
+            // Aborted is terminal but incomplete — no node is done, active, or
+            // highlighted; the rail reads as a neutral stopped state.
+            TaskStage::Aborted => [[], '', ''],
         };
 
         foreach ($done as $d) {

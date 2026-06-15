@@ -20,6 +20,7 @@ use App\Models\PhaseRun;
 use App\Models\Task;
 use App\Services\Task\TaskService;
 use App\Services\Workflow\PhaseRunner;
+use App\Services\Workflow\RunResourceReaper;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Event;
@@ -321,6 +322,58 @@ class TaskServiceTest extends TestCase
         Event::assertDispatched(TaskCompleted::class, fn ($e) => $e->task->id === $task->id);
     }
 
+    // ── abortTask ─────────────────────────────────────────────────────────────
+
+    public function test_abort_task_sets_aborted_status(): void
+    {
+        $this->mock(RunResourceReaper::class)->shouldReceive('reapTask')->once();
+        $service = app(TaskService::class);
+
+        $task = Task::factory()->create([
+            'workflow_status' => WorkflowStatus::ImplementRunning,
+            'current_status' => PhaseStatus::Running,
+        ]);
+        $service->abortTask($task);
+
+        $this->assertSame(WorkflowStatus::Aborted, $task->fresh()->workflow_status);
+        $this->assertSame(PhaseStatus::Failed, $task->fresh()->current_status);
+    }
+
+    public function test_abort_task_reaps_the_run_containers(): void
+    {
+        $task = Task::factory()->create([
+            'workflow_status' => WorkflowStatus::ImplementRunning,
+            'current_status' => PhaseStatus::Running,
+        ]);
+
+        $this->mock(RunResourceReaper::class)
+            ->shouldReceive('reapTask')->once()
+            ->with($task->id);
+        $service = app(TaskService::class);
+
+        $service->abortTask($task);
+    }
+
+    public function test_abort_task_closes_the_running_phase_run(): void
+    {
+        $this->mock(RunResourceReaper::class)->shouldReceive('reapTask');
+        $service = app(TaskService::class);
+
+        $task = Task::factory()->create([
+            'workflow_status' => WorkflowStatus::ImplementRunning,
+            'current_status' => PhaseStatus::Running,
+        ]);
+        $run = PhaseRun::factory()->running()->create([
+            'task_id' => $task->id,
+            'phase' => 'implement',
+        ]);
+
+        $service->abortTask($task);
+
+        $this->assertSame(PhaseStatus::Failed, $run->fresh()->status);
+        $this->assertNotNull($run->fresh()->finished_at);
+    }
+
     // ── saveConceptNotes ──────────────────────────────────────────────────────
 
     public function test_save_concept_notes_persists_notes(): void
@@ -504,11 +557,11 @@ class TaskServiceTest extends TestCase
 
     // ── find (used by MCP via InteractsWithTasks) ──────────────────────────────
 
-    public function test_find_by_name(): void
+    public function test_find_by_slug(): void
     {
-        $task = Task::factory()->create(['name' => 'search-me']);
+        $task = Task::factory()->create(['name' => 'Search me please']);
 
-        $found = $this->service->find('search-me');
+        $found = $this->service->find($task->slug);
 
         $this->assertNotNull($found);
         $this->assertSame($task->id, $found->id);
@@ -522,6 +575,15 @@ class TaskServiceTest extends TestCase
 
         $this->assertNotNull($found);
         $this->assertSame($task->id, $found->id);
+    }
+
+    public function test_find_does_not_resolve_by_display_name(): void
+    {
+        // The display name is non-unique and is NOT a lookup key. A name that
+        // differs from its derived slug (e.g. spaces) must not resolve.
+        Task::factory()->create(['name' => 'Some Display Name']);
+
+        $this->assertNull($this->service->find('Some Display Name'));
     }
 
     public function test_find_returns_null_for_unknown(): void

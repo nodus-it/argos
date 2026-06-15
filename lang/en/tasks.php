@@ -8,7 +8,7 @@ return [
 
     'fields' => [
         'name_label' => 'Name',
-        'name_helper' => 'Unique slug for this task — surfaces in URLs, volume names, and the branch prefix.',
+        'name_helper' => 'Display name for this task — free-form and renameable later. The immutable slug (branch prefix, volume) is derived from it once on creation.',
         'project' => 'Project',
         'project_helper' => 'Which repo profile. Stack/agent/models inherit the project default; you can override per task in the Worker tab.',
         'description_label' => 'Description',
@@ -90,6 +90,7 @@ return [
         'push_failed' => 'Push failed',
         'review' => 'Pull request created',
         'done' => 'Completed',
+        'aborted' => 'Aborted',
     ],
 
     'rail' => [
@@ -284,6 +285,11 @@ return [
         ],
 
         'logs' => [
+            'title' => 'Logs — :name',
+            'breadcrumb_tasks' => 'Tasks',
+            'breadcrumb_self' => 'Logs',
+            'download' => 'Download log',
+            'download_bundle' => 'Log bundle (ZIP)',
             'status_live' => 'Live',
             'status_idle' => 'Ended',
             'status_paused' => '⏸ paused (turn limit)',
@@ -317,6 +323,10 @@ return [
         ],
 
         'diff' => [
+            'title' => 'Diff — :name',
+            'breadcrumb_tasks' => 'Tasks',
+            'breadcrumb_self' => 'Diff',
+            'refresh' => 'Refresh',
             'not_loaded' => 'Diff not loaded automatically.',
             'load_button' => 'Load diff',
             'loading' => 'Loading…',
@@ -373,6 +383,11 @@ return [
             'logs_download' => 'Logs Download',
             'mark_completed' => 'Complete',
             'mark_completed_description' => 'Complete the task and delete the Docker workspace? Both actions cannot be undone.',
+            'abort' => 'Abort',
+            'abort_heading' => 'Abort running phase',
+            'abort_description' => 'Stop the running worker container immediately and mark the task as Aborted? The workspace is kept (removed only on delete).',
+            'abort_submit' => 'Abort phase',
+            'task_aborted' => 'Task aborted',
             'run_concept' => 'Re-run Concept',
             'run_concept_description' => 'Starts a new concept run. Existing notes will be passed as feedback.',
             'start_implement' => 'Start Implement',
