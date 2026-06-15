@@ -73,6 +73,8 @@ _ep_load_libs() {
     # shellcheck disable=SC1091
     source "$LIB_DIR/state.sh"
     # shellcheck disable=SC1091
+    source "$LIB_DIR/git.sh"
+    # shellcheck disable=SC1091
     source "$LIB_DIR/lock.sh"
     # shellcheck disable=SC1091
     source "$LIB_DIR/prompts.sh"

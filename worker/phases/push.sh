@@ -364,6 +364,14 @@ phase_push_run() {
         feature_branch="$(git -C /workspace rev-parse --abbrev-ref HEAD)"
     fi
 
+    # I2: refuse to clobber commits a user pushed to the branch externally
+    # (e.g. during this run). Fail with a clear, actionable message instead of
+    # the cryptic --force-with-lease reject.
+    if git_remote_branch_diverged "$feature_branch"; then
+        echo "push: remote branch '$feature_branch' carries external commits not in this run — re-run the task to pull them in before pushing." >&2
+        return 1
+    fi
+
     local push_log="/workspace/.agent/logs/git-push.${ITERATION}.log"
     if ! git -C /workspace -c "http.extraheader=$auth_header" push -u --force-with-lease origin "$feature_branch" "${push_opts[@]}" > "$push_log" 2>&1; then
         local push_exit=1
