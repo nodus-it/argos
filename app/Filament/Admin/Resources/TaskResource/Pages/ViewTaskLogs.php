@@ -111,13 +111,13 @@ class ViewTaskLogs extends Page
     {
         $configDir = config('argos.config_dir');
 
-        return file_exists("{$configDir}/tasks/{$this->task->name}/{$this->phase}.bg.log");
+        return file_exists("{$configDir}/tasks/{$this->task->slug}/{$this->phase}.bg.log");
     }
 
     private function readLogFile(): string
     {
         $configDir = config('argos.config_dir');
-        $logPath = "{$configDir}/tasks/{$this->task->name}/{$this->phase}.bg.log";
+        $logPath = "{$configDir}/tasks/{$this->task->slug}/{$this->phase}.bg.log";
 
         return LogTail::read($logPath);
     }

@@ -422,7 +422,7 @@ class DemoDeployer
      */
     public function demoSlug(Task $task): string
     {
-        $base = strtolower((string) preg_replace('/[^a-zA-Z0-9]+/', '-', $task->name));
+        $base = strtolower((string) preg_replace('/[^a-zA-Z0-9]+/', '-', $task->slug));
         $base = trim($base, '-');
 
         return 'demo-'.($base !== '' ? $base : 'task');

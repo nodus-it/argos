@@ -41,8 +41,11 @@ erledigt, siehe [AGENTS.md](AGENTS.md).
 
 Ein Task verknüpft:
 
-- einen **Namen** — einen eindeutigen Slug, der auch in URLs, im Namen des
-  Docker-Workspace-Volumes und im Präfix des Feature-Branches auftaucht;
+- einen **Namen** — ein frei wählbares Anzeige-Label. Er darf sich über Tasks
+  wiederholen und ist später änderbar. Beim Anlegen leitet Argos daraus einmalig
+  einen unveränderlichen **Slug** ab (der Slug bestimmt den Namen des
+  Docker-Workspace-Volumes und das Feature-Branch-Präfix und ändert sich beim
+  Umbenennen nie);
 - ein **Projekt** (Repo-Profil) — in welchem Repository gearbeitet werden soll.
   Der Worker-Stack, der Agent, die Modelle und der Base-Branch werden alle vom
   Projektstandard geerbt, sofern Sie sie nicht am Task überschreiben;
@@ -64,7 +67,8 @@ task**. Das Formular hat zwei Tabs:
 
 **General**
 
-- **Name** — der eindeutige Slug (siehe oben).
+- **Name** — das frei wählbare Anzeige-Label (siehe oben); der unveränderliche
+  Slug wird automatisch daraus abgeleitet.
 - **Project** — das Repo-Profil, in dem gearbeitet werden soll.
 - **Description** — die vorzunehmende Änderung, mit Akzeptanzkriterien.
 - **Start concept immediately** — wenn aktiviert, startet die Concept-Phase

@@ -8,7 +8,7 @@ return [
 
     'fields' => [
         'name_label' => 'Name',
-        'name_helper' => 'Eindeutiger Slug für diesen Task — taucht in URLs, Volume-Namen und Branch-Präfix auf.',
+        'name_helper' => 'Anzeigename für diesen Task — frei wählbar und später änderbar. Aus ihm wird beim Anlegen einmalig der unveränderliche Slug (Branch-Präfix, Volume) abgeleitet.',
         'project' => 'Projekt',
         'project_helper' => 'Welches Repo-Profil. Stack/Agent/Modelle erben den Default vom Projekt; im Worker-Tab kannst du sie pro Task überschreiben.',
         'description_label' => 'Beschreibung',
