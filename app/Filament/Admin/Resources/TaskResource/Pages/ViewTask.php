@@ -705,7 +705,7 @@ class ViewTask extends ViewRecord
         /** @var Task $task */
         $task = $this->getRecord();
         $configDir = config('argos.config_dir');
-        $path = "{$configDir}/tasks/{$task->name}/{$phase}.bg.log";
+        $path = "{$configDir}/tasks/{$task->slug}/{$phase}.bg.log";
 
         return LogTail::read($path);
     }

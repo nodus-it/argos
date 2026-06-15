@@ -21,11 +21,11 @@ class TaskLogController extends Controller
         abort_unless(in_array($phase, self::ALLOWED_PHASES, true), 400, 'Invalid phase');
 
         $configDir = (string) config('argos.config_dir');
-        $logPath = "{$configDir}/tasks/{$task->name}/{$phase}.bg.log";
+        $logPath = "{$configDir}/tasks/{$task->slug}/{$phase}.bg.log";
 
         abort_unless(file_exists($logPath), 404, 'Log file not found');
 
-        $filename = sprintf('argos-%s-%s-%s.log', $task->name, $phase, now()->format('Y-m-d'));
+        $filename = sprintf('argos-%s-%s-%s.log', $task->slug, $phase, now()->format('Y-m-d'));
 
         return response()->download($logPath, $filename, [
             'Content-Type' => 'text/plain; charset=UTF-8',

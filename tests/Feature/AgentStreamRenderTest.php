@@ -92,7 +92,7 @@ final class AgentStreamRenderTest extends TestCase
             'current_status' => 'running',
         ]);
 
-        $logDir = "{$this->tmpDir}/tasks/{$task->name}";
+        $logDir = "{$this->tmpDir}/tasks/{$task->slug}";
         mkdir($logDir, 0755, true);
         // .bg.log mixes worker bash logs (argos) with the agent's JSON stream.
         file_put_contents(

@@ -42,6 +42,7 @@ class TaskService
         $task = Task::create([
             'user_id' => $data['user_id'] ?? null,
             'name' => $data['name'],
+            'slug' => $data['slug'] ?? Task::generateSlug((string) $data['name']),
             'repo_profile_id' => $data['repo_profile_id'] ?? null,
             'description' => $data['description'],
             'base_branch' => $data['base_branch'] ?? null,
@@ -292,11 +293,12 @@ class TaskService
     }
 
     /**
-     * Resolve a task by its name or ULID. Used by the MCP tools via
-     * InteractsWithTasks to turn a user-supplied reference into a Task.
+     * Resolve a task by its ULID or its (unique) slug. Used by the MCP tools via
+     * InteractsWithTasks to turn a user-supplied reference into a Task. The
+     * display `name` is non-unique and deliberately NOT a lookup key.
      */
-    public function find(string $nameOrId): ?Task
+    public function find(string $slugOrId): ?Task
     {
-        return Task::where('name', $nameOrId)->orWhere('id', $nameOrId)->first();
+        return Task::where('id', $slugOrId)->orWhere('slug', $slugOrId)->first();
     }
 }

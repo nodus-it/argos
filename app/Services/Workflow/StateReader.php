@@ -12,13 +12,14 @@ use Symfony\Component\Process\Process;
 class StateReader
 {
     /**
-     * Read state.json from a task's workspace volume (used for tests and CLI diagnostics).
+     * Read state.json from a task's workspace volume (used for tests and CLI
+     * diagnostics). Keyed by the task's frozen `slug` (the volume identity).
      */
-    public function read(string $taskName): ?array
+    public function read(string $taskSlug): ?array
     {
         $process = $this->newProcess([
             'docker', 'run', '--rm',
-            '-v', 'task_ws_'.Task::slugifyName($taskName).':/workspace:ro',
+            '-v', 'task_ws_'.Task::slugifyName($taskSlug).':/workspace:ro',
             'alpine',
             'cat', '/workspace/.agent/state.json',
         ]);
@@ -35,9 +36,9 @@ class StateReader
         return is_array($decoded) ? $decoded : null;
     }
 
-    public function getPhaseStatus(string $taskName, string $phase): ?string
+    public function getPhaseStatus(string $taskSlug, string $phase): ?string
     {
-        $state = $this->read($taskName);
+        $state = $this->read($taskSlug);
 
         return $state['phases'][$phase]['current_status'] ?? null;
     }

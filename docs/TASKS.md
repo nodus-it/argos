@@ -39,8 +39,10 @@ the agent/model that does the work, see [AGENTS.md](AGENTS.md).
 
 A task ties together:
 
-- a **name** — a unique slug that also shows up in URLs, the Docker workspace
-  volume name, and the feature-branch prefix;
+- a **name** — a free-form display label. It can repeat across tasks and you can
+  rename it later. On creation Argos derives a frozen **slug** from it once (the
+  slug drives the Docker workspace volume name and the feature-branch prefix and
+  never changes on rename);
 - a **project** (repo profile) — which repository to work in. The worker
   stack, agent, models, and base branch all inherit from the project default
   unless you override them on the task;
@@ -60,7 +62,8 @@ form has two tabs:
 
 **General**
 
-- **Name** — the unique slug (see above).
+- **Name** — the free-form display label (see above); the frozen slug is derived
+  from it automatically.
 - **Project** — the repo profile to work in.
 - **Description** — the change to make, with acceptance criteria.
 - **Start concept immediately** — when on, the Concept phase starts right after

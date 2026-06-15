@@ -60,7 +60,7 @@ class PhaseCommandBuilder
             '--memory', (string) config('argos.docker.memory_limit'),
             '--cpus',   (string) config('argos.docker.cpu_limit'),
             '-e', "PHASE={$phase}",
-            '-e', "TASK_ID={$task->name}",
+            '-e', "TASK_ID={$task->slug}",
             '-e', "REPO_URL={$profile->url}",
             '-e', "REPO_TOKEN={$this->resolveRepoToken($profile)}",
             '-e', "REPO_PLATFORM={$profile->platform->value}",
@@ -127,7 +127,7 @@ class PhaseCommandBuilder
 
         $cmd[] = $workerImage;
         $cmd[] = $phase;
-        $cmd[] = $task->name;
+        $cmd[] = $task->slug;
 
         return $cmd;
     }
