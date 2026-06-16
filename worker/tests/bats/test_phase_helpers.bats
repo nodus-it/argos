@@ -161,6 +161,50 @@ X
     rm -f /workspace/.agent/cur.xml
 }
 
+# --- quality_phpstan_new_errors ---
+
+@test "quality_phpstan_new_errors: nur neue Errors vs. Baseline werden gemeldet" {
+    command -v php >/dev/null 2>&1 || skip "php not available in bats env (the worker image has it)"
+    cat > /workspace/.agent/phpstan-base.json <<'J'
+{"files":{"/workspace/app/Old.php":{"errors":1,"messages":[{"message":"Pre-existing type error.","line":10}]}}}
+J
+    cat > /workspace/.agent/phpstan-cur.json <<'J'
+{"files":{
+"/workspace/app/Old.php":{"errors":1,"messages":[{"message":"Pre-existing type error.","line":10}]},
+"/workspace/app/New.php":{"errors":1,"messages":[{"message":"Brand new type error.","line":42}]}
+}}
+J
+    run quality_phpstan_new_errors /workspace/.agent/phpstan-base.json /workspace/.agent/phpstan-cur.json
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"app/New.php:42: Brand new type error."* ]]
+    [[ "$output" != *"Pre-existing type error."* ]]
+    rm -f /workspace/.agent/phpstan-base.json /workspace/.agent/phpstan-cur.json
+}
+
+@test "quality_phpstan_new_errors: gleiche Message, andere Zeile → vorbestehend (kein neuer Error)" {
+    command -v php >/dev/null 2>&1 || skip "php not available in bats env (the worker image has it)"
+    cat > /workspace/.agent/phpstan-base.json <<'J'
+{"files":{"/workspace/app/Old.php":{"errors":1,"messages":[{"message":"Pre-existing type error.","line":10}]}}}
+J
+    cat > /workspace/.agent/phpstan-cur.json <<'J'
+{"files":{"/workspace/app/Old.php":{"errors":1,"messages":[{"message":"Pre-existing type error.","line":37}]}}}
+J
+    run quality_phpstan_new_errors /workspace/.agent/phpstan-base.json /workspace/.agent/phpstan-cur.json
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+    rm -f /workspace/.agent/phpstan-base.json /workspace/.agent/phpstan-cur.json
+}
+
+@test "quality_phpstan_new_errors: fehlende Baseline → alle Errors (strict)" {
+    command -v php >/dev/null 2>&1 || skip "php not available in bats env (the worker image has it)"
+    cat > /workspace/.agent/phpstan-cur.json <<'J'
+{"files":{"/workspace/app/A.php":{"errors":1,"messages":[{"message":"Some error.","line":5}]}}}
+J
+    run quality_phpstan_new_errors /workspace/.agent/nope.json /workspace/.agent/phpstan-cur.json
+    [[ "$output" == *"app/A.php:5: Some error."* ]]
+    rm -f /workspace/.agent/phpstan-cur.json
+}
+
 # --- quality_ensure_vite_hot ---
 
 @test "quality_ensure_vite_hot: kein public/hot → wird mit Stub-URL angelegt" {

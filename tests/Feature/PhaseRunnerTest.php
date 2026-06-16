@@ -1006,6 +1006,53 @@ class PhaseRunnerTest extends TestCase
         $this->assertSame([], $logs);
     }
 
+    public function test_parse_gate_log_output_sanitizes_malformed_utf8_bodies(): void
+    {
+        // A 3-byte UTF-8 char (€ = \xE2\x82\xAC) sliced at the byte boundary by
+        // the reader's head -c / tail -c truncation leaves an invalid \xE2\x82
+        // sequence — which previously made the json `quality_gate_logs` cast
+        // throw a JsonEncodingException and fail the whole phase run.
+        $output = "###GATE-LOG-START###phpstan###30###\n"
+            ."errors before \xE2\x82\n"
+            ."###GATE-LOG-END###\n";
+
+        $reader = app(WorkerVolumeReader::class);
+        $reflection = new \ReflectionMethod($reader, 'parseGateLogOutput');
+        $reflection->setAccessible(true);
+
+        /** @var array<string, string> $logs */
+        $logs = $reflection->invoke($reader, $output);
+
+        $this->assertArrayHasKey('phpstan', $logs);
+        $this->assertTrue(mb_check_encoding($logs['phpstan'], 'UTF-8'));
+        // The cast that previously threw must now succeed.
+        $this->assertNotFalse(json_encode($logs['phpstan']));
+        $this->assertStringContainsString('errors before', $logs['phpstan']);
+    }
+
+    public function test_post_phase_sync_survives_malformed_utf8_gate_logs(): void
+    {
+        $task = $this->taskWithProfile();
+        $phaseRun = PhaseRun::create([
+            'task_id' => $task->id,
+            'phase' => 'implement',
+            'iteration' => 1,
+            'status' => 'completed',
+        ]);
+
+        // Malformed UTF-8 reaching the persist layer directly (e.g. a future
+        // source bypassing the reader's sanitization). A diagnostic log write
+        // may never fail an otherwise-completed implement run.
+        $gateLogs = ['phpstan' => "Line 42: bad type \xE2\x82 cut here"];
+
+        $this->fakeVolumeReader([], $gateLogs);
+        $runner = app(PhaseRunner::class);
+
+        $runner->postPhaseSync($task, $phaseRun, 'implement', null);
+
+        $this->assertSame(PhaseStatus::Completed, $phaseRun->fresh()->status);
+    }
+
     public function test_post_phase_sync_strips_outer_code_fence_from_concept_md(): void
     {
         $task = $this->taskWithProfile();

@@ -79,10 +79,12 @@ _implement_setup_toolchain() {
         fi
     fi
 
-    # Snapshot which tests are already red on the pristine checkout (before the
-    # agent edits anything) so the quality gate only blocks on regressions, not
-    # on the target repo's pre-existing failures. Idempotent across iterations.
+    # Snapshot which tests are already red AND which PHPStan errors already exist
+    # on the pristine checkout (before the agent edits anything) so the quality
+    # gates only block on regressions the agent introduces, not on the target
+    # repo's pre-existing debt. Idempotent across iterations.
     quality_pest_baseline_capture
+    quality_phpstan_baseline_capture
 
     return 0
 }
