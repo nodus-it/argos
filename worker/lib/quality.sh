@@ -86,6 +86,25 @@ quality_pest_baseline_capture() {
     return 0
 }
 
+# quality_phpstan_baseline_capture: record which PHPStan errors ALREADY exist on
+# the pristine checkout, so the gate only blocks on errors the agent actually
+# introduces — not on the target repo's pre-existing type debt. Without this,
+# any repo carrying PHPStan findings drags every implement run into a long
+# off-task remediation session (the gate has no other way to "pass"). Run once,
+# before the agent edits anything; idempotent. Best-effort — a missing/empty
+# baseline falls back to strict gating. PHPStan exits non-zero when it finds
+# errors, so the `|| true` keeps the JSON report (written to stdout) intact.
+quality_phpstan_baseline_capture() {
+    [[ -f /workspace/.agent/phpstan-baseline.json ]] && return 0
+    if { [[ -f /workspace/phpstan.neon ]] || [[ -f /workspace/phpstan.neon.dist ]]; } \
+            && [[ -x /workspace/vendor/bin/phpstan ]]; then
+        log_info "quality: capturing phpstan baseline (pre-existing errors) on the clean checkout"
+        (cd /workspace && vendor/bin/phpstan analyse --no-progress --error-format=json \
+            > /workspace/.agent/phpstan-baseline.json 2> /workspace/.agent/logs/phpstan-baseline.log) || true
+    fi
+    return 0
+}
+
 # quality_pest_new_failures: print test ids that fail in the CURRENT JUnit
 # report ($2) but were NOT already failing in the BASELINE report ($1) — i.e.
 # regressions introduced by the agent. Parsing is done in PHP (SimpleXML),
@@ -118,6 +137,59 @@ foreach (array_keys(failing($argv[2] ?? '')) as $id) {
     if (! isset($base[$id])) {
         echo $id, "\n";
     }
+}
+PHP
+    php "$parser" "$baseline" "$current"
+    rm -f "$parser"
+}
+
+# quality_phpstan_new_errors: print the PHPStan errors present in the CURRENT
+# json report ($2) but NOT already present in the BASELINE report ($1) — i.e.
+# findings the agent introduced. Comparison is a multiset diff keyed by
+# (file, message), deliberately ignoring line numbers: edits elsewhere in a file
+# shift the lines of pre-existing errors, and matching on line would re-report
+# them as new. Parsing is done in PHP (json_decode), robust against format
+# quirks. Missing/empty baseline → every current error counts as new → strict
+# gating (the safe default). Output: one `relpath:line: message` per new error.
+# Args: =baseline_json, =current_json
+quality_phpstan_new_errors() {
+    local baseline="$1" current="$2" parser
+    parser="$(mktemp)"
+    cat > "$parser" <<'PHP'
+<?php
+function errors(string $f): array {
+    if (! is_file($f)) {
+        return [];
+    }
+    $json = @json_decode((string) @file_get_contents($f), true);
+    if (! is_array($json) || ! isset($json['files']) || ! is_array($json['files'])) {
+        return [];
+    }
+    $out = [];
+    foreach ($json['files'] as $path => $info) {
+        foreach (($info['messages'] ?? []) as $m) {
+            $msg = trim((string) ($m['message'] ?? ''));
+            if ($msg === '') {
+                continue;
+            }
+            $out[] = ['path' => (string) $path, 'line' => (int) ($m['line'] ?? 0), 'msg' => $msg];
+        }
+    }
+    return $out;
+}
+$baseCounts = [];
+foreach (errors($argv[1] ?? '') as $e) {
+    $k = $e['path']."\0".$e['msg'];
+    $baseCounts[$k] = ($baseCounts[$k] ?? 0) + 1;
+}
+foreach (errors($argv[2] ?? '') as $e) {
+    $k = $e['path']."\0".$e['msg'];
+    if (($baseCounts[$k] ?? 0) > 0) {
+        $baseCounts[$k]--;
+        continue;
+    }
+    $rel = preg_replace('#^/workspace/#', '', $e['path']);
+    echo $rel.':'.$e['line'].': '.$e['msg']."\n";
 }
 PHP
     php "$parser" "$baseline" "$current"
@@ -242,19 +314,40 @@ quality_gates_run() {
     fi
 
     # ── 4. PHPStan ───────────────────────────────────────────────────────
+    # Run with --error-format=json so a red result can be diffed against the
+    # baseline captured on the clean checkout (quality_phpstan_baseline_capture);
+    # only NEW errors block the gate. Without the baseline (file absent/empty)
+    # every error counts → strict gating. The stderr stream is kept separately so
+    # the infra-crash heuristic can inspect it (OOM/broken config go there, not
+    # into the json report).
     if [[ -f /workspace/phpstan.neon || -f /workspace/phpstan.neon.dist ]] \
             && [[ -x /workspace/vendor/bin/phpstan ]]; then
         local phpstan_log="/workspace/.agent/logs/phpstan.${iteration}.log" phpstan_exit=0
-        (cd /workspace && vendor/bin/phpstan analyse --no-progress) \
-            &> "$phpstan_log" || phpstan_exit=$?
+        local phpstan_json="/workspace/.agent/logs/phpstan.${iteration}.json"
+        (cd /workspace && vendor/bin/phpstan analyse --no-progress --error-format=json \
+            > "$phpstan_json" 2> "$phpstan_log") || phpstan_exit=$?
         if [[ "$phpstan_exit" -eq 0 ]]; then
             gates="$(printf '%s' "$gates" | jq '.phpstan = "pass"')"
         elif quality_is_infra_crash "$phpstan_log" "$phpstan_exit"; then
             gates="$(printf '%s' "$gates" | jq '.phpstan = "skip"')"
             printf '\n── PHPStan crashed on infrastructure (OOM/config/binary), not a real finding — gate skipped, NOT sent to remediation ──\n' \
                 >> "$phpstan_log"
-        else
+        elif ! jq -e . "$phpstan_json" >/dev/null 2>&1; then
+            # Non-zero exit, no parseable report, not a known infra crash — fail
+            # strictly on whatever the tool emitted (kept in $phpstan_log).
             gates="$(printf '%s' "$gates" | jq '.phpstan = "fail"')"
+        else
+            local new_errors
+            new_errors="$(quality_phpstan_new_errors /workspace/.agent/phpstan-baseline.json "$phpstan_json")"
+            if [[ -n "$new_errors" ]]; then
+                gates="$(printf '%s' "$gates" | jq '.phpstan = "fail"')"
+                { printf 'PHPStan — new errors vs. baseline (these block the gate):\n\n'; printf '%s\n' "$new_errors"; } \
+                    > "$phpstan_log"
+            else
+                gates="$(printf '%s' "$gates" | jq '.phpstan = "pass"')"
+                printf 'PHPStan red only with pre-existing errors (no new findings introduced by this change) — gate passes.\n' \
+                    > "$phpstan_log"
+            fi
         fi
     fi
 
