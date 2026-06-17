@@ -40,14 +40,33 @@ Der Worker prüft nach deiner Session alle Gates nochmal automatisch. Wenn dort 
 
 ## Datenbank-Hinweis (Boost / Laravel)
 
-Wenn das Projekt eine Datenbank-Konfiguration hat die im Container nicht erreichbar ist (z.B. MariaDB-Host der nicht existiert), schalte temporär in `.env` auf SQLite um:
+**Zuerst die bereitgestellten Backing-Services nutzen.** Wenn das Projekt eine
+Datenbank braucht, stellt der Worker sie in der Regel schon bereit: MySQL/MariaDB
+unter dem Host **`db`**, Redis unter **`redis`**. Die passenden Verbindungs-Env
+sind bereits in den Container exportiert (z.B. `DB_HOST=db` sowie projektspezifische
+Test-Variablen wie `TESTING_DB_HOST` / `TESTING_DB_DATABASE`). Prüfe das, bevor du
+irgendetwas umkonfigurierst — z.B. `printenv | grep -iE 'DB_|REDIS'`.
+
+Wenn ein Test-Lauf nicht verbindet (z.B. weil das Projekt einen anderen Default-Host
+wie `database` annimmt), **nutze die bereitgestellten Variablen**, statt die
+Konfiguration umzubauen — etwa `TESTING_DB_HOST=db TESTING_DB_DATABASE=<db> vendor/bin/pest`,
+oder trag die vorhandenen Werte in `.env` ein.
+
+**Niemals `config/database.php` (oder andere committete Config) für die Testumgebung
+ändern** und **nicht** den Produktiv-DB-Treiber auf SQLite umstellen — das verfälscht
+DB-spezifische Änderungen (Migrations, rohe SQL-Queries, Strict-Mode) und produziert
+Cruft im Diff.
+
+Nur wenn **gar keine** Datenbank erreichbar ist (kein `db`-Host, keine Test-Env),
+darfst du als letzten Ausweg **ausschließlich in `.env`** temporär auf SQLite
+ausweichen:
 
 ```
 DB_CONNECTION=sqlite
 DB_DATABASE=:memory:
 ```
 
-Damit du Tests ausführen und ggf. `php artisan migrate` laufen lassen kannst. Die Änderung an `.env` darf NICHT in den Commit — `.env` ist ohnehin in `.gitignore`. Setze die Konfiguration nicht auf den Original-Stand zurück; sie bleibt im Workspace bis zum nächsten `--fresh`-Reset.
+Die Änderung an `.env` darf NICHT in den Commit — `.env` ist ohnehin in `.gitignore`.
 
 ## Wichtig
 
