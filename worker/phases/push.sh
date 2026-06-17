@@ -131,13 +131,80 @@ _push_pr_github() {
     printf '%s' "$pr_url"
 }
 
-# _push_pr_gitlab: extract the MR URL from the git-push output. GitLab writes
-# it to the remote-side output when `-o merge_request.create` is set.
-# Args: $1=push_log
-# Output: MR URL on stdout, empty if not found.
-_push_pr_gitlab() {
-    local push_log="$1"
-    grep -oE 'https://[^[:space:]]*/merge_requests/[0-9]+' "$push_log" | head -1
+# _push_pr_gitlab_create: create a GitLab merge request via the REST API.
+#
+# We deliberately do NOT use git push options (`-o merge_request.*`): git
+# rejects any push option containing a newline ("fatal: push options must not
+# have new line characters"), so a multi-line MR description breaks every push.
+# Creating the MR over the API mirrors the GitHub/Bitbucket paths and lets the
+# GitLab MR carry the full rich description (summary + technical details).
+# Args: $1=feature_branch, $2=title, $3=body (optional)
+# Output: MR web URL on stdout (empty on error).
+_push_pr_gitlab_create() {
+    local feature_branch="$1"
+    local title="$2"
+    local body="${3:-}"
+
+    # MR titles are single-line; collapse any stray newline defensively.
+    title="${title//$'\n'/ }"
+
+    local instance project project_enc
+    instance="$(printf '%s' "$REPO_URL" | sed -E 's|^(https?://[^/]+).*|\1|')"
+    project="$(printf '%s' "$REPO_URL" | sed -E 's|^https?://[^/]+/||; s|/$||; s|\.git$||')"
+    [[ -n "$instance" && -n "$project" ]] || return 0
+    # rawurlencode the project path: replace '/' with %2F (only character we expect).
+    project_enc="${project//\//%2F}"
+
+    local pr_log="/workspace/.agent/logs/gl-mr.${ITERATION}.log"
+    local tmp_resp
+    tmp_resp="$(mktemp)"
+
+    set +x
+    local http_code
+    http_code="$(curl -s \
+        -o "$tmp_resp" \
+        -w '%{http_code}' \
+        -X POST \
+        -H "Authorization: Bearer $REPO_TOKEN" \
+        -H "Content-Type: application/json" \
+        "${instance}/api/v4/projects/${project_enc}/merge_requests" \
+        -d "$(jq -n \
+            --arg source "$feature_branch" \
+            --arg target "$BASE_BRANCH" \
+            --arg title  "$title" \
+            --arg desc   "$body" \
+            '{source_branch:$source,target_branch:$target,title:$title,description:$desc,remove_source_branch:true,squash:true}')" \
+        2>"$pr_log")"
+
+    local pr_url=""
+    case "$http_code" in
+        201)
+            pr_url="$(jq -r '.web_url // empty' "$tmp_resp")"
+            ;;
+        409)
+            # An open MR already exists for this source branch — look it up and
+            # refresh its metadata, mirroring the GitHub "already exists" path.
+            pr_url="$(curl -s \
+                -H "Authorization: Bearer $REPO_TOKEN" \
+                "${instance}/api/v4/projects/${project_enc}/merge_requests?source_branch=${feature_branch}&state=opened" \
+                2>>"$pr_log" \
+                | jq -r '.[0].web_url // empty')"
+            if [[ -n "$pr_url" ]]; then
+                log_info "push: MR already exists — updating description ($pr_url)"
+                pr_update "$pr_url" "$title" "$body"
+                pr_comment "$pr_url" "$(_push_build_iteration_comment)"
+            else
+                log_warn "push: GitLab MR already exists but URL could not be determined"
+            fi
+            ;;
+        *)
+            cat "$tmp_resp" >> "$pr_log"
+            log_warn "push: GitLab MR creation failed (HTTP $http_code, see logs/gl-mr.${ITERATION}.log)"
+            ;;
+    esac
+
+    rm -f "$tmp_resp"
+    printf '%s' "$pr_url"
 }
 
 # _push_pr_bitbucket: create a Bitbucket pull request via REST API.
@@ -307,6 +374,16 @@ phase_push_run() {
         : > "/workspace/.agent/logs/commit-message.${ITERATION}.body"
     fi
 
+    # Surface the commit-message agent's cost/tokens in the push result so they
+    # land in phase_runs (the push phase has no agent of its own otherwise, so
+    # cost_usd would stay null even though the sub-phase spent tokens).
+    local cm_cost=0 cm_in=0 cm_out=0
+    if [[ -s "$cm_result_log" ]]; then
+        cm_cost="$(jq -r '.claude_total_cost_usd // 0' "$cm_result_log" 2>/dev/null || echo 0)"
+        cm_in="$(jq -r '.input_tokens // 0' "$cm_result_log" 2>/dev/null || echo 0)"
+        cm_out="$(jq -r '.output_tokens // 0' "$cm_result_log" 2>/dev/null || echo 0)"
+    fi
+
     local subject_file="/workspace/.agent/logs/commit-message.${ITERATION}.subject"
     local body_file="/workspace/.agent/logs/commit-message.${ITERATION}.body"
     if [[ ! -s "$subject_file" ]]; then
@@ -336,21 +413,14 @@ phase_push_run() {
         fi
     fi
 
-    # Detect the platform and prepare GitLab push options.
+    # Detect the platform. GitLab MRs are created over the API after the push
+    # (see _push_pr_gitlab_create) rather than via `-o merge_request.*` push
+    # options — git forbids newlines in push options, which broke every push
+    # carrying a multi-line MR description.
     local platform
     platform="$(_push_detect_platform)"
 
     local push_opts=()
-    if [[ "$platform" == "gitlab" ]]; then
-        push_opts+=(
-            -o merge_request.create
-            -o "merge_request.target=$BASE_BRANCH"
-            -o "merge_request.title=$subject"
-        )
-        if [[ -n "$body" && "$body" != $'\n' ]]; then
-            push_opts+=(-o "merge_request.description=$body")
-        fi
-    fi
 
     # Push with auth via http.extraheader — token never lands in origin URL
     # nor in /workspace/.git/config.
@@ -389,6 +459,9 @@ phase_push_run() {
             started_at "$started_at" \
             finished_at "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
             --int exit_code "$push_exit" \
+            --raw claude_total_cost_usd "$cm_cost" \
+            --int input_tokens "$cm_in" \
+            --int output_tokens "$cm_out" \
             error_message "git push failed (see ${push_log})"
         return "$push_exit"
     fi
@@ -422,7 +495,7 @@ phase_push_run() {
             pr_url="$(_push_pr_github "$feature_branch" "$subject" "$pr_body")"
             _push_configure_repo_github
             ;;
-        gitlab)     pr_url="$(_push_pr_gitlab "$push_log")" ;;
+        gitlab)     pr_url="$(_push_pr_gitlab_create "$feature_branch" "$subject" "$pr_body")" ;;
         bitbucket)  pr_url="$(_push_pr_bitbucket "$feature_branch" "$subject" "$pr_body")" ;;
     esac
     if [[ -n "$pr_url" ]]; then
@@ -443,6 +516,9 @@ phase_push_run() {
         finished_at "$finished_at" \
         --int duration_ms "$duration_ms" \
         --int exit_code 0 \
+        --raw claude_total_cost_usd "$cm_cost" \
+        --int input_tokens "$cm_in" \
+        --int output_tokens "$cm_out" \
         branch "$feature_branch" \
         commit_sha "$commit_sha" \
         remote_url "$REPO_URL" \

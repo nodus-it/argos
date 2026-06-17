@@ -110,6 +110,24 @@ class TaskLogBundleBuilderTest extends TestCase
         @unlink($zipPath);
     }
 
+    public function test_bundle_flags_a_failed_volume_read_in_the_manifest(): void
+    {
+        $task = $this->taskWithRuns();
+
+        $builder = $this->partialMock(TaskLogBundleBuilder::class, function (MockInterface $mock): void {
+            $mock->shouldAllowMockingProtectedMethods();
+            $mock->shouldReceive('readVolumeStream')->andReturnNull();
+        });
+        $zipPath = $builder->build($task);
+
+        $manifest = $this->readEntry($zipPath, 'MANIFEST.txt');
+        $this->assertStringContainsString('WORKSPACE READ FAILED', $manifest);
+        $this->assertStringContainsString($task->volumeName(), $manifest);
+        $this->assertStringContainsString('git-push.N.log', $manifest);
+
+        @unlink($zipPath);
+    }
+
     // ─── helpers ─────────────────────────────────────────────────────────────
 
     private function taskWithRuns(): Task
