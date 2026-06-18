@@ -136,6 +136,8 @@ class AppServiceProvider extends ServiceProvider
         // Task workflow follow-up actions. The kernel services (WorkflowService,
         // TaskService) just advance state and fire the event; these listeners
         // carry out the side-effects so the services stay side-effect-free.
+        // Auto-discovery is explicitly disabled in bootstrap/app.php so this
+        // block remains the single source of truth and no listener fires twice.
         Event::listen(PhaseCompleted::class, DispatchAutoPush::class);
         Event::listen(PhaseCompleted::class, StopDemoAfterPush::class);
         Event::listen(PhaseCompleted::class, NotifyIssueTrackerOfPhase::class);
