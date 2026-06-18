@@ -38,6 +38,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'ability' => CheckForAnyAbility::class,
         ]);
     })
+    ->withEvents(discover: false)
     ->withExceptions(function (Exceptions $exceptions): void {
         //
     })->create();
