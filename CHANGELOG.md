@@ -5,6 +5,10 @@ curated highlights, not a per-commit log — see the [GitHub Releases](https://g
 for the full commit list of each tag. Versions follow SemVer; pre-1.0 betas
 may carry breaking changes between releases.
 
+## [Unreleased]
+
+- **Fix:** Issue-Tracker-Kommentare wurden bei jeder Phase doppelt gepostet (Listener-Doppelregistrierung durch Laravel-Event-Discovery + manuelle Registrierung in `AppServiceProvider`). Auto-Discovery ist jetzt explizit deaktiviert; `AppServiceProvider::boot()` bleibt die einzige Quelle der Wahrheit.
+
 ## [0.3.0-beta.1] - 2026-06-15
 
 A consolidation release: a service-layer architecture pass, in-app docs, a
