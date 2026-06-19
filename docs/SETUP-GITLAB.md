@@ -199,8 +199,10 @@ For the shared binding setup details, see
 
 The manager passes `REPO_PLATFORM=gitlab` to the worker container as an
 environment variable. The push phase uses this to detect the platform reliably
-— even for self-hosted GitLab instances with non-obvious hostnames — and pushes
-with `-o merge_request.create` to create the merge request automatically.
+— even for self-hosted GitLab instances with non-obvious hostnames — and then
+creates the merge request over the GitLab REST API (`POST
+…/api/v4/projects/<id>/merge_requests`), so the MR carries the full multi-line
+description.
 
 ---
 
