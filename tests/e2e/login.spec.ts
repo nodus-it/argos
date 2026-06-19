@@ -15,6 +15,10 @@ test('admin can log in and reach the dashboard', async ({ page }) => {
   await page.getByRole('textbox', { name: /password/i }).fill('12345');
   await page.getByRole('button', { name: /sign in/i }).click();
 
-  await expect(page).toHaveURL(/\/admin/);
+  // Wait until we have actually LEFT the login page. A bare /\/admin/ match
+  // resolves immediately against /admin/login itself, so a broken login (e.g. a
+  // session cookie the browser can't return over the test's http/127.0.0.1
+  // origin) would still pass — assert the navigation away instead.
+  await page.waitForURL((url) => /\/admin(\/|$)/.test(url.pathname) && !/\/admin\/login/.test(url.pathname));
   await expect(page.locator('body')).not.toContainText(/these credentials/i);
 });

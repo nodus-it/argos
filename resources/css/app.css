@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@custom-variant dark (&:where(.dark, .dark *));
 @plugin '@tailwindcss/typography';
 
 /* Self-hosted fonts (offline-robust, no CDN). */
@@ -1289,6 +1290,10 @@ body,
 /* Responsive breakpoints */
 @media(max-width:760px){
   .dh-eye-stage{display:none;}
+  /* Without wrap, the full-width terminal (.dh-right) and the flex:1 headline
+     fight on one row and squeeze the title to a sliver — wrap so the terminal
+     stacks BELOW the headline. */
+  .dh-hero{flex-wrap:wrap;gap:20px;}
   .dh-right{width:100%;}
   .ph-hero{padding:20px 16px 18px;gap:14px;}
   .ph-meta{gap:6px;}
@@ -1302,4 +1307,73 @@ body,
 @media(prefers-reduced-motion:reduce){
   .dh-ring,.dh-eye-glow,.th-live-tag .dot,.dh-term-head .live .dot{animation:none!important;}
   .stat.is-live .accent-bar{animation:none!important;}
+}
+
+/* ============================================================
+   Mobile / phone polish (P9). Consolidated <=480px overrides for the
+   custom control-room UI so it stays overflow-free and tappable at 375px.
+   Filament tables get their responsive treatment (visibleFrom) in the
+   Resource classes; this block only covers the bespoke Tailwind/CSS layer.
+   ============================================================ */
+@media (max-width: 480px) {
+  /* Dashboard hero — tighter frame, smaller headline; status row may wrap */
+  .dh-hero{padding:22px 18px;gap:18px;}
+  .dh-txt h1{font-size:22px;}
+  .dh-status{flex-wrap:wrap;gap:10px 16px;justify-content:flex-start;}
+
+  /* Dashboard stat cards — 4-across is unreadable on a phone; go 2-up so the
+     labels ("Worker Updates") and the big number both fit. */
+  .stats{grid-template-columns:repeat(2,1fr);}
+
+  /* Respond composer — avatar + textarea + (one or two) action buttons can't
+     share a 375px row. Drop the decorative avatar, give the textarea the full
+     width, and let the buttons share their own row below. */
+  .respond-body{flex-wrap:wrap;align-items:stretch;}
+  .respond-body .avatar{display:none;}
+  .respond-ta{flex:1 1 100%;}
+  .respond-body .btn{flex:1 1 auto;}
+
+  /* Page hero — action buttons drop to their own full-width row instead of
+     being clipped by the hero's overflow:hidden */
+  .ph-hero{flex-wrap:wrap;}
+  .ph-act{width:100%;display:flex;flex-wrap:wrap;gap:8px;}
+  .ph-act > .btn{flex:1 1 auto;}
+
+  /* Task-detail hero — let long titles wrap instead of truncating */
+  .th-title h2{white-space:normal;max-width:none;}
+
+  /* Meta strip — keep values from over-spreading */
+  .ms-row{gap:8px 14px;}
+
+  /* Phase rail — all five phases must stay readable at 375px, so drop the
+     connecting lines and lay the nodes out as a fixed 5-column grid (label
+     wraps under each dot) instead of a horizontally-scrolled row that clipped
+     the last phase ("Review"). */
+  .rail{display:grid;grid-template-columns:repeat(5,1fr);gap:10px 2px;align-items:start;}
+  .rail-line,.rail-note{display:none;}
+  .rail-node{flex:initial;}
+  .rail-dot{width:30px;height:30px;}
+  .rail-dot svg{width:15px;height:15px;}
+  .rail-lbl{font-size:10px;line-height:1.2;text-align:center;}
+
+  /* Diff — slimmer line-number gutter shows more code; the body still scrolls
+     horizontally for long lines (read-only, acceptable per concept) */
+  .diff-row .gut{width:52px;}
+  .diff-row .gut span{width:26px;padding:0 5px;}
+  .diff-row .code{padding:0 10px;}
+
+  /* Thread/feed — smaller node gutter */
+  .feed-item{gap:12px;}
+
+  /* Respond composer — quick chips reclaim the avatar indent */
+  .respond-quick{padding-left:0;}
+
+  /* Touch targets — key custom + action-bar buttons reach 44px */
+  .btn{min-height:44px;}
+  .th-actions .fi-btn,
+  .respond-dock .fi-btn,
+  .fi-main .fi-sc-form .fi-sc-actions .fi-btn{min-height:44px;}
+
+  /* Form action bar padding tightened for phones */
+  .fi-main .fi-sc-form .fi-sc-actions{padding:14px 16px;}
 }

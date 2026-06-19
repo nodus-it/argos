@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services\IssueTracker;
+namespace App\Services\IssueTracker\Providers;
 
 use App\Integrations\Bitbucket\BitbucketConnector;
 use App\Integrations\Bitbucket\Requests\CloseIssue;

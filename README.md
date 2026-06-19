@@ -62,6 +62,7 @@ the admin password.
 | `--dir PATH` | `ARGOS_INSTALL_DIR` | Install into `PATH` instead of `$PWD` |
 | `--version REF` | `ARGOS_VERSION` | Pin a specific Git tag or branch |
 | `--stage` | `ARGOS_STAGE=1` | Use rolling `:stage` images from `develop` |
+| `--next` | `ARGOS_NEXT=1` | Use rolling `:next` images from the `next` integration branch |
 | `--beta` | `ARGOS_BETA=1` | Use the latest release including pre-releases |
 | `--reset` | — | Tear down the stack and wipe all data (destructive) |
 | `--force` | — | Skip safety prompts (required for `--reset` in non-interactive shells) |
@@ -100,52 +101,20 @@ next to the compose file — the installer never touches that.
 
 For any of those: see **[Extended Setup](docs/SETUP.md)**.
 
-## Usage
-
-Once the container is up:
-
-1. **Sign in** — the first visit auto-creates an admin user. Set a real
-   password under *Profile* before exposing the instance.
-2. **Onboarding** — paste your Claude token (`claude setup-token`).
-3. **Create a project** — pick a Git host, paste a PAT, set the default
-   branch.
-4. **Create a task** — describe what you want done. Argos drafts a concept,
-   implements it, opens a pull request.
-
-## Prepare a project for Argos
-
-Most PHP / Laravel repos work out of the box. To check a specific project — and
-wire up a custom build environment or live-demo when the defaults don't fit —
-point your coding agent at the guide and let it do the work. Paste this into an
-agent running **inside the target repository**:
-
-> Prepare this repository for Argos, following
-> `https://github.com/nodus-it/argos/blob/master/docs/PREPARE-PROJECT.md`.
-> Decide whether it runs on Argos's defaults as-is; if not, show me the two
-> options (ship a `.argos/` contract vs. adjust the project) before changing
-> anything.
-
-The guide ([docs/PREPARE-PROJECT.md](docs/PREPARE-PROJECT.md)) is written for an
-AI agent and covers both the worker execution environment
-(`.argos/worker.dockerfile`) and the live-demo contract (`.argos/demo.*`).
+After install, open <http://localhost:8080/admin>: the onboarding wizard takes
+you from your Claude token to your first project and task.
 
 ## Documentation
 
-| Topic | Where |
-|---|---|
-| Prepare a repo for Argos (agent guide) | [docs/PREPARE-PROJECT.md](docs/PREPARE-PROJECT.md) |
-| Extended setup (production, custom workers, reverse proxy) | [docs/SETUP.md](docs/SETUP.md) |
-| All environment variables with defaults | [docs/CONFIGURATION.md](docs/CONFIGURATION.md) |
-| What Argos runs (worker & demo commands) | [docs/EXECUTION-COMMANDS.md](docs/EXECUTION-COMMANDS.md) |
-| OAuth — when and why | [docs/OAUTH.md](docs/OAUTH.md) |
-| GitHub setup (PAT + OAuth) | [docs/SETUP-GITHUB.md](docs/SETUP-GITHUB.md) |
-| GitLab setup (incl. self-hosted) | [docs/SETUP-GITLAB.md](docs/SETUP-GITLAB.md) |
-| Bitbucket setup | [docs/SETUP-BITBUCKET.md](docs/SETUP-BITBUCKET.md) |
-| Task-Provider / Issue-Tracker integration | [docs/SETUP-TASK-PROVIDERS.md](docs/SETUP-TASK-PROVIDERS.md) |
-| MCP server (drive Argos from Claude Code) | [docs/SETUP-MCP.md](docs/SETUP-MCP.md) |
-| Media library — file / image uploads (optional) | [docs/SETUP-MEDIA-LIBRARY.md](docs/SETUP-MEDIA-LIBRARY.md) |
-| Provider contract tests (local, real APIs) | [docs/PROVIDER-TEST-SETUP.md](docs/PROVIDER-TEST-SETUP.md) |
-| Local development & tests | [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) |
+The full operator documentation is **built into Argos** — open **Help →
+Documentation** in the running app (setup, integrations, configuration, and
+operations, with deep links from the relevant screens). The same pages live as
+Markdown under [`docs/`](docs/) and are readable here on GitHub.
+
+Start with **[Setup](docs/SETUP.md)**. To make a target repository Argos-ready,
+see **[Preparing a Project](docs/PREPARE-PROJECT.md)** (covers the
+`.argos/worker.dockerfile` build environment and the `.argos/demo.*` live-demo
+contract).
 
 ## Contributing
 

@@ -30,15 +30,39 @@ class TaskSlugifyNameTest extends TestCase
         $this->assertSame('abc-123_foo.bar', Task::slugifyName('abc-123_foo.bar'));
     }
 
-    public function test_volume_name_uses_slugified_task_name(): void
+    // ── slugifyForBranch (mirrors the worker's _concept_branch_slug) ──────────
+
+    public function test_branch_slug_replaces_space_and_slash_with_hyphen(): void
     {
-        $task = new Task(['name' => 'My Feature Task']);
-        $this->assertSame('task_ws_My_Feature_Task', $task->volumeName());
+        $this->assertSame('feat-my-feature', Task::slugifyForBranch('feat/my feature'));
+    }
+
+    public function test_branch_slug_transliterates_umlauts(): void
+    {
+        $this->assertSame('Ueber-Strasse-Oel', Task::slugifyForBranch('Über Straße Öl'));
+    }
+
+    public function test_branch_slug_strips_disallowed_chars_and_keeps_dot_dash_underscore(): void
+    {
+        $this->assertSame('Fix-a-bc_d.e-f', Task::slugifyForBranch('Fix: (a) b@c_d.e-f!'));
+    }
+
+    public function test_branch_slug_trims_leading_and_trailing_separators(): void
+    {
+        $this->assertSame('clean', Task::slugifyForBranch('  -clean-  '));
+    }
+
+    // ── volumeName is keyed by the frozen slug ───────────────────────────────
+
+    public function test_volume_name_uses_the_slug(): void
+    {
+        $task = new Task(['slug' => 'my-feature-task']);
+        $this->assertSame('task_ws_my-feature-task', $task->volumeName());
     }
 
     public function test_volume_name_prefix_is_always_present(): void
     {
-        $task = new Task(['name' => 'simple']);
+        $task = new Task(['slug' => 'simple']);
         $this->assertStringStartsWith('task_ws_', $task->volumeName());
     }
 }

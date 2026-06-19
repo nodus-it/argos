@@ -1,7 +1,16 @@
 # Contributing
 
-Thanks for considering a contribution. This guide covers local setup, the
-test suite, and the conventions that keep the codebase coherent.
+Thanks for your interest in Argos. This guide covers local setup, the test
+suite, and the conventions that keep the codebase coherent.
+
+> **Contribution policy — please read first.** Bug reports, feature ideas, and
+> questions are very welcome (open an [issue](https://github.com/nodus-it/argos/issues)
+> or a discussion). However, **we do not merge external code pull requests** —
+> Argos is developed by Nodus IT under a single-vendor, open-core model and
+> Nodus IT must remain the sole copyright holder to keep commercial licensing
+> open. See [Pull requests](#pull-requests) below for the why and the best way
+> to help instead. The setup and convention sections here serve the internal
+> team, self-hosters, and transparency.
 
 For project-internal conventions read by Claude (the AI agent powering
 Argos), see [`CLAUDE.md`](../CLAUDE.md).
@@ -155,28 +164,50 @@ status documents — those belong in PR descriptions.
 
 ## Pull requests
 
-- Reference the issue or backlog entry the PR addresses.
-- Include the test you wrote that reproduces the bug, if applicable.
-- For UI changes, attach a screenshot.
-- For architecture changes, link to a discussion or design doc first.
+**We do not merge external code contributions.** Please don't invest time
+writing one.
+
+Argos is licensed under the **GNU AGPL-3.0-or-later** and developed by Nodus IT
+under a single-vendor, open-core model. To keep the option of offering a
+commercial license and proprietary enterprise features, Nodus IT needs to remain
+the sole copyright holder of the codebase. Merging external contributions would
+split that copyright across many authors and block dual-licensing unless every
+contributor signed a Contributor License Agreement (CLA) — a process we have
+deliberately chosen **not** to run at this stage. This is purely a
+copyright-ownership decision, not a judgment on your work.
+
+**The best way to help instead:** if you found and fixed something, open an
+issue describing the bug and the fix in prose. We'll re-implement it ourselves
+and credit you in the release notes.
+
+(This policy does not apply to commits authored within Nodus IT, which are
+covered by employment/contract terms.)
+
+## Security issues
+
+Please do **not** open a public issue for security vulnerabilities. Report them
+privately to [argos@nodus-it.de](mailto:argos@nodus-it.de). Never include
+credentials or tokens.
 
 ## Reporting issues
 
-Open an issue on <https://github.com/nodus-it/argos/issues>. Include:
+For non-security bugs, open an issue on
+<https://github.com/nodus-it/argos/issues>. Include:
 
-- Argos image tag (`:latest`, `:stage`, `vX.Y.Z`)
+- Argos image tag (`:latest`, `:stage`, `:next`, `vX.Y.Z`)
 - Worker image tag if relevant
 - Provider (GitHub / GitLab / Bitbucket) + auth mode (PAT / OAuth)
 - Reproduction steps and any logs from the affected task
 
 Logs are visible per-task in the UI under **Task → Logs**.
 
-## License of contributions
+## License
 
 Argos is licensed under the
-[GNU Affero General Public License v3.0 or later](../LICENSE). By submitting
-a pull request you agree that your contribution is licensed under the same
-terms and may be redistributed under AGPL-3.0-or-later.
+[GNU Affero General Public License v3.0 or later](../LICENSE). All code is
+authored by Nodus IT, which remains the sole copyright holder — see
+[Pull requests](#pull-requests) for why we don't accept external code
+contributions.
 
 If you need different licensing terms — for example to integrate Argos into
 a closed-source product — contact Nodus IT at

@@ -42,13 +42,13 @@ class ViewTaskDiff extends Page
     {
         return [
             Action::make('refresh')
-                ->label('Aktualisieren')
+                ->label(__('tasks.view.diff.refresh'))
                 ->icon('heroicon-o-arrow-path')
                 ->color('gray')
                 ->action(fn () => $this->loadDiff()),
 
             Action::make('back')
-                ->label('← Zurück zur Task')
+                ->label(__('tasks.view.actions.back'))
                 ->color('gray')
                 ->url(fn () => TaskResource::getUrl('view', ['record' => $this->task])),
         ];
@@ -56,15 +56,15 @@ class ViewTaskDiff extends Page
 
     public function getTitle(): string
     {
-        return "Diff — {$this->task->name}";
+        return __('tasks.view.diff.title', ['name' => $this->task->name]);
     }
 
     public function getBreadcrumbs(): array
     {
         return [
-            TaskResource::getUrl() => 'Tasks',
+            TaskResource::getUrl() => __('tasks.view.diff.breadcrumb_tasks'),
             TaskResource::getUrl('view', ['record' => $this->task]) => $this->task->name,
-            '#' => 'Diff',
+            '#' => __('tasks.view.diff.breadcrumb_self'),
         ];
     }
 

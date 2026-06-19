@@ -18,6 +18,7 @@ use App\Events\Task\TaskDeleted;
 use App\Jobs\RunPhaseJob;
 use App\Models\Task;
 use App\Services\Workflow\PhaseRunner;
+use App\Services\Workflow\RunResourceReaper;
 use App\Services\Workflow\WorkflowService;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Process;
@@ -27,6 +28,7 @@ class TaskService
     public function __construct(
         private readonly WorkflowService $workflowService,
         private readonly PhaseRunner $phaseRunner,
+        private readonly RunResourceReaper $reaper,
     ) {}
 
     /**
@@ -40,6 +42,7 @@ class TaskService
         $task = Task::create([
             'user_id' => $data['user_id'] ?? null,
             'name' => $data['name'],
+            'slug' => $data['slug'] ?? Task::generateSlug((string) $data['name']),
             'repo_profile_id' => $data['repo_profile_id'] ?? null,
             'description' => $data['description'],
             'base_branch' => $data['base_branch'] ?? null,
@@ -198,6 +201,30 @@ class TaskService
     }
 
     /**
+     * Abort a task: hard-kill its running worker/sidecar containers so the phase
+     * stops immediately, close the in-flight phase run, and move the task to the
+     * Aborted terminal state. The workspace volume is kept (inspection / a later
+     * delete drops it) — see RunPhaseJob::failed(), which yields to this status
+     * so the dying job doesn't overwrite it with Failed.
+     */
+    public function abortTask(Task $task): void
+    {
+        $this->reaper->reapTask($task->id);
+
+        $task->phaseRuns()
+            ->where('status', PhaseStatus::Running->value)
+            ->update([
+                'status' => PhaseStatus::Failed->value,
+                'finished_at' => now(),
+            ]);
+
+        $task->update([
+            'workflow_status' => WorkflowStatus::Aborted,
+            'current_status' => PhaseStatus::Failed,
+        ]);
+    }
+
+    /**
      * Persist concept notes and fire ConceptNotesUpdated.
      */
     public function saveConceptNotes(Task $task, string $notes): void
@@ -266,11 +293,12 @@ class TaskService
     }
 
     /**
-     * Resolve a task by its name or ULID. Used by the MCP tools via
-     * InteractsWithTasks to turn a user-supplied reference into a Task.
+     * Resolve a task by its ULID or its (unique) slug. Used by the MCP tools via
+     * InteractsWithTasks to turn a user-supplied reference into a Task. The
+     * display `name` is non-unique and deliberately NOT a lookup key.
      */
-    public function find(string $nameOrId): ?Task
+    public function find(string $slugOrId): ?Task
     {
-        return Task::where('name', $nameOrId)->orWhere('id', $nameOrId)->first();
+        return Task::where('id', $slugOrId)->orWhere('slug', $slugOrId)->first();
     }
 }

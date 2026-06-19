@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Services\IssueTracker;
 
 use App\Integrations\Bitbucket\Requests\CloseIssue;
-use App\Services\IssueTracker\BitbucketIssueTracker;
+use App\Services\IssueTracker\Providers\BitbucketIssueTracker;
 use Saloon\Http\Faking\MockResponse;
 use Saloon\Http\Request;
 use Saloon\Laravel\Facades\Saloon;

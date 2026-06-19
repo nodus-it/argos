@@ -32,8 +32,8 @@
         "laravel/boost": "^2.4",
         "laravel/pail": "^1.2.5",
         "laravel/pao": "^1.0.6",
-        "laravel/pint": "^1.27",
         "mockery/mockery": "^1.6",
+        "nodus-it/dev-tools": "dev-main",
         "nunomaduro/collision": "^8.6",
         "pestphp/pest": "^4.7"
     },
@@ -67,34 +67,17 @@
             "Composer\\Config::disableProcessTimeout",
             "npx concurrently -c \"#93c5fd,#fb7185\" \"docker compose --env-file .env -f .tools/docker/docker-compose.yml -f .tools/docker/docker-compose.dev.yml up --build --remove-orphans\" \"npm run dev\" --names=compose,vite --kill-others"
         ],
-        "dev:stop": "docker compose --env-file .env -f .tools/docker/docker-compose.yml -f .tools/docker/docker-compose.dev.yml down",
-        "dev:logs": "docker compose --env-file .env -f .tools/docker/docker-compose.yml -f .tools/docker/docker-compose.dev.yml logs -f",
-        "dev:exec": "docker compose --env-file .env -f .tools/docker/docker-compose.yml -f .tools/docker/docker-compose.dev.yml exec app bash",
-
         "dev:basic": "bash .tools/bin/dev-reset.sh basic",
         "dev:full": "bash .tools/bin/dev-reset.sh full",
         "dev:live": "bash .tools/bin/dev-reset.sh live",
 
-        "pint": "vendor/bin/pint --format agent",
-        "pint:test": "vendor/bin/pint --test --format agent",
-        "phpstan": "vendor/bin/phpstan analyse --no-progress --memory-limit=1G",
-        "test": [
-            "@php artisan config:clear --ansi",
-            "@php artisan test --compact"
-        ],
         "test:external": "@php artisan test --compact --configuration=phpunit.external.xml",
+        "test:browser:up": "bash .tools/bin/e2e-up.sh",
         "test:browser": "npx playwright test",
         "test:browser:real": "npx playwright test full-flow.real",
 
-        "qa": [
-            "@pint:test",
-            "@phpstan",
-            "@test"
-        ],
         "qa:full": [
-            "@pint:test",
-            "@phpstan",
-            "@test",
+            "@qa",
             "@test:external"
         ],
 
@@ -114,6 +97,12 @@
     "extra": {
         "laravel": {
             "dont-discover": []
+        },
+        "nodus-dev": {
+            "dir": ".tools/docker",
+            "environments": {
+                "dev": ["docker-compose.yml", "docker-compose.dev.yml"]
+            }
         }
     },
     "config": {
@@ -122,7 +111,8 @@
         "sort-packages": true,
         "allow-plugins": {
             "pestphp/pest-plugin": true,
-            "php-http/discovery": true
+            "php-http/discovery": true,
+            "nodus-it/dev-tools": true
         }
     },
     "minimum-stability": "stable",

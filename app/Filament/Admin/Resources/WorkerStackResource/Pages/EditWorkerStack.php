@@ -6,11 +6,13 @@ namespace App\Filament\Admin\Resources\WorkerStackResource\Pages;
 
 use App\Filament\Admin\Concerns\HasArgosEditHeading;
 use App\Filament\Admin\Resources\WorkerStackResource;
+use App\Filament\Admin\Support\Pages\EditRecord;
 use App\Filament\Admin\Support\WorkerStackBuildDispatcher;
 use App\Models\WorkerStack;
+use App\Services\EntityService;
+use App\Services\Worker\WorkerStackService;
 use Filament\Actions\DeleteAction;
 use Filament\Notifications\Notification;
-use Filament\Resources\Pages\EditRecord;
 
 /**
  * @property-read WorkerStack $record
@@ -20,6 +22,11 @@ class EditWorkerStack extends EditRecord
     use HasArgosEditHeading;
 
     protected static string $resource = WorkerStackResource::class;
+
+    protected function service(): EntityService
+    {
+        return app(WorkerStackService::class);
+    }
 
     private ?string $dockerfileBeforeSave = null;
 

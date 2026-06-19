@@ -1,0 +1,58 @@
+name: Promote next → develop
+
+# Manual promotion: when the upcoming version on `next` is ready, merge it back
+# into `develop` with a real merge commit (--no-ff, history preserved — never
+# squashed). After this, cut the release from develop as usual. By default
+# `next` is fast-forwarded back onto develop so it continues clean for the
+# version after.
+#
+# Pushes to protected develop/next use RELEASE_TOKEN (admin bypass).
+
+on:
+  workflow_dispatch:
+    inputs:
+      recreate_next:
+        description: 'Fast-forward next back onto develop after promotion'
+        type: boolean
+        default: true
+
+concurrency:
+  group: promote-next
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: develop
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Merge next into develop (--no-ff)
+        run: |
+          git fetch origin next develop
+          if ! git merge --no-ff --no-edit -m "Promote next → develop" origin/next; then
+            echo "::error::next→develop merge conflict. Resolve locally: git checkout develop && git merge --no-ff origin/next"
+            git merge --abort || true
+            exit 1
+          fi
+          git push origin HEAD:develop
+          echo "next promoted into develop — ready to cut a release from develop."
+
+      - name: Fast-forward next back onto develop
+        if: ${{ inputs.recreate_next }}
+        run: |
+          # develop now contains all of next, so next's tip is an ancestor of
+          # develop's new HEAD — this is a fast-forward, no force needed.
+          git push origin HEAD:next
+          echo "next fast-forwarded onto develop for the next cycle."

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\IssueTracker;
 
-use App\Services\IssueTracker\LinearIssueTracker;
+use App\Services\IssueTracker\Providers\LinearIssueTracker;
 use Saloon\Http\Faking\MockResponse;
 use Saloon\Http\Request;
 use Saloon\Laravel\Facades\Saloon;

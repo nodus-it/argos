@@ -86,6 +86,25 @@ quality_pest_baseline_capture() {
     return 0
 }
 
+# quality_phpstan_baseline_capture: record which PHPStan errors ALREADY exist on
+# the pristine checkout, so the gate only blocks on errors the agent actually
+# introduces — not on the target repo's pre-existing type debt. Without this,
+# any repo carrying PHPStan findings drags every implement run into a long
+# off-task remediation session (the gate has no other way to "pass"). Run once,
+# before the agent edits anything; idempotent. Best-effort — a missing/empty
+# baseline falls back to strict gating. PHPStan exits non-zero when it finds
+# errors, so the `|| true` keeps the JSON report (written to stdout) intact.
+quality_phpstan_baseline_capture() {
+    [[ -f /workspace/.agent/phpstan-baseline.json ]] && return 0
+    if { [[ -f /workspace/phpstan.neon ]] || [[ -f /workspace/phpstan.neon.dist ]]; } \
+            && [[ -x /workspace/vendor/bin/phpstan ]]; then
+        log_info "quality: capturing phpstan baseline (pre-existing errors) on the clean checkout"
+        (cd /workspace && vendor/bin/phpstan analyse --no-progress --error-format=json \
+            > /workspace/.agent/phpstan-baseline.json 2> /workspace/.agent/logs/phpstan-baseline.log) || true
+    fi
+    return 0
+}
+
 # quality_pest_new_failures: print test ids that fail in the CURRENT JUnit
 # report ($2) but were NOT already failing in the BASELINE report ($1) — i.e.
 # regressions introduced by the agent. Parsing is done in PHP (SimpleXML),
@@ -122,6 +141,83 @@ foreach (array_keys(failing($argv[2] ?? '')) as $id) {
 PHP
     php "$parser" "$baseline" "$current"
     rm -f "$parser"
+}
+
+# quality_phpstan_new_errors: print the PHPStan errors present in the CURRENT
+# json report ($2) but NOT already present in the BASELINE report ($1) — i.e.
+# findings the agent introduced. Comparison is a multiset diff keyed by
+# (file, message), deliberately ignoring line numbers: edits elsewhere in a file
+# shift the lines of pre-existing errors, and matching on line would re-report
+# them as new. Parsing is done in PHP (json_decode), robust against format
+# quirks. Missing/empty baseline → every current error counts as new → strict
+# gating (the safe default). Output: one `relpath:line: message` per new error.
+# Args: =baseline_json, =current_json
+quality_phpstan_new_errors() {
+    local baseline="$1" current="$2" parser
+    parser="$(mktemp)"
+    cat > "$parser" <<'PHP'
+<?php
+function errors(string $f): array {
+    if (! is_file($f)) {
+        return [];
+    }
+    $json = @json_decode((string) @file_get_contents($f), true);
+    if (! is_array($json) || ! isset($json['files']) || ! is_array($json['files'])) {
+        return [];
+    }
+    $out = [];
+    foreach ($json['files'] as $path => $info) {
+        foreach (($info['messages'] ?? []) as $m) {
+            $msg = trim((string) ($m['message'] ?? ''));
+            if ($msg === '') {
+                continue;
+            }
+            $out[] = ['path' => (string) $path, 'line' => (int) ($m['line'] ?? 0), 'msg' => $msg];
+        }
+    }
+    return $out;
+}
+$baseCounts = [];
+foreach (errors($argv[1] ?? '') as $e) {
+    $k = $e['path']."\0".$e['msg'];
+    $baseCounts[$k] = ($baseCounts[$k] ?? 0) + 1;
+}
+foreach (errors($argv[2] ?? '') as $e) {
+    $k = $e['path']."\0".$e['msg'];
+    if (($baseCounts[$k] ?? 0) > 0) {
+        $baseCounts[$k]--;
+        continue;
+    }
+    $rel = preg_replace('#^/workspace/#', '', $e['path']);
+    echo $rel.':'.$e['line'].': '.$e['msg']."\n";
+}
+PHP
+    php "$parser" "$baseline" "$current"
+    rm -f "$parser"
+}
+
+# quality_is_infra_crash: Heuristic — did a gate command die on infrastructure
+# (OOM, broken/missing config, missing binary) rather than emit a real finding?
+# Such crashes are not fixable by the agent; treating them as a normal "fail"
+# burns the whole 200–800k-token remediation budget on an unfixable problem
+# (wave-1: PHPStan OOM at the 128M limit zerschoss sogar phpstan.neon). When this
+# returns 0 the caller should skip the gate with a loud log line instead.
+# Args: =log_file =exit_code
+# Returns: 0 if the failure looks like an infra crash, 1 otherwise.
+quality_is_infra_crash() {
+    local log="${1:-}" exit_code="${2:-0}"
+    # 137 = 128 + SIGKILL(9): almost always the kernel OOM-killer.
+    if [[ "$exit_code" -eq 137 ]]; then
+        return 0
+    fi
+    [[ -f "$log" ]] || return 1
+    # Conservative signatures only — must not swallow genuine findings. Missing
+    # binaries are already handled by the `-x` guards on each gate, so we don't
+    # match generic "No such file"/"command not found" (a real test asserting on
+    # a missing file would false-positive). Left: OOM and broken config.
+    grep -qE \
+        'Allowed memory size of [0-9]+ bytes exhausted|mmap\(\) failed|Out of memory|annot allocate memory|Invalid configuration|is not a valid configuration|Configuration file .* (does not exist|is invalid)' \
+        "$log"
 }
 
 # quality_gates_run: run all quality gates and return the gates JSON.
@@ -172,47 +268,86 @@ quality_gates_run() {
     # is not 100% green). No baseline → every failure counts (strict).
     local new_failures
     if [[ -x /workspace/vendor/bin/pest ]]; then
-        if (cd /workspace && vendor/bin/pest --no-coverage --log-junit "/workspace/.agent/logs/pest.${iteration}.xml") \
-                &> "/workspace/.agent/logs/pest.${iteration}.log"; then
+        local pest_log="/workspace/.agent/logs/pest.${iteration}.log" pest_exit=0
+        (cd /workspace && vendor/bin/pest --no-coverage --log-junit "/workspace/.agent/logs/pest.${iteration}.xml") \
+            &> "$pest_log" || pest_exit=$?
+        if [[ "$pest_exit" -eq 0 ]]; then
             gates="$(printf '%s' "$gates" | jq '.pest = "pass"')"
+        elif quality_is_infra_crash "$pest_log" "$pest_exit"; then
+            gates="$(printf '%s' "$gates" | jq '.pest = "skip"')"
+            printf '\n── Pest crashed on infrastructure (OOM/config/binary), not a real finding — gate skipped, NOT sent to remediation ──\n' \
+                >> "$pest_log"
         else
             new_failures="$(quality_pest_new_failures /workspace/.agent/pest-baseline.xml "/workspace/.agent/logs/pest.${iteration}.xml")"
             if [[ -n "$new_failures" ]]; then
                 gates="$(printf '%s' "$gates" | jq '.pest = "fail"')"
                 { printf '\n── New failures vs. baseline (these block the gate) ──\n'; printf '%s\n' "$new_failures"; } \
-                    >> "/workspace/.agent/logs/pest.${iteration}.log"
+                    >> "$pest_log"
             else
                 gates="$(printf '%s' "$gates" | jq '.pest = "pass"')"
                 printf '\n── Pest red only with pre-existing failures (no new regressions) — gate passes ──\n' \
-                    >> "/workspace/.agent/logs/pest.${iteration}.log"
+                    >> "$pest_log"
             fi
         fi
     elif [[ -x /workspace/vendor/bin/phpunit ]]; then
-        if (cd /workspace && vendor/bin/phpunit --log-junit "/workspace/.agent/logs/phpunit.${iteration}.xml") \
-                &> "/workspace/.agent/logs/phpunit.${iteration}.log"; then
+        local phpunit_log="/workspace/.agent/logs/phpunit.${iteration}.log" phpunit_exit=0
+        (cd /workspace && vendor/bin/phpunit --log-junit "/workspace/.agent/logs/phpunit.${iteration}.xml") \
+            &> "$phpunit_log" || phpunit_exit=$?
+        if [[ "$phpunit_exit" -eq 0 ]]; then
             gates="$(printf '%s' "$gates" | jq '.phpunit = "pass"')"
+        elif quality_is_infra_crash "$phpunit_log" "$phpunit_exit"; then
+            gates="$(printf '%s' "$gates" | jq '.phpunit = "skip"')"
+            printf '\n── PHPUnit crashed on infrastructure (OOM/config/binary), not a real finding — gate skipped, NOT sent to remediation ──\n' \
+                >> "$phpunit_log"
         else
             new_failures="$(quality_pest_new_failures /workspace/.agent/pest-baseline.xml "/workspace/.agent/logs/phpunit.${iteration}.xml")"
             if [[ -n "$new_failures" ]]; then
                 gates="$(printf '%s' "$gates" | jq '.phpunit = "fail"')"
                 { printf '\n── New failures vs. baseline (these block the gate) ──\n'; printf '%s\n' "$new_failures"; } \
-                    >> "/workspace/.agent/logs/phpunit.${iteration}.log"
+                    >> "$phpunit_log"
             else
                 gates="$(printf '%s' "$gates" | jq '.phpunit = "pass"')"
                 printf '\n── PHPUnit red only with pre-existing failures (no new regressions) — gate passes ──\n' \
-                    >> "/workspace/.agent/logs/phpunit.${iteration}.log"
+                    >> "$phpunit_log"
             fi
         fi
     fi
 
     # ── 4. PHPStan ───────────────────────────────────────────────────────
+    # Run with --error-format=json so a red result can be diffed against the
+    # baseline captured on the clean checkout (quality_phpstan_baseline_capture);
+    # only NEW errors block the gate. Without the baseline (file absent/empty)
+    # every error counts → strict gating. The stderr stream is kept separately so
+    # the infra-crash heuristic can inspect it (OOM/broken config go there, not
+    # into the json report).
     if [[ -f /workspace/phpstan.neon || -f /workspace/phpstan.neon.dist ]] \
             && [[ -x /workspace/vendor/bin/phpstan ]]; then
-        if (cd /workspace && vendor/bin/phpstan analyse --no-progress) \
-                &> "/workspace/.agent/logs/phpstan.${iteration}.log"; then
+        local phpstan_log="/workspace/.agent/logs/phpstan.${iteration}.log" phpstan_exit=0
+        local phpstan_json="/workspace/.agent/logs/phpstan.${iteration}.json"
+        (cd /workspace && vendor/bin/phpstan analyse --no-progress --error-format=json \
+            > "$phpstan_json" 2> "$phpstan_log") || phpstan_exit=$?
+        if [[ "$phpstan_exit" -eq 0 ]]; then
             gates="$(printf '%s' "$gates" | jq '.phpstan = "pass"')"
-        else
+        elif quality_is_infra_crash "$phpstan_log" "$phpstan_exit"; then
+            gates="$(printf '%s' "$gates" | jq '.phpstan = "skip"')"
+            printf '\n── PHPStan crashed on infrastructure (OOM/config/binary), not a real finding — gate skipped, NOT sent to remediation ──\n' \
+                >> "$phpstan_log"
+        elif ! jq -e . "$phpstan_json" >/dev/null 2>&1; then
+            # Non-zero exit, no parseable report, not a known infra crash — fail
+            # strictly on whatever the tool emitted (kept in $phpstan_log).
             gates="$(printf '%s' "$gates" | jq '.phpstan = "fail"')"
+        else
+            local new_errors
+            new_errors="$(quality_phpstan_new_errors /workspace/.agent/phpstan-baseline.json "$phpstan_json")"
+            if [[ -n "$new_errors" ]]; then
+                gates="$(printf '%s' "$gates" | jq '.phpstan = "fail"')"
+                { printf 'PHPStan — new errors vs. baseline (these block the gate):\n\n'; printf '%s\n' "$new_errors"; } \
+                    > "$phpstan_log"
+            else
+                gates="$(printf '%s' "$gates" | jq '.phpstan = "pass"')"
+                printf 'PHPStan red only with pre-existing errors (no new findings introduced by this change) — gate passes.\n' \
+                    > "$phpstan_log"
+            fi
         fi
     fi
 

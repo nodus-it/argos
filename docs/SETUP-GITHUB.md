@@ -1,14 +1,18 @@
-# GitHub Setup Guide
+# GitHub Setup
 
 Argos supports GitHub with two authentication methods: Personal Access Token
-(PAT) and OAuth. PAT is the simpler option and works without any server-side
-configuration.
+(PAT) and OAuth. Both work with github.com.
+
+See [OAuth Overview](OAUTH.md) for how PAT and OAuth compare and which one to
+pick.
 
 ---
 
 ## Option 1: Personal Access Token (PAT)
 
-Recommended for single-user instances or when you just want to try Argos.
+Recommended for single-user instances or when you just want to try Argos. PAT
+works without any server-side configuration — you only paste the token in the
+project form.
 
 ### Step 1: Create a token
 
@@ -16,11 +20,16 @@ Recommended for single-user instances or when you just want to try Argos.
 2. Click **Generate new token (classic)**.
 3. Give it a descriptive name (e.g. `argos`).
 4. Select these scopes:
-   - `repo` — full repository access (clone, push, create branches, create PRs)
+   - `repo` — full repository access (clone, push, create branches, create
+     PRs). This is the scope Argos asks for.
    - `workflow` — only if your repo has GitHub Actions and Argos should touch
-     `.github/workflows/*`
+     `.github/workflows/*`.
 5. Set an expiration (or pick "No expiration" for a long-lived token).
 6. Copy the token — it is shown only once.
+
+> **Fine-grained tokens** also work, scoped to the specific repository, with
+> read/write access to **Contents**, **Pull requests**, and **Workflows** (if
+> applicable).
 
 ### Step 2: Configure the project in Argos
 
@@ -32,51 +41,66 @@ Under **Projects → New Project**:
 - **Token**: paste the token from step 1
 - **Default Branch**: e.g. `main`
 
-> **Fine-grained tokens** also work, scoped to the specific repository, with
-> read/write access to **Contents**, **Pull requests**, and **Workflows** (if
-> applicable).
-
 ---
 
 ## Option 2: OAuth (optional)
 
 OAuth enables repo and branch dropdowns in the project form and per-user
-account binding — no manual URL entry, and each user connects their own
-GitHub account.
+account binding — no manual URL entry, and each user connects their own GitHub
+account.
 
-### Step 1: Register an OAuth App
+OAuth apps are managed **in the Argos UI**, not via environment variables.
+There is no `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` to set. The full UI
+flow is described in
+[OAuth Overview → Registering the OAuth app in Argos](OAUTH.md#registering-the-oauth-app-in-argos).
+
+### Step 1: Register an OAuth App on GitHub
 
 1. Open <https://github.com/settings/applications/new> (or your
    organization's developer settings for org-wide apps).
 2. Fill in:
-   - **Application name**: `Argos` (or any descriptive name)
-   - **Homepage URL**: your Argos instance, e.g. `https://argos.example.com`
+   - **Application name**: `Argos` (or any descriptive name).
+   - **Homepage URL**: your Argos instance, e.g. `https://argos.example.com`.
    - **Authorization callback URL**:
-     `https://argos.example.com/auth/github/callback`
+     `https://argos.example.com/auth/github/callback` — the callback is fixed
+     at `${APP_URL}/auth/github/callback`. Register exactly that URL, including
+     the scheme.
 3. Click **Register application**.
-4. Copy the **Client ID** and generate a new **Client secret** — copy it too.
+4. Copy the **Client ID** and generate a new **Client secret** — copy it too
+   (the secret is shown only once).
 
-### Step 2: Configure environment variables
+> The **Add OAuth App** form in Argos can deep-link you to GitHub's
+> registration page with the name, homepage and callback already pre-filled,
+> so you do not have to type them by hand.
 
-Add to your `.env` (or pass as `-e` flags to `docker run`):
+### Step 2: Add the OAuth App in Argos
 
-```env
-GITHUB_CLIENT_ID=your-client-id
-GITHUB_CLIENT_SECRET=your-client-secret
-```
+1. Open **Configuration → OAuth Apps** in the Argos admin.
+2. Add an app for **GitHub**, paste its **Client ID** and **Client secret**,
+   and enable it.
+3. The **callback URL** shown in the form is read-only and derived from
+   `APP_URL` — copy it into the GitHub OAuth app's Authorization callback URL
+   if you have not already.
 
-The callback URL is fixed at `${APP_URL}/auth/github/callback` and is what
-you registered with GitHub in step 1 — no extra variable needed. Restart the
-manager so the new vars are picked up.
+Credentials are stored in the database (`provider_oauth_configs`) and take
+effect immediately, without a restart. There are **no** `*_CLIENT_ID` /
+`*_CLIENT_SECRET` environment variables — the UI is the only place these are
+configured. See [Configuration Reference](CONFIGURATION.md) for the settings
+that *are* still ENV-based.
+
+The OAuth App is registered with the `repo` scope, which covers cloning,
+pushing, branch and PR creation — the same access a classic PAT with `repo`
+provides.
 
 ### Step 3: Connect your account
 
 1. Sign in to Argos.
 2. Go to **Connected Accounts** in the navigation.
-3. Click **Connect GitHub** and approve the OAuth flow.
+3. Click **Connect GitHub** — you are redirected to GitHub to authorize the
+   app. After authorizing, you are returned to the Connected Accounts page.
 4. When creating a project, select **GitHub** as the platform and choose
    **OAuth** as the authentication method — the repo and branch dropdowns
-   will appear, populated from your account.
+   appear, populated from your connected account.
 
 ---
 
@@ -149,6 +173,9 @@ column. Fix the issue and click **Einrichten** again.
   the `X-GitHub-Delivery` header). Pull requests appearing in the issues list
   are filtered out automatically.
 
+For the shared binding setup details, see
+[Task Providers Setup](SETUP-TASK-PROVIDERS.md).
+
 ---
 
 ## Troubleshooting
@@ -157,6 +184,7 @@ column. Fix the issue and click **Einrichten** again.
 |---|---|
 | 401 on push / PR creation | PAT missing the `repo` scope, or token expired. |
 | 403 when pushing to `.github/workflows/*` | PAT missing the `workflow` scope. |
-| OAuth redirect fails with "redirect_uri mismatch" | The callback URL registered in the OAuth App must exactly match `${APP_URL}/auth/github/callback` — including scheme. Verify `APP_URL`. |
+| OAuth redirect fails with "redirect_uri mismatch" | The Authorization callback URL on the GitHub OAuth App must exactly match `${APP_URL}/auth/github/callback` — including scheme. Verify `APP_URL`. |
 | OAuth callback returns 500 | `APP_URL` not set or doesn't match the public URL — Laravel can't generate the correct callback. |
+| "Connect GitHub" rejected right after authorizing | The OAuth App in **Configuration → OAuth Apps** is disabled or has the wrong client ID/secret. Re-check and enable it. |
 | PR creation returns 422 with "A pull request already exists" | Argos detects this and reports the existing PR URL — no action needed. |

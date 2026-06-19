@@ -14,9 +14,17 @@ use Illuminate\Database\Eloquent\Factories\Factory;
  */
 class ExternalIssueLinkFactory extends Factory
 {
+    /**
+     * Monotonic issue-number source. A random number collided on the
+     * (task_provider_binding_id, external_id) unique index whenever a test
+     * created several links on the same binding — a flaky CI failure. A
+     * per-process sequence keeps the default external_id collision-free.
+     */
+    private static int $issueSequence = 0;
+
     public function definition(): array
     {
-        $issueNumber = fake()->numberBetween(1, 9999);
+        $issueNumber = ++self::$issueSequence;
 
         return [
             'task_provider_binding_id' => TaskProviderBinding::factory(),

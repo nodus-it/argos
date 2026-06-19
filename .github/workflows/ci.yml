@@ -2,7 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [develop]
+    # next is included so the auto-synced (merged) integration state gets the
+    # same push-CI as develop; build-app stays develop/tags-only via its `if`.
+    branches: [develop, next]
     # SemVer-style tags without v-prefix (e.g. 0.2.0, 0.2.0-beta.1).
     tags: ['[0-9]+.[0-9]+.[0-9]+*']
   pull_request:
@@ -68,6 +70,27 @@ jobs:
             exit 1
           fi
           echo "Secret scan clean."
+
+  docs-reminder:
+    # Non-blocking nudge: if a PR changes user-facing logic but no docs, remind
+    # the author to check the operator docs. Never fails the build.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Remind to update docs on user-facing changes
+        run: |
+          base="origin/${{ github.base_ref }}"
+          changed="$(git diff --name-only "$base"...HEAD)"
+          sensitive="$(printf '%s\n' "$changed" | grep -E '^(app/Enums/|app/Filament/|app/Mcp/|app/Http/Controllers/Api/|routes/|config/)' || true)"
+          docs="$(printf '%s\n' "$changed" | grep -E '^docs/' || true)"
+          if [ -n "$sensitive" ] && [ -z "$docs" ]; then
+            echo "::warning::This PR touches user-facing logic (app/Enums, app/Filament, app/Mcp, app/Http/Controllers/Api, routes/, config/) but changes no docs/. Check whether the operator docs + config/docs.php manifest need an update. Workflow: update the ENGLISH source first, then re-translate the affected pages and run \`php artisan argos:docs:stamp-translations\` — never translate the other way."
+          else
+            echo "Docs reminder: nothing to flag."
+          fi
 
   app-quality:
     runs-on: ubuntu-latest
@@ -216,13 +239,15 @@ jobs:
 
   build-app:
     needs: [shellcheck, worker-unit, app-quality, installer-unit, secret-scan]
-    # The metadata-action only emits tags for develop and release tags;
+    # The metadata-action only emits tags for develop, next and release tags;
     # on a feature branch (push or workflow_dispatch) the tag list is
     # empty and `docker buildx push` errors with "tag is needed when
     # pushing to registry". Limit the job accordingly.
     if: |
       github.event_name != 'pull_request' &&
-      (github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/tags/'))
+      (github.ref == 'refs/heads/develop' ||
+       github.ref == 'refs/heads/next' ||
+       startsWith(github.ref, 'refs/tags/'))
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -255,15 +280,18 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=stage,enable=${{ github.ref == 'refs/heads/develop' }}
+            type=raw,value=next,enable=${{ github.ref == 'refs/heads/next' }}
 
       - name: Compute version build-arg
         id: ver
         run: |
-          # Only :stage (develop) images get a build-time version stamp; on
-          # release tags we leave it empty so the sed-bumped $argosVersion
-          # literal in config/argos.php is used instead.
+          # Only the rolling :stage (develop) and :next images get a build-time
+          # version stamp; on release tags we leave it empty so the sed-bumped
+          # $argosVersion literal in config/argos.php is used instead.
           if [ "${{ github.ref }}" = "refs/heads/develop" ]; then
             echo "value=stage-$(date -u +%Y-%m-%d)-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.ref }}" = "refs/heads/next" ]; then
+            echo "value=next-$(date -u +%Y-%m-%d)-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
           else
             echo "value=" >> "$GITHUB_OUTPUT"
           fi

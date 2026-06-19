@@ -6,6 +6,7 @@ namespace App\Filament\Admin\Resources\TaskResource\Pages;
 
 use App\Filament\Admin\Resources\TaskResource;
 use App\Services\Task\TaskService;
+use App\Support\DocsLinkAction;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -14,6 +15,13 @@ use Illuminate\Validation\ValidationException;
 class CreateTask extends CreateRecord
 {
     protected static string $resource = TaskResource::class;
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            DocsLinkAction::make('tasks'),
+        ];
+    }
 
     /**
      * Pre-select the project when opened from a project's "Neuer Task" button

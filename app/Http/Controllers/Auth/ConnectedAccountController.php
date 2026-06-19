@@ -6,9 +6,9 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Auth\Concerns\ReverifiesConnectedAccount;
 use App\Http\Controllers\Controller;
-use App\Models\ConnectedAccount;
 use App\Models\ProviderOAuthConfig;
 use App\Models\User;
+use App\Services\OAuth\ConnectedAccountService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -53,20 +53,8 @@ final class ConnectedAccountController extends Controller
         /** @var User $user */
         $user = Auth::user();
 
-        $account = ConnectedAccount::updateOrCreate(
-            ['user_id' => $user->id, 'provider' => 'github'],
-            [
-                'provider_id' => (string) $socialUser->getId(),
-                'token' => (string) $socialUser->token,
-                'refresh_token' => $socialUser->refreshToken,
-                'expires_at' => $socialUser->expiresIn ? now()->addSeconds($socialUser->expiresIn) : null,
-                'name' => $socialUser->getName(),
-                'nickname' => $socialUser->getNickname(),
-                'avatar' => $socialUser->getAvatar(),
-            ]
-        );
-
-        $account->relinkOrphanedResources();
+        $service = app(ConnectedAccountService::class);
+        $account = $service->upsert($user, 'github', $service->socialiteAttributes($socialUser));
         $this->reverifyConnectedAccount($account);
 
         $returnTo = $request->session()->pull(self::GITHUB_RETURN_SESSION_KEY);
@@ -83,7 +71,7 @@ final class ConnectedAccountController extends Controller
         /** @var User $user */
         $user = Auth::user();
 
-        $user->connectedAccounts()->where('provider', 'github')->delete();
+        app(ConnectedAccountService::class)->disconnect($user, 'github');
 
         return redirect()->route('filament.admin.pages.connected-accounts');
     }
@@ -126,20 +114,8 @@ final class ConnectedAccountController extends Controller
         /** @var User $user */
         $user = Auth::user();
 
-        $account = ConnectedAccount::updateOrCreate(
-            ['user_id' => $user->id, 'provider' => 'gitlab', 'instance_url' => $instanceUrl],
-            [
-                'provider_id' => (string) $socialUser->getId(),
-                'token' => (string) $socialUser->token,
-                'refresh_token' => $socialUser->refreshToken,
-                'expires_at' => $socialUser->expiresIn ? now()->addSeconds($socialUser->expiresIn) : null,
-                'name' => $socialUser->getName(),
-                'nickname' => $socialUser->getNickname(),
-                'avatar' => $socialUser->getAvatar(),
-            ]
-        );
-
-        $account->relinkOrphanedResources();
+        $service = app(ConnectedAccountService::class);
+        $account = $service->upsert($user, 'gitlab', $service->socialiteAttributes($socialUser), $instanceUrl);
         $this->reverifyConnectedAccount($account);
 
         $returnTo = $request->session()->pull(self::GITLAB_RETURN_SESSION_KEY);
@@ -212,7 +188,7 @@ final class ConnectedAccountController extends Controller
         /** @var User $user */
         $user = Auth::user();
 
-        $user->connectedAccounts()->where('provider', 'gitlab')->delete();
+        app(ConnectedAccountService::class)->disconnect($user, 'gitlab');
 
         return redirect()->route('filament.admin.pages.connected-accounts');
     }

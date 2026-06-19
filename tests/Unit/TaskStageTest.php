@@ -52,6 +52,8 @@ dataset('stage_mapping', [
     'failed implement' => [WorkflowStatus::Failed, PhaseStatus::Failed, Phase::Implement, TaskStage::ImplementFailed],
     'failed push' => [WorkflowStatus::Failed, PhaseStatus::Failed, Phase::Push, TaskStage::PushFailed],
     'failed without phase falls back to concept' => [WorkflowStatus::Failed, PhaseStatus::Failed, null, TaskStage::ConceptFailed],
+
+    'aborted (terminal, ignores phase)' => [WorkflowStatus::Aborted, PhaseStatus::Failed, Phase::Implement, TaskStage::Aborted],
 ]);
 
 it('resolves the presentation stage from the persisted state triple', function (
@@ -109,7 +111,7 @@ it('knows once the concept phase is locked', function () {
 });
 
 it('reports a banner state and a non-empty label for every case', function () {
-    $validBannerStates = ['running', 'queued', 'failed', 'paused', 'waiting', 'done', 'draft'];
+    $validBannerStates = ['running', 'queued', 'failed', 'paused', 'waiting', 'done', 'aborted', 'draft'];
 
     foreach (TaskStage::cases() as $stage) {
         expect($validBannerStates)->toContain($stage->bannerState())

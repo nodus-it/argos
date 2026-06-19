@@ -5,11 +5,26 @@ declare(strict_types=1);
 namespace App\Filament\Admin\Resources\RepoProfileResource\Pages;
 
 use App\Filament\Admin\Resources\RepoProfileResource;
-use Filament\Resources\Pages\CreateRecord;
+use App\Filament\Admin\Support\Pages\CreateRecord;
+use App\Services\EntityService;
+use App\Services\Project\RepoProfileService;
+use App\Support\DocsLinkAction;
 
 class CreateRepoProfile extends CreateRecord
 {
     protected static string $resource = RepoProfileResource::class;
+
+    protected function service(): EntityService
+    {
+        return app(RepoProfileService::class);
+    }
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            DocsLinkAction::make('projects'),
+        ];
+    }
 
     /**
      * Im OAuth-Pfad schreibt der sichtbare Picker in `oauth_repo` /

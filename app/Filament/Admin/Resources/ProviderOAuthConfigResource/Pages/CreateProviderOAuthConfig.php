@@ -6,7 +6,9 @@ namespace App\Filament\Admin\Resources\ProviderOAuthConfigResource\Pages;
 
 use App\Enums\IntegrationProvider;
 use App\Filament\Admin\Resources\ProviderOAuthConfigResource;
-use Filament\Resources\Pages\CreateRecord;
+use App\Filament\Admin\Support\Pages\CreateRecord;
+use App\Services\EntityService;
+use App\Services\OAuth\ProviderOAuthConfigService;
 
 class CreateProviderOAuthConfig extends CreateRecord
 {
@@ -14,6 +16,11 @@ class CreateProviderOAuthConfig extends CreateRecord
 
     /** Set when reached from the onboarding wizard (?return=onboarding). */
     public ?string $returnTo = null;
+
+    protected function service(): EntityService
+    {
+        return app(ProviderOAuthConfigService::class);
+    }
 
     public function mount(): void
     {

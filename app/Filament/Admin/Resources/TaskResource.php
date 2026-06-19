@@ -22,6 +22,7 @@ use App\Models\RepoProfile;
 use App\Models\Task;
 use App\Models\WorkerStack;
 use App\Services\GitProvider\GitServiceFactory;
+use App\Support\DocsLinkAction;
 use App\Workers\Agents\AgentRegistry;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
@@ -37,7 +38,6 @@ use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Validation\Rule;
 
 class TaskResource extends Resource
 {
@@ -74,8 +74,7 @@ class TaskResource extends Resource
                                 ->label(__('tasks.fields.name_label'))
                                 ->helperText(__('tasks.fields.name_helper'))
                                 ->required()
-                                ->maxLength(255)
-                                ->rules([Rule::unique('tasks', 'name')]),
+                                ->maxLength(255),
 
                             Select::make('repo_profile_id')
                                 ->label(__('tasks.fields.project'))
@@ -89,13 +88,14 @@ class TaskResource extends Resource
 
                             Textarea::make('description')
                                 ->label(__('tasks.fields.description_label'))
+                                ->hintAction(DocsLinkAction::make('tasks'))
                                 ->rows(8)
                                 ->helperText(__('tasks.fields.description_helper'))
                                 ->columnSpanFull(),
 
                             Select::make('base_branch')
                                 ->label(__('tasks.fields.base_branch_label'))
-                                ->helperText(__('tasks.fields.base_branch_helper'))
+                                ->helperText(fn (Get $get): string => self::baseBranchHelperText($get))
                                 ->options(function (Get $get): array {
                                     $profileId = $get('repo_profile_id');
                                     if (! is_string($profileId) || $profileId === '') {
@@ -111,7 +111,7 @@ class TaskResource extends Resource
                                         return [];
                                     }
                                 })
-                                ->placeholder(fn (Get $get): string => self::resolveProfile($get('repo_profile_id'))?->default_branch ?? 'main')
+                                ->placeholder('—')
                                 ->searchable()
                                 ->native(false),
 
@@ -128,22 +128,16 @@ class TaskResource extends Resource
                             Select::make('worker_stack_id_override')
                                 ->label(__('tasks.fields.worker_stack_label'))
                                 ->options(fn (): array => self::stackOptions())
-                                ->placeholder(fn (Get $get): string => __(
-                                    'tasks.fields.worker_stack_placeholder',
-                                    ['stack' => self::projectStackLabel($get) ?? (string) config('argos.compose.default_stack', 'php-8.4')],
-                                ))
-                                ->helperText(__('tasks.fields.worker_stack_helper'))
+                                ->placeholder('—')
+                                ->helperText(fn (Get $get): string => self::workerStackHelperText($get))
                                 ->searchable()
                                 ->native(false),
 
                             Select::make('worker_agent_name_override')
                                 ->label(__('tasks.fields.worker_agent_label'))
                                 ->options(fn (): array => self::agentOptions())
-                                ->placeholder(fn (Get $get): string => __(
-                                    'tasks.fields.worker_agent_placeholder',
-                                    ['agent' => self::projectAgent($get)->value],
-                                ))
-                                ->helperText(__('tasks.fields.worker_agent_helper'))
+                                ->placeholder('—')
+                                ->helperText(fn (Get $get): string => self::workerAgentHelperText($get))
                                 ->live()
                                 ->afterStateUpdated(function (Set $set): void {
                                     // Different agent → previously-chosen credential
@@ -328,6 +322,37 @@ class TaskResource extends Resource
         }
 
         return $stack->label !== '' ? $stack->label : $stack->name;
+    }
+
+    private static function baseBranchHelperText(Get $get): string
+    {
+        $profile = self::resolveProfile($get('repo_profile_id'));
+        if ($profile === null) {
+            return __('tasks.fields.base_branch_helper_no_project');
+        }
+
+        return __('tasks.fields.base_branch_helper_with_default', ['branch' => $profile->default_branch]);
+    }
+
+    private static function workerStackHelperText(Get $get): string
+    {
+        $profile = self::resolveProfile($get('repo_profile_id'));
+        if ($profile === null) {
+            return __('tasks.fields.worker_stack_helper_no_project');
+        }
+        $stackLabel = self::projectStackLabel($get) ?? (string) config('argos.compose.default_stack', 'php-8.4');
+
+        return __('tasks.fields.worker_stack_helper_with_default', ['stack' => $stackLabel]);
+    }
+
+    private static function workerAgentHelperText(Get $get): string
+    {
+        $profile = self::resolveProfile($get('repo_profile_id'));
+        if ($profile === null) {
+            return __('tasks.fields.worker_agent_helper_no_project');
+        }
+
+        return __('tasks.fields.worker_agent_helper_with_default', ['agent' => self::projectAgent($get)->value]);
     }
 
     /**

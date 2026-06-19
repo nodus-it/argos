@@ -44,7 +44,11 @@ PAT projects keep working alongside OAuth projects — switching is per-project.
 
 - [GitHub Setup](SETUP-GITHUB.md)
 - [GitLab Setup](SETUP-GITLAB.md) — supports self-hosted instances
-- [Bitbucket Setup](SETUP-BITBUCKET.md)
+- [Bitbucket Setup](SETUP-BITBUCKET.md) — Bitbucket Cloud
+
+All three are code providers (the Git host Argos clones, branches, and opens
+pull requests against). GitLab additionally lets you point an OAuth App at a
+self-hosted instance: set the instance URL on the app itself (see below).
 
 ## Registering the OAuth app in Argos
 
@@ -57,7 +61,8 @@ provider side:
    and enable it. For self-hosted GitLab, set the instance URL on the app
    itself (no `GITLAB_INSTANCE_URL` environment variable needed).
 3. The callback URL is fixed at `${APP_URL}/auth/<provider>/callback` —
-   register exactly that URL in the provider's OAuth app.
+   register exactly that URL in the provider's OAuth app. The Argos form shows
+   the exact value to copy once you pick a provider.
 
 Credentials are stored in the database (`provider_oauth_configs`) and take
 effect without a restart. See [Configuration Reference](CONFIGURATION.md) for
@@ -73,12 +78,15 @@ branches from the connected account.
 ## Token refresh
 
 Bitbucket and GitLab issue short-lived access tokens (~2h); GitHub OAuth Apps
-with token expiration enabled behave the same way (~8h). Argos refreshes the
-access token via the stored `refresh_token` whenever a worker job is about to
-dispatch and the token has less than 1h of validity left, so a freshly started
-job always begins with a token that survives the worker's job timeout.
+with token expiration enabled behave the same way. Argos refreshes the access
+token via the stored `refresh_token` whenever a connected account is used to
+build worker credentials and the token has less than 1h of validity left
+(`TokenRefresher::REFRESH_BUFFER_SECONDS`, sized to cover the worker's 3600s
+job timeout), so a freshly started job always begins with a token that survives
+the run.
 
 If a refresh fails (revoked token, provider 4xx, missing `refresh_token`), the
-phase fails fast with a "bitte Account neu verbinden" message — reconnect the
-account on the **Connected Accounts** page to mint a fresh token + refresh
-token pair, then re-run the task.
+phase fails fast with a message asking you to reconnect the account. (The UI
+message is currently shown in German — "… bitte Account neu verbinden".)
+Reconnect the account on the **Connected Accounts** page to mint a fresh token
++ refresh token pair, then re-run the task.

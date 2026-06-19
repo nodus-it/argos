@@ -70,16 +70,29 @@ class TaskLogBundleBuilder
         $this->addStringEntry($zip, 'phase_runs.json', (string) $runsJson, $bytesWritten, $manifest);
 
         // 3) Worker volume contents (state.json, logs/, usage_limit.env, …)
-        $volumeFiles = $this->readVolumeFiles($task);
+        $volumeStream = $this->readVolumeStream($task);
+        $volumeFiles = ($volumeStream === null || $volumeStream === '')
+            ? []
+            : $this->parseBundleStream($volumeStream);
         foreach ($volumeFiles as $entryName => $content) {
             if (! $this->addStringEntry($zip, "workspace/{$entryName}", $content, $bytesWritten, $manifest)) {
                 break;
             }
         }
+        // Make a failed volume read VISIBLE instead of silently shipping a
+        // bundle without the in-container logs (this is exactly how a
+        // git-push.N.log went missing from a failed-push bundle).
+        if ($volumeStream === null) {
+            $manifest[] = sprintf(
+                'WORKSPACE READ FAILED — could not read volume %s. The in-container '
+                .'logs (.agent/logs/*, including git-push.N.log) are NOT in this bundle.',
+                $task->volumeName(),
+            );
+        }
 
         // 4) Host-side phase bg.log files
         $configDir = (string) config('argos.config_dir');
-        $taskLogDir = "{$configDir}/tasks/{$task->name}";
+        $taskLogDir = "{$configDir}/tasks/{$task->slug}";
         if (is_dir($taskLogDir)) {
             foreach (glob("{$taskLogDir}/*.bg.log") ?: [] as $logFile) {
                 $base = basename($logFile);
@@ -127,29 +140,26 @@ class TaskLogBundleBuilder
     }
 
     /**
-     * Pull state.json, runtime/usage_limit.env, logs/*.log, logs/*.result.json,
-     * concept.md and the two implement summaries off the worker volume in one
-     * shot. The shell script emits a delimited stream; we parse it back into
-     * a path => content map.
+     * Container images tried (in order) to read the read-only workspace volume.
+     * `alpine` is the historical default; `busybox` is the fallback so a host
+     * that happens to lack the alpine image still yields the in-container logs
+     * instead of silently dropping the whole `workspace/` section.
      *
-     * @return array<string, string>
+     * @var list<string>
      */
-    protected function readVolumeFiles(Task $task): array
-    {
-        $output = $this->readVolumeStream($task);
-        if ($output === '') {
-            return [];
-        }
-
-        return $this->parseBundleStream($output);
-    }
+    private const VOLUME_READER_IMAGES = ['alpine', 'busybox'];
 
     /**
      * Spawn the read-only `docker run` that streams the workspace contents
-     * back to us. Overridable in tests via partialMock — the docker call is
-     * the one external dependency we want to fake.
+     * (state.json, runtime/usage_limit.env, logs/*, concept.md and the two
+     * implement summaries) back to us as a delimited stream. Overridable in
+     * tests via partialMock — the docker call is the one external dependency
+     * we want to fake.
+     *
+     * @return string|null the raw stream, or null when every reader image
+     *                     failed (so the caller can flag the gap)
      */
-    protected function readVolumeStream(Task $task): string
+    protected function readVolumeStream(Task $task): ?string
     {
         $script = <<<'SH'
 DIR=/workspace/.agent
@@ -175,27 +185,38 @@ if [ -d "$DIR/logs" ]; then
 fi
 SH;
 
-        $process = new Process([
-            'docker', 'run', '--rm',
-            '-v', $task->volumeName().':/workspace:ro',
-            'alpine',
-            'sh', '-c', $script,
+        $lastError = 'no reader image available';
+        foreach (self::VOLUME_READER_IMAGES as $image) {
+            $process = new Process([
+                'docker', 'run', '--rm',
+                '-v', $task->volumeName().':/workspace:ro',
+                $image,
+                'sh', '-c', $script,
+            ]);
+            $process->setTimeout(60);
+
+            try {
+                $process->run();
+            } catch (\Throwable $e) {
+                $lastError = $e->getMessage();
+
+                continue;
+            }
+
+            if ($process->isSuccessful()) {
+                return $process->getOutput();
+            }
+
+            $lastError = trim($process->getErrorOutput()) ?: "docker run exited {$process->getExitCode()}";
+        }
+
+        Log::channel('argos')->warning('TaskLogBundleBuilder: volume read failed for all reader images', [
+            'task' => $task->id,
+            'volume' => $task->volumeName(),
+            'error' => $lastError,
         ]);
-        $process->setTimeout(60);
 
-        try {
-            $process->run();
-        } catch (\Throwable $e) {
-            Log::channel('argos')->warning('TaskLogBundleBuilder: docker run failed', ['error' => $e->getMessage()]);
-
-            return '';
-        }
-
-        if (! $process->isSuccessful()) {
-            return '';
-        }
-
-        return $process->getOutput();
+        return null;
     }
 
     /**

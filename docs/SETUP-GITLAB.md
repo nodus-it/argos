@@ -1,152 +1,229 @@
 # GitLab Setup
 
-Argos supports GitLab with two authentication methods: Personal Access Token (PAT) and OAuth. Both also work with Self-Hosted GitLab instances.
+Argos supports GitLab with two authentication methods: Personal Access Token
+(PAT) and OAuth. Both work with gitlab.com and with self-hosted GitLab
+(CE/EE) instances.
 
-## Personal Access Token (PAT)
+See [OAuth Overview](OAUTH.md) for how PAT and OAuth compare and which one to
+pick.
 
-PAT works without any additional configuration beyond adding your token in the project form.
+---
 
-### Creating a PAT
+## Option 1: Personal Access Token (PAT)
 
-1. Go to **GitLab → User Settings → Access Tokens** (or your instance equivalent)
-2. Create a new token with the following scopes:
-   - `api` — full API access (required for listing repositories, creating MRs)
-   - `write_repository` — push access to repositories
-3. Set an expiry date (or leave empty for no expiry)
-4. Copy the token — it is shown only once
+Recommended for single-user instances or when you just want to try Argos. PAT
+works without any server-side configuration — you only paste the token in the
+project form.
 
-### Configuring a project with PAT
+### Step 1: Create a token
 
-In the Argos project form:
+1. Open **GitLab → User Settings → Access Tokens** (on a self-hosted instance
+   the path is `https://git.example.com/-/user_settings/personal_access_tokens`).
+2. Give it a descriptive name (e.g. `argos`).
+3. Select these scopes:
+   - `api` — full API access (required for listing repositories and creating
+     merge requests).
+   - `write_repository` — push access to repositories.
+4. Set an expiry date (or leave it empty for a long-lived token).
+5. Copy the token — it is shown only once.
+
+### Step 2: Configure the project in Argos
+
+Under **Projects → New Project**:
+
 - **Platform**: GitLab
 - **Authentication**: Personal Access Token (PAT)
-- **Repo URL**: full HTTPS URL, e.g. `https://gitlab.com/mygroup/myproject` or `https://git.example.com/mygroup/myproject` for Self-Hosted
-- **Token (PAT)**: paste the token you created above
+- **Repo URL**: full HTTPS URL, e.g. `https://gitlab.com/your-group/your-project`,
+  or `https://git.example.com/your-group/your-project` for a self-hosted
+  instance.
+- **Token**: paste the token from step 1.
 - **Default Branch**: e.g. `main`
 
 ---
 
-## OAuth
+## Option 2: OAuth (optional)
 
-OAuth enables repo and branch selection via dropdown — no manual URL needed.
+OAuth enables repo and branch dropdowns in the project form and per-user
+account binding — no manual URL entry, and each user connects their own GitLab
+account.
 
-### Prerequisites in `.env`
+OAuth apps are managed **in the Argos UI**, not via environment variables.
+There is no `GITLAB_CLIENT_ID` / `GITLAB_CLIENT_SECRET` / `GITLAB_INSTANCE_URL`
+to set. The full UI flow is described in
+[OAuth Overview → Registering the OAuth app in Argos](OAUTH.md#registering-the-oauth-app-in-argos).
 
-```
-GITLAB_CLIENT_ID=your-app-id
-GITLAB_CLIENT_SECRET=your-app-secret
-# GITLAB_INSTANCE_URL=https://gitlab.com  # Override for Self-Hosted
-```
-
-The callback URL is fixed at `${APP_URL}/auth/gitlab/callback` — register
-that exact URL when creating the GitLab application.
-
-`GITLAB_INSTANCE_URL` defaults to `https://gitlab.com`. Set it to your Self-Hosted instance URL (no trailing slash) to use Self-Hosted OAuth.
-
-### Registering the OAuth Application
+### Step 1: Register an OAuth App on GitLab
 
 #### gitlab.com
 
-1. Go to **User Settings → Applications** (or ask your Admin for a Group/Instance app)
-2. **Name**: Argos (or any descriptive name)
-3. **Redirect URI**: `https://your-argos-app.example.com/auth/gitlab/callback`
-4. **Scopes**: `read_user`, `api`
-5. Save and copy the **Application ID** and **Secret**
+1. Open **User Settings → Applications**
+   (`https://gitlab.com/-/user_settings/applications`). For org-wide use, ask
+   your admin for a Group or Instance application instead.
+2. Fill in:
+   - **Name**: `Argos` (or any descriptive name).
+   - **Redirect URI**: `https://argos.example.com/auth/gitlab/callback` — the
+     callback is fixed at `${APP_URL}/auth/gitlab/callback`. Register exactly
+     that URL, including the scheme.
+   - **Scopes**: `read_user`, `api`.
+3. Save and copy the **Application ID** and **Secret**.
 
-#### Self-Hosted GitLab
+#### Self-hosted GitLab
 
-Same steps, but in your instance:
-- **User Applications**: `https://git.example.com/-/user_settings/applications`
-- **Admin Area Applications** (for shared use): `https://git.example.com/admin/applications`
+Same steps, but on your own instance:
 
-Also set `GITLAB_INSTANCE_URL=https://git.example.com` in `.env`.
+- **User application**:
+  `https://git.example.com/-/user_settings/applications`
+- **Admin Area application** (for shared, instance-wide use):
+  `https://git.example.com/admin/applications`
 
-### Connecting your account
+The redirect URI is still `${APP_URL}/auth/gitlab/callback`, and the scopes are
+still `read_user`, `api`.
 
-1. Start Argos and log in
-2. Go to **Connected Accounts**
-3. Click **Connect with GitLab** — you will be redirected to GitLab for authorization
-4. After authorizing, you are returned to the Connected Accounts page
+### Step 2: Add the OAuth App in Argos
 
-### Configuring a project with OAuth
+1. Open **Configuration → OAuth Apps** in the Argos admin.
+2. Add an app for **GitLab**, paste its **Application ID** (client ID) and
+   **Secret** (client secret), and enable it.
+3. For a self-hosted instance, set the **Instance URL** field on the app
+   (e.g. `https://git.example.com`, no trailing slash). Leave it empty for
+   gitlab.com. This is the only place the self-hosted URL is configured —
+   there is no `GITLAB_INSTANCE_URL` environment variable.
+4. The **callback URL** shown in the form is read-only and derived from
+   `APP_URL` — copy it into the GitLab OAuth app's Redirect URI if you have
+   not already.
 
-In the Argos project form:
-- **Platform**: GitLab
-- **Authentication**: OAuth (GitLab)
-- Select your **GitLab account** from the dropdown
-- Pick **Repository** and **Default Branch** from the dropdowns
+Credentials are stored in the database (`provider_oauth_configs`) and take
+effect immediately, without a restart. You can register multiple GitLab apps
+side by side — for example one for gitlab.com and one per self-hosted instance.
+
+### Step 3: Connect your account
+
+1. Sign in to Argos.
+2. Go to **Connected Accounts** in the navigation.
+3. Click **Connect with GitLab** — you are redirected to GitLab to authorize
+   the app. After authorizing, you are returned to the Connected Accounts page.
+4. When creating a project, select **GitLab** as the platform and choose
+   **OAuth** as the authentication method — the repo and branch dropdowns
+   appear, populated from your connected account.
+
+> For gitlab.com the account's `instance_url` is stored empty (defaults to
+> `https://gitlab.com`); for a self-hosted account it carries the instance URL
+> from the OAuth app you connected through.
 
 ---
 
 ## Option 3: Issue-Provider (Pull + Webhook)
 
-Argos kann GitLab-Issues als Tasks importieren und bei Phasenabschluss automatisch einen Kommentar im Issue hinterlassen. Jedes Repository benötigt ein **TaskProviderBinding**, das im Filament-Admin-Interface angelegt wird.
+Argos can import GitLab issues as Tasks and automatically leave a comment on the
+issue when a phase completes. Each repository needs a **TaskProviderBinding**,
+created through the Filament admin interface.
 
-### Schritt 1: Benötigte Token-Scopes
+### Step 1: Required token scopes
 
-| Token-Typ | Benötigte Scopes |
+| Token type | Scopes needed |
 |---|---|
-| Personal Access Token (PAT) | `api` — Vollzugriff auf API inkl. Webhook-Verwaltung |
-| OAuth | Scope `api` (bereits bei der OAuth-App-Einrichtung gesetzt) |
+| Personal Access Token (PAT) | `api` — full API access including webhook management |
+| OAuth | `api` (already set when you registered the OAuth app) |
 
-> **Hinweis**: Der `api`-Scope ist erforderlich für Webhook-Registrierung (`POST /projects/:id/hooks`). Ohne diesen Scope schlägt die Webhook-Einrichtung mit 403 fehl und das Binding bleibt im Status `Pending`.
+> **Note**: the `api` scope is required for webhook registration
+> (`POST /projects/:id/hooks`). Without it, webhook setup fails with 403 and the
+> binding stays in `Pending` state.
 
-### Schritt 2: Binding in Filament anlegen
+### Step 2: Create a binding in Filament
 
-1. Im Admin-Panel unter **Repo Profiles** das gewünschte Projekt öffnen
-2. Tab **Task Provider Bindings** → **New Binding**
-3. Felder ausfüllen:
+1. In the admin panel, open the target project under **Repo Profiles**.
+2. Go to the **Task Provider Bindings** tab → **New Binding**.
+3. Fill in the fields:
 
-| Feld | Beschreibung |
+| Field | Description |
 |---|---|
-| **Kind** | GitLab |
-| **Mode** | `Webhook` (Echtzeit) oder `Poll` (alle 5 min) |
-| **Connected Account** | OAuth- oder PAT-Account mit `api`-Scope |
-| **External Project Ref** | Projektpfad im Format `group/projekt`, z. B. `acme/widget` |
-| **Filters** | Optional: nur Issues mit bestimmtem State oder Labels importieren |
+| **Provider** | GitLab |
+| **Mode** | `Webhook` (real-time) or `Poll` (every 5 min) |
+| **Connected Account** | An OAuth or PAT account with the `api` scope |
+| **Project / Team Ref** | Project path in `group/project` format, e.g. `acme/widget` |
+| **Filters** | Optional: import only issues with a given state or labels |
 
-4. Speichern → Binding ist im Status **Pending**
+4. Click **Save**. The binding starts in `Pending` state.
 
-### Schritt 3: Aktivieren mit „Einrichten"
+### Step 3: Activate with "Einrichten"
 
-Klicke auf die **Einrichten**-Aktion beim Binding:
+Click the **Einrichten** (Setup) action on the binding:
 
-- **Webhook-Modus**: Argos registriert automatisch einen Webhook in GitLab via `POST /projects/:id/hooks` mit `issues_events: true`. Die Callback-URL `${APP_URL}/webhooks/issues/gitlab/{binding-id}` und das Secret werden automatisch generiert — kein manuelles Eintragen in GitLab nötig. Das Binding wechselt auf `Active`.
-- **Poll-Modus**: Das Binding wechselt sofort auf `Active`. Der Poll-Scheduler fragt Issues beim nächsten Lauf ab.
+- **Webhook mode**: Argos registers a webhook on GitLab via
+  `POST /projects/:id/hooks` with `issues_events: true`. The callback URL
+  `${APP_URL}/webhooks/issues/gitlab/{binding-id}` and the secret are generated
+  automatically — no manual entry in GitLab needed. The binding moves to
+  `Active`.
+- **Poll mode**: The binding moves to `Active` immediately. The poll scheduler
+  fetches issues on its next run.
 
-Schlägt die Einrichtung fehl (fehlender `api`-Scope, falscher Projektpfad, `APP_URL` nicht erreichbar), bleibt das Binding auf `Pending` und der Fehler steht in der **Last Error**-Spalte. Problem beheben und **Einrichten** erneut klicken.
+If setup fails (missing `api` scope, wrong project path, `APP_URL` not
+reachable), the binding stays `Pending` and the error appears in the
+**Last Error** column. Fix the issue and click **Einrichten** again.
 
-### Webhook- vs. Poll-Modus
+### Webhook vs. Poll
 
 | | Webhook | Poll |
 |---|---|---|
-| Latenz | Sekunden | Minuten (Scheduler-Intervall) |
-| `APP_URL` öffentlich erreichbar | Ja | Nein |
-| GitLab API-Rate-Limits | Nicht relevant | Zählt gegen Quota |
+| Latency | Seconds | Minutes (scheduler interval) |
+| Requires public `APP_URL` | Yes | No |
+| GitLab API rate limits | Not applicable | Counts against quota |
 
-### Verhaltenshinweise
+### Behaviour notes
 
-- **Signatur**: GitLab sendet das Secret als Plain-Token im `X-Gitlab-Token`-Header (kein HMAC). Argos vergleicht direkt per `hash_equals`.
-- **Idempotenz**: Doppelte Deliveries werden anhand des `X-Gitlab-Event-UUID`-Headers erkannt und verworfen.
-- **Note- und MR-Hooks**: GitLab kann auch `note`- und `merge_request`-Events an dieselbe Webhook-URL senden. Diese werden vom Job erkannt (`object_kind ≠ issue`) und ohne Task-Erstellung verworfen.
-- **Confidential Issues**: Der Webhook ist mit `confidential_issues_events: true` registriert — vertrauliche Issues werden ebenfalls verarbeitet.
-- **Self-Hosted GitLab**: Der Tracker verwendet automatisch den `instance_url`-Wert des verknüpften `ConnectedAccount`. Für GitLab.com bleibt dieser leer (Standard `https://gitlab.com`).
-- **Labels**: GitLab-Issues liefern Labels als String-Array im API-Response; Webhook-Payloads liefern Label-Objekte im Top-Level-`labels`-Array. Argos normalisiert beide Formate automatisch.
-- **State**: GitLab verwendet `opened`/`closed` (nicht `open`). Der Default-State beim Polling ist `opened`.
+- **Signature**: GitLab sends the secret as a plain token in the
+  `X-Gitlab-Token` header (not an HMAC). Argos compares it directly with
+  `hash_equals`.
+- **Idempotency**: duplicate deliveries are detected via the
+  `X-Gitlab-Event-UUID` header and discarded.
+- **Note and MR hooks**: GitLab may also send `note` and `merge_request` events
+  to the same webhook URL. These are recognised (`object_kind ≠ issue`) and
+  discarded without creating a Task.
+- **Confidential issues**: the webhook is registered with
+  `confidential_issues_events: true`, so confidential issues are processed too.
+- **Self-hosted GitLab**: the tracker automatically uses the `instance_url` of
+  the linked `ConnectedAccount`. For gitlab.com this stays empty (defaults to
+  `https://gitlab.com`).
+- **Labels**: GitLab issues return labels as a string array in API responses;
+  webhook payloads return label objects in the top-level `labels` array. Argos
+  normalises both formats automatically.
+- **State**: GitLab uses `opened`/`closed` (not `open`). The default state when
+  polling is `opened`.
 
-Weitere Details zum Binding-Setup: [`docs/SETUP-TASK-PROVIDERS.md`](SETUP-TASK-PROVIDERS.md)
+For the shared binding setup details, see
+[Task Providers Setup](SETUP-TASK-PROVIDERS.md).
 
 ---
 
 ## Worker: REPO_PLATFORM
 
-The manager passes `REPO_PLATFORM=gitlab` to the worker container as an environment variable. The push phase uses this to detect the platform reliably — even for Self-Hosted GitLab instances with non-obvious hostnames — and pushes with `-o merge_request.create` to create the MR automatically.
+The manager passes `REPO_PLATFORM=gitlab` to the worker container as an
+environment variable. The push phase uses this to detect the platform reliably
+— even for self-hosted GitLab instances with non-obvious hostnames — and then
+creates the merge request over the GitLab REST API (`POST
+…/api/v4/projects/<id>/merge_requests`), so the MR carries the full multi-line
+description.
 
 ---
 
 ## Notes
 
-- GitLab API authentication uses `Authorization: Bearer <token>` for both PAT and OAuth tokens.
-- The `PRIVATE-TOKEN` header is **not** used — GitLab accepts Bearer for both token types.
-- For GitLab.com the `instance_url` in `connected_accounts` is stored as `NULL` (defaults to `https://gitlab.com`).
-- Self-Hosted MR URLs are extracted from the git push output and stored in the task record.
+- GitLab API authentication uses `Authorization: Bearer <token>` for both PAT
+  and OAuth tokens. The `PRIVATE-TOKEN` header is **not** used — GitLab accepts
+  Bearer for both token types.
+- For gitlab.com, the `instance_url` in `connected_accounts` is stored empty
+  (it defaults to `https://gitlab.com`).
+- Self-hosted MR URLs are extracted from the git push output and stored on the
+  task record.
+
+---
+
+## Troubleshooting
+
+| Symptom | Likely cause |
+|---|---|
+| 401 on push / MR creation | PAT missing the `api` or `write_repository` scope, or the token expired. |
+| 403 during webhook setup | The connected account's token lacks the `api` scope. Reconnect or recreate the token with `api`. |
+| OAuth redirect fails with "redirect_uri mismatch" | The Redirect URI on the GitLab OAuth app must exactly match `${APP_URL}/auth/gitlab/callback`, including the scheme. Verify `APP_URL`. |
+| OAuth callback returns 500 | `APP_URL` not set or not matching the public URL — Laravel cannot generate the correct callback. |
+| Self-hosted OAuth hits gitlab.com instead of your instance | The **Instance URL** field on the OAuth App in Argos is empty or wrong. Set it to your instance URL (no trailing slash) under **Configuration → OAuth Apps**. |

@@ -68,6 +68,12 @@ return [
             'callback_note' => 'Trage die Callback-URL oben in der OAuth-App als Redirect-URL ein.',
             'manual_note' => 'Lege die OAuth-App in den Workspace-Einstellungen deines Providers an (OAuth-Consumer) und trage die Callback-URL oben als Redirect-URL ein.',
         ],
+        'refresh' => [
+            'expired_no_refresh_token' => 'Das OAuth-Token für :provider ist abgelaufen und es liegt kein refresh_token vor — bitte Account neu verbinden.',
+            'failed' => 'OAuth-Token-Refresh für :provider fehlgeschlagen (HTTP :status) — bitte Account neu verbinden.',
+            'no_access_token' => 'OAuth-Token-Refresh für :provider lieferte kein access_token — bitte Account neu verbinden.',
+            'unknown_provider' => 'Unbekannter OAuth-Provider für Token-Refresh: :provider',
+        ],
     ],
 
     'verify' => [

@@ -14,9 +14,14 @@ use App\Models\ProviderOAuthConfig;
 use App\Models\RepoProfile;
 use App\Models\User;
 use App\Services\Anthropic\AnthropicTokenValidator;
+use App\Services\Credentials\AgentCredentialService;
 use App\Services\Git\RepositoryFetcher;
+use App\Services\OAuth\ConnectedAccountService;
 use App\Services\OAuth\TokenRefresher;
+use App\Services\Project\RepoProfileService;
+use App\Support\DocsLinkAction;
 use App\Support\RepoUrlBuilder;
+use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Auth;
@@ -48,6 +53,18 @@ class Onboarding extends Page
     protected string $view = 'filament.admin.pages.onboarding';
 
     public int $currentStep = 1;
+
+    /**
+     * @return array<int, Action>
+     */
+    protected function getHeaderActions(): array
+    {
+        // Contextual help: the setup docs are reachable here even pre-onboarding
+        // (Documentation page is on the RedirectToOnboarding whitelist).
+        return [
+            DocsLinkAction::make('setup'),
+        ];
+    }
 
     // ── Step 1: agents ──────────────────────────────────────────────────────
 
@@ -229,7 +246,7 @@ class Onboarding extends Page
             return;
         }
 
-        $user->connectedAccounts()->where('provider', $provider)->delete();
+        app(ConnectedAccountService::class)->disconnect($user, $provider);
         $this->resetRepoSelection();
         $this->refreshState();
 
@@ -261,7 +278,7 @@ class Onboarding extends Page
             return;
         }
 
-        AgentCredential::updateOrCreate(
+        app(AgentCredentialService::class)->upsert(
             [
                 'agent_name' => AgentName::ClaudeCode->value,
                 'name' => self::ONBOARDING_CREDENTIAL_NAME,
@@ -308,7 +325,7 @@ class Onboarding extends Page
             return;
         }
 
-        AgentCredential::updateOrCreate(
+        app(AgentCredentialService::class)->upsert(
             [
                 'agent_name' => AgentName::Codex->value,
                 'name' => self::ONBOARDING_CREDENTIAL_NAME,
@@ -455,10 +472,7 @@ class Onboarding extends Page
             return;
         }
 
-        $user->connectedAccounts()
-            ->where('provider', $provider)
-            ->where('instance_url', $instanceUrl)
-            ->delete();
+        app(ConnectedAccountService::class)->disconnect($user, $provider, $instanceUrl);
         $this->resetRepoSelection();
 
         Notification::make()
@@ -482,9 +496,8 @@ class Onboarding extends Page
         if ($user !== null) {
             // Every connected git account — including multiple GitLab instances
             // (public + self-hosted), which connectedAccount() would collapse to one.
-            $accounts = $user->connectedAccounts()
-                ->whereIn('provider', array_keys(self::OAUTH_PROVIDERS))
-                ->get();
+            $accounts = app(ConnectedAccountService::class)
+                ->selectableFor($user, array_keys(self::OAUTH_PROVIDERS));
             foreach ($accounts as $account) {
                 $label = $account->name ?? $account->nickname ?? "#{$account->id}";
                 $host = ($account->instance_url !== null && $account->instance_url !== '')
@@ -663,7 +676,8 @@ class Onboarding extends Page
             return;
         }
 
-        $profile = RepoProfile::create([
+        /** @var RepoProfile $profile */
+        $profile = app(RepoProfileService::class)->create([
             'name' => $name,
             'url' => RepoUrlBuilder::build($source['platform'], $this->selectedRepo, $source['instance_url']),
             'platform' => $source['platform'],

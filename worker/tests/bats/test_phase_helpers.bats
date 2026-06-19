@@ -161,6 +161,50 @@ X
     rm -f /workspace/.agent/cur.xml
 }
 
+# --- quality_phpstan_new_errors ---
+
+@test "quality_phpstan_new_errors: nur neue Errors vs. Baseline werden gemeldet" {
+    command -v php >/dev/null 2>&1 || skip "php not available in bats env (the worker image has it)"
+    cat > /workspace/.agent/phpstan-base.json <<'J'
+{"files":{"/workspace/app/Old.php":{"errors":1,"messages":[{"message":"Pre-existing type error.","line":10}]}}}
+J
+    cat > /workspace/.agent/phpstan-cur.json <<'J'
+{"files":{
+"/workspace/app/Old.php":{"errors":1,"messages":[{"message":"Pre-existing type error.","line":10}]},
+"/workspace/app/New.php":{"errors":1,"messages":[{"message":"Brand new type error.","line":42}]}
+}}
+J
+    run quality_phpstan_new_errors /workspace/.agent/phpstan-base.json /workspace/.agent/phpstan-cur.json
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"app/New.php:42: Brand new type error."* ]]
+    [[ "$output" != *"Pre-existing type error."* ]]
+    rm -f /workspace/.agent/phpstan-base.json /workspace/.agent/phpstan-cur.json
+}
+
+@test "quality_phpstan_new_errors: gleiche Message, andere Zeile → vorbestehend (kein neuer Error)" {
+    command -v php >/dev/null 2>&1 || skip "php not available in bats env (the worker image has it)"
+    cat > /workspace/.agent/phpstan-base.json <<'J'
+{"files":{"/workspace/app/Old.php":{"errors":1,"messages":[{"message":"Pre-existing type error.","line":10}]}}}
+J
+    cat > /workspace/.agent/phpstan-cur.json <<'J'
+{"files":{"/workspace/app/Old.php":{"errors":1,"messages":[{"message":"Pre-existing type error.","line":37}]}}}
+J
+    run quality_phpstan_new_errors /workspace/.agent/phpstan-base.json /workspace/.agent/phpstan-cur.json
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+    rm -f /workspace/.agent/phpstan-base.json /workspace/.agent/phpstan-cur.json
+}
+
+@test "quality_phpstan_new_errors: fehlende Baseline → alle Errors (strict)" {
+    command -v php >/dev/null 2>&1 || skip "php not available in bats env (the worker image has it)"
+    cat > /workspace/.agent/phpstan-cur.json <<'J'
+{"files":{"/workspace/app/A.php":{"errors":1,"messages":[{"message":"Some error.","line":5}]}}}
+J
+    run quality_phpstan_new_errors /workspace/.agent/nope.json /workspace/.agent/phpstan-cur.json
+    [[ "$output" == *"app/A.php:5: Some error."* ]]
+    rm -f /workspace/.agent/phpstan-cur.json
+}
+
 # --- quality_ensure_vite_hot ---
 
 @test "quality_ensure_vite_hot: kein public/hot → wird mit Stub-URL angelegt" {
@@ -427,4 +471,99 @@ EOF
 @test "_concept_build_continue_prompt: erinnert, dass KEINE Datei geschrieben werden soll" {
     output="$(_concept_build_continue_prompt)"
     [[ "$output" == *"KEINE Datei"* ]]
+}
+
+@test "_concept_branch_slug: transliteriert deutsche Umlaute (ä→ae, ö→oe, ü→ue, ß→ss)" {
+    run _concept_branch_slug "Neuabschluss bei abgelaufenen Verträgen"
+    [ "$output" = "Neuabschluss-bei-abgelaufenen-Vertraegen" ]
+}
+
+@test "_concept_branch_slug: Leerzeichen und Slashes werden zu Bindestrichen" {
+    run _concept_branch_slug "feature/foo bar"
+    [ "$output" = "feature-foo-bar" ]
+}
+
+@test "_concept_branch_slug: nicht erlaubte Zeichen werden gestrippt, ._- bleiben" {
+    run _concept_branch_slug "Fix: (a) b@c_d.e-f!"
+    [ "$output" = "Fix-a-bc_d.e-f" ]
+}
+
+@test "_concept_branch_slug: Groß-Umlaute und ß" {
+    run _concept_branch_slug "Über Straße Öl Ärger"
+    [ "$output" = "Ueber-Strasse-Oel-Aerger" ]
+}
+
+@test "_implement_fix_max_turns: Default = halbe Haupt-Turns" {
+    unset GATE_FIX_MAX_TURNS
+    run _implement_fix_max_turns 200
+    [ "$output" = "100" ]
+}
+
+@test "_implement_fix_max_turns: Boden 60 bei kleinem Haupt-Budget" {
+    unset GATE_FIX_MAX_TURNS
+    run _implement_fix_max_turns 50
+    [ "$output" = "60" ]
+}
+
+@test "_implement_fix_max_turns: GATE_FIX_MAX_TURNS überschreibt explizit" {
+    GATE_FIX_MAX_TURNS=20 run _implement_fix_max_turns 200
+    [ "$output" = "20" ]
+}
+
+@test "_implement_sum_fix_costs: addiert alle fix*.result.json der Iteration" {
+    mkdir -p /workspace/.agent/logs
+    printf '{"total_cost_usd":1.28}' > /workspace/.agent/logs/implement.1.fix1.result.json
+    printf '{"total_cost_usd":0.5}'  > /workspace/.agent/logs/implement.1.fix2.result.json
+    run _implement_sum_fix_costs 5.69 1
+    [ "$output" = "7.47" ]
+}
+
+@test "_implement_sum_fix_costs: keine fix-Logs → Hauptkosten unverändert" {
+    mkdir -p /workspace/.agent/logs
+    run _implement_sum_fix_costs 5.69 1
+    [ "$output" = "5.69" ]
+}
+
+@test "_implement_sum_fix_costs: ignoriert andere Iterationen" {
+    mkdir -p /workspace/.agent/logs
+    printf '{"total_cost_usd":9.99}' > /workspace/.agent/logs/implement.2.fix1.result.json
+    run _implement_sum_fix_costs 1.00 1
+    [ "$output" = "1.00" ]
+}
+
+@test "quality_is_infra_crash: exit 137 (OOM-kill) → crash" {
+    run quality_is_infra_crash /nonexistent 137
+    [ "$status" -eq 0 ]
+}
+
+@test "quality_is_infra_crash: PHP OOM fatal im Log → crash" {
+    log="$(mktemp)"
+    printf 'PHP Fatal error:  Allowed memory size of 134217728 bytes exhausted\n' > "$log"
+    run quality_is_infra_crash "$log" 255
+    rm -f "$log"
+    [ "$status" -eq 0 ]
+}
+
+@test "quality_is_infra_crash: kaputte Config → crash" {
+    log="$(mktemp)"
+    printf 'Invalid configuration: Unexpected item under phpstan\n' > "$log"
+    run quality_is_infra_crash "$log" 1
+    rm -f "$log"
+    [ "$status" -eq 0 ]
+}
+
+@test "quality_is_infra_crash: echtes PHPStan-Finding → kein crash" {
+    log="$(mktemp)"
+    printf ' [ERROR] Found 3 errors\n\nLine app/Foo.php\n  12  Method bar() has no return type\n' > "$log"
+    run quality_is_infra_crash "$log" 1
+    rm -f "$log"
+    [ "$status" -eq 1 ]
+}
+
+@test "quality_is_infra_crash: normaler Pest-Failure → kein crash" {
+    log="$(mktemp)"
+    printf 'FAILED  Tests\\Feature\\FooTest > it works\nExpected true, got false\n' > "$log"
+    run quality_is_infra_crash "$log" 1
+    rm -f "$log"
+    [ "$status" -eq 1 ]
 }

@@ -14,6 +14,7 @@ use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
+use Filament\Navigation\NavigationGroup;
 use Filament\Navigation\NavigationItem;
 use Filament\Panel;
 use Filament\PanelProvider;
@@ -63,11 +64,16 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->discoverWidgets(in: app_path('Filament/Admin/Widgets'), for: 'App\Filament\Admin\Widgets')
             ->widgets([])
+            // Labels are lazy closures: the panel is configured at provider-boot
+            // (before SetUserLocale runs), so eager __() would freeze the
+            // group labels to the default locale and stop matching the
+            // render-time getNavigationGroup() strings in other locales — the
+            // groups would then split/reorder (e.g. a stray English "Help").
             ->navigationGroups([
-                __('navigation.groups.worker'),
-                __('navigation.groups.configuration'),
+                NavigationGroup::make()->label(fn (): string => __('navigation.groups.worker')),
+                NavigationGroup::make()->label(fn (): string => __('navigation.groups.configuration')),
                 // Kept last so the Help section sits at the bottom of the sidebar.
-                __('navigation.groups.help'),
+                NavigationGroup::make()->label(fn (): string => __('navigation.groups.help')),
             ])
             ->navigationItems([
                 // Link to the auto-generated REST API docs (Scramble, served at
@@ -76,7 +82,7 @@ class AdminPanelProvider extends PanelProvider
                 NavigationItem::make('api-docs')
                     ->label(fn (): string => __('navigation.pages.api_docs'))
                     ->icon(Heroicon::OutlinedCodeBracket)
-                    ->group(__('navigation.groups.help'))
+                    ->group(fn (): string => __('navigation.groups.help'))
                     ->url(fn (): string => url('docs/api'), shouldOpenInNewTab: true)
                     ->sort(99),
             ])

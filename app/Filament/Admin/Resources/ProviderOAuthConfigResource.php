@@ -149,11 +149,13 @@ class ProviderOAuthConfigResource extends Resource
                     ->placeholder(__('credentials.oauth.public_instance'))
                     ->formatStateUsing(fn (?string $state): string => ($state === null || $state === '')
                         ? __('credentials.oauth.public_instance')
-                        : $state),
+                        : $state)
+                    ->visibleFrom('md'),
 
                 TextColumn::make('client_id')
                     ->label(__('credentials.oauth.fields.client_id'))
-                    ->limit(20),
+                    ->limit(20)
+                    ->visibleFrom('md'),
 
                 IconColumn::make('enabled')
                     ->label(__('credentials.oauth.fields.enabled'))

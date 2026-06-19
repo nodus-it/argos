@@ -150,7 +150,7 @@ SH;
         }
         foreach ($matches as $match) {
             $key = trim($match[1]);
-            $body = $match[2];
+            $body = $this->toValidUtf8($match[2]);
             if ($key !== '') {
                 // Normalize internal key: worker emits e.g. "artisan-smoke",
                 // but the UI/quality_gates output uses "artisan".
@@ -160,6 +160,21 @@ SH;
         }
 
         return $logs;
+    }
+
+    /**
+     * Strip malformed UTF-8 from a gate-log body. The shell reader truncates
+     * oversized logs byte-wise (head -c / tail -c in buildGateLogReadScript),
+     * which can slice a multi-byte UTF-8 character at the cut boundary. The
+     * resulting invalid sequence makes json_encode() throw a
+     * JsonEncodingException when the value is cast into the json
+     * `quality_gate_logs` column (PhaseRun) — which previously flipped an
+     * otherwise-successful implement run to "failed". Substituting the invalid
+     * bytes keeps the diagnostic log readable and the JSON cast safe.
+     */
+    private function toValidUtf8(string $value): string
+    {
+        return mb_convert_encoding($value, 'UTF-8', 'UTF-8');
     }
 
     /**

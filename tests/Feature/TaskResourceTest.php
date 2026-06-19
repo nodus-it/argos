@@ -215,18 +215,28 @@ class TaskResourceTest extends TestCase
         $this->assertSame($this->user->id, $task->user_id);
     }
 
-    public function test_create_with_duplicate_name_shows_validation_error(): void
+    public function test_create_with_duplicate_name_is_allowed_and_gets_distinct_slug(): void
     {
+        // I3: the display name is non-unique. A second task with the same name
+        // is allowed and receives a distinct, frozen slug.
         $profile = RepoProfile::factory()->create();
-        Task::factory()->create(['name' => 'Existing Task']);
+        $existing = Task::factory()->create(['name' => 'Existing Task']);
 
         Livewire::test(CreateTask::class)
             ->fillForm([
                 'name' => 'Existing Task',
                 'repo_profile_id' => $profile->id,
+                'description' => 'Test',
+                'auto_concept' => false,
             ])
             ->call('create')
-            ->assertHasFormErrors(['name']);
+            ->assertHasNoFormErrors()
+            ->assertRedirect();
+
+        $tasks = Task::where('name', 'Existing Task')->get();
+        $this->assertCount(2, $tasks);
+        $this->assertCount(2, $tasks->pluck('slug')->unique());
+        $this->assertContains($existing->slug, $tasks->pluck('slug')->all());
     }
 
     public function test_list_renders_task_with_phase_runs(): void
@@ -246,6 +256,30 @@ class TaskResourceTest extends TestCase
         Livewire::test(ListTasks::class)
             ->assertSuccessful()
             ->assertCanSeeTableRecords([$task]);
+    }
+
+    public function test_create_form_shows_project_default_branch_in_helper_text(): void
+    {
+        $profile = RepoProfile::factory()->create(['default_branch' => 'develop']);
+
+        Livewire::test(CreateTask::class)
+            ->set('data.repo_profile_id', $profile->id)
+            ->assertSee('develop');
+    }
+
+    public function test_create_form_shows_no_project_hint_when_no_project_selected(): void
+    {
+        Livewire::test(CreateTask::class)
+            ->assertSee('Select a project first to see the default');
+    }
+
+    public function test_create_form_shows_agent_default_after_project_selected(): void
+    {
+        $profile = RepoProfile::factory()->create();
+
+        Livewire::test(CreateTask::class)
+            ->set('data.repo_profile_id', $profile->id)
+            ->assertSee('claude-code');
     }
 
     public function test_phase_runs_relation_manager_renders_and_shows_resolved_model(): void

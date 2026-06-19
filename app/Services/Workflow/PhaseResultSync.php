@@ -8,6 +8,7 @@ use App\Enums\PhaseStatus;
 use App\Models\PhaseRun;
 use App\Models\Task;
 use App\Support\ConceptMarkdown;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Persists the artefacts a finished phase left in the worker volume into the
@@ -162,7 +163,10 @@ class PhaseResultSync
                 $phaseRun->iteration
             );
             if ($gateLogs !== null && $gateLogs !== []) {
-                $phaseRun->update(['quality_gate_logs' => $gateLogs]);
+                $this->persistArtefactQuietly(
+                    'quality_gate_logs',
+                    fn () => $phaseRun->update(['quality_gate_logs' => $gateLogs])
+                );
             }
         }
 
@@ -182,12 +186,6 @@ class PhaseResultSync
                 $nontechnical = $this->extractResultTextFromStreamLog($phaseRun->stream_log);
             }
 
-            $phaseRun->update([
-                'implement_summary_nontechnical' => $nontechnical,
-                'implement_summary_technical' => $technical,
-                'implement_notes' => $notesBeforeRun,
-            ]);
-
             $taskUpdate = ['implement_notes' => null];
             if ($nontechnical !== null) {
                 $taskUpdate['implement_summary_nontechnical'] = $nontechnical;
@@ -195,7 +193,15 @@ class PhaseResultSync
             if ($technical !== null) {
                 $taskUpdate['implement_summary_technical'] = $technical;
             }
-            $task->update($taskUpdate);
+
+            $this->persistArtefactQuietly('implement_summary', function () use ($phaseRun, $task, $nontechnical, $technical, $notesBeforeRun, $taskUpdate): void {
+                $phaseRun->update([
+                    'implement_summary_nontechnical' => $nontechnical,
+                    'implement_summary_technical' => $technical,
+                    'implement_notes' => $notesBeforeRun,
+                ]);
+                $task->update($taskUpdate);
+            });
         }
 
         if ($phase === 'push') {
@@ -210,6 +216,28 @@ class PhaseResultSync
             if ($taskUpdate !== []) {
                 $task->update($taskUpdate);
             }
+        }
+    }
+
+    /**
+     * Persist a non-essential artefact (diagnostic gate logs, summaries) without
+     * ever letting a write failure fail an otherwise-successful phase run.
+     *
+     * A malformed-UTF-8 gate log once threw a JsonEncodingException on the json
+     * `quality_gate_logs` cast right here, which propagated up through
+     * postPhaseSync → RunPhaseJob and flipped a fully-green implement to
+     * "failed". These artefacts are diagnostic, not load-bearing: the phase run
+     * is already persisted with its real status by the time we get here, so a
+     * storage hiccup must be logged, not fatal.
+     */
+    private function persistArtefactQuietly(string $what, callable $persist): void
+    {
+        try {
+            $persist();
+        } catch (\Throwable $e) {
+            Log::channel('argos')->warning('PhaseResultSync: failed to persist '.$what, [
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 

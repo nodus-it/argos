@@ -29,6 +29,20 @@ class TaskFactory extends Factory
         ];
     }
 
+    /**
+     * Derive the frozen slug from the final name (after any override). Done in
+     * afterMaking — not via a model event — so it also runs in tests that fake
+     * the event dispatcher.
+     */
+    public function configure(): static
+    {
+        return $this->afterMaking(function (Task $task): void {
+            if (($task->slug ?? '') === '') {
+                $task->slug = Task::generateSlug((string) $task->name);
+            }
+        });
+    }
+
     public function inReview(): static
     {
         return $this->state([

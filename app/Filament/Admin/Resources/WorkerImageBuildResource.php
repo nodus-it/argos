@@ -120,7 +120,8 @@ class WorkerImageBuildResource extends Resource
                 TextColumn::make('agent_name')
                     ->label(__('worker.image_builds.fields.agent'))
                     ->badge()
-                    ->formatStateUsing(fn (AgentName $state): string => $state->label()),
+                    ->formatStateUsing(fn (AgentName $state): string => $state->label())
+                    ->visibleFrom('md'),
 
                 TextColumn::make('status')
                     ->label(__('worker.image_builds.fields.status'))
@@ -129,14 +130,16 @@ class WorkerImageBuildResource extends Resource
                 TextColumn::make('size_bytes')
                     ->label(__('worker.image_builds.fields.size_bytes'))
                     ->state(fn (WorkerImageBuild $r): string => self::formatBytes($r->size_bytes))
-                    ->sortable(),
+                    ->sortable()
+                    ->visibleFrom('md'),
 
                 TextColumn::make('built_at')
                     ->label(__('worker.image_builds.fields.built_at'))
                     ->dateTime()
                     ->since()
                     ->placeholder('—')
-                    ->sortable(),
+                    ->sortable()
+                    ->visibleFrom('md'),
             ])
             ->filters([
                 TernaryFilter::make('outdated')

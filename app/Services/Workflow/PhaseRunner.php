@@ -103,7 +103,7 @@ class PhaseRunner
      */
     public function postPhaseSync(Task $task, PhaseRun $phaseRun, string $phase, ?string $notesBeforeRun): void
     {
-        $bgLog = $this->readPhaseBgLog($task->name, $phase);
+        $bgLog = $this->readPhaseBgLog($task->slug, $phase);
 
         app(PhaseResultSync::class)->sync($task, $phaseRun, $phase, $notesBeforeRun, $bgLog);
     }
@@ -146,7 +146,7 @@ class PhaseRunner
 
         try {
             $cmd = $builder->build($task, $phase, $flags, $sidecars);
-            $logPath = $this->getPhaseLogPath($task->name, $phase);
+            $logPath = $this->getPhaseLogPath($task->slug, $phase);
 
             $logDir = dirname($logPath);
             if (! is_dir($logDir)) {
@@ -236,7 +236,7 @@ class PhaseRunner
 
         try {
             $cmd = $builder->build($task, $phase, $flags, $sidecars);
-            $logPath = $this->getPhaseLogPath($task->name, $phase);
+            $logPath = $this->getPhaseLogPath($task->slug, $phase);
 
             $logDir = dirname($logPath);
             if (! is_dir($logDir)) {

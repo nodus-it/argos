@@ -47,7 +47,11 @@ class WorkerSidecarManager
         $coordinates = app(BackingServiceResolver::class)->coordinates($profile);
 
         $network = $this->networkName($task, $phase);
-        $this->mustRun(['docker', 'network', 'create', $network], 30);
+        $this->mustRun([
+            'docker', 'network', 'create',
+            ...WorkerRunLabels::args(WorkerRunLabels::ROLE_NETWORK, $task->id, $phase),
+            $network,
+        ], 30);
 
         $containers = [];
         $env = [];
@@ -62,6 +66,7 @@ class WorkerSidecarManager
                     '--name', $container,
                     '--network', $network,
                     '--network-alias', $alias,
+                    ...WorkerRunLabels::args(WorkerRunLabels::ROLE_SIDECAR, $task->id, $phase),
                 ];
                 foreach ($service->containerEnv($coords) as $key => $value) {
                     $cmd[] = '-e';
@@ -184,7 +189,7 @@ class WorkerSidecarManager
 
     private function networkName(Task $task, string $phase): string
     {
-        $base = strtolower((string) preg_replace('/[^a-zA-Z0-9]+/', '-', $task->name));
+        $base = strtolower((string) preg_replace('/[^a-zA-Z0-9]+/', '-', $task->slug));
         $base = trim($base, '-');
 
         return 'argos-run-'.($base !== '' ? $base : 'task').'-'.$phase;

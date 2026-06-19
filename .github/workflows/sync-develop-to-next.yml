@@ -1,0 +1,106 @@
+name: Sync develop → next
+
+# Keeps `next` (the integration line for the upcoming version) current by
+# merging every new `develop` commit forward with a real merge commit
+# (--no-ff, history preserved — never squashed). This is the single most
+# important discipline point of the branching strategy, hence automated.
+#
+# On conflict the workflow does NOT push a broken `next`: it aborts the merge
+# and opens (or comments on) a tracking issue so a human resolves it locally.
+# The issue auto-closes on the next clean sync.
+#
+# `next` is self-healing — if it does not exist yet, the first run creates it
+# from develop.
+#
+# Pushes to the protected `next` branch use RELEASE_TOKEN (an admin PAT in the
+# ruleset's admin bypass); the default GITHUB_TOKEN cannot be granted bypass.
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+concurrency:
+  group: sync-develop-to-next
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: develop
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Merge develop into next (--no-ff) or open a conflict issue
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          git fetch origin develop
+          git fetch origin 'refs/heads/next:refs/remotes/origin/next' || true
+
+          # Self-heal: create next from develop if it does not exist yet.
+          if ! git show-ref --verify --quiet refs/remotes/origin/next; then
+            echo "next does not exist yet — creating it from develop."
+            git push origin "origin/develop:refs/heads/next"
+            exit 0
+          fi
+
+          git checkout -B next origin/next
+          if git merge --no-ff --no-edit origin/develop; then
+            git push origin HEAD:next
+            echo "next synced to develop ($(git rev-parse --short origin/develop))."
+            # A clean sync resolves any open conflict tracker.
+            for n in $(gh issue list --label auto-sync-conflict --state open --json number --jq '.[].number'); do
+              gh issue close "$n" --comment "Resolved — develop→next synced cleanly at $(git rev-parse --short origin/develop)."
+            done
+            exit 0
+          fi
+
+          # Conflict: record the offending files, abort, never push a broken next.
+          CONFLICTS=$(git diff --name-only --diff-filter=U | sed 's/^/- /')
+          git merge --abort || true
+          DEVELOP_SHA=$(git rev-parse --short origin/develop)
+
+          {
+            echo "The automatic \`develop → next\` sync hit a merge conflict at develop@${DEVELOP_SHA} and did **not** push \`next\` (it would be broken)."
+            echo
+            echo "Conflicting files:"
+            echo "${CONFLICTS}"
+            echo
+            echo "Resolve locally:"
+            echo '```bash'
+            echo "git checkout next && git pull"
+            echo "git merge --no-ff origin/develop"
+            echo "# resolve the conflicts, then:"
+            echo "git commit && git push origin next"
+            echo '```'
+            echo
+            echo "_This issue auto-closes on the next clean sync._"
+          } > /tmp/conflict-body.md
+
+          gh label create auto-sync-conflict --color B60205 \
+            --description "develop→next auto-sync needs manual resolution" 2>/dev/null || true
+
+          EXISTING=$(gh issue list --label auto-sync-conflict --state open --json number --jq '.[0].number // empty')
+          if [ -n "${EXISTING}" ]; then
+            gh issue comment "${EXISTING}" --body-file /tmp/conflict-body.md
+          else
+            gh issue create \
+              --title "🔀 Auto-Sync develop→next: manual conflict resolution needed" \
+              --label auto-sync-conflict \
+              --body-file /tmp/conflict-body.md
+          fi
+          echo "::error::develop→next merge conflict — next left untouched, see the tracking issue."
+          exit 1

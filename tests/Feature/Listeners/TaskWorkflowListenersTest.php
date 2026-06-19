@@ -11,12 +11,17 @@ use App\Events\Task\TaskCompleted;
 use App\Jobs\RunPhaseJob;
 use App\Jobs\StopDemoJob;
 use App\Models\Demo;
+use App\Models\ExternalIssueLink;
 use App\Models\RepoProfile;
 use App\Models\Task;
+use App\Models\TaskProviderBinding;
+use App\Services\IssueTracker\Contracts\IssueTrackerContract;
+use App\Services\IssueTracker\IssueTrackerRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Process;
+use Mockery;
 use Tests\TestCase;
 
 /**
@@ -84,5 +89,31 @@ class TaskWorkflowListenersTest extends TestCase
 
             return str_contains($cmd, 'volume rm') && str_contains($cmd, $task->volumeName());
         });
+    }
+
+    public function test_phase_completed_posts_issue_comment_exactly_once(): void
+    {
+        // Regression guard: if listeners are registered twice (e.g. auto-discovery
+        // AND manual registration both active), createComment fires twice per event.
+        $tracker = Mockery::mock(IssueTrackerContract::class);
+        $tracker->shouldReceive('createComment')->once()->andReturn([]);
+
+        $mockRegistry = Mockery::mock(IssueTrackerRegistry::class);
+        $mockRegistry->shouldReceive('has')->andReturn(true);
+        $mockRegistry->shouldReceive('make')->andReturn($tracker);
+
+        $this->app->instance(IssueTrackerRegistry::class, $mockRegistry);
+
+        $task = Task::factory()->create();
+        $binding = TaskProviderBinding::factory()->create([
+            'external_project_ref' => 'test-org/test-repo',
+        ]);
+        ExternalIssueLink::factory()->create([
+            'task_id' => $task->id,
+            'task_provider_binding_id' => $binding->id,
+            'external_id' => '1',
+        ]);
+
+        Event::dispatch(new PhaseCompleted($task, Phase::Implement, PhaseStatus::Completed));
     }
 }

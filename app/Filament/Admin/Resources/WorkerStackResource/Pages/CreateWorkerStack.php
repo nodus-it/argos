@@ -5,14 +5,21 @@ declare(strict_types=1);
 namespace App\Filament\Admin\Resources\WorkerStackResource\Pages;
 
 use App\Filament\Admin\Resources\WorkerStackResource;
+use App\Filament\Admin\Support\Pages\CreateRecord;
 use App\Filament\Admin\Support\WorkerStackBuildDispatcher;
 use App\Models\WorkerStack;
+use App\Services\EntityService;
+use App\Services\Worker\WorkerStackService;
 use Filament\Notifications\Notification;
-use Filament\Resources\Pages\CreateRecord;
 
 class CreateWorkerStack extends CreateRecord
 {
     protected static string $resource = WorkerStackResource::class;
+
+    protected function service(): EntityService
+    {
+        return app(WorkerStackService::class);
+    }
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {

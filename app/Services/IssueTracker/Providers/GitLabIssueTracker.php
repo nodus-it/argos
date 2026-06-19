@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services\IssueTracker;
+namespace App\Services\IssueTracker\Providers;
 
 use App\Integrations\GitLab\GitLabConnector;
 use App\Integrations\GitLab\Requests\CloseIssue;

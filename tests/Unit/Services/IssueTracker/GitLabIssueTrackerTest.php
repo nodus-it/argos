@@ -9,7 +9,7 @@ use App\Integrations\GitLab\Requests\ListIssues;
 use App\Integrations\GitLab\Requests\ListProjects;
 use App\Integrations\GitLab\Requests\RegisterWebhook;
 use App\Integrations\GitLab\Requests\UnregisterWebhook;
-use App\Services\IssueTracker\GitLabIssueTracker;
+use App\Services\IssueTracker\Providers\GitLabIssueTracker;
 use Saloon\Http\Faking\MockResponse;
 use Saloon\Http\Request;
 use Saloon\Laravel\Facades\Saloon;

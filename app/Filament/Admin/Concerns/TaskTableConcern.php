@@ -38,13 +38,18 @@ trait TaskTableConcern
         $columns = [
             TextColumn::make('name')
                 ->searchable()
-                ->sortable(),
+                ->sortable()
+                // Let long names wrap instead of forcing the table wider than a
+                // 375px phone (which pushed the status column off-screen). On
+                // desktop names rarely wrap, so the table layout is unchanged.
+                ->wrap(),
         ];
 
         if ($withProject) {
             $columns[] = TextColumn::make('repoProfile.name')
                 ->label(__('tasks.columns.project'))
-                ->sortable();
+                ->sortable()
+                ->visibleFrom('md');
         }
 
         $columns[] = TextColumn::make('externalIssueLink.binding.kind')
@@ -53,7 +58,8 @@ trait TaskTableConcern
             ->color('gray')
             ->icon('heroicon-o-arrow-down-tray')
             ->formatStateUsing(fn (?TaskProviderKind $state): string => $state?->label() ?? '—')
-            ->placeholder('—');
+            ->placeholder('—')
+            ->visibleFrom('md');
 
         // Warm-Paper status language: render the workflow + phase as the
         // <x-argos.badge> / <x-argos.phase-chip> components (colour + icon +
@@ -64,7 +70,8 @@ trait TaskTableConcern
 
         $columns[] = ViewColumn::make('current_phase')
             ->label(__('tasks.columns.phase'))
-            ->view('filament.tables.columns.argos-phase-chip');
+            ->view('filament.tables.columns.argos-phase-chip')
+            ->visibleFrom('md');
 
         $columns[] = TextColumn::make('agent')
             ->label(__('tasks.columns.agent'))
@@ -75,12 +82,14 @@ trait TaskTableConcern
                 ?? $record->repoProfile?->worker_agent_name
                 ?? AgentName::ClaudeCode
             )->label())
-            ->toggleable();
+            ->toggleable()
+            ->visibleFrom('md');
 
         $columns[] = TextColumn::make('updated_at')
             ->label(__('tasks.columns.last_activity'))
             ->since()
-            ->sortable();
+            ->sortable()
+            ->visibleFrom('md');
 
         return $columns;
     }
