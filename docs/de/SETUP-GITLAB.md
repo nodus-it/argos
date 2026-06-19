@@ -205,8 +205,9 @@ Details zum gemeinsamen Binding-Setup siehe
 Der Manager übergibt `REPO_PLATFORM=gitlab` als Umgebungsvariable an den
 Worker-Container. Die Push-Phase nutzt dies, um die Plattform zuverlässig zu
 erkennen — auch bei selbst gehosteten GitLab-Instanzen mit unauffälligen
-Hostnamen — und pusht mit `-o merge_request.create`, um den Merge Request
-automatisch zu erstellen.
+Hostnamen — und erstellt den Merge Request anschließend über die GitLab-REST-API
+(`POST …/api/v4/projects/<id>/merge_requests`), damit der MR die vollständige
+mehrzeilige Beschreibung trägt.
 
 ---
 

@@ -5,11 +5,7 @@ curated highlights, not a per-commit log — see the [GitHub Releases](https://g
 for the full commit list of each tag. Versions follow SemVer; pre-1.0 betas
 may carry breaking changes between releases.
 
-## [Unreleased]
-
-- **Fix:** Issue-Tracker-Kommentare wurden bei jeder Phase doppelt gepostet (Listener-Doppelregistrierung durch Laravel-Event-Discovery + manuelle Registrierung in `AppServiceProvider`). Auto-Discovery ist jetzt explizit deaktiviert; `AppServiceProvider::boot()` bleibt die einzige Quelle der Wahrheit.
-
-## [0.3.0-beta.1] - 2026-06-15
+## [0.3.0-beta.1] - 2026-06-19
 
 A consolidation release: a service-layer architecture pass, in-app docs, a
 mobile-ready UI, and three workflow/quality improvements (localization, task
@@ -22,7 +18,9 @@ identity, external branch collaboration).
 - **External branch collaboration:** you can check out a task's feature branch, push your own commits, and Argos pulls them before continuing (remote-wins on refine/respond). Pushing over external commits fails with a clear message instead of a cryptic git error, and a demo rebuild reflects the pushed remote state.
 - **Localization:** user-facing German strings that were hardcoded (task-provider bindings, log/diff screens, issue write-back comments, OAuth token-refresh errors) moved into `lang/{de,en}` — the app honours the configured locale consistently.
 - **Teardown:** task resource cleanup (containers, volumes, networks) centralized and triggered on delete / abort / orphan sweep, with an explicit aborted status.
-- **Fixes & tooling:** quality gate skipped on worker infra crashes (no wasted remediation), helper text shows the inherited defaults on task override fields, Tailwind dark utilities aligned with Filament's `.dark` toggle, adopted `nodus-it/dev-tools` for commands/QA, and added the `--next` installer channel tracking the rolling `:next` images.
+- **Push & GitLab:** GitLab MRs are now created over the REST API instead of `git push -o` push options — Git rejects any option containing a newline, so a multi-line MR description broke nearly every GitLab push that carried a commit body; MRs now also carry the full rich description (summary + technical details) rather than the bare commit body. The push phase records its commit-message cost (`cost_usd` no longer null).
+- **Quality gate:** the implement PHPStan gate is now baselined like Pest — a pre-edit snapshot is diffed by `(file, message)` (line-shift-tolerant) so only **new** type errors block the run, ending off-task remediation of pre-existing debt; a missing baseline still gates strictly. A green run also no longer flips to failed when oversized gate logs are truncated mid-multibyte: log bodies are sanitized to valid UTF-8 at the read boundary and the diagnostic artefacts persist through a guarded helper. The implement agent is steered at the provisioned backing services / exported test-DB env instead of switching tests to SQLite and churning committed DB config.
+- **Fixes & tooling:** issue-tracker comments are no longer double-posted (event auto-discovery disabled; `AppServiceProvider::boot()` is the single registration point), the log bundle reads the worker volume resiliently (alpine → busybox, with a `WORKSPACE READ FAILED` note instead of silently dropping in-container logs), quality gate skipped on worker infra crashes (no wasted remediation), helper text shows the inherited defaults on task override fields, Tailwind dark utilities aligned with Filament's `.dark` toggle, adopted `nodus-it/dev-tools` for commands/QA, and added the `--next` installer channel tracking the rolling `:next` images.
 
 ## [0.2.0-beta.1] - 2026-06-09
 

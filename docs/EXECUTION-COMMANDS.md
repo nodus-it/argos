@@ -130,7 +130,7 @@ be produced); on `implement` it aborts the phase.
 | **concept** | clone & branch (first run) → `composer install` (best-effort) → archive any prior concept → [agent session](#the-agent-session) that writes `concept.md`. Read-only on the repo by design. |
 | **implement** | (default `--fresh`) `git fetch` + `git reset --hard origin/$BASE_BRANCH` + `git clean -fd` (keeps gitignored `vendor/`, `node_modules/`) → `composer install` / `npm ci` → **capture test baseline** on the clean checkout → agent session → **quality gate**; on a blocking gate failure, up to 3 focused agent fix sessions (`GATE_RETRY_LIMIT`). `--refine` skips the reset and builds on the prior iteration; `--continue` resumes the paused agent session. |
 | **diff** | read-only. `git diff [--stat] [-- <file>] origin/$BASE_BRANCH` (working tree vs base — implement leaves changes uncommitted) → `git status --short` → `git diff --numstat` + `git ls-files --others --exclude-standard` for the change counters. |
-| **push** | invoke the **commit-message** sub-phase → set git identity (`"<name> via Argos"`) → `git add -A` → `git commit -m "<subject>" [-m "<body>"]` → `git push -u --force-with-lease origin "$feature_branch"` (GitLab adds `-o merge_request.create` push options) → open / update the PR/MR (see below). Skips entirely with status `no_changes` when there is nothing to push. |
+| **push** | invoke the **commit-message** sub-phase → set git identity (`"<name> via Argos"`) → `git add -A` → `git commit -m "<subject>" [-m "<body>"]` → `git push -u --force-with-lease origin "$feature_branch"` → open / update the PR/MR over the provider API (see below). Skips entirely with status `no_changes` when there is nothing to push. |
 | **commit-message** | short agent session (`--max-turns 8`, JSON-schema output, Claude pinned to Haiku) over the concept + diff that produces the commit subject/body. Invoked only by `push`; a failure falls back to `chore: apply implementation changes (N files)`. |
 | **respond** | agent session over `respond.feedback.md` (review feedback from the UI) + concept → the same quality gate as implement. Applies the feedback to the existing feature branch; run `push` afterwards. |
 
@@ -141,8 +141,11 @@ PR / MR creation in **push** is provider-specific:
   the description + adds an iteration comment. It also `PATCH`es the repo to
   squash-only + auto-delete-branch-on-merge (best-effort; a warning if the
   token lacks admin rights).
-- **GitLab** — no API call; the MR URL is parsed out of the `git push` output
-  produced by the `merge_request.create` push options.
+- **GitLab** — `curl POST …/api/v4/projects/<id>/merge_requests` (Bearer
+  `REPO_TOKEN`), mirroring the GitHub/Bitbucket paths. An existing open MR for
+  the branch is looked up and its description updated instead of recreated. This
+  replaces the former `-o merge_request.create` push options, which could not
+  carry a multi-line description.
 - **Bitbucket** — `curl POST …/2.0/repositories/<ws>/<slug>/pullrequests`
   (Basic auth for a `user:app_password` token, else Bearer). HTTP 409 → looks
   up the existing PR.

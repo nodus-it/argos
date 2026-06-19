@@ -135,7 +135,7 @@ Plan kann trotzdem erstellt werden); bei `implement` bricht es die Phase ab.
 | **concept** | Klonen & Branch (erster Lauf) → `composer install` (best-effort) → ein etwaiges vorheriges Concept archivieren → [Agenten-Session](#the-agent-session), die `concept.md` schreibt. Auf dem Repo bewusst read-only. |
 | **implement** | (Standard `--fresh`) `git fetch` + `git reset --hard origin/$BASE_BRANCH` + `git clean -fd` (behält gitignorierte `vendor/`, `node_modules/`) → `composer install` / `npm ci` → **Test-Baseline auf dem sauberen Checkout erfassen** → Agenten-Session → **Quality-Gate**; bei einem blockierenden Gate-Fehler bis zu 3 fokussierte Agenten-Fix-Sessions (`GATE_RETRY_LIMIT`). `--refine` überspringt den Reset und baut auf der vorherigen Iteration auf; `--continue` setzt die pausierte Agenten-Session fort. |
 | **diff** | read-only. `git diff [--stat] [-- <file>] origin/$BASE_BRANCH` (Working-Tree vs. Base — implement lässt Änderungen uncommitted) → `git status --short` → `git diff --numstat` + `git ls-files --others --exclude-standard` für die Änderungszähler. |
-| **push** | die Sub-Phase **commit-message** aufrufen → Git-Identität setzen (`"<name> via Argos"`) → `git add -A` → `git commit -m "<subject>" [-m "<body>"]` → `git push -u --force-with-lease origin "$feature_branch"` (GitLab fügt `-o merge_request.create`-Push-Optionen hinzu) → den PR/MR öffnen / aktualisieren (siehe unten). Überspringt komplett mit Status `no_changes`, wenn es nichts zu pushen gibt. |
+| **push** | die Sub-Phase **commit-message** aufrufen → Git-Identität setzen (`"<name> via Argos"`) → `git add -A` → `git commit -m "<subject>" [-m "<body>"]` → `git push -u --force-with-lease origin "$feature_branch"` → den PR/MR über die Provider-API öffnen / aktualisieren (siehe unten). Überspringt komplett mit Status `no_changes`, wenn es nichts zu pushen gibt. |
 | **commit-message** | kurze Agenten-Session (`--max-turns 8`, JSON-Schema-Ausgabe, Claude auf Haiku gepinnt) über Concept + Diff, die Commit-Subject/Body erzeugt. Wird nur von `push` aufgerufen; ein Fehler fällt zurück auf `chore: apply implementation changes (N files)`. |
 | **respond** | Agenten-Session über `respond.feedback.md` (Review-Feedback aus der UI) + Concept → dasselbe Quality-Gate wie implement. Wendet das Feedback auf den bestehenden Feature-Branch an; danach `push` ausführen. |
 
@@ -146,8 +146,11 @@ Die PR-/MR-Erstellung in **push** ist providerspezifisch:
   und die Beschreibung aktualisiert + ein Iterationskommentar hinzugefügt. Es
   `PATCH`t außerdem das Repo auf squash-only + auto-delete-branch-on-merge
   (best-effort; eine Warnung, wenn dem Token Admin-Rechte fehlen).
-- **GitLab** — kein API-Aufruf; die MR-URL wird aus der `git push`-Ausgabe
-  geparst, die von den `merge_request.create`-Push-Optionen erzeugt wird.
+- **GitLab** — `curl POST …/api/v4/projects/<id>/merge_requests` (Bearer
+  `REPO_TOKEN`), analog zu den GitHub-/Bitbucket-Pfaden. Ein bereits offener MR
+  für den Branch wird nachgeschlagen und seine Beschreibung aktualisiert statt
+  neu erstellt. Das ersetzt die früheren `-o merge_request.create`-Push-Optionen,
+  die keine mehrzeilige Beschreibung tragen konnten.
 - **Bitbucket** — `curl POST …/2.0/repositories/<ws>/<slug>/pullrequests`
   (Basic Auth für ein `user:app_password`-Token, sonst Bearer). HTTP 409 →
   schlägt den bestehenden PR nach.
