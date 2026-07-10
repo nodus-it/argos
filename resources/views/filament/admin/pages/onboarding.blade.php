@@ -2,8 +2,8 @@
 
     @php
         $sources = $this->repoSourceOptions();
-        $repoOptions = $this->currentStep === 2 ? $this->repoOptions() : [];
-        $branchOptions = $this->currentStep === 2 ? $this->branchOptions() : [];
+        $repoOptions = $this->currentStep === 3 ? $this->repoOptions() : [];
+        $branchOptions = $this->currentStep === 3 ? $this->branchOptions() : [];
     @endphp
 
     <div class="max-w-6xl mx-auto w-full space-y-8">
@@ -54,8 +54,61 @@
         {{-- ── Active step card ────────────────────────────────────────── --}}
         <div class="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
 
-            {{-- Step 1: Agents --}}
+            {{-- Step 1: Security (password) --}}
             @if ($this->currentStep === 1)
+                <div class="px-6 py-5 border-b border-gray-100 dark:border-gray-800">
+                    <h2 class="text-base font-semibold text-gray-900 dark:text-white">{{ __('onboarding.security.heading') }}</h2>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ __('onboarding.security.description') }}</p>
+                </div>
+                <div class="px-6 py-5 space-y-4">
+
+                    @if ($this->usingDefaultPassword())
+                        <div class="flex items-start gap-2 rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-4 py-3">
+                            <x-heroicon-o-exclamation-triangle class="h-5 w-5 flex-shrink-0 text-amber-500 mt-0.5" />
+                            <p class="text-xs text-amber-700 dark:text-amber-300">{{ __('onboarding.security.warning_default') }}</p>
+                        </div>
+                    @endif
+
+                    <div class="rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-4 space-y-3">
+                        <div class="flex items-center gap-2">
+                            <x-heroicon-o-lock-closed class="h-5 w-5 text-gray-400 flex-shrink-0" />
+                            <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">{{ __('onboarding.security.card_label') }}</span>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{{ __('onboarding.security.new_label') }}</label>
+                                <input wire:model="newPassword" type="password" autocomplete="new-password" placeholder="{{ __('onboarding.security.new_placeholder') }}"
+                                    class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{{ __('onboarding.security.confirm_label') }}</label>
+                                <input wire:model="newPasswordConfirmation" type="password" autocomplete="new-password" placeholder="{{ __('onboarding.security.confirm_placeholder') }}"
+                                    class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                            </div>
+                        </div>
+                        <div class="flex justify-end">
+                            <x-filament::button wire:click="savePassword" type="button">
+                                {{ __('onboarding.security.save_button') }}
+                            </x-filament::button>
+                        </div>
+                    </div>
+
+                    <p class="text-xs text-gray-400 dark:text-gray-500">{{ __('onboarding.security.optional_hint') }}</p>
+                </div>
+
+                <div class="px-6 py-4 bg-gray-50 dark:bg-gray-800/50 flex items-center justify-end">
+                    <x-filament::button
+                        wire:click="nextStep"
+                        icon="heroicon-o-arrow-right"
+                        icon-position="after"
+                    >
+                        {{ __('onboarding.nav.next') }}
+                    </x-filament::button>
+                </div>
+            @endif
+
+            {{-- Step 2: Agents --}}
+            @if ($this->currentStep === 2)
                 <div class="px-6 py-5 border-b border-gray-100 dark:border-gray-800">
                     <h2 class="text-base font-semibold text-gray-900 dark:text-white">{{ __('onboarding.agents.heading') }}</h2>
                     <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ __('onboarding.agents.description') }}</p>
@@ -112,20 +165,25 @@
                 </div>
 
                 <div class="px-6 py-4 bg-gray-50 dark:bg-gray-800/50 flex items-center justify-between">
-                    <span class="text-xs text-gray-400 dark:text-gray-500">{{ __('onboarding.agents.gate_hint') }}</span>
-                    <x-filament::button
-                        wire:click="nextStep"
-                        icon="heroicon-o-arrow-right"
-                        icon-position="after"
-                        :disabled="! $this->isAnyAgentConfigured()"
-                    >
-                        {{ __('onboarding.nav.next') }}
+                    <x-filament::button wire:click="prevStep" color="gray" icon="heroicon-o-arrow-left">
+                        {{ __('onboarding.nav.back') }}
                     </x-filament::button>
+                    <div class="flex items-center gap-3">
+                        <span class="text-xs text-gray-400 dark:text-gray-500">{{ __('onboarding.agents.gate_hint') }}</span>
+                        <x-filament::button
+                            wire:click="nextStep"
+                            icon="heroicon-o-arrow-right"
+                            icon-position="after"
+                            :disabled="! $this->isAnyAgentConfigured()"
+                        >
+                            {{ __('onboarding.nav.next') }}
+                        </x-filament::button>
+                    </div>
                 </div>
             @endif
 
-            {{-- Step 2: Repository --}}
-            @if ($this->currentStep === 2)
+            {{-- Step 3: Repository --}}
+            @if ($this->currentStep === 3)
                 <div class="px-6 py-5 border-b border-gray-100 dark:border-gray-800">
                     <h2 class="text-base font-semibold text-gray-900 dark:text-white">{{ __('onboarding.repo.heading') }}</h2>
                     <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ __('onboarding.repo.description') }}</p>
@@ -310,8 +368,8 @@
                 </div>
             @endif
 
-            {{-- Step 3: Done --}}
-            @if ($this->currentStep === 3)
+            {{-- Step 4: Done --}}
+            @if ($this->currentStep === 4)
                 <div class="px-6 py-10 text-center space-y-4">
                     <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900">
                         <x-heroicon-o-check class="h-8 w-8 text-emerald-600 dark:text-emerald-400" />

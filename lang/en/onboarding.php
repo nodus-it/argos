@@ -12,12 +12,15 @@ return [
     ],
 
     'steps' => [
+        'security' => 'Security',
         'agents' => 'Agents',
         'repository' => 'Repository',
         'done' => 'Done',
     ],
 
     'notifications' => [
+        'password_invalid_title' => 'Password not changed',
+        'password_saved' => 'Password updated',
         'empty_token' => 'Please enter a token',
         'invalid_token_title' => 'Token invalid',
         'invalid_token_body' => 'The entered token was rejected by the API.',
@@ -33,6 +36,19 @@ return [
         'name_taken_title' => 'Name already in use',
         'name_taken_body' => 'A project with this name already exists — choose a different one.',
         'project_created' => 'Project created',
+    ],
+
+    'security' => [
+        'heading' => 'Secure your account',
+        'description' => 'Set your own password before you continue. This step is optional — you can change it anytime under your profile.',
+        'warning_default' => 'You are still signed in with the default password. Please set your own password now.',
+        'card_label' => 'Change password',
+        'new_label' => 'New password',
+        'new_placeholder' => 'At least 8 characters',
+        'confirm_label' => 'Confirm password',
+        'confirm_placeholder' => 'Repeat the password',
+        'save_button' => 'Update password',
+        'optional_hint' => 'Optional — skip with “Continue” to set it up later under your profile.',
     ],
 
     'agents' => [

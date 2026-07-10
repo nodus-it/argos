@@ -12,12 +12,15 @@ return [
     ],
 
     'steps' => [
+        'security' => 'Sicherheit',
         'agents' => 'Agenten',
         'repository' => 'Repository',
         'done' => 'Fertig',
     ],
 
     'notifications' => [
+        'password_invalid_title' => 'Passwort nicht geändert',
+        'password_saved' => 'Passwort aktualisiert',
         'empty_token' => 'Bitte einen Token eingeben',
         'invalid_token_title' => 'Token ungültig',
         'invalid_token_body' => 'Der eingegebene Token wurde von der API abgelehnt.',
@@ -33,6 +36,19 @@ return [
         'name_taken_title' => 'Name bereits vergeben',
         'name_taken_body' => 'Ein Projekt mit diesem Namen existiert bereits — bitte einen anderen wählen.',
         'project_created' => 'Projekt angelegt',
+    ],
+
+    'security' => [
+        'heading' => 'Konto absichern',
+        'description' => 'Lege ein eigenes Passwort fest, bevor du fortfährst. Dieser Schritt ist optional — du kannst es jederzeit in deinem Profil ändern.',
+        'warning_default' => 'Du bist noch mit dem Standard-Passwort angemeldet. Bitte lege jetzt ein eigenes Passwort fest.',
+        'card_label' => 'Passwort ändern',
+        'new_label' => 'Neues Passwort',
+        'new_placeholder' => 'Mindestens 8 Zeichen',
+        'confirm_label' => 'Passwort bestätigen',
+        'confirm_placeholder' => 'Passwort wiederholen',
+        'save_button' => 'Passwort aktualisieren',
+        'optional_hint' => 'Optional — mit „Weiter" überspringen und später im Profil festlegen.',
     ],
 
     'agents' => [

@@ -14,6 +14,7 @@ use App\Models\ProviderOAuthConfig;
 use App\Models\RepoProfile;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 use Saloon\Http\Faking\MockResponse;
@@ -44,7 +45,9 @@ class OnboardingPageTest extends TestCase
 
     public function test_onboarding_shows_token_help_when_missing(): void
     {
+        // The token help lives on the agents step (2); step 1 is security.
         Livewire::test(Onboarding::class)
+            ->call('goToStep', 2)
             ->assertSee('claude setup-token');
     }
 
@@ -52,18 +55,21 @@ class OnboardingPageTest extends TestCase
     {
         $steps = Livewire::test(Onboarding::class)->instance()->steps();
 
-        // Step 1 is active and reachable; nothing is done yet.
+        // Step 1 (security) is active and reachable; nothing is done yet.
         $this->assertSame(1, $steps[0]['number']);
         $this->assertTrue($steps[0]['active']);
         $this->assertTrue($steps[0]['reachable']);
         $this->assertFalse($steps[0]['done']);
 
-        // Steps 2 and 3 stay locked until an agent is configured.
-        $this->assertFalse($steps[1]['reachable']);
+        // The security step is optional, so agents (step 2) is reachable too.
+        $this->assertTrue($steps[1]['reachable']);
+
+        // Repository and done stay locked until an agent is configured.
         $this->assertFalse($steps[2]['reachable']);
+        $this->assertFalse($steps[3]['reachable']);
     }
 
-    public function test_steps_mark_step_one_done_when_agent_configured(): void
+    public function test_steps_mark_earlier_steps_done_when_agent_configured(): void
     {
         AgentCredential::factory()->create([
             'agent_name' => AgentName::ClaudeCode,
@@ -71,14 +77,92 @@ class OnboardingPageTest extends TestCase
             'status' => AgentCredentialStatus::Active,
         ]);
 
-        // mount() resumes on the repository step once an agent exists.
+        // mount() resumes on the repository step (3) once an agent exists.
         $steps = Livewire::test(Onboarding::class)->instance()->steps();
 
+        // Security (1) and agents (2) are behind us and marked done.
         $this->assertTrue($steps[0]['done']);
-        $this->assertFalse($steps[0]['active']);
-        $this->assertTrue($steps[1]['active']);
-        $this->assertTrue($steps[1]['reachable']);
-        $this->assertFalse($steps[2]['reachable']);
+        $this->assertTrue($steps[1]['done']);
+        $this->assertFalse($steps[1]['active']);
+
+        // Repository (3) is the active, reachable step; done (4) stays locked.
+        $this->assertTrue($steps[2]['active']);
+        $this->assertTrue($steps[2]['reachable']);
+        $this->assertFalse($steps[3]['reachable']);
+    }
+
+    public function test_security_step_shows_default_password_warning(): void
+    {
+        config(['argos.admin_password' => 'secret-default']);
+        $user = User::factory()->create(['password' => Hash::make('secret-default')]);
+        $this->actingAs($user);
+
+        Livewire::test(Onboarding::class)
+            ->assertSet('currentStep', 1)
+            ->assertSee('default password');
+    }
+
+    public function test_using_default_password_detects_seeded_default(): void
+    {
+        config(['argos.admin_password' => 'secret-default']);
+        $user = User::factory()->create(['password' => Hash::make('secret-default')]);
+        $this->actingAs($user);
+
+        $this->assertTrue(Livewire::test(Onboarding::class)->instance()->usingDefaultPassword());
+    }
+
+    public function test_using_default_password_false_for_custom_password(): void
+    {
+        config(['argos.admin_password' => 'secret-default']);
+        $user = User::factory()->create(['password' => Hash::make('my-own-password')]);
+        $this->actingAs($user);
+
+        $this->assertFalse(Livewire::test(Onboarding::class)->instance()->usingDefaultPassword());
+    }
+
+    public function test_save_password_updates_the_user(): void
+    {
+        config(['argos.admin_password' => 'secret-default']);
+        $user = User::factory()->create(['password' => Hash::make('secret-default')]);
+        $this->actingAs($user);
+
+        Livewire::test(Onboarding::class)
+            ->set('newPassword', 'a-brand-new-pw')
+            ->set('newPasswordConfirmation', 'a-brand-new-pw')
+            ->call('savePassword')
+            ->assertSet('newPassword', '')
+            ->assertSet('newPasswordConfirmation', '')
+            ->assertSet('passwordJustChanged', true);
+
+        $this->assertTrue(Hash::check('a-brand-new-pw', (string) $user->fresh()?->password));
+    }
+
+    public function test_save_password_rejects_mismatched_confirmation(): void
+    {
+        $user = User::factory()->create(['password' => Hash::make('old-password')]);
+        $this->actingAs($user);
+
+        Livewire::test(Onboarding::class)
+            ->set('newPassword', 'a-brand-new-pw')
+            ->set('newPasswordConfirmation', 'does-not-match')
+            ->call('savePassword')
+            ->assertSet('passwordJustChanged', false);
+
+        $this->assertTrue(Hash::check('old-password', (string) $user->fresh()?->password));
+    }
+
+    public function test_save_password_rejects_too_short(): void
+    {
+        $user = User::factory()->create(['password' => Hash::make('old-password')]);
+        $this->actingAs($user);
+
+        Livewire::test(Onboarding::class)
+            ->set('newPassword', 'short')
+            ->set('newPasswordConfirmation', 'short')
+            ->call('savePassword')
+            ->assertSet('passwordJustChanged', false);
+
+        $this->assertTrue(Hash::check('old-password', (string) $user->fresh()?->password));
     }
 
     public function test_save_claude_token_persists_and_updates_state(): void
@@ -129,7 +213,7 @@ class OnboardingPageTest extends TestCase
         config(['services.github.client_id' => null, 'services.github.client_secret' => null]);
 
         Livewire::test(Onboarding::class)
-            ->assertSet('currentStep', 2)
+            ->assertSet('currentStep', 3)
             ->assertDontSee('Connect with GitHub');
 
         config(['services.github.client_id' => 'cid', 'services.github.client_secret' => 'cs']);
@@ -206,7 +290,7 @@ class OnboardingPageTest extends TestCase
         // config('services.*'), so the old config-only check hid it. It must now
         // surface with an instance-scoped connect link.
         Livewire::test(Onboarding::class)
-            ->assertSet('currentStep', 2)
+            ->assertSet('currentStep', 3)
             ->assertSee('git.example.com')
             ->assertSee('instance=');
     }
@@ -220,25 +304,28 @@ class OnboardingPageTest extends TestCase
         ]);
 
         Livewire::test(Onboarding::class)
-            ->assertSet('currentStep', 2)
+            ->assertSet('currentStep', 3)
             ->assertSee('CI token');
     }
 
     public function test_step_navigation_is_gated_by_agent_then_advances(): void
     {
-        // No agent yet → next is refused and we stay on step 1.
+        // Start on the optional security step (1); skipping it reaches agents (2),
+        // where next is refused without an agent.
         Livewire::test(Onboarding::class)
             ->assertSet('currentStep', 1)
             ->call('nextStep')
-            ->assertSet('currentStep', 1);
+            ->assertSet('currentStep', 2)
+            ->call('nextStep')
+            ->assertSet('currentStep', 2);
 
         $this->configureCodexAgent();
 
         Livewire::test(Onboarding::class)
-            ->call('goToStep', 1)
-            ->assertSet('currentStep', 1)
+            ->call('goToStep', 2)
+            ->assertSet('currentStep', 2)
             ->call('nextStep')
-            ->assertSet('currentStep', 2);
+            ->assertSet('currentStep', 3);
     }
 
     public function test_create_project_not_in_header_actions(): void
@@ -259,7 +346,7 @@ class OnboardingPageTest extends TestCase
         // Regression: the deep links must resolve — the OAuth-config resource
         // slug is pinned, otherwise route() throws RouteNotFoundException here.
         Livewire::test(Onboarding::class)
-            ->assertSet('currentStep', 2)
+            ->assertSet('currentStep', 3)
             ->assertSuccessful()
             ->assertSee(route('filament.admin.resources.provider-oauth-configs.create'))
             ->assertSee(route('filament.admin.resources.provider-credentials.create'));
@@ -273,7 +360,7 @@ class OnboardingPageTest extends TestCase
         // Even with GitHub configured, the "add another OAuth app" route must be
         // reachable so further providers / self-hosted instances can be added.
         Livewire::test(Onboarding::class)
-            ->assertSet('currentStep', 2)
+            ->assertSet('currentStep', 3)
             ->assertSee('Connect with GitHub')
             ->assertSee(route('filament.admin.resources.provider-oauth-configs.create'));
     }
@@ -303,13 +390,13 @@ class OnboardingPageTest extends TestCase
         ]);
 
         Livewire::test(Onboarding::class)
-            ->assertSet('currentStep', 2)
+            ->assertSet('currentStep', 3)
             ->set('repoSource', "oauth:{$account->id}")
             ->set('selectedRepo', 'acme/widget')
             ->set('selectedBranch', 'main')
             ->set('projectName', 'widget')
             ->call('createProject')
-            ->assertSet('currentStep', 3);
+            ->assertSet('currentStep', 4);
 
         $this->assertDatabaseHas(RepoProfile::class, [
             'name' => 'widget',
@@ -345,7 +432,7 @@ class OnboardingPageTest extends TestCase
             ->set('selectedBranch', 'main')
             ->set('projectName', 'gadget')
             ->call('createProject')
-            ->assertSet('currentStep', 3);
+            ->assertSet('currentStep', 4);
 
         $profile = RepoProfile::query()->where('name', 'gadget')->first();
         $this->assertNotNull($profile);
@@ -371,7 +458,7 @@ class OnboardingPageTest extends TestCase
             ->set('selectedBranch', 'main')
             ->set('projectName', 'widget')
             ->call('createProject')
-            ->assertSet('currentStep', 2);
+            ->assertSet('currentStep', 3);
 
         $this->assertSame(1, RepoProfile::query()->where('name', 'widget')->count());
     }
@@ -391,6 +478,7 @@ class OnboardingPageTest extends TestCase
     public function test_onboarding_shows_codex_setup_box_when_no_codex_credential(): void
     {
         Livewire::test(Onboarding::class)
+            ->call('goToStep', 2)
             ->assertSet('codexConfigured', false)
             ->assertSee('OpenAI Codex')
             ->assertSee('codex login')
@@ -411,7 +499,7 @@ class OnboardingPageTest extends TestCase
         Livewire::test(Onboarding::class)
             ->assertSet('codexConfigured', true)
             ->assertSet('tokenSource', 'none')
-            ->assertSet('currentStep', 2);
+            ->assertSet('currentStep', 3);
     }
 
     public function test_save_codex_auth_json_persists_and_clears_input(): void

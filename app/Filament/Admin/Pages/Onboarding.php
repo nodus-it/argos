@@ -13,6 +13,7 @@ use App\Models\ProviderCredential;
 use App\Models\ProviderOAuthConfig;
 use App\Models\RepoProfile;
 use App\Models\User;
+use App\Services\Account\AccountPasswordService;
 use App\Services\Anthropic\AnthropicTokenValidator;
 use App\Services\Credentials\AgentCredentialService;
 use App\Services\Git\RepositoryFetcher;
@@ -25,16 +26,24 @@ use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rules\Password;
 
 /**
- * Guided three-step setup wizard: authenticate an agent, connect & authorize a
- * repository, done. The active step is state-driven so it survives the external
- * OAuth round-trip (the provider callback redirects back here and we resume on
- * the repository step once an agent is configured).
+ * Guided four-step setup wizard: secure the account, authenticate an agent,
+ * connect & authorize a repository, done. The active step is state-driven so it
+ * survives the external OAuth round-trip (the provider callback redirects back
+ * here and we resume on the repository step once an agent is configured).
+ *
+ * The first step (security) is optional and skippable — it exists so the first
+ * user, who logs in with the seeded default password, can change it right where
+ * the onboarding redirect strands them (the profile page is not on the
+ * RedirectToOnboarding whitelist while no RepoProfile exists).
  */
 class Onboarding extends Page
 {
-    public const TOTAL_STEPS = 3;
+    public const TOTAL_STEPS = 4;
 
     /** Git providers usable as a repository source, mapped to their OAuth config key. */
     private const OAUTH_PROVIDERS = [
@@ -66,7 +75,16 @@ class Onboarding extends Page
         ];
     }
 
-    // ── Step 1: agents ──────────────────────────────────────────────────────
+    // ── Step 1: security (password) ─────────────────────────────────────────
+
+    public string $newPassword = '';
+
+    public string $newPasswordConfirmation = '';
+
+    /** Set once the password was changed here, to drop the default-password warning. */
+    public bool $passwordJustChanged = false;
+
+    // ── Step 2: agents ──────────────────────────────────────────────────────
 
     /** 'agent_credential' | 'none' — drives which Claude UI is shown. */
     public string $tokenSource = 'none';
@@ -77,7 +95,7 @@ class Onboarding extends Page
 
     public string $codexAuthJson = '';
 
-    // ── Step 2: repository ──────────────────────────────────────────────────
+    // ── Step 3: repository ──────────────────────────────────────────────────
 
     /** @var array<string, array{configured: bool, connected: bool}> */
     public array $oauthState = [];
@@ -91,7 +109,7 @@ class Onboarding extends Page
 
     public string $projectName = '';
 
-    // ── Step 3: done ────────────────────────────────────────────────────────
+    // ── Step 4: done ────────────────────────────────────────────────────────
 
     public ?string $createdProfileId = null;
 
@@ -124,8 +142,9 @@ class Onboarding extends Page
     {
         $this->refreshState();
         // Resume on the repository step after an agent is set up (e.g. when an
-        // OAuth callback redirected back here mid-flow).
-        $this->currentStep = $this->isAnyAgentConfigured() ? 2 : 1;
+        // OAuth callback redirected back here mid-flow); otherwise start on the
+        // security step so the first user can change the default password.
+        $this->currentStep = $this->isAnyAgentConfigured() ? 3 : 1;
     }
 
     private function refreshState(): void
@@ -163,15 +182,16 @@ class Onboarding extends Page
     /** The highest step the user is allowed to reach given current state. */
     public function furthestUnlockedStep(): int
     {
+        // The security step is optional, so agents (step 2) is always reachable.
         if (! $this->isAnyAgentConfigured()) {
-            return 1;
-        }
-
-        if ($this->createdProfileId === null) {
             return 2;
         }
 
-        return 3;
+        if ($this->createdProfileId === null) {
+            return 3;
+        }
+
+        return 4;
     }
 
     /**
@@ -185,9 +205,10 @@ class Onboarding extends Page
     {
         $furthest = $this->furthestUnlockedStep();
         $labels = [
-            1 => __('onboarding.steps.agents'),
-            2 => __('onboarding.steps.repository'),
-            3 => __('onboarding.steps.done'),
+            1 => __('onboarding.steps.security'),
+            2 => __('onboarding.steps.agents'),
+            3 => __('onboarding.steps.repository'),
+            4 => __('onboarding.steps.done'),
         ];
 
         $steps = [];
@@ -215,7 +236,7 @@ class Onboarding extends Page
 
     public function nextStep(): void
     {
-        if ($this->currentStep === 1 && ! $this->isAnyAgentConfigured()) {
+        if ($this->currentStep === 2 && ! $this->isAnyAgentConfigured()) {
             Notification::make()
                 ->title(__('onboarding.notifications.need_agent'))
                 ->warning()
@@ -232,7 +253,71 @@ class Onboarding extends Page
         $this->currentStep = max(1, $this->currentStep - 1);
     }
 
-    // ── Step 1: agent actions ────────────────────────────────────────────────
+    // ── Step 1: security actions ─────────────────────────────────────────────
+
+    /**
+     * True while the logged-in user still carries the seeded default password.
+     * Drives the warning banner that nudges the first user to change it — no
+     * DB flag needed, we simply compare against the configured admin password.
+     */
+    public function usingDefaultPassword(): bool
+    {
+        if ($this->passwordJustChanged) {
+            return false;
+        }
+
+        /** @var User|null $user */
+        $user = Auth::user();
+        if ($user === null) {
+            return false;
+        }
+
+        $default = config('argos.admin_password');
+
+        return is_string($default) && $default !== '' && Hash::check($default, (string) $user->password);
+    }
+
+    public function savePassword(): void
+    {
+        /** @var User|null $user */
+        $user = Auth::user();
+        if ($user === null) {
+            return;
+        }
+
+        $validator = Validator::make(
+            [
+                'password' => $this->newPassword,
+                'password_confirmation' => $this->newPasswordConfirmation,
+            ],
+            [
+                'password' => ['required', 'confirmed', Password::defaults()],
+            ],
+        );
+
+        if ($validator->fails()) {
+            Notification::make()
+                ->title(__('onboarding.notifications.password_invalid_title'))
+                ->body($validator->errors()->first('password'))
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        app(AccountPasswordService::class)->change($user, $this->newPassword);
+
+        $this->newPassword = '';
+        $this->newPasswordConfirmation = '';
+        $this->passwordJustChanged = true;
+
+        Notification::make()
+            ->title(__('onboarding.notifications.password_saved'))
+            ->success()
+            ->send();
+    }
+
+    // ── Step 2: agent actions ────────────────────────────────────────────────
 
     public function disconnectProvider(string $provider): void
     {
@@ -347,7 +432,7 @@ class Onboarding extends Page
         return $this->tokenSource !== 'none' || $this->codexConfigured;
     }
 
-    // ── Step 2: repository source + picker ────────────────────────────────────
+    // ── Step 3: repository source + picker ────────────────────────────────────
 
     public function hasAnyOAuthConfigured(): bool
     {
@@ -689,7 +774,7 @@ class Onboarding extends Page
         ]);
 
         $this->createdProfileId = $profile->id;
-        $this->currentStep = 3;
+        $this->currentStep = 4;
 
         Notification::make()->title(__('onboarding.notifications.project_created'))->success()->send();
     }
