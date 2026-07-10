@@ -187,9 +187,12 @@ Melde dich mit den Zugangsdaten aus der Installer-Zusammenfassung an:
 - **Passwort:** das generierte `ADMIN_PASSWORD` aus der Zusammenfassung (auch in
   `.env`).
 
-Ändere das Admin-Passwort unter **Profile** nach der ersten Anmeldung.
-
 Ein in der App integrierter **Onboarding-Assistent** führt dich anschließend
+durch die Einrichtung. Sein erster Schritt ist **Sicherheit**: Lege dort direkt
+ein eigenes Passwort fest, um das generierte Standard-Passwort zu ersetzen. Der
+Schritt ist optional und überspringbar — solange du noch das Standard-Passwort
+nutzt, weist dich ein Hinweis darauf hin, es zu ändern (du kannst es auch
+jederzeit später unter **Profile** ändern). Der Assistent führt dich danach
 durch das Einfügen deines Claude-Tokens und das Anlegen deines ersten Projekts.
 Um ein Ziel-Repository "Argos-ready" zu machen (eine eigene Build-Umgebung oder
 einen Live-Demo-Vertrag), siehe [PREPARE-PROJECT.md](PREPARE-PROJECT.md).

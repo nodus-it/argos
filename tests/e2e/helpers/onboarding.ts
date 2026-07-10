@@ -2,9 +2,12 @@ import { type Page } from '@playwright/test';
 import { type Agent } from '../matrix';
 
 /**
- * Complete onboarding step 1 (agent auth), which is what unlocks the onboarding
+ * Complete onboarding's agent-auth step, which is what unlocks the onboarding
  * gate so the rest of the panel is reachable. Uses the page's Livewire
  * wire:model / wire:click hooks as selectors (i18n-independent, robust).
+ *
+ * Step 1 is the optional security (password) step — we skip it via the
+ * "Continue" button to reach the agents step where the token inputs live.
  *
  * In fake mode the Anthropic validator always passes, so any token string works.
  *
@@ -12,6 +15,10 @@ import { type Agent } from '../matrix';
  */
 export async function completeOnboarding(page: Page, agent: Agent): Promise<void> {
   await page.goto('/admin/onboarding');
+
+  // Skip the optional security step to reach the agents step.
+  await page.locator('[wire\\:click="nextStep"]').first().click();
+  await page.waitForLoadState('networkidle');
 
   if (agent === 'claude-code') {
     await page.locator('input[wire\\:model="claudeToken"]').fill('e2e-fake-claude-token');

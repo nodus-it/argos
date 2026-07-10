@@ -179,12 +179,14 @@ Log in with the credentials from the installer summary:
 - **Password:** the generated `ADMIN_PASSWORD` from the summary (also in
   `.env`).
 
-Change the admin password under **Profile** after the first login.
-
-An in-app **onboarding wizard** then walks you through pasting your Claude
-token and creating your first project. To make a target repository
-"Argos-ready" (a custom build environment or a live-demo contract), see
-[PREPARE-PROJECT.md](PREPARE-PROJECT.md).
+An in-app **onboarding wizard** then walks you through the setup. Its first
+step is **Security**: set your own password right there to replace the
+generated default. The step is optional and skippable, but while you still
+carry the default password a warning nudges you to change it (you can also
+change it anytime later under **Profile**). The wizard then walks you through
+pasting your Claude token and creating your first project. To make a target
+repository "Argos-ready" (a custom build environment or a live-demo contract),
+see [PREPARE-PROJECT.md](PREPARE-PROJECT.md).
 
 ## Reverse proxy and APP_URL
 
