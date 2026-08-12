@@ -25,6 +25,7 @@ use Illuminate\Support\Carbon;
  * @property int|null $user_id
  * @property string $name
  * @property string $slug
+ * @property string|null $external_ref
  * @property string|null $repo_profile_id
  * @property string $description
  * @property string|null $base_branch
@@ -66,6 +67,7 @@ class Task extends Model
         'user_id',
         'name',
         'slug',
+        'external_ref',
         'repo_profile_id',
         'description',
         'base_branch',

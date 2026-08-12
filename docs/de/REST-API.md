@@ -160,6 +160,7 @@ Query-Parameter:
 | --- | --- |
 | `project` | Nach Projekt-id oder Projektname filtern. Wird bei projektgebundenen Tokens ignoriert (bereits auf ihr Projekt beschränkt). |
 | `status` | Nach `workflow_status`-Wert filtern (siehe unten). |
+| `external_ref` | Nach der eigenen Referenz des Aufrufers filtern (siehe [Idempotenz](#idempotenz)). Damit lässt sich nachsehen, ob es zum eigenen Schlüssel schon einen Task gibt, ohne einen anzulegen. |
 
 ```bash
 curl "https://your-argos-host/api/v1/tasks?project=my-service&status=in_review" \
@@ -173,6 +174,7 @@ curl "https://your-argos-host/api/v1/tasks?project=my-service&status=in_review" 
     {
       "id": "01J...",
       "name": "Add rate limiting",
+      "external_ref": "https://tracker.example/issues/4711",
       "project": { "id": "01J...", "name": "my-service" },
       "workflow_status": "in_review",
       "current_phase": "push",
@@ -210,6 +212,7 @@ curl https://your-argos-host/api/v1/tasks/01J... \
   "data": {
     "id": "01J...",
     "name": "Add rate limiting",
+    "external_ref": "https://tracker.example/issues/4711",
     "description": "The plan text...",
     "workflow_status": "in_review",
     "current_phase": "push",
@@ -259,6 +262,7 @@ Request-Body:
 | `plan` | ja | Der Plan. Wird sowohl als Task-Beschreibung als auch als Concept-Notizen gespeichert. |
 | `project` | bedingt | Projekt-id oder -name. Erforderlich für Tokens mit Vollzugriff; optional für projektgebundene Tokens. Wird er mit einem projektgebundenen Token angegeben, muss er dem Projekt des Tokens entsprechen. |
 | `base_branch` | nein | Branch, auf dem die Arbeit basieren soll (max. 255 Zeichen). Standardmäßig der Default-Branch des Projekts. |
+| `external_ref` | nein | Die eigene Referenz des Aufrufers für diesen Vorgang (max. 255 Zeichen). Eindeutig je Projekt — siehe [Idempotenz](#idempotenz). |
 
 ```bash
 curl -X POST https://your-argos-host/api/v1/tasks \
@@ -269,12 +273,48 @@ curl -X POST https://your-argos-host/api/v1/tasks \
         "name": "Add rate limiting",
         "plan": "Add a rate limiter to the public API...",
         "project": "my-service",
-        "base_branch": "main"
+        "base_branch": "main",
+        "external_ref": "https://tracker.example/issues/4711"
       }'
 ```
 
-Antwortet mit `202 Accepted` und dem Task in derselben Form wie bei **Einen
-Task abrufen**.
+Antwortet mit dem Task in derselben Form wie bei **Einen Task abrufen**,
+ergänzt um ein `created`-Flag neben dem `data`-Envelope:
+
+| Status | Bedeutung |
+| --- | --- |
+| `202` | Der Task wurde angelegt und die Concept-Phase gestartet (`created: true`). |
+| `200` | Unter dieser `external_ref` gab es den Task bereits; es wurde nichts angelegt und keine Phase gestartet (`created: false`). |
+
+### Idempotenz
+
+`external_ref` ist der **natürliche Schlüssel** des Vorgangs: derselbe
+Sachverhalt muss zwangsläufig denselben Wert ergeben, ohne dass sich der
+Aufrufer etwas merken muss.
+
+| Anwendungsfall | Schlüssel |
+| --- | --- |
+| Task aus einem anderen Tracker gespiegelt | dessen Task-URL oder -ID |
+| Arbeit aus einem Pull-Request | die PR-URL |
+| Ein Task je Issue | `<repo>#<issue-nummer>` |
+
+Die Eindeutigkeit garantiert der Server über einen Unique-Index auf
+`(Projekt, external_ref)` — nicht der Aufrufer. Ein zweiter Aufruf mit
+demselben Schlüssel legt nichts an, sondern gibt den bestehenden Task mit `200`
+und `created: false` zurück. Das gilt auch für zwei Läufe, die sich zeitlich
+überholen.
+
+Am meisten zählt das dort, wo niemand zusieht: Geht die *Antwort* auf einen
+Anlege-Aufruf verloren — Timeout, Verbindungsabbruch —, kann der Aufrufer nicht
+wissen, ob der Task existiert. Mit einem Schlüssel sendet er einfach nochmal;
+ohne ihn hat er die Wahl zwischen einem doppelten Implement-Lauf und einer
+Nachschau von Hand.
+
+Der Schlüssel gilt **je Projekt**: Zwei Automaten dürfen ihre Schlüssel aus
+demselben Namensraum bilden (eine Issue-Nummer, eine fremde Task-ID), und
+derselbe Schlüssel in einem anderen Projekt ist ein anderer Task.
+
+Ohne `external_ref` legt jeder Aufruf einen neuen Task an.
 
 ### Feedback einreichen
 
@@ -370,6 +410,9 @@ finden.
 - Schreibaktionen, die eine asynchrone Phase anstoßen, liefern `202 Accepted`
   mit dem Task in der `data`-Hülle. Die Arbeit läuft im Hintergrund — lesen Sie
   den Task erneut, um ihr zu folgen.
+- `POST /api/v1/tasks` antwortet stattdessen mit `200`, wenn eine
+  `external_ref` auf einen bestehenden Task passte: Es wurde nichts angelegt
+  und nichts gestartet. Siehe [Idempotenz](#idempotenz).
 - Fehler liefern einen JSON-Body mit einem `message`-Feld und einem passenden
   HTTP-Status.
 

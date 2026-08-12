@@ -24,6 +24,7 @@ class TaskSummaryResource extends JsonResource
         return [
             'id' => $this->id,
             'name' => $this->name,
+            'external_ref' => $this->external_ref,
             'project' => [
                 'id' => $this->repoProfile?->id,
                 'name' => $this->repoProfile?->name,

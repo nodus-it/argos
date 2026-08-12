@@ -20,6 +20,7 @@ use App\Models\Task;
 use App\Services\Workflow\PhaseRunner;
 use App\Services\Workflow\RunResourceReaper;
 use App\Services\Workflow\WorkflowService;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Process;
 
@@ -43,6 +44,7 @@ class TaskService
             'user_id' => $data['user_id'] ?? null,
             'name' => $data['name'],
             'slug' => $data['slug'] ?? Task::generateSlug((string) $data['name']),
+            'external_ref' => $data['external_ref'] ?? null,
             'repo_profile_id' => $data['repo_profile_id'] ?? null,
             'description' => $data['description'],
             'base_branch' => $data['base_branch'] ?? null,
@@ -77,6 +79,52 @@ class TaskService
         }
 
         return $task;
+    }
+
+    /**
+     * Create a task at most once per external reference, scoped to the project.
+     *
+     * The lookup answers the normal case; the promise rests on the unique
+     * index, which also settles two runs that overtake each other.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array{task: Task, created: bool}
+     */
+    public function createIdempotent(array $data, ?string $externalRef): array
+    {
+        if ($externalRef === null || $externalRef === '') {
+            return ['task' => $this->createTask($data), 'created' => true];
+        }
+
+        $data['external_ref'] = $externalRef;
+        $project = $data['repo_profile_id'] ?? null;
+
+        $existing = $this->findByExternalRef($project, $externalRef);
+
+        if ($existing !== null) {
+            return ['task' => $existing, 'created' => false];
+        }
+
+        try {
+            return ['task' => $this->createTask($data), 'created' => true];
+        } catch (UniqueConstraintViolationException $e) {
+            $task = $this->findByExternalRef($project, $externalRef);
+
+            // A different constraint collided — surface the real cause.
+            if ($task === null) {
+                throw $e;
+            }
+
+            return ['task' => $task, 'created' => false];
+        }
+    }
+
+    private function findByExternalRef(?string $repoProfileId, string $externalRef): ?Task
+    {
+        return Task::query()
+            ->where('repo_profile_id', $repoProfileId)
+            ->where('external_ref', $externalRef)
+            ->first();
     }
 
     /**
