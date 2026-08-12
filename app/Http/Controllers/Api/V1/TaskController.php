@@ -43,6 +43,11 @@ class TaskController extends Controller
                 is_string($request->query('status')) && $request->query('status') !== '',
                 fn ($query) => $query->where('workflow_status', $request->query('status')),
             )
+            // Lets a caller check its key without creating a task.
+            ->when(
+                is_string($request->query('external_ref')) && $request->query('external_ref') !== '',
+                fn ($query) => $query->where('external_ref', $request->query('external_ref')),
+            )
             ->latest()
             ->get();
 
@@ -59,12 +64,18 @@ class TaskController extends Controller
         return new TaskResource($task);
     }
 
+    /**
+     * Create a task — at most once per `external_ref`.
+     *
+     * `202` for a fresh task (the concept phase starts asynchronously), `200`
+     * for a repeat, which starts nothing. Both carry a `created` flag.
+     */
     public function store(StoreTaskRequest $request): JsonResponse
     {
         $project = $this->resolveStoreProject($request);
         $plan = (string) $request->input('plan');
 
-        $task = $this->taskService->createTask([
+        ['task' => $task, 'created' => $created] = $this->taskService->createIdempotent([
             // API-created tasks are owned by the consumer (ApiClient/RepoProfile
             // token), not a human user.
             'user_id' => null,
@@ -73,7 +84,14 @@ class TaskController extends Controller
             'description' => $plan,
             'base_branch' => $request->input('base_branch'),
             'auto_concept' => false,
-        ]);
+        ], $request->input('external_ref'));
+
+        if (! $created) {
+            return (new TaskResource($task->load('repoProfile')))
+                ->additional(['created' => false])
+                ->response()
+                ->setStatusCode(200);
+        }
 
         // createTask() inserts with the DB default workflow_status ('draft') but
         // leaves it unset in memory; refresh so startPhase() transitions cleanly.
@@ -90,6 +108,7 @@ class TaskController extends Controller
         }
 
         return (new TaskResource($task->load('repoProfile')))
+            ->additional(['created' => true])
             ->response()
             ->setStatusCode(202);
     }
