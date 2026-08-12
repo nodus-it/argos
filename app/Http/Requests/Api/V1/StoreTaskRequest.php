@@ -26,6 +26,8 @@ class StoreTaskRequest extends FormRequest
             // (the controller resolves and validates against the token's scope).
             'project' => ['nullable', 'string'],
             'base_branch' => ['nullable', 'string', 'max:255'],
+            // The caller's natural key — unique per project, see TaskService.
+            'external_ref' => ['nullable', 'string', 'max:255'],
         ];
     }
 }

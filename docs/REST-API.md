@@ -151,6 +151,7 @@ Requires `tasks:read`. Returns tasks newest-first. Optional query parameters:
 | --- | --- |
 | `project` | Filter by project id or project name. Ignored for project-scoped tokens (already confined to their project). |
 | `status` | Filter by `workflow_status` value (see below). |
+| `external_ref` | Filter by the caller's own reference (see [Idempotency](#idempotency)). Lets you check whether your key already has a task without creating one. |
 
 ```bash
 curl "https://your-argos-host/api/v1/tasks?project=my-service&status=in_review" \
@@ -164,6 +165,7 @@ curl "https://your-argos-host/api/v1/tasks?project=my-service&status=in_review" 
     {
       "id": "01J...",
       "name": "Add rate limiting",
+      "external_ref": "https://tracker.example/issues/4711",
       "project": { "id": "01J...", "name": "my-service" },
       "workflow_status": "in_review",
       "current_phase": "push",
@@ -201,6 +203,7 @@ curl https://your-argos-host/api/v1/tasks/01J... \
   "data": {
     "id": "01J...",
     "name": "Add rate limiting",
+    "external_ref": "https://tracker.example/issues/4711",
     "description": "The plan text...",
     "workflow_status": "in_review",
     "current_phase": "push",
@@ -249,6 +252,7 @@ Request body:
 | `plan` | yes | The plan. Stored as both the task description and the concept notes. |
 | `project` | conditional | Project id or name. Required for full-access tokens; optional for project-scoped tokens. If supplied with a project-scoped token, it must match the token's project. |
 | `base_branch` | no | Branch to base the work on (max 255 chars). Defaults to the project's default branch. |
+| `external_ref` | no | Your own reference for this piece of work (max 255 chars). Unique per project — see [Idempotency](#idempotency). |
 
 ```bash
 curl -X POST https://your-argos-host/api/v1/tasks \
@@ -259,11 +263,46 @@ curl -X POST https://your-argos-host/api/v1/tasks \
         "name": "Add rate limiting",
         "plan": "Add a rate limiter to the public API...",
         "project": "my-service",
-        "base_branch": "main"
+        "base_branch": "main",
+        "external_ref": "https://tracker.example/issues/4711"
       }'
 ```
 
-Responds `202 Accepted` with the task in the same shape as **Get a task**.
+Responds with the task in the same shape as **Get a task**, plus a `created`
+flag next to the `data` envelope:
+
+| Status | Meaning |
+| --- | --- |
+| `202` | The task was created and the Concept phase started (`created: true`). |
+| `200` | A task already existed under this `external_ref`; nothing was created and no phase was started (`created: false`). |
+
+### Idempotency
+
+`external_ref` is the **natural key** of the piece of work: the same matter
+must inevitably produce the same value, without the caller having to remember
+anything.
+
+| Use case | Key |
+| --- | --- |
+| Task mirrored from another tracker | that tracker's task URL or id |
+| Work derived from a pull request | the PR URL |
+| One task per issue | `<repo>#<issue-number>` |
+
+Uniqueness is guaranteed by the server through a unique index on
+`(project, external_ref)` — not by the caller. A second call with the same key
+creates nothing and returns the existing task with `200` and `created: false`.
+That holds for two runs overtaking each other as well.
+
+This matters most where nobody is watching. When the *response* to a create
+call is lost — a timeout, a dropped connection — the caller cannot tell whether
+the task exists. With a key it may simply send again; without one it has to
+choose between a duplicate Implement run and a manual look.
+
+The key is scoped **per project**: two automations may derive their keys from
+the same namespace (an issue number, a foreign task id), and the same key in a
+different project is a different task.
+
+Without `external_ref`, every call creates a new task.
 
 ### Submit feedback
 
@@ -354,6 +393,9 @@ the task to find the `pr_url` and the `checkout` block.
 - Write actions that kick off an asynchronous phase return `202 Accepted` with
   the task in the `data` envelope. The work runs in the background — re-read the
   task to follow it.
+- `POST /api/v1/tasks` answers `200` instead when an `external_ref` matched an
+  existing task: nothing was created, nothing was started. See
+  [Idempotency](#idempotency).
 - Errors return a JSON body with a `message` field and an appropriate HTTP
   status.
 

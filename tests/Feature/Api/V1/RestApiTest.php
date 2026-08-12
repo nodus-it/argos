@@ -154,6 +154,177 @@ test('create requires a project for a user token', function () {
     ])->assertStatus(422)->assertJsonValidationErrors('project');
 });
 
+// ── Tasks: idempotent create ─────────────────────────────────────────────────
+
+test('a fresh external_ref creates the task and reports created (202)', function () {
+    Process::fake();
+    Queue::fake();
+
+    $repo = RepoProfile::factory()->create(['name' => 'target']);
+    $token = fullToken(['tasks:write']);
+
+    $this->withToken($token)->postJson('/api/v1/tasks', [
+        'name' => 'keyed-task',
+        'project' => 'target',
+        'plan' => 'Do the thing.',
+        'external_ref' => 'https://tracker.example/issues/4711',
+    ])
+        ->assertStatus(202)
+        ->assertJsonPath('created', true)
+        ->assertJsonPath('data.external_ref', 'https://tracker.example/issues/4711');
+
+    expect(Task::where('repo_profile_id', $repo->id)->value('external_ref'))
+        ->toBe('https://tracker.example/issues/4711');
+});
+
+test('a repeated external_ref returns the existing task without starting anything (200)', function () {
+    Process::fake();
+    Queue::fake();
+
+    RepoProfile::factory()->create(['name' => 'target']);
+    $token = fullToken(['tasks:write']);
+
+    $payload = [
+        'name' => 'keyed-task',
+        'project' => 'target',
+        'plan' => 'Do the thing.',
+        'external_ref' => 'tracker:4711',
+    ];
+
+    $first = $this->withToken($token)->postJson('/api/v1/tasks', $payload)->assertStatus(202);
+
+    $this->withToken($token)->postJson('/api/v1/tasks', $payload)
+        ->assertStatus(200)
+        ->assertJsonPath('created', false)
+        ->assertJsonPath('data.id', $first->json('data.id'));
+
+    expect(Task::where('external_ref', 'tracker:4711')->count())->toBe(1);
+    Queue::assertPushed(RunPhaseJob::class, 1);
+});
+
+test('a repeat under a different name still returns the original task', function () {
+    Process::fake();
+    Queue::fake();
+
+    RepoProfile::factory()->create(['name' => 'target']);
+    $token = fullToken(['tasks:write']);
+
+    $this->withToken($token)->postJson('/api/v1/tasks', [
+        'name' => 'first name', 'project' => 'target', 'plan' => 'a', 'external_ref' => 'tracker:4711',
+    ])->assertStatus(202);
+
+    $this->withToken($token)->postJson('/api/v1/tasks', [
+        'name' => 'renamed meanwhile', 'project' => 'target', 'plan' => 'b', 'external_ref' => 'tracker:4711',
+    ])
+        ->assertStatus(200)
+        ->assertJsonPath('data.name', 'first name');
+
+    expect(Task::count())->toBe(1);
+});
+
+test('the same external_ref in another project creates its own task', function () {
+    Process::fake();
+    Queue::fake();
+
+    RepoProfile::factory()->create(['name' => 'one']);
+    RepoProfile::factory()->create(['name' => 'two']);
+    $token = fullToken(['tasks:write']);
+
+    foreach (['one', 'two'] as $project) {
+        $this->withToken($token)->postJson('/api/v1/tasks', [
+            'name' => "task for {$project}",
+            'project' => $project,
+            'plan' => 'Do the thing.',
+            'external_ref' => 'issue-7',
+        ])->assertStatus(202);
+    }
+
+    expect(Task::where('external_ref', 'issue-7')->count())->toBe(2);
+});
+
+test('without an external_ref every call creates a new task', function () {
+    Process::fake();
+    Queue::fake();
+
+    RepoProfile::factory()->create(['name' => 'target']);
+    $token = fullToken(['tasks:write']);
+
+    $payload = ['name' => 'unkeyed', 'project' => 'target', 'plan' => 'Do the thing.'];
+
+    $this->withToken($token)->postJson('/api/v1/tasks', $payload)->assertStatus(202);
+    $this->withToken($token)->postJson('/api/v1/tasks', $payload)
+        ->assertStatus(202)
+        ->assertJsonPath('created', true);
+
+    expect(Task::count())->toBe(2);
+});
+
+test('an empty external_ref is treated as none, not as a shared key', function () {
+    Process::fake();
+    Queue::fake();
+
+    RepoProfile::factory()->create(['name' => 'target']);
+    $token = fullToken(['tasks:write']);
+
+    $payload = ['name' => 'blank', 'project' => 'target', 'plan' => 'x', 'external_ref' => ''];
+
+    $this->withToken($token)->postJson('/api/v1/tasks', $payload)->assertStatus(202);
+    $this->withToken($token)->postJson('/api/v1/tasks', $payload)->assertStatus(202);
+
+    expect(Task::count())->toBe(2)
+        ->and(Task::whereNotNull('external_ref')->count())->toBe(0);
+});
+
+test('a concurrent create that wins the insert is returned instead of a duplicate', function () {
+    Process::fake();
+    Queue::fake();
+
+    $repo = RepoProfile::factory()->create(['name' => 'target']);
+    $token = fullToken(['tasks:write']);
+
+    // A second run that slips past the lookup and inserts first.
+    $raced = false;
+    Task::creating(function (Task $task) use ($repo, &$raced): void {
+        if ($raced) {
+            return;
+        }
+        $raced = true;
+
+        Task::create([
+            'name' => 'winner',
+            'slug' => 'winner',
+            'external_ref' => 'tracker:4711',
+            'repo_profile_id' => $repo->id,
+            'description' => 'won the race',
+        ]);
+    });
+
+    $this->withToken($token)->postJson('/api/v1/tasks', [
+        'name' => 'loser',
+        'project' => 'target',
+        'plan' => 'Do the thing.',
+        'external_ref' => 'tracker:4711',
+    ])
+        ->assertStatus(200)
+        ->assertJsonPath('created', false)
+        ->assertJsonPath('data.name', 'winner');
+
+    expect(Task::where('external_ref', 'tracker:4711')->count())->toBe(1);
+});
+
+test('tasks can be looked up by external_ref without creating one', function () {
+    $repo = RepoProfile::factory()->create();
+    Task::factory()->create(['repo_profile_id' => $repo->id, 'external_ref' => 'tracker:4711']);
+    Task::factory()->create(['repo_profile_id' => $repo->id, 'external_ref' => 'tracker:4712']);
+
+    $token = fullToken(['tasks:read']);
+
+    $this->withToken($token)->getJson('/api/v1/tasks?external_ref=tracker:4711')
+        ->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.external_ref', 'tracker:4711');
+});
+
 // ── Tasks: phase gates ───────────────────────────────────────────────────────
 
 test('returns 409 when a phase is already running', function () {
