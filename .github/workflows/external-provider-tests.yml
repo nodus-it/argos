@@ -1,17 +1,15 @@
 name: External Provider Contract Tests
 
 # Hits the real GitHub/GitLab/Bitbucket APIs and writes to dedicated test
-# repositories, so this workflow is opt-in. It runs on a weekly schedule
-# (catch silent provider API regressions) and on demand via the Actions UI.
+# repositories, so this workflow is opt-in and runs on demand only. There is
+# deliberately no schedule: the provider PATs expire, and an unattended weekly
+# run then goes red and keeps notifying without anyone acting on it. Refresh
+# the secrets, then start the run from the Actions UI.
 # The repository PATs are stored as repo secrets — see docs/PROVIDER-TEST-SETUP.md
 # for which scopes each token needs and which test repo it must be limited to.
 
 on:
   workflow_dispatch:
-  schedule:
-    # Sonntag 04:00 UTC. Times of day with low traffic on all three providers
-    # so we don't fight rate limits or release windows.
-    - cron: '0 4 * * 0'
 
 permissions:
   contents: read
