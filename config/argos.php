@@ -195,6 +195,8 @@ return [
         'editor_cookie_hours' => (int) $envOr('ARGOS_WORKSPACE_EDITOR_COOKIE_HOURS', 12),
         // How often open pull requests of workspaces are re-read (minutes).
         'pr_sync_minutes' => (int) $envOr('ARGOS_WORKSPACE_PR_SYNC_MINUTES', 15),
+        // Upload limit per image attached to a thread message (MB).
+        'upload_max_mb' => (int) $envOr('ARGOS_WORKSPACE_UPLOAD_MAX_MB', 5),
         'daemon_port' => 7777,
         'editor_port' => 3000,
         'openvscode_version' => $envOr('ARGOS_OPENVSCODE_VERSION', '1.109.5'),

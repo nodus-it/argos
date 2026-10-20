@@ -6,6 +6,7 @@ import type { Outbox } from './outbox.js';
 import { ThreadSession, USER_PERMISSION_MODES, type QueryFactory, type SessionEnvironment } from './threadSession.js';
 import { initWorkspace, WorkspaceInitError } from './workspaceInit.js';
 import * as gitOps from './gitOps.js';
+import { FileIndex } from './files.js';
 import { OneshotError, runOneshot, type OneshotRunner } from './oneshot.js';
 
 export const DAEMON_VERSION = '0.1.0';
@@ -237,6 +238,13 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
     });
 
     const dir = deps.environment.workspaceDir;
+    const fileIndex = new FileIndex(dir);
+
+    app.get('/files', async (request) => {
+        const query = z.object({ q: z.string().max(200).default(''), limit: z.coerce.number().int().min(1).max(50).default(20) }).parse(request.query);
+
+        return { files: await fileIndex.search(query.q, query.limit) };
+    });
 
     app.get('/git/status', async () => gitOps.status(dir));
 

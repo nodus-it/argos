@@ -131,6 +131,13 @@ class FakeWorkspaceDaemon extends WorkspaceDaemonClient implements WorkspaceDaem
 
     public function gitFetch(): void {}
 
+    public function files(string $query, int $limit = 20): array
+    {
+        $all = ['README.md', 'app/Http/Controllers/LoginController.php', 'app/Models/User.php', 'routes/web.php'];
+
+        return array_values(array_slice(array_filter($all, fn (string $f): bool => $query === '' || str_contains(strtolower($f), strtolower($query))), 0, $limit));
+    }
+
     public function gitCommit(string $subject, string $body, array $author): ?array
     {
         return ['sha' => str_repeat('a', 40)];

@@ -23,6 +23,7 @@ use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Illuminate\Contracts\Support\Htmlable;
+use Livewire\Attributes\On;
 
 /**
  * The workspace: chat with Claude on the left, editor and preview on the
@@ -69,6 +70,13 @@ class ViewWorkspace extends ViewRecord
     public function getTitle(): string|Htmlable
     {
         return $this->workspace()->name;
+    }
+
+    /** `/ship` in the composer opens the ship dialog. */
+    #[On('workspace-ship')]
+    public function openShipDialog(): void
+    {
+        $this->mountAction('ship');
     }
 
     /** Re-read the record while the container changes state (polled). */

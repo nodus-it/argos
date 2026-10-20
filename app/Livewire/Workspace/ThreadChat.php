@@ -10,6 +10,7 @@ use App\Enums\PermissionMode;
 use App\Enums\ThreadEventType;
 use App\Enums\ThreadStatus;
 use App\Enums\WorkspaceRole;
+use App\Integrations\WorkspaceDaemon\DaemonTransportException;
 use App\Models\AgentCredential;
 use App\Models\Thread;
 use App\Models\ThreadApproval;
@@ -17,8 +18,10 @@ use App\Models\ThreadEvent;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Workspace\AgentPool;
+use App\Services\Workspace\ThreadAttachmentService;
 use App\Services\Workspace\ThreadReadService;
 use App\Services\Workspace\ThreadService;
+use App\Services\Workspace\WorkspaceDaemonClient;
 use App\Services\Workspace\WorkspaceException;
 use Filament\Notifications\Notification;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -27,6 +30,8 @@ use Illuminate\Support\Collection;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
+use Livewire\WithFileUploads;
 
 /**
  * The chat of a workspace: thread switcher, history, approvals and the
@@ -36,7 +41,15 @@ use Livewire\Component;
  */
 class ThreadChat extends Component
 {
+    use WithFileUploads;
+
     private const PAGE = 200;
+
+    /** Commands Argos handles itself instead of sending them to Claude. */
+    public const ARGOS_COMMANDS = ['plan', 'ship', 'preview', 'review'];
+
+    /** @var list<TemporaryUploadedFile> */
+    public array $uploads = [];
 
     #[Locked]
     public string $workspaceId;
@@ -126,14 +139,97 @@ class ThreadChat extends Component
     {
         $text = trim($this->draft);
         $thread = $this->activeThread();
-        if ($text === '' || $thread === null) {
+        if (($text === '' && $this->uploads === []) || $thread === null) {
             return;
         }
 
-        $this->attempt(function () use ($thread, $text): void {
-            app(ThreadService::class)->send($thread, $this->user(), $text);
+        if ($this->runArgosCommand($text)) {
             $this->draft = '';
+
+            return;
+        }
+
+        $this->validate([
+            'uploads' => ['array', 'max:'.ThreadAttachmentService::MAX_FILES],
+            'uploads.*' => ['image', 'mimes:png,jpg,jpeg,gif,webp', 'max:'.((int) config('argos.workspaces.upload_max_mb', 5) * 1024)],
+        ]);
+
+        $this->attempt(function () use ($thread, $text): void {
+            $images = app(ThreadAttachmentService::class)->store($thread, $this->uploads);
+            app(ThreadService::class)->send($thread, $this->user(), $text, $images);
+            $this->draft = '';
+            $this->uploads = [];
         });
+    }
+
+    public function removeUpload(int $index): void
+    {
+        unset($this->uploads[$index]);
+        $this->uploads = array_values($this->uploads);
+    }
+
+    /**
+     * Fuzzy file search for `@` mentions in the composer.
+     *
+     * @return list<string>
+     */
+    public function searchFiles(string $query): array
+    {
+        try {
+            return app(WorkspaceDaemonClient::class)->for($this->workspace(), 5)->files(mb_substr($query, 0, 200), 15);
+        } catch (DaemonTransportException) {
+            return [];
+        }
+    }
+
+    /**
+     * Slash commands for the composer: Argos' own, then those Claude Code
+     * reported for this session (project commands, skills).
+     *
+     * @return list<array{name: string, description: string, argos: bool}>
+     */
+    public function commandList(): array
+    {
+        $commands = array_map(fn (string $name): array => [
+            'name' => $name,
+            'description' => __('workspaces.commands.'.$name),
+            'argos' => true,
+        ], self::ARGOS_COMMANDS);
+
+        foreach ($this->activeThread()?->commands ?? [] as $command) {
+            if (! in_array($command['name'], self::ARGOS_COMMANDS, true)) {
+                $commands[] = ['name' => $command['name'], 'description' => (string) $command['description'], 'argos' => false];
+            }
+        }
+
+        return $commands;
+    }
+
+    /** Handle `/plan`, `/ship`, `/preview`, `/review`; true when consumed. */
+    private function runArgosCommand(string $text): bool
+    {
+        if (preg_match('/^\/([a-z-]+)(?:\s+(.*))?$/s', $text, $m) !== 1 || ! in_array($m[1], self::ARGOS_COMMANDS, true)) {
+            return false;
+        }
+        $rest = trim($m[2] ?? '');
+
+        match ($m[1]) {
+            'plan' => $this->runPlan($rest),
+            'ship' => $this->dispatch('workspace-ship'),
+            'preview' => $this->dispatch('workspace-tab', tab: 'preview'),
+            'review' => $this->dispatch('workspace-tab', tab: 'review'),
+        };
+
+        return true;
+    }
+
+    private function runPlan(string $rest): void
+    {
+        $this->setMode(PermissionMode::Plan->value);
+        $thread = $this->activeThread();
+        if ($rest !== '' && $thread !== null) {
+            $this->attempt(fn () => app(ThreadService::class)->send($thread, $this->user(), $rest));
+        }
     }
 
     public function interrupt(): void
@@ -302,6 +398,7 @@ class ThreadChat extends Component
             'modes' => PermissionMode::cases(),
             'busy' => $thread !== null && $thread->status->isBusy(),
             'user' => $this->user(),
+            'commands' => $thread !== null ? $this->commandList() : [],
         ]);
     }
 

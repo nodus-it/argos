@@ -7,6 +7,7 @@ use App\Http\Controllers\Auth\ConnectedAccountController;
 use App\Http\Controllers\Auth\LinearConnectedAccountController;
 use App\Http\Controllers\DemoGateController;
 use App\Http\Controllers\TaskLogController;
+use App\Http\Controllers\ThreadAttachmentController;
 use App\Http\Controllers\Webhooks\IssueWebhookController;
 use App\Http\Controllers\WorkspaceGateController;
 use App\Http\Controllers\WorkspaceOpenController;
@@ -38,6 +39,9 @@ Route::post('/webhooks/issues/{kind}/{binding}', [IssueWebhookController::class,
     ->middleware(['throttle:60,1']);
 
 Route::middleware('auth')->group(function () {
+    Route::get('/threads/{thread}/attachments/{file}', ThreadAttachmentController::class)
+        ->name('threads.attachments');
+
     // Open a workspace host (editor/preview) with a fresh access ticket.
     Route::get('/workspaces/{workspace}/open/{target}', WorkspaceOpenController::class)
         ->whereIn('target', ['code', 'preview'])

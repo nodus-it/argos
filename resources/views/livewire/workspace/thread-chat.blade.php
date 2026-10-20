@@ -162,6 +162,16 @@
                                     @endif
                                 </div>
                                 <div class="ws-text">{{ $p['text'] ?? '' }}</div>
+                                @if (! empty($p['images']))
+                                    <div class="ws-images">
+                                        @foreach ($p['images'] as $image)
+                                            @if (! empty($image['path']))
+                                                @php $imageUrl = route('threads.attachments', ['thread' => $thread, 'file' => basename($image['path'])]); @endphp
+                                                <a href="{{ $imageUrl }}" target="_blank" rel="noopener"><img src="{{ $imageUrl }}" alt="{{ __('workspaces.thread.image') }}" loading="lazy"></a>
+                                            @endif
+                                        @endforeach
+                                    </div>
+                                @endif
                             </div>
                         </div>
                         @break
@@ -293,17 +303,57 @@
 
         {{-- Composer --}}
         @if ($canWrite)
-            <div class="ws-composer">
+            <div class="ws-composer"
+                 x-on:dragover.prevent="dragging = true"
+                 x-on:dragleave.prevent="dragging = false"
+                 x-on:drop.prevent="dragging = false; attach($event.dataTransfer.files)"
+                 :class="{ 'is-dragging': dragging }"
+                 x-init="commands = @js($commands)">
                 <div class="ws-typing muted" x-show="typingText()" x-text="typingText()" x-cloak></div>
-                <textarea
-                    class="respond-ta ws-ta"
-                    rows="3"
-                    wire:model="draft"
-                    placeholder="{{ __('workspaces.thread.placeholder') }}"
-                    x-on:keydown.enter="if (!$event.shiftKey) { $event.preventDefault(); $wire.send(); }"
-                    x-on:input="typed()"
-                ></textarea>
+
+                @if ($uploads !== [])
+                    <div class="ws-upload-previews">
+                        @foreach ($uploads as $i => $upload)
+                            <span class="ws-upload" wire:key="upload-{{ $i }}">
+                                @if ($upload->isPreviewable())
+                                    <img src="{{ $upload->temporaryUrl() }}" alt="">
+                                @else
+                                    <span class="ws-upload-name mono">{{ $upload->getClientOriginalName() }}</span>
+                                @endif
+                                <button type="button" wire:click="removeUpload({{ $i }})" aria-label="×">@svg('heroicon-o-x-mark')</button>
+                            </span>
+                        @endforeach
+                    </div>
+                @endif
+                @error('uploads.*') <p class="t-err">{{ $message }}</p> @enderror
+                @error('uploads') <p class="t-err">{{ $message }}</p> @enderror
+
+                <div class="ws-suggest-wrap">
+                    <ul class="ws-suggest" x-show="suggestions.length > 0" x-cloak role="listbox">
+                        <template x-for="(item, i) in suggestions" :key="item.value">
+                            <li :class="{ 'on': i === suggestIndex }" x-on:mousedown.prevent="choose(i)" role="option">
+                                <span class="mono" x-text="item.label"></span>
+                                <span class="muted" x-text="item.hint"></span>
+                            </li>
+                        </template>
+                    </ul>
+                    <textarea
+                        class="respond-ta ws-ta"
+                        rows="3"
+                        x-ref="composer"
+                        wire:model="draft"
+                        placeholder="{{ __('workspaces.thread.placeholder') }}"
+                        x-on:keydown="onComposerKeydown($event)"
+                        x-on:input="typed(); suggest()"
+                        x-on:paste="pasted($event)"
+                        x-on:blur="setTimeout(() => suggestions = [], 150)"
+                    ></textarea>
+                </div>
                 <div class="ws-composer-bar">
+                    <label class="btn btn-ghost btn-sm" title="{{ __('workspaces.thread.attach') }}">
+                        @svg('heroicon-o-photo')
+                        <input type="file" class="hidden" accept="image/png,image/jpeg,image/gif,image/webp" multiple x-on:change="attach($event.target.files); $event.target.value = ''">
+                    </label>
                     <select class="ws-select ws-select-sm" wire:change="setMode($event.target.value)" aria-label="{{ __('workspaces.thread.mode') }}">
                         @foreach ($modes as $mode)
                             @if ($mode !== PermissionMode::BypassPermissions || $isOwner)

@@ -92,6 +92,7 @@ class WorkspaceService extends EntityService
     public function deleteWorkspace(Workspace $workspace): void
     {
         $this->teardown->purge($workspace->slug);
+        app(ThreadAttachmentService::class)->purgeWorkspace($workspace->id);
         $workspace->delete();
         $this->emit(new WorkspaceDeleted($workspace));
     }

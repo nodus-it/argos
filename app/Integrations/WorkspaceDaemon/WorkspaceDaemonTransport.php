@@ -65,4 +65,7 @@ interface WorkspaceDaemonTransport
      * @return array{text: string, structured: mixed, cost_usd: float|int}
      */
     public function oneshot(array $payload): array;
+
+    /** @return list<string> */
+    public function files(string $query, int $limit = 20): array;
 }

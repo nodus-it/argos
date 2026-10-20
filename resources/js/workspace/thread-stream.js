@@ -15,6 +15,12 @@ export function argosThreadStream(config) {
         channel: null,
         refreshTimer: null,
         lastWhisper: 0,
+        dragging: false,
+        commands: [],
+        suggestions: [],
+        suggestIndex: 0,
+        suggestToken: null,
+        fileTimer: null,
 
         init() {
             this.$watch('live', () => this.scrollDown());
@@ -121,6 +127,105 @@ export function argosThreadStream(config) {
                 return '';
             }
             return config.labels.typing.replace('__NAME__', names.join(', '));
+        },
+
+        /** Upload pasted or dropped images through Livewire. */
+        attach(fileList) {
+            const images = Array.from(fileList || []).filter((f) => f.type.startsWith('image/'));
+            if (images.length > 0) {
+                this.$wire.uploadMultiple('uploads', images, () => {}, () => {});
+            }
+        },
+
+        pasted(event) {
+            const files = Array.from(event.clipboardData?.files || []);
+            if (files.some((f) => f.type.startsWith('image/'))) {
+                event.preventDefault();
+                this.attach(files);
+            }
+        },
+
+        /** Enter sends unless a suggestion list is open. */
+        onComposerKeydown(event) {
+            if (this.suggestions.length > 0) {
+                if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                    event.preventDefault();
+                    const n = this.suggestions.length;
+                    this.suggestIndex = (this.suggestIndex + (event.key === 'ArrowDown' ? 1 : n - 1)) % n;
+                    return;
+                }
+                if (event.key === 'Enter' || event.key === 'Tab') {
+                    event.preventDefault();
+                    this.choose(this.suggestIndex);
+                    return;
+                }
+                if (event.key === 'Escape') {
+                    this.suggestions = [];
+                    return;
+                }
+            }
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                this.$wire.send();
+            }
+        },
+
+        /** Find an `@file` or leading `/command` token at the caret. */
+        suggest() {
+            const el = this.$refs.composer;
+            if (!el) {
+                return;
+            }
+            const before = el.value.slice(0, el.selectionStart);
+
+            const command = before.match(/^\/([a-z0-9:_-]*)$/i);
+            if (command) {
+                const q = command[1].toLowerCase();
+                this.suggestToken = { start: 0, end: before.length, kind: 'command' };
+                this.suggestions = this.commands
+                    .filter((c) => c.name.toLowerCase().startsWith(q))
+                    .slice(0, 10)
+                    .map((c) => ({ value: `/${c.name} `, label: `/${c.name}`, hint: c.description }));
+                this.suggestIndex = 0;
+                return;
+            }
+
+            const mention = before.match(/(^|\s)@([^\s@]*)$/);
+            if (mention) {
+                const q = mention[2];
+                const start = before.length - q.length - 1;
+                this.suggestToken = { start, end: before.length, kind: 'file' };
+                clearTimeout(this.fileTimer);
+                this.fileTimer = setTimeout(() => {
+                    this.$wire.searchFiles(q).then((files) => {
+                        if (!this.suggestToken || this.suggestToken.kind !== 'file') {
+                            return;
+                        }
+                        this.suggestions = files.map((f) => ({ value: `@${f} `, label: f, hint: '' }));
+                        this.suggestIndex = 0;
+                    });
+                }, 150);
+                return;
+            }
+
+            this.suggestToken = null;
+            this.suggestions = [];
+        },
+
+        choose(index) {
+            const el = this.$refs.composer;
+            const item = this.suggestions[index];
+            if (!el || !item || !this.suggestToken) {
+                return;
+            }
+            const value = el.value;
+            el.value = value.slice(0, this.suggestToken.start) + item.value + value.slice(this.suggestToken.end);
+            const caret = this.suggestToken.start + item.value.length;
+            el.setSelectionRange(caret, caret);
+            el.dispatchEvent(new Event('input'));
+            this.suggestions = [];
+            this.suggestToken = null;
+            el.focus();
         },
 
         initials(name) {

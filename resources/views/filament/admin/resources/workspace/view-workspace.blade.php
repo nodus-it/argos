@@ -44,7 +44,7 @@
         </div>
     @endif
 
-    <div class="ws-layout" x-data="{ tab: 'code' }">
+    <div class="ws-layout" x-data="{ tab: 'code' }" x-on:workspace-tab.window="tab = $event.detail.tab">
         <section class="ws-pane ws-pane-chat card">
             @livewire('workspace.thread-chat', ['workspaceId' => $workspace->id], key('chat-'.$workspace->id))
         </section>

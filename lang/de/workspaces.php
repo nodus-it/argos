@@ -128,6 +128,14 @@ return [
         'threads' => '{0} keine Threads|{1} :count Thread|[2,*] :count Threads',
         'threads_column' => 'Threads',
     ],
+    'commands' => [
+        'plan' => 'In den Plan-Mode wechseln (optional gefolgt von einer Anfrage)',
+        'ship' => 'Committen, pushen und den Pull Request öffnen',
+        'preview' => 'Die Preview zeigen',
+        'review' => 'Das Review der Änderungen zeigen',
+        'argos' => 'Argos',
+        'claude' => 'Claude Code',
+    ],
     'tabs' => [
         'review' => 'Review',
         'code_viewer' => 'Der Editor steht Besitzern und Bearbeitern dieses Workspaces zur Verfügung.',
@@ -142,6 +150,9 @@ return [
         'coming_soon' => 'Noch nicht verfügbar.',
     ],
     'thread' => [
+        'attach' => 'Bilder anhängen',
+        'drop_hint' => 'Bilder hier ablegen, um sie anzuhängen',
+        'image' => 'Angehängtes Bild',
         'threads' => 'Threads',
         'rename' => 'Umbenennen',
         'archive' => 'Archivieren',

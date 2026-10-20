@@ -12,6 +12,7 @@ use App\Integrations\WorkspaceDaemon\Requests\GitPush;
 use App\Integrations\WorkspaceDaemon\Requests\GitStatus;
 use App\Integrations\WorkspaceDaemon\Requests\InitWorkspace;
 use App\Integrations\WorkspaceDaemon\Requests\InterruptThread;
+use App\Integrations\WorkspaceDaemon\Requests\ListFiles;
 use App\Integrations\WorkspaceDaemon\Requests\ResolveApproval;
 use App\Integrations\WorkspaceDaemon\Requests\RunOneshot;
 use App\Integrations\WorkspaceDaemon\Requests\SendMessage;
@@ -140,6 +141,13 @@ class WorkspaceDaemonApi implements WorkspaceDaemonTransport
         $result = $this->call(new RunOneshot($payload));
 
         return ['text' => (string) ($result['text'] ?? ''), 'structured' => $result['structured'] ?? null, 'cost_usd' => $result['cost_usd'] ?? 0];
+    }
+
+    public function files(string $query, int $limit = 20): array
+    {
+        $files = $this->call(new ListFiles($query, $limit))['files'] ?? [];
+
+        return array_values(array_filter(is_array($files) ? $files : [], 'is_string'));
     }
 
     /**

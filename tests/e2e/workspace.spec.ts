@@ -69,4 +69,20 @@ test.describe('workspace pair programming', () => {
     await expect(side.locator('.ws-unread')).toBeVisible({ timeout: 15_000 });
     await expect(ada.locator('.ws-thread-title')).toHaveText('Pairing');
   });
+
+  test('the composer suggests commands and files', async ({ browser }) => {
+    const ada = await openWorkspace(browser, 'admin@argos.local');
+    const composer = ada.locator('.ws-composer textarea');
+
+    await composer.pressSequentially('/pre');
+    await expect(ada.locator('.ws-suggest li')).toHaveCount(1);
+    await composer.press('Enter');
+    await expect(composer).toHaveValue('/preview ');
+
+    await composer.fill('');
+    await composer.pressSequentially('look at @login');
+    await expect(ada.locator('.ws-suggest li').first()).toContainText('LoginController.php', { timeout: 10_000 });
+    await composer.press('Enter');
+    await expect(composer).toHaveValue('look at @app/Http/Controllers/LoginController.php ');
+  });
 });
