@@ -6,6 +6,7 @@ namespace App\Console\Commands;
 
 use App\Enums\DemoStatus;
 use App\Jobs\StopDemoJob;
+use App\Jobs\Workspace\StopWorkspaceDemoJob;
 use App\Models\Demo;
 use Illuminate\Console\Command;
 
@@ -29,7 +30,13 @@ class CleanupExpiredDemos extends Command
             ->get();
 
         foreach ($expired as $demo) {
-            StopDemoJob::dispatch($demo->task_id);
+            if ($demo->workspace_id !== null) {
+                StopWorkspaceDemoJob::dispatch($demo->workspace_id);
+                $this->info("Dispatched teardown for expired demo {$demo->id} (workspace {$demo->workspace_id}).");
+
+                continue;
+            }
+            StopDemoJob::dispatch((string) $demo->task_id);
             $this->info("Dispatched teardown for expired demo {$demo->id} (task {$demo->task_id}).");
         }
 

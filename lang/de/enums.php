@@ -95,6 +95,7 @@ return [
         'session' => 'Argos-Login',
         'basic' => 'Passwortschutz',
         'public' => 'Öffentlich',
+        'workspace' => 'Workspace-Mitglieder',
     ],
 
     'task_provider_mode' => [

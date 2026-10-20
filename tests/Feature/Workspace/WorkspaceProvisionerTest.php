@@ -16,6 +16,7 @@ use App\Models\Workspace;
 use App\Services\Workflow\WorkerSidecarManager;
 use App\Services\Workflow\WorkerSidecars;
 use App\Services\Workspace\WorkspaceContainerManager;
+use App\Services\Workspace\WorkspacePreviewService;
 use App\Services\Workspace\WorkspaceProvisioner;
 use App\Workers\Agents\AgentSpec;
 use App\Workers\Compose\ResolvedWorkerImage;
@@ -131,6 +132,7 @@ class WorkspaceProvisionerTest extends TestCase
         $this->bindDocker(function ($mock): void {
             $mock->shouldReceive('stop')->once();
         });
+        $this->mock(WorkspacePreviewService::class)->shouldReceive('stop')->once();
         $stopped = [];
         Saloon::fake([StopThread::class => function (PendingRequest $request) use (&$stopped) {
             $stopped[] = $request->getUrl();

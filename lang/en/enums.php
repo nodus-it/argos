@@ -95,6 +95,7 @@ return [
         'session' => 'Argos login',
         'basic' => 'Password',
         'public' => 'Public',
+        'workspace' => 'Workspace members',
     ],
 
     'task_provider_mode' => [

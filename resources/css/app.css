@@ -1456,3 +1456,6 @@ body,
 .ws-tab-body{flex:1;display:flex;flex-direction:column;min-height:0;}
 .ws-frame{flex:1;width:100%;border:0;min-height:520px;background:var(--surface);}
 .ws-frame-bar{display:flex;gap:8px;align-items:center;justify-content:flex-end;padding:6px 8px;border-bottom:1px solid var(--border);font-size:var(--t-xs);}
+.ws-preview{display:flex;flex-direction:column;flex:1;min-height:0;}
+.ws-log{margin:8px;font-size:var(--t-xs);}
+.ws-log pre{white-space:pre-wrap;max-height:320px;overflow:auto;background:var(--surface-2);border-radius:var(--radius-sm);padding:8px;}

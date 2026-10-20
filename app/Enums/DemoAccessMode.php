@@ -24,6 +24,9 @@ enum DemoAccessMode: string
     /** No protection — anyone with the URL. */
     case Public = 'public';
 
+    /** Workspace members only (Traefik forwardAuth → /_argos/workspace-gate). */
+    case Workspace = 'workspace';
+
     public function label(): string
     {
         return match ($this) {
@@ -31,6 +34,7 @@ enum DemoAccessMode: string
             self::Session => __('enums.demo_access_mode.session'),
             self::Basic => __('enums.demo_access_mode.basic'),
             self::Public => __('enums.demo_access_mode.public'),
+            self::Workspace => __('enums.demo_access_mode.workspace'),
         };
     }
 
@@ -41,6 +45,7 @@ enum DemoAccessMode: string
             self::Session => 'success',
             self::Basic => 'warning',
             self::Public => 'danger',
+            self::Workspace => 'success',
         };
     }
 

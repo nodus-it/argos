@@ -11,6 +11,7 @@ use App\Enums\Phase;
 use App\Enums\PhaseStatus;
 use App\Enums\WorkflowStatus;
 use App\Presenters\TaskPresenter;
+use App\Services\Demo\DemoTarget;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -58,7 +59,7 @@ use Illuminate\Support\Carbon;
  * @property-read WorkerStack|null $workerStackOverride
  * @property-read AgentCredential|null $agentCredential
  */
-class Task extends Model
+class Task extends Model implements DemoTarget
 {
     use HasFactory;
     use HasUlids;
@@ -268,6 +269,44 @@ class Task extends Model
     public function demos(): HasMany
     {
         return $this->hasMany(Demo::class);
+    }
+
+    /**
+     * DNS-safe demo key derived from the frozen slug (compose project, edge
+     * alias, Traefik router and subdomain).
+     */
+    public function demoSlug(): string
+    {
+        $base = strtolower((string) preg_replace('/[^a-zA-Z0-9]+/', '-', $this->slug));
+        $base = trim($base, '-');
+
+        return 'demo-'.($base !== '' ? $base : 'task');
+    }
+
+    public function workspaceVolumeName(): string
+    {
+        return $this->volumeName();
+    }
+
+    public function demoRepoProfile(): ?RepoProfile
+    {
+        return $this->repoProfile;
+    }
+
+    public function demoAccessMode(): DemoAccessMode
+    {
+        return $this->effectiveDemoAccessMode();
+    }
+
+    public function demoBasicPassword(): ?string
+    {
+        return $this->demo_basic_password;
+    }
+
+    /** Task demos run after the worker finished: image default user. */
+    public function demoExecUser(): ?string
+    {
+        return null;
     }
 
     /** The most recent demo for this task, if any. */

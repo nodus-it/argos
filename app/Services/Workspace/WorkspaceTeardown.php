@@ -27,7 +27,7 @@ class WorkspaceTeardown
         $this->router->removeCodeRoute($slug);
         $this->containers->removeBySlug($slug);
         $this->sidecars->purgeWorkspace($slug);
-        $this->demos->teardownBySlug('ws-'.$slug);
+        $this->demos->teardownBySlug('demo-ws-'.$slug);
         $this->containers->removeVolumesBySlug($slug);
     }
 }

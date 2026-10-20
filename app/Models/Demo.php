@@ -18,7 +18,8 @@ use Illuminate\Support\Carbon;
  * (see live-demo-concept.md).
  *
  * @property string $id
- * @property string $task_id
+ * @property string|null $task_id
+ * @property string|null $workspace_id
  * @property DemoStatus $status
  * @property string|null $url
  * @property string|null $compose_project
@@ -38,6 +39,7 @@ class Demo extends Model
 
     protected $fillable = [
         'task_id',
+        'workspace_id',
         'status',
         'url',
         'compose_project',
@@ -61,5 +63,19 @@ class Demo extends Model
     public function task(): BelongsTo
     {
         return $this->belongsTo(Task::class);
+    }
+
+    /**
+     * @return BelongsTo<Workspace, $this>
+     */
+    public function workspace(): BelongsTo
+    {
+        return $this->belongsTo(Workspace::class);
+    }
+
+    /** What the demo was built for (task or workspace), if still present. */
+    public function target(): Task|Workspace|null
+    {
+        return $this->task ?? $this->workspace;
     }
 }

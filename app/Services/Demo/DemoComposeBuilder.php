@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services\Demo;
 
-use App\Models\Task;
 use App\Services\Project\ProjectEnvironmentResolver;
 use Illuminate\Encryption\Encrypter;
 use Symfony\Component\Yaml\Yaml;
@@ -27,7 +26,7 @@ class DemoComposeBuilder
      * @param  string  $demoUrl  the public URL (incl. external port) the demo is
      *                           reachable under, from TraefikRouter::urlForSlug()
      */
-    public function buildOverrideYaml(Task $task, string $slug, array $entry, string $demoUrl): string
+    public function buildOverrideYaml(DemoTarget $target, string $slug, array $entry, string $demoUrl): string
     {
         $network = (string) config('argos.preview.network', 'argos_edge');
 
@@ -35,8 +34,9 @@ class DemoComposeBuilder
         // API keys, …) so the demo's `composer install` + boot see the same env
         // as the worker. Argos-owned keys below win via array_merge order, so
         // the project can't override APP_URL / APP_KEY / SESSION_COOKIE here.
-        $projectEnv = $task->repoProfile !== null
-            ? app(ProjectEnvironmentResolver::class)->resolve($task->repoProfile)
+        $profile = $target->demoRepoProfile();
+        $projectEnv = $profile !== null
+            ? app(ProjectEnvironmentResolver::class)->resolve($profile)
             : [];
 
         $override = [
@@ -76,7 +76,7 @@ class DemoComposeBuilder
                         'ARGOS_DEMO' => '1',
                     ]),
                     'volumes' => [
-                        $task->volumeName().':'.$entry['workspace_mount'],
+                        $target->workspaceVolumeName().':'.$entry['workspace_mount'],
                     ],
                     'networks' => [
                         $network => [
@@ -102,7 +102,7 @@ class DemoComposeBuilder
             // declare it external so compose mounts it instead of erroring on an
             // "undefined volume".
             'volumes' => [
-                $task->volumeName() => [
+                $target->workspaceVolumeName() => [
                     'external' => true,
                 ],
             ],

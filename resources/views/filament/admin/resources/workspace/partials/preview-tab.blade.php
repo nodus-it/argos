@@ -1,2 +1,2 @@
-{{-- Live preview tab. Wired up with workspace demos in M7. --}}
-<div class="ws-tab-empty muted">{{ __('workspaces.tabs.coming_soon') }}</div>
+{{-- Live preview of the workspace (members-only demo on demo-ws-<slug>). --}}
+@livewire('workspace.preview-panel', ['workspaceId' => $workspace->id], key('preview-'.$workspace->id))

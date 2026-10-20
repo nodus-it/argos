@@ -198,6 +198,14 @@ class TraefikRouter
                     ],
                 ],
             ],
+            DemoAccessMode::Workspace => [
+                $name => [
+                    'forwardAuth' => [
+                        'address' => (string) config('argos.workspaces.gate_url', 'http://nginx:80/_argos/workspace-gate'),
+                        'trustForwardHeader' => true,
+                    ],
+                ],
+            ],
             DemoAccessMode::Basic => [
                 $name => [
                     'basicAuth' => [

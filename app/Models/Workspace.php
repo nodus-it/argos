@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\DemoAccessMode;
 use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceStatus;
+use App\Services\Demo\DemoTarget;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -38,7 +40,7 @@ use Illuminate\Support\Str;
  * @property-read RepoProfile $repoProfile
  * @property-read User|null $creator
  */
-class Workspace extends Model
+class Workspace extends Model implements DemoTarget
 {
     use HasFactory;
     use HasUlids;
@@ -135,6 +137,49 @@ class Workspace extends Model
     public function demoKey(): string
     {
         return 'ws-'.$this->slug;
+    }
+
+    public function demoSlug(): string
+    {
+        return 'demo-'.$this->demoKey();
+    }
+
+    public function workspaceVolumeName(): string
+    {
+        return $this->volumeName();
+    }
+
+    public function demoRepoProfile(): ?RepoProfile
+    {
+        return $this->repoProfile;
+    }
+
+    /** Workspace previews are members-only, like the editor. */
+    public function demoAccessMode(): DemoAccessMode
+    {
+        return DemoAccessMode::Workspace;
+    }
+
+    public function demoBasicPassword(): ?string
+    {
+        return null;
+    }
+
+    /** The agent user of the worker image (see PhaseRunner / prepareVolumes). */
+    public function demoExecUser(): ?string
+    {
+        return '1000:1000';
+    }
+
+    /** @return HasMany<Demo, $this> */
+    public function demos(): HasMany
+    {
+        return $this->hasMany(Demo::class);
+    }
+
+    public function currentDemo(): ?Demo
+    {
+        return $this->demos()->latest()->first();
     }
 
     /** DNS-/docker-safe slug: lowercase [a-z0-9-], no leading/trailing dash. */

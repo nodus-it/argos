@@ -91,6 +91,7 @@ class WorkspaceProvisioner
                 $thread->forceFill(['status' => ThreadStatus::Closed])->save();
             });
 
+        app(WorkspacePreviewService::class)->stop($workspace);
         $this->router->removeCodeRoute($workspace->slug);
         $this->containers->stop($workspace);
         $this->sidecars->stopWorkspaceContainers($workspace);

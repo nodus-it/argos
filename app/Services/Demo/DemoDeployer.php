@@ -8,6 +8,7 @@ use App\Enums\DemoStatus;
 use App\Models\Demo;
 use App\Models\RepoProfile;
 use App\Models\Task;
+use App\Models\Workspace;
 use App\Services\GitProvider\GitServiceFactory;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -43,17 +44,18 @@ class DemoDeployer
     ) {}
 
     /**
-     * Build (or rebuild) the live demo for a task. Always replaces a previous
-     * demo of the same task. Returns the persisted Demo row (live or failed).
+     * Build (or rebuild) the live demo for a task or workspace. Always replaces
+     * a previous demo of the same target. Returns the persisted Demo row (live
+     * or failed).
      */
-    public function deploy(Task $task): Demo
+    public function deploy(DemoTarget $target): Demo
     {
-        $profile = $task->repoProfile;
+        $profile = $target->demoRepoProfile();
         if ($profile === null) {
-            throw new RuntimeException("Task '{$task->name}' has no repo profile — cannot deploy a demo.");
+            throw new RuntimeException("Demo target '{$target->demoSlug()}' has no repo profile — cannot deploy a demo.");
         }
 
-        $slug = $this->demoSlug($task);
+        $slug = $target->demoSlug();
         $project = $slug;
 
         // A task has exactly one current demo — tear the old one down first so
@@ -61,7 +63,7 @@ class DemoDeployer
         $this->teardownBySlug($slug);
 
         $demo = Demo::query()->create([
-            'task_id' => $task->id,
+            ...$this->ownerColumns($target),
             'status' => DemoStatus::Building,
             'compose_project' => $project,
             'url' => null,
@@ -74,7 +76,10 @@ class DemoDeployer
             // Pull external commits a user pushed to the feature branch into the
             // volume first, so the demo reflects the current remote state (I2).
             // No-op on a dirty tree — see DemoWorkspaceSync.
-            app(DemoWorkspaceSync::class)->syncToRemote($task);
+            // Workspaces are the source of truth themselves — never sync them.
+            if ($target instanceof Task) {
+                app(DemoWorkspaceSync::class)->syncToRemote($target);
+            }
 
             [$composeYaml, $settings] = $this->readContract($profile);
 
@@ -92,19 +97,19 @@ class DemoDeployer
 
             $router = app(TraefikRouter::class);
             $overrideYaml = app(DemoComposeBuilder::class)
-                ->buildOverrideYaml($task, $slug, $entry, $router->urlForSlug($slug));
+                ->buildOverrideYaml($target, $slug, $entry, $router->urlForSlug($slug));
             $workDir = $this->prepareWorkDir($slug, $composeYaml, $overrideYaml);
 
-            $log .= $this->enforceConcurrencyCap($task);
+            $log .= $this->enforceConcurrencyCap($target);
             $log .= $this->composeUp($project, $workDir);
-            $log .= $this->runCommands($project, $entry['service'], $settings['commands'] ?? []);
+            $log .= $this->runCommands($project, $entry['service'], $settings['commands'] ?? [], $target->demoExecUser());
             $log .= $this->probeHealth($project, $entry, $settings['health'] ?? null);
 
             $url = $router->writeRoute(
                 $slug,
                 $entry['port'],
-                $task->effectiveDemoAccessMode(),
-                $task->demo_basic_password,
+                $target->demoAccessMode(),
+                $target->demoBasicPassword(),
             );
 
             $demo->forceFill([
@@ -115,7 +120,7 @@ class DemoDeployer
             ])->save();
         } catch (Throwable $e) {
             Log::channel('argos')->warning('Demo deploy failed', [
-                'task' => $task->name,
+                'target' => $slug,
                 'demo' => $demo->id,
                 'error' => $e->getMessage(),
             ]);
@@ -133,12 +138,62 @@ class DemoDeployer
     }
 
     /**
-     * Stop and remove a task's running demo (containers + volumes + route).
+     * Stop and remove a target's running demo (containers + volumes + route).
      * Safe to call when nothing is running.
      */
-    public function teardown(Task $task): void
+    public function teardown(DemoTarget $target): void
     {
-        $this->teardownBySlug($this->demoSlug($task));
+        $this->teardownBySlug($target->demoSlug());
+    }
+
+    /**
+     * Re-run the contract's setup commands in the running demo — after a
+     * migration, a composer/npm change or a build-config edit — without a
+     * teardown. Appends the output to the demo's build log.
+     */
+    public function rerunCommands(DemoTarget $target): Demo
+    {
+        $demo = $this->currentDemoOf($target);
+        if ($demo === null || $demo->status !== DemoStatus::Live) {
+            throw new RuntimeException('No live demo to re-run the setup commands in.');
+        }
+
+        $profile = $target->demoRepoProfile();
+        if ($profile === null) {
+            throw new RuntimeException('Demo target has no repo profile.');
+        }
+
+        [, $settings] = $this->readContract($profile);
+        $entry = $this->parseEntry($settings);
+
+        $log = "\n[rerun ".now()->toIso8601String()."]\n";
+        try {
+            $log .= $this->runCommands($target->demoSlug(), $entry['service'], $settings['commands'] ?? [], $target->demoExecUser());
+        } catch (Throwable $e) {
+            $log .= '[error] '.$e->getMessage()."\n";
+        }
+
+        $demo->forceFill(['build_log' => $this->truncateLog(($demo->build_log ?? '').$log)])->save();
+
+        return $demo->refresh();
+    }
+
+    /**
+     * Columns tying a demo row to its target.
+     *
+     * @return array<string, string|null>
+     */
+    private function ownerColumns(DemoTarget $target): array
+    {
+        return [
+            'task_id' => $target instanceof Task ? $target->id : null,
+            'workspace_id' => $target instanceof Workspace ? $target->id : null,
+        ];
+    }
+
+    private function currentDemoOf(DemoTarget $target): ?Demo
+    {
+        return Demo::query()->where($this->ownerColumns($target))->latest()->first();
     }
 
     /**
@@ -165,16 +220,19 @@ class DemoDeployer
      * the total over the cap (counting the one we're about to start), evict the
      * oldest ones until there is room. Evictions are logged — never silent.
      */
-    private function enforceConcurrencyCap(Task $current): string
+    private function enforceConcurrencyCap(DemoTarget $current): string
     {
         $max = (int) config('argos.preview.max_concurrent', 10);
         if ($max <= 0) {
             return '';
         }
 
+        $own = $this->ownerColumns($current);
         $active = Demo::query()
             ->whereIn('status', [DemoStatus::Building->value, DemoStatus::Live->value])
-            ->where('task_id', '!=', $current->id)
+            ->where(fn ($q) => $q
+                ->where(fn ($t) => $own['task_id'] === null ? $t->whereNotNull('task_id') : $t->where('task_id', '!=', $own['task_id']))
+                ->orWhere(fn ($w) => $own['workspace_id'] === null ? $w->whereNotNull('workspace_id') : $w->where('workspace_id', '!=', $own['workspace_id'])))
             ->orderBy('created_at')
             ->get();
 
@@ -186,16 +244,18 @@ class DemoDeployer
 
         $log = '';
         foreach ($active->take($overflow) as $demo) {
-            $task = $demo->task;
-            if ($task !== null) {
-                $this->teardownBySlug($this->demoSlug($task));
+            $target = $demo->target();
+            if ($target !== null) {
+                $this->teardownBySlug($target->demoSlug());
             }
             $demo->update(['status' => DemoStatus::Stopped, 'url' => null]);
 
-            $log .= "[cap] evicted demo {$demo->id} (task {$demo->task_id}) to stay under max_concurrent={$max}\n";
+            $owner = $demo->task_id !== null ? "task {$demo->task_id}" : "workspace {$demo->workspace_id}";
+            $log .= "[cap] evicted demo {$demo->id} ({$owner}) to stay under max_concurrent={$max}\n";
             Log::channel('argos')->info('Evicted demo to honour concurrency cap', [
                 'demo' => $demo->id,
                 'task' => $demo->task_id,
+                'workspace' => $demo->workspace_id,
                 'max' => $max,
             ]);
         }
@@ -314,7 +374,7 @@ class DemoDeployer
      *
      * @param  array<int, mixed>  $commands
      */
-    private function runCommands(string $project, string $service, array $commands): string
+    private function runCommands(string $project, string $service, array $commands, ?string $user = null): string
     {
         $log = '';
         foreach ($commands as $command) {
@@ -322,11 +382,12 @@ class DemoDeployer
                 continue;
             }
 
-            $process = $this->newProcess([
-                'docker', 'compose', '-p', $project,
-                'exec', '-T', $service,
-                'sh', '-c', $command,
-            ]);
+            $exec = ['docker', 'compose', '-p', $project, 'exec', '-T'];
+            if ($user !== null) {
+                // HOME must be writable for npm/composer caches of a non-root user.
+                $exec = [...$exec, '--user', $user, '-e', 'HOME=/tmp'];
+            }
+            $process = $this->newProcess([...$exec, $service, 'sh', '-c', $command]);
             $process->setTimeout($this->commandTimeoutSeconds);
             $process->run();
 
@@ -427,10 +488,7 @@ class DemoDeployer
      */
     public function demoSlug(Task $task): string
     {
-        $base = strtolower((string) preg_replace('/[^a-zA-Z0-9]+/', '-', $task->slug));
-        $base = trim($base, '-');
-
-        return 'demo-'.($base !== '' ? $base : 'task');
+        return $task->demoSlug();
     }
 
     /** Truncate an overly long build log to keep the DB row reasonable (head+tail). */

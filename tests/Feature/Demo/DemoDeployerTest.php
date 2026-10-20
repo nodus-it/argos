@@ -9,6 +9,7 @@ use App\Enums\DemoStatus;
 use App\Models\Demo;
 use App\Models\RepoProfile;
 use App\Models\Task;
+use App\Models\Workspace;
 use App\Services\Demo\DemoComposeBuilder;
 use App\Services\Demo\DemoDeployer;
 use App\Services\Demo\DemoImageBuilder;
@@ -427,6 +428,91 @@ class DemoDeployerTest extends TestCase
 
         $this->assertSame(DemoStatus::Failed, $demo->status);
         $this->assertStringContainsString('contract incomplete', strtolower($demo->build_log));
+    }
+
+    public function test_workspace_demos_mount_the_workspace_volume_and_are_members_only(): void
+    {
+        $this->fakeContract();
+        $workspace = Workspace::factory()->create(['slug' => 'login', 'repo_profile_id' => $this->profile()->id]);
+
+        $deployer = new FakeDemoDeployer(app(GitServiceFactory::class), new FakeDemoImageBuilder, [
+            ['cmd' => 'down', 'exit' => 0],
+            ['cmd' => 'up', 'exit' => 0],
+            ['cmd' => 'exec', 'exit' => 0, 'stdout' => "composer ok\n"],
+            ['cmd' => 'exec', 'exit' => 0],
+        ]);
+
+        $demo = $deployer->deploy($workspace);
+
+        $this->assertSame(DemoStatus::Live, $demo->status);
+        $this->assertSame($workspace->id, $demo->workspace_id);
+        $this->assertNull($demo->task_id);
+        $this->assertSame('http://demo-ws-login.127.0.0.1.nip.io:8080', $demo->url);
+        $this->assertSame($demo->id, $workspace->currentDemo()?->id);
+
+        // Contract commands run as the agent user so the volume stays editable.
+        $exec = collect($deployer->invokedCommands)->first(fn (array $c): bool => in_array('composer install --no-interaction', $c, true));
+        $this->assertNotNull($exec);
+        $this->assertSame(['--user', '1000:1000', '-e', 'HOME=/tmp'], array_slice($exec, 6, 4));
+
+        $route = Yaml::parseFile($this->traefikDir.'/demo-ws-login.yml')['http'];
+        $this->assertStringEndsWith('/_argos/workspace-gate', $route['middlewares']['demo-ws-login-auth']['forwardAuth']['address']);
+    }
+
+    public function test_workspace_override_mounts_the_workspace_volume(): void
+    {
+        $workspace = Workspace::factory()->create(['slug' => 'login']);
+
+        $yaml = app(DemoComposeBuilder::class)->buildOverrideYaml($workspace, 'demo-ws-login', [
+            'service' => 'app', 'port' => 8000, 'workspace_mount' => '/var/www/html',
+        ], 'http://demo-ws-login.127.0.0.1.nip.io:8080');
+
+        $this->assertStringContainsString('ws_login:/var/www/html', $yaml);
+        $this->assertStringNotContainsString('task_ws_', $yaml);
+    }
+
+    public function test_rerun_commands_appends_to_the_live_demo_log(): void
+    {
+        $this->fakeContract();
+        $workspace = Workspace::factory()->create(['slug' => 'login', 'repo_profile_id' => $this->profile()->id]);
+        Demo::factory()->create(['task_id' => null, 'workspace_id' => $workspace->id, 'status' => DemoStatus::Live, 'build_log' => 'first build']);
+
+        $deployer = new FakeDemoDeployer(app(GitServiceFactory::class), new FakeDemoImageBuilder, [
+            ['cmd' => 'exec', 'exit' => 0, 'stdout' => "migrated\n"],
+        ]);
+        $demo = $deployer->rerunCommands($workspace);
+
+        $this->assertStringStartsWith('first build', $demo->build_log);
+        $this->assertStringContainsString('migrated', $demo->build_log);
+        $this->assertSame(['docker', 'compose', '-p', 'demo-ws-login', 'exec', '-T', '--user', '1000:1000'], array_slice($deployer->invokedCommands[0], 0, 8));
+    }
+
+    public function test_rerun_requires_a_live_demo(): void
+    {
+        $workspace = Workspace::factory()->create();
+
+        $this->expectException(RuntimeException::class);
+        app(DemoDeployer::class)->rerunCommands($workspace);
+    }
+
+    public function test_the_concurrency_cap_spans_tasks_and_workspaces(): void
+    {
+        config(['argos.preview.max_concurrent' => 1]);
+        $this->fakeContract();
+        $task = Task::factory()->for($this->profile(), 'repoProfile')->create(['name' => 'old']);
+        $taskDemo = Demo::factory()->create(['task_id' => $task->id, 'status' => DemoStatus::Live, 'created_at' => now()->subHour()]);
+        $workspace = Workspace::factory()->create(['slug' => 'login', 'repo_profile_id' => $task->repo_profile_id]);
+
+        $deployer = new FakeDemoDeployer(app(GitServiceFactory::class), new FakeDemoImageBuilder, [
+            ['cmd' => 'down', 'exit' => 0],
+            ['cmd' => 'down', 'exit' => 0],
+            ['cmd' => 'up', 'exit' => 0],
+            ['cmd' => 'exec', 'exit' => 0],
+            ['cmd' => 'exec', 'exit' => 0],
+        ]);
+        $deployer->deploy($workspace);
+
+        $this->assertSame(DemoStatus::Stopped, $taskDemo->fresh()->status);
     }
 }
 
