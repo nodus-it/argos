@@ -31,7 +31,9 @@ use App\Workers\Agents\AgentRegistry;
 use App\Workers\Agents\ClaudeCodeRunner;
 use App\Workers\Agents\CodexRunner;
 use App\Workers\Builtin\BuiltinSync;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Events\MigrationsEnded;
+use Illuminate\Http\Request;
 use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Support\Env;
 use Illuminate\Support\Facades\Artisan;
@@ -39,6 +41,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Passport\Passport;
 use PDO;
@@ -186,6 +189,10 @@ class AppServiceProvider extends ServiceProvider
         // authenticated user by default; redefine this gate to restrict access
         // (e.g. role-based) without touching the User model or the panel.
         Gate::define('access-argos-panel', fn (User $user): bool => true);
+
+        // Workspace daemons report many small event batches; cap each
+        // workspace separately so one busy daemon cannot starve the others.
+        RateLimiter::for('workspace-daemon', fn (Request $request): Limit => Limit::perMinute(600)->by('ws:'.$request->route('workspace')));
 
         // Platform administration (users, worker stacks, OAuth apps, settings,
         // API clients, provider credentials). Redefine for finer roles.

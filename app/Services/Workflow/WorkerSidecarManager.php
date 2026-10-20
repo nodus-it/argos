@@ -6,6 +6,7 @@ namespace App\Services\Workflow;
 
 use App\Enums\BackingService;
 use App\Models\Task;
+use App\Models\Workspace;
 use App\Services\Project\BackingServiceResolver;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -24,6 +25,9 @@ use Throwable;
  */
 class WorkerSidecarManager
 {
+    /** Label every workspace-owned Docker resource carries (orphan sweep). */
+    public const WORKSPACE_LABEL = 'argos.workspace';
+
     /** Phases whose worker runs the quality/test gate and may hit a DB. */
     private const PHASES_NEEDING_SERVICES = ['implement', 'respond'];
 
@@ -95,6 +99,107 @@ class WorkerSidecarManager
         ]);
 
         return new WorkerSidecars($network, $env, $containers);
+    }
+
+    /**
+     * Start the enabled services of a workspace as long-lived sidecars on a
+     * per-workspace network. Unlike task sidecars their data lives in named
+     * volumes (`<network>_<alias>`), so a stopped and restarted workspace
+     * keeps its database. Containers are recreated on every start.
+     */
+    public function startForWorkspace(Workspace $workspace): WorkerSidecars
+    {
+        $profile = $workspace->repoProfile;
+        $services = $profile->backingServices();
+        if ($services === []) {
+            return new WorkerSidecars;
+        }
+
+        $coordinates = app(BackingServiceResolver::class)->coordinates($profile);
+        $network = $this->workspaceNetworkName($workspace);
+        $label = ['--label', self::WORKSPACE_LABEL.'='.$workspace->slug];
+
+        $this->stopWorkspaceContainers($workspace);
+        if (! $this->networkExists($network)) {
+            $this->mustRun(['docker', 'network', 'create', ...$label, $network], 30);
+        }
+
+        $containers = [];
+        $env = [];
+
+        try {
+            foreach ($services as $service) {
+                $coords = $coordinates[$service->value];
+                $alias = $coords['host'];
+                $container = $network.'-'.$alias;
+                $cmd = [
+                    'docker', 'run', '-d',
+                    '--name', $container,
+                    '--network', $network,
+                    '--network-alias', $alias,
+                    '--restart', 'unless-stopped',
+                    '-v', $network.'_'.$alias.':'.$service->dataPath(),
+                    ...$label,
+                ];
+                foreach ($service->containerEnv($coords) as $key => $value) {
+                    $cmd[] = '-e';
+                    $cmd[] = "{$key}={$value}";
+                }
+                $cmd[] = $service->image();
+
+                $this->mustRun($cmd, 60);
+                $containers[] = $container;
+                $env = array_merge($env, $service->connectionEnv($coords));
+            }
+
+            $this->awaitReadiness($services, $containers);
+        } catch (Throwable $e) {
+            $this->stopWorkspaceContainers($workspace);
+
+            throw $e;
+        }
+
+        return new WorkerSidecars($network, $env, $containers);
+    }
+
+    /** Remove a workspace's sidecar containers; volumes and network stay. */
+    public function stopWorkspaceContainers(Workspace $workspace): void
+    {
+        $network = $this->workspaceNetworkName($workspace);
+        foreach ($workspace->repoProfile->backingServices() as $service) {
+            $alias = $service->defaultCoordinates()['host'];
+            $this->runQuietly(['docker', 'rm', '-f', $network.'-'.$alias], 30);
+        }
+    }
+
+    /**
+     * Remove everything the workspace's sidecars left behind: containers,
+     * data volumes and the network. Works by slug alone (teardown after the
+     * workspace row is gone).
+     */
+    public function purgeWorkspace(string $slug): void
+    {
+        $network = 'ws_'.$slug.'_svc';
+        foreach (BackingService::cases() as $service) {
+            $alias = $service->defaultCoordinates()['host'];
+            $this->runQuietly(['docker', 'rm', '-f', $network.'-'.$alias], 30);
+            $this->runQuietly(['docker', 'volume', 'rm', '-f', $network.'_'.$alias], 30);
+        }
+        $this->runQuietly(['docker', 'network', 'rm', $network], 30);
+    }
+
+    public function workspaceNetworkName(Workspace $workspace): string
+    {
+        return 'ws_'.$workspace->slug.'_svc';
+    }
+
+    private function networkExists(string $network): bool
+    {
+        $process = $this->newProcess(['docker', 'network', 'inspect', $network]);
+        $process->setTimeout(15);
+        $process->run();
+
+        return $process->isSuccessful();
     }
 
     /**

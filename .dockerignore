@@ -24,3 +24,7 @@ storage/framework/testing/
 .phpunit.cache/
 .phpunit.result.cache
 todo.md
+
+# Workspace daemon build artefacts (installed/compiled inside the image)
+daemon/node_modules/
+daemon/dist/

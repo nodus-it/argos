@@ -117,5 +117,6 @@ arch('integration requests extend the saloon request base')
         'App\Integrations\Linear\Requests',
         'App\Integrations\Anthropic\Requests',
         'App\Integrations\OAuth\Requests',
+        'App\Integrations\WorkspaceDaemon\Requests',
     ])
     ->toExtend('Saloon\Http\Request');

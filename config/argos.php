@@ -191,7 +191,7 @@ return [
         'network' => $envOr('ARGOS_WORKSPACE_NETWORK', 'argos_ws'),
         'daemon_port' => 7777,
         'editor_port' => 3000,
-        'openvscode_version' => $envOr('ARGOS_OPENVSCODE_VERSION', '1.105.1'),
+        'openvscode_version' => $envOr('ARGOS_OPENVSCODE_VERSION', '1.109.5'),
     ],
 
     /*

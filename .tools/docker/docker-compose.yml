@@ -98,6 +98,9 @@ services:
       start_period: 10s
 
   app:
+    networks:
+      - default
+      - argos_ws
     # Production pulls the tag in ARGOS_APP_IMAGE; local dev (docker-compose.dev.yml)
     # adds a build block and builds argos-app:local from source.
     image: "${ARGOS_APP_IMAGE:-argos-app:local}"
@@ -184,6 +187,7 @@ services:
     networks:
       - default
       - argos_edge
+      - argos_ws
     depends_on:
       - nginx
 
@@ -196,6 +200,7 @@ services:
     networks:
       - default
       - argos_edge
+      - argos_ws
     volumes:
       # Both volumes are populated by the app container's entrypoint on every
       # boot. Mounted RO here so nginx serves static assets directly without
@@ -204,6 +209,9 @@ services:
       - argos-nginx-config:/etc/nginx/conf.d:ro
 
   queue:
+    networks:
+      - default
+      - argos_ws
     # Reuses the image built/pulled by the `app` service — same Dockerfile
     # target, same content.
     image: "${ARGOS_APP_IMAGE:-argos-app:local}"
@@ -280,6 +288,12 @@ networks:
   # Named explicitly so the per-demo compose override can join it as external.
   argos_edge:
     name: argos_edge
+  # Workspace network: the manager (app/queue), nginx (daemon → manager
+  # events) and Traefik (code-<slug> editor routes) plus every workspace
+  # container. db and redis are deliberately NOT members — workspace
+  # containers run arbitrary agent code and must not reach them.
+  argos_ws:
+    name: argos_ws
 
 volumes:
   argos-data:

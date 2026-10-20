@@ -117,6 +117,18 @@ enum BackingService: string
     }
 
     /**
+     * Data directory inside the service image; persistent workspace
+     * sidecars mount a named volume here so data survives an idle stop.
+     */
+    public function dataPath(): string
+    {
+        return match ($this) {
+            self::Mysql => '/var/lib/mysql',
+            self::Redis => '/data',
+        };
+    }
+
+    /**
      * Readiness probe executed via `docker exec <container> …`. The worker is
      * only launched once every enabled service answers it.
      *

@@ -66,6 +66,23 @@ class WorkerImageResolver
     }
 
     /**
+     * Resolution for a project without a task in scope (interactive
+     * workspaces): the project's stack (BYOI read at `$ref`) with the
+     * project's agent, falling back to Claude Code. Workspaces always run
+     * Claude, so a project configured for another agent still gets Claude.
+     */
+    public function resolveForRepoProfile(RepoProfile $profile, string $ref): ResolvedWorkerImage
+    {
+        $agentName = AgentName::ClaudeCode;
+
+        $stack = $profile->worker_source === WorkerSource::Byoi
+            ? $this->resolveByoiStack($profile, $ref, $agentName)
+            : ($profile->workerStack ?? $this->defaultStack());
+
+        return $this->resolveFor($stack, $agentName);
+    }
+
+    /**
      * Resolution + build-on-demand. Returns the worker image tag ready
      * for `docker run`. Builds synchronously when the image is missing.
      */
@@ -96,7 +113,11 @@ class WorkerImageResolver
         // .argos/worker.dockerfile. Argos still layers the agent + worker code
         // on top (Dockerfile.compose), so this only replaces the FROM base.
         if ($profile?->worker_source === WorkerSource::Byoi) {
-            return $this->resolveByoiStack($task, $profile);
+            return $this->resolveByoiStack(
+                $profile,
+                $task->base_branch ?? $profile->default_branch,
+                $this->resolveAgentName($task),
+            );
         }
 
         return $profile?->workerStack ?? $this->defaultStack();
@@ -108,9 +129,8 @@ class WorkerImageResolver
      * tracking) applies unchanged. The file is read via the provider API at the
      * task's base branch — before any worker image (and thus any clone) exists.
      */
-    private function resolveByoiStack(Task $task, RepoProfile $profile): WorkerStack
+    private function resolveByoiStack(RepoProfile $profile, string $ref, AgentName $agentName): WorkerStack
     {
-        $ref = $task->base_branch ?? $profile->default_branch;
 
         $dockerfile = app(GitServiceFactory::class)
             ->fromRepoProfile($profile)
@@ -125,7 +145,7 @@ class WorkerImageResolver
             ));
         }
 
-        $agent = $this->resolveAgentName($task)->spec();
+        $agent = $agentName->spec();
 
         return WorkerStack::query()->updateOrCreate(
             ['name' => "byoi-{$profile->id}"],

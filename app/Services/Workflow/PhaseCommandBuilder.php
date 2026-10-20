@@ -10,6 +10,7 @@ use App\Enums\WorkflowStatus;
 use App\Models\AgentCredential;
 use App\Models\RepoProfile;
 use App\Models\Task;
+use App\Services\GitProvider\RepoTokenResolver;
 use App\Services\Project\ProjectEnvironmentResolver;
 use App\Workers\Agents\MaterializedAgentCredential;
 use App\Workers\Compose\WorkerImageResolver;
@@ -193,7 +194,7 @@ class PhaseCommandBuilder
 
     private function resolveRepoToken(RepoProfile $profile): string
     {
-        return $profile->resolveToken();
+        return app(RepoTokenResolver::class)->token($profile);
     }
 
     /**

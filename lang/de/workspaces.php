@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 return [
     'errors' => [
+        'capacity' => 'Es laufen bereits :max Workspaces. Stoppe einen, bevor du einen weiteren startest.',
+        'init_failed' => 'Das Einrichten des Repositorys ist fehlgeschlagen (:code): :message',
         'agent_unavailable' => 'Der Agent dieses Threads ist nicht verfügbar.',
         'agent_usage_limited' => 'Das Abo von :agent hat sein Nutzungslimit bis :time erreicht.',
         'agent_busy' => ':agent führt bereits :max parallele Session(s) aus. Schließe einen anderen Thread oder wähle einen anderen Agenten.',
