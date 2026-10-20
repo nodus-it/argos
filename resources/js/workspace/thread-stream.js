@@ -61,6 +61,11 @@ export function argosThreadStream(config) {
                         this.thinking = '';
                         persisted = true;
                         break;
+                    case 'turn.completed':
+                        // The Review tab offers a refresh after Claude changed files.
+                        window.dispatchEvent(new CustomEvent('argos-turn-completed', { detail: { threadId: this.threadId } }));
+                        persisted = true;
+                        break;
                     case 'status':
                         this.status = event.data.state;
                         if (this.status !== 'running') {

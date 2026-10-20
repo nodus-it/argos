@@ -1464,3 +1464,10 @@ body,
   .ws-composer-bar .ws-select-sm{min-height:44px;}
   .ws-approval,.ws-line,.ws-working{margin-left:0;padding-left:0;}
 }
+.ws-review{display:flex;flex-direction:column;flex:1;min-height:0;}
+.ws-review-files{flex:1;overflow:auto;padding:8px;}
+.ws-review .diff-row.ws-commentable{cursor:pointer;}
+.ws-review .diff-row.ws-commentable:hover{outline:1px solid var(--accent-soft-border);}
+.ws-review-draft{padding:6px 8px;background:var(--surface-2);border-top:1px solid var(--border);border-bottom:1px solid var(--border);display:grid;gap:6px;}
+.ws-review-comments{padding:8px;border-bottom:1px solid var(--border);display:grid;gap:6px;background:var(--surface-2);}
+.ws-review-comment{display:flex;gap:8px;align-items:baseline;font-size:var(--t-xs);}

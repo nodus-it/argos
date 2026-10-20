@@ -51,12 +51,16 @@
             <div class="ws-tabs" role="tablist">
                 <button type="button" role="tab" :class="{ 'on': tab === 'code' }" x-on:click="tab = 'code'">@svg('heroicon-o-code-bracket') {{ __('workspaces.tabs.code') }}</button>
                 <button type="button" role="tab" :class="{ 'on': tab === 'preview' }" x-on:click="tab = 'preview'">@svg('heroicon-o-globe-alt') {{ __('workspaces.tabs.preview') }}</button>
+                <button type="button" role="tab" :class="{ 'on': tab === 'review' }" x-on:click="tab = 'review'">@svg('heroicon-o-document-magnifying-glass') {{ __('workspaces.tabs.review') }}</button>
             </div>
             <div class="ws-tab-body" x-show="tab === 'code'">
                 @include('filament.admin.resources.workspace.partials.code-tab', ['workspace' => $workspace])
             </div>
             <div class="ws-tab-body" x-show="tab === 'preview'" x-cloak>
                 @include('filament.admin.resources.workspace.partials.preview-tab', ['workspace' => $workspace])
+            </div>
+            <div class="ws-tab-body" x-show="tab === 'review'" x-cloak>
+                @livewire('workspace.review-panel', ['workspaceId' => $workspace->id], key('review-'.$workspace->id))
             </div>
         </section>
     </div>
