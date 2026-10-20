@@ -6,7 +6,7 @@ namespace App\Services\Workspace;
 
 use App\Services\Demo\DemoDeployer;
 use App\Services\Demo\TraefikRouter;
-use App\Services\Workflow\WorkerSidecarManager;
+use App\Services\Worker\WorkerSidecarManager;
 
 /**
  * Removes every Docker resource of a workspace by slug alone, so it also

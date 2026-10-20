@@ -12,6 +12,9 @@ use App\Models\RepoProfile;
 use App\Models\Task;
 use App\Services\GitProvider\RepoTokenResolver;
 use App\Services\Project\ProjectEnvironmentResolver;
+use App\Services\Worker\WorkerRunLabels;
+use App\Services\Worker\WorkerSidecars;
+use App\Support\UntrustedInput;
 use App\Workers\Agents\MaterializedAgentCredential;
 use App\Workers\Compose\WorkerImageResolver;
 use Illuminate\Support\Facades\Log;
@@ -67,7 +70,7 @@ class PhaseCommandBuilder
             '-e', "REPO_PLATFORM={$profile->platform->value}",
             '-e', 'BASE_BRANCH='.($task->base_branch ?: $profile->default_branch),
             '-e', "AGENT_NAME={$agentName->value}",
-            '-e', 'TASK_DESCRIPTION='.app(UntrustedTaskInput::class)->wrap($task),
+            '-e', 'TASK_DESCRIPTION='.app(UntrustedInput::class)->wrap($task),
             '-e', "PHASE_FLAGS={$phaseFlags}",
             '-e', "MAX_TURNS={$maxTurns}",
             '-e', 'CLAUDE_CONFIG_DIR=/workspace/.agent/claude-state',

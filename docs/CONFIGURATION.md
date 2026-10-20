@@ -29,7 +29,6 @@ ENV var Argos actually reads.
 - [OAuth & credentials (UI-managed)](#oauth--credentials-ui-managed)
 - [MCP server (Argos API)](#mcp-server-argos-api)
 - [Target-project MCP (Laravel Boost)](#target-project-mcp-laravel-boost)
-- [Media library (optional)](#media-library-optional)
 - [Logging](#logging)
 - [Compose / OPS-level keys](#compose--ops-level-keys)
 
@@ -252,17 +251,6 @@ The MCP server runs entirely inside the worker container. It gives the agent
 access to Boost tools (e.g. `search-docs`, `database-schema`) scoped to the
 target project. To opt out, set `"mcp": false` in `boost.json` or remove the
 file.
-
-## Media library (optional)
-
-File and image uploads attached to models go through
-[spatie/laravel-medialibrary](https://spatie.be/docs/laravel-medialibrary).
-
-| Variable | Default | Purpose |
-|---|---|---|
-| `MEDIA_DISK` | `public` | Filesystem disk (from `config/filesystems.php`) uploads are stored on. Point at `s3` etc. for off-box storage. |
-
-See [Media library setup](SETUP-MEDIA-LIBRARY.md).
 
 ## Logging
 

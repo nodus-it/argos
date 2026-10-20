@@ -12,7 +12,7 @@ use App\Models\Workspace;
 use App\Services\IssueTracker\Concerns\ParsesExternalProjectRef;
 use App\Services\IssueTracker\DTO\ExternalIssue;
 use App\Services\IssueTracker\IssueTrackerRegistry;
-use App\Services\Workflow\UntrustedTaskInput;
+use App\Support\UntrustedInput;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -36,7 +36,7 @@ class WorkspaceIssueService
 
     public function __construct(
         private readonly IssueTrackerRegistry $registry,
-        private readonly UntrustedTaskInput $untrusted,
+        private readonly UntrustedInput $untrusted,
     ) {}
 
     /** The project's first usable tracker binding, if any. */

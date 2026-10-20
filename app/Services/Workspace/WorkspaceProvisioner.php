@@ -12,7 +12,7 @@ use App\Integrations\WorkspaceDaemon\DaemonTransportException;
 use App\Models\Thread;
 use App\Models\Workspace;
 use App\Services\Demo\TraefikRouter;
-use App\Services\Workflow\WorkerSidecarManager;
+use App\Services\Worker\WorkerSidecarManager;
 use App\Workers\Compose\WorkerImageResolver;
 use App\Workers\Compose\WorkspaceImageBuilder;
 use Illuminate\Support\Facades\Log;

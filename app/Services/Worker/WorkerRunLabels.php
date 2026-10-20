@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services\Workflow;
+namespace App\Services\Worker;
 
 /**
  * The Docker labels every per-run container and network carries so the

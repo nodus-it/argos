@@ -9,6 +9,7 @@ use App\Jobs\DeployDemoJob;
 use App\Jobs\RunPhaseJob;
 use App\Models\PhaseRun;
 use App\Models\Task;
+use App\Services\Worker\WorkerSidecarManager;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\Process\Process;
 

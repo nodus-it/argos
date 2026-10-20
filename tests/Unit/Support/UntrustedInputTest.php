@@ -2,16 +2,16 @@
 
 declare(strict_types=1);
 
-namespace Tests\Unit\Services\Workflow;
+namespace Tests\Unit\Support;
 
 use App\Models\ExternalIssueLink;
 use App\Models\Task;
 use App\Models\TaskProviderBinding;
-use App\Services\Workflow\UntrustedTaskInput;
+use App\Support\UntrustedInput;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
-class UntrustedTaskInputTest extends TestCase
+class UntrustedInputTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -19,7 +19,7 @@ class UntrustedTaskInputTest extends TestCase
     {
         $task = Task::factory()->create(['description' => 'Build the thing.']);
 
-        $wrapped = app(UntrustedTaskInput::class)->wrap($task);
+        $wrapped = app(UntrustedInput::class)->wrap($task);
 
         $this->assertStringContainsString('[BEGIN UNTRUSTED TASK DESCRIPTION', $wrapped);
         $this->assertStringContainsString('[END UNTRUSTED TASK DESCRIPTION', $wrapped);
@@ -40,7 +40,7 @@ class UntrustedTaskInputTest extends TestCase
             'task_provider_binding_id' => $binding->id,
         ]);
 
-        $wrapped = app(UntrustedTaskInput::class)->wrap($task);
+        $wrapped = app(UntrustedInput::class)->wrap($task);
 
         $this->assertStringContainsString('source: external issue tracker', $wrapped);
     }
@@ -49,7 +49,7 @@ class UntrustedTaskInputTest extends TestCase
     {
         $task = Task::factory()->create();
 
-        $wrapped = app(UntrustedTaskInput::class)->wrap($task);
+        $wrapped = app(UntrustedInput::class)->wrap($task);
 
         $this->assertStringContainsString('source: operator', $wrapped);
     }

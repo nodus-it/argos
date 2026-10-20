@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services\Workflow;
+namespace App\Services\Worker;
 
 /**
  * Immutable handle to the ephemeral sidecars started for one worker phase run:

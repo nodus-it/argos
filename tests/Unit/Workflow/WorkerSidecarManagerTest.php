@@ -6,8 +6,8 @@ namespace Tests\Unit\Workflow;
 
 use App\Models\RepoProfile;
 use App\Models\Task;
-use App\Services\Workflow\WorkerSidecarManager;
-use App\Services\Workflow\WorkerSidecars;
+use App\Services\Worker\WorkerSidecarManager;
+use App\Services\Worker\WorkerSidecars;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Symfony\Component\Process\Process;
 use Tests\TestCase;

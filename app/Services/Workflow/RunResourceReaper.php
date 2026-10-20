@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Workflow;
 
+use App\Services\Worker\WorkerRunLabels;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\Process\Process;
 use Throwable;

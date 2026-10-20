@@ -79,7 +79,6 @@ return [
             'pages' => [
                 ['slug' => 'configuration', 'title' => 'Configuration', 'file' => 'CONFIGURATION.md'],
                 ['slug' => 'execution-commands', 'title' => 'Worker & Demo Commands', 'file' => 'EXECUTION-COMMANDS.md'],
-                ['slug' => 'media-library', 'title' => 'Media Library', 'file' => 'SETUP-MEDIA-LIBRARY.md'],
             ],
         ],
     ],

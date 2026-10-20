@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services\Workflow;
+namespace App\Support;
 
 use App\Models\Task;
 
@@ -17,7 +17,7 @@ use App\Models\Task;
  * A per-call random nonce in the markers makes it impractical for a malicious
  * description to forge the closing marker and "break out" of the wrapped block.
  */
-final class UntrustedTaskInput
+final class UntrustedInput
 {
     public function wrap(Task $task): string
     {

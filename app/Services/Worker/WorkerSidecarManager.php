@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services\Workflow;
+namespace App\Services\Worker;
 
 use App\Enums\BackingService;
 use App\Models\Task;
