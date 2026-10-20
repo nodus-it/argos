@@ -25,7 +25,8 @@ export type DaemonEventType =
     | 'gates.started'
     | 'gates.completed'
     | 'gates.failed'
-    | 'gates.baseline';
+    | 'gates.baseline'
+    | 'checkpoint.created';
 
 export type ThreadState = 'starting' | 'idle' | 'running' | 'waiting_input' | 'closed';
 

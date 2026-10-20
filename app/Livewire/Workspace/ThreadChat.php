@@ -14,11 +14,13 @@ use App\Integrations\WorkspaceDaemon\DaemonTransportException;
 use App\Models\AgentCredential;
 use App\Models\Thread;
 use App\Models\ThreadApproval;
+use App\Models\ThreadCheckpoint;
 use App\Models\ThreadEvent;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Workspace\AgentPool;
 use App\Services\Workspace\ThreadAttachmentService;
+use App\Services\Workspace\ThreadCheckpointService;
 use App\Services\Workspace\ThreadReadService;
 use App\Services\Workspace\ThreadService;
 use App\Services\Workspace\WorkspaceDaemonClient;
@@ -47,7 +49,7 @@ class ThreadChat extends Component
     private const PAGE = 200;
 
     /** Commands Argos handles itself instead of sending them to Claude. */
-    public const ARGOS_COMMANDS = ['plan', 'ship', 'preview', 'review', 'gates'];
+    public const ARGOS_COMMANDS = ['plan', 'ship', 'preview', 'review', 'gates', 'checkpoint'];
 
     /** @var list<TemporaryUploadedFile> */
     public array $uploads = [];
@@ -77,6 +79,15 @@ class ThreadChat extends Component
     public ?string $renamingId = null;
 
     public string $renameTitle = '';
+
+    /** "Reset to here" dialog: the checkpoint and its diff preview. */
+    public ?string $restoreId = null;
+
+    public string $restoreDiff = '';
+
+    public bool $restoreTruncated = false;
+
+    public bool $restoreCommitsSince = false;
 
     public function mount(string $workspaceId): void
     {
@@ -217,7 +228,7 @@ class ThreadChat extends Component
         return $commands;
     }
 
-    /** Handle `/plan`, `/ship`, `/preview`, `/review`, `/gates`; true when consumed. */
+    /** Handle Argos' own slash commands (ARGOS_COMMANDS); true when consumed. */
     private function runArgosCommand(string $text): bool
     {
         if (preg_match('/^\/([a-z-]+)(?:\s+(.*))?$/s', $text, $m) !== 1 || ! in_array($m[1], self::ARGOS_COMMANDS, true)) {
@@ -231,9 +242,62 @@ class ThreadChat extends Component
             'preview' => $this->dispatch('workspace-tab', tab: 'preview'),
             'review' => $this->dispatch('workspace-tab', tab: 'review'),
             'gates' => [$this->dispatch('workspace-tab', tab: 'review'), $this->dispatch('workspace-run-gates')],
+            'checkpoint' => $this->runCheckpoint($rest),
         };
 
         return true;
+    }
+
+    private function runCheckpoint(string $label): void
+    {
+        $thread = $this->activeThread();
+        if ($thread !== null) {
+            $this->attempt(fn () => app(ThreadCheckpointService::class)->manual($thread, $this->user(), $label));
+        }
+    }
+
+    /** Open the "reset to here" dialog with a preview of what it undoes. */
+    public function previewRestore(string $checkpointId): void
+    {
+        $checkpoint = $this->checkpoint($checkpointId);
+        if ($checkpoint === null) {
+            return;
+        }
+
+        $this->attempt(function () use ($checkpoint): void {
+            $preview = app(ThreadCheckpointService::class)->preview($checkpoint, $this->user());
+            $this->restoreId = $checkpoint->id;
+            $this->restoreDiff = mb_strcut($preview['diff'], 0, 60_000);
+            $this->restoreTruncated = $preview['truncated'] || strlen($preview['diff']) > 60_000;
+            $this->restoreCommitsSince = $preview['commits_since'];
+        });
+    }
+
+    public function cancelRestore(): void
+    {
+        $this->restoreId = null;
+        $this->restoreDiff = '';
+    }
+
+    public function confirmRestore(): void
+    {
+        $checkpoint = $this->restoreId !== null ? $this->checkpoint($this->restoreId) : null;
+        if ($checkpoint === null) {
+            return;
+        }
+
+        $this->attempt(function () use ($checkpoint): void {
+            app(ThreadCheckpointService::class)->restore($checkpoint, $this->user());
+            $this->cancelRestore();
+            Notification::make()->title(__('workspaces.checkpoints.restored'))->success()->send();
+        });
+    }
+
+    private function checkpoint(string $id): ?ThreadCheckpoint
+    {
+        $thread = $this->activeThread();
+
+        return $thread === null ? null : ThreadCheckpoint::query()->where('thread_id', $thread->id)->find($id);
     }
 
     private function runPlan(string $rest): void
@@ -412,6 +476,10 @@ class ThreadChat extends Component
             'busy' => $thread !== null && $thread->status->isBusy(),
             'user' => $this->user(),
             'commands' => $thread !== null ? $this->commandList() : [],
+            // user message id => checkpoint taken right before it
+            'checkpoints' => $thread !== null
+                ? ThreadCheckpoint::query()->where('thread_id', $thread->id)->whereIn('thread_event_id', $events->pluck('id'))->orderBy('n')->get()->unique('thread_event_id')->pluck('id', 'thread_event_id')
+                : collect(),
         ]);
     }
 

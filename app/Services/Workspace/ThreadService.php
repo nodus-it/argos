@@ -128,7 +128,8 @@ class ThreadService
         $payload = [
             'client_msg_id' => (string) $event->id,
             'author' => ['id' => $author->id, 'name' => $author->name],
-            'text' => $text,
+            // After a restore Claude's context is out of date; say so once.
+            'text' => $thread->restore_note !== null ? '['.$thread->restore_note."]\n\n".$text : $text,
         ];
         if ($images !== []) {
             $payload['images'] = array_map(fn (array $image): array => ['media_type' => $image['media_type'], 'data' => $image['data']], $images);
@@ -144,6 +145,10 @@ class ThreadService
             $this->pool->release($thread);
             $this->open($thread);
             $this->daemon->for($thread->workspace)->sendMessage($thread->id, $payload);
+        }
+
+        if ($thread->restore_note !== null) {
+            $thread->forceFill(['restore_note' => null])->save();
         }
 
         $this->publisher->publish($thread->workspace_id, $thread->id, [[
@@ -314,7 +319,12 @@ class ThreadService
      *
      * @param  array<string, mixed>  $extra
      */
-    private function notice(Thread $thread, string $kind, User $by, array $extra = []): void
+    /**
+     * Add a system notice to the thread and broadcast it.
+     *
+     * @param  array<string, mixed>  $extra
+     */
+    public function notice(Thread $thread, string $kind, User $by, array $extra = []): void
     {
         $event = DB::transaction(fn (): ThreadEvent => ThreadEvent::query()->create([
             'thread_id' => $thread->id,

@@ -160,6 +160,11 @@
                                     @if (! isset($p['accepted_at']) && $busy)
                                         <span class="badge badge-draft">{{ __('workspaces.thread.queued') }}</span>
                                     @endif
+                                    @if ($canWrite && isset($checkpoints[$event->id]))
+                                        <button type="button" class="ws-reset-btn" wire:click="previewRestore('{{ $checkpoints[$event->id] }}')" title="{{ __('workspaces.checkpoints.reset_here_hint') }}">
+                                            @svg('heroicon-o-arrow-uturn-left') <span>{{ __('workspaces.checkpoints.reset_here') }}</span>
+                                        </button>
+                                    @endif
                                 </div>
                                 <div class="ws-text">{{ $p['text'] ?? '' }}</div>
                                 @if (! empty($p['images']))
@@ -260,8 +265,15 @@
                                 'permission_mode' => __('workspaces.events.permission_mode', ['name' => $p['author_name'] ?? '', 'mode' => PermissionMode::tryFrom((string) ($p['mode'] ?? ''))?->label() ?? '']),
                                 'model' => __('workspaces.events.model', ['name' => $p['author_name'] ?? '', 'model' => $p['model'] ?? '']),
                                 'shipped' => __('workspaces.events.shipped', ['name' => $p['author_name'] ?? '']),
+                                'restored' => __('workspaces.events.restored', ['name' => $p['author_name'] ?? '', 'excerpt' => $p['excerpt'] ?? '']),
+                                'checkpoint' => __('workspaces.events.checkpoint', ['name' => $p['author_name'] ?? '', 'label' => ($p['label'] ?? '') !== '' ? $p['label'] : '—']),
                                 default => '',
                             } }}
+                            @if (in_array($p['kind'] ?? '', ['restored', 'checkpoint'], true) && $canWrite && ! empty($p['checkpoint_id']))
+                                <button type="button" class="link" wire:click="previewRestore('{{ $p['checkpoint_id'] }}')">
+                                    {{ ($p['kind'] ?? '') === 'restored' ? __('workspaces.checkpoints.undo_restore') : __('workspaces.checkpoints.reset_here') }}
+                                </button>
+                            @endif
                             @if (($p['kind'] ?? '') === 'shipped' && ($p['url'] ?? '') !== '')
                                 <a class="link" href="{{ $p['url'] }}" target="_blank" rel="noopener">{{ $p['url'] }}</a>
                             @endif
@@ -298,6 +310,37 @@
             <div class="ws-alert ws-alert-warn">
                 <span>{{ __('workspaces.thread.session_ended') }}</span>
                 <button type="button" class="btn btn-secondary btn-sm" wire:click="resume">{{ __('workspaces.thread.resume') }}</button>
+            </div>
+        @endif
+
+        {{-- Reset to a checkpoint --}}
+        @if ($restoreId !== null)
+            <div class="ws-restore" role="dialog" aria-modal="true" aria-labelledby="ws-restore-title" wire:key="restore-{{ $restoreId }}">
+                <div class="ws-restore-card">
+                    <h3 id="ws-restore-title">{{ __('workspaces.checkpoints.confirm_title') }}</h3>
+                    <p class="muted">{{ __('workspaces.checkpoints.confirm_body') }}</p>
+                    @if ($restoreCommitsSince)
+                        <p class="t-warn">{{ __('workspaces.checkpoints.commits_since') }}</p>
+                    @endif
+                    @if (trim($restoreDiff) === '')
+                        <p class="muted">{{ __('workspaces.checkpoints.no_changes') }}</p>
+                    @else
+                        <pre class="ws-restore-diff">{{ $restoreDiff }}</pre>
+                        @if ($restoreTruncated)
+                            <p class="muted">{{ __('workspaces.checkpoints.truncated') }}</p>
+                        @endif
+                    @endif
+                    <div class="ws-row">
+                        <span class="ws-spacer"></span>
+                        <button type="button" class="btn btn-ghost btn-sm" wire:click="cancelRestore">{{ __('workspaces.checkpoints.cancel') }}</button>
+                        <button type="button" class="btn btn-danger btn-sm" wire:click="confirmRestore" wire:loading.attr="disabled" @disabled($busy)>
+                            @svg('heroicon-o-arrow-uturn-left') {{ __('workspaces.checkpoints.confirm') }}
+                        </button>
+                    </div>
+                    @if ($busy)
+                        <p class="muted">{{ __('workspaces.checkpoints.busy') }}</p>
+                    @endif
+                </div>
             </div>
         @endif
 

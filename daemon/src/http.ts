@@ -9,6 +9,7 @@ import * as gitOps from './gitOps.js';
 import { FileIndex } from './files.js';
 import { OneshotError, runOneshot, type OneshotRunner } from './oneshot.js';
 import { GateRunner, GatesBusyError, type GateScript } from './gates.js';
+import { CheckpointError, CheckpointStore, parseRef, type Checkpoint } from './checkpoints.js';
 
 export const DAEMON_VERSION = '0.1.0';
 
@@ -98,6 +99,13 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
     const sessions = new Map<string, ThreadSession>();
     const approvals = new ApprovalRegistry();
     const gates = deps.gateScript === undefined ? null : new GateRunner(deps.gateScript, (event) => deps.outbox.push(null, event), deps.environment.workspaceDir);
+    const checkpoints = new CheckpointStore(deps.environment.workspaceDir);
+    const announceCheckpoint = (threadId: string, checkpoint: Checkpoint, clientMsgId: string | null): void => {
+        deps.outbox.push(threadId, {
+            type: 'checkpoint.created',
+            data: { ref: checkpoint.ref, n: checkpoint.n, sha: checkpoint.sha, head: checkpoint.head, label: checkpoint.label, client_msg_id: clientMsgId },
+        });
+    };
     const gateRunner = (): GateRunner => {
         if (gates === null) {
             throw new HttpError(501, 'gates_unavailable', 'Quality gates are not configured');
@@ -129,6 +137,9 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
         }
         if (error instanceof gitOps.PushError) {
             return reply.code(409).send({ error: { code: error.code, message: error.message } });
+        }
+        if (error instanceof CheckpointError) {
+            return reply.code(error.code === 'unknown_checkpoint' ? 404 : 422).send({ error: { code: error.code, message: error.message } });
         }
         if (error instanceof GatesBusyError) {
             return reply.code(409).send({ error: { code: 'gates_running', message: error.message } });
@@ -198,6 +209,7 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
             approvals,
             deps.queryFactory,
             deps.environment,
+            async (clientMsgId) => announceCheckpoint(id, await checkpoints.create(id, ''), clientMsgId),
         );
         sessions.set(id, session);
         session.start();
@@ -293,6 +305,33 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
         await gitOps.push(dir, branch);
 
         return reply.code(202).send({});
+    });
+
+    app.post('/checkpoints', async (request, reply) => {
+        const body = z.object({ thread_id: threadIdSchema, label: z.string().max(120).default('') }).parse(request.body);
+        const checkpoint = await checkpoints.create(body.thread_id, body.label);
+        announceCheckpoint(body.thread_id, checkpoint, null);
+
+        return reply.code(201).send(checkpoint);
+    });
+
+    app.get('/checkpoints/diff', async (request) => {
+        const { ref } = z.object({ ref: z.string().max(200) }).parse(request.query);
+
+        return checkpoints.diff(ref);
+    });
+
+    app.post('/checkpoints/restore', async (request) => {
+        const { ref } = z.object({ ref: z.string().max(200) }).parse(request.body);
+        const { threadId } = parseRef(ref);
+        const state = sessions.get(threadId)?.currentState;
+        if (state === 'running' || state === 'starting' || state === 'waiting_input') {
+            throw new HttpError(409, 'thread_running', 'Claude is working in this thread; interrupt it first');
+        }
+        const result = await checkpoints.restore(ref);
+        announceCheckpoint(threadId, result.before, null);
+
+        return result;
     });
 
     app.get('/gates', async () => ({ running: gateRunner().running, baseline: gateRunner().baseline }));

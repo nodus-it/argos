@@ -73,4 +73,17 @@ interface WorkspaceDaemonTransport
     public function runGates(string $runId): void;
 
     public function gateFixPrompt(string $gate, string $runId): string;
+
+    /** @return array{ref: string, n: int, sha: string, head: string|null, label: string} */
+    public function createCheckpoint(string $threadId, string $label): array;
+
+    /** @return array{diff: string, truncated: bool, head: string|null} */
+    public function checkpointDiff(string $ref): array;
+
+    /**
+     * Throws `thread_running` while Claude works in the checkpoint's thread.
+     *
+     * @return array{before: array{ref: string, n: int, sha: string, head: string|null, label: string}, removed: list<string>}
+     */
+    public function restoreCheckpoint(string $ref): array;
 }

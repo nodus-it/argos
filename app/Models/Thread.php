@@ -31,6 +31,7 @@ use Illuminate\Support\Carbon;
  * @property string $cost_usd
  * @property bool $session_open
  * @property Carbon|null $archived_at
+ * @property string|null $restore_note
  * @property Carbon $created_at
  * @property Carbon $updated_at
  * @property-read Workspace $workspace

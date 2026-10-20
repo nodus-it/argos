@@ -98,4 +98,22 @@ test.describe('workspace pair programming', () => {
     await gates.locator('li', { hasText: 'pest' }).getByRole('button', { name: /agent/i }).click();
     await expect(ada.locator('.ws-msg-user').last()).toContainText('Quality-Gate-Fix: pest', { timeout: 15_000 });
   });
+
+  test('a turn can be reset and the reset undone', async ({ browser }) => {
+    const ada = await openWorkspace(browser, 'admin@argos.local');
+
+    await send(ada, 'Hello checkpoint');
+    await expect(ada.getByText('Echo: [Argos Admin]: Hello checkpoint')).toBeVisible({ timeout: 15_000 });
+
+    await ada.locator('.ws-msg-user', { hasText: 'Hello checkpoint' }).locator('.ws-reset-btn').click();
+    const dialog = ada.getByRole('dialog');
+    await expect(dialog).toContainText('Hello Argos');
+    await dialog.locator('.btn-danger').click();
+    await expect(dialog).toHaveCount(0);
+
+    const notice = ada.locator('.ws-notice', { hasText: 'Hello checkpoint' });
+    await expect(notice).toBeVisible();
+    await notice.getByRole('button').click();
+    await expect(ada.getByRole('dialog')).toBeVisible();
+  });
 });

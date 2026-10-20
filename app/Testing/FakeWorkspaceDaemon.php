@@ -7,6 +7,7 @@ namespace App\Testing;
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
 use App\Integrations\WorkspaceDaemon\WorkspaceDaemonTransport;
 use App\Models\Thread;
+use App\Models\ThreadCheckpoint;
 use App\Models\Workspace;
 use App\Services\Workspace\ThreadEventIngestor;
 use App\Services\Workspace\WorkspaceDaemonClient;
@@ -61,6 +62,7 @@ class FakeWorkspaceDaemon extends WorkspaceDaemonClient implements WorkspaceDaem
         $author = (string) ($payload['author']['name'] ?? '');
 
         $events = [
+            ['checkpoint.created', ['client_msg_id' => $payload['client_msg_id'] ?? null, 'label' => '', ...$this->nextCheckpoint($threadId)]],
             ['user.accepted', ['client_msg_id' => $payload['client_msg_id'] ?? '']],
             ['status', ['state' => 'running']],
         ];
@@ -159,6 +161,34 @@ class FakeWorkspaceDaemon extends WorkspaceDaemonClient implements WorkspaceDaem
     public function gateFixPrompt(string $gate, string $runId): string
     {
         return "# Quality-Gate-Fix: {$gate}\n\nTests sind fehlgeschlagen.\n";
+    }
+
+    public function createCheckpoint(string $threadId, string $label): array
+    {
+        return [...$this->nextCheckpoint($threadId), 'label' => $label];
+    }
+
+    public function checkpointDiff(string $ref): array
+    {
+        return ['diff' => "diff --git a/README.md b/README.md\n--- a/README.md\n+++ b/README.md\n@@ -1 +1 @@\n-Hello\n+Hello Argos\n", 'truncated' => false, 'head' => str_repeat('0', 40)];
+    }
+
+    public function restoreCheckpoint(string $ref): array
+    {
+        $threadId = explode('/', $ref)[3] ?? '';
+        if (in_array(Thread::query()->whereKey($threadId)->value('status'), ['running', 'waiting_input'], true)) {
+            throw new DaemonTransportException('Claude is working in this thread; interrupt it first', 409, 'thread_running');
+        }
+
+        return ['before' => [...$this->nextCheckpoint($threadId), 'label' => 'before restore'], 'removed' => []];
+    }
+
+    /** @return array{ref: string, n: int, sha: string, head: string} */
+    private function nextCheckpoint(string $threadId): array
+    {
+        $n = (int) ThreadCheckpoint::query()->where('thread_id', $threadId)->max('n') + 1;
+
+        return ['ref' => "refs/argos/checkpoints/{$threadId}/{$n}", 'n' => $n, 'sha' => str_pad(dechex($n), 40, 'c', STR_PAD_LEFT), 'head' => str_repeat('0', 40)];
     }
 
     public function gitCommit(string $subject, string $body, array $author): ?array

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Integrations\WorkspaceDaemon;
 
+use App\Integrations\WorkspaceDaemon\Requests\CreateCheckpoint;
+use App\Integrations\WorkspaceDaemon\Requests\GetCheckpointDiff;
 use App\Integrations\WorkspaceDaemon\Requests\GetGateFixPrompt;
 use App\Integrations\WorkspaceDaemon\Requests\GetHealth;
 use App\Integrations\WorkspaceDaemon\Requests\GitCommit;
@@ -15,6 +17,7 @@ use App\Integrations\WorkspaceDaemon\Requests\InitWorkspace;
 use App\Integrations\WorkspaceDaemon\Requests\InterruptThread;
 use App\Integrations\WorkspaceDaemon\Requests\ListFiles;
 use App\Integrations\WorkspaceDaemon\Requests\ResolveApproval;
+use App\Integrations\WorkspaceDaemon\Requests\RestoreCheckpoint;
 use App\Integrations\WorkspaceDaemon\Requests\RunGates;
 use App\Integrations\WorkspaceDaemon\Requests\RunOneshot;
 use App\Integrations\WorkspaceDaemon\Requests\SendMessage;
@@ -160,6 +163,44 @@ class WorkspaceDaemonApi implements WorkspaceDaemonTransport
     public function gateFixPrompt(string $gate, string $runId): string
     {
         return (string) ($this->call(new GetGateFixPrompt($gate, $runId))['prompt'] ?? '');
+    }
+
+    public function createCheckpoint(string $threadId, string $label): array
+    {
+        return self::checkpoint($this->call(new CreateCheckpoint(['thread_id' => $threadId, 'label' => $label])));
+    }
+
+    public function checkpointDiff(string $ref): array
+    {
+        $result = $this->call(new GetCheckpointDiff($ref));
+
+        return ['diff' => (string) ($result['diff'] ?? ''), 'truncated' => (bool) ($result['truncated'] ?? false), 'head' => is_string($result['head'] ?? null) ? $result['head'] : null];
+    }
+
+    public function restoreCheckpoint(string $ref): array
+    {
+        $result = $this->call(new RestoreCheckpoint(['ref' => $ref]));
+        $removed = is_array($result['removed'] ?? null) ? $result['removed'] : [];
+
+        return [
+            'before' => self::checkpoint(is_array($result['before'] ?? null) ? $result['before'] : []),
+            'removed' => array_values(array_filter($removed, 'is_string')),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $raw
+     * @return array{ref: string, n: int, sha: string, head: string|null, label: string}
+     */
+    private static function checkpoint(array $raw): array
+    {
+        return [
+            'ref' => (string) ($raw['ref'] ?? ''),
+            'n' => (int) ($raw['n'] ?? 0),
+            'sha' => (string) ($raw['sha'] ?? ''),
+            'head' => is_string($raw['head'] ?? null) ? $raw['head'] : null,
+            'label' => (string) ($raw['label'] ?? ''),
+        ];
     }
 
     /**

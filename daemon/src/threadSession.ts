@@ -89,6 +89,8 @@ export class ThreadSession {
         private readonly approvals: ApprovalRegistry,
         private readonly queryFactory: QueryFactory,
         private readonly environment: SessionEnvironment,
+        /** Runs when the SDK takes a message, before Claude sees it (checkpoints). */
+        private readonly beforeTurn: (clientMsgId: string) => Promise<void> = async () => {},
     ) {
         this.claudeSessionId = params.resumeSessionId ?? null;
         this.queue = this.newQueue();
@@ -191,9 +193,12 @@ export class ThreadSession {
         env.CLAUDE_CONFIG_DIR = configDir;
 
         const queue = this.queue;
+        const beforeTurn = this.beforeTurn;
         const prompt: AsyncIterable<SDKUserMessage> = {
             async *[Symbol.asyncIterator]() {
                 for await (const item of queue.iterable()) {
+                    // A failing hook must never cost the user their message.
+                    await beforeTurn(item.clientMsgId).catch(() => {});
                     yield item.message;
                 }
             },

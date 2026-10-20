@@ -40,6 +40,7 @@ class ThreadEventIngestor
         private readonly WorkspaceService $workspaces,
         private readonly WorkspaceNotifier $notifier,
         private readonly WorkspaceGateService $gates,
+        private readonly ThreadCheckpointService $checkpoints,
     ) {}
 
     /**
@@ -205,6 +206,11 @@ class ThreadEventIngestor
                 $thread->commands = $this->commands(is_array($data['commands'] ?? null) ? $data['commands'] : []);
 
                 return $broadcast;
+
+            case 'checkpoint.created':
+                $checkpoint = $this->checkpoints->record($thread, $data);
+
+                return $checkpoint === null ? null : $broadcast + ['checkpoint_id' => $checkpoint->id];
 
             case 'status':
                 $this->applyStatus($thread, (string) ($data['state'] ?? ''));

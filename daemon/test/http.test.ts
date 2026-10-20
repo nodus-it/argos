@@ -145,4 +145,53 @@ describe('daemon HTTP API', () => {
         expect(oneshot.statusCode).toBe(501);
         outbox.stop();
     });
+
+    it('checkpoints every turn and restores only while Claude is not working', async () => {
+        const { execFileSync } = await import('node:child_process');
+        const { writeFileSync, readFileSync } = await import('node:fs');
+        const gitEnv = { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null' };
+        execFileSync('git', ['init', '-q', '-b', 'main', dir], { env: gitEnv });
+        writeFileSync(join(dir, 'README.md'), 'v1\n');
+        execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', 'add', '.'], { cwd: dir, env: gitEnv });
+        execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-m', 'init'], { cwd: dir, env: gitEnv });
+
+        let release!: () => void;
+        const working = new Promise<void>((resolve) => (release = resolve));
+        const { app, outbox } = make(async function* (message) {
+            writeFileSync(join(dir, 'README.md'), 'v2\n');
+            await working;
+            yield assistantText('m1', `done ${textOfUserMessage(message)}`);
+        });
+        await app.inject({ method: 'POST', url: '/threads/t1/start', headers: auth, payload: startBody });
+        await app.inject({ method: 'POST', url: '/threads/t1/messages', headers: auth, payload: { client_msg_id: '42', author: { id: 3, name: 'Ada' }, text: 'change it' } });
+
+        await waitFor(() => events().some((e) => e.type === 'checkpoint.created'));
+        const created = events().find((e) => e.type === 'checkpoint.created')!;
+        expect(created.data).toMatchObject({ ref: 'refs/argos/checkpoints/t1/1', n: 1, client_msg_id: '42' });
+
+        const busy = await app.inject({ method: 'POST', url: '/checkpoints/restore', headers: auth, payload: { ref: created.data.ref } });
+        expect(busy.statusCode).toBe(409);
+        expect(busy.json().error.code).toBe('thread_running');
+
+        release();
+        await waitFor(() => events().some((e) => e.type === 'turn.completed'));
+        const preview = await app.inject({ method: 'GET', url: `/checkpoints/diff?ref=${encodeURIComponent(String(created.data.ref))}`, headers: auth });
+        expect(preview.json().diff).toContain('+v2');
+
+        const restored = await app.inject({ method: 'POST', url: '/checkpoints/restore', headers: auth, payload: { ref: created.data.ref } });
+        expect(restored.statusCode).toBe(200);
+        expect(restored.json().before.n).toBe(2);
+        expect(readFileSync(join(dir, 'README.md'), 'utf8')).toBe('v1\n');
+        // Unacked events are re-sent; count distinct ones.
+        await waitFor(() => new Set(events().filter((e) => e.type === 'checkpoint.created').map((e) => e.seq)).size === 2);
+
+        const manual = await app.inject({ method: 'POST', url: '/checkpoints', headers: auth, payload: { thread_id: 't1', label: 'before refactor' } });
+        expect(manual.statusCode).toBe(201);
+        expect(manual.json()).toMatchObject({ n: 3, label: 'before refactor' });
+
+        expect((await app.inject({ method: 'POST', url: '/checkpoints/restore', headers: auth, payload: { ref: 'refs/heads/main' } })).statusCode).toBe(422);
+        expect((await app.inject({ method: 'POST', url: '/checkpoints/restore', headers: auth, payload: { ref: 'refs/argos/checkpoints/t1/99' } })).statusCode).toBe(404);
+        await app.inject({ method: 'POST', url: '/threads/t1/stop', headers: auth });
+        outbox.stop();
+    });
 });
