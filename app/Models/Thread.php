@@ -26,6 +26,7 @@ use Illuminate\Support\Carbon;
  * @property PermissionMode $permission_mode
  * @property string $model
  * @property string|null $claude_session_id
+ * @property list<array{name: string, description: string, argument_hint: string}>|null $commands
  * @property int $last_seq
  * @property string $cost_usd
  * @property bool $session_open
@@ -49,6 +50,7 @@ class Thread extends Model
         'permission_mode',
         'model',
         'claude_session_id',
+        'commands',
         'last_seq',
         'cost_usd',
         'session_open',
@@ -60,6 +62,7 @@ class Thread extends Model
         return [
             'status' => ThreadStatus::class,
             'permission_mode' => PermissionMode::class,
+            'commands' => 'array',
             'last_seq' => 'integer',
             'cost_usd' => 'decimal:4',
             'session_open' => 'boolean',

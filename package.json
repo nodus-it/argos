@@ -17,6 +17,8 @@
     "dependencies": {
         "@fontsource-variable/hanken-grotesk": "^5.2.8",
         "@fontsource/ibm-plex-mono": "^5.2.7",
-        "@tailwindcss/typography": "^0.5.19"
+        "@tailwindcss/typography": "^0.5.19",
+        "laravel-echo": "^2.6.1",
+        "pusher-js": "^8.6.0"
     }
 }

@@ -95,11 +95,22 @@ http:
       priority: 1
       entryPoints: ["web"]
       service: argos
+    # Browser websockets for Laravel Reverb (live workspace threads). Only the
+    # client path is public; the publish API (/apps) stays internal.
+    argos-realtime:
+      rule: "PathPrefix(`/app/`)"
+      priority: 10
+      entryPoints: ["web"]
+      service: argos-realtime
   services:
     argos:
       loadBalancer:
         servers:
           - url: "http://nginx:80"
+    argos-realtime:
+      loadBalancer:
+        servers:
+          - url: "http://reverb:8080"
 YML
     chown www-data:www-data "$TRAEFIK_DIR/argos.yml"
 fi
@@ -175,7 +186,7 @@ case "${ARGOS_ROLE:-app}" in
         # off or the image is already cached). Dispatched to the queue worker.
         php /app/artisan argos:warm-demo-image --no-interaction || true
         ;;
-    worker|queue|scheduler)
+    worker|queue|scheduler|reverb)
         echo "ARGOS_ROLE=${ARGOS_ROLE} — skipping migrations (app service owns the schema)."
         ;;
     *)

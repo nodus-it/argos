@@ -20,6 +20,8 @@ return Application::configure(basePath: dirname(__DIR__))
             Route::group([], base_path('routes/internal.php'));
         },
     )
+    // Channel auth runs in the web group so the Filament session decides.
+    ->withBroadcasting(__DIR__.'/../routes/channels.php', ['middleware' => ['web', 'auth']])
     ->withMiddleware(function (Middleware $middleware): void {
         // Argos is designed to run behind a reverse proxy (the bundled nginx
         // service plus, typically, a TLS-terminating proxy like HAProxy /

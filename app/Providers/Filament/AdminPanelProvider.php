@@ -113,11 +113,28 @@ class AdminPanelProvider extends PanelProvider
             ->renderHook(
                 PanelsRenderHook::HEAD_END,
                 function (): HtmlString {
+                    $realtime = config('broadcasting.default') === 'reverb';
+                    $entries = $realtime ? ['resources/css/app.css', 'resources/js/app.js'] : ['resources/css/app.css'];
+
                     try {
-                        return new HtmlString(app(Vite::class)(['resources/css/app.css']));
+                        $assets = app(Vite::class)($entries)->toHtml();
                     } catch (ViteManifestNotFoundException) {
-                        return new HtmlString('');
+                        $assets = '';
                     }
+
+                    if (! $realtime) {
+                        return new HtmlString($assets);
+                    }
+
+                    // Runtime realtime config for resources/js/app.js — images
+                    // are prebuilt, so nothing here can be a Vite build-time env.
+                    $config = json_encode([
+                        'key' => (string) config('broadcasting.connections.reverb.key'),
+                        'authEndpoint' => url('broadcasting/auth'),
+                        'csrfToken' => csrf_token(),
+                    ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+
+                    return new HtmlString('<script>window.ArgosRealtime = '.$config.';</script>'.$assets);
                 }
             )
             ->renderHook(

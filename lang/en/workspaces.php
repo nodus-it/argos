@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 return [
     'errors' => [
+        'not_running' => 'The workspace is not running. Start it first.',
+        'daemon_unreachable' => 'The workspace did not respond: :message',
+        'bypass_owner_only' => 'Only workspace owners may bypass permissions.',
         'capacity' => 'Already :max workspaces are running. Stop one before starting another.',
         'init_failed' => 'Setting up the repository failed (:code): :message',
         'agent_unavailable' => 'The agent of this thread is not available.',

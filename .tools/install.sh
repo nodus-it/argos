@@ -387,6 +387,7 @@ initialise_env_file() {
     set_env_value "$ENV_FILE" ADMIN_PASSWORD         "$(gen_password)"
     set_env_value "$ENV_FILE" ARGOS_DB_PASSWORD      "$(gen_password)"
     set_env_value "$ENV_FILE" ARGOS_DB_ROOT_PASSWORD "$(gen_password)"
+    set_env_value "$ENV_FILE" ARGOS_REVERB_APP_SECRET "$(gen_password)"
     chmod 600 "$ENV_FILE"
     success "Wrote $ENV_FILE with generated secrets (mode 600)."
 }
@@ -407,7 +408,7 @@ backfill_missing_secrets() {
         generated=$((generated + 1))
     fi
     local key
-    for key in ADMIN_PASSWORD ARGOS_DB_PASSWORD ARGOS_DB_ROOT_PASSWORD; do
+    for key in ADMIN_PASSWORD ARGOS_DB_PASSWORD ARGOS_DB_ROOT_PASSWORD ARGOS_REVERB_APP_SECRET; do
         if [[ -z "$(get_env_value "$ENV_FILE" "$key")" ]]; then
             set_env_value "$ENV_FILE" "$key" "$(gen_password)"
             warn "$key was empty in $ENV_FILE — generated a new one."

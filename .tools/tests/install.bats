@@ -173,12 +173,28 @@ APP_KEY=base64:x
 ADMIN_PASSWORD=a
 ARGOS_DB_PASSWORD=b
 ARGOS_DB_ROOT_PASSWORD=c
+ARGOS_REVERB_APP_SECRET=d
 EOF
 
     local before
     before="$(sha256_of "$ENV_FILE")"
     backfill_missing_secrets 2>/dev/null
     [ "$(sha256_of "$ENV_FILE")" = "$before" ]
+}
+
+@test "backfill_missing_secrets generates the realtime secret an update added empty" {
+    ENV_FILE="$TEST_DIR/.env"
+    cat > "$ENV_FILE" <<'EOF'
+APP_KEY=base64:x
+ADMIN_PASSWORD=a
+ARGOS_DB_PASSWORD=b
+ARGOS_DB_ROOT_PASSWORD=c
+ARGOS_REVERB_APP_SECRET=
+EOF
+
+    backfill_missing_secrets 2>/dev/null
+    [ -n "$(get_env_value "$ENV_FILE" ARGOS_REVERB_APP_SECRET)" ]
+    [ "$(get_env_value "$ENV_FILE" ADMIN_PASSWORD)" = "a" ]
 }
 
 # ── apply_stage_image ─────────────────────────────────────────────────────────
