@@ -85,7 +85,7 @@ return [
      * sidecars (one private network per run, torn down afterwards) so a
      * project's tests can talk to a real MySQL/Redis. A repo profile opts in per
      * service; only the test-running phases start them. See
-     * App\Enums\BackingService and App\Services\Workflow\WorkerSidecarManager.
+     * App\Enums\BackingService and App\Services\Worker\WorkerSidecarManager.
      */
     'worker' => [
         'services' => [

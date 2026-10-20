@@ -33,9 +33,15 @@ Claude subscription, not the API.
 
 ---
 
-Argos accepts a task description, runs it through isolated worker containers
-in phases (`concept` → `implement` → `diff` → `push`), and opens a pull
-request you can review.
+Argos lets you work with Claude two ways, both on your own subscription:
+
+- **Workspaces** — interactive, like Claude Code on your machine but in the
+  browser and together: chat with Claude while it works, decide its
+  approvals, edit in VS Code, click through a live preview, review the diff and
+  ship a pull request. See [Workspaces](docs/WORKSPACES.md).
+- **Tasks** — hands-off: Argos takes a task description, runs it through
+  isolated worker containers in phases (`concept` → `implement` → `diff` →
+  `push`), and opens a pull request you can review.
 
 > [!IMPORTANT]
 > - **Runs on your Claude subscription, not the API.** Argos uses the Claude

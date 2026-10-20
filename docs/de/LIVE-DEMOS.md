@@ -181,7 +181,7 @@ Projekt aktiviert sind und die Implement-Phase abgeschlossen ist):
 
 ## Workspace-Previews
 
-[Workspaces](WORKSPACES.md) nutzen dasselbe Demo-System für ihren Tab
+[Workspaces](WORKSPACES.md) nutzen dasselbe Demo-System für ihre
 **Preview**, mit drei Unterschieden:
 
 - die Demo mountet das **Workspace-Volume** (`ws_<workspace>`) und wird nie vom

@@ -14,6 +14,7 @@
 #   nginx     — serves static assets + proxies to app:9000, behind Traefik
 #   queue     — Laravel Horizon (same image as app, ARGOS_ROLE=queue)
 #   scheduler — Laravel scheduler (`schedule:work`, ARGOS_ROLE=scheduler)
+#   reverb    — Laravel Reverb websockets (live workspace threads, ARGOS_ROLE=reverb)
 #
 # Production vs. development:
 #   Production pulls a prebuilt image (ARGOS_APP_IMAGE points at a registry tag,
@@ -38,6 +39,21 @@ name: argos
 # OAuth client credentials are managed entirely in the UI (Configuration →
 # OAuth Apps) and stored in the database; OAuthConfigHydrator mirrors them into
 # config at boot in every context (app + queue + scheduler). No ENV path.
+
+# Workspace settings (see docs/CONFIGURATION.md#workspaces). Forwarded empty
+# by default so config/argos.php applies its defaults; app, queue (provisioning,
+# PR sync) and scheduler (idle stop) must agree, hence one anchor.
+x-workspace-env: &workspace-env
+  ARGOS_WORKSPACES_ENABLED:            "${ARGOS_WORKSPACES_ENABLED:-}"
+  ARGOS_WORKSPACE_COLLABORATION:       "${ARGOS_WORKSPACE_COLLABORATION:-}"
+  ARGOS_WORKSPACE_MAX_ACTIVE:          "${ARGOS_WORKSPACE_MAX_ACTIVE:-}"
+  ARGOS_WORKSPACE_IDLE_MINUTES:        "${ARGOS_WORKSPACE_IDLE_MINUTES:-}"
+  ARGOS_WORKSPACE_CPUS:                "${ARGOS_WORKSPACE_CPUS:-}"
+  ARGOS_WORKSPACE_MEMORY:              "${ARGOS_WORKSPACE_MEMORY:-}"
+  ARGOS_WORKSPACE_EDITOR_COOKIE_HOURS: "${ARGOS_WORKSPACE_EDITOR_COOKIE_HOURS:-}"
+  ARGOS_WORKSPACE_PR_SYNC_MINUTES:     "${ARGOS_WORKSPACE_PR_SYNC_MINUTES:-}"
+  ARGOS_WORKSPACE_UPLOAD_MAX_MB:       "${ARGOS_WORKSPACE_UPLOAD_MAX_MB:-}"
+  ARGOS_OPENVSCODE_VERSION:            "${ARGOS_OPENVSCODE_VERSION:-}"
 
 # Live-Demo (P6) preview settings — shared verbatim by app + queue (the queue
 # worker runs DeployDemoJob, the app warms the runtime image). Listed via an
@@ -135,7 +151,7 @@ services:
       - argos-public:/srv/argos-public
       - argos-nginx-config:/srv/argos-nginx
     environment:
-      <<: [*preview-env, *realtime-env]
+      <<: [*preview-env, *realtime-env, *workspace-env]
       ARGOS_ROLE:                        "app"
       APP_ENV:                           "${APP_ENV:-production}"
       APP_DEBUG:                         "${APP_DEBUG:-false}"
@@ -239,7 +255,7 @@ services:
       - argos-data:/data
       - argos-traefik:/data/traefik
     environment:
-      <<: [*preview-env, *realtime-env]
+      <<: [*preview-env, *realtime-env, *workspace-env]
       ARGOS_ROLE:                        "queue"
       APP_ENV:                           "${APP_ENV:-production}"
       APP_DEBUG:                         "${APP_DEBUG:-false}"
@@ -312,7 +328,7 @@ services:
     volumes:
       - argos-data:/data
     environment:
-      <<: *realtime-env
+      <<: [*realtime-env, *workspace-env]
       ARGOS_ROLE:               "scheduler"
       APP_ENV:                  "${APP_ENV:-production}"
       APP_DEBUG:                "${APP_DEBUG:-false}"

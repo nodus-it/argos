@@ -339,7 +339,7 @@ docker compose -p <slug> down -v --remove-orphans   # containers + volumes
 | --- | --- |
 | `docker run`-Zusammenbau für eine Phase | `app/Services/Workflow/PhaseCommandBuilder.php` |
 | Phasen-Ausführung, Notiz-/Feedback-Schreibvorgänge, Log-Streaming | `app/Services/Workflow/PhaseRunner.php` |
-| Backing-Service-Sidecars | `app/Services/Workflow/WorkerSidecarManager.php` |
+| Backing-Service-Sidecars | `app/Services/Worker/WorkerSidecarManager.php` |
 | Container-Entrypoint (Credentials materialisieren, Dispatch) | `.tools/docker/worker/worker-entrypoint.sh` |
 | Per-Phase-Skripte | `worker/phases/{concept,implement,diff,push,commit-message,respond}.sh` |
 | Quality-Gate | `worker/lib/quality.sh` |

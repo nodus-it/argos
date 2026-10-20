@@ -177,7 +177,7 @@ the project and the Implement phase has completed):
 
 ## Workspace previews
 
-[Workspaces](WORKSPACES.md) use the same demo system for their **Preview** tab,
+[Workspaces](WORKSPACES.md) use the same demo system for their **preview**,
 with three differences:
 
 - the demo mounts the **workspace volume** (`ws_<workspace>`) and is never synced

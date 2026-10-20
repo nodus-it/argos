@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Tests\Unit\Workflow;
+namespace Tests\Unit\Worker;
 
 use App\Models\RepoProfile;
 use App\Models\Task;
