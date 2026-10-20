@@ -63,6 +63,7 @@ return [
         'rerun_queued' => 'Setup-Befehle laufen erneut.',
     ],
     'tabs' => [
+        'code_viewer' => 'Der Editor steht Besitzern und Bearbeitern dieses Workspaces zur Verfügung.',
         'not_embeddable' => 'In diesem Setup kann der Browser Workspace-Hosts nicht einbetten (App und Workspace-Hosts liegen auf verschiedenen Sites). Öffne sie in einem eigenen Tab — der Zugriff funktioniert genauso.',
         'open_editor' => 'VS Code öffnen',
         'open_preview' => 'Preview öffnen',

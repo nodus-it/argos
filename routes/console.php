@@ -44,3 +44,13 @@ Schedule::command('argos:cleanup-demos')
 Schedule::command('argos:cleanup-orphans')
     ->everyFifteenMinutes()
     ->withoutOverlapping();
+
+// Interactive workspaces: stop idle containers (volumes stay) and remove
+// containers whose workspace is gone.
+Schedule::command('argos:workspaces:idle-stop')
+    ->everyFiveMinutes()
+    ->withoutOverlapping();
+
+Schedule::command('argos:workspaces:reap-orphans')
+    ->everyFifteenMinutes()
+    ->withoutOverlapping();

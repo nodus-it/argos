@@ -64,6 +64,23 @@ class WorkspaceGateTest extends TestCase
         $this->assertNull(collect($response->headers->getCookies())->firstWhere(fn ($c) => $c->getName() === config('session.cookie')));
     }
 
+    public function test_viewers_get_the_preview_but_not_the_editor(): void
+    {
+        $viewer = User::factory()->create();
+        WorkspaceMember::query()->create(['workspace_id' => $this->workspace->id, 'user_id' => $viewer->id, 'role' => WorkspaceRole::Viewer]);
+        $cookie = $this->tokens()->cookie($this->workspace, $viewer);
+
+        $this->gate('demo-ws-login.argos.test', cookies: ['argos_ws_login' => $cookie])->assertNoContent();
+        $this->gate(headers: ['Accept' => 'application/json'], cookies: ['argos_ws_login' => $cookie])->assertUnauthorized();
+
+        $this->actingAs($viewer)
+            ->get(route('workspaces.open', ['workspace' => $this->workspace, 'target' => 'code']))
+            ->assertForbidden();
+        $this->actingAs($viewer)
+            ->get(route('workspaces.open', ['workspace' => $this->workspace, 'target' => 'preview']))
+            ->assertRedirect();
+    }
+
     public function test_unknown_or_foreign_hosts_are_404(): void
     {
         $this->gate('code-nope.argos.test')->assertNotFound();

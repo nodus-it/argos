@@ -33,6 +33,9 @@ class WorkspaceResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'name';
 
+    /** Keep the panel without a global search box (no other resource has one). */
+    protected static bool $isGloballySearchable = false;
+
     public static function getNavigationIcon(): string
     {
         return 'heroicon-o-command-line';

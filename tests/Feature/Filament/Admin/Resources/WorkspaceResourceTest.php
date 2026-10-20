@@ -155,9 +155,20 @@ class WorkspaceResourceTest extends TestCase
     public function test_code_tab_explains_a_stopped_workspace(): void
     {
         $me = User::factory()->create();
-        $workspace = $this->workspaceFor($me, WorkspaceRole::Viewer, ['status' => WorkspaceStatus::Stopped]);
+        $workspace = $this->workspaceFor($me, WorkspaceRole::Editor, ['status' => WorkspaceStatus::Failed]);
 
         $this->actingAs($me)->get(ViewWorkspace::getUrl(['record' => $workspace]))
             ->assertSee(__('workspaces.tabs.not_running'));
+    }
+
+    public function test_viewers_do_not_get_the_editor(): void
+    {
+        $me = User::factory()->create();
+        $workspace = $this->workspaceFor($me, WorkspaceRole::Viewer);
+
+        $this->actingAs($me)->get(ViewWorkspace::getUrl(['record' => $workspace]))
+            ->assertSee(__('workspaces.tabs.code_viewer'))
+            ->assertDontSee('target=code', false)
+            ->assertDontSee('/open/code', false);
     }
 }

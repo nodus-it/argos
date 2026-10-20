@@ -20,6 +20,7 @@ up Argos — you do not need to read the worker source to follow it.
 - [Adding a credential during onboarding](#adding-a-credential-during-onboarding)
 - [Managing credentials later](#managing-credentials-later)
 - [Credential status](#credential-status)
+- [Personal and shared agents](#personal-and-shared-agents)
 - [How a project selects its agent](#how-a-project-selects-its-agent)
 - [Per-task overrides](#per-task-overrides)
 - [Model selection](#model-selection)
@@ -149,6 +150,25 @@ Each credential carries one of three statuses:
 
 When a task does not name a credential explicitly, Argos uses the **first
 active credential** for the resolved agent (ordered by creation date).
+
+## Personal and shared agents
+
+A credential is either **personal** (it has an owner and runs on that person's
+subscription) or **shared** (no owner).
+
+- Every user can add their **own** Claude agent under *Agents* — paste the output
+  of `claude setup-token`. Users only see their own agents.
+- Administrators see all agents and can assign an owner, or leave it empty for a
+  shared agent.
+- **Tasks** use the agent chosen on the task, otherwise the first active
+  **shared** agent — a personal agent is never picked implicitly.
+- **Workspace threads** run on a personal or shared agent chosen when the thread
+  is created (see [Workspaces](WORKSPACES.md)).
+- **Parallel sessions** (administrators) limits how many workspace threads may
+  run on one agent at the same time (default `1`). When Claude reports that the
+  subscription hit its usage limit, the agent shows *Usage limit until …* and
+  starts no new sessions before then.
+- **Default model** preselects the model for new workspace threads.
 
 ## How a project selects its agent
 

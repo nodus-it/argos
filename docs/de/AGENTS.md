@@ -21,6 +21,7 @@ musst den Worker-Quellcode nicht lesen, um es nachzuvollziehen.
 - [Eine Zugangsdaten während des Onboardings hinzufügen](#eine-zugangsdaten-während-des-onboardings-hinzufügen)
 - [Zugangsdaten später verwalten](#zugangsdaten-später-verwalten)
 - [Status von Zugangsdaten](#status-von-zugangsdaten)
+- [Persönliche und geteilte Agenten](#personliche-und-geteilte-agenten)
 - [Wie ein Projekt seinen Agenten auswählt](#wie-ein-projekt-seinen-agenten-auswählt)
 - [Überschreibungen pro Aufgabe](#überschreibungen-pro-aufgabe)
 - [Modellauswahl](#modellauswahl)
@@ -164,6 +165,27 @@ Jeder Zugangsdatensatz trägt einen von drei Status:
 Wenn eine Aufgabe keinen Zugangsdatensatz explizit benennt, verwendet Argos den
 **ersten aktiven Zugangsdatensatz** für den aufgelösten Agenten (nach
 Erstellungsdatum sortiert).
+
+## Persönliche und geteilte Agenten
+
+Zugangsdaten sind entweder **persönlich** (sie haben einen Besitzer und laufen
+über dessen Abo) oder **geteilt** (kein Besitzer).
+
+- Jeder Benutzer kann unter *Agenten* seinen **eigenen** Claude-Agenten
+  anlegen — füge die Ausgabe von `claude setup-token` ein. Benutzer sehen nur
+  ihre eigenen Agenten.
+- Administratoren sehen alle Agenten und können einen Besitzer zuweisen oder ihn
+  für einen geteilten Agenten leer lassen.
+- **Aufgaben** nutzen den in der Aufgabe gewählten Agenten, sonst den ersten
+  aktiven **geteilten** Agenten — ein persönlicher Agent wird nie stillschweigend
+  gewählt.
+- **Workspace-Threads** laufen auf einem persönlichen oder geteilten Agenten, der
+  beim Anlegen des Threads gewählt wird (siehe [Workspaces](WORKSPACES.md)).
+- **Parallele Sessions** (Administratoren) begrenzt, wie viele Workspace-Threads
+  gleichzeitig auf einem Agenten laufen dürfen (Standard `1`). Meldet Claude,
+  dass das Abo sein Nutzungslimit erreicht hat, zeigt der Agent *Nutzungslimit
+  bis …* und startet bis dahin keine neuen Sessions.
+- **Standardmodell** wählt das Modell für neue Workspace-Threads vor.
 
 ## Wie ein Projekt seinen Agenten auswählt
 

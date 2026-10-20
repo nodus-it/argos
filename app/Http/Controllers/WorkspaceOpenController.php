@@ -23,6 +23,8 @@ class WorkspaceOpenController extends Controller
         /** @var User $user */
         $user = $request->user();
         abort_unless($user->can('view', $workspace), 404);
+        // The editor is a shell into the container: readers get the preview only.
+        abort_if($target === 'code' && ! $user->can('operate', $workspace), 403);
 
         $host = $target === 'code' ? TraefikRouter::codeKey($workspace->slug) : 'demo-'.$workspace->demoKey();
         $url = $router->urlForSlug($host).'/';

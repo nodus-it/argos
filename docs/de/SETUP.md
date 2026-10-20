@@ -22,6 +22,8 @@ Details.
 - [Reverse-Proxy und APP_URL](#reverse-proxy-and-app_url)
 - [OAuth (optional)](#oauth-optional)
 - [Auswahl von Worker-Stack und Agent](#choosing-a-worker-stack-and-agent)
+- [Benutzer und Administratoren](#benutzer-und-administratoren)
+- [Workspaces](#workspaces)
 - [Vorbelegen des Claude-Tokens](#pre-seeding-the-claude-token)
 - [Produktionsnahe Installation](#production-style-install)
 - [Aktualisieren](#updating)
@@ -264,6 +266,34 @@ in derselben UI deinen eigenen Benutzer-Stack hinzufügen.
 Um ein *Ziel*-Repository auf Argos zuzuschneiden — eine eigene Build-Umgebung
 (`.argos/worker.dockerfile`) oder einen Live-Demo-Vertrag (`.argos/demo.*`) —
 siehe [PREPARE-PROJECT.md](PREPARE-PROJECT.md).
+
+## Benutzer und Administratoren
+
+Das bei der Installation angelegte Admin-Konto ist **Administrator**.
+Administratoren verwalten Benutzer (*Konfiguration → Benutzer*), Worker-Stacks,
+Image-Builds, OAuth-Apps, Zugangstoken, API-Clients und Einstellungen und sehen
+alle Workspaces. Andere Benutzer arbeiten mit Projekten, Aufgaben, ihren eigenen
+Agenten und den Workspaces, in denen sie Mitglied sind. Die Rolle lässt sich
+über die Kommandozeile wiederherstellen:
+
+```bash
+docker compose exec app php artisan argos:user:admin someone@example.com
+```
+
+Beim Upgrade wird der erste bestehende Benutzer Administrator.
+
+## Workspaces
+
+[Workspaces](WORKSPACES.md) brauchen zusätzlich zum oben beschriebenen Stack:
+
+- den Dienst `reverb` (Live-Updates; Teil der Compose-Datei),
+- das Docker-Netz `argos_ws` (legt Compose an) — Workspace-Container, Manager,
+  nginx und Traefik teilen es; db und Redis nicht,
+- Wildcard-DNS für `code-<workspace>.<basisdomain>` und
+  `demo-ws-<workspace>.<basisdomain>` (dieselbe Basisdomain wie die Live-Demos).
+
+Der erste Workspace eines Projekts baut sein Image (Worker-Image +
+Workspace-Daemon + VS Code); das dauert einige Minuten.
 
 ## Vorbelegen des Claude-Tokens
 

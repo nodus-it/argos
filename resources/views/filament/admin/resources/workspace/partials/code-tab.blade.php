@@ -3,7 +3,9 @@
      workspace gate trades for a host cookie. Embedded only where the browser
      will send that cookie in an iframe (same-site hosts); otherwise the
      editor opens in its own tab. --}}
-@if ($workspace->status === \App\Enums\WorkspaceStatus::Running)
+@if (! (auth()->user()?->can('operate', $workspace) ?? false))
+    <div class="ws-tab-empty muted">{{ __('workspaces.tabs.code_viewer') }}</div>
+@elseif ($workspace->status === \App\Enums\WorkspaceStatus::Running)
     @php $openUrl = route('workspaces.open', ['workspace' => $workspace, 'target' => 'code']); @endphp
     @if (\App\Support\WorkspaceHosts::embeddable())
         <div class="ws-frame-bar">

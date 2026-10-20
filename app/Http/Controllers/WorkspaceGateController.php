@@ -17,7 +17,8 @@ use Symfony\Component\HttpFoundation\Response;
  * ForwardAuth target for workspace hosts: `code-<slug>.<base>` (the editor —
  * effectively a shell into the container) and `demo-ws-<slug>.<base>` (the
  * workspace preview). Unlike DemoGateController it checks *membership*, not
- * just a login: only users who may view the workspace get through.
+ * just a login: the editor needs an operating role (owner/editor), the
+ * preview any membership.
  *
  * Stateless (no session): access is the host-only cookie, or a fresh ticket
  * from the workspace page that is traded for the cookie with a redirect.
@@ -30,19 +31,19 @@ class WorkspaceGateController extends Controller
 
     public function __invoke(Request $request, WorkspaceAccessTokens $tokens, WorkspaceService $workspaces): Response
     {
-        $workspace = $this->workspaceFromHost($request);
+        [$workspace, $ability] = $this->targetFromHost($request);
         if ($workspace === null) {
             return response('', 404);
         }
 
         $cookie = (string) $request->cookies->get($tokens->cookieName($workspace), '');
         if ($cookie !== '') {
-            $cacheKey = 'ws-gate:'.hash('sha256', $cookie);
-            $allowed = Cache::remember($cacheKey, self::DECISION_TTL, function () use ($tokens, $workspace, $cookie, $workspaces): bool {
+            $cacheKey = 'ws-gate:'.$ability.':'.hash('sha256', $cookie);
+            $allowed = Cache::remember($cacheKey, self::DECISION_TTL, function () use ($tokens, $workspace, $cookie, $workspaces, $ability): bool {
                 $userId = $tokens->verifyCookie($workspace, $cookie);
                 $user = $userId !== null ? User::query()->find($userId) : null;
 
-                return $user !== null && $this->decide($workspace, $user, $workspaces);
+                return $user !== null && $this->decide($workspace, $user, $ability, $workspaces);
             });
             if ($allowed) {
                 return response()->noContent();
@@ -53,7 +54,7 @@ class WorkspaceGateController extends Controller
         if ($ticket !== null) {
             $userId = $tokens->verifyTicket($workspace, $ticket);
             $user = $userId !== null ? User::query()->find($userId) : null;
-            if ($user !== null && $this->decide($workspace, $user, $workspaces)) {
+            if ($user !== null && $this->decide($workspace, $user, $ability, $workspaces)) {
                 return $this->grant($request, $workspace, $user, $tokens, $path);
             }
         }
@@ -61,9 +62,9 @@ class WorkspaceGateController extends Controller
         return $this->deny($request);
     }
 
-    private function decide(Workspace $workspace, User $user, WorkspaceService $workspaces): bool
+    private function decide(Workspace $workspace, User $user, string $ability, WorkspaceService $workspaces): bool
     {
-        if (! $user->can('view', $workspace)) {
+        if (! $user->can($ability, $workspace)) {
             return false;
         }
         $workspaces->touch($workspace);
@@ -104,26 +105,32 @@ class WorkspaceGateController extends Controller
         return response('', 401);
     }
 
-    /** Workspace for `code-<slug>.<base>` / `demo-ws-<slug>.<base>`, else null. */
-    private function workspaceFromHost(Request $request): ?Workspace
+    /**
+     * Workspace and required ability for the forwarded host: the editor
+     * (`code-<slug>`) is a shell into the container and needs an operating
+     * role; the preview (`demo-ws-<slug>`) is readable by every member.
+     *
+     * @return array{0: Workspace|null, 1: string}
+     */
+    private function targetFromHost(Request $request): array
     {
         $base = (string) config('argos.preview.base_domain', '');
         $host = strtolower((string) preg_replace('/:\d+$/', '', (string) $request->header('X-Forwarded-Host', '')));
         if ($base === '' || $host === '' || ! str_ends_with($host, '.'.$base)) {
-            return null;
+            return [null, 'view'];
         }
 
         $label = substr($host, 0, -strlen('.'.$base));
-        $slug = match (true) {
-            str_starts_with($label, 'code-') => substr($label, 5),
-            str_starts_with($label, 'demo-ws-') => substr($label, 8),
-            default => null,
+        [$slug, $ability] = match (true) {
+            str_starts_with($label, 'code-') => [substr($label, 5), 'operate'],
+            str_starts_with($label, 'demo-ws-') => [substr($label, 8), 'view'],
+            default => [null, 'view'],
         };
         if ($slug === null || $slug === '' || preg_match('/^[a-z0-9-]+$/', $slug) !== 1) {
-            return null;
+            return [null, $ability];
         }
 
-        return Workspace::query()->where('slug', $slug)->first();
+        return [Workspace::query()->where('slug', $slug)->first(), $ability];
     }
 
     /**

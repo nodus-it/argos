@@ -17,6 +17,7 @@ open it, and how its lifecycle (build → live → stopped) works.
 - [Access modes](#access-modes)
 - [Lifecycle](#lifecycle)
 - [Rebuild and stop](#rebuild-and-stop)
+- [Workspace previews](#workspace-previews)
 - [Operator configuration](#operator-configuration)
 
 ## What a live demo is
@@ -122,6 +123,7 @@ demo they take effect on the next build.
 | **Session** | Require an Argos login. Traefik checks your Argos session via a forward-auth gate before serving the demo. |
 | **Basic** | Protect the demo with shared HTTP Basic credentials (username + password). |
 | **Public** | No protection — anyone with the URL can open it. |
+| **Workspace** (`workspace`) | Only for workspace previews: members of the workspace only (forwardAuth against the workspace gate). Not selectable for tasks. |
 
 Notes:
 
@@ -172,6 +174,22 @@ the project and the Implement phase has completed):
 - **Stop demo** — removes the demo's containers, volumes, and route. Available
   while the demo is **Building** or **Live**. A stopped demo can be restarted
   later.
+
+## Workspace previews
+
+[Workspaces](WORKSPACES.md) use the same demo system for their **Preview** tab,
+with three differences:
+
+- the demo mounts the **workspace volume** (`ws_<workspace>`) and is never synced
+  from the remote — the workspace is the source of truth,
+- it lives at `demo-ws-<workspace>.<base-domain>` and is always protected with
+  the `workspace` access mode (members only),
+- it is started on demand from the Preview tab, and the contract commands run as
+  the workspace's agent user so the files they create stay editable.
+
+**Re-run setup commands** executes the contract's `commands` again in the running
+preview without a rebuild. TTL, the concurrency cap and the operator settings
+below apply to workspace previews as well.
 
 ## Operator configuration
 

@@ -36,9 +36,12 @@ const MASKS: { label: string; path: string }[] = [
   { label: 'Connected accounts', path: '/admin/connected-accounts' },
   { label: 'Settings', path: '/admin/settings' },
   { label: 'Documentation', path: '/admin/docs' },
+  { label: 'Workspaces', path: '/admin/workspaces' },
+  { label: 'Users', path: '/admin/users' },
   // Forms must not break on mobile (Filament stacks grids to 1 column below lg).
   { label: 'Create task', path: '/admin/tasks/create' },
   { label: 'Create project', path: '/admin/repo-profiles/create' },
+  { label: 'Create workspace', path: '/admin/workspaces/create' },
 ];
 
 test.describe('mobile gate @375px', () => {
@@ -107,5 +110,18 @@ test.describe('mobile gate @375px', () => {
       await assertWithinViewport(page, btn, `Respond dock button ${i}`);
       await assertTapTarget(btn, `Respond dock button ${i}`);
     }
+  });
+
+  test('workspace page fits the phone and its composer actions are tappable', async ({ page }) => {
+    resetDatabase('E2eWorkspaceSeeder');
+    await login(page);
+
+    await gotoStable(page, '/admin/workspaces');
+    await assertNoHorizontalOverflow(page, 'Workspaces list');
+    await page.getByText('E2E pairing').first().click();
+    await expect(page.locator('.ws-chat')).toBeVisible();
+
+    await assertNoHorizontalOverflow(page, 'Workspace · chat');
+    await assertTapTarget(page.locator('.ws-composer-bar .btn-primary').first(), 'Workspace · Send');
   });
 });

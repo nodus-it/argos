@@ -1459,3 +1459,8 @@ body,
 .ws-preview{display:flex;flex-direction:column;flex:1;min-height:0;}
 .ws-log{margin:8px;font-size:var(--t-xs);}
 .ws-log pre{white-space:pre-wrap;max-height:320px;overflow:auto;background:var(--surface-2);border-radius:var(--radius-sm);padding:8px;}
+@media (max-width:640px){
+  .ws-composer-bar .btn,.ws-approval-actions .btn,.ws-tabs button,.ws-frame-bar .btn{min-height:44px;}
+  .ws-composer-bar .ws-select-sm{min-height:44px;}
+  .ws-approval,.ws-line,.ws-working{margin-left:0;padding-left:0;}
+}

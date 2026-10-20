@@ -24,6 +24,8 @@ Betreiberreferenz für jede ENV-Variable, die Argos tatsächlich liest.
 - [Worker (Phasen-Container)](#worker-phase-containers)
 - [Worker-Hintergrunddienste (Test-Sidecars)](#worker-backing-services-test-sidecars)
 - [Live-Demos (optional)](#live-demos-optional)
+- [Workspaces](#workspaces)
+- [Echtzeit (Reverb)](#echtzeit-reverb)
 - [Integrationen & Polling](#integrations--polling)
 - [OAuth & Credentials (UI-verwaltet)](#oauth--credentials-ui-managed)
 - [MCP-Server (Argos-API)](#mcp-server-argos-api)
@@ -149,6 +151,40 @@ Traefik- + `argos_edge`-Preview-Infrastruktur).
 | `ARGOS_PREVIEW_NETWORK` | `argos_edge` | Externes Docker-Netzwerk, das mit Traefik geteilt wird (definiert in `docker-compose.yml`). |
 | `ARGOS_PREVIEW_DEFAULT_IMAGE` | `argos-demo` | Eingebaute Standard-Demo-Laufzeitumgebung (php-fpm + nginx + node), verwendet, wenn ein Repo keinen `.argos/demo.*`-Vertrag mitliefert. Ein Content-Hash wird angehängt (`argos-demo:<hash>`). |
 | `ARGOS_TRAEFIK_DIR` | `/data/traefik` | Geteiltes Volume, in das der Manager pro Demo eine Traefik-File-Provider-Route schreibt (Traefik mountet es read-only). |
+
+## Workspaces
+
+Interaktive Workspaces (siehe [Workspaces](WORKSPACES.md)): ein langlebiger
+Container pro Workspace mit Workspace-Daemon und OpenVSCode Server im internen
+Netz `argos_ws`. Der Editor liegt unter `code-<workspace>.<base_domain>`, die
+Preview unter `demo-ws-<workspace>.<base_domain>` (dieselbe Basisdomain wie die
+Live-Demos).
+
+| Variable | Standard | Zweck |
+|---|---|---|
+| `ARGOS_WORKSPACES_ENABLED` | `true` | Hauptschalter für die Workspace-Oberfläche, Jobs und Routen. |
+| `ARGOS_WORKSPACE_COLLABORATION` | `true` | Ob Workspaces außer ihrem Besitzer weitere Mitglieder haben dürfen (Pair Programming). Steht hinter dem Gate `workspace-collaboration`. |
+| `ARGOS_WORKSPACE_MAX_ACTIVE` | `5` | Gleichzeitig laufende Workspace-Container. Ein Start darüber hinaus wird abgelehnt — laufende Workspaces werden nie verdrängt. `0` hebt das Limit auf. |
+| `ARGOS_WORKSPACE_IDLE_MINUTES` | `60` | Einen laufenden Workspace nach so vielen Minuten ohne Aktivität stoppen (nie, solange ein Thread arbeitet oder auf eine Entscheidung wartet). `0` deaktiviert. |
+| `ARGOS_WORKSPACE_CPUS` | `2` | CPU-Limit pro Workspace-Container. |
+| `ARGOS_WORKSPACE_MEMORY` | `4g` | Speicherlimit pro Workspace-Container. |
+| `ARGOS_INTERNAL_URL` | `http://nginx` | Basis-URL, über die der Workspace-Daemon den Manager im Netz `argos_ws` erreicht. |
+| `ARGOS_WORKSPACE_NETWORK` | `argos_ws` | Docker-Netz, das Manager und Workspace-Container teilen. |
+| `ARGOS_WORKSPACE_GATE_URL` | `http://nginx:80/_argos/workspace-gate` | forwardAuth-Ziel, das Traefik für `code-*`- und `demo-ws-*`-Hosts aufruft (Mitgliedschaftsprüfung). |
+| `ARGOS_WORKSPACE_EDITOR_COOKIE_HOURS` | `12` | Lebensdauer des Zugangs-Cookies auf Workspace-Hosts. |
+| `ARGOS_OPENVSCODE_VERSION` | `1.109.5` | Release von OpenVSCode Server, das ins Workspace-Image eingebaut wird. |
+
+## Echtzeit (Reverb)
+
+Live-Updates der Workspace-Threads laufen über [Laravel Reverb](https://reverb.laravel.com)
+(den Dienst `reverb`). Browser verbinden sich über Traefik auf dem Argos-Host
+unter `/app/…`; der Manager veröffentlicht intern an `reverb:8080`. Die
+Compose-Datei setzt die Verbindung für dich.
+
+| Variable | Standard | Zweck |
+|---|---|---|
+| `ARGOS_REVERB_APP_SECRET` | vom Installer erzeugt | Signiert Nachrichten zwischen Manager und Reverb. Stabil halten. |
+| `ARGOS_REVERB_APP_KEY` | `argos` | Öffentlicher App-Schlüssel, mit dem sich der Browser verbindet. |
 
 ## Integrationen & Polling
 

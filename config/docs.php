@@ -48,6 +48,7 @@ return [
             'pages' => [
                 ['slug' => 'projects', 'title' => 'Projects', 'file' => 'PROJECTS.md'],
                 ['slug' => 'tasks', 'title' => 'Tasks & Workflow', 'file' => 'TASKS.md'],
+                ['slug' => 'workspaces', 'title' => 'Workspaces', 'file' => 'WORKSPACES.md'],
                 ['slug' => 'worker-stacks', 'title' => 'Worker Stacks', 'file' => 'WORKER-STACKS.md'],
                 ['slug' => 'agents', 'title' => 'Agents', 'file' => 'AGENTS.md'],
                 ['slug' => 'live-demos', 'title' => 'Live Demos', 'file' => 'LIVE-DEMOS.md'],

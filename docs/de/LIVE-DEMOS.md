@@ -19,6 +19,7 @@ funktioniert.
 - [Zugriffsmodi](#access-modes)
 - [Lebenszyklus](#lifecycle)
 - [Neu bauen und stoppen](#rebuild-and-stop)
+- [Workspace-Previews](#workspace-previews)
 - [Betreiber-Konfiguration](#operator-configuration)
 
 ## Was eine Live-Demo ist
@@ -125,6 +126,7 @@ für eine gestoppte Demo werden sie beim nächsten Build wirksam.
 | **Session** | Ein Argos-Login erforderlich. Traefik prüft deine Argos-Session über ein Forward-Auth-Gate, bevor die Demo ausgeliefert wird. |
 | **Basic** | Die Demo mit gemeinsamen HTTP-Basic-Zugangsdaten (Benutzername + Passwort) schützen. |
 | **Public** | Kein Schutz — jeder mit der URL kann sie öffnen. |
+| **Workspace** (`workspace`) | Nur für Workspace-Previews: ausschließlich Mitglieder des Workspaces (forwardAuth gegen das Workspace-Gate). Für Aufgaben nicht wählbar. |
 
 Hinweise:
 
@@ -176,6 +178,23 @@ Projekt aktiviert sind und die Implement-Phase abgeschlossen ist):
 - **Stop demo** — entfernt Container, Volumes und Route der Demo. Verfügbar,
   während die Demo **Building** oder **Live** ist. Eine gestoppte Demo kann später
   neu gestartet werden.
+
+## Workspace-Previews
+
+[Workspaces](WORKSPACES.md) nutzen dasselbe Demo-System für ihren Tab
+**Preview**, mit drei Unterschieden:
+
+- die Demo mountet das **Workspace-Volume** (`ws_<workspace>`) und wird nie vom
+  Remote synchronisiert — der Workspace ist die Wahrheit,
+- sie liegt unter `demo-ws-<workspace>.<basisdomain>` und ist immer mit dem
+  Zugriffsmodus `workspace` geschützt (nur Mitglieder),
+- sie wird bei Bedarf über den Preview-Tab gestartet, und die Befehle des
+  Vertrags laufen als Agent-Benutzer des Workspaces, damit die angelegten Dateien
+  bearbeitbar bleiben.
+
+**Setup-Befehle erneut ausführen** führt die `commands` des Vertrags in der
+laufenden Preview erneut aus, ohne neu zu bauen. TTL, das Limit gleichzeitiger
+Demos und die Betreiber-Einstellungen unten gelten auch für Workspace-Previews.
 
 ## Betreiber-Konfiguration
 
