@@ -193,6 +193,8 @@ return [
         'gate_url' => $envOr('ARGOS_WORKSPACE_GATE_URL', 'http://nginx:80/_argos/workspace-gate'),
         // Lifetime of the editor access cookie set on code-<slug> hosts.
         'editor_cookie_hours' => (int) $envOr('ARGOS_WORKSPACE_EDITOR_COOKIE_HOURS', 12),
+        // How often open pull requests of workspaces are re-read (minutes).
+        'pr_sync_minutes' => (int) $envOr('ARGOS_WORKSPACE_PR_SYNC_MINUTES', 15),
         'daemon_port' => 7777,
         'editor_port' => 3000,
         'openvscode_version' => $envOr('ARGOS_OPENVSCODE_VERSION', '1.109.5'),

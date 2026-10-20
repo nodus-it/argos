@@ -18,6 +18,14 @@
             <x-argos.meta-item label="{{ __('workspaces.fields.project') }}" :mono="true">{{ $workspace->repoProfile->name }}</x-argos.meta-item>
             <x-argos.meta-item label="{{ __('workspaces.fields.branch') }}" :mono="true">{{ $workspace->branch }}</x-argos.meta-item>
             <x-argos.meta-item label="{{ __('workspaces.fields.base_branch') }}" :mono="true">{{ $workspace->base_branch }}</x-argos.meta-item>
+            @if ($workspace->pr_url)
+                <x-argos.meta-item label="{{ __('workspaces.ship.pr') }}" :link="true">
+                    <a href="{{ $workspace->pr_url }}" target="_blank" rel="noopener">#{{ $workspace->pr_number }}</a>
+                    @if ($workspace->pr_state)
+                        <span class="badge {{ $workspace->pr_state === 'merged' ? 'badge-success' : ($workspace->pr_state === 'open' ? 'badge-running' : 'badge-draft') }}">{{ __('workspaces.pr_state.'.$workspace->pr_state) }}</span>
+                    @endif
+                </x-argos.meta-item>
+            @endif
             <x-argos.meta-item label="{{ __('workspaces.fields.members') }}">
                 {{ $members->map(fn ($m) => $m->user->name.' ('.$m->role->label().')')->implode(', ') }}
             </x-argos.meta-item>

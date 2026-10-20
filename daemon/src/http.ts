@@ -5,6 +5,8 @@ import { ApprovalRegistry, UnknownApprovalError } from './approvals.js';
 import type { Outbox } from './outbox.js';
 import { ThreadSession, USER_PERMISSION_MODES, type QueryFactory, type SessionEnvironment } from './threadSession.js';
 import { initWorkspace, WorkspaceInitError } from './workspaceInit.js';
+import * as gitOps from './gitOps.js';
+import { OneshotError, runOneshot, type OneshotRunner } from './oneshot.js';
 
 export const DAEMON_VERSION = '0.1.0';
 
@@ -14,6 +16,7 @@ export interface AppDependencies {
     queryFactory: QueryFactory;
     environment: SessionEnvironment;
     credentialHelper: string;
+    oneshotRunner?: OneshotRunner;
     versions?: { sdk?: string; claude?: string };
 }
 
@@ -55,6 +58,23 @@ const initSchema = z.object({
 
 const threadIdSchema = z.string().min(1).max(64).regex(/^[A-Za-z0-9_-]+$/);
 
+const refSchema = z.string().min(1).max(255).regex(/^[A-Za-z0-9._\/-]+$/).refine((ref) => !ref.startsWith('-') && !ref.includes('..'), 'invalid ref');
+
+const commitSchema = z.object({
+    subject: z.string().min(1).max(200),
+    body: z.string().max(10_000).default(''),
+    author: z.object({ name: z.string().min(1).max(120), email: z.string().min(3).max(200) }),
+});
+
+const oneshotSchema = z.object({
+    agent_id: z.string().min(1).max(64).regex(/^[A-Za-z0-9_-]+$/),
+    oauth_token: z.string().min(1),
+    model: z.string().min(1),
+    system_prompt: z.string().max(100_000),
+    user_prompt: z.string().max(1_000_000),
+    json_schema: z.record(z.string(), z.unknown()).optional(),
+});
+
 class HttpError extends Error {
     constructor(
         readonly status: number,
@@ -95,6 +115,12 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
         }
         if (error instanceof WorkspaceInitError) {
             return reply.code(422).send({ error: { code: error.code, message: error.message } });
+        }
+        if (error instanceof gitOps.PushError) {
+            return reply.code(409).send({ error: { code: error.code, message: error.message } });
+        }
+        if (error instanceof OneshotError) {
+            return reply.code(502).send({ error: { code: 'oneshot_failed', message: error.message } });
         }
         const status = typeof (error as { statusCode?: unknown }).statusCode === 'number' ? (error as { statusCode: number }).statusCode : 500;
 
@@ -208,6 +234,52 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
         sessions.delete(session.threadId);
 
         return reply.code(202).send({});
+    });
+
+    const dir = deps.environment.workspaceDir;
+
+    app.get('/git/status', async () => gitOps.status(dir));
+
+    app.get('/git/diff', async (request) => {
+        const base = refSchema.parse((request.query as { base?: string }).base);
+
+        return gitOps.diffAgainst(dir, base);
+    });
+
+    app.post('/git/fetch', async (_request, reply) => {
+        await gitOps.fetch(dir);
+
+        return reply.code(202).send({});
+    });
+
+    app.post('/git/commit', async (request, reply) => {
+        const body = commitSchema.parse(request.body);
+        const result = await gitOps.commit(dir, body.subject, body.body, body.author);
+        if (result === null) {
+            throw new HttpError(409, 'no_changes', 'Nothing to commit');
+        }
+
+        return reply.code(201).send(result);
+    });
+
+    app.post('/git/push', async (request, reply) => {
+        const { branch } = z.object({ branch: refSchema }).parse(request.body);
+        await gitOps.push(dir, branch);
+
+        return reply.code(202).send({});
+    });
+
+    app.post('/oneshot', async (request) => {
+        const body = oneshotSchema.parse(request.body);
+        if (deps.oneshotRunner === undefined) {
+            throw new HttpError(501, 'oneshot_unavailable', 'One-shot prompts are not configured');
+        }
+
+        return runOneshot(
+            deps.oneshotRunner,
+            { agentId: body.agent_id, oauthToken: body.oauth_token, model: body.model, systemPrompt: body.system_prompt, userPrompt: body.user_prompt, jsonSchema: body.json_schema },
+            deps.environment,
+        );
     });
 
     return { app, sessions };

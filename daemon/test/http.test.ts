@@ -124,4 +124,25 @@ describe('daemon HTTP API', () => {
         expect(response.json().error.code).toBe('unknown_thread');
         outbox.stop();
     });
+
+    it('serves git status and refuses unsafe refs, empty commits and missing oneshot runners', async () => {
+        const { execFileSync } = await import('node:child_process');
+        execFileSync('git', ['init', '-q', '-b', 'main', dir], { env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null' } });
+        const { app, outbox } = make(async function* () {});
+
+        const statusResponse = await app.inject({ method: 'GET', url: '/git/status', headers: auth });
+        expect(statusResponse.statusCode).toBe(200);
+        expect(statusResponse.json()).toMatchObject({ branch: 'main', dirty: false });
+
+        expect((await app.inject({ method: 'GET', url: '/git/diff?base=--output=/tmp/x', headers: auth })).statusCode).toBe(422);
+        expect((await app.inject({ method: 'GET', url: '/git/diff?base=../etc', headers: auth })).statusCode).toBe(422);
+
+        const empty = await app.inject({ method: 'POST', url: '/git/commit', headers: auth, payload: { subject: 'feat: x', author: { name: 'A', email: 'a@b' } } });
+        expect(empty.statusCode).toBe(409);
+        expect(empty.json().error.code).toBe('no_changes');
+
+        const oneshot = await app.inject({ method: 'POST', url: '/oneshot', headers: auth, payload: { agent_id: 'a', oauth_token: 't', model: 'm', system_prompt: 's', user_prompt: 'u' } });
+        expect(oneshot.statusCode).toBe(501);
+        outbox.stop();
+    });
 });

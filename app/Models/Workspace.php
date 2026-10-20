@@ -34,6 +34,11 @@ use Illuminate\Support\Str;
  * @property string|null $container_name
  * @property string $daemon_token
  * @property Carbon|null $last_activity_at
+ * @property string|null $pr_url
+ * @property int|null $pr_number
+ * @property string|null $pr_state
+ * @property Carbon|null $pr_synced_at
+ * @property Carbon|null $shipped_at
  * @property Carbon|null $deleted_at
  * @property Carbon $created_at
  * @property Carbon $updated_at
@@ -61,6 +66,11 @@ class Workspace extends Model implements DemoTarget
         'container_name',
         'daemon_token',
         'last_activity_at',
+        'pr_url',
+        'pr_number',
+        'pr_state',
+        'pr_synced_at',
+        'shipped_at',
     ];
 
     protected $hidden = ['daemon_token'];
@@ -71,6 +81,9 @@ class Workspace extends Model implements DemoTarget
             'status' => WorkspaceStatus::class,
             'daemon_token' => 'encrypted',
             'last_activity_at' => 'datetime',
+            'pr_number' => 'integer',
+            'pr_synced_at' => 'datetime',
+            'shipped_at' => 'datetime',
         ];
     }
 

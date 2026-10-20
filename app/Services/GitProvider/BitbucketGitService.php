@@ -7,6 +7,7 @@ namespace App\Services\GitProvider;
 use App\Integrations\Bitbucket\BitbucketConnector;
 use App\Integrations\Bitbucket\Requests\CommentOnPullRequest;
 use App\Integrations\Bitbucket\Requests\CreatePullRequest;
+use App\Integrations\Bitbucket\Requests\GetPullRequest;
 use App\Integrations\Bitbucket\Requests\GetRepository;
 use App\Integrations\Bitbucket\Requests\GetSourceFile;
 use App\Integrations\Bitbucket\Requests\ListBranches;
@@ -210,5 +211,16 @@ class BitbucketGitService implements GitProviderContract
 
             return null;
         }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getPullRequest(string $owner, string $repo, int|string $pullRequestId): array
+    {
+        return $this->connector
+            ->send(new GetPullRequest($owner, $repo, $pullRequestId))
+            ->throw()
+            ->json();
     }
 }

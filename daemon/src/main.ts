@@ -6,6 +6,7 @@ import { query } from '@anthropic-ai/claude-agent-sdk';
 import { managerCredentialFetcher, RepoCredentialCache, startCredentialServer } from './credentials.js';
 import { buildApp } from './http.js';
 import { Outbox, type Acks } from './outbox.js';
+import type { SdkMessageLike } from './normalize.js';
 import type { QueryFactory, QueryLike } from './threadSession.js';
 
 function required(name: string): string {
@@ -75,6 +76,7 @@ async function main(): Promise<void> {
             claudeBin,
         },
         credentialHelper: process.env.ARGOS_CREDENTIAL_HELPER ?? '/opt/argos/bin/git-credential-argos',
+        oneshotRunner: (params) => query(params) as unknown as AsyncIterable<SdkMessageLike>,
         versions: { sdk: sdkVersion(), claude: claudeVersion(claudeBin) },
     });
 

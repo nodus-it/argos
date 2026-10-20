@@ -8,6 +8,7 @@ use App\Integrations\GitHub\GitHubConnector;
 use App\Integrations\GitHub\Requests\CommentOnPullRequest;
 use App\Integrations\GitHub\Requests\CreatePullRequest;
 use App\Integrations\GitHub\Requests\GetFileContents;
+use App\Integrations\GitHub\Requests\GetPullRequest;
 use App\Integrations\GitHub\Requests\GetRepository;
 use App\Integrations\GitHub\Requests\ListBranches;
 use App\Integrations\GitHub\Requests\ListRepositories;
@@ -205,5 +206,16 @@ class GitHubGitService implements GitProviderContract
         }
 
         return $options;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getPullRequest(string $owner, string $repo, int|string $pullRequestId): array
+    {
+        return $this->connector
+            ->send(new GetPullRequest($owner, $repo, $pullRequestId))
+            ->throw()
+            ->json();
     }
 }

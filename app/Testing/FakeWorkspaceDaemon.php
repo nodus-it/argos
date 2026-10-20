@@ -119,6 +119,30 @@ class FakeWorkspaceDaemon extends WorkspaceDaemonClient implements WorkspaceDaem
         $this->emit($threadId, [['status', ['state' => 'closed']]]);
     }
 
+    public function gitStatus(): array
+    {
+        return ['branch' => $this->workspace?->branch, 'upstream' => null, 'ahead' => 1, 'behind' => 0, 'dirty' => true, 'files' => [['path' => 'README.md', 'status' => 'M']]];
+    }
+
+    public function gitDiff(string $base): array
+    {
+        return ['diff' => "diff --git a/README.md b/README.md\n--- a/README.md\n+++ b/README.md\n@@ -1 +1 @@\n-Hello\n+Hello Argos\n", 'truncated' => false];
+    }
+
+    public function gitFetch(): void {}
+
+    public function gitCommit(string $subject, string $body, array $author): ?array
+    {
+        return ['sha' => str_repeat('a', 40)];
+    }
+
+    public function gitPush(string $branch): void {}
+
+    public function oneshot(array $payload): array
+    {
+        return ['text' => '', 'structured' => ['subject' => 'docs: greet Argos in the README', 'body' => 'Updates the README greeting.'], 'cost_usd' => 0.001];
+    }
+
     private function assertOpen(string $threadId): void
     {
         // A real daemon forgets sessions on restart; here the slot is the truth.

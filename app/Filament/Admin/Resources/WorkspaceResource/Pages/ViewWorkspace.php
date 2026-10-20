@@ -9,12 +9,17 @@ use App\Enums\WorkspaceStatus;
 use App\Filament\Admin\Resources\WorkspaceResource;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Services\Workspace\ThreadService;
 use App\Services\Workspace\WorkspaceException;
 use App\Services\Workspace\WorkspaceMemberService;
 use App\Services\Workspace\WorkspaceService;
+use App\Services\Workspace\WorkspaceShipService;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Illuminate\Contracts\Support\Htmlable;
@@ -27,12 +32,18 @@ class ViewWorkspace extends ViewRecord
 {
     protected static string $resource = WorkspaceResource::class;
 
+    /** Shown in the ship dialog (changed files, unpushed commits). */
+    public string $shipSummary = '';
+
     public function mount(int|string $record): void
     {
         parent::mount($record);
 
         // Opening a stopped workspace brings it back (files were kept).
         $workspace = $this->workspace();
+        if ($workspace->pr_number !== null && $workspace->pr_state === 'open' && ($workspace->pr_synced_at === null || $workspace->pr_synced_at->lt(now()->subMinutes(5)))) {
+            app(WorkspaceShipService::class)->syncPullRequest($workspace);
+        }
         if ($workspace->status === WorkspaceStatus::Stopped && auth()->user()?->can('operate', $workspace)) {
             try {
                 app(WorkspaceService::class)->start($workspace);
@@ -86,7 +97,74 @@ class ViewWorkspace extends ViewRecord
                     $this->refreshStatus();
                 }),
 
+            Action::make('ship')
+                ->label(__('workspaces.ship.action'))
+                ->icon('heroicon-o-paper-airplane')
+                ->color('primary')
+                ->visible(fn (): bool => $this->workspace()->status === WorkspaceStatus::Running
+                    && (auth()->user()?->can('ship', $this->workspace()) ?? false))
+                ->modalHeading(__('workspaces.ship.heading'))
+                ->modalWidth('2xl')
+                ->fillForm(function (): array {
+                    /** @var User $user */
+                    $user = auth()->user();
+                    try {
+                        $draft = app(WorkspaceShipService::class)->draft($this->workspace(), $user);
+                    } catch (\Throwable) {
+                        $draft = ['subject' => '', 'body' => '', 'changed_files' => 0, 'ahead' => 0];
+                    }
+                    $this->shipSummary = __('workspaces.ship.summary', ['files' => $draft['changed_files'], 'ahead' => $draft['ahead']])
+                        .($draft['subject'] === '' ? ' '.__('workspaces.ship.no_draft') : '');
+
+                    return ['subject' => $draft['subject'], 'body' => $draft['body'], 'draft' => false];
+                })
+                ->modalDescription(fn (): string => $this->shipSummary)
+                ->schema([
+                    TextInput::make('subject')
+                        ->label(__('workspaces.ship.subject'))
+                        ->required()
+                        ->maxLength(120),
+                    Textarea::make('body')
+                        ->label(__('workspaces.ship.body'))
+                        ->rows(5),
+                    Toggle::make('draft')
+                        ->label(__('workspaces.ship.draft'))
+                        ->visible(fn (): bool => $this->workspace()->pr_number === null),
+                ])
+                ->action(function (array $data): void {
+                    /** @var User $user */
+                    $user = auth()->user();
+                    try {
+                        $url = app(WorkspaceShipService::class)->ship($this->workspace(), $user, (string) $data['subject'], (string) ($data['body'] ?? ''), (bool) ($data['draft'] ?? false));
+                        Notification::make()->title(__('workspaces.ship.shipped', ['url' => $url]))->success()->send();
+                    } catch (WorkspaceException $e) {
+                        Notification::make()->title($e->getMessage())->danger()->persistent()->send();
+                    }
+                    $this->refreshStatus();
+                }),
+
             ActionGroup::make([
+                Action::make('rebase')
+                    ->label(__('workspaces.ship.rebase'))
+                    ->icon('heroicon-o-arrow-path-rounded-square')
+                    ->visible(fn (): bool => $this->workspace()->status === WorkspaceStatus::Running
+                        && (auth()->user()?->can('ship', $this->workspace()) ?? false))
+                    ->action(function (): void {
+                        /** @var User $user */
+                        $user = auth()->user();
+                        $thread = $this->workspace()->threads()->whereNull('archived_at')->latest('updated_at')->first();
+                        if ($thread === null) {
+                            Notification::make()->title(__('workspaces.ship.no_thread'))->warning()->send();
+
+                            return;
+                        }
+                        try {
+                            app(ThreadService::class)->send($thread, $user, __('workspaces.ship.rebase_prompt', ['branch' => $this->workspace()->branch]));
+                        } catch (WorkspaceException $e) {
+                            Notification::make()->title($e->getMessage())->danger()->send();
+                        }
+                    }),
+
                 Action::make('members')
                     ->label(__('workspaces.actions.add_member'))
                     ->icon('heroicon-o-user-plus')

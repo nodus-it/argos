@@ -5,9 +5,15 @@ declare(strict_types=1);
 namespace App\Integrations\WorkspaceDaemon;
 
 use App\Integrations\WorkspaceDaemon\Requests\GetHealth;
+use App\Integrations\WorkspaceDaemon\Requests\GitCommit;
+use App\Integrations\WorkspaceDaemon\Requests\GitDiff;
+use App\Integrations\WorkspaceDaemon\Requests\GitFetch;
+use App\Integrations\WorkspaceDaemon\Requests\GitPush;
+use App\Integrations\WorkspaceDaemon\Requests\GitStatus;
 use App\Integrations\WorkspaceDaemon\Requests\InitWorkspace;
 use App\Integrations\WorkspaceDaemon\Requests\InterruptThread;
 use App\Integrations\WorkspaceDaemon\Requests\ResolveApproval;
+use App\Integrations\WorkspaceDaemon\Requests\RunOneshot;
 use App\Integrations\WorkspaceDaemon\Requests\SendMessage;
 use App\Integrations\WorkspaceDaemon\Requests\SetModel;
 use App\Integrations\WorkspaceDaemon\Requests\SetPermissionMode;
@@ -90,6 +96,50 @@ class WorkspaceDaemonApi implements WorkspaceDaemonTransport
     public function stopThread(string $threadId): void
     {
         $this->call(new StopThread($threadId));
+    }
+
+    public function gitStatus(): array
+    {
+        /** @var array{branch: string|null, upstream: string|null, ahead: int, behind: int, dirty: bool, files: list<array{path: string, status: string}>} */
+        return $this->call(new GitStatus) + ['branch' => null, 'upstream' => null, 'ahead' => 0, 'behind' => 0, 'dirty' => false, 'files' => []];
+    }
+
+    public function gitDiff(string $base): array
+    {
+        $result = $this->call(new GitDiff($base));
+
+        return ['diff' => (string) ($result['diff'] ?? ''), 'truncated' => (bool) ($result['truncated'] ?? false)];
+    }
+
+    public function gitFetch(): void
+    {
+        $this->call(new GitFetch);
+    }
+
+    public function gitCommit(string $subject, string $body, array $author): ?array
+    {
+        try {
+            $result = $this->call(new GitCommit(['subject' => $subject, 'body' => $body, 'author' => $author]));
+        } catch (DaemonTransportException $e) {
+            if ($e->errorCode === 'no_changes') {
+                return null;
+            }
+            throw $e;
+        }
+
+        return ['sha' => (string) ($result['sha'] ?? '')];
+    }
+
+    public function gitPush(string $branch): void
+    {
+        $this->call(new GitPush(['branch' => $branch]));
+    }
+
+    public function oneshot(array $payload): array
+    {
+        $result = $this->call(new RunOneshot($payload));
+
+        return ['text' => (string) ($result['text'] ?? ''), 'structured' => $result['structured'] ?? null, 'cost_usd' => $result['cost_usd'] ?? 0];
     }
 
     /**

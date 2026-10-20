@@ -43,4 +43,26 @@ interface WorkspaceDaemonTransport
     public function setModel(string $threadId, string $model): void;
 
     public function stopThread(string $threadId): void;
+
+    /** @return array{branch: string|null, upstream: string|null, ahead: int, behind: int, dirty: bool, files: list<array{path: string, status: string}>} */
+    public function gitStatus(): array;
+
+    /** @return array{diff: string, truncated: bool} */
+    public function gitDiff(string $base): array;
+
+    public function gitFetch(): void;
+
+    /**
+     * @param  array{name: string, email: string}  $author
+     * @return array{sha: string}|null null when there was nothing to commit
+     */
+    public function gitCommit(string $subject, string $body, array $author): ?array;
+
+    public function gitPush(string $branch): void;
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array{text: string, structured: mixed, cost_usd: float|int}
+     */
+    public function oneshot(array $payload): array;
 }

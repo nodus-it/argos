@@ -49,6 +49,12 @@ class WorkspacePolicy
         return $user->isAdmin() || ($workspace->roleOf($user)?->canOperate() ?? false);
     }
 
+    /** Commit, push and open/update the pull request. */
+    public function ship(User $user, Workspace $workspace): bool
+    {
+        return $this->operate($user, $workspace);
+    }
+
     public function delete(User $user, Workspace $workspace): bool
     {
         return $this->update($user, $workspace);

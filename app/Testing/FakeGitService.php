@@ -128,4 +128,12 @@ class FakeGitService implements GitProviderContract
     ): array {
         return ['number' => $pullRequestId, 'title' => $title, 'body' => $body];
     }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getPullRequest(string $owner, string $repo, int|string $pullRequestId): array
+    {
+        return ['number' => (int) $pullRequestId, 'html_url' => "https://example.test/{$owner}/{$repo}/pull/{$pullRequestId}", 'state' => 'open', 'merged' => false];
+    }
 }

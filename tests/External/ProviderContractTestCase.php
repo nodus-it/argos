@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\External;
 
+use App\Enums\GitProvider;
 use App\Services\GitProvider\Contracts\GitProviderContract;
+use App\Services\GitProvider\PullRequestInfo;
 use App\Services\GitProvider\RemoteBranchValidator;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
@@ -269,6 +271,19 @@ abstract class ProviderContractTestCase extends TestCase
         );
 
         $this->assertNotEmpty($updated, 'updatePullRequest lieferte leere Antwort.');
+
+        // Workspaces read the PR back to track open/merged/closed. The
+        // provider-neutral view must find the same PR, still open.
+        $read = $service->getPullRequest(
+            $this->config->testRepoOwner,
+            $this->config->testRepo,
+            $prId,
+        );
+        $info = PullRequestInfo::from(GitProvider::from($this->config->providerKey), $read);
+
+        $this->assertSame((int) $prId, $info->number, 'getPullRequest lieferte eine andere PR-Nummer.');
+        $this->assertSame('open', $info->state, 'getPullRequest meldet die frische PR nicht als offen.');
+        $this->assertNotNull($info->url, 'getPullRequest lieferte keine URL.');
     }
 
     /**

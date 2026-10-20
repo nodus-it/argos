@@ -7,6 +7,7 @@ namespace App\Services\GitProvider;
 use App\Integrations\GitLab\GitLabConnector;
 use App\Integrations\GitLab\Requests\CommentOnMergeRequest;
 use App\Integrations\GitLab\Requests\CreateMergeRequest;
+use App\Integrations\GitLab\Requests\GetMergeRequest;
 use App\Integrations\GitLab\Requests\GetProject;
 use App\Integrations\GitLab\Requests\GetRawFile;
 use App\Integrations\GitLab\Requests\ListBranches;
@@ -185,5 +186,16 @@ class GitLabGitService implements GitProviderContract
         }
 
         return $options;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getPullRequest(string $owner, string $repo, int|string $pullRequestId): array
+    {
+        return $this->connector
+            ->send(new GetMergeRequest($owner, $repo, $pullRequestId))
+            ->throw()
+            ->json();
     }
 }

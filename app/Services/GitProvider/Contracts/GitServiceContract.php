@@ -88,4 +88,13 @@ interface GitServiceContract
         string $title,
         string $body,
     ): array;
+
+    /**
+     * Raw API representation of a pull/merge request (GitHub `number`,
+     * GitLab `iid`, Bitbucket `id`). Read through PullRequestInfo for a
+     * provider-neutral view of number, URL and state.
+     *
+     * @return array<string, mixed>
+     */
+    public function getPullRequest(string $owner, string $repo, int|string $pullRequestId): array;
 }

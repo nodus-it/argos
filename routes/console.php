@@ -54,3 +54,7 @@ Schedule::command('argos:workspaces:idle-stop')
 Schedule::command('argos:workspaces:reap-orphans')
     ->everyFifteenMinutes()
     ->withoutOverlapping();
+
+Schedule::command('argos:workspaces:sync-prs')
+    ->cron('*/'.max(1, (int) config('argos.workspaces.pr_sync_minutes', 15)).' * * * *')
+    ->withoutOverlapping();
