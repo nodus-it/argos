@@ -46,6 +46,23 @@ jobs:
       - name: bats unit tests (via Docker, includes jq + check-jsonschema)
         run: bash worker/tests/run-bats.sh
 
+  daemon:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: daemon
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: daemon/package-lock.json
+      - name: Install daemon dependencies
+        run: npm ci
+      - name: Typecheck, lint, tests (live tests skip without credentials)
+        run: npm run check
+
   installer-unit:
     runs-on: ubuntu-latest
     steps:
@@ -238,7 +255,7 @@ jobs:
           retention-days: 7
 
   build-app:
-    needs: [shellcheck, worker-unit, app-quality, installer-unit, secret-scan]
+    needs: [shellcheck, worker-unit, daemon, app-quality, installer-unit, secret-scan]
     # The metadata-action only emits tags for develop, next and release tags;
     # on a feature branch (push or workflow_dispatch) the tag list is
     # empty and `docker buildx push` errors with "tag is needed when

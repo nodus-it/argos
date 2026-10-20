@@ -1,0 +1,25 @@
+[
+    { "type": "system", "subtype": "init", "session_id": "3f1c", "model": "claude-sonnet-5-5", "permissionMode": "default", "claude_code_version": "2.1.304", "slash_commands": ["compact", "review"], "cwd": "/workspace", "tools": ["Read", "Edit", "Bash"], "apiKeySource": "none" },
+    { "type": "system", "subtype": "session_state_changed", "state": "running", "session_id": "3f1c", "uuid": "u0" },
+    { "type": "stream_event", "parent_tool_use_id": null, "session_id": "3f1c", "uuid": "u1", "event": { "type": "message_start", "message": { "id": "msg_01" } } },
+    { "type": "stream_event", "parent_tool_use_id": null, "session_id": "3f1c", "uuid": "u2", "event": { "type": "content_block_delta", "index": 0, "delta": { "type": "thinking_delta", "thinking": "Let me look" } } },
+    { "type": "stream_event", "parent_tool_use_id": null, "session_id": "3f1c", "uuid": "u3", "event": { "type": "content_block_delta", "index": 1, "delta": { "type": "text_delta", "text": "I'll read " } } },
+    { "type": "stream_event", "parent_tool_use_id": null, "session_id": "3f1c", "uuid": "u4", "event": { "type": "content_block_delta", "index": 2, "delta": { "type": "input_json_delta", "partial_json": "{\"file" } } },
+    { "type": "assistant", "parent_tool_use_id": null, "session_id": "3f1c", "uuid": "u5", "message": { "id": "msg_01", "role": "assistant", "content": [
+        { "type": "thinking", "thinking": "Let me look", "signature": "x" },
+        { "type": "text", "text": "I'll read the file." },
+        { "type": "tool_use", "id": "toolu_01", "name": "Read", "input": { "file_path": "/workspace/app/Foo.php" } }
+    ] } },
+    { "type": "user", "parent_tool_use_id": null, "session_id": "3f1c", "uuid": "u6", "message": { "role": "user", "content": [
+        { "type": "tool_result", "tool_use_id": "toolu_01", "content": [{ "type": "text", "text": "<?php class Foo {}" }] }
+    ] } },
+    { "type": "assistant", "parent_tool_use_id": "toolu_01", "session_id": "3f1c", "uuid": "u7", "message": { "id": "msg_sub", "content": [
+        { "type": "text", "text": "subagent chatter" },
+        { "type": "tool_use", "id": "toolu_sub", "name": "Grep", "input": { "pattern": "Foo" } }
+    ] } },
+    { "type": "user", "parent_tool_use_id": null, "session_id": "3f1c", "uuid": "u8", "message": { "role": "user", "content": [
+        { "type": "tool_result", "tool_use_id": "toolu_02", "is_error": true, "content": "Exit code 1" }
+    ] } },
+    { "type": "result", "subtype": "success", "is_error": false, "session_id": "3f1c", "uuid": "u9", "total_cost_usd": 0.0421, "usage": { "input_tokens": 1200, "output_tokens": 80 }, "duration_ms": 3100, "num_turns": 2, "result": "I'll read the file." },
+    { "type": "system", "subtype": "session_state_changed", "state": "idle", "session_id": "3f1c", "uuid": "u10" }
+]

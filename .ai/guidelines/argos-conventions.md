@@ -89,6 +89,21 @@ runners (`run-tests.sh`, `run-bats.sh`).
     worker-build).
   - Build context is always the repo root.
 
+### Daemon (TypeScript)
+
+- `daemon/` is the workspace daemon: it runs inside a workspace container,
+  holds interactive Claude sessions through the Claude Agent SDK and relays
+  normalized events to the manager. **No business logic** — permissions,
+  persistence and history belong to the Laravel app.
+- Node 22, ESM, `strict` TypeScript. `npm run check` (typecheck + eslint +
+  vitest) must pass; CI runs it in the `daemon` job.
+- The SDK is installed at image build time (`npm ci`). Never commit `dist/`
+  or vendor the SDK — it is not AGPL.
+- Live tests (`test/live.test.ts`) run only with `ARGOS_LIVE_CLAUDE_TOKEN` and
+  `ARGOS_LIVE_REPO_DIR` set; everything else is offline.
+- Secrets (OAuth tokens, repo credentials) live in memory only — never on
+  disk, in logs, or in the container environment.
+
 ### Documentation
 
 - Every new function in `worker/lib/` needs a docstring.
