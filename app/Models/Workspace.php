@@ -39,6 +39,7 @@ use Illuminate\Support\Str;
  * @property string|null $pr_state
  * @property Carbon|null $pr_synced_at
  * @property Carbon|null $shipped_at
+ * @property array{binding_id: string, provider: string, owner: string, project: string, number: string, title: string, url: string, body: string}|null $external_issue
  * @property Carbon|null $deleted_at
  * @property Carbon $created_at
  * @property Carbon $updated_at
@@ -71,6 +72,7 @@ class Workspace extends Model implements DemoTarget
         'pr_state',
         'pr_synced_at',
         'shipped_at',
+        'external_issue',
     ];
 
     protected $hidden = ['daemon_token'];
@@ -84,6 +86,7 @@ class Workspace extends Model implements DemoTarget
             'pr_number' => 'integer',
             'pr_synced_at' => 'datetime',
             'shipped_at' => 'datetime',
+            'external_issue' => 'array',
         ];
     }
 

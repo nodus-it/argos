@@ -34,6 +34,7 @@ class WorkspaceShipService
         private readonly GitServiceFactory $git,
         private readonly ThreadStreamPublisher $publisher,
         private readonly WorkspaceNotifier $notifier,
+        private readonly WorkspaceIssueService $issues,
     ) {}
 
     /**
@@ -118,6 +119,7 @@ class WorkspaceShipService
                 'pr_state' => $info->state ?? 'open',
                 'pr_synced_at' => now(),
             ]);
+            $this->issues->announcePullRequest($workspace, (string) $info->url);
         } else {
             $service->commentOnPullRequest($owner, $repo, $workspace->pr_number, __('workspaces.ship.pr_comment', ['subject' => $subject, 'name' => $by->name]));
         }
@@ -209,8 +211,9 @@ class WorkspaceShipService
     private function pullRequestBody(Workspace $workspace, string $body): string
     {
         $link = url('/admin/workspaces/'.$workspace->id);
+        $reference = $this->issues->pullRequestReference($workspace);
 
-        return trim($body)."\n\n---\n".__('workspaces.ship.pr_footer', ['url' => $link]);
+        return trim($body).($reference !== null ? "\n\n".$reference : '')."\n\n---\n".__('workspaces.ship.pr_footer', ['url' => $link]);
     }
 
     /** Note the shipment in every open thread and broadcast it. */

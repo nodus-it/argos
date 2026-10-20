@@ -25,6 +25,7 @@ use App\Models\WorkspaceMember;
 use App\Services\GitProvider\Contracts\GitServiceContract;
 use App\Services\GitProvider\GitServiceFactory;
 use App\Services\Workspace\WorkspaceException;
+use App\Services\Workspace\WorkspaceIssueService;
 use App\Services\Workspace\WorkspaceShipService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -131,6 +132,22 @@ class WorkspaceShipTest extends TestCase
         $this->assertSame(['branch' => 'ws/login'], $this->sent['GitPush'][0]);
         $notice = ThreadEvent::query()->where('thread_id', $thread->id)->where('type', ThreadEventType::Notice->value)->firstOrFail();
         $this->assertSame('shipped', $notice->payload['kind']);
+    }
+
+    public function test_shipping_an_issue_workspace_closes_and_comments_on_the_issue(): void
+    {
+        $this->workspace->forceFill(['external_issue' => [
+            'binding_id' => 'b1', 'provider' => 'gitlab', 'owner' => 'acme', 'project' => 'sub/widget',
+            'number' => '12', 'title' => 'Login', 'url' => 'https://gitlab.com/acme/sub/widget/-/issues/12', 'body' => '',
+        ]])->save();
+        $issues = $this->mock(WorkspaceIssueService::class);
+        $issues->shouldReceive('pullRequestReference')->andReturn('Closes #12');
+        $issues->shouldReceive('announcePullRequest')->once()->with(Mockery::type(Workspace::class), 'https://x/9');
+        $this->git->shouldReceive('createPullRequest')->once()
+            ->withArgs(fn ($owner, $repo, $title, $body) => str_contains($body, "Adds the login.\n\nCloses #12"))
+            ->andReturn(['iid' => 9, 'web_url' => 'https://x/9', 'state' => 'opened']);
+
+        $this->service()->ship($this->workspace, $this->editor, 'feat: add login', 'Adds the login.');
     }
 
     public function test_shipping_again_comments_on_the_existing_pull_request(): void

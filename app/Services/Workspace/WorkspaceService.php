@@ -36,12 +36,16 @@ class WorkspaceService extends EntityService
         return Workspace::class;
     }
 
-    public function createWorkspace(User $creator, RepoProfile $profile, string $name, ?string $baseBranch = null): Workspace
+    /**
+     * @param  array{binding_id: string, provider: string, owner: string, project: string, number: string, title: string, url: string, body: string}|null  $issue  from WorkspaceIssueService::load()
+     */
+    public function createWorkspace(User $creator, RepoProfile $profile, string $name, ?string $baseBranch = null, ?array $issue = null): Workspace
     {
         $this->ensureCapacity();
 
-        $workspace = DB::transaction(function () use ($creator, $profile, $name, $baseBranch): Workspace {
+        $workspace = DB::transaction(function () use ($creator, $profile, $name, $baseBranch, $issue): Workspace {
             $slug = Workspace::generateSlug($name);
+            $branch = $issue !== null ? $this->issueBranch($issue) : 'ws/'.$slug;
 
             $workspace = new Workspace;
             $workspace->forceFill([
@@ -50,9 +54,10 @@ class WorkspaceService extends EntityService
                 'created_by' => $creator->id,
                 'name' => $name,
                 'base_branch' => $baseBranch !== null && $baseBranch !== '' ? $baseBranch : $profile->default_branch,
-                'branch' => 'ws/'.$slug,
+                'branch' => $branch,
                 'status' => WorkspaceStatus::Provisioning,
                 'daemon_token' => Str::random(64),
+                'external_issue' => $issue,
             ])->save();
 
             $this->members->addOwner($workspace, $creator);
@@ -64,6 +69,21 @@ class WorkspaceService extends EntityService
         ProvisionWorkspaceJob::dispatch($workspace->id);
 
         return $workspace;
+    }
+
+    /**
+     * `ws/<nr>-<slug>`; a second workspace for the same issue gets a suffix.
+     *
+     * @param  array{number: string, title: string}  $issue
+     */
+    private function issueBranch(array $issue): string
+    {
+        $branch = app(WorkspaceIssueService::class)->branchFor($issue['number'], $issue['title']);
+        if (! Workspace::withTrashed()->where('branch', $branch)->exists()) {
+            return $branch;
+        }
+
+        return mb_substr($branch, 0, WorkspaceIssueService::BRANCH_MAX - 5).'-'.Str::lower(Str::random(4));
     }
 
     /** Start a stopped or failed workspace again. */

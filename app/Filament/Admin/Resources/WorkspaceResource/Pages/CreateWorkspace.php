@@ -8,6 +8,7 @@ use App\Filament\Admin\Resources\WorkspaceResource;
 use App\Models\RepoProfile;
 use App\Models\User;
 use App\Services\Workspace\WorkspaceException;
+use App\Services\Workspace\WorkspaceIssueService;
 use App\Services\Workspace\WorkspaceService;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
@@ -29,11 +30,15 @@ class CreateWorkspace extends CreateRecord
         $user = auth()->user();
 
         try {
+            $profile = RepoProfile::query()->findOrFail($data['repo_profile_id']);
+            $issue = filled($data['issue'] ?? null) ? app(WorkspaceIssueService::class)->load($profile, (string) $data['issue']) : null;
+
             return app(WorkspaceService::class)->createWorkspace(
                 $user,
-                RepoProfile::query()->findOrFail($data['repo_profile_id']),
+                $profile,
                 (string) $data['name'],
                 isset($data['base_branch']) ? (string) $data['base_branch'] : null,
+                $issue,
             );
         } catch (WorkspaceException $e) {
             Notification::make()->title($e->getMessage())->danger()->send();

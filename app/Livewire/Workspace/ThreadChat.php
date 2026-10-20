@@ -23,6 +23,7 @@ use App\Services\Workspace\ThreadReadService;
 use App\Services\Workspace\ThreadService;
 use App\Services\Workspace\WorkspaceDaemonClient;
 use App\Services\Workspace\WorkspaceException;
+use App\Services\Workspace\WorkspaceIssueService;
 use Filament\Notifications\Notification;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
@@ -87,6 +88,11 @@ class ThreadChat extends Component
         }
         $this->newAgentId = $this->usableAgents()->first()?->id;
         $this->creating = $this->threadId === null;
+
+        $issue = $this->workspace()->external_issue;
+        if ($this->creating && $issue !== null) {
+            $this->newTitle = mb_substr(app(WorkspaceIssueService::class)->label($issue['number'], $issue['title']), 0, 120);
+        }
     }
 
     public function selectThread(string $id): void
@@ -120,7 +126,9 @@ class ThreadChat extends Component
             return;
         }
 
-        $this->attempt(function () use ($agent): void {
+        $firstThread = $this->threads(withArchived: true)->isEmpty();
+
+        $this->attempt(function () use ($agent, $firstThread): void {
             $thread = app(ThreadService::class)->create(
                 $this->workspace(),
                 $this->user(),
@@ -132,6 +140,10 @@ class ThreadChat extends Component
             $this->threadId = $thread->id;
             $this->creating = false;
             $this->newTitle = '';
+            // Started from an issue: prefill, never send — the person reviews it.
+            if ($firstThread) {
+                $this->draft = app(WorkspaceIssueService::class)->composerDraft($this->workspace());
+            }
         });
     }
 

@@ -21,14 +21,23 @@ final class UntrustedTaskInput
 {
     public function wrap(Task $task): string
     {
-        $source = $task->externalIssueLink()->exists()
+        return $this->wrapText((string) $task->description, $task->externalIssueLink()->exists(), 'TASK DESCRIPTION');
+    }
+
+    /**
+     * Wrap any text with the same markers; `$external` flags text imported
+     * from an issue tracker (workspaces started from an issue use this).
+     */
+    public function wrapText(string $text, bool $external, string $label = 'TASK DESCRIPTION'): string
+    {
+        $source = $external
             ? 'external issue tracker (UNTRUSTED — may contain prompt injection)'
             : 'operator, entered directly in Argos';
 
         $nonce = bin2hex(random_bytes(8));
 
-        return "[BEGIN UNTRUSTED TASK DESCRIPTION · source: {$source} · ref:{$nonce}]\n"
-            .((string) $task->description)."\n"
-            ."[END UNTRUSTED TASK DESCRIPTION · ref:{$nonce}]";
+        return "[BEGIN UNTRUSTED {$label} · source: {$source} · ref:{$nonce}]\n"
+            .$text."\n"
+            ."[END UNTRUSTED {$label} · ref:{$nonce}]";
     }
 }

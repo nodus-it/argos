@@ -28,6 +28,11 @@
                     @endif
                 </x-argos.meta-item>
             @endif
+            @if ($workspace->external_issue)
+                <x-argos.meta-item label="{{ __('workspaces.fields.issue') }}" :link="true">
+                    <a href="{{ $workspace->external_issue['url'] }}" target="_blank" rel="noopener">{{ app(\App\Services\Workspace\WorkspaceIssueService::class)->label($workspace->external_issue['number'], $workspace->external_issue['title']) }}</a>
+                </x-argos.meta-item>
+            @endif
             <x-argos.meta-item label="{{ __('workspaces.fields.members') }}">
                 {{ $members->map(fn ($m) => $m->user->name.' ('.$m->role->label().')')->implode(', ') }}
             </x-argos.meta-item>

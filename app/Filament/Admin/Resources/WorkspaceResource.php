@@ -11,12 +11,15 @@ use App\Filament\Admin\Resources\WorkspaceResource\Pages\ViewWorkspace;
 use App\Models\RepoProfile;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Services\Workspace\WorkspaceIssueService;
 use App\Services\Workspace\WorkspaceSummaryService;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
@@ -84,7 +87,28 @@ class WorkspaceResource extends Resource
                         ->options(fn (): array => RepoProfile::query()->orderBy('name')->pluck('name', 'id')->all())
                         ->searchable()
                         ->required()
-                        ->live(),
+                        ->live()
+                        ->afterStateUpdated(fn (Set $set) => $set('issue', null)),
+
+                    Select::make('issue')
+                        ->label(__('workspaces.fields.issue'))
+                        ->helperText(__('workspaces.fields.issue_help'))
+                        ->visible(fn (Get $get): bool => app(WorkspaceIssueService::class)->bindingFor(RepoProfile::query()->find($get('repo_profile_id'))) !== null)
+                        ->searchable()
+                        ->getSearchResultsUsing(fn (Get $get, string $search): array => ($profile = RepoProfile::query()->find($get('repo_profile_id'))) !== null
+                            ? app(WorkspaceIssueService::class)->search($profile, $search)
+                            : [])
+                        ->getOptionLabelUsing(fn (Get $get, ?string $value): ?string => $value !== null && ($profile = RepoProfile::query()->find($get('repo_profile_id'))) !== null
+                            ? (app(WorkspaceIssueService::class)->search($profile, $value, 200)[$value] ?? '#'.$value)
+                            : null)
+                        ->live()
+                        ->afterStateUpdated(function (Get $get, Set $set, ?string $state): void {
+                            $profile = RepoProfile::query()->find($get('repo_profile_id'));
+                            if ($state === null || $profile === null || filled($get('name'))) {
+                                return;
+                            }
+                            $set('name', mb_substr(app(WorkspaceIssueService::class)->search($profile, $state, 200)[$state] ?? '#'.$state, 0, 120));
+                        }),
 
                     TextInput::make('name')
                         ->label(__('workspaces.fields.name'))
