@@ -8,6 +8,7 @@ import { initWorkspace, WorkspaceInitError } from './workspaceInit.js';
 import * as gitOps from './gitOps.js';
 import { FileIndex } from './files.js';
 import { OneshotError, runOneshot, type OneshotRunner } from './oneshot.js';
+import { GateRunner, GatesBusyError, type GateScript } from './gates.js';
 
 export const DAEMON_VERSION = '0.1.0';
 
@@ -18,6 +19,7 @@ export interface AppDependencies {
     environment: SessionEnvironment;
     credentialHelper: string;
     oneshotRunner?: OneshotRunner;
+    gateScript?: GateScript;
     versions?: { sdk?: string; claude?: string };
 }
 
@@ -95,6 +97,14 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
     const app = Fastify({ logger: false, bodyLimit: 40 * 1024 * 1024 });
     const sessions = new Map<string, ThreadSession>();
     const approvals = new ApprovalRegistry();
+    const gates = deps.gateScript === undefined ? null : new GateRunner(deps.gateScript, (event) => deps.outbox.push(null, event), deps.environment.workspaceDir);
+    const gateRunner = (): GateRunner => {
+        if (gates === null) {
+            throw new HttpError(501, 'gates_unavailable', 'Quality gates are not configured');
+        }
+
+        return gates;
+    };
     const expected = Buffer.from(`Bearer ${deps.daemonToken}`);
 
     app.addHook('onRequest', async (request, reply) => {
@@ -119,6 +129,9 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
         }
         if (error instanceof gitOps.PushError) {
             return reply.code(409).send({ error: { code: error.code, message: error.message } });
+        }
+        if (error instanceof GatesBusyError) {
+            return reply.code(409).send({ error: { code: 'gates_running', message: error.message } });
         }
         if (error instanceof OneshotError) {
             return reply.code(502).send({ error: { code: 'oneshot_failed', message: error.message } });
@@ -152,6 +165,11 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
             { repoUrl: body.repo_url, baseBranch: body.base_branch, branch: body.branch, gitUserName: body.git_user_name, gitUserEmail: body.git_user_email },
             deps.credentialHelper,
         );
+        // Fresh base checkout: record pre-existing test/type failures so the
+        // gates only report new ones. Runs in the background.
+        if (status === 'ready' && gates !== null) {
+            void gates.startBaseline();
+        }
 
         return { status };
     });
@@ -275,6 +293,21 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
         await gitOps.push(dir, branch);
 
         return reply.code(202).send({});
+    });
+
+    app.get('/gates', async () => ({ running: gateRunner().running, baseline: gateRunner().baseline }));
+
+    app.post('/gates/run', async (request, reply) => {
+        const { run_id: runId } = z.object({ run_id: threadIdSchema }).parse(request.body);
+        void gateRunner().start(runId);
+
+        return reply.code(202).send({ run_id: runId });
+    });
+
+    app.get('/gates/fix-prompt', async (request) => {
+        const query = z.object({ gate: z.string().regex(/^[a-z_]{1,32}$/), run_id: threadIdSchema }).parse(request.query);
+
+        return { prompt: await gateRunner().fixPrompt(query.gate, query.run_id) };
     });
 
     app.post('/oneshot', async (request) => {

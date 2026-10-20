@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Workspace\ThreadService;
 use App\Services\Workspace\WorkspaceException;
+use App\Services\Workspace\WorkspaceGateService;
 use App\Services\Workspace\WorkspaceMemberService;
 use App\Services\Workspace\WorkspaceService;
 use App\Services\Workspace\WorkspaceShipService;
@@ -121,8 +122,11 @@ class ViewWorkspace extends ViewRecord
                     } catch (\Throwable) {
                         $draft = ['subject' => '', 'body' => '', 'changed_files' => 0, 'ahead' => 0];
                     }
+                    $gates = app(WorkspaceGateService::class)->summary($this->workspace());
+                    $failed = app(WorkspaceGateService::class)->latest($this->workspace())?->failedGates() !== [];
                     $this->shipSummary = __('workspaces.ship.summary', ['files' => $draft['changed_files'], 'ahead' => $draft['ahead']])
-                        .($draft['subject'] === '' ? ' '.__('workspaces.ship.no_draft') : '');
+                        .($draft['subject'] === '' ? ' '.__('workspaces.ship.no_draft') : '')
+                        .($gates !== null ? ' '.__($failed ? 'workspaces.gates.ship_warning' : 'workspaces.gates.ship_summary', ['summary' => $gates]) : '');
 
                     return ['subject' => $draft['subject'], 'body' => $draft['body'], 'draft' => false];
                 })
@@ -152,6 +156,22 @@ class ViewWorkspace extends ViewRecord
                 }),
 
             ActionGroup::make([
+                Action::make('gates')
+                    ->label(__('workspaces.gates.run'))
+                    ->icon('heroicon-o-shield-check')
+                    ->visible(fn (): bool => $this->workspace()->status === WorkspaceStatus::Running
+                        && (auth()->user()?->can('operate', $this->workspace()) ?? false))
+                    ->action(function (): void {
+                        /** @var User $user */
+                        $user = auth()->user();
+                        try {
+                            app(WorkspaceGateService::class)->run($this->workspace(), $user);
+                            Notification::make()->title(__('workspaces.gates.started'))->success()->send();
+                            $this->dispatch('workspace-tab', tab: 'review');
+                        } catch (WorkspaceException $e) {
+                            Notification::make()->title($e->getMessage())->warning()->send();
+                        }
+                    }),
                 Action::make('rebase')
                     ->label(__('workspaces.ship.rebase'))
                     ->icon('heroicon-o-arrow-path-rounded-square')

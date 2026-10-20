@@ -1525,3 +1525,7 @@ body,
 .ws-suggest li.on{background:var(--surface-2);}
 .ws-suggest li .muted{font-size:var(--t-xs);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .ws-upload-name{display:inline-flex;align-items:center;height:56px;padding:0 8px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:var(--t-xs);}
+.ws-gates{display:flex;flex-direction:column;gap:6px;padding:10px 12px;border-bottom:1px solid var(--border);}
+.ws-gates p{margin:0;font-size:var(--t-sm);}
+.ws-gate-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;}
+.ws-gate-log{margin:4px 0 0;padding:8px;max-height:240px;overflow:auto;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:var(--t-xs);white-space:pre-wrap;}

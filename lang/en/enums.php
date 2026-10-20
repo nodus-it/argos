@@ -125,6 +125,12 @@ return [
         'viewer' => 'Viewer',
     ],
 
+    'gate_run_status' => [
+        'running' => 'Running',
+        'passed' => 'Passed',
+        'failed' => 'Failed',
+        'error' => 'Error',
+    ],
     'thread_status' => [
         'closed' => 'Closed',
         'starting' => 'Starting',

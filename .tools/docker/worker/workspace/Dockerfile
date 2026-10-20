@@ -33,7 +33,8 @@ RUN cd /opt/argos/daemon && npm run build && npm prune --omit=dev --no-audit --n
 
 COPY .tools/docker/worker/workspace/workspace-entrypoint.sh /opt/argos/bin/workspace-entrypoint.sh
 COPY .tools/docker/worker/workspace/git-credential-argos /opt/argos/bin/git-credential-argos
-RUN chmod 0755 /opt/argos/bin/workspace-entrypoint.sh /opt/argos/bin/git-credential-argos \
+COPY .tools/docker/worker/workspace/run-gates.sh /opt/argos/bin/run-gates.sh
+RUN chmod 0755 /opt/argos/bin/workspace-entrypoint.sh /opt/argos/bin/git-credential-argos /opt/argos/bin/run-gates.sh \
     && mkdir -p /home/agent/.claude-agents /workspace \
     && chown -R agent:agent /home/agent/.claude-agents /workspace
 

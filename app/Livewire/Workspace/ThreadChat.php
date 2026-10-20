@@ -47,7 +47,7 @@ class ThreadChat extends Component
     private const PAGE = 200;
 
     /** Commands Argos handles itself instead of sending them to Claude. */
-    public const ARGOS_COMMANDS = ['plan', 'ship', 'preview', 'review'];
+    public const ARGOS_COMMANDS = ['plan', 'ship', 'preview', 'review', 'gates'];
 
     /** @var list<TemporaryUploadedFile> */
     public array $uploads = [];
@@ -217,7 +217,7 @@ class ThreadChat extends Component
         return $commands;
     }
 
-    /** Handle `/plan`, `/ship`, `/preview`, `/review`; true when consumed. */
+    /** Handle `/plan`, `/ship`, `/preview`, `/review`, `/gates`; true when consumed. */
     private function runArgosCommand(string $text): bool
     {
         if (preg_match('/^\/([a-z-]+)(?:\s+(.*))?$/s', $text, $m) !== 1 || ! in_array($m[1], self::ARGOS_COMMANDS, true)) {
@@ -230,6 +230,7 @@ class ThreadChat extends Component
             'ship' => $this->dispatch('workspace-ship'),
             'preview' => $this->dispatch('workspace-tab', tab: 'preview'),
             'review' => $this->dispatch('workspace-tab', tab: 'review'),
+            'gates' => [$this->dispatch('workspace-tab', tab: 'review'), $this->dispatch('workspace-run-gates')],
         };
 
         return true;

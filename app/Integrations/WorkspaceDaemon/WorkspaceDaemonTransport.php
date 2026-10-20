@@ -68,4 +68,9 @@ interface WorkspaceDaemonTransport
 
     /** @return list<string> */
     public function files(string $query, int $limit = 20): array;
+
+    /** Start a gate run; throws `gates_running` while one is active. */
+    public function runGates(string $runId): void;
+
+    public function gateFixPrompt(string $gate, string $runId): string;
 }

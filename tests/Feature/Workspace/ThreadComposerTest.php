@@ -124,7 +124,7 @@ class ThreadComposerTest extends TestCase
         $names = array_column($this->chat()->set('threadId', $this->thread->id)->instance()->commandList(), 'name');
 
         // The fake session reports `review` too; Argos' own wins, no duplicate.
-        $this->assertSame(['plan', 'ship', 'preview', 'review'], $names);
+        $this->assertSame(['plan', 'ship', 'preview', 'review', 'gates'], $names);
     }
 
     public function test_plan_switches_the_mode_and_sends_the_rest(): void
@@ -142,6 +142,7 @@ class ThreadComposerTest extends TestCase
         $chat->set('draft', '/ship')->call('send')->assertDispatched('workspace-ship');
         $chat->set('draft', '/preview')->call('send')->assertDispatched('workspace-tab', tab: 'preview');
         $chat->set('draft', '/review')->call('send')->assertDispatched('workspace-tab', tab: 'review');
+        $chat->set('draft', '/gates')->call('send')->assertDispatched('workspace-run-gates');
 
         $this->assertCount(0, $this->userMessages());
     }

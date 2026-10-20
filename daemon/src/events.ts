@@ -21,7 +21,11 @@ export type DaemonEventType =
     | 'approval.cancelled'
     | 'turn.completed'
     | 'usage_limit'
-    | 'error';
+    | 'error'
+    | 'gates.started'
+    | 'gates.completed'
+    | 'gates.failed'
+    | 'gates.baseline';
 
 export type ThreadState = 'starting' | 'idle' | 'running' | 'waiting_input' | 'closed';
 

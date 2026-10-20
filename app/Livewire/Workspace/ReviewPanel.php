@@ -12,11 +12,13 @@ use App\Models\Workspace;
 use App\Services\Git\WorkspaceDiffService;
 use App\Services\Workspace\ThreadService;
 use App\Services\Workspace\WorkspaceException;
+use App\Services\Workspace\WorkspaceGateService;
 use Filament\Notifications\Notification;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 /**
@@ -87,6 +89,41 @@ class ReviewPanel extends Component
         return true;
     }
 
+    /** Start a gate run (header button, the panel or `/gates`). */
+    #[On('workspace-run-gates')]
+    public function runGates(): void
+    {
+        try {
+            app(WorkspaceGateService::class)->run($this->workspace(), $this->user());
+            Notification::make()->title(__('workspaces.gates.started'))->success()->send();
+        } catch (WorkspaceException $e) {
+            Notification::make()->title($e->getMessage())->warning()->send();
+        } catch (AuthorizationException) {
+            Notification::make()->title(__('workspaces.thread.viewer_hint'))->warning()->send();
+        }
+    }
+
+    /** Hand a failed gate to Claude with the worker's fix prompt. */
+    public function sendGateFix(string $gate): void
+    {
+        $run = app(WorkspaceGateService::class)->latest($this->workspace());
+        $thread = $this->threadId !== null ? $this->threads()->firstWhere('id', $this->threadId) : null;
+        if ($run === null || $thread === null) {
+            Notification::make()->title(__('workspaces.ship.no_thread'))->warning()->send();
+
+            return;
+        }
+
+        try {
+            app(WorkspaceGateService::class)->sendFixToAgent($run, $thread, $this->user(), $gate);
+            Notification::make()->title(__('workspaces.gates.fix_sent'))->success()->send();
+        } catch (WorkspaceException|DaemonTransportException $e) {
+            Notification::make()->title($e->getMessage())->danger()->send();
+        } catch (AuthorizationException) {
+            Notification::make()->title(__('workspaces.thread.viewer_hint'))->warning()->send();
+        }
+    }
+
     public function render(): View
     {
         $workspace = $this->workspace();
@@ -105,6 +142,7 @@ class ReviewPanel extends Component
             'diff' => $diff,
             'error' => $error,
             'threads' => $this->threads(),
+            'gateRun' => app(WorkspaceGateService::class)->latest($workspace),
             'canWrite' => $workspace->roleOf($this->user())?->canOperate() ?? false,
         ]);
     }

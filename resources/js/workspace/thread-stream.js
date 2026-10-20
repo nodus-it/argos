@@ -47,6 +47,11 @@ export function argosThreadStream(config) {
         },
 
         onStream(payload) {
+            if (payload.thread_id === '_workspace') {
+                // Workspace-level change (quality gates): the Review tab reloads.
+                window.dispatchEvent(new CustomEvent('argos-gates-updated'));
+                return;
+            }
             if (payload.thread_id !== this.threadId) {
                 // Another thread changed: the switcher shows its status.
                 this.scheduleRefresh(600);
@@ -154,10 +159,18 @@ export function argosThreadStream(config) {
                     this.suggestIndex = (this.suggestIndex + (event.key === 'ArrowDown' ? 1 : n - 1)) % n;
                     return;
                 }
-                if (event.key === 'Enter' || event.key === 'Tab') {
+                const item = this.suggestions[this.suggestIndex];
+                const complete = event.key === 'Enter' && this.suggestToken?.kind === 'command'
+                    && item?.value.trim() === this.$refs.composer?.value.trim();
+                if ((event.key === 'Enter' || event.key === 'Tab') && !complete) {
                     event.preventDefault();
                     this.choose(this.suggestIndex);
                     return;
+                }
+                if (complete) {
+                    // `/gates` typed out: Enter runs it.
+                    this.suggestions = [];
+                    this.suggestToken = null;
                 }
                 if (event.key === 'Escape') {
                     this.suggestions = [];

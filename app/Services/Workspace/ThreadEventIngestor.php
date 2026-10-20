@@ -39,6 +39,7 @@ class ThreadEventIngestor
         private readonly ThreadStreamPublisher $publisher,
         private readonly WorkspaceService $workspaces,
         private readonly WorkspaceNotifier $notifier,
+        private readonly WorkspaceGateService $gates,
     ) {}
 
     /**
@@ -58,7 +59,7 @@ class ThreadEventIngestor
             usort($threadEvents, fn (array $a, array $b): int => (int) $a['seq'] <=> (int) $b['seq']);
 
             if ($key === self::WORKSPACE_KEY) {
-                // No workspace-level event kinds yet (quality gates add them).
+                $this->ingestWorkspace($workspace, $threadEvents);
                 $acks[$key] = (int) end($threadEvents)['seq'];
 
                 continue;
@@ -73,6 +74,27 @@ class ThreadEventIngestor
         $this->workspaces->touch($workspace);
 
         return $acks;
+    }
+
+    /**
+     * Workspace-level events (thread_id = null): quality gates. Their seq is
+     * not persisted — the daemon restarts it — so they are applied
+     * idempotently by run id instead.
+     *
+     * @param  list<array<string, mixed>>  $events
+     */
+    private function ingestWorkspace(Workspace $workspace, array $events): void
+    {
+        $changed = false;
+        foreach ($events as $event) {
+            $type = (string) ($event['type'] ?? '');
+            if (str_starts_with($type, 'gates.')) {
+                $changed = $this->gates->apply($workspace, $type, is_array($event['data'] ?? null) ? $event['data'] : []) || $changed;
+            }
+        }
+        if ($changed) {
+            $this->gates->announce($workspace);
+        }
     }
 
     /**

@@ -138,6 +138,29 @@ class FakeWorkspaceDaemon extends WorkspaceDaemonClient implements WorkspaceDaem
         return array_values(array_slice(array_filter($all, fn (string $f): bool => $query === '' || str_contains(strtolower($f), strtolower($query))), 0, $limit));
     }
 
+    /** Gates: pint passes, pest fails with one test — enough to drive the fix flow. */
+    public function runGates(string $runId): void
+    {
+        if ($this->workspace === null) {
+            throw new \LogicException('FakeWorkspaceDaemon used without a workspace');
+        }
+
+        app(ThreadEventIngestor::class)->ingest($this->workspace, [
+            ['thread_id' => null, 'seq' => 1, 'type' => 'gates.started', 'data' => ['run_id' => $runId, 'baseline' => 'ready']],
+            ['thread_id' => null, 'seq' => 2, 'type' => 'gates.completed', 'data' => [
+                'run_id' => $runId,
+                'baseline' => 'ready',
+                'gates' => ['artisan' => 'pass', 'pint' => 'pass', 'pest' => 'fail', 'phpstan' => 'skip'],
+                'logs' => ['artisan' => '', 'pint' => "PASS\n", 'pest' => "FAILED  Tests\\Feature\\LoginTest > redirects home\n"],
+            ]],
+        ]);
+    }
+
+    public function gateFixPrompt(string $gate, string $runId): string
+    {
+        return "# Quality-Gate-Fix: {$gate}\n\nTests sind fehlgeschlagen.\n";
+    }
+
     public function gitCommit(string $subject, string $body, array $author): ?array
     {
         return ['sha' => str_repeat('a', 40)];

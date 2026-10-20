@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Integrations\WorkspaceDaemon;
 
+use App\Integrations\WorkspaceDaemon\Requests\GetGateFixPrompt;
 use App\Integrations\WorkspaceDaemon\Requests\GetHealth;
 use App\Integrations\WorkspaceDaemon\Requests\GitCommit;
 use App\Integrations\WorkspaceDaemon\Requests\GitDiff;
@@ -14,6 +15,7 @@ use App\Integrations\WorkspaceDaemon\Requests\InitWorkspace;
 use App\Integrations\WorkspaceDaemon\Requests\InterruptThread;
 use App\Integrations\WorkspaceDaemon\Requests\ListFiles;
 use App\Integrations\WorkspaceDaemon\Requests\ResolveApproval;
+use App\Integrations\WorkspaceDaemon\Requests\RunGates;
 use App\Integrations\WorkspaceDaemon\Requests\RunOneshot;
 use App\Integrations\WorkspaceDaemon\Requests\SendMessage;
 use App\Integrations\WorkspaceDaemon\Requests\SetModel;
@@ -148,6 +150,16 @@ class WorkspaceDaemonApi implements WorkspaceDaemonTransport
         $files = $this->call(new ListFiles($query, $limit))['files'] ?? [];
 
         return array_values(array_filter(is_array($files) ? $files : [], 'is_string'));
+    }
+
+    public function runGates(string $runId): void
+    {
+        $this->call(new RunGates(['run_id' => $runId]));
+    }
+
+    public function gateFixPrompt(string $gate, string $runId): string
+    {
+        return (string) ($this->call(new GetGateFixPrompt($gate, $runId))['prompt'] ?? '');
     }
 
     /**

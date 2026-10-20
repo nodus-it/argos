@@ -15,7 +15,8 @@
         async send() { if (await $wire.sendComments(this.comments)) { this.comments = []; } },
      }"
      x-intersect.once="$wire.load()"
-     x-init="window.addEventListener('argos-turn-completed', () => { stale = true; })">
+     x-init="window.addEventListener('argos-turn-completed', () => { stale = true; })"
+     x-on:argos-gates-updated.window="$wire.$refresh()">
 
     <div class="ws-frame-bar">
         @if ($diff)
@@ -30,6 +31,55 @@
             @svg('heroicon-o-arrow-path') {{ __('workspaces.review.refresh') }}
         </button>
     </div>
+
+    {{-- Quality gates --}}
+    <section class="ws-gates" @if ($gateRun?->status === \App\Enums\GateRunStatus::Running) wire:poll.10s @endif>
+        <div class="ws-row">
+            <strong>{{ __('workspaces.gates.title') }}</strong>
+            @if ($gateRun && $gateRun->status !== \App\Enums\GateRunStatus::Running)
+                <span class="badge {{ $gateRun->status === \App\Enums\GateRunStatus::Passed ? 'badge-success' : 'badge-failed' }}">{{ $gateRun->status->label() }}</span>
+                @if ($gateRun->gates)
+                    <span class="muted">{{ __('workspaces.gates.result', ['passed' => $gateRun->passedCount(), 'total' => count($gateRun->ranGates())]) }}</span>
+                @endif
+            @endif
+            <span class="ws-spacer"></span>
+            @if ($canWrite && $workspace->status === \App\Enums\WorkspaceStatus::Running)
+                <button type="button" class="btn btn-ghost btn-sm" wire:click="runGates" wire:loading.attr="disabled" @disabled($gateRun?->status === \App\Enums\GateRunStatus::Running)>
+                    @svg('heroicon-o-shield-check') {{ __('workspaces.gates.run') }}
+                </button>
+            @endif
+        </div>
+
+        @if (! $gateRun)
+            <p class="muted">{{ __('workspaces.gates.never') }}</p>
+        @elseif ($gateRun->status === \App\Enums\GateRunStatus::Running)
+            <p class="muted">{{ __('workspaces.gates.running') }}</p>
+        @elseif ($gateRun->status === \App\Enums\GateRunStatus::Error)
+            <p class="t-err">{{ $gateRun->message }}</p>
+        @else
+            <p class="muted">{{ __('workspaces.gates.baseline_'.($gateRun->baseline ?? 'missing')) }}</p>
+            <ul class="ws-gate-list">
+                @foreach ($gateRun->gates ?? [] as $gate => $result)
+                    <li x-data="{ open: {{ $result === 'fail' ? 'true' : 'false' }} }">
+                        <div class="ws-row">
+                            <span class="badge {{ ['pass' => 'badge-success', 'fail' => 'badge-failed'][$result] ?? 'badge-draft' }}">{{ __('workspaces.gates.'.$result) }}</span>
+                            <span class="mono">{{ $gate }}</span>
+                            <span class="ws-spacer"></span>
+                            @if (($gateRun->logs[$gate] ?? '') !== '')
+                                <button type="button" class="btn btn-ghost btn-sm" x-on:click="open = ! open">{{ __('workspaces.gates.log') }}</button>
+                            @endif
+                            @if ($result === 'fail' && $canWrite)
+                                <button type="button" class="btn btn-ghost btn-sm" wire:click="sendGateFix('{{ $gate }}')">@svg('heroicon-o-sparkles') {{ __('workspaces.gates.send_fix') }}</button>
+                            @endif
+                        </div>
+                        @if (($gateRun->logs[$gate] ?? '') !== '')
+                            <pre class="ws-gate-log" x-show="open" x-cloak>{{ $gateRun->logs[$gate] }}</pre>
+                        @endif
+                    </li>
+                @endforeach
+            </ul>
+        @endif
+    </section>
 
     {{-- Collected comments --}}
     @if ($canWrite)

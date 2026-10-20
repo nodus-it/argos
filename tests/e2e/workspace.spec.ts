@@ -85,4 +85,17 @@ test.describe('workspace pair programming', () => {
     await composer.press('Enter');
     await expect(composer).toHaveValue('look at @app/Http/Controllers/LoginController.php ');
   });
+
+  test('quality gates run from the composer and failures go to the agent', async ({ browser }) => {
+    const ada = await openWorkspace(browser, 'admin@argos.local');
+
+    await send(ada, '/gates');
+    const gates = ada.locator('.ws-gates');
+    await expect(gates).toBeVisible();
+    await expect(gates.locator('.ws-gate-list li')).toHaveCount(4, { timeout: 15_000 });
+    await expect(gates).toContainText('LoginTest');
+
+    await gates.locator('li', { hasText: 'pest' }).getByRole('button', { name: /agent/i }).click();
+    await expect(ada.locator('.ws-msg-user').last()).toContainText('Quality-Gate-Fix: pest', { timeout: 15_000 });
+  });
 });
