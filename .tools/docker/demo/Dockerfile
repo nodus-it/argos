@@ -57,6 +57,15 @@ COPY --from=node:22-bookworm /usr/local/lib/node_modules /usr/local/lib/node_mod
 RUN ln -sf /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
     && ln -sf /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
 
+# Workspace previews mount files owned by the workspace's agent user (uid
+# 1000) and run their setup commands as that user. php-fpm must then run as
+# the same uid or Laravel cannot write storage/ (500 on every request); the
+# deployer sets ARGOS_FPM_USER=argos for them. Task demos keep www-data.
+RUN groupadd --gid 1000 argos \
+    && useradd --uid 1000 --gid 1000 --no-create-home --shell /usr/sbin/nologin argos \
+    && printf '[www]\nuser = ${ARGOS_FPM_USER}\ngroup = ${ARGOS_FPM_USER}\n' > /usr/local/etc/php-fpm.d/zz-argos-user.conf
+ENV ARGOS_FPM_USER=www-data
+
 COPY .tools/docker/demo/nginx.conf /etc/nginx/sites-available/default
 COPY .tools/docker/demo/supervisord.conf /etc/supervisor/conf.d/demo.conf
 

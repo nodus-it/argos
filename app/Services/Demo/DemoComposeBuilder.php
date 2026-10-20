@@ -74,7 +74,12 @@ class DemoComposeBuilder
                         // seed the full demo profile instead of the production-safe
                         // admin-only seed. Harmless for any other repo.
                         'ARGOS_DEMO' => '1',
-                    ]),
+                    ], $target->demoExecUser() !== null ? [
+                        // Serve as the user that owns the mounted files (see
+                        // .tools/docker/demo/Dockerfile); otherwise Laravel
+                        // cannot write storage/ and every request 500s.
+                        'ARGOS_FPM_USER' => 'argos',
+                    ] : []),
                     'volumes' => [
                         $target->workspaceVolumeName().':'.$entry['workspace_mount'],
                     ],
