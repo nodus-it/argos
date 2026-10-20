@@ -2,6 +2,8 @@ import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { open } from 'node:fs/promises';
 import { join } from 'node:path';
+import { strippedEnv } from './claudeEnv.js';
+import { CodedError } from './errors.js';
 import type { PendingEvent } from './events.js';
 
 /** Runs `run-gates.sh` with the given arguments. */
@@ -9,21 +11,30 @@ export type GateScript = (args: string[], timeoutMs: number) => Promise<{ code: 
 
 export type BaselineState = 'missing' | 'running' | 'ready' | 'failed';
 
-export class GatesBusyError extends Error {}
+export class GatesBusyError extends CodedError {
+    constructor(message: string) {
+        super(409, 'gates_running', message);
+    }
+}
+
+/** The gate script failed to answer a request (not a failing gate). */
+export class GateScriptError extends CodedError {
+    constructor(message: string) {
+        super(502, 'gates_failed', message);
+    }
+}
+
+/** Gate names as `run-gates.sh` reports them. */
+export const GATE_NAME_PATTERN = /^[a-z_]{1,32}$/;
 
 const RUN_TIMEOUT_MS = 30 * 60_000;
 const BASELINE_TIMEOUT_MS = 30 * 60_000;
 const LOG_TAIL_BYTES = 8 * 1024;
 const GATE_RESULTS = new Set(['pass', 'fail', 'skip']);
 
-/** Environment for the gate script: never the daemon's or anyone's tokens. */
-const STRIPPED_ENV = ['ARGOS_DAEMON_TOKEN', 'ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'CLAUDE_CODE_OAUTH_TOKEN'];
-
 export function scriptRunner(script: string, cwd: string): GateScript {
-    const env = { ...process.env };
-    for (const key of STRIPPED_ENV) {
-        delete env[key];
-    }
+    // Never the daemon's or anyone's tokens.
+    const env = strippedEnv();
 
     return (args, timeoutMs) =>
         new Promise((resolve) => {
@@ -72,10 +83,13 @@ export class GateRunner {
         );
     }
 
-    /** Start a run; throws GatesBusyError while another one is active. */
+    /** Start a run; throws GatesBusyError while another run or the baseline capture is active. */
     start(runId: string): Promise<void> {
         if (this.current !== null) {
             throw new GatesBusyError(`Gate run ${this.current} is still running`);
+        }
+        if (this.baselineState === 'running') {
+            throw new GatesBusyError('The quality-gate baseline is still being captured');
         }
         this.current = runId;
         this.emit({ type: 'gates.started', data: { run_id: runId, baseline: this.baselineState } });
@@ -88,7 +102,7 @@ export class GateRunner {
     async fixPrompt(gate: string, runId: string): Promise<string> {
         const { code, stdout, stderr } = await this.script(['--fix-prompt', gate, runId], 30_000);
         if (code !== 0) {
-            throw new Error(stderr.trim() || `run-gates.sh exited with ${code}`);
+            throw new GateScriptError(stderr.trim() || `run-gates.sh exited with ${code}`);
         }
 
         return stdout;
@@ -144,7 +158,7 @@ export function parseGates(stdout: string): Record<string, string> | null {
         }
         const gates: Record<string, string> = {};
         for (const [gate, result] of Object.entries(parsed)) {
-            if (typeof result !== 'string' || !GATE_RESULTS.has(result) || !/^[a-z_]{1,32}$/.test(gate)) {
+            if (typeof result !== 'string' || !GATE_RESULTS.has(result) || !GATE_NAME_PATTERN.test(gate)) {
                 return null;
             }
             gates[gate] = result;

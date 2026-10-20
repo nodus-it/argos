@@ -39,6 +39,17 @@ describe('InputQueue', () => {
         expect(queue.size).toBe(0);
     });
 
+    it('keeps untaken items for drain() when the consumer stops', async () => {
+        const queue = new InputQueue<string>();
+        const iterator = queue.iterable()[Symbol.asyncIterator]();
+        queue.push('a');
+        queue.push('b');
+        expect((await iterator.next()).value).toBe('a');
+        await iterator.return?.();
+        expect(queue.isClosed).toBe(true);
+        expect(queue.drain()).toEqual(['b']);
+    });
+
     it('allows only one consumer', () => {
         const queue = new InputQueue<string>();
         queue.iterable();

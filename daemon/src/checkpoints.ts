@@ -1,8 +1,10 @@
-import { copyFile, mkdtemp, rm, unlink } from 'node:fs/promises';
+import { copyFile, mkdtemp, rm, stat, unlink, utimes } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join, normalize } from 'node:path';
+import { CodedError } from './errors.js';
 import { truncateUtf8 } from './events.js';
 import { git, GitError } from './git.js';
+import { ID_CHARS, ID_PATTERN } from './ids.js';
 
 export const CHECKPOINT_PREFIX = 'refs/argos/checkpoints';
 
@@ -18,12 +20,11 @@ export interface Checkpoint {
     label: string;
 }
 
-export class CheckpointError extends Error {
-    constructor(
-        readonly code: string,
-        message: string,
-    ) {
-        super(message);
+export type CheckpointErrorCode = 'invalid_thread' | 'invalid_ref' | 'unknown_checkpoint';
+
+export class CheckpointError extends CodedError {
+    constructor(code: CheckpointErrorCode, message: string) {
+        super(code === 'unknown_checkpoint' ? 404 : 422, code, message);
     }
 }
 
@@ -34,7 +35,7 @@ const AUTHOR_ENV = {
     GIT_COMMITTER_EMAIL: 'checkpoints@argos.invalid',
 };
 
-const REF_PATTERN = /^refs\/argos\/checkpoints\/([A-Za-z0-9_-]{1,64})\/(\d{1,9})$/;
+const REF_PATTERN = new RegExp(`^${CHECKPOINT_PREFIX}/(${ID_CHARS})/(\\d{1,9})$`);
 
 /**
  * Per-turn snapshots of the working tree (index + files, untracked but not
@@ -91,8 +92,9 @@ export class CheckpointStore {
         parseRef(ref);
 
         return this.serial(async () => {
+            const target = await this.treeOf(ref);
             const current = await this.snapshotTree();
-            const diff = (await this.git(['diff', '--no-color', '--find-renames', `${ref}^{tree}`, current])).stdout;
+            const diff = (await this.git(['diff', '--no-color', '--find-renames', target, current])).stdout;
             const bounded = truncateUtf8(diff, maxBytes);
 
             return { diff: bounded.text, truncated: bounded.truncated, head: await this.head() };
@@ -110,7 +112,7 @@ export class CheckpointStore {
     }
 
     private async createNow(threadId: string, label: string): Promise<Checkpoint> {
-        if (!/^[A-Za-z0-9_-]{1,64}$/.test(threadId)) {
+        if (!ID_PATTERN.test(threadId)) {
             throw new CheckpointError('invalid_thread', 'Invalid thread id');
         }
         const existing = await this.list(threadId);
@@ -135,7 +137,7 @@ export class CheckpointStore {
         try {
             const gitDir = (await this.git(['rev-parse', '--absolute-git-dir'])).stdout.trim();
             // Start from the real index: keeps staged state and its stat cache.
-            await copyFile(join(gitDir, 'index'), index).catch(() => {});
+            await copyIndex(join(gitDir, 'index'), index);
             await this.git(['add', '-A'], { GIT_INDEX_FILE: index });
 
             return (await this.git(['write-tree'], { GIT_INDEX_FILE: index })).stdout.trim();
@@ -194,6 +196,21 @@ export function parseRef(ref: string): { threadId: string; n: number } {
     }
 
     return { threadId: match[1]!, n: Number(match[2]) };
+}
+
+/**
+ * Copy an index file keeping its mtime. Git treats entries modified in the
+ * same timestamp tick as the index as "racily clean" and re-hashes them; a
+ * fresh mtime on the copy would make a same-size edit look unchanged.
+ */
+async function copyIndex(from: string, to: string): Promise<void> {
+    try {
+        const { atime, mtime } = await stat(from);
+        await copyFile(from, to);
+        await utimes(to, atime, mtime);
+    } catch {
+        // No index yet (fresh repo): `git add` builds one.
+    }
 }
 
 function isInside(path: string): boolean {

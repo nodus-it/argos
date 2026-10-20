@@ -1,3 +1,4 @@
+import { CodedError } from './errors.js';
 import { ulid } from './ulid.js';
 
 export type ApprovalKind = 'tool' | 'plan' | 'question';
@@ -14,9 +15,9 @@ interface PendingApproval {
     resolve: (decision: ApprovalDecision) => void;
 }
 
-export class UnknownApprovalError extends Error {
+export class UnknownApprovalError extends CodedError {
     constructor(approvalId: string) {
-        super(`Unknown approval ${approvalId}`);
+        super(404, 'unknown_approval', `Unknown approval ${approvalId}`);
     }
 }
 
@@ -73,15 +74,15 @@ export class ApprovalRegistry {
         entry.resolve(decision);
     }
 
-    /** Deny every open request of a thread; returns the affected ids. */
-    cancelThread(threadId: string, message: string, interrupt: boolean): string[] {
+    /** Deny (and interrupt) every open request of a thread; returns the affected ids. */
+    cancelThread(threadId: string, message: string): string[] {
         const cancelled: string[] = [];
         for (const [approvalId, entry] of this.pending) {
             if (entry.threadId !== threadId) {
                 continue;
             }
             this.pending.delete(approvalId);
-            entry.resolve({ decision: 'deny', message, interrupt });
+            entry.resolve({ decision: 'deny', message, interrupt: true });
             cancelled.push(approvalId);
         }
 

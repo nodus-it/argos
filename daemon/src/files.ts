@@ -28,10 +28,6 @@ export class FileIndex {
             .map((entry) => entry.path);
     }
 
-    invalidate(): void {
-        this.cache = null;
-    }
-
     private async files(): Promise<string[]> {
         if (this.cache !== null && this.cache.until > this.now()) {
             return this.cache.files;

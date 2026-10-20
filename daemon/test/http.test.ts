@@ -141,6 +141,11 @@ describe('daemon HTTP API', () => {
         expect(empty.statusCode).toBe(409);
         expect(empty.json().error.code).toBe('no_changes');
 
+        // No `origin` remote: git fails and the daemon answers 502 with a classified code.
+        const fetchFailed = await app.inject({ method: 'POST', url: '/git/fetch', headers: auth });
+        expect(fetchFailed.statusCode).toBe(502);
+        expect(fetchFailed.json().error).toMatchObject({ code: 'unknown', message: 'git fetch failed' });
+
         const oneshot = await app.inject({ method: 'POST', url: '/oneshot', headers: auth, payload: { agent_id: 'a', oauth_token: 't', model: 'm', system_prompt: 's', user_prompt: 'u' } });
         expect(oneshot.statusCode).toBe(501);
         outbox.stop();
@@ -173,6 +178,12 @@ describe('daemon HTTP API', () => {
         expect(busy.statusCode).toBe(409);
         expect(busy.json().error.code).toBe('thread_running');
 
+        // Another thread's checkpoint: the restore would still rewrite t1's working tree.
+        const other = await app.inject({ method: 'POST', url: '/checkpoints', headers: auth, payload: { thread_id: 't2' } });
+        const otherBusy = await app.inject({ method: 'POST', url: '/checkpoints/restore', headers: auth, payload: { ref: other.json().ref } });
+        expect(otherBusy.statusCode).toBe(409);
+        expect(otherBusy.json().error.code).toBe('thread_running');
+
         release();
         await waitFor(() => events().some((e) => e.type === 'turn.completed'));
         const preview = await app.inject({ method: 'GET', url: `/checkpoints/diff?ref=${encodeURIComponent(String(created.data.ref))}`, headers: auth });
@@ -191,6 +202,9 @@ describe('daemon HTTP API', () => {
 
         expect((await app.inject({ method: 'POST', url: '/checkpoints/restore', headers: auth, payload: { ref: 'refs/heads/main' } })).statusCode).toBe(422);
         expect((await app.inject({ method: 'POST', url: '/checkpoints/restore', headers: auth, payload: { ref: 'refs/argos/checkpoints/t1/99' } })).statusCode).toBe(404);
+        const unknownDiff = await app.inject({ method: 'GET', url: `/checkpoints/diff?ref=${encodeURIComponent('refs/argos/checkpoints/t1/99')}`, headers: auth });
+        expect(unknownDiff.statusCode).toBe(404);
+        expect(unknownDiff.json().error.code).toBe('unknown_checkpoint');
         await app.inject({ method: 'POST', url: '/threads/t1/stop', headers: auth });
         outbox.stop();
     });

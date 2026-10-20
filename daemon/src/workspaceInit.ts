@@ -1,5 +1,6 @@
 import { appendFileSync, existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { CodedError } from './errors.js';
 import { classifyGitError, git, GitError } from './git.js';
 
 export interface WorkspaceInitParams {
@@ -10,12 +11,9 @@ export interface WorkspaceInitParams {
     gitUserEmail: string;
 }
 
-export class WorkspaceInitError extends Error {
-    constructor(
-        readonly code: string,
-        message: string,
-    ) {
-        super(message);
+export class WorkspaceInitError extends CodedError {
+    constructor(code: string, message: string) {
+        super(422, code, message);
     }
 }
 

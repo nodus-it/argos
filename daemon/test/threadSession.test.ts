@@ -229,6 +229,57 @@ describe('ThreadSession', () => {
         await session.stop();
     });
 
+    it('keeps a message queued during an interrupted turn for the resumed query', async () => {
+        const script: Script = async function* (message) {
+            if (textOfUserMessage(message).includes('long')) {
+                await new Promise((r) => setTimeout(r, 30));
+            }
+            yield assistantText('m', `reply ${textOfUserMessage(message)}`);
+        };
+        const { session, queries } = make(script, {}, (q) => {
+            q.endAfterInterrupt = true;
+        });
+        session.start();
+        session.send({ clientMsgId: 'm1', author: { id: 1, name: 'A' }, text: 'long' });
+        await waitFor(() => session.currentState === 'running');
+        // Not taken yet: the SDK pulls the next message only after the turn.
+        session.send({ clientMsgId: 'm2', author: { id: 1, name: 'A' }, text: 'queued' });
+        await session.interrupt();
+
+        await waitFor(() => queries.length === 2);
+        await waitFor(() => ofType('assistant.message').some((e) => e.data.text === 'reply [A]: queued'));
+        await session.stop();
+    });
+
+    it('reports only the failing query\'s stderr', async () => {
+        const script: Script = async function* (message, ctx) {
+            const text = textOfUserMessage(message);
+            if (text.includes('long')) {
+                ctx.options.stderr?.('stale noise from the first query\n');
+                await new Promise((r) => setTimeout(r, 30));
+            }
+            if (text.includes('crash')) {
+                ctx.options.stderr?.('fresh failure\n');
+                throw new Error('boom');
+            }
+            yield assistantText('m', 'ok');
+        };
+        const { session, queries } = make(script, {}, (q) => {
+            q.endAfterInterrupt = true;
+        });
+        session.start();
+        session.send({ clientMsgId: 'm1', author: { id: 1, name: 'A' }, text: 'long' });
+        await waitFor(() => session.currentState === 'running');
+        await session.interrupt();
+        await waitFor(() => queries.length === 2);
+        session.send({ clientMsgId: 'm2', author: { id: 1, name: 'A' }, text: 'crash' });
+
+        await waitFor(() => session.currentState === 'closed');
+        const message = String(ofType('error')[0]!.data.message);
+        expect(message).toContain('fresh failure');
+        expect(message).not.toContain('stale noise');
+    });
+
     it('passes resume and reports a crash as session_failed', async () => {
         const crashing: Script = async function* () {
             throw new Error("You've hit your limit · resets 9pm (UTC)");

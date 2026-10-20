@@ -47,6 +47,7 @@ async function main(): Promise<void> {
     const port = Number(process.env.ARGOS_DAEMON_PORT ?? '7777');
     const credentialPort = Number(process.env.ARGOS_CREDENTIAL_PORT ?? '7778');
     const claudeBin = process.env.ARGOS_CLAUDE_BIN || undefined;
+    const workspaceDir = process.env.ARGOS_WORKSPACE_DIR ?? '/workspace';
 
     const outbox = new Outbox(
         async (batch) => {
@@ -72,13 +73,13 @@ async function main(): Promise<void> {
         outbox,
         queryFactory,
         environment: {
-            workspaceDir: process.env.ARGOS_WORKSPACE_DIR ?? '/workspace',
+            workspaceDir,
             agentsDir: process.env.ARGOS_AGENTS_DIR ?? '/home/agent/.claude-agents',
             claudeBin,
         },
         credentialHelper: process.env.ARGOS_CREDENTIAL_HELPER ?? '/opt/argos/bin/git-credential-argos',
         oneshotRunner: (params) => query(params) as unknown as AsyncIterable<SdkMessageLike>,
-        gateScript: scriptRunner(process.env.ARGOS_GATES_SCRIPT ?? '/opt/argos/bin/run-gates.sh', process.env.ARGOS_WORKSPACE_DIR ?? '/workspace'),
+        gateScript: scriptRunner(process.env.ARGOS_GATES_SCRIPT ?? '/opt/argos/bin/run-gates.sh', workspaceDir),
         versions: { sdk: sdkVersion(), claude: claudeVersion(claudeBin) },
     });
 

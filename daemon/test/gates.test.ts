@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { EventBatch, PendingEvent } from '../src/events.js';
-import { GateRunner, GatesBusyError, parseGates, type GateScript } from '../src/gates.js';
+import { GateRunner, GateScriptError, GatesBusyError, parseGates, type GateScript } from '../src/gates.js';
 import { buildApp } from '../src/http.js';
 import { Outbox } from '../src/outbox.js';
 import { fakeFactory, waitFor } from './fakeQuery.js';
@@ -71,6 +71,26 @@ describe('quality gates', () => {
         release();
         await first;
         expect(gates.running).toBeNull();
+    });
+
+    it('refuses a run while the baseline is being captured', async () => {
+        let release!: () => void;
+        const gate = new Promise<void>((resolve) => (release = resolve));
+        const gates = runner(fakeScript({ '--baseline': async () => { await gate; return { code: 0, stdout: '', stderr: '' }; } }));
+
+        const baseline = gates.startBaseline();
+        expect(() => gates.start('r1')).toThrow(GatesBusyError);
+        release();
+        await baseline;
+        await gates.start('r1');
+        expect(gates.running).toBeNull();
+    });
+
+    it('reports a failed fix-prompt request as a gate script error', async () => {
+        const gates = runner(fakeScript({ '--fix-prompt': async () => ({ code: 2, stdout: '', stderr: 'no such gate' }) }));
+
+        await expect(gates.fixPrompt('pest', 'r1')).rejects.toMatchObject({ status: 502, code: 'gates_failed', message: 'no such gate' });
+        expect(new GateScriptError('x')).toBeInstanceOf(Error);
     });
 
     it('reports a failed run with the script error', async () => {

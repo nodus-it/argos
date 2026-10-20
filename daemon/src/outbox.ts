@@ -133,7 +133,9 @@ export class Outbox {
             return;
         }
         if (this.timer !== null) {
-            if (delayMs > 0) {
+            // A pending timer wins over a later one, and a retry backoff is
+            // never cut short by new events.
+            if (delayMs > 0 || this.failures > 0) {
                 return;
             }
             clearTimeout(this.timer);

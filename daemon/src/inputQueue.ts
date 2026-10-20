@@ -41,21 +41,25 @@ export class InputQueue<T> {
 
     /** End the iterable. Items still queued are dropped. */
     close(): void {
-        this.closed = true;
+        this.end();
         this.items.length = 0;
+    }
+
+    /**
+     * Drain queued (not yet taken) items, e.g. to hand them to the
+     * replacement query after an interrupt ended the previous one.
+     */
+    drain(): T[] {
+        return this.items.splice(0, this.items.length);
+    }
+
+    private end(): void {
+        this.closed = true;
         if (this.waiter !== null) {
             const resolve = this.waiter;
             this.waiter = null;
             resolve({ value: undefined, done: true });
         }
-    }
-
-    /**
-     * Drain queued (not yet taken) items, e.g. to hand them to a replacement
-     * session after a crash.
-     */
-    drain(): T[] {
-        return this.items.splice(0, this.items.length);
     }
 
     iterable(): AsyncIterable<T> {
@@ -81,8 +85,10 @@ export class InputQueue<T> {
                         this.waiter = resolve;
                     });
                 },
+                // The consumer stopped (e.g. the query ended): no more takes,
+                // but untaken items stay available to `drain()`.
                 return: (): Promise<IteratorResult<T>> => {
-                    this.close();
+                    this.end();
 
                     return Promise.resolve({ value: undefined, done: true });
                 },

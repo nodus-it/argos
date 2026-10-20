@@ -1,8 +1,7 @@
-import { mkdirSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
-import { join } from 'node:path';
 import type { Options, PermissionMode, PermissionResult, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 import { ApprovalRegistry } from './approvals.js';
+import { applyClaudeBin, claudeChildEnv, type SessionEnvironment } from './claudeEnv.js';
 import type { EventSink, PendingEvent, ThreadState } from './events.js';
 import { InputQueue } from './inputQueue.js';
 import { mapCommands, mapModels, Normalizer, type SdkMessageLike } from './normalize.js';
@@ -33,13 +32,7 @@ export interface ThreadStartParams {
     appendSystemPrompt?: string;
 }
 
-export interface SessionEnvironment {
-    workspaceDir: string;
-    agentsDir: string;
-    claudeBin?: string;
-    /** Base environment for the claude child process (defaults to process.env). */
-    baseEnv?: NodeJS.ProcessEnv;
-}
+export type { SessionEnvironment } from './claudeEnv.js';
 
 export interface MessageImage {
     media_type: string;
@@ -57,9 +50,6 @@ interface QueuedMessage {
     clientMsgId: string;
     message: SDKUserMessage;
 }
-
-/** Variables the claude child must never inherit. */
-const STRIPPED_ENV = ['ARGOS_DAEMON_TOKEN', 'ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'CLAUDE_CODE_OAUTH_TOKEN', 'CLAUDE_CONFIG_DIR'];
 
 /** How long after an interrupt an ended query counts as "ended by the interrupt". */
 const INTERRUPT_RESTART_WINDOW_MS = 30_000;
@@ -106,16 +96,8 @@ export class ThreadSession {
         return this.claudeSessionId;
     }
 
-    /** Resolves when the SDK loop has ended (tests, shutdown). */
-    get finished(): Promise<void> {
-        return this.loop ?? Promise.resolve();
-    }
-
+    /** Launch the SDK query; call once per session. */
     start(): void {
-        if (this.query !== null) {
-            return;
-        }
-        this.stopped = false;
         this.setState('starting');
         this.launch();
     }
@@ -148,7 +130,7 @@ export class ThreadSession {
 
     async interrupt(): Promise<void> {
         this.lastInterruptAt = Date.now();
-        for (const approvalId of this.approvals.cancelThread(this.threadId, 'Interrupted by user', true)) {
+        for (const approvalId of this.approvals.cancelThread(this.threadId, 'Interrupted by user')) {
             this.emit({ type: 'approval.cancelled', data: { approval_id: approvalId, reason: 'interrupted' } });
         }
         await this.query?.interrupt();
@@ -167,7 +149,7 @@ export class ThreadSession {
     /** Close the session for good. */
     async stop(): Promise<void> {
         this.stopped = true;
-        for (const approvalId of this.approvals.cancelThread(this.threadId, 'Session closed', true)) {
+        for (const approvalId of this.approvals.cancelThread(this.threadId, 'Session closed')) {
             this.emit({ type: 'approval.cancelled', data: { approval_id: approvalId, reason: 'closed' } });
         }
         this.queue.close();
@@ -184,15 +166,9 @@ export class ThreadSession {
     }
 
     private launch(): void {
-        const configDir = join(this.environment.agentsDir, this.params.agentId);
-        mkdirSync(configDir, { recursive: true });
-
-        const env: Record<string, string | undefined> = { ...(this.environment.baseEnv ?? process.env) };
-        for (const key of STRIPPED_ENV) {
-            delete env[key];
-        }
-        env.CLAUDE_CODE_OAUTH_TOKEN = this.params.oauthToken;
-        env.CLAUDE_CONFIG_DIR = configDir;
+        const env = claudeChildEnv(this.environment, this.params.agentId, this.params.oauthToken);
+        // Only this query's stderr belongs in its failure report.
+        this.stderrTail = [];
 
         const queue = this.queue;
         const beforeTurn = this.beforeTurn;
@@ -218,9 +194,7 @@ export class ThreadSession {
             env,
             stderr: (data: string) => this.captureStderr(data),
         };
-        if (this.environment.claudeBin !== undefined && this.environment.claudeBin !== '') {
-            options.pathToClaudeCodeExecutable = this.environment.claudeBin;
-        }
+        applyClaudeBin(options, this.environment);
         if (this.claudeSessionId !== null) {
             options.resume = this.claudeSessionId;
         }
@@ -265,8 +239,8 @@ export class ThreadSession {
             this.emit({ type: 'usage_limit', data: { resets_at: extractResetAt(detail) } });
         }
         this.emit({ type: 'error', data: { code: failure === null ? 'session_ended' : 'session_failed', message: detail.slice(0, 4000) } });
+        // A closed session is never relaunched: the HTTP layer starts a new one.
         this.queue.close();
-        this.queue = this.newQueue();
         this.setState('closed');
     }
 

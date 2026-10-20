@@ -1,6 +1,6 @@
-import { execFile } from 'node:child_process';
+import { CodedError } from './errors.js';
 import { truncateUtf8 } from './events.js';
-import { git, GitError } from './git.js';
+import { AUTH_FAILURE, git, GitError, gitUnchecked, NETWORK_FAILURE } from './git.js';
 
 export interface GitStatus {
     branch: string | null;
@@ -78,15 +78,8 @@ export async function diffAgainst(dir: string, base: string, maxBytes = 512 * 10
 }
 
 /** Diff of one untracked file against /dev/null (`--no-index` exits 1 on differences). */
-function untrackedDiff(dir: string, path: string): Promise<string> {
-    return new Promise((resolve) => {
-        execFile(
-            'git',
-            ['diff', '--no-color', '--no-index', '--', '/dev/null', path],
-            { cwd: dir, maxBuffer: 16 * 1024 * 1024, env: { ...process.env, LC_ALL: 'C', GIT_TERMINAL_PROMPT: '0' } },
-            (_error, stdout) => resolve(String(stdout)),
-        );
-    });
+async function untrackedDiff(dir: string, path: string): Promise<string> {
+    return (await gitUnchecked(['diff', '--no-color', '--no-index', '--', '/dev/null', path], dir)).stdout;
 }
 
 export async function fetch(dir: string): Promise<void> {
@@ -109,12 +102,12 @@ export async function commit(dir: string, subject: string, body: string, author:
 
 export type PushFailure = 'rejected_non_fast_forward' | 'auth' | 'network' | 'unknown';
 
-export class PushError extends Error {
+export class PushError extends CodedError {
     constructor(
-        readonly code: PushFailure,
+        override readonly code: PushFailure,
         message: string,
     ) {
-        super(message);
+        super(409, code, message);
     }
 }
 
@@ -123,10 +116,10 @@ export function classifyPushError(stderr: string): PushFailure {
     if (/non-fast-forward|fetch first|\[rejected\]|updates were rejected/.test(text)) {
         return 'rejected_non_fast_forward';
     }
-    if (/authentication failed|could not read username|permission|access denied|403|401|terminal prompts disabled/.test(text)) {
+    if (AUTH_FAILURE.test(text)) {
         return 'auth';
     }
-    if (/could not resolve host|connection timed out|connection refused|network is unreachable|failed to connect/.test(text)) {
+    if (NETWORK_FAILURE.test(text)) {
         return 'network';
     }
 

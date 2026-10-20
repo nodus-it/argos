@@ -83,6 +83,30 @@ describe('Outbox', () => {
         outbox.stop();
     });
 
+    it('does not cut the retry backoff short when more events arrive', async () => {
+        let calls = 0;
+        const outbox = new Outbox(async () => {
+            calls++;
+            throw new Error('down');
+        }, { flushMaxEvents: 3, maxBackoffMs: 10_000 });
+        for (let i = 0; i < 3; i++) {
+            outbox.push('t1', { type: 'assistant.delta', data: { i } });
+        }
+        await vi.advanceTimersByTimeAsync(0);
+        expect(calls).toBe(1);
+
+        // Still above the size threshold, but within the 250 ms backoff.
+        for (let i = 0; i < 10; i++) {
+            outbox.push('t1', { type: 'assistant.delta', data: { i } });
+            await vi.advanceTimersByTimeAsync(10);
+        }
+        expect(calls).toBe(1);
+
+        await vi.advanceTimersByTimeAsync(200);
+        expect(calls).toBe(2);
+        outbox.stop();
+    });
+
     it('keeps events the manager did not acknowledge yet', async () => {
         const outbox = new Outbox(async () => ({ t1: 1 }));
         outbox.push('t1', { type: 'status', data: {} });

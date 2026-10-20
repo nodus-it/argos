@@ -1,6 +1,6 @@
-import { mkdirSync } from 'node:fs';
-import { join } from 'node:path';
 import type { Options } from '@anthropic-ai/claude-agent-sdk';
+import { applyClaudeBin, claudeChildEnv, type SessionEnvironment } from './claudeEnv.js';
+import { CodedError } from './errors.js';
 import type { SdkMessageLike } from './normalize.js';
 
 /** Runs a single, tool-less prompt (e.g. a commit message). */
@@ -21,9 +21,11 @@ export interface OneshotResult {
     cost_usd: number;
 }
 
-export class OneshotError extends Error {}
-
-const STRIPPED_ENV = ['ARGOS_DAEMON_TOKEN', 'ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'CLAUDE_CODE_OAUTH_TOKEN', 'CLAUDE_CONFIG_DIR'];
+export class OneshotError extends CodedError {
+    constructor(message: string) {
+        super(502, 'oneshot_failed', message);
+    }
+}
 
 /**
  * One prompt, no tools, no project settings, on the given agent's
@@ -33,17 +35,9 @@ const STRIPPED_ENV = ['ARGOS_DAEMON_TOKEN', 'ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH
 export async function runOneshot(
     runner: OneshotRunner,
     params: OneshotParams,
-    environment: { workspaceDir: string; agentsDir: string; claudeBin?: string; baseEnv?: NodeJS.ProcessEnv },
+    environment: SessionEnvironment,
 ): Promise<OneshotResult> {
-    const configDir = join(environment.agentsDir, params.agentId);
-    mkdirSync(configDir, { recursive: true });
-
-    const env: Record<string, string | undefined> = { ...(environment.baseEnv ?? process.env) };
-    for (const key of STRIPPED_ENV) {
-        delete env[key];
-    }
-    env.CLAUDE_CODE_OAUTH_TOKEN = params.oauthToken;
-    env.CLAUDE_CONFIG_DIR = configDir;
+    const env = claudeChildEnv(environment, params.agentId, params.oauthToken);
 
     const options: Options = {
         cwd: environment.workspaceDir,
@@ -59,9 +53,7 @@ export async function runOneshot(
     if (params.jsonSchema !== undefined) {
         options.outputFormat = { type: 'json_schema', schema: params.jsonSchema };
     }
-    if (environment.claudeBin !== undefined && environment.claudeBin !== '') {
-        options.pathToClaudeCodeExecutable = environment.claudeBin;
-    }
+    applyClaudeBin(options, environment);
 
     let result: SdkMessageLike | null = null;
     for await (const message of runner({ prompt: params.userPrompt, options })) {

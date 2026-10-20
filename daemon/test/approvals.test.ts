@@ -23,7 +23,7 @@ describe('ApprovalRegistry', () => {
         const a = registry.open('t1');
         const b = registry.open('t1');
         const c = registry.open('t2');
-        expect(registry.cancelThread('t1', 'Interrupted', true).sort()).toEqual([a.approvalId, b.approvalId].sort());
+        expect(registry.cancelThread('t1', 'Interrupted').sort()).toEqual([a.approvalId, b.approvalId].sort());
         await expect(a.decision).resolves.toEqual({ decision: 'deny', message: 'Interrupted', interrupt: true });
         expect(registry.has(c.approvalId)).toBe(true);
     });

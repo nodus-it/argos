@@ -1,17 +1,21 @@
 import { timingSafeEqual } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import { ApprovalRegistry, UnknownApprovalError } from './approvals.js';
+import { ApprovalRegistry } from './approvals.js';
+import { CodedError } from './errors.js';
+import { ID_PATTERN } from './ids.js';
 import type { Outbox } from './outbox.js';
 import { ThreadSession, USER_PERMISSION_MODES, type QueryFactory, type SessionEnvironment } from './threadSession.js';
-import { initWorkspace, WorkspaceInitError } from './workspaceInit.js';
+import { initWorkspace } from './workspaceInit.js';
 import * as gitOps from './gitOps.js';
 import { FileIndex } from './files.js';
-import { OneshotError, runOneshot, type OneshotRunner } from './oneshot.js';
-import { GateRunner, GatesBusyError, type GateScript } from './gates.js';
-import { CheckpointError, CheckpointStore, parseRef, type Checkpoint } from './checkpoints.js';
+import { runOneshot, type OneshotRunner } from './oneshot.js';
+import { GATE_NAME_PATTERN, GateRunner, type GateScript } from './gates.js';
+import { CheckpointStore, parseRef, type Checkpoint } from './checkpoints.js';
 
-export const DAEMON_VERSION = '0.1.0';
+/** The daemon's version, from package.json (one directory above src/ and dist/). */
+export const DAEMON_VERSION = (JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string }).version;
 
 export interface AppDependencies {
     daemonToken: string;
@@ -26,8 +30,14 @@ export interface AppDependencies {
 
 const permissionMode = z.enum(USER_PERMISSION_MODES);
 
+/** Thread, agent and run ids. */
+const idSchema = z.string().regex(ID_PATTERN);
+
+/** Checkpoint refs; the shape is checked by `parseRef`. */
+const checkpointRefSchema = z.string().max(200);
+
 const startSchema = z.object({
-    agent_id: z.string().min(1).max(64).regex(/^[A-Za-z0-9_-]+$/),
+    agent_id: idSchema,
     oauth_token: z.string().min(1),
     model: z.string().min(1),
     permission_mode: permissionMode,
@@ -60,8 +70,6 @@ const initSchema = z.object({
     git_user_email: z.string().min(1),
 });
 
-const threadIdSchema = z.string().min(1).max(64).regex(/^[A-Za-z0-9_-]+$/);
-
 const refSchema = z.string().min(1).max(255).regex(/^[A-Za-z0-9._\/-]+$/).refine((ref) => !ref.startsWith('-') && !ref.includes('..'), 'invalid ref');
 
 const commitSchema = z.object({
@@ -71,23 +79,13 @@ const commitSchema = z.object({
 });
 
 const oneshotSchema = z.object({
-    agent_id: z.string().min(1).max(64).regex(/^[A-Za-z0-9_-]+$/),
+    agent_id: idSchema,
     oauth_token: z.string().min(1),
     model: z.string().min(1),
     system_prompt: z.string().max(100_000),
     user_prompt: z.string().max(1_000_000),
     json_schema: z.record(z.string(), z.unknown()).optional(),
 });
-
-class HttpError extends Error {
-    constructor(
-        readonly status: number,
-        readonly code: string,
-        message: string,
-    ) {
-        super(message);
-    }
-}
 
 /**
  * The daemon's command API (manager → daemon). Every route requires the
@@ -108,7 +106,7 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
     };
     const gateRunner = (): GateRunner => {
         if (gates === null) {
-            throw new HttpError(501, 'gates_unavailable', 'Quality gates are not configured');
+            throw new CodedError(501, 'gates_unavailable', 'Quality gates are not configured');
         }
 
         return gates;
@@ -123,29 +121,11 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
     });
 
     app.setErrorHandler(async (error, _request, reply) => {
-        if (error instanceof HttpError) {
+        if (error instanceof CodedError) {
             return reply.code(error.status).send({ error: { code: error.code, message: error.message } });
         }
         if (error instanceof z.ZodError) {
             return reply.code(422).send({ error: { code: 'validation_failed', message: z.prettifyError(error) } });
-        }
-        if (error instanceof UnknownApprovalError) {
-            return reply.code(404).send({ error: { code: 'unknown_approval', message: error.message } });
-        }
-        if (error instanceof WorkspaceInitError) {
-            return reply.code(422).send({ error: { code: error.code, message: error.message } });
-        }
-        if (error instanceof gitOps.PushError) {
-            return reply.code(409).send({ error: { code: error.code, message: error.message } });
-        }
-        if (error instanceof CheckpointError) {
-            return reply.code(error.code === 'unknown_checkpoint' ? 404 : 422).send({ error: { code: error.code, message: error.message } });
-        }
-        if (error instanceof GatesBusyError) {
-            return reply.code(409).send({ error: { code: 'gates_running', message: error.message } });
-        }
-        if (error instanceof OneshotError) {
-            return reply.code(502).send({ error: { code: 'oneshot_failed', message: error.message } });
         }
         const status = typeof (error as { statusCode?: unknown }).statusCode === 'number' ? (error as { statusCode: number }).statusCode : 500;
 
@@ -153,10 +133,10 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
     });
 
     const sessionFor = (request: FastifyRequest): ThreadSession => {
-        const id = threadIdSchema.parse((request.params as { id?: string }).id);
+        const id = idSchema.parse((request.params as { id?: string }).id);
         const session = sessions.get(id);
         if (session === undefined) {
-            throw new HttpError(404, 'unknown_thread', `Thread ${id} is not running`);
+            throw new CodedError(404, 'unknown_thread', `Thread ${id} is not running`);
         }
 
         return session;
@@ -186,7 +166,7 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
     });
 
     app.post('/threads/:id/start', async (request) => {
-        const id = threadIdSchema.parse((request.params as { id?: string }).id);
+        const id = idSchema.parse((request.params as { id?: string }).id);
         const body = startSchema.parse(request.body);
 
         const existing = sessions.get(id);
@@ -221,7 +201,7 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
         const session = sessionFor(request);
         const body = messageSchema.parse(request.body);
         if (session.currentState === 'closed') {
-            throw new HttpError(409, 'thread_closed', 'Thread session is closed; start it again');
+            throw new CodedError(409, 'thread_closed', 'Thread session is closed; start it again');
         }
         const accepted = session.send({ clientMsgId: body.client_msg_id, author: body.author, text: body.text, images: body.images });
 
@@ -294,7 +274,7 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
         const body = commitSchema.parse(request.body);
         const result = await gitOps.commit(dir, body.subject, body.body, body.author);
         if (result === null) {
-            throw new HttpError(409, 'no_changes', 'Nothing to commit');
+            throw new CodedError(409, 'no_changes', 'Nothing to commit');
         }
 
         return reply.code(201).send(result);
@@ -308,7 +288,7 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
     });
 
     app.post('/checkpoints', async (request, reply) => {
-        const body = z.object({ thread_id: threadIdSchema, label: z.string().max(120).default('') }).parse(request.body);
+        const body = z.object({ thread_id: idSchema, label: z.string().max(120).default('') }).parse(request.body);
         const checkpoint = await checkpoints.create(body.thread_id, body.label);
         announceCheckpoint(body.thread_id, checkpoint, null);
 
@@ -316,17 +296,18 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
     });
 
     app.get('/checkpoints/diff', async (request) => {
-        const { ref } = z.object({ ref: z.string().max(200) }).parse(request.query);
+        const { ref } = z.object({ ref: checkpointRefSchema }).parse(request.query);
 
         return checkpoints.diff(ref);
     });
 
     app.post('/checkpoints/restore', async (request) => {
-        const { ref } = z.object({ ref: z.string().max(200) }).parse(request.body);
+        const { ref } = z.object({ ref: checkpointRefSchema }).parse(request.body);
         const { threadId } = parseRef(ref);
-        const state = sessions.get(threadId)?.currentState;
-        if (state === 'running' || state === 'starting' || state === 'waiting_input') {
-            throw new HttpError(409, 'thread_running', 'Claude is working in this thread; interrupt it first');
+        // A restore rewrites the whole working tree, so no thread may be working.
+        const busy = [...sessions.values()].find((s) => s.currentState === 'running' || s.currentState === 'starting' || s.currentState === 'waiting_input');
+        if (busy !== undefined) {
+            throw new CodedError(409, 'thread_running', busy.threadId === threadId ? 'Claude is working in this thread; interrupt it first' : `Claude is working in thread ${busy.threadId}; interrupt it first`);
         }
         const result = await checkpoints.restore(ref);
         announceCheckpoint(threadId, result.before, null);
@@ -337,14 +318,14 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
     app.get('/gates', async () => ({ running: gateRunner().running, baseline: gateRunner().baseline }));
 
     app.post('/gates/run', async (request, reply) => {
-        const { run_id: runId } = z.object({ run_id: threadIdSchema }).parse(request.body);
+        const { run_id: runId } = z.object({ run_id: idSchema }).parse(request.body);
         void gateRunner().start(runId);
 
         return reply.code(202).send({ run_id: runId });
     });
 
     app.get('/gates/fix-prompt', async (request) => {
-        const query = z.object({ gate: z.string().regex(/^[a-z_]{1,32}$/), run_id: threadIdSchema }).parse(request.query);
+        const query = z.object({ gate: z.string().regex(GATE_NAME_PATTERN), run_id: idSchema }).parse(request.query);
 
         return { prompt: await gateRunner().fixPrompt(query.gate, query.run_id) };
     });
@@ -352,7 +333,7 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
     app.post('/oneshot', async (request) => {
         const body = oneshotSchema.parse(request.body);
         if (deps.oneshotRunner === undefined) {
-            throw new HttpError(501, 'oneshot_unavailable', 'One-shot prompts are not configured');
+            throw new CodedError(501, 'oneshot_unavailable', 'One-shot prompts are not configured');
         }
 
         return runOneshot(
