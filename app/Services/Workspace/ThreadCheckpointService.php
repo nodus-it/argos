@@ -75,7 +75,7 @@ class ThreadCheckpointService
      */
     public function preview(ThreadCheckpoint $checkpoint, User $by): array
     {
-        Gate::forUser($by)->authorize('operate', $checkpoint->thread->workspace);
+        Gate::forUser($by)->authorize('update', $checkpoint->thread);
         $result = $this->call(fn () => $this->daemon->for($checkpoint->thread->workspace)->checkpointDiff($checkpoint->ref));
 
         return [
@@ -88,7 +88,7 @@ class ThreadCheckpointService
     public function restore(ThreadCheckpoint $checkpoint, User $by): void
     {
         $thread = $checkpoint->thread;
-        Gate::forUser($by)->authorize('operate', $thread->workspace);
+        Gate::forUser($by)->authorize('update', $thread);
         if ($thread->status->isBusy()) {
             throw WorkspaceException::translated('workspaces.checkpoints.busy');
         }
@@ -109,7 +109,7 @@ class ThreadCheckpointService
     /** `/checkpoint [name]`: a named snapshot, shown in the chat. */
     public function manual(Thread $thread, User $by, string $label): ThreadCheckpoint
     {
-        Gate::forUser($by)->authorize('operate', $thread->workspace);
+        Gate::forUser($by)->authorize('update', $thread);
         $label = mb_substr(trim($label), 0, 120);
         $raw = $this->call(fn () => $this->daemon->for($thread->workspace)->createCheckpoint($thread->id, $label));
         $checkpoint = $this->record($thread, $raw) ?? throw WorkspaceException::translated('workspaces.checkpoints.failed');
@@ -130,11 +130,10 @@ class ThreadCheckpointService
         try {
             return $call();
         } catch (DaemonTransportException $e) {
-            throw match ($e->errorCode) {
-                'thread_running' => WorkspaceException::translated('workspaces.checkpoints.busy'),
-                'unknown_checkpoint' => WorkspaceException::translated('workspaces.checkpoints.gone'),
-                default => WorkspaceException::translated('workspaces.errors.daemon_unreachable', ['message' => $e->getMessage()]),
-            };
+            throw WorkspaceException::fromDaemon($e, [
+                'thread_running' => 'workspaces.checkpoints.busy',
+                'unknown_checkpoint' => 'workspaces.checkpoints.gone',
+            ]);
         }
     }
 }

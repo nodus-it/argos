@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services\Workspace;
 
-use App\Enums\ThreadStatus;
 use App\Enums\WorkspaceStatus;
 use App\Events\Workspace\WorkspaceStarted;
 use App\Events\Workspace\WorkspaceStopped;
@@ -31,7 +30,7 @@ class WorkspaceProvisioner
         private readonly WorkspaceContainerManager $containers,
         private readonly WorkerSidecarManager $sidecars,
         private readonly WorkspaceDaemonClient $daemon,
-        private readonly AgentPool $pool,
+        private readonly ThreadService $threads,
         private readonly TraefikRouter $router,
     ) {}
 
@@ -61,7 +60,7 @@ class WorkspaceProvisioner
                 'git_user_email' => $creator !== null ? $creator->email : 'argos@localhost',
             ]);
         } catch (Throwable $e) {
-            $this->fail($workspace, $e);
+            $this->fail($workspace, $e, 'Workspace boot failed');
 
             throw $e;
         }
@@ -76,33 +75,33 @@ class WorkspaceProvisioner
         event(new WorkspaceStarted($workspace));
     }
 
-    /** Close open sessions, then stop the container and its sidecars. */
+    /**
+     * Close open sessions, then stop the container and its sidecars. A
+     * failure marks the workspace `failed` (never stuck in `stopping`).
+     */
     public function shutdown(Workspace $workspace): void
     {
-        $api = $this->daemon->for($workspace, 30);
-        Thread::query()->where('workspace_id', $workspace->id)->where('session_open', true)->get()
-            ->each(function (Thread $thread) use ($api): void {
-                try {
-                    $api->stopThread($thread->id);
-                } catch (DaemonTransportException) {
-                    // container already gone — the slot is released below anyway
-                }
-                $this->pool->release($thread);
-                $thread->forceFill(['status' => ThreadStatus::Closed])->save();
-            });
+        try {
+            Thread::query()->where('workspace_id', $workspace->id)->where('session_open', true)->get()
+                ->each(fn (Thread $thread) => $this->threads->close($thread));
 
-        app(WorkspacePreviewService::class)->stop($workspace);
-        $this->router->removeCodeRoute($workspace->slug);
-        $this->containers->stop($workspace);
-        $this->sidecars->stopWorkspaceContainers($workspace);
+            app(WorkspacePreviewService::class)->stop($workspace);
+            $this->router->removeCodeRoute($workspace->slug);
+            $this->containers->stop($workspace);
+            $this->sidecars->stopWorkspaceContainers($workspace);
+        } catch (Throwable $e) {
+            $this->fail($workspace, $e, 'Workspace shutdown failed');
+
+            throw $e;
+        }
 
         $workspace->forceFill(['status' => WorkspaceStatus::Stopped])->save();
         event(new WorkspaceStopped($workspace));
     }
 
-    private function fail(Workspace $workspace, Throwable $e): void
+    private function fail(Workspace $workspace, Throwable $e, string $logMessage): void
     {
-        Log::channel('argos')->warning('Workspace boot failed', ['workspace' => $workspace->slug, 'error' => $e->getMessage()]);
+        Log::channel('argos')->warning($logMessage, ['workspace' => $workspace->slug, 'error' => $e->getMessage()]);
 
         $message = $e instanceof DaemonTransportException && $e->errorCode !== null
             ? __('workspaces.errors.init_failed', ['code' => $e->errorCode, 'message' => $e->getMessage()])

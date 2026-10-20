@@ -13,8 +13,8 @@ use Illuminate\Http\Request;
 
 /**
  * Redirects to a workspace host (`code` → editor, `preview` → workspace
- * demo) with a freshly minted access ticket, so the iframe and the
- * "open in new tab" link never carry an expired one.
+ * demo) with a freshly minted access ticket, so the links in the workspace
+ * (opened in their own tab) never carry an expired one.
  */
 class WorkspaceOpenController extends Controller
 {
@@ -26,7 +26,7 @@ class WorkspaceOpenController extends Controller
         // The editor is a shell into the container: readers get the preview only.
         abort_if($target === 'code' && ! $user->can('operate', $workspace), 403);
 
-        $host = $target === 'code' ? TraefikRouter::codeKey($workspace->slug) : 'demo-'.$workspace->demoKey();
+        $host = $target === 'code' ? TraefikRouter::codeKey($workspace->slug) : $workspace->demoSlug();
         $url = $router->urlForSlug($host).'/';
         if ($target === 'code') {
             $url .= '?folder=/workspace&';

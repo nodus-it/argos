@@ -165,7 +165,13 @@ class Workspace extends Model implements DemoTarget
 
     public function demoSlug(): string
     {
-        return 'demo-'.$this->demoKey();
+        return self::demoSlugFor($this->slug);
+    }
+
+    /** Demo slug (= preview host label) for a workspace slug; works for orphans. */
+    public static function demoSlugFor(string $slug): string
+    {
+        return 'demo-ws-'.$slug;
     }
 
     public function workspaceVolumeName(): string

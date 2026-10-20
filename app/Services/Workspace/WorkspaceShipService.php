@@ -31,14 +31,14 @@ class WorkspaceShipService
         private readonly WorkspaceDaemonClient $daemon,
         private readonly AgentPool $pool,
         private readonly GitServiceFactory $git,
-        private readonly ThreadStreamPublisher $publisher,
+        private readonly ThreadService $threads,
         private readonly WorkspaceNotifier $notifier,
         private readonly WorkspaceIssueService $issues,
     ) {}
 
     /**
      * Draft a commit message. Falls back to an empty draft (the person
-     * writes it) when no agent is usable or Claude fails.
+     * writes it) when no agent is usable or Claude or the daemon fails.
      *
      * @return array{subject: string, body: string, changed_files: int, ahead: int}
      */
@@ -46,15 +46,17 @@ class WorkspaceShipService
     {
         Gate::forUser($by)->authorize('ship', $workspace);
         $api = $this->daemon->for($workspace, 120);
-        $status = $api->gitStatus();
-        $empty = ['subject' => '', 'body' => '', 'changed_files' => count($status['files']), 'ahead' => (int) $status['ahead']];
-
-        $agent = $this->pool->usableAgentsFor($by)->first();
-        if ($agent === null) {
-            return $empty;
-        }
+        $empty = ['subject' => '', 'body' => '', 'changed_files' => 0, 'ahead' => 0];
 
         try {
+            $status = $api->gitStatus();
+            $empty = [...$empty, 'changed_files' => count($status['files']), 'ahead' => (int) $status['ahead']];
+
+            $agent = $this->pool->usableAgentsFor($by)->first();
+            if ($agent === null) {
+                return $empty;
+            }
+
             $diff = $api->gitDiff('origin/'.$workspace->base_branch)['diff'];
             $result = $api->oneshot([
                 'agent_id' => $agent->id,
@@ -99,29 +101,37 @@ class WorkspaceShipService
             }
             $api->gitPush($workspace->branch);
         } catch (DaemonTransportException $e) {
-            throw match ($e->errorCode) {
-                'rejected_non_fast_forward' => WorkspaceException::translated('workspaces.ship.rejected'),
-                'auth' => WorkspaceException::translated('workspaces.ship.auth', ['message' => $e->getMessage()]),
-                default => WorkspaceException::translated('workspaces.errors.daemon_unreachable', ['message' => $e->getMessage()]),
-            };
+            throw WorkspaceException::fromDaemon($e, [
+                'rejected_non_fast_forward' => 'workspaces.ship.rejected',
+                'auth' => 'workspaces.ship.auth',
+            ]);
         }
 
         $profile = $workspace->repoProfile;
-        [$owner, $repo] = $this->ownerRepo($profile->getOwnerRepo());
-        $service = $this->git->fromRepoProfile($profile);
+        [$owner, $repo] = $profile->ownerAndRepo();
 
-        if ($workspace->pr_number === null) {
-            $raw = $service->createPullRequest($owner, $repo, $subject, $this->pullRequestBody($workspace, $body), $workspace->branch, $workspace->base_branch, ['draft' => $draft]);
-            $info = PullRequestInfo::from($profile->platform, $raw);
-            $workspace->forceFill([
-                'pr_url' => $info->url,
-                'pr_number' => $info->number,
-                'pr_state' => $info->state ?? 'open',
-                'pr_synced_at' => now(),
-            ]);
-            $this->issues->announcePullRequest($workspace, (string) $info->url);
-        } else {
-            $service->commentOnPullRequest($owner, $repo, $workspace->pr_number, __('workspaces.ship.pr_comment', ['subject' => $subject, 'name' => $by->name]));
+        // The branch is pushed by now; a provider failure leaves it there and
+        // shipping again retries only the pull request part.
+        try {
+            $service = $this->git->fromRepoProfile($profile);
+            if ($workspace->pr_number === null) {
+                $raw = $service->createPullRequest($owner, $repo, $subject, $this->pullRequestBody($workspace, $body), $workspace->branch, $workspace->base_branch, ['draft' => $draft]);
+                $info = PullRequestInfo::from($profile->platform, $raw);
+                $workspace->forceFill([
+                    'pr_url' => $info->url,
+                    'pr_number' => $info->number,
+                    'pr_state' => $info->state ?? 'open',
+                    'pr_synced_at' => now(),
+                ]);
+                // Never throws: tracker failures are only logged.
+                $this->issues->announcePullRequest($workspace, (string) $info->url);
+            } else {
+                $service->commentOnPullRequest($owner, $repo, $workspace->pr_number, __('workspaces.ship.pr_comment', ['subject' => $subject, 'name' => $by->name]));
+            }
+        } catch (Throwable $e) {
+            Log::channel('argos')->warning('Pull request step of ship failed', ['workspace' => $workspace->slug, 'error' => $e->getMessage()]);
+
+            throw WorkspaceException::translated('workspaces.ship.pr_failed', ['message' => $e->getMessage()]);
         }
 
         $workspace->forceFill(['shipped_at' => now()])->save();
@@ -139,7 +149,7 @@ class WorkspaceShipService
         }
 
         $profile = $workspace->repoProfile;
-        [$owner, $repo] = $this->ownerRepo($profile->getOwnerRepo());
+        [$owner, $repo] = $profile->ownerAndRepo();
         try {
             $info = PullRequestInfo::from($profile->platform, $this->git->fromRepoProfile($profile)->getPullRequest($owner, $repo, $workspace->pr_number));
         } catch (Throwable $e) {
@@ -166,19 +176,6 @@ class WorkspaceShipService
         }
 
         return trim($api->gitDiff('origin/'.$workspace->base_branch)['diff']) === '';
-    }
-
-    /**
-     * Split "owner/repo" (GitLab owners may contain subgroups).
-     *
-     * @return array{0: string, 1: string}
-     */
-    private function ownerRepo(string $ownerRepo): array
-    {
-        $parts = explode('/', $ownerRepo);
-        $repo = (string) array_pop($parts);
-
-        return [implode('/', $parts), $repo];
     }
 
     private function prompt(Workspace $workspace, string $diff): string
@@ -221,13 +218,7 @@ class WorkspaceShipService
     {
         $threads = Thread::query()->where('workspace_id', $workspace->id)->whereNull('archived_at')->get();
         foreach ($threads as $thread) {
-            $event = ThreadEvent::query()->create([
-                'thread_id' => $thread->id,
-                'type' => ThreadEventType::Notice,
-                'author_user_id' => $by->id,
-                'payload' => ['kind' => 'shipped', 'author_name' => $by->name, 'url' => $url],
-            ]);
-            $this->publisher->publish($workspace->id, $thread->id, [['type' => 'notice', 'event_id' => $event->id, 'data' => $event->payload]]);
+            $this->threads->notice($thread, 'shipped', $by, ['url' => $url]);
         }
     }
 }

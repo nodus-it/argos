@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Workspace;
 
+use App\Models\Workspace;
 use App\Services\Demo\DemoDeployer;
 use App\Services\Demo\TraefikRouter;
 use App\Services\Worker\WorkerSidecarManager;
@@ -27,7 +28,7 @@ class WorkspaceTeardown
         $this->router->removeCodeRoute($slug);
         $this->containers->removeBySlug($slug);
         $this->sidecars->purgeWorkspace($slug);
-        $this->demos->teardownBySlug('demo-ws-'.$slug);
+        $this->demos->teardownBySlug(Workspace::demoSlugFor($slug));
         $this->containers->removeVolumesBySlug($slug);
     }
 }

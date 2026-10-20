@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Workspace;
 
+use App\Enums\ThreadEventType;
 use App\Models\Thread;
 use App\Models\ThreadEvent;
 use App\Models\ThreadRead;
@@ -49,7 +50,7 @@ class ThreadReadService
                 ->where('thread_id', $thread->id)
                 ->where('id', '>', (int) ($reads[$thread->id] ?? 0))
                 ->where(fn ($q) => $q->whereNull('author_user_id')->orWhere('author_user_id', '!=', $user->id))
-                ->whereNotIn('type', ['tool_result', 'thinking', 'status_changed'])
+                ->whereNotIn('type', [ThreadEventType::ToolResult->value, ThreadEventType::Thinking->value, ThreadEventType::StatusChanged->value])
                 ->count();
         }
 

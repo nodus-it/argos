@@ -233,6 +233,20 @@ class RepoProfile extends Model implements HasApiTokensContract
     }
 
     /**
+     * `getOwnerRepo()` split into owner and repository name. The repository
+     * is the last segment; GitLab owners keep their subgroups.
+     *
+     * @return array{0: string, 1: string}
+     */
+    public function ownerAndRepo(): array
+    {
+        $parts = explode('/', $this->getOwnerRepo());
+        $repo = (string) array_pop($parts);
+
+        return [implode('/', $parts), $repo];
+    }
+
+    /**
      * Normalise repo URLs on save: trim whitespace and strip trailing slashes.
      * A trailing "/" survived in the URL otherwise leaks into
      * `https://api.github.com/repos/<owner>/<repo>//pulls` and the GitHub REST

@@ -51,9 +51,7 @@ class WorkspaceGateService
         } catch (DaemonTransportException $e) {
             $run->forceFill(['status' => GateRunStatus::Error, 'message' => $e->getMessage(), 'finished_at' => now()])->save();
 
-            throw $e->errorCode === 'gates_running'
-                ? WorkspaceException::translated('workspaces.gates.already_running')
-                : WorkspaceException::translated('workspaces.errors.daemon_unreachable', ['message' => $e->getMessage()]);
+            throw WorkspaceException::fromDaemon($e, ['gates_running' => 'workspaces.gates.already_running']);
         }
 
         return $run->refresh();
@@ -109,8 +107,16 @@ class WorkspaceGateService
     /** Ask the agent to fix a failed gate, with the worker's fix prompt. */
     public function sendFixToAgent(WorkspaceGateRun $run, Thread $thread, User $by, string $gate): void
     {
-        abort_unless($thread->workspace_id === $run->workspace_id && in_array($gate, $run->failedGates(), true), 404);
-        $prompt = $this->daemon->for($run->workspace)->gateFixPrompt($gate, $run->id);
+        Gate::forUser($by)->authorize('prompt', $thread);
+        if ($thread->workspace_id !== $run->workspace_id || ! in_array($gate, $run->failedGates(), true)) {
+            throw WorkspaceException::translated('workspaces.gates.no_prompt');
+        }
+
+        try {
+            $prompt = $this->daemon->for($run->workspace)->gateFixPrompt($gate, $run->id);
+        } catch (DaemonTransportException $e) {
+            throw WorkspaceException::fromDaemon($e);
+        }
         if (trim($prompt) === '') {
             throw WorkspaceException::translated('workspaces.gates.no_prompt');
         }

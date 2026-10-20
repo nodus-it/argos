@@ -34,9 +34,7 @@ class WorkspaceAccessTokens
 
     public function cookie(Workspace $workspace, User $user): string
     {
-        $hours = max(1, (int) config('argos.workspaces.editor_cookie_hours', 12));
-
-        return $this->sign('cookie', $workspace->id, $user->id, now()->getTimestamp() + $hours * 3600);
+        return $this->sign('cookie', $workspace->id, $user->id, now()->getTimestamp() + $this->cookieLifetimeSeconds());
     }
 
     public function cookieLifetimeSeconds(): int

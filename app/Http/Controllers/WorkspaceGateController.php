@@ -87,15 +87,17 @@ class WorkspaceGateController extends Controller
             $secure,
             true,
             false,
-            // Inside the Argos iframe the editor host is a third party on
-            // non-matching domains; that only works with SameSite=None+Secure.
+            // Requests from Argos pages to a workspace host on a different
+            // registrable domain are cross-site; with TLS allow them
+            // (SameSite=None needs Secure), otherwise fall back to Lax.
             $secure ? Cookie::SAMESITE_NONE : Cookie::SAMESITE_LAX,
         ));
     }
 
     private function deny(Request $request): Response
     {
-        // Inside an iframe a login redirect would render Argos within Argos.
+        // Argos no longer frames workspace hosts, but a host embedded
+        // elsewhere must not render the Argos login inside a frame.
         if ($request->header('Sec-Fetch-Dest') === 'iframe') {
             return response('', 401);
         }

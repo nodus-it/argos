@@ -291,6 +291,62 @@ class ThreadServiceTest extends TestCase
         $this->assertSame(ApprovalStatus::Cancelled, $approval->fresh()->status);
     }
 
+    public function test_an_undelivered_approval_decision_stays_pending(): void
+    {
+        $thread = $this->thread();
+        $approval = ThreadApproval::factory()->create(['thread_id' => $thread->id]);
+        $this->fakeDaemon([ResolveApproval::class => MockResponse::make(['error' => ['code' => 'internal_error', 'message' => 'boom']], 500)]);
+
+        try {
+            $this->service()->resolveApproval($approval, $this->owner, 'allow');
+            $this->fail('expected WorkspaceException');
+        } catch (WorkspaceException) {
+            $approval->refresh();
+            $this->assertSame(ApprovalStatus::Pending, $approval->status);
+            $this->assertNull($approval->resolved_by);
+        }
+
+        $this->fakeDaemon();
+        $this->assertTrue($this->service()->resolveApproval($approval->fresh(), $this->owner, 'allow'));
+    }
+
+    public function test_an_undelivered_message_is_removed_from_the_history(): void
+    {
+        $thread = $this->thread();
+        $this->service()->open($thread);
+        $this->fakeDaemon([SendMessage::class => MockResponse::make(['error' => ['code' => 'internal_error', 'message' => 'boom']], 500)]);
+
+        try {
+            $this->service()->send($thread, $this->owner, 'lost');
+            $this->fail('expected WorkspaceException');
+        } catch (WorkspaceException) {
+            $this->assertSame(0, ThreadEvent::query()->where('type', ThreadEventType::UserMessage->value)->count());
+        }
+    }
+
+    public function test_a_failed_retry_after_reopen_is_a_workspace_exception(): void
+    {
+        $thread = $this->thread();
+        $this->service()->open($thread);
+        $sends = 0;
+        Saloon::fake([
+            SendMessage::class => function () use (&$sends) {
+                return ++$sends === 1
+                    ? MockResponse::make(['error' => ['code' => 'unknown_thread', 'message' => 'gone']], 404)
+                    : MockResponse::make(['error' => ['code' => 'internal_error', 'message' => 'boom']], 500);
+            },
+            StartThread::class => MockResponse::make(['state' => 'starting']),
+        ]);
+
+        $this->expectException(WorkspaceException::class);
+        try {
+            $this->service()->send($thread, $this->owner, 'again');
+        } finally {
+            $this->assertSame(2, $sends);
+            $this->assertSame(0, ThreadEvent::query()->where('type', ThreadEventType::UserMessage->value)->count());
+        }
+    }
+
     public function test_close_stops_the_session_and_frees_the_slot(): void
     {
         $thread = $this->thread();

@@ -153,4 +153,21 @@ class WorkspaceProvisionerTest extends TestCase
         $this->assertSame(WorkspaceStatus::Stopped, $workspace->fresh()->status);
         $this->assertFileDoesNotExist($this->traefikDir.'/code-'.$workspace->slug.'.yml');
     }
+
+    public function test_a_failed_shutdown_marks_the_workspace_failed(): void
+    {
+        $this->bindDocker(function ($mock): void {
+            $mock->shouldReceive('stop')->once()->andThrow(new RuntimeException('docker stop failed'));
+        });
+        $this->mock(WorkspacePreviewService::class)->shouldReceive('stop')->once();
+        $workspace = Workspace::factory()->create(['status' => WorkspaceStatus::Stopping]);
+
+        try {
+            app(WorkspaceProvisioner::class)->shutdown($workspace);
+            $this->fail('expected RuntimeException');
+        } catch (RuntimeException) {
+            $this->assertSame(WorkspaceStatus::Failed, $workspace->fresh()->status);
+            $this->assertSame('docker stop failed', $workspace->fresh()->status_message);
+        }
+    }
 }

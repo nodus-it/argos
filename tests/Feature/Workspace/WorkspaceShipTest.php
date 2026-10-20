@@ -137,6 +137,30 @@ class WorkspaceShipTest extends TestCase
         $this->assertSame('shipped', $notice->payload['kind']);
     }
 
+    public function test_a_provider_failure_after_the_push_is_a_workspace_exception(): void
+    {
+        $this->git->shouldReceive('createPullRequest')->once()->andThrow(new \RuntimeException('422 head branch missing'));
+
+        try {
+            $this->service()->ship($this->workspace, $this->editor, 'feat: add login', '');
+            $this->fail('expected WorkspaceException');
+        } catch (WorkspaceException $e) {
+            $this->assertSame(__('workspaces.ship.pr_failed', ['message' => '422 head branch missing']), $e->getMessage());
+        }
+
+        $this->assertCount(1, $this->sent['GitPush']);
+        $this->workspace->refresh();
+        $this->assertNull($this->workspace->pr_number);
+        $this->assertNull($this->workspace->shipped_at);
+    }
+
+    public function test_draft_is_empty_when_the_daemon_is_unreachable(): void
+    {
+        $this->fakeDaemon([GitStatus::class => MockResponse::make(['error' => ['code' => 'internal_error', 'message' => 'down']], 500)]);
+
+        $this->assertSame(['subject' => '', 'body' => '', 'changed_files' => 0, 'ahead' => 0], $this->service()->draft($this->workspace, $this->editor));
+    }
+
     public function test_shipping_an_issue_workspace_closes_and_comments_on_the_issue(): void
     {
         $this->workspace->forceFill(['external_issue' => [

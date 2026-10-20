@@ -77,4 +77,14 @@ class WorkspaceMemberServiceTest extends TestCase
         $this->members->changeRole($this->workspace, $this->owner, WorkspaceRole::Editor);
         $this->assertSame(WorkspaceRole::Editor, $this->workspace->roleOf($this->owner));
     }
+
+    public function test_adding_an_existing_owner_cannot_demote_the_last_owner(): void
+    {
+        try {
+            $this->members->add($this->workspace, $this->owner, $this->owner, WorkspaceRole::Editor);
+            $this->fail('expected WorkspaceException');
+        } catch (WorkspaceException) {
+            $this->assertSame(WorkspaceRole::Owner, $this->workspace->roleOf($this->owner));
+        }
+    }
 }

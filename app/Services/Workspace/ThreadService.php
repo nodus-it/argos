@@ -19,7 +19,6 @@ use App\Models\ThreadApproval;
 use App\Models\ThreadEvent;
 use App\Models\User;
 use App\Models\Workspace;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
 /**
@@ -93,7 +92,7 @@ class ThreadService
             $this->pool->release($thread);
             $thread->forceFill(['status' => ThreadStatus::Error])->save();
 
-            throw WorkspaceException::translated('workspaces.errors.daemon_unreachable', ['message' => $e->getMessage()]);
+            throw WorkspaceException::fromDaemon($e);
         }
 
         $thread->forceFill(['status' => ThreadStatus::Starting])->save();
@@ -101,7 +100,8 @@ class ThreadService
 
     /**
      * Post a message as `$author`. Opens the session on demand; while a turn
-     * is running the daemon queues it as a follow-up.
+     * is running the daemon queues it as a follow-up. A message the daemon
+     * never received is removed again, so history only shows delivered ones.
      *
      * @param  list<array{media_type: string, data: string, path?: string}>  $images
      */
@@ -135,15 +135,11 @@ class ThreadService
         }
 
         try {
-            $this->daemon->for($thread->workspace)->sendMessage($thread->id, $payload);
-        } catch (DaemonTransportException $e) {
-            // The daemon lost the session (container restart): reopen once.
-            if (! in_array($e->errorCode, ['unknown_thread', 'thread_closed'], true)) {
-                throw WorkspaceException::translated('workspaces.errors.daemon_unreachable', ['message' => $e->getMessage()]);
-            }
-            $this->pool->release($thread);
-            $this->open($thread);
-            $this->daemon->for($thread->workspace)->sendMessage($thread->id, $payload);
+            $this->deliver($thread, $payload);
+        } catch (WorkspaceException $e) {
+            $event->delete();
+
+            throw $e;
         }
 
         if ($thread->restore_note !== null) {
@@ -229,7 +225,15 @@ class ThreadService
             $this->daemon->for($thread->workspace)->resolveApproval($thread->id, $approval->id, $response);
         } catch (DaemonTransportException $e) {
             if ($e->errorCode !== 'unknown_approval') {
-                throw WorkspaceException::translated('workspaces.errors.daemon_unreachable', ['message' => $e->getMessage()]);
+                // Not delivered: give the decision back so it can be retried.
+                ThreadApproval::query()->whereKey($approval->getKey())->update([
+                    'status' => ApprovalStatus::Pending->value,
+                    'resolved_by' => null,
+                    'resolved_at' => null,
+                    'response' => null,
+                ]);
+
+                throw WorkspaceException::fromDaemon($e);
             }
             // The daemon no longer waits for it (session restarted).
             $status = ApprovalStatus::Cancelled;
@@ -314,23 +318,19 @@ class ThreadService
     }
 
     /**
-     * Persist a system notice (e.g. "Ada interrupted") in the history.
-     *
-     * @param  array<string, mixed>  $extra
-     */
-    /**
-     * Add a system notice to the thread and broadcast it.
+     * Persist a system notice (e.g. "Ada interrupted") in the history and
+     * broadcast it.
      *
      * @param  array<string, mixed>  $extra
      */
     public function notice(Thread $thread, string $kind, User $by, array $extra = []): void
     {
-        $event = DB::transaction(fn (): ThreadEvent => ThreadEvent::query()->create([
+        $event = ThreadEvent::query()->create([
             'thread_id' => $thread->id,
             'type' => ThreadEventType::Notice,
             'author_user_id' => $by->id,
             'payload' => ['kind' => $kind, 'author_name' => $by->name, ...$extra],
-        ]));
+        ]);
 
         $this->publisher->publish($thread->workspace_id, $thread->id, [[
             'type' => 'notice',
@@ -339,12 +339,38 @@ class ThreadService
         ]]);
     }
 
+    /**
+     * Hand a message to the daemon. When the daemon lost the session
+     * (container restart) the session is reopened and the message sent once
+     * more.
+     *
+     * @param  array<string, mixed>  $payload
+     *
+     * @throws WorkspaceException when the message could not be delivered
+     */
+    private function deliver(Thread $thread, array $payload): void
+    {
+        try {
+            $this->daemon->for($thread->workspace)->sendMessage($thread->id, $payload);
+
+            return;
+        } catch (DaemonTransportException $e) {
+            if (! in_array($e->errorCode, ['unknown_thread', 'thread_closed'], true)) {
+                throw WorkspaceException::fromDaemon($e);
+            }
+        }
+
+        $this->pool->release($thread);
+        $this->open($thread);
+        $this->callDaemon(fn () => $this->daemon->for($thread->workspace)->sendMessage($thread->id, $payload));
+    }
+
     private function callDaemon(callable $call): void
     {
         try {
             $call();
         } catch (DaemonTransportException $e) {
-            throw WorkspaceException::translated('workspaces.errors.daemon_unreachable', ['message' => $e->getMessage()]);
+            throw WorkspaceException::fromDaemon($e);
         }
     }
 }

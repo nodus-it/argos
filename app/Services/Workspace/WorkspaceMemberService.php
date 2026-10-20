@@ -42,10 +42,19 @@ class WorkspaceMemberService
             throw WorkspaceException::translated('workspaces.errors.collaboration_disabled');
         }
 
-        return WorkspaceMember::query()->updateOrCreate(
-            ['workspace_id' => $workspace->id, 'user_id' => $member->id],
-            ['role' => $role, 'added_by' => $actor->id],
-        );
+        // An existing member only changes role — through the last-owner check.
+        if (WorkspaceMember::query()->where('workspace_id', $workspace->id)->where('user_id', $member->id)->exists()) {
+            $this->changeRole($workspace, $member, $role);
+
+            return $this->find($workspace, $member);
+        }
+
+        return WorkspaceMember::query()->create([
+            'workspace_id' => $workspace->id,
+            'user_id' => $member->id,
+            'role' => $role,
+            'added_by' => $actor->id,
+        ]);
     }
 
     public function changeRole(Workspace $workspace, User $member, WorkspaceRole $role): void
