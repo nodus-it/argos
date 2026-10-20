@@ -201,6 +201,7 @@ return [
         'coming_soon' => 'Not available yet.',
     ],
     'thread' => [
+        'model_default' => 'Agent default (otherwise Sonnet)',
         'attach' => 'Attach images',
         'drop_hint' => 'Drop images to attach them',
         'image' => 'Attached image',

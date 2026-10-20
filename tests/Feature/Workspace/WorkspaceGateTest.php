@@ -132,6 +132,8 @@ class WorkspaceGateTest extends TestCase
     {
         $this->gate(headers: ['Accept' => 'application/json'])->assertUnauthorized();
         $this->gate(headers: ['Accept' => 'text/html', 'X-Forwarded-Uri' => '/?argos_ticket=forged'])->assertRedirect();
+        // Never the Argos login inside the embedded editor (Argos in Argos).
+        $this->gate(headers: ['Accept' => 'text/html', 'Sec-Fetch-Dest' => 'iframe'])->assertUnauthorized();
     }
 
     public function test_open_redirects_members_to_the_editor_with_a_fresh_ticket(): void

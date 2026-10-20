@@ -95,6 +95,11 @@ class WorkspaceGateController extends Controller
 
     private function deny(Request $request): Response
     {
+        // Inside an iframe a login redirect would render Argos within Argos.
+        if ($request->header('Sec-Fetch-Dest') === 'iframe') {
+            return response('', 401);
+        }
+
         // Top-level navigation: send the person to the Argos login and back.
         if (str_contains((string) $request->header('Accept', ''), 'text/html')) {
             $loginUrl = rtrim((string) config('app.url'), '/').route('filament.admin.auth.login', [], false);

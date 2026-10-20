@@ -6,7 +6,7 @@
 #
 # Usage:
 #   run-gates.sh --run <run-id>                 gates JSON on stdout
-#   run-gates.sh --baseline                     capture pest/phpstan baselines
+#   run-gates.sh --baseline                     composer install + pest/phpstan baselines
 #   run-gates.sh --fix-prompt <gate> <run-id>   fix prompt on stdout
 #   run-gates.sh --log-path <gate> <run-id>     path of a gate's log
 #
@@ -30,6 +30,18 @@ gates_prepare() {
         grep -qxF '.agent/' /workspace/.git/info/exclude 2>/dev/null \
             || echo '.agent/' >> /workspace/.git/info/exclude
     fi
+}
+
+# gates_install_deps: install composer dependencies of a fresh clone, so the
+# baseline (and Claude) can run tests. Best-effort; skipped when vendor/
+# exists or the project has no composer.json.
+gates_install_deps() {
+    [[ -f /workspace/composer.json && ! -f /workspace/vendor/autoload.php ]] || return 0
+    command -v composer >/dev/null || return 0
+    log_info "workspace: composer install"
+    (cd /workspace && composer install --no-interaction --no-progress --prefer-dist) \
+        &> /workspace/.agent/logs/composer-install.log || log_warn "workspace: composer install failed (see .agent/logs/composer-install.log)"
+    return 0
 }
 
 # gates_safe_id: run ids end up in file names — allow only [A-Za-z0-9_-].
@@ -59,6 +71,7 @@ case "$mode" in
         ;;
     --baseline)
         gates_prepare
+        gates_install_deps
         quality_pest_baseline_capture
         quality_phpstan_baseline_capture
         ;;

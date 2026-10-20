@@ -19,6 +19,9 @@ class WorkspaceHostsTest extends TestCase
             'local ip with nip.io' => ['http://127.0.0.1:8080', '127.0.0.1.nip.io', false],
             'unrelated domains' => ['https://argos.example.com', 'preview.other.dev', false],
             'suffix trap' => ['https://example.com', 'notexample.com', false],
+            // Browsers treat every *.localhost host as its own site.
+            'localhost' => ['http://localhost:8080', 'localhost', false],
+            'single-label intranet host' => ['http://argos', 'argos', false],
         ];
     }
 

@@ -111,7 +111,7 @@
                     <label class="ws-field">
                         <span>{{ __('workspaces.thread.model') }}</span>
                         <select class="ws-select" wire:model="newModel">
-                            <option value="">—</option>
+                            <option value="">{{ __('workspaces.thread.model_default') }}</option>
                             @foreach ($models as $model)
                                 <option value="{{ $model->value }}">{{ $model->label() }}</option>
                             @endforeach

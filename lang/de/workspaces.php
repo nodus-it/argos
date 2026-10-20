@@ -201,6 +201,7 @@ return [
         'coming_soon' => 'Noch nicht verfügbar.',
     ],
     'thread' => [
+        'model_default' => 'Standard des Agenten (sonst Sonnet)',
         'attach' => 'Bilder anhängen',
         'drop_hint' => 'Bilder hier ablegen, um sie anzuhängen',
         'image' => 'Angehängtes Bild',

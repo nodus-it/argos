@@ -88,8 +88,12 @@ final class LiveReadySeeder extends Seeder
 
     private function liveProfile(ConnectedAccount $account, string $repoUrl, string $branch): RepoProfile
     {
+        // Named after the repo, so a live profile for another repo is not
+        // mistaken for Argos itself.
+        $name = basename(preg_replace('/\.git$/', '', rtrim($repoUrl, '/')) ?? $repoUrl).' (live)';
+
         return RepoProfile::updateOrCreate(
-            ['name' => 'argos (live)'],
+            ['name' => $name],
             [
                 'url' => $repoUrl,
                 'platform' => GitProvider::GitHub->value,

@@ -17,7 +17,9 @@ final class WorkspaceHosts
     {
         $appHost = strtolower((string) parse_url((string) config('app.url'), PHP_URL_HOST));
         $base = strtolower((string) config('argos.preview.base_domain', ''));
-        if ($appHost === '' || $base === '' || filter_var($appHost, FILTER_VALIDATE_IP) !== false) {
+        // Single-label hosts (localhost, intranet names) have no registrable
+        // domain: browsers treat each subdomain as a site of its own.
+        if ($appHost === '' || $base === '' || filter_var($appHost, FILTER_VALIDATE_IP) !== false || ! str_contains($appHost, '.')) {
             return false;
         }
 
