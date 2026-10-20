@@ -272,6 +272,22 @@ class ThreadService
         $thread->forceFill(['title' => $title])->save();
     }
 
+    /** Hide a thread from the list (closing its session first). */
+    public function archive(Thread $thread, User $by): void
+    {
+        Gate::forUser($by)->authorize('update', $thread);
+        if ($thread->session_open) {
+            $this->close($thread);
+        }
+        $thread->forceFill(['archived_at' => now()])->save();
+    }
+
+    public function unarchive(Thread $thread, User $by): void
+    {
+        Gate::forUser($by)->authorize('update', $thread);
+        $thread->forceFill(['archived_at' => null])->save();
+    }
+
     /** Text appended to the Claude Code system prompt of every session. */
     public function systemPrompt(Thread $thread): string
     {

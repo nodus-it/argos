@@ -80,6 +80,22 @@ class E2eWorkspaceSeeder extends Seeder
             WorkspaceMember::query()->create(['workspace_id' => $workspace->id, 'user_id' => $user->id, 'role' => $role, 'added_by' => $admin->id]);
         }
 
+        // Created first so "Pairing" is the most recent thread (opened by default).
+        $side = new Thread;
+        $side->forceFill([
+            'workspace_id' => $workspace->id,
+            'agent_credential_id' => $agent->id,
+            'created_by' => $admin->id,
+            'title' => 'Side quest',
+            'status' => ThreadStatus::Closed,
+            'permission_mode' => PermissionMode::Default,
+            'model' => ClaudeModel::Sonnet46->value,
+            'last_seq' => 0,
+            'cost_usd' => 0,
+            'session_open' => false,
+        ])->save();
+        $side->forceFill(['updated_at' => now()->subMinute()])->saveQuietly();
+
         $thread = new Thread;
         $thread->forceFill([
             'workspace_id' => $workspace->id,

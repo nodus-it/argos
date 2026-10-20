@@ -23,6 +23,6 @@ class E2eWorkspaceSeederTest extends TestCase
         $workspace = Workspace::query()->where('slug', 'e2e-pairing')->firstOrFail();
         $this->assertSame(WorkspaceRole::Owner, $workspace->roleOf(User::query()->where('email', 'admin@argos.local')->firstOrFail()));
         $this->assertSame(WorkspaceRole::Editor, $workspace->roleOf(User::query()->where('email', 'pair@argos.local')->firstOrFail()));
-        $this->assertSame(1, Thread::query()->where('workspace_id', $workspace->id)->count());
+        $this->assertSame(2, Thread::query()->where('workspace_id', $workspace->id)->count());
     }
 }

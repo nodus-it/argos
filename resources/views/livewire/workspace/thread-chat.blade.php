@@ -22,20 +22,12 @@
 @endphp
 
 <div class="ws-chat" x-data="window.argosThreadStream ? window.argosThreadStream(@js($streamConfig)) : {}" x-init="$nextTick(() => scrollDown?.())">
-    {{-- Thread switcher + presence --}}
+    {{-- Presence + new thread --}}
     <div class="ws-chat-head">
         <div class="ws-thread-picker">
-            @if ($threads->isNotEmpty())
-                <select class="ws-select" wire:change="selectThread($event.target.value)" aria-label="{{ __('workspaces.thread.title') }}">
-                    @foreach ($threads as $t)
-                        <option value="{{ $t->id }}" @selected($thread?->id === $t->id)>{{ $t->title }} · {{ $t->status->label() }}</option>
-                    @endforeach
-                </select>
-            @endif
-            @if ($canWrite)
-                <button type="button" class="btn btn-ghost btn-sm" wire:click="startCreating">
-                    @svg('heroicon-o-plus') {{ __('workspaces.thread.new') }}
-                </button>
+            <strong class="ws-thread-title">{{ $thread?->title ?? __('workspaces.thread.new') }}</strong>
+            @if ($thread)
+                <span class="ws-status-dot ws-status-{{ $thread->status->value }}" title="{{ $thread->status->label() }}"></span>
             @endif
         </div>
 
@@ -47,6 +39,54 @@
         </div>
     </div>
 
+    <div class="ws-chat-body">
+    {{-- Thread sidebar --}}
+    <aside class="ws-threads" x-data="{ collapsed: window.innerWidth < 640 }" :class="{ 'is-collapsed': collapsed }">
+        <div class="ws-threads-head">
+            <button type="button" class="btn btn-ghost btn-sm" x-on:click="collapsed = !collapsed" :aria-expanded="!collapsed" title="{{ __('workspaces.thread.threads') }}">@svg('heroicon-o-bars-3')</button>
+            <span class="ws-threads-label" x-show="!collapsed">{{ __('workspaces.thread.threads') }}</span>
+            @if ($canWrite)
+                <button type="button" class="btn btn-ghost btn-sm" wire:click="startCreating" title="{{ __('workspaces.thread.new') }}" x-show="!collapsed">@svg('heroicon-o-plus')</button>
+            @endif
+        </div>
+        <ul class="ws-thread-list" x-show="!collapsed">
+            @forelse ($threads as $t)
+                <li @class(['ws-thread-item', 'is-active' => $thread?->id === $t->id, 'is-archived' => $t->archived_at !== null]) wire:key="t-{{ $t->id }}">
+                    @if ($renamingId === $t->id)
+                        <form wire:submit="rename" class="ws-row">
+                            <input type="text" class="ws-input" wire:model="renameTitle" maxlength="120" x-init="$el.focus()">
+                        </form>
+                    @else
+                        <button type="button" class="ws-thread-link" wire:click="selectThread('{{ $t->id }}')">
+                            <span class="ws-status-dot ws-status-{{ $t->status->value }}" title="{{ $t->status->label() }}"></span>
+                            <span class="ws-thread-name">{{ $t->title }}</span>
+                            @if (($unread[$t->id] ?? 0) > 0 && $thread?->id !== $t->id)
+                                <span class="ws-unread">{{ $unread[$t->id] }}</span>
+                            @endif
+                        </button>
+                        <span class="ws-thread-meta muted">{{ $t->agentCredential?->name }} · {{ $t->updated_at?->diffForHumans(short: true) }}</span>
+                        @if ($canWrite)
+                            <span class="ws-thread-actions">
+                                <button type="button" class="btn btn-ghost btn-sm" wire:click="startRename('{{ $t->id }}')" title="{{ __('workspaces.thread.rename') }}">@svg('heroicon-o-pencil')</button>
+                                @if ($t->archived_at === null)
+                                    <button type="button" class="btn btn-ghost btn-sm" wire:click="archive('{{ $t->id }}')" title="{{ __('workspaces.thread.archive') }}">@svg('heroicon-o-archive-box')</button>
+                                @else
+                                    <button type="button" class="btn btn-ghost btn-sm" wire:click="unarchive('{{ $t->id }}')" title="{{ __('workspaces.thread.unarchive') }}">@svg('heroicon-o-arrow-uturn-left')</button>
+                                @endif
+                            </span>
+                        @endif
+                    @endif
+                </li>
+            @empty
+                <li class="muted ws-thread-empty">{{ __('workspaces.thread.none_short') }}</li>
+            @endforelse
+        </ul>
+        <label class="ws-inline ws-show-archived" x-show="!collapsed">
+            <input type="checkbox" wire:model.live="showArchived"> {{ __('workspaces.thread.show_archived') }}
+        </label>
+    </aside>
+
+    <div class="ws-chat-main">
     {{-- New thread form --}}
     @if ($creating && $canWrite)
         <div class="card card-pad ws-new-thread">
@@ -295,4 +335,6 @@
             <div class="ws-viewer muted">{{ __('workspaces.thread.viewer_hint') }}</div>
         @endif
     @endif
+    </div>{{-- .ws-chat-main --}}
+    </div>{{-- .ws-chat-body --}}
 </div>

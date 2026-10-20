@@ -53,4 +53,20 @@ test.describe('workspace pair programming', () => {
     await expect(ada.locator('.ws-approval')).toContainText('Pair Partner');
     await expect(ada.locator('.ws-approval.is-pending')).toHaveCount(0);
   });
+
+  test('the thread sidebar shows another thread waiting for a decision', async ({ browser }) => {
+    const ada = await openWorkspace(browser, 'admin@argos.local');
+    const pair = await openWorkspace(browser, 'pair@argos.local');
+
+    // Pair switches to the side thread and asks for an edit there.
+    await pair.locator('.ws-thread-link', { hasText: 'Side quest' }).click();
+    await expect(pair.locator('.ws-thread-title')).toHaveText('Side quest');
+    await send(pair, 'please edit the readme');
+
+    // Ada stays in "Pairing" and sees the side thread waiting, with unread entries.
+    const side = ada.locator('.ws-thread-item', { hasText: 'Side quest' });
+    await expect(side.locator('.ws-status-waiting_input')).toBeVisible({ timeout: 15_000 });
+    await expect(side.locator('.ws-unread')).toBeVisible({ timeout: 15_000 });
+    await expect(ada.locator('.ws-thread-title')).toHaveText('Pairing');
+  });
 });

@@ -6,6 +6,7 @@ namespace App\Filament\Admin\Pages;
 
 use App\Filament\Admin\Widgets\CurrentTasksWidget;
 use App\Filament\Admin\Widgets\DashboardHeroWidget;
+use App\Filament\Admin\Widgets\MyWorkspacesWidget;
 use App\Filament\Admin\Widgets\StatsOverviewWidget;
 use Filament\Pages\Dashboard as BaseDashboard;
 use Illuminate\Contracts\Support\Htmlable;
@@ -26,6 +27,7 @@ class Dashboard extends BaseDashboard
     {
         return [
             DashboardHeroWidget::class,
+            MyWorkspacesWidget::class,
             StatsOverviewWidget::class,
             CurrentTasksWidget::class,
         ];

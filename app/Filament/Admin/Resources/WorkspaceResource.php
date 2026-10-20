@@ -9,7 +9,9 @@ use App\Filament\Admin\Resources\WorkspaceResource\Pages\CreateWorkspace;
 use App\Filament\Admin\Resources\WorkspaceResource\Pages\ListWorkspaces;
 use App\Filament\Admin\Resources\WorkspaceResource\Pages\ViewWorkspace;
 use App\Models\RepoProfile;
+use App\Models\User;
 use App\Models\Workspace;
+use App\Services\Workspace\WorkspaceSummaryService;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -123,6 +125,24 @@ class WorkspaceResource extends Resource
                     ->label(__('workspaces.fields.members'))
                     ->state(fn (Workspace $record): string => $record->members->map(fn ($m) => $m->user->name)->implode(', '))
                     ->visibleFrom('lg'),
+                TextColumn::make('activity')
+                    ->label(__('workspaces.overview.threads_column'))
+                    ->state(function (Workspace $record): string {
+                        /** @var User $user */
+                        $user = auth()->user();
+                        $sum = app(WorkspaceSummaryService::class)->for($record, $user);
+                        $parts = [];
+                        if ($sum['waiting_for_me']) {
+                            $parts[] = __('workspaces.overview.waiting_for_you');
+                        }
+                        if ($sum['working'] > 0) {
+                            $parts[] = trans_choice('workspaces.overview.working', $sum['working'], ['count' => $sum['working']]);
+                        }
+                        $parts[] = trans_choice('workspaces.overview.threads', $sum['threads'], ['count' => $sum['threads']]);
+
+                        return implode(' · ', $parts);
+                    })
+                    ->visibleFrom('md'),
                 TextColumn::make('last_activity_at')
                     ->label(__('workspaces.fields.last_activity'))
                     ->since()
@@ -133,6 +153,11 @@ class WorkspaceResource extends Resource
                 SelectFilter::make('status')
                     ->label(__('workspaces.fields.status'))
                     ->options(collect(WorkspaceStatus::cases())->mapWithKeys(fn (WorkspaceStatus $s): array => [$s->value => $s->label()])->all()),
+                Filter::make('waiting_for_me')
+                    ->label(__('workspaces.overview.waiting_for_you'))
+                    ->query(fn (Builder $query): Builder => $query
+                        ->whereHas('members', fn (Builder $q) => $q->where('user_id', auth()->id())->whereIn('role', ['owner', 'editor']))
+                        ->whereHas('threads.approvals', fn (Builder $q) => $q->where('status', 'pending'))),
                 Filter::make('mine')
                     ->label(__('workspaces.filters.mine'))
                     ->query(fn (Builder $query): Builder => $query->whereHas('members', fn (Builder $q) => $q->where('user_id', auth()->id())))

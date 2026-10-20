@@ -33,6 +33,7 @@ class WorkspaceShipService
         private readonly AgentPool $pool,
         private readonly GitServiceFactory $git,
         private readonly ThreadStreamPublisher $publisher,
+        private readonly WorkspaceNotifier $notifier,
     ) {}
 
     /**
@@ -123,6 +124,7 @@ class WorkspaceShipService
 
         $workspace->forceFill(['shipped_at' => now()])->save();
         $this->announce($workspace, $by, (string) $workspace->pr_url);
+        $this->notifier->notify($workspace, null, 'ship', __('workspaces.notifications.ship', ['name' => $by->name]), (string) $workspace->pr_url, $by->id);
 
         return (string) $workspace->pr_url;
     }

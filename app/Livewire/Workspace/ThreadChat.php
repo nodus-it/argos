@@ -17,6 +17,7 @@ use App\Models\ThreadEvent;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Workspace\AgentPool;
+use App\Services\Workspace\ThreadReadService;
 use App\Services\Workspace\ThreadService;
 use App\Services\Workspace\WorkspaceException;
 use Filament\Notifications\Notification;
@@ -56,6 +57,12 @@ class ThreadChat extends Component
     public ?string $newModel = null;
 
     public string $newMode = 'default';
+
+    public bool $showArchived = false;
+
+    public ?string $renamingId = null;
+
+    public string $renameTitle = '';
 
     public function mount(string $workspaceId): void
     {
@@ -192,6 +199,45 @@ class ThreadChat extends Component
         }
     }
 
+    public function startRename(string $id): void
+    {
+        $thread = $this->threads(true)->firstWhere('id', $id);
+        if ($thread !== null) {
+            $this->renamingId = $id;
+            $this->renameTitle = $thread->title;
+        }
+    }
+
+    public function rename(): void
+    {
+        $thread = $this->threads(true)->firstWhere('id', $this->renamingId);
+        $title = trim($this->renameTitle);
+        if ($thread !== null && $title !== '') {
+            $this->attempt(fn () => app(ThreadService::class)->rename($thread, $this->user(), mb_substr($title, 0, 120)));
+        }
+        $this->renamingId = null;
+    }
+
+    public function archive(string $id): void
+    {
+        $thread = $this->threads()->firstWhere('id', $id);
+        if ($thread === null) {
+            return;
+        }
+        $this->attempt(fn () => app(ThreadService::class)->archive($thread, $this->user()));
+        if ($this->threadId === $id) {
+            $this->threadId = $this->threads()->first()?->id;
+        }
+    }
+
+    public function unarchive(string $id): void
+    {
+        $thread = $this->threads(true)->firstWhere('id', $id);
+        if ($thread !== null) {
+            $this->attempt(fn () => app(ThreadService::class)->unarchive($thread, $this->user()));
+        }
+    }
+
     public function loadOlder(): void
     {
         $this->limit += self::PAGE;
@@ -203,11 +249,11 @@ class ThreadChat extends Component
     }
 
     /** @return Collection<int, Thread> */
-    public function threads(): Collection
+    public function threads(bool $withArchived = false): Collection
     {
         return Thread::query()
             ->where('workspace_id', $this->workspaceId)
-            ->whereNull('archived_at')
+            ->when(! $withArchived, fn ($q) => $q->whereNull('archived_at'))
             ->with('agentCredential.user')
             ->latest('updated_at')
             ->get();
@@ -235,11 +281,16 @@ class ThreadChat extends Component
         $role = $workspace->roleOf($this->user());
 
         [$events, $hasOlder] = $thread !== null ? $this->events($thread) : [collect(), false];
+        if ($thread !== null) {
+            app(ThreadReadService::class)->markRead($thread, $this->user());
+        }
+        $sidebar = $this->threads($this->showArchived);
 
         return view('livewire.workspace.thread-chat', [
             'workspace' => $workspace,
             'thread' => $thread,
-            'threads' => $this->threads(),
+            'threads' => $sidebar,
+            'unread' => app(ThreadReadService::class)->unreadCounts($sidebar, $this->user()),
             'events' => $events,
             'hasOlder' => $hasOlder,
             'toolResults' => $events->where('type', ThreadEventType::ToolResult)->keyBy(fn (ThreadEvent $e) => (string) ($e->payload['tool_use_id'] ?? '')),

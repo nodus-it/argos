@@ -31,10 +31,14 @@ class ThreadEventIngestor
     /** Key the daemon uses for workspace-level events (thread_id = null). */
     public const WORKSPACE_KEY = '_workspace';
 
+    /** Turns shorter than this finish while people still watch — no notification. */
+    private const NOTIFY_TURN_AFTER_MS = 30_000;
+
     public function __construct(
         private readonly AgentPool $pool,
         private readonly ThreadStreamPublisher $publisher,
         private readonly WorkspaceService $workspaces,
+        private readonly WorkspaceNotifier $notifier,
     ) {}
 
     /**
@@ -110,9 +114,46 @@ class ThreadEventIngestor
         $outgoing = array_values(array_filter($outgoing));
         if ($outgoing !== []) {
             $this->publisher->publish($workspace->id, $threadId, $outgoing);
+            $this->notify($workspace, $threadId, $outgoing);
         }
 
         return $ack;
+    }
+
+    /**
+     * Tell members about what needs them; refresh overviews on status changes.
+     *
+     * @param  list<array<string, mixed>>  $events
+     */
+    private function notify(Workspace $workspace, string $threadId, array $events): void
+    {
+        $thread = Thread::query()->find($threadId);
+        if ($thread === null) {
+            return;
+        }
+
+        $statusChanged = false;
+        foreach ($events as $event) {
+            $data = is_array($event['data'] ?? null) ? $event['data'] : [];
+            match ($event['type']) {
+                'approval.requested' => $this->notifier->notify($workspace, $thread, 'approval',
+                    __('workspaces.notifications.approval', ['tool' => (string) ($data['tool_name'] ?? '')]), $thread->title),
+                'turn.completed' => (int) ($data['duration_ms'] ?? 0) >= self::NOTIFY_TURN_AFTER_MS
+                    ? $this->notifier->notify($workspace, $thread, 'turn', __('workspaces.notifications.turn'), $thread->title)
+                    : null,
+                'usage_limit' => $this->notifier->notify($workspace, $thread, 'limit',
+                    __('workspaces.notifications.limit', ['agent' => $thread->agentCredential?->name ?? '']), $thread->title),
+                'error' => ($data['code'] ?? '') === 'session_ended'
+                    ? null
+                    : $this->notifier->notify($workspace, $thread, 'error', __('workspaces.notifications.error'), (string) ($data['message'] ?? '')),
+                default => null,
+            };
+            $statusChanged = $statusChanged || $event['type'] === 'status';
+        }
+
+        if ($statusChanged) {
+            $this->notifier->summaryChanged($workspace, $thread);
+        }
     }
 
     /**

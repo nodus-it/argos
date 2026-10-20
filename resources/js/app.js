@@ -1,6 +1,7 @@
 import Echo from 'laravel-echo';
 import Pusher from 'pusher-js';
 import { argosThreadStream } from './workspace/thread-stream';
+import { listenForWorkspaceSignals } from './workspace/notifications';
 
 // Alpine data factory for the workspace chat; available with or without realtime.
 window.argosThreadStream = argosThreadStream;
@@ -30,4 +31,8 @@ if (config && config.key) {
         authEndpoint: config.authEndpoint,
         auth: { headers: { 'X-CSRF-TOKEN': config.csrfToken } },
     });
+
+    if (config.userId) {
+        listenForWorkspaceSignals(window.Echo, config.userId);
+    }
 }

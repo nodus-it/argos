@@ -25,8 +25,9 @@ use Laravel\Passport\HasApiTokens;
  * @property string $name
  * @property string $email
  * @property bool $is_admin
+ * @property array<string, bool>|null $notification_prefs
  */
-#[Fillable(['name', 'email', 'password', 'locale'])]
+#[Fillable(['name', 'email', 'password', 'locale', 'notification_prefs'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable implements FilamentUser, OAuthenticatable
 {
@@ -42,6 +43,7 @@ class User extends Authenticatable implements FilamentUser, OAuthenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_admin' => 'boolean',
+            'notification_prefs' => 'array',
         ];
     }
 
@@ -51,6 +53,15 @@ class User extends Authenticatable implements FilamentUser, OAuthenticatable
     public function connectedAccounts(): HasMany
     {
         return $this->hasMany(ConnectedAccount::class);
+    }
+
+    /** Workspace notification kinds a user can switch off. */
+    public const NOTIFICATION_KINDS = ['approval', 'turn', 'limit', 'error', 'ship'];
+
+    /** Whether the user wants workspace notifications of this kind (default: yes). */
+    public function wantsNotification(string $kind): bool
+    {
+        return ($this->notification_prefs[$kind] ?? true) !== false;
     }
 
     public function isAdmin(): bool

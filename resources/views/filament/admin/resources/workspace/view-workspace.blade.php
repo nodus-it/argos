@@ -1,5 +1,7 @@
 @use('App\Enums\WorkspaceStatus')
 <x-filament-panels::page>
+    {{-- Lets notifications.js skip signals for the workspace in front of you. --}}
+    <script>window.ArgosCurrentWorkspace = @js($workspace->id);</script>
     @php
         /** @var \App\Models\Workspace $workspace */
         $statusBadge = \App\Support\BadgeClass::for($workspace->status->color());

@@ -86,6 +86,9 @@ class AdminPanelProvider extends PanelProvider
                     ->url(fn (): string => url('docs/api'), shouldOpenInNewTab: true)
                     ->sort(99),
             ])
+            // The bell: workspace approvals, limits, errors and shipments.
+            ->databaseNotifications()
+            ->databaseNotificationsPolling('30s')
             ->login(Login::class)
             ->profile(Profile::class)
             ->plugins([
@@ -131,6 +134,7 @@ class AdminPanelProvider extends PanelProvider
                         'key' => (string) config('broadcasting.connections.reverb.key'),
                         'authEndpoint' => url('broadcasting/auth'),
                         'csrfToken' => csrf_token(),
+                        'userId' => auth()->id(),
                     ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
 
                     return new HtmlString('<script>window.ArgosRealtime = '.$config.';</script>'.$assets);
