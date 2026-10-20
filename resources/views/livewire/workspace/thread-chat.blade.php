@@ -3,7 +3,6 @@
     use App\Enums\ApprovalStatus;
     use App\Enums\PermissionMode;
     use App\Enums\ThreadEventType;
-    use App\Enums\ThreadStatus;
     use App\Livewire\Workspace\ThreadChat;
     use App\Support\ThreadEventFormatter as Fmt;
 
@@ -26,10 +25,10 @@
     {{-- Thread sidebar --}}
     <aside class="ws-threads" x-data="{ collapsed: window.innerWidth < 640 }" :class="{ 'is-collapsed': collapsed }">
         <div class="ws-threads-head">
-            <button type="button" class="btn btn-ghost btn-sm" x-on:click="collapsed = !collapsed" :aria-expanded="!collapsed" title="{{ __('workspaces.thread.threads') }}">@svg('heroicon-o-bars-3')</button>
+            <button type="button" class="btn btn-ghost btn-sm" x-on:click="collapsed = !collapsed" :aria-expanded="!collapsed" title="{{ __('workspaces.thread.threads') }}" aria-label="{{ __('workspaces.thread.threads') }}">@svg('heroicon-o-bars-3')</button>
             <span class="ws-threads-label" x-show="!collapsed">{{ __('workspaces.thread.threads') }}</span>
             @if ($canWrite)
-                <button type="button" class="btn btn-ghost btn-sm" wire:click="startCreating" title="{{ __('workspaces.thread.new') }}" x-show="!collapsed">@svg('heroicon-o-plus')</button>
+                <button type="button" class="btn btn-ghost btn-sm" wire:click="startCreating" title="{{ __('workspaces.thread.new') }}" aria-label="{{ __('workspaces.thread.new') }}" x-show="!collapsed">@svg('heroicon-o-plus')</button>
             @endif
         </div>
         <ul class="ws-thread-list" x-show="!collapsed">
@@ -41,7 +40,7 @@
                         </form>
                     @else
                         <button type="button" class="ws-thread-link" wire:click="selectThread('{{ $t->id }}')">
-                            <span class="ws-status-dot ws-status-{{ $t->status->value }}" title="{{ $t->status->label() }}"></span>
+                            <span class="ws-status-dot ws-status-{{ $t->status->value }}" role="img" aria-label="{{ $t->status->label() }}" title="{{ $t->status->label() }}"></span>
                             <span class="ws-thread-name">{{ $t->title }}</span>
                             @if (($unread[$t->id] ?? 0) > 0 && $thread?->id !== $t->id)
                                 <span class="ws-unread">{{ $unread[$t->id] }}</span>
@@ -50,11 +49,11 @@
                         <span class="ws-thread-meta muted">{{ $t->agentCredential?->name }} · {{ $t->updated_at?->diffForHumans(short: true) }}</span>
                         @if ($canWrite)
                             <span class="ws-thread-actions">
-                                <button type="button" class="btn btn-ghost btn-sm" wire:click="startRename('{{ $t->id }}')" title="{{ __('workspaces.thread.rename') }}">@svg('heroicon-o-pencil')</button>
+                                <button type="button" class="btn btn-ghost btn-sm" wire:click="startRename('{{ $t->id }}')" title="{{ __('workspaces.thread.rename') }}" aria-label="{{ __('workspaces.thread.rename') }}">@svg('heroicon-o-pencil')</button>
                                 @if ($t->archived_at === null)
-                                    <button type="button" class="btn btn-ghost btn-sm" wire:click="archive('{{ $t->id }}')" title="{{ __('workspaces.thread.archive') }}">@svg('heroicon-o-archive-box')</button>
+                                    <button type="button" class="btn btn-ghost btn-sm" wire:click="archive('{{ $t->id }}')" title="{{ __('workspaces.thread.archive') }}" aria-label="{{ __('workspaces.thread.archive') }}">@svg('heroicon-o-archive-box')</button>
                                 @else
-                                    <button type="button" class="btn btn-ghost btn-sm" wire:click="unarchive('{{ $t->id }}')" title="{{ __('workspaces.thread.unarchive') }}">@svg('heroicon-o-arrow-uturn-left')</button>
+                                    <button type="button" class="btn btn-ghost btn-sm" wire:click="unarchive('{{ $t->id }}')" title="{{ __('workspaces.thread.unarchive') }}" aria-label="{{ __('workspaces.thread.unarchive') }}">@svg('heroicon-o-arrow-uturn-left')</button>
                                 @endif
                             </span>
                         @endif
@@ -75,7 +74,7 @@
             <div class="ws-thread-picker">
                 <strong class="ws-thread-title">{{ $thread?->title ?? __('workspaces.thread.new') }}</strong>
                 @if ($thread)
-                    <span class="ws-status-dot ws-status-{{ $thread->status->value }}" title="{{ $thread->status->label() }}"></span>
+                    <span class="ws-status-dot ws-status-{{ $thread->status->value }}" role="img" aria-label="{{ $thread->status->label() }}" title="{{ $thread->status->label() }}"></span>
                 @endif
             </div>
 
@@ -153,7 +152,7 @@
                 @switch ($event->type)
                     @case (ThreadEventType::UserMessage)
                         <div class="ws-msg ws-msg-user" wire:key="ev-{{ $event->id }}">
-                            <span class="ws-avatar" title="{{ $p['author_name'] ?? '' }}">{{ \Illuminate\Support\Str::of($p['author_name'] ?? '?')->explode(' ')->map(fn ($w) => mb_substr($w, 0, 1))->take(2)->implode('') }}</span>
+                            <span class="ws-avatar" title="{{ $p['author_name'] ?? '' }}" aria-hidden="true">{{ \App\Support\Initials::of($p['author_name'] ?? null) }}</span>
                             <div class="ws-bubble">
                                 <div class="ws-who">
                                     {{ $event->author_user_id === $user->id ? __('workspaces.events.you') : ($p['author_name'] ?? '') }}
@@ -196,7 +195,7 @@
                             <span class="as-ico">✳</span>
                             <span class="ws-line-main">
                                 <span class="as-tag">{{ __('workspaces.events.thinking') }}</span>
-                                <span class="as-toggle" x-on:click="open = !open">{{ __('workspaces.events.show_more') }}</span>
+                                <button type="button" class="as-toggle" x-on:click="open = !open" :aria-expanded="open">{{ __('workspaces.events.show_more') }}</button>
                                 <div class="as-more" x-show="open" x-cloak>{{ $p['text'] ?? '' }}</div>
                             </span>
                         </div>
@@ -212,7 +211,7 @@
                             <span class="ws-line-main">
                                 <span class="name">{{ $p['name'] ?? __('workspaces.events.tool') }}</span>
                                 <span class="summary mono">{{ $summary }}</span>
-                                <span class="as-toggle" x-on:click="open = !open">{{ __('workspaces.events.show_more') }}</span>
+                                <button type="button" class="as-toggle" x-on:click="open = !open" :aria-expanded="open">{{ __('workspaces.events.show_more') }}</button>
                                 <div class="as-more mono" x-show="open" x-cloak>{{ Fmt::json($p['input'] ?? null) }}@if ($result)
 
 ────
@@ -363,7 +362,7 @@
                                 @else
                                     <span class="ws-upload-name mono">{{ $upload->getClientOriginalName() }}</span>
                                 @endif
-                                <button type="button" wire:click="removeUpload({{ $i }})" aria-label="×">@svg('heroicon-o-x-mark')</button>
+                                <button type="button" wire:click="removeUpload({{ $i }})" aria-label="{{ __('workspaces.thread.remove_image') }}" title="{{ __('workspaces.thread.remove_image') }}">@svg('heroicon-o-x-mark')</button>
                             </span>
                         @endforeach
                     </div>
@@ -393,10 +392,8 @@
                     ></textarea>
                 </div>
                 <div class="ws-composer-bar">
-                    <label class="btn btn-ghost btn-sm" title="{{ __('workspaces.thread.attach') }}">
-                        @svg('heroicon-o-photo')
-                        <input type="file" class="hidden" accept="image/png,image/jpeg,image/gif,image/webp" multiple x-on:change="attach($event.target.files); $event.target.value = ''">
-                    </label>
+                    <button type="button" class="btn btn-ghost btn-sm" x-on:click="$refs.file.click()" title="{{ __('workspaces.thread.attach') }}" aria-label="{{ __('workspaces.thread.attach') }}">@svg('heroicon-o-photo')</button>
+                    <input type="file" class="sr-only" tabindex="-1" aria-hidden="true" x-ref="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple x-on:change="attach($event.target.files); $event.target.value = ''">
                     <select class="ws-select ws-select-sm" wire:change="setMode($event.target.value)" aria-label="{{ __('workspaces.thread.mode') }}">
                         @foreach ($modes as $mode)
                             @if ($mode !== PermissionMode::BypassPermissions || $isOwner)

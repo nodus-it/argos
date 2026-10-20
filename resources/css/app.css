@@ -1379,7 +1379,6 @@ body,
 }
 
 /* ── Workspaces (interactive threads, editor, preview) ─────────────────────── */
-.ws-meta{margin-bottom:16px;}
 /* Desktop: the layout fills the viewport below its own top (measured by
    argosWorkspaceLayout → --ws-top) so only the chat feed and the tool panes
    scroll, never the page. The middle column is the drag gutter. */
@@ -1388,16 +1387,11 @@ body,
 .ws-gutter::after{content:"";width:2px;margin:24px 0;border-radius:2px;background:var(--border);transition:background .15s;}
 .ws-gutter:hover::after,.ws-gutter:focus-visible::after,.ws-layout.is-resizing .ws-gutter::after{background:var(--accent);}
 .ws-layout.is-resizing{cursor:col-resize;user-select:none;}
-.ws-layout.is-resizing iframe{pointer-events:none;}
-@media (max-width:1024px){
-  .ws-layout{grid-template-columns:1fr;gap:16px;height:auto;}
-  .ws-gutter{display:none;}
-  .ws-pane{height:80dvh;}
-}
-.ws-pane{display:flex;flex-direction:column;min-height:0;overflow:hidden;}
+.ws-pane{display:flex;flex-direction:column;min-height:0;overflow:hidden;border-radius:var(--radius);}
 .ws-pane-chat{padding:0;}
 .ws-chat{display:flex;flex-direction:column;height:100%;min-height:0;}
-.ws-chat-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border);flex-wrap:wrap;}
+/* Threads (quiet sidebar) · chat · workbench: the three headers share a 48px row. */
+.ws-chat-head{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:48px;box-sizing:border-box;padding:8px 14px;border-bottom:1px solid var(--border);flex-wrap:wrap;background:var(--surface);}
 .ws-thread-picker{display:flex;align-items:center;gap:8px;min-width:0;}
 .ws-select{font:inherit;font-size:var(--t-sm);padding:6px 8px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);max-width:100%;}
 .ws-select-sm{font-size:var(--t-xs);padding:4px 6px;}
@@ -1455,27 +1449,14 @@ body,
 .ws-question{display:grid;gap:4px;}
 .ws-question-text{font-weight:600;font-size:var(--t-sm);}
 .ws-option{display:flex;gap:6px;align-items:baseline;font-size:var(--t-sm);}
-.ws-composer{border-top:1px solid var(--border);padding:10px 12px;display:grid;gap:8px;}
+.ws-composer{border-top:1px solid var(--border);padding:10px 12px;display:grid;gap:8px;background:var(--surface);}
 .ws-ta{width:100%;resize:vertical;min-height:64px;}
 .ws-composer-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
 .ws-spacer{flex:1;}
 .ws-cost{font-size:var(--t-xs);}
 .ws-typing{font-size:var(--t-xs);}
-.ws-tabs{display:flex;gap:4px;padding:8px;border-bottom:1px solid var(--border);}
-.ws-tabs button{display:inline-flex;align-items:center;gap:6px;font:inherit;font-size:var(--t-sm);font-weight:600;padding:6px 12px;border-radius:var(--radius-sm);border:1px solid transparent;background:transparent;color:var(--text-2);cursor:pointer;}
-.ws-tabs button svg{width:16px;height:16px;}
-.ws-tabs button.on{background:var(--surface-2);border-color:var(--border);color:var(--text);}
-.ws-tab-body{flex:1;display:flex;flex-direction:column;min-height:0;}
-.ws-frame{flex:1;width:100%;border:0;min-height:0;background:var(--surface);}
-.ws-frame-bar{display:flex;gap:8px;align-items:center;justify-content:flex-end;padding:6px 8px;border-bottom:1px solid var(--border);font-size:var(--t-xs);}
-.ws-preview{display:flex;flex-direction:column;flex:1;min-height:0;}
-.ws-log{margin:8px;font-size:var(--t-xs);}
-.ws-log pre{white-space:pre-wrap;max-height:320px;overflow:auto;background:var(--surface-2);border-radius:var(--radius-sm);padding:8px;}
-@media (max-width:640px){
-  .ws-composer-bar .btn,.ws-approval-actions .btn,.ws-tabs button,.ws-frame-bar .btn{min-height:44px;}
-  .ws-composer-bar .ws-select-sm{min-height:44px;}
-  .ws-approval,.ws-line,.ws-working{margin-left:0;padding-left:0;}
-}
+.ws-review-wrap{flex:1;display:flex;flex-direction:column;min-height:0;}
+.ws-review-bar{display:flex;gap:8px;align-items:center;justify-content:flex-end;padding:6px 8px;border-bottom:1px solid var(--border);font-size:var(--t-xs);}
 .ws-review{display:flex;flex-direction:column;flex:1;min-height:0;}
 .ws-review-files{flex:1;overflow:auto;padding:8px;}
 .ws-review .diff-row.ws-commentable{cursor:pointer;}
@@ -1484,20 +1465,22 @@ body,
 .ws-review-comments{padding:8px;border-bottom:1px solid var(--border);display:grid;gap:6px;background:var(--surface-2);}
 .ws-review-comment{display:flex;gap:8px;align-items:baseline;font-size:var(--t-xs);}
 .ws-chat-body{display:flex;flex:1;min-height:0;}
-.ws-chat-main{display:flex;flex-direction:column;flex:1;min-width:0;min-height:0;}
-.ws-threads{width:210px;flex:none;border-right:1px solid var(--border);display:flex;flex-direction:column;min-height:0;}
+.ws-chat-main{display:flex;flex-direction:column;flex:1;min-width:0;min-height:0;background:var(--surface);}
+.ws-threads{width:220px;flex:none;border-right:1px solid var(--border);display:flex;flex-direction:column;min-height:0;background:var(--surface-2);}
 .ws-threads.is-collapsed{width:44px;}
-.ws-threads-head{display:flex;align-items:center;gap:4px;padding:6px;border-bottom:1px solid var(--border);}
-.ws-threads-label{font-size:var(--t-xs);font-weight:700;color:var(--muted);flex:1;}
-.ws-thread-list{list-style:none;margin:0;padding:4px;overflow-y:auto;flex:1;}
-.ws-thread-item{position:relative;border-radius:var(--radius-sm);padding:4px 6px;margin-bottom:2px;}
-.ws-thread-item.is-active{background:var(--surface-2);}
+.ws-threads-head{display:flex;align-items:center;gap:4px;min-height:48px;box-sizing:border-box;padding:8px 8px 8px 10px;border-bottom:1px solid var(--border);}
+.ws-threads-label{font-size:var(--t-xs);font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);flex:1;}
+.ws-thread-list{list-style:none;margin:0;padding:6px;overflow-y:auto;flex:1;}
+.ws-thread-item{position:relative;border-radius:var(--radius-sm);padding:6px 8px;margin-bottom:2px;border:1px solid transparent;}
+.ws-thread-item:hover{background:color-mix(in srgb,var(--surface) 60%,transparent);}
+.ws-thread-item.is-active{background:var(--surface);border-color:var(--border);box-shadow:0 1px 2px rgba(0,0,0,.04);}
+.ws-thread-item.is-active .ws-thread-name{font-weight:600;}
 .ws-thread-item.is-archived{opacity:.6;}
 .ws-thread-link{display:flex;align-items:center;gap:6px;width:100%;background:none;border:0;padding:0;font:inherit;font-size:var(--t-sm);color:var(--text);cursor:pointer;text-align:left;}
 .ws-thread-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .ws-thread-meta{display:block;font-size:11px;padding-left:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .ws-thread-actions{display:none;position:absolute;right:2px;top:2px;background:var(--surface);}
-.ws-thread-item:hover .ws-thread-actions{display:flex;}
+.ws-thread-item:hover .ws-thread-actions,.ws-thread-item:focus-within .ws-thread-actions{display:flex;}
 .ws-thread-empty{padding:8px;font-size:var(--t-xs);}
 .ws-show-archived{padding:6px 8px;border-top:1px solid var(--border);}
 .ws-unread{font-size:11px;font-weight:700;background:var(--accent);color:var(--on-accent);border-radius:99px;padding:0 6px;}
@@ -1507,11 +1490,6 @@ body,
 .ws-status-idle{background:var(--ok-500);}
 .ws-status-error{background:var(--dg-500);}
 .ws-thread-title{font-size:var(--t-sm);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-@media (max-width:640px){
-  .ws-threads{width:44px;}
-  .ws-threads:not(.is-collapsed){position:absolute;z-index:5;background:var(--surface);height:100%;width:80%;box-shadow:var(--shadow-sm);}
-  .ws-chat-body{position:relative;}
-}
 .ws-overview{display:grid;gap:10px;}
 .ws-overview-head{display:flex;align-items:center;justify-content:space-between;}
 .ws-overview-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;}
@@ -1544,7 +1522,6 @@ body,
 .ws-reset-btn{display:inline-flex;align-items:center;gap:4px;margin-left:auto;padding:2px 6px;border:0;background:none;color:var(--muted);font-size:var(--t-xs);cursor:pointer;border-radius:var(--radius-sm);opacity:0;transition:opacity .15s;}
 .ws-reset-btn svg{width:14px;height:14px;}
 .ws-msg:hover .ws-reset-btn,.ws-reset-btn:focus-visible{opacity:1;}
-@media (hover:none){.ws-reset-btn{opacity:1;min-height:44px;}.ws-reset-btn span{display:none;}}
 .ws-restore{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.4);}
 .ws-restore-card{width:min(720px,100%);max-height:calc(100vh - 32px);overflow:auto;display:flex;flex-direction:column;gap:8px;padding:16px;background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--radius);box-shadow:var(--shadow-sm);}
 .ws-restore-card h3{margin:0;font-size:var(--t-md,1rem);}
@@ -1565,31 +1542,49 @@ a.ws-headline-item:hover{color:var(--accent);}
 .ws-headline-members{display:inline-flex;gap:2px;}
 .ws-avatar-sm{width:22px;height:22px;font-size:10px;}
 
-/* ── Workspace page: three clear zones ───────────────────────────────────
-   threads (quiet sidebar) · chat (the conversation) · workbench (tools).
-   Shared 48px header row so the three tops line up. */
-.ws-pane{border-radius:var(--radius);}
-.ws-chat-head,.ws-threads-head,.ws-workbench-bar{min-height:48px;box-sizing:border-box;}
-.ws-chat-head{padding:8px 14px;background:var(--surface);}
-.ws-chat-main{background:var(--surface);}
-.ws-threads{width:220px;background:var(--surface-2);border-right:1px solid var(--border);}
-.ws-threads-head{padding:8px 8px 8px 10px;border-bottom:1px solid var(--border);}
-.ws-threads-label{font-size:var(--t-xs);letter-spacing:.06em;text-transform:uppercase;}
-.ws-thread-list{padding:6px;}
-.ws-thread-item{padding:6px 8px;margin-bottom:2px;border:1px solid transparent;}
-.ws-thread-item:hover{background:color-mix(in srgb,var(--surface) 60%,transparent);}
-.ws-thread-item.is-active{background:var(--surface);border-color:var(--border);box-shadow:0 1px 2px rgba(0,0,0,.04);}
-.ws-thread-item.is-active .ws-thread-name{font-weight:600;}
-.ws-show-archived{background:transparent;}
-.ws-composer{background:var(--surface);}
-.ws-workbench-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:8px 12px;border-bottom:1px solid var(--border);background:var(--surface-2);transition:box-shadow .3s;}
+/* Workbench bar: two tools (VS Code, preview) built the same way —
+   name + status on the left, icon actions, then one main action at the far
+   right. All controls share one height. */
+.ws-workbench-bar{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:8px;padding:8px;border-bottom:1px solid var(--border);background:var(--surface-2);transition:box-shadow .3s;}
 .ws-workbench-bar.is-highlighted{box-shadow:inset 0 0 0 2px var(--accent);}
-.ws-workbench-sep{width:1px;align-self:stretch;background:var(--border);}
-.ws-tool{display:flex;flex-wrap:wrap;align-items:center;gap:6px;}
-.ws-tool-label{display:inline-flex;align-items:center;gap:5px;font-size:var(--t-xs);font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-right:2px;}
-.ws-tool-label svg{width:14px;height:14px;}
-.ws-tool-note{font-size:var(--t-xs);}
-.ws-tool-log{flex-basis:100%;font-size:var(--t-xs);}
-.ws-tool-log pre{max-height:240px;overflow:auto;margin:6px 0 0;padding:8px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);white-space:pre-wrap;}
-@media (max-width:1400px){.ws-tool-text{display:none;}}
-@media (max-width:1024px){.ws-workbench-sep{display:none;}.ws-workbench-bar .btn{min-height:44px;}}
+.ws-tool{display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-height:32px;padding:6px 6px 6px 10px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);}
+.ws-tool-head{display:flex;align-items:center;gap:8px;flex:1;min-width:0;}
+.ws-tool-icon{display:inline-flex;color:var(--muted);}
+.ws-tool-icon svg{width:16px;height:16px;}
+.ws-tool-name{font-size:var(--t-sm);font-weight:600;color:var(--text);white-space:nowrap;}
+.ws-chip{display:inline-flex;align-items:center;gap:5px;padding:1px 8px;border-radius:99px;font-size:var(--t-xs);background:var(--surface-2);color:var(--text-2);border:1px solid var(--border);white-space:nowrap;}
+.ws-chip.is-ok{background:var(--ok-50);color:var(--ok-700);border-color:var(--ok-100);}
+.ws-chip.is-busy{background:var(--wn-50,var(--surface-2));color:var(--wn-700);}
+.ws-chip.is-error{background:var(--dg-50);color:var(--dg-700);border-color:var(--dg-100);}
+.ws-tool-actions{display:flex;align-items:center;gap:4px;margin-left:auto;}
+.ws-tool-icon-btn,.ws-tool-main{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:32px;border-radius:var(--radius-sm);font:inherit;font-size:var(--t-sm);font-weight:600;cursor:pointer;text-decoration:none;}
+.ws-tool-icon-btn{width:32px;padding:0;border:1px solid transparent;background:transparent;color:var(--text-2);}
+.ws-tool-icon-btn:hover,.ws-tool-icon-btn.is-on{background:var(--surface-2);border-color:var(--border);color:var(--text);}
+.ws-tool-main{padding:0 12px;border:1px solid var(--border-strong);background:var(--surface);color:var(--text);}
+.ws-tool-main:hover{border-color:var(--accent);color:var(--accent);}
+.ws-tool-icon-btn svg,.ws-tool-main svg{width:16px;height:16px;}
+.ws-tool-log{flex-basis:100%;margin:2px 0 0;padding:8px;max-height:260px;overflow:auto;font-size:var(--t-xs);background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);white-space:pre-wrap;}
+
+/* Breakpoints for everything above, kept together so they win over the base rules. */
+@media (max-width:1024px){
+  .ws-layout{grid-template-columns:1fr;gap:16px;height:auto;}
+  .ws-gutter{display:none;}
+  .ws-pane{height:80dvh;}
+  .ws-tool-icon-btn{width:44px;height:44px;}
+  .ws-tool-main{height:44px;}
+}
+@media (max-width:640px){
+  .ws-composer-bar .btn,.ws-approval-actions .btn,.ws-review-bar .btn,.ws-review .btn,.ws-threads .btn,.ws-composer-bar .ws-select-sm{min-height:44px;}
+  .ws-threads .btn,.ws-review .btn{min-width:44px;}
+  .ws-upload button{width:44px;height:44px;top:-12px;right:-12px;}
+  .ws-approval,.ws-line,.ws-working{margin-left:0;padding-left:0;}
+  .ws-threads{width:44px;}
+  .ws-threads:not(.is-collapsed){position:absolute;z-index:5;background:var(--surface);height:100%;width:80%;box-shadow:var(--shadow-sm);}
+  .ws-chat-body{position:relative;}
+}
+@media (hover:none){
+  .ws-reset-btn{opacity:1;min-height:44px;}
+  .ws-reset-btn span{display:none;}
+  .ws-thread-actions{display:flex;position:static;}
+}
+button.as-toggle{background:none;border:0;padding:0;font:inherit;font-size:var(--t-xs);}

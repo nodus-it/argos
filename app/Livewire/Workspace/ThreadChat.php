@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Livewire\Workspace;
 
-use App\Enums\ApprovalStatus;
 use App\Enums\PermissionMode;
 use App\Enums\ThreadEventType;
 use App\Enums\ThreadStatus;
@@ -239,9 +238,9 @@ class ThreadChat extends Component
         match ($m[1]) {
             'plan' => $this->runPlan($rest),
             'ship' => $this->dispatch('workspace-ship'),
-            'preview' => $this->dispatch('workspace-tab', tab: 'preview'),
-            'review' => $this->dispatch('workspace-tab', tab: 'review'),
-            'gates' => [$this->dispatch('workspace-tab', tab: 'review'), $this->dispatch('workspace-run-gates')],
+            'preview' => $this->dispatch('workspace-focus', target: 'preview'),
+            'review' => $this->dispatch('workspace-focus', target: 'review'),
+            'gates' => [$this->dispatch('workspace-focus', target: 'review'), $this->dispatch('workspace-run-gates')],
             'checkpoint' => $this->runCheckpoint($rest),
         };
 
@@ -518,12 +517,6 @@ class ThreadChat extends Component
         } catch (AuthorizationException) {
             Notification::make()->title(__('workspaces.thread.viewer_hint'))->warning()->send();
         }
-    }
-
-    /** True when the thread waits for a decision on an approval. */
-    public static function isPending(?ThreadApproval $approval): bool
-    {
-        return $approval !== null && $approval->status === ApprovalStatus::Pending;
     }
 
     /** Session closed although the thread was used: offer to resume. */

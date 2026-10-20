@@ -10,7 +10,7 @@ window.argosWorkspaceLayout = argosWorkspaceLayout;
 
 /**
  * Realtime (Laravel Reverb). The server renders `window.ArgosRealtime` (see
- * AdminPanelProvider) because app images are prebuilt: key and path are
+ * ConfiguresArgosPanel) because app images are prebuilt: key and path are
  * runtime config, the host is whatever the browser is on (Traefik routes
  * /app/ to the reverb service).
  */

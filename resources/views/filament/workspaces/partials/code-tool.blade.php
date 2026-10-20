@@ -1,15 +1,20 @@
-{{-- VS Code (OpenVSCode Server) of the workspace at code-<slug>, opened in
-     its own named tab (one per workspace, reused): the full editor with its
-     shortcuts, and no same-site constraints for embedding. --}}
-<div class="ws-tool ws-tool-code">
-    <span class="ws-tool-label">@svg('heroicon-o-code-bracket') {{ __('workspaces.tabs.code') }}</span>
-    @if (! (auth()->user()?->can('operate', $workspace) ?? false))
-        <span class="muted ws-tool-note">{{ __('workspaces.tabs.code_viewer') }}</span>
-    @elseif ($workspace->status === \App\Enums\WorkspaceStatus::Running)
-        <a class="btn btn-primary btn-sm" href="{{ route('workspaces.open', ['workspace' => $workspace, 'target' => 'code']) }}" target="argos-code-{{ $workspace->slug }}">
-            @svg('heroicon-o-arrow-top-right-on-square') {{ __('workspaces.tabs.open_editor') }}
-        </a>
-    @else
-        <span class="muted ws-tool-note">{{ __('workspaces.tabs.not_running') }}</span>
-    @endif
+{{-- VS Code (OpenVSCode Server) at code-<slug>, opened in its own named tab
+     (one per workspace, reused): the full editor with its shortcuts. --}}
+<div class="ws-tool">
+    <div class="ws-tool-head">
+        <span class="ws-tool-icon">@svg('heroicon-o-code-bracket')</span>
+        <span class="ws-tool-name">VS Code</span>
+        @if (! $canOperate)
+            <span class="ws-chip">{{ __('workspaces.tabs.viewer_short') }}</span>
+        @else
+            <span @class(['ws-chip', 'is-ok' => $running])>{{ $running ? __('workspaces.tabs.ready') : __('workspaces.tabs.not_running_short') }}</span>
+        @endif
+    </div>
+    <div class="ws-tool-actions">
+        @if ($canOperate && $running)
+            <a class="ws-tool-main" href="{{ route('workspaces.open', ['workspace' => $workspace, 'target' => 'code']) }}" target="argos-code-{{ $workspace->slug }}">
+                @svg('heroicon-o-arrow-top-right-on-square') {{ __('workspaces.tabs.open') }}
+            </a>
+        @endif
+    </div>
 </div>

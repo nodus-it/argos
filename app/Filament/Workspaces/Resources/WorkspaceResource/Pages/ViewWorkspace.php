@@ -12,6 +12,7 @@ use App\Models\Workspace;
 use App\Services\Workspace\ThreadService;
 use App\Services\Workspace\WorkspaceException;
 use App\Services\Workspace\WorkspaceGateService;
+use App\Services\Workspace\WorkspaceIssueService;
 use App\Services\Workspace\WorkspaceMemberService;
 use App\Services\Workspace\WorkspaceService;
 use App\Services\Workspace\WorkspaceShipService;
@@ -28,8 +29,9 @@ use Illuminate\Support\HtmlString;
 use Livewire\Attributes\On;
 
 /**
- * The workspace: chat with Claude on the left, editor and preview on the
- * right. The chat itself is the `workspace.thread-chat` Livewire component.
+ * The workspace: threads and chat with Claude on the left, the workbench on
+ * the right (editor and preview open in their own tabs, the review stays).
+ * The parts are Livewire components: thread-chat, preview-panel, review-panel.
  */
 class ViewWorkspace extends ViewRecord
 {
@@ -66,7 +68,7 @@ class ViewWorkspace extends ViewRecord
 
     public function getView(): string
     {
-        return 'filament.admin.resources.workspace.view-workspace';
+        return 'filament.workspaces.view-workspace';
     }
 
     public function getTitle(): string|Htmlable
@@ -77,7 +79,14 @@ class ViewWorkspace extends ViewRecord
     /** Status, branch, PR, issue and members in one line instead of a card. */
     public function getSubheading(): string|Htmlable|null
     {
-        return new HtmlString(view('filament.workspaces.header-meta', ['workspace' => $this->workspace()])->render());
+        $workspace = $this->workspace();
+        $issue = $workspace->external_issue;
+
+        return new HtmlString(view('filament.workspaces.partials.header-meta', [
+            'workspace' => $workspace,
+            'members' => $workspace->members()->with('user')->get(),
+            'issueLabel' => $issue !== null ? app(WorkspaceIssueService::class)->label($issue['number'], $issue['title']) : null,
+        ])->render());
     }
 
     /** `/ship` in the composer opens the ship dialog. */
@@ -174,7 +183,7 @@ class ViewWorkspace extends ViewRecord
                         try {
                             app(WorkspaceGateService::class)->run($this->workspace(), $user);
                             Notification::make()->title(__('workspaces.gates.started'))->success()->send();
-                            $this->dispatch('workspace-tab', tab: 'review');
+                            $this->dispatch('workspace-focus', target: 'review');
                         } catch (WorkspaceException $e) {
                             Notification::make()->title($e->getMessage())->warning()->send();
                         }
@@ -269,7 +278,8 @@ class ViewWorkspace extends ViewRecord
 
         return [
             'workspace' => $workspace,
-            'members' => $workspace->members()->with('user')->get(),
+            'canOperate' => auth()->user()?->can('operate', $workspace) ?? false,
+            'running' => $workspace->status === WorkspaceStatus::Running,
             'transitional' => in_array($workspace->status, [WorkspaceStatus::Provisioning, WorkspaceStatus::Starting, WorkspaceStatus::Stopping], true),
         ];
     }

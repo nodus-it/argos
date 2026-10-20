@@ -178,7 +178,8 @@ class WorkspaceQualityGateTest extends TestCase
         $this->assertStringContainsString('# Quality-Gate-Fix: pest', $message->payload['text']);
 
         // Only failed gates can be sent.
-        $panel->call('sendGateFix', 'pint')->assertStatus(404);
+        $panel->call('sendGateFix', 'pint')->assertNotified(__('workspaces.gates.no_prompt'));
+        $this->assertSame(1, ThreadEvent::query()->where('thread_id', $thread->id)->where('type', ThreadEventType::UserMessage->value)->count());
     }
 
     public function test_viewers_see_results_without_actions(): void
@@ -196,7 +197,7 @@ class WorkspaceQualityGateTest extends TestCase
         Livewire::actingAs($this->editor)->test(ViewWorkspace::class, ['record' => $this->workspace->id])
             ->callAction('gates')
             ->assertNotified(__('workspaces.gates.started'))
-            ->assertDispatched('workspace-tab', tab: 'review');
+            ->assertDispatched('workspace-focus', target: 'review');
 
         $this->assertSame(GateRunStatus::Failed, WorkspaceGateRun::query()->sole()->status);
         $this->assertSame('2/3', $this->service()->summary($this->workspace));

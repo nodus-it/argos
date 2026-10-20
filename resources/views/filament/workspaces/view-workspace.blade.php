@@ -2,10 +2,6 @@
 <x-filament-panels::page>
     {{-- Lets notifications.js skip signals for the workspace in front of you. --}}
     <script>window.ArgosCurrentWorkspace = @js($workspace->id);</script>
-    @php
-        /** @var \App\Models\Workspace $workspace */
-        $statusBadge = \App\Support\BadgeClass::for($workspace->status->color());
-    @endphp
 
     {{-- Container state changes come from queued jobs; poll only while one runs. --}}
     @if ($transitional)
@@ -24,24 +20,27 @@
 
     {{-- Fills the viewport below the header; the chat feed scrolls inside.
          The gutter between the panes sets the split (remembered per browser). --}}
-    <div class="ws-layout" x-data="window.argosWorkspaceLayout ? argosWorkspaceLayout() : { highlight: null, resizing: false, style() { return '' }, startResize() {}, nudge() {}, show() {} }" x-on:workspace-tab.window="show($event.detail.tab)"
+    <div class="ws-layout" x-data="argosWorkspaceLayout()" x-on:workspace-focus.window="show($event.detail.target)"
          :class="{ 'is-resizing': resizing }" :style="style()">
-        <section class="ws-pane ws-pane-chat card">
+        <section class="ws-pane ws-pane-chat card" id="ws-chat-pane">
             @livewire('workspace.thread-chat', ['workspaceId' => $workspace->id], key('chat-'.$workspace->id))
         </section>
 
-        <div class="ws-gutter" role="separator" aria-orientation="vertical" aria-label="{{ __('workspaces.tabs.resize') }}"
-             tabindex="0" x-on:pointerdown.prevent="startResize($event)" x-on:keydown.left.prevent="nudge(-2)" x-on:keydown.right.prevent="nudge(2)"></div>
+        <div class="ws-gutter" role="separator" tabindex="0" aria-orientation="vertical"
+             aria-label="{{ __('workspaces.tabs.resize') }}" aria-controls="ws-chat-pane"
+             aria-valuemin="25" aria-valuemax="70" :aria-valuenow="Math.round(split)"
+             x-on:pointerdown.prevent="startResize($event)"
+             x-on:keydown.left.prevent="nudge(-2)" x-on:keydown.right.prevent="nudge(2)"
+             x-on:keydown.home.prevent="nudge(-100)" x-on:keydown.end.prevent="nudge(100)"></div>
 
         <section class="ws-pane ws-pane-tools card">
-            {{-- Workbench: editor + preview open in their own tabs; the review
-                 (diff, line comments, gates) stays here. --}}
+            {{-- Workbench: editor and preview open in their own tabs; the
+                 review (diff, line comments, gates) stays here. --}}
             <div class="ws-workbench-bar" :class="{ 'is-highlighted': highlight === 'preview' }">
-                @include('filament.admin.resources.workspace.partials.code-tab', ['workspace' => $workspace])
-                <span class="ws-workbench-sep" aria-hidden="true"></span>
-                @include('filament.admin.resources.workspace.partials.preview-tab', ['workspace' => $workspace])
+                @include('filament.workspaces.partials.code-tool')
+                @livewire('workspace.preview-panel', ['workspaceId' => $workspace->id], key('preview-'.$workspace->id))
             </div>
-            <div class="ws-tab-body" x-ref="review">
+            <div class="ws-review-wrap" x-ref="review">
                 @livewire('workspace.review-panel', ['workspaceId' => $workspace->id], key('review-'.$workspace->id))
             </div>
         </section>

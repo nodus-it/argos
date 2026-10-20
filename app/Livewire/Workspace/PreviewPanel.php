@@ -17,8 +17,8 @@ use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 /**
- * Preview tab of a workspace: start/rebuild/stop the live demo, re-run the
- * setup commands, show the build log and the preview itself.
+ * Preview tool of the workbench: start/rebuild/stop the live demo, re-run the
+ * setup commands and show the build log; the preview opens in its own tab.
  */
 class PreviewPanel extends Component
 {

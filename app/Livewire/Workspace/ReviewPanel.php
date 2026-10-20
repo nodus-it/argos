@@ -22,15 +22,16 @@ use Livewire\Attributes\On;
 use Livewire\Component;
 
 /**
- * Review tab: the workspace's diff against its base branch. Line comments
- * are collected in the browser and sent to Claude as one message.
+ * Review in the workbench: the workspace's diff against its base branch and
+ * the quality gates. Line comments are collected in the browser and sent to
+ * Claude as one message.
  */
 class ReviewPanel extends Component
 {
     #[Locked]
     public string $workspaceId;
 
-    /** Load the diff only once the tab is opened. */
+    /** Load the diff only once the review scrolls into view. */
     public bool $loaded = false;
 
     public ?string $threadId = null;

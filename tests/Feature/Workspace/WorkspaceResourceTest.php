@@ -165,7 +165,7 @@ class WorkspaceResourceTest extends TestCase
         $workspace = $this->workspaceFor($me, WorkspaceRole::Viewer);
 
         $this->actingAs($me)->get(ViewWorkspace::getUrl(['record' => $workspace]))
-            ->assertSee(__('workspaces.tabs.code_viewer'))
+            ->assertSee(__('workspaces.tabs.viewer_short'))
             ->assertDontSee('target=code', false)
             ->assertDontSee('/open/code', false);
     }

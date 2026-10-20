@@ -140,8 +140,8 @@ class ThreadComposerTest extends TestCase
         $chat = $this->chat()->set('threadId', $this->thread->id);
 
         $chat->set('draft', '/ship')->call('send')->assertDispatched('workspace-ship');
-        $chat->set('draft', '/preview')->call('send')->assertDispatched('workspace-tab', tab: 'preview');
-        $chat->set('draft', '/review')->call('send')->assertDispatched('workspace-tab', tab: 'review');
+        $chat->set('draft', '/preview')->call('send')->assertDispatched('workspace-focus', target: 'preview');
+        $chat->set('draft', '/review')->call('send')->assertDispatched('workspace-focus', target: 'review');
         $chat->set('draft', '/gates')->call('send')->assertDispatched('workspace-run-gates');
 
         $this->assertCount(0, $this->userMessages());

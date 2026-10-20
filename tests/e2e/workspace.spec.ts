@@ -13,7 +13,7 @@ async function openWorkspace(browser: Browser, email: string): Promise<Page> {
   await login(page, email);
   await page.goto('/w/workspaces');
   await page.getByText('E2E pairing').first().click();
-  await page.waitForURL(/\/admin\/workspaces\/[0-9A-Za-z]+/);
+  await page.waitForURL(/\/w\/workspaces\/[0-9A-Za-z]+/);
   await expect(page.locator('.ws-chat')).toBeVisible();
   return page;
 }

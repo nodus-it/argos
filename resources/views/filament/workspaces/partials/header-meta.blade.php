@@ -1,5 +1,7 @@
 @php
     /** @var \App\Models\Workspace $workspace */
+    /** @var \Illuminate\Support\Collection<int, \App\Models\WorkspaceMember> $members */
+    /** @var string|null $issueLabel */
     $statusBadge = \App\Support\BadgeClass::for($workspace->status->color());
 @endphp
 {{-- One compact line under the workspace name (the page header). --}}
@@ -15,14 +17,14 @@
             @endif
         </a>
     @endif
-    @if ($workspace->external_issue)
+    @if ($issueLabel !== null)
         <a class="ws-headline-item" href="{{ $workspace->external_issue['url'] }}" target="_blank" rel="noopener" title="{{ __('workspaces.fields.issue') }}">
-            @svg('heroicon-o-ticket') {{ app(\App\Services\Workspace\WorkspaceIssueService::class)->label($workspace->external_issue['number'], $workspace->external_issue['title']) }}
+            @svg('heroicon-o-ticket') {{ $issueLabel }}
         </a>
     @endif
     <span class="ws-headline-members" title="{{ __('workspaces.fields.members') }}">
-        @foreach ($workspace->members()->with('user')->get() as $member)
-            <span class="ws-avatar ws-avatar-sm" title="{{ $member->user->name }} ({{ $member->role->label() }})">{{ \Illuminate\Support\Str::of($member->user->name)->explode(' ')->map(fn ($w) => mb_substr($w, 0, 1))->take(2)->implode('') }}</span>
+        @foreach ($members as $member)
+            <span class="ws-avatar ws-avatar-sm" role="img" aria-label="{{ $member->user->name }} ({{ $member->role->label() }})" title="{{ $member->user->name }} ({{ $member->role->label() }})">{{ \App\Support\Initials::of($member->user->name) }}</span>
         @endforeach
     </span>
 </span>

@@ -15,10 +15,10 @@
         async send() { if (await $wire.sendComments(this.comments)) { this.comments = []; } },
      }"
      x-intersect.once="$wire.load()"
-     x-init="window.addEventListener('argos-turn-completed', () => { stale = true; })"
+     x-on:argos-turn-completed.window="stale = true"
      x-on:argos-gates-updated.window="$wire.$refresh()">
 
-    <div class="ws-frame-bar">
+    <div class="ws-review-bar">
         @if ($diff)
             <span class="muted">
                 {{ __('workspaces.review.summary', ['files' => count($diff['files']), 'ahead' => $diff['ahead'], 'uncommitted' => $diff['uncommitted']]) }}
@@ -88,7 +88,7 @@
                 <div class="ws-review-comment">
                     <span class="mono" x-text="c.path + ':' + c.line"></span>
                     <span x-text="c.text"></span>
-                    <button type="button" class="btn btn-ghost btn-sm" x-on:click="remove(i)">@svg('heroicon-o-x-mark')</button>
+                    <button type="button" class="btn btn-ghost btn-sm" x-on:click="remove(i)" title="{{ __('workspaces.review.remove') }}" aria-label="{{ __('workspaces.review.remove') }}">@svg('heroicon-o-x-mark')</button>
                 </div>
             </template>
             <div class="ws-row">
@@ -136,7 +136,7 @@
                             @foreach ($hunk['lines'] as $line)
                                 @php $lineNo = $line['new_num'] ?? $line['old_num']; @endphp
                                 <div @class(['diff-row', 'add' => $line['type'] === 'add', 'del' => $line['type'] === 'del', 'ws-commentable' => $canWrite])
-                                     @if ($canWrite) x-on:click="open(@js($path), @js($lineNo))" title="{{ __('workspaces.review.comment') }}" @endif>
+                                     @if ($canWrite) x-on:click="open(@js($path), @js($lineNo))" x-on:keydown.enter.prevent="open(@js($path), @js($lineNo))" tabindex="0" role="button" title="{{ __('workspaces.review.comment') }}" @endif>
                                     <span class="gut"><span>{{ $line['old_num'] ?? '' }}</span><span>{{ $line['new_num'] ?? '' }}</span></span>
                                     <span class="code">{{ $line['type'] === 'add' ? '+' : ($line['type'] === 'del' ? '-' : ' ') }}{{ $line['text'] }}</span>
                                 </div>

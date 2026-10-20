@@ -121,7 +121,7 @@ class WorkspacePreviewTest extends TestCase
 
         Livewire::actingAs($this->editor)
             ->test(PreviewPanel::class, ['workspaceId' => $this->workspace->id])
-            ->assertSee(__('workspaces.preview.start'))
+            ->assertSee(__('workspaces.preview.start_short'))
             ->call('start')
             ->assertSee(__('workspaces.preview.queued'));
         Queue::assertPushed(DeployWorkspaceDemoJob::class);
@@ -142,7 +142,7 @@ class WorkspacePreviewTest extends TestCase
     {
         Livewire::actingAs($this->member(WorkspaceRole::Viewer))
             ->test(PreviewPanel::class, ['workspaceId' => $this->workspace->id])
-            ->assertDontSee(__('workspaces.preview.start'));
+            ->assertDontSee(__('workspaces.preview.start_short'));
     }
 
     public function test_expired_workspace_previews_are_stopped_by_the_cleanup(): void
