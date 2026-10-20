@@ -7,10 +7,14 @@ namespace App\Providers;
 use App\Services\Anthropic\AnthropicTokenValidator;
 use App\Services\GitProvider\GitProviderRegistry;
 use App\Services\Workflow\PhaseRunner;
+use App\Services\Workspace\WorkspaceDaemonClient;
+use App\Services\Workspace\WorkspaceProvisioner;
 use App\Testing\E2eConnectAccountCommand;
 use App\Testing\FakeAnthropicTokenValidator;
 use App\Testing\FakeGitService;
 use App\Testing\FakePhaseRunner;
+use App\Testing\FakeWorkspaceDaemon;
+use App\Testing\FakeWorkspaceProvisioner;
 use Illuminate\Support\ServiceProvider;
 use RuntimeException;
 
@@ -57,6 +61,11 @@ class E2eFakeServiceProvider extends ServiceProvider
         // Replace the phase runner so concept/implement/push complete
         // deterministically without docker, image builds, or volume I/O.
         $this->app->singleton(PhaseRunner::class, FakePhaseRunner::class);
+
+        // Workspaces: no containers, and a scripted daemon that feeds events
+        // through the real ingest path.
+        $this->app->singleton(WorkspaceDaemonClient::class, FakeWorkspaceDaemon::class);
+        $this->app->singleton(WorkspaceProvisioner::class, FakeWorkspaceProvisioner::class);
 
         // Test-only seeding helper for OAuth-auth runs (the real browser OAuth
         // redirect can't be automated offline). Registered here so it never

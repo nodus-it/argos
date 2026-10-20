@@ -114,10 +114,9 @@ class AdminPanelProvider extends PanelProvider
                 PanelsRenderHook::HEAD_END,
                 function (): HtmlString {
                     $realtime = config('broadcasting.default') === 'reverb';
-                    $entries = $realtime ? ['resources/css/app.css', 'resources/js/app.js'] : ['resources/css/app.css'];
 
                     try {
-                        $assets = app(Vite::class)($entries)->toHtml();
+                        $assets = app(Vite::class)(['resources/css/app.css', 'resources/js/app.js'])->toHtml();
                     } catch (ViteManifestNotFoundException) {
                         $assets = '';
                     }

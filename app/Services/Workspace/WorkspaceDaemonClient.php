@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Workspace;
 
 use App\Integrations\WorkspaceDaemon\WorkspaceDaemonApi;
+use App\Integrations\WorkspaceDaemon\WorkspaceDaemonTransport;
 use App\Models\Workspace;
 
 /**
@@ -18,7 +19,7 @@ class WorkspaceDaemonClient
         return 'http://'.$workspace->containerName().':'.(int) config('argos.workspaces.daemon_port', 7777);
     }
 
-    public function for(Workspace $workspace, int $timeoutSeconds = 15): WorkspaceDaemonApi
+    public function for(Workspace $workspace, int $timeoutSeconds = 15): WorkspaceDaemonTransport
     {
         return new WorkspaceDaemonApi($this->baseUrl($workspace), $workspace->daemon_token, $timeoutSeconds);
     }

@@ -220,10 +220,10 @@ jobs:
           ARGOS_E2E_FAKE=1
           EOF
 
-      - name: Bring up the stack (db, redis, app, queue, nginx, traefik)
+      - name: Bring up the stack (db, redis, app, queue, nginx, traefik, reverb)
         run: |
           docker compose --env-file .env -f .tools/docker/docker-compose.yml \
-            up -d --wait db redis app queue nginx traefik
+            up -d --wait db redis app queue nginx traefik reverb
 
       - name: Seed the full demo profile
         run: |

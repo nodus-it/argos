@@ -52,3 +52,7 @@ services:
   queue:
     environment:
       <<: *e2e-env
+
+  reverb:
+    environment:
+      <<: *e2e-env

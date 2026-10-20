@@ -81,6 +81,19 @@ services:
       - /app/public/build
       - /app/bootstrap/cache
 
+  reverb:
+    environment:
+      APP_NAME:  "${APP_NAME:-Argos}"
+      APP_ENV:   "${APP_ENV:-local}"
+      APP_DEBUG: "${APP_DEBUG:-true}"
+      APP_KEY:   "${APP_KEY:-base64:28CjcHgVoyT5B9N4+XGZuGrahXj6KrALGKEbrbgm+JY=}"
+      LOG_LEVEL: "${LOG_LEVEL:-debug}"
+    volumes:
+      - ../..:/app
+      - /app/node_modules
+      - /app/public/build
+      - /app/bootstrap/cache
+
   # phpMyAdmin on port 8081 (override via ARGOS_PMA_PORT) — dev only.
   phpmyadmin:
     image: phpmyadmin:5

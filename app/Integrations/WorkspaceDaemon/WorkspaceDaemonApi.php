@@ -22,7 +22,7 @@ use Saloon\Http\Request;
  * DaemonTransportException so callers outside App\Integrations never touch
  * Saloon types.
  */
-class WorkspaceDaemonApi
+class WorkspaceDaemonApi implements WorkspaceDaemonTransport
 {
     private readonly WorkspaceDaemonConnector $connector;
 
