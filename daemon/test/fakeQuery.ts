@@ -53,6 +53,13 @@ export class FakeQuery implements QueryLike {
         return [{ name: 'review', description: 'Review the diff', argumentHint: '[path]' }];
     }
 
+    async supportedModels(): Promise<unknown[]> {
+        return [
+            { value: 'default', displayName: 'Default (recommended)', description: 'Sonnet 5.5', resolvedModel: 'claude-sonnet-5-5' },
+            { value: 'opus', displayName: 'Opus', description: 'Most capable', resolvedModel: 'claude-opus-5-5' },
+        ];
+    }
+
     close(): void {
         this.closed = true;
     }

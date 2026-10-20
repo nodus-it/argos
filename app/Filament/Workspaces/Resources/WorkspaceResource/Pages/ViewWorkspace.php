@@ -24,6 +24,7 @@ use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Support\HtmlString;
 use Livewire\Attributes\On;
 
 /**
@@ -71,6 +72,12 @@ class ViewWorkspace extends ViewRecord
     public function getTitle(): string|Htmlable
     {
         return $this->workspace()->name;
+    }
+
+    /** Status, branch, PR, issue and members in one line instead of a card. */
+    public function getSubheading(): string|Htmlable|null
+    {
+        return new HtmlString(view('filament.workspaces.header-meta', ['workspace' => $this->workspace()])->render());
     }
 
     /** `/ship` in the composer opens the ship dialog. */

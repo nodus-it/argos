@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services\Workspace;
 
-use App\Enums\ClaudeModel;
 use App\Enums\ThreadEventType;
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
 use App\Integrations\WorkspaceDaemon\WorkspaceDaemonTransport;
@@ -60,7 +59,8 @@ class WorkspaceShipService
             $result = $api->oneshot([
                 'agent_id' => $agent->id,
                 'oauth_token' => (string) ($agent->credentials['token'] ?? ''),
-                'model' => ClaudeModel::default('commit-message')->value,
+                // Alias: always the newest Haiku the subscription offers.
+                'model' => 'haiku',
                 'system_prompt' => (string) file_get_contents(base_path('worker/prompts/commit-message.system.md')),
                 'user_prompt' => $this->prompt($workspace, $diff),
                 'json_schema' => json_decode((string) file_get_contents(base_path('worker/schemas/commit-message.schema.json')), true),

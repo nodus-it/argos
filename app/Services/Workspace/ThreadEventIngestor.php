@@ -41,6 +41,7 @@ class ThreadEventIngestor
         private readonly WorkspaceNotifier $notifier,
         private readonly WorkspaceGateService $gates,
         private readonly ThreadCheckpointService $checkpoints,
+        private readonly ModelCatalog $models,
     ) {}
 
     /**
@@ -198,6 +199,9 @@ class ThreadEventIngestor
                 $thread->claude_session_id = is_string($data['claude_session_id'] ?? null) ? $data['claude_session_id'] : $thread->claude_session_id;
                 if (is_array($data['commands'] ?? null)) {
                     $thread->commands = $this->commands($data['commands']);
+                }
+                if (is_array($data['models'] ?? null) && $thread->agentCredential instanceof AgentCredential) {
+                    $this->models->record($thread->agentCredential, $data['models']);
                 }
 
                 return $broadcast;

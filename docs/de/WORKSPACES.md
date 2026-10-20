@@ -29,9 +29,8 @@ ist der interaktive. Beide nutzen dieselben Projekte, Worker-Stacks und Agenten.
 - [Freigaben, Pläne und Fragen](#freigaben-plane-und-fragen)
 - [Zusammenarbeiten](#zusammenarbeiten)
 - [Übersicht und Benachrichtigungen](#ubersicht-und-benachrichtigungen)
-- [Der Code-Tab (VS Code)](#der-code-tab-vs-code)
-- [Der Preview-Tab](#der-preview-tab)
-- [Der Review-Tab](#der-review-tab)
+- [Der Arbeitsbereich: Editor und Preview](#der-arbeitsbereich-editor-und-preview)
+- [Das Review](#das-review)
 - [Quality-Gates](#quality-gates)
 - [Checkpoints und Zurücksetzen](#checkpoints-und-zurucksetzen)
 - [Ausliefern: Commit und Pull Request](#ausliefern-commit-und-pull-request)
@@ -113,7 +112,7 @@ Request im Issue. Geschlossen wird das Issue durch den Merge, nie durch Argos.
 ## Threads
 
 Der linke Teil der Workspace-Seite ist der Chat; zieh den Trenner zwischen
-Chat und den Tabs, um die Aufteilung zu ändern (dein Browser merkt sie sich).
+Chat und dem Arbeitsbereich, um die Aufteilung zu ändern (dein Browser merkt sie sich).
 Die Seite füllt das Fenster, und nur die Unterhaltung scrollt. Lege einen
 **Thread** an
 (Titel, Agent, Modell, Modus) und schreib los. Claudes Antwort erscheint live;
@@ -160,7 +159,7 @@ archivierte zurück. Auf schmalen Bildschirmen klappt die Liste ein.
   |---|---|
   | `/plan [Anfrage]` | In den Plan-Mode wechseln, optional die Anfrage senden. |
   | `/ship` | Den Dialog für Commit und Pull Request öffnen. |
-  | `/preview`, `/review` | Den Preview- bzw. Review-Tab zeigen. |
+  | `/preview`, `/review` | Auf die Preview-Steuerung bzw. das Review zeigen. |
   | `/gates` | Die [Quality-Gates](#quality-gates) ausführen. |
   | `/checkpoint [Name]` | Einen benannten [Checkpoint](#checkpoints-und-zurucksetzen) setzen. |
 
@@ -223,44 +222,49 @@ eine Benachrichtigung (und ein Zähler im Tab-Titel) nur, wenn der betreffende
 Workspace nicht gerade vor dir offen ist; Browser-Benachrichtigungen erlaubst
 du in deinem **Profil**, wo du auch jede Art einzeln abschalten kannst.
 
-## Der Code-Tab (VS Code)
+## Der Arbeitsbereich: Editor und Preview
 
-Die rechte Hälfte zeigt **VS Code** (OpenVSCode Server) auf dem Workspace-Volume.
-Was du änderst, sieht Claude sofort — und umgekehrt.
+Der rechte Teil der Seite ist der Arbeitsbereich. Seine Leiste öffnet Editor und
+Preview jeweils in **einem eigenen Browser-Tab** — einer pro Workspace, beim
+nächsten Klick wiederverwendet. So bekommen beide das ganze Fenster,
+Tastenkürzel funktionieren, und auch Apps, die sich nicht einbetten lassen,
+werden angezeigt. Unter der Leiste liegt das [Review](#das-review) der
+Änderungen.
 
-Der Zugriff auf den Editor-Host wird bei jeder Anfrage gegen die Mitgliedschaft
-im Workspace geprüft: Die Workspace-Seite gibt deinem Browser ein kurzlebiges
-Ticket, das gegen ein Cookie auf dem Editor-Host getauscht wird. Browser senden
-dieses Cookie in einem eingebetteten Frame nur, wenn der Editor-Host zur selben
-Site wie Argos gehört (z. B. `argos.example.com` und
-`code-x.argos.example.com`). In anderen Setups — etwa dem lokalen Standard
-`127.0.0.1` / `nip.io` — bietet der Tab stattdessen **VS Code öffnen** in einem
-eigenen Browser-Tab an; der Zugriff funktioniert genauso.
+### VS Code
 
-## Der Preview-Tab
+**VS Code öffnen** öffnet VS Code (OpenVSCode Server) auf dem Workspace-Volume.
+Was du änderst, sieht Claude sofort und umgekehrt. Der Zugang zum Editor-Host
+wird bei jeder Anfrage gegen die Mitgliedschaft im Workspace geprüft: Argos gibt
+deinem Browser ein kurzlebiges Ticket, das gegen ein Cookie auf dem Editor-Host
+getauscht wird.
+
+### Preview
 
 Die Preview ist eine [Live-Demo](LIVE-DEMOS.md) des Workspaces: derselbe
-Demo-Vertrag (`.argos/demo.*` oder der eingebaute Laravel-Standard), sie mountet
-aber das **Workspace-Volume** und zeigt so immer die aktuellen Dateien. Sie ist
-nur für Mitglieder zugänglich (Zugriffsmodus `workspace`) und wird bei Bedarf
-gestartet.
+Demo-Vertrag (`.argos/demo.*` oder der eingebaute Laravel-Standard), aber sie
+mountet das **Workspace-Volume** und zeigt daher immer die aktuellen Dateien.
+Sie ist nur für Mitglieder zugänglich (Zugriffsmodus `workspace`) und wird bei
+Bedarf gestartet.
 
-- **Preview starten** baut sie, **Neu bauen** ersetzt sie.
+- **Preview starten** baut sie, **Preview öffnen** öffnet sie, **Neu bauen**
+  ersetzt sie. Die Leiste zeigt ihren Zustand; ein fehlgeschlagener Build zeigt
+  das Build-Log.
 - **Setup-Befehle erneut ausführen** führt die Befehle des Vertrags in der
-  laufenden Preview erneut aus — nach einer Migration, einer
+  laufenden Preview noch einmal aus — nach einer Migration, einer
   `composer`-/`npm`-Änderung oder einer geänderten Build-Konfiguration.
   PHP-Änderungen erscheinen auch ohne.
-- Die Befehle laufen als Agent-Benutzer des Workspaces, damit die Dateien, die
-  sie anlegen (z. B. `vendor/`), bearbeitbar bleiben.
+- Befehle und PHP laufen als Agent-Benutzer des Workspaces, damit Dateien, die
+  sie anlegen (z. B. `vendor/`, kompilierte Views), bearbeitbar bleiben.
 - Die TTL der Previews und das plattformweite Limit gleichzeitiger Live-Demos
   gelten.
 
 Previews brauchen `ARGOS_PREVIEW_ENABLED` und den Schalter *Live-Demo* im
 Projekt.
 
-## Der Review-Tab
+## Das Review
 
-Der Review-Tab zeigt die Änderungen des Workspaces gegenüber dem Basis-Branch —
+Das Review zeigt die Änderungen des Workspaces gegenüber dem Basis-Branch —
 Commits, nicht committete Änderungen und neue Dateien — Datei für Datei. Hat
 Claude einen Turn beendet, markiert er sich als *seit deinem Blick geändert*;
 **Aktualisieren** lädt neu.
@@ -271,7 +275,7 @@ werden gesammelt; **An Claude senden** schickt sie als eine Nachricht
 
 ## Quality-Gates
 
-**Gates prüfen** (im Review-Tab, im Menü der Kopfzeile oder per `/gates`) führt
+**Gates prüfen** (im Review, im Menü der Kopfzeile oder per `/gates`) führt
 dieselben Quality-Gates aus wie die Implementierungsphase von Aufgaben
 (`worker/lib/quality.sh`): Artisan-Start, Pint auf geänderten Dateien,
 Pest/PHPUnit, PHPStan, Migrations-Syntax, Debug-Aufrufe und vorhandene Tests.

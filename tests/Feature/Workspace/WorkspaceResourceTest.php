@@ -139,20 +139,15 @@ class WorkspaceResourceTest extends TestCase
             ->assertActionHidden('members');
     }
 
-    public function test_code_tab_embeds_only_on_same_site_setups(): void
+    public function test_the_editor_opens_in_its_own_reused_tab(): void
     {
         $me = User::factory()->create();
         $workspace = $this->workspaceFor($me);
         $openUrl = route('workspaces.open', ['workspace' => $workspace, 'target' => 'code']);
 
-        config(['app.url' => 'https://argos.example.com', 'argos.preview.base_domain' => 'argos.example.com']);
         $this->actingAs($me)->get(ViewWorkspace::getUrl(['record' => $workspace]))
-            ->assertSee('<iframe class="ws-frame" src="'.$openUrl.'"', false);
-
-        config(['app.url' => 'http://127.0.0.1:8080', 'argos.preview.base_domain' => '127.0.0.1.nip.io']);
-        $this->actingAs($me)->get(ViewWorkspace::getUrl(['record' => $workspace]))
-            ->assertDontSee('<iframe class="ws-frame"', false)
-            ->assertSee(__('workspaces.tabs.open_editor'));
+            ->assertDontSee('<iframe', false)
+            ->assertSee('href="'.$openUrl.'" target="argos-code-'.$workspace->slug.'"', false);
     }
 
     public function test_code_tab_explains_a_stopped_workspace(): void

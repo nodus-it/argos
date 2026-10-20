@@ -18,19 +18,31 @@ function readSplit() {
 
 export function argosWorkspaceLayout() {
     return {
-        tab: 'code',
+        highlight: null,
         split: readSplit(),
         top: 0,
         resizing: false,
 
         init() {
             const measure = () => {
-                this.top = Math.max(0, Math.round(this.$el.getBoundingClientRect().top + window.scrollY));
+                this.top = Math.max(0, Math.round(this.$root.getBoundingClientRect().top + window.scrollY));
             };
             measure();
             window.addEventListener('resize', measure);
             // Banners above (status, usage limit) appear and disappear.
             new ResizeObserver(measure).observe(document.querySelector('.fi-main') ?? document.body);
+        },
+
+        /** `/preview` and `/review`: point at the control instead of switching tabs. */
+        show(target) {
+            if (target === 'review') {
+                this.$refs.review?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                return;
+            }
+            this.highlight = target;
+            setTimeout(() => {
+                this.highlight = null;
+            }, 1600);
         },
 
         style() {
@@ -39,9 +51,13 @@ export function argosWorkspaceLayout() {
 
         startResize(event) {
             this.resizing = true;
-            const rect = this.$el.getBoundingClientRect();
+            // $root, not $el: inside the handler $el is the gutter itself.
+            const rect = this.$root.getBoundingClientRect();
+            // Keep the grab offset, so the divider does not jump to the pointer.
+            const startX = event.clientX;
+            const startSplit = this.split;
             const move = (e) => {
-                this.split = Math.min(MAX, Math.max(MIN, ((e.clientX - rect.left) / rect.width) * 100));
+                this.split = Math.min(MAX, Math.max(MIN, startSplit + ((e.clientX - startX) / rect.width) * 100));
             };
             const stop = () => {
                 this.resizing = false;
@@ -51,7 +67,6 @@ export function argosWorkspaceLayout() {
             };
             window.addEventListener('pointermove', move);
             window.addEventListener('pointerup', stop);
-            move(event);
         },
 
         nudge(delta) {

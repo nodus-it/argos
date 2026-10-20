@@ -7,7 +7,6 @@ namespace App\Services\Workspace;
 use App\Enums\AgentName;
 use App\Enums\ApprovalKind;
 use App\Enums\ApprovalStatus;
-use App\Enums\ClaudeModel;
 use App\Enums\PermissionMode;
 use App\Enums\ThreadEventType;
 use App\Enums\ThreadStatus;
@@ -54,7 +53,7 @@ class ThreadService
             'title' => $title,
             'status' => ThreadStatus::Closed,
             'permission_mode' => $mode,
-            'model' => $model ?? $agent->default_model ?? ClaudeModel::Sonnet46->value,
+            'model' => $model ?? $agent->default_model ?? ModelCatalog::DEFAULT,
             'last_seq' => 0,
             'cost_usd' => 0,
             'session_open' => false,

@@ -188,7 +188,7 @@ Projekt aktiviert sind und die Implement-Phase abgeschlossen ist):
   Remote synchronisiert — der Workspace ist die Wahrheit,
 - sie liegt unter `demo-ws-<workspace>.<basisdomain>` und ist immer mit dem
   Zugriffsmodus `workspace` geschützt (nur Mitglieder),
-- sie wird bei Bedarf über den Preview-Tab gestartet, und die Befehle des
+- sie wird bei Bedarf im Arbeitsbereich des Workspaces gestartet, und die Befehle des
   Vertrags laufen als Agent-Benutzer des Workspaces, damit die angelegten Dateien
   bearbeitbar bleiben.
 

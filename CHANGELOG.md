@@ -24,6 +24,8 @@ in the browser, together. See [Workspaces](docs/WORKSPACES.md).
 - **From an issue:** start a workspace from an issue of the project's tracker — named and branched after it (`ws/<nr>-<slug>`), first message prefilled as untrusted input, `Closes #<nr>` and an issue comment when shipping.
 - **Quality gates on demand:** the worker's gates (Pint, Pest/PHPUnit, PHPStan, …) run inside the workspace against a baseline of the base branch; results and logs in the Review tab, *send errors to agent* with the task flow's fix prompt, a warning (not a blocker) in the ship dialog.
 - **Checkpoints:** a git snapshot before every turn (untracked files included, branch/index untouched, 200 per thread); *Reset to here* with a diff preview, undoable, never touching commits; Claude is told about the reset.
+- **Own workspaces area:** workspaces live at `/w` (where `/` now leads) — full width, top navigation, a page that fills the window with a resizable chat/workbench split; administration stays at `/admin`. VS Code and the preview open in their own (reused) browser tabs instead of iframes.
+- **Models from the subscription:** the model picker lists what Claude Code reports for the agent's subscription (aliases like `sonnet` follow the newest model) instead of fixed model ids.
 - **Operations:** idle stop and an orphan sweep for workspace containers; the test suite memory limit is 1G.
 
 ## [0.3.0-beta.1] - 2026-06-19

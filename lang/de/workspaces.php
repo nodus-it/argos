@@ -5,6 +5,9 @@ declare(strict_types=1);
 return [
     'label' => 'Workspace',
     'plural' => 'Workspaces',
+    'models' => [
+        'alias' => ':family (neuestes)',
+    ],
     'panel' => [
         'admin' => 'Verwaltung',
     ],
@@ -51,6 +54,10 @@ return [
         'failed' => 'Der Workspace konnte nicht starten.',
     ],
     'preview' => [
+        'live' => 'Läuft',
+        'failed_short' => 'Build fehlgeschlagen',
+        'stopped_short' => 'Gestoppt',
+        'none_short' => 'Nicht gestartet',
         'disabled_platform' => 'Live-Previews sind in dieser Installation abgeschaltet (ARGOS_PREVIEW_ENABLED).',
         'disabled_project' => 'Live-Previews sind für dieses Projekt aus. Aktiviere „Live-Demo“ in den Projekteinstellungen.',
         'not_live' => 'Die Preview läuft nicht.',
@@ -194,18 +201,15 @@ return [
         'resize' => 'Breite von Chat und Werkzeugen ändern',
         'review' => 'Review',
         'code_viewer' => 'Der Editor steht Besitzern und Bearbeitern dieses Workspaces zur Verfügung.',
-        'not_embeddable' => 'In diesem Setup kann der Browser Workspace-Hosts nicht einbetten (App und Workspace-Hosts liegen auf verschiedenen Sites). Öffne sie in einem eigenen Tab — der Zugriff funktioniert genauso.',
         'open_editor' => 'VS Code öffnen',
         'open_preview' => 'Preview öffnen',
-        'code_hint' => 'Änderungen landen direkt im Workspace und sind sofort für Claude sichtbar.',
         'not_running' => 'Starte den Workspace, um Editor und Preview zu öffnen.',
         'code' => 'Code',
         'preview' => 'Preview',
-        'open_new_tab' => 'In neuem Tab öffnen',
         'coming_soon' => 'Noch nicht verfügbar.',
     ],
     'thread' => [
-        'model_default' => 'Standard des Agenten (sonst Sonnet)',
+        'model_default' => 'Standard des Agenten (sonst neuestes Sonnet)',
         'attach' => 'Bilder anhängen',
         'drop_hint' => 'Bilder hier ablegen, um sie anzuhängen',
         'image' => 'Angehängtes Bild',

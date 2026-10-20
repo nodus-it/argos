@@ -221,6 +221,13 @@ export function mapCommands(commands: unknown[]): { name: string; description: s
         .map((c) => ({ name: c.name, description: c.description ?? '', argument_hint: c.argumentHint ?? '' }));
 }
 
+/** SDK ModelInfo rows → wire shape; `resolved_model` is what an alias points at. */
+export function mapModels(models: unknown[]): { value: string; display_name: string; description: string; resolved_model: string | null }[] {
+    return models
+        .filter((m): m is { value: string; displayName?: string; description?: string; resolvedModel?: string } => typeof m === 'object' && m !== null && typeof (m as { value?: unknown }).value === 'string')
+        .map((m) => ({ value: m.value, display_name: m.displayName ?? m.value, description: m.description ?? '', resolved_model: m.resolvedModel ?? null }));
+}
+
 function blocksOf(content: unknown): ContentBlock[] {
     if (!Array.isArray(content)) {
         return [];

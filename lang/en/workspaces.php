@@ -5,6 +5,9 @@ declare(strict_types=1);
 return [
     'label' => 'Workspace',
     'plural' => 'Workspaces',
+    'models' => [
+        'alias' => ':family (newest)',
+    ],
     'panel' => [
         'admin' => 'Administration',
     ],
@@ -51,6 +54,10 @@ return [
         'failed' => 'The workspace failed to start.',
     ],
     'preview' => [
+        'live' => 'Live',
+        'failed_short' => 'Build failed',
+        'stopped_short' => 'Stopped',
+        'none_short' => 'Not started',
         'disabled_platform' => 'Live previews are switched off on this installation (ARGOS_PREVIEW_ENABLED).',
         'disabled_project' => 'Live previews are off for this project. Enable “Live demo” in the project settings.',
         'not_live' => 'The preview is not running.',
@@ -194,18 +201,15 @@ return [
         'resize' => 'Resize chat and tools',
         'review' => 'Review',
         'code_viewer' => 'The editor is available to owners and editors of this workspace.',
-        'not_embeddable' => 'On this setup the browser cannot embed workspace hosts (the app and the workspace hosts are on different sites). Open them in their own tab — access works the same.',
         'open_editor' => 'Open VS Code',
         'open_preview' => 'Open preview',
-        'code_hint' => 'Changes are saved to the workspace and visible to Claude right away.',
         'not_running' => 'Start the workspace to open the editor and the preview.',
         'code' => 'Code',
         'preview' => 'Preview',
-        'open_new_tab' => 'Open in new tab',
         'coming_soon' => 'Not available yet.',
     ],
     'thread' => [
-        'model_default' => 'Agent default (otherwise Sonnet)',
+        'model_default' => 'Agent default (otherwise newest Sonnet)',
         'attach' => 'Attach images',
         'drop_hint' => 'Drop images to attach them',
         'image' => 'Attached image',

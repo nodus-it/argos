@@ -5,7 +5,7 @@ import type { Options, PermissionMode, PermissionResult, SDKUserMessage } from '
 import { ApprovalRegistry } from './approvals.js';
 import type { EventSink, PendingEvent, ThreadState } from './events.js';
 import { InputQueue } from './inputQueue.js';
-import { mapCommands, Normalizer, type SdkMessageLike } from './normalize.js';
+import { mapCommands, mapModels, Normalizer, type SdkMessageLike } from './normalize.js';
 import { extractResetAt, isUsageLimitMessage } from './usageLimit.js';
 
 /** The parts of the SDK's `Query` the session relies on. */
@@ -14,6 +14,8 @@ export interface QueryLike extends AsyncIterable<SdkMessageLike> {
     setPermissionMode(mode: PermissionMode): Promise<void>;
     setModel(model?: string): Promise<void>;
     supportedCommands(): Promise<unknown[]>;
+    /** Models the session may use (aliases resolve to the newest model). */
+    supportedModels?(): Promise<unknown[]>;
     close(): void;
 }
 
@@ -273,9 +275,13 @@ export class ThreadSession {
             this.claudeSessionId = message.session_id;
             const events = this.normalizer.normalize(message);
             const commands = await query.supportedCommands().then(mapCommands, () => null);
+            const models = query.supportedModels !== undefined ? await query.supportedModels().then(mapModels, () => null) : null;
             for (const event of events) {
                 if (event.type === 'session.started' && commands !== null) {
                     event.data.commands = commands;
+                }
+                if (event.type === 'session.started' && models !== null && models.length > 0) {
+                    event.data.models = models;
                 }
                 this.emit(event);
             }

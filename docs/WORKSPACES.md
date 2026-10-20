@@ -27,9 +27,8 @@ projects, worker stacks and agents.
 - [Approvals, plans and questions](#approvals-plans-and-questions)
 - [Working together](#working-together)
 - [Overview and notifications](#overview-and-notifications)
-- [The Code tab (VS Code)](#the-code-tab-vs-code)
-- [The Preview tab](#the-preview-tab)
-- [The Review tab](#the-review-tab)
+- [The workbench: editor and preview](#the-workbench-editor-and-preview)
+- [The review](#the-review)
 - [Quality gates](#quality-gates)
 - [Checkpoints and reset](#checkpoints-and-reset)
 - [Shipping: commit and pull request](#shipping-commit-and-pull-request)
@@ -108,7 +107,7 @@ issue. The issue is closed by merging, never by Argos.
 ## Threads
 
 The left part of the workspace page is the chat; drag the divider between
-chat and the tabs to change the split (your browser remembers it). The page
+chat and the workbench to change the split (your browser remembers it). The page
 fills the window, and only the conversation scrolls. Create a **thread** (title,
 agent, model, mode), then write. Claude's answer streams in live; tool calls
 (reading files, running commands, editing) appear as compact rows you can expand.
@@ -147,7 +146,7 @@ screens the list folds away.
   |---|---|
   | `/plan [request]` | Switch to plan mode, optionally send the request. |
   | `/ship` | Open the commit & pull request dialog. |
-  | `/preview`, `/review` | Show the Preview or Review tab. |
+  | `/preview`, `/review` | Point at the preview controls or the review. |
   | `/gates` | Run the [quality gates](#quality-gates). |
   | `/checkpoint [name]` | Set a named [checkpoint](#checkpoints-and-reset). |
 
@@ -208,39 +207,43 @@ browser, a notification (and a counter in the tab title) only shows when the
 workspace in question is not open in front of you; allow browser notifications
 in your **profile**, where you can also switch each kind off.
 
-## The Code tab (VS Code)
+## The workbench: editor and preview
 
-The right half shows **VS Code** (OpenVSCode Server) on the workspace volume.
+The right part of the page is the workbench. Its bar opens the editor and the
+preview, each in **its own browser tab** — one per workspace, reused on the
+next click — so both get the whole window, keyboard shortcuts work and apps
+that refuse to be embedded still show. Below the bar sits the
+[review](#the-review) of the changes.
+
+### VS Code
+
+**Open VS Code** opens VS Code (OpenVSCode Server) on the workspace volume.
 What you change is immediately visible to Claude and the other way round.
-
 Access to the editor host is checked against workspace membership on every
-request: the workspace page hands your browser a short-lived ticket that is
-traded for a cookie on the editor host. Browsers only send that cookie inside an
-embedded frame when the editor host belongs to the same site as Argos (e.g.
-`argos.example.com` and `code-x.argos.example.com`). On other setups — such as
-the local `127.0.0.1` / `nip.io` default — the tab offers **Open VS Code** in a
-separate browser tab instead; access works the same.
+request: Argos hands your browser a short-lived ticket that is traded for a
+cookie on the editor host.
 
-## The Preview tab
+### Preview
 
 The preview is a [live demo](LIVE-DEMOS.md) of the workspace: the same demo
 contract (`.argos/demo.*` or the built-in Laravel default), but it mounts the
 **workspace volume**, so it always shows the current files. It is
 members-only (access mode `workspace`) and started on demand.
 
-- **Start preview** builds it, **Rebuild** replaces it.
+- **Start preview** builds it, **Open preview** opens it, **Rebuild** replaces
+  it. The bar shows its state; a failed build shows the build log.
 - **Re-run setup commands** runs the contract's commands again in the running
   preview — after a migration, a `composer`/`npm` change or a build-config edit.
   PHP changes show up without it.
-- Commands run as the workspace's agent user, so files they create (e.g.
-  `vendor/`) stay editable.
+- Commands and PHP run as the workspace's agent user, so files they create
+  (e.g. `vendor/`, compiled views) stay editable.
 - The preview TTL and the platform-wide concurrency cap of live demos apply.
 
 Previews need `ARGOS_PREVIEW_ENABLED` and the project's *Live demo* toggle.
 
-## The Review tab
+## The review
 
-The Review tab shows the workspace's changes against its base branch —
+The review shows the workspace's changes against its base branch —
 commits, uncommitted edits and new files — file by file. After Claude finished
 a turn it marks itself *changed since you looked*; **Refresh** reloads.
 
@@ -250,7 +253,7 @@ you pick.
 
 ## Quality gates
 
-**Check gates** (in the Review tab, the header menu or `/gates`) runs the same
+**Check gates** (in the review, the header menu or `/gates`) runs the same
 quality gates as the implement phase of tasks (`worker/lib/quality.sh`):
 Artisan boot, Pint on changed files, Pest/PHPUnit, PHPStan, migration syntax,
 debug calls and test presence. They are made for PHP/Laravel projects; on other

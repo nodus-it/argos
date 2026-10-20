@@ -184,7 +184,7 @@ with three differences:
   from the remote — the workspace is the source of truth,
 - it lives at `demo-ws-<workspace>.<base-domain>` and is always protected with
   the `workspace` access mode (members only),
-- it is started on demand from the Preview tab, and the contract commands run as
+- it is started on demand from the workspace's workbench, and the contract commands run as
   the workspace's agent user so the files they create stay editable.
 
 **Re-run setup commands** executes the contract's `commands` again in the running

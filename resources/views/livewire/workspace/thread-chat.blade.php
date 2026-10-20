@@ -22,23 +22,6 @@
 @endphp
 
 <div class="ws-chat" x-data="window.argosThreadStream ? window.argosThreadStream(@js($streamConfig)) : {}" x-init="$nextTick(() => scrollDown?.())">
-    {{-- Presence + new thread --}}
-    <div class="ws-chat-head">
-        <div class="ws-thread-picker">
-            <strong class="ws-thread-title">{{ $thread?->title ?? __('workspaces.thread.new') }}</strong>
-            @if ($thread)
-                <span class="ws-status-dot ws-status-{{ $thread->status->value }}" title="{{ $thread->status->label() }}"></span>
-            @endif
-        </div>
-
-        <div class="ws-presence" x-show="members && members.length" x-cloak>
-            <span class="ws-presence-label">{{ __('workspaces.thread.present') }}</span>
-            <template x-for="m in members" :key="m.id">
-                <span class="ws-avatar" :title="m.name" x-text="initials(m.name)"></span>
-            </template>
-        </div>
-    </div>
-
     <div class="ws-chat-body">
     {{-- Thread sidebar --}}
     <aside class="ws-threads" x-data="{ collapsed: window.innerWidth < 640 }" :class="{ 'is-collapsed': collapsed }">
@@ -87,6 +70,23 @@
     </aside>
 
     <div class="ws-chat-main">
+        {{-- Current thread + who is here --}}
+        <div class="ws-chat-head">
+            <div class="ws-thread-picker">
+                <strong class="ws-thread-title">{{ $thread?->title ?? __('workspaces.thread.new') }}</strong>
+                @if ($thread)
+                    <span class="ws-status-dot ws-status-{{ $thread->status->value }}" title="{{ $thread->status->label() }}"></span>
+                @endif
+            </div>
+
+            <div class="ws-presence" x-show="members && members.length" x-cloak>
+                <span class="ws-presence-label">{{ __('workspaces.thread.present') }}</span>
+                <template x-for="m in members" :key="m.id">
+                    <span class="ws-avatar" :title="m.name" x-text="initials(m.name)"></span>
+                </template>
+            </div>
+        </div>
+
     {{-- New thread form --}}
     @if ($creating && $canWrite)
         <div class="card card-pad ws-new-thread">
@@ -101,7 +101,7 @@
                     </label>
                     <label class="ws-field">
                         <span>{{ __('workspaces.thread.agent') }}</span>
-                        <select class="ws-select" wire:model="newAgentId">
+                        <select class="ws-select" wire:model.live="newAgentId">
                             @foreach ($agents as $agent)
                                 <option value="{{ $agent->id }}">{{ $agent->name }}{{ $agent->user ? ' · '.$agent->user->name : ' · '.__('worker.credentials.fields.owner_shared') }}</option>
                             @endforeach
@@ -112,8 +112,8 @@
                         <span>{{ __('workspaces.thread.model') }}</span>
                         <select class="ws-select" wire:model="newModel">
                             <option value="">{{ __('workspaces.thread.model_default') }}</option>
-                            @foreach ($models as $model)
-                                <option value="{{ $model->value }}">{{ $model->label() }}</option>
+                            @foreach ($newModels as $model)
+                                <option value="{{ $model['value'] }}" title="{{ $model['description'] }}">{{ $model['label'] }}</option>
                             @endforeach
                         </select>
                     </label>
@@ -406,7 +406,7 @@
                     </select>
                     <select class="ws-select ws-select-sm" wire:change="setModel($event.target.value)" aria-label="{{ __('workspaces.thread.model') }}">
                         @foreach ($models as $model)
-                            <option value="{{ $model->value }}" @selected($thread->model === $model->value)>{{ $model->label() }}</option>
+                            <option value="{{ $model['value'] }}" title="{{ $model['description'] }}" @selected($thread->model === $model['value'])>{{ $model['label'] }}</option>
                         @endforeach
                     </select>
                     @if ($thread->permission_mode === PermissionMode::BypassPermissions)

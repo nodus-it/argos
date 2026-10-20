@@ -12,33 +12,6 @@
         <div wire:poll.3s="refreshStatus" class="hidden"></div>
     @endif
 
-    <div class="fade-in ws-meta">
-        <x-argos.meta-strip>
-            <x-argos.meta-item label="{{ __('workspaces.fields.status') }}">
-                <span class="badge {{ $statusBadge }}">{{ $workspace->status->label() }}</span>
-            </x-argos.meta-item>
-            <x-argos.meta-item label="{{ __('workspaces.fields.project') }}" :mono="true">{{ $workspace->repoProfile->name }}</x-argos.meta-item>
-            <x-argos.meta-item label="{{ __('workspaces.fields.branch') }}" :mono="true">{{ $workspace->branch }}</x-argos.meta-item>
-            <x-argos.meta-item label="{{ __('workspaces.fields.base_branch') }}" :mono="true">{{ $workspace->base_branch }}</x-argos.meta-item>
-            @if ($workspace->pr_url)
-                <x-argos.meta-item label="{{ __('workspaces.ship.pr') }}" :link="true">
-                    <a href="{{ $workspace->pr_url }}" target="_blank" rel="noopener">#{{ $workspace->pr_number }}</a>
-                    @if ($workspace->pr_state)
-                        <span class="badge {{ $workspace->pr_state === 'merged' ? 'badge-success' : ($workspace->pr_state === 'open' ? 'badge-running' : 'badge-draft') }}">{{ __('workspaces.pr_state.'.$workspace->pr_state) }}</span>
-                    @endif
-                </x-argos.meta-item>
-            @endif
-            @if ($workspace->external_issue)
-                <x-argos.meta-item label="{{ __('workspaces.fields.issue') }}" :link="true">
-                    <a href="{{ $workspace->external_issue['url'] }}" target="_blank" rel="noopener">{{ app(\App\Services\Workspace\WorkspaceIssueService::class)->label($workspace->external_issue['number'], $workspace->external_issue['title']) }}</a>
-                </x-argos.meta-item>
-            @endif
-            <x-argos.meta-item label="{{ __('workspaces.fields.members') }}">
-                {{ $members->map(fn ($m) => $m->user->name.' ('.$m->role->label().')')->implode(', ') }}
-            </x-argos.meta-item>
-        </x-argos.meta-strip>
-    </div>
-
     @if ($workspace->status !== WorkspaceStatus::Running)
         <div @class(['ws-alert', 'ws-alert-error' => $workspace->status === WorkspaceStatus::Failed, 'ws-alert-warn' => $workspace->status !== WorkspaceStatus::Failed]) role="status">
             @if ($transitional) <span class="ws-dot"></span> @else @svg('heroicon-o-information-circle') @endif
@@ -51,7 +24,7 @@
 
     {{-- Fills the viewport below the header; the chat feed scrolls inside.
          The gutter between the panes sets the split (remembered per browser). --}}
-    <div class="ws-layout" x-data="window.argosWorkspaceLayout ? argosWorkspaceLayout() : { tab: 'code', resizing: false, style() { return '' }, startResize() {}, nudge() {} }" x-on:workspace-tab.window="tab = $event.detail.tab"
+    <div class="ws-layout" x-data="window.argosWorkspaceLayout ? argosWorkspaceLayout() : { highlight: null, resizing: false, style() { return '' }, startResize() {}, nudge() {}, show() {} }" x-on:workspace-tab.window="show($event.detail.tab)"
          :class="{ 'is-resizing': resizing }" :style="style()">
         <section class="ws-pane ws-pane-chat card">
             @livewire('workspace.thread-chat', ['workspaceId' => $workspace->id], key('chat-'.$workspace->id))
@@ -61,18 +34,14 @@
              tabindex="0" x-on:pointerdown.prevent="startResize($event)" x-on:keydown.left.prevent="nudge(-2)" x-on:keydown.right.prevent="nudge(2)"></div>
 
         <section class="ws-pane ws-pane-tools card">
-            <div class="ws-tabs" role="tablist">
-                <button type="button" role="tab" :class="{ 'on': tab === 'code' }" x-on:click="tab = 'code'">@svg('heroicon-o-code-bracket') {{ __('workspaces.tabs.code') }}</button>
-                <button type="button" role="tab" :class="{ 'on': tab === 'preview' }" x-on:click="tab = 'preview'">@svg('heroicon-o-globe-alt') {{ __('workspaces.tabs.preview') }}</button>
-                <button type="button" role="tab" :class="{ 'on': tab === 'review' }" x-on:click="tab = 'review'">@svg('heroicon-o-document-magnifying-glass') {{ __('workspaces.tabs.review') }}</button>
-            </div>
-            <div class="ws-tab-body" x-show="tab === 'code'">
+            {{-- Workbench: editor + preview open in their own tabs; the review
+                 (diff, line comments, gates) stays here. --}}
+            <div class="ws-workbench-bar" :class="{ 'is-highlighted': highlight === 'preview' }">
                 @include('filament.admin.resources.workspace.partials.code-tab', ['workspace' => $workspace])
-            </div>
-            <div class="ws-tab-body" x-show="tab === 'preview'" x-cloak>
+                <span class="ws-workbench-sep" aria-hidden="true"></span>
                 @include('filament.admin.resources.workspace.partials.preview-tab', ['workspace' => $workspace])
             </div>
-            <div class="ws-tab-body" x-show="tab === 'review'" x-cloak>
+            <div class="ws-tab-body" x-ref="review">
                 @livewire('workspace.review-panel', ['workspaceId' => $workspace->id], key('review-'.$workspace->id))
             </div>
         </section>

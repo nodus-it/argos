@@ -64,6 +64,10 @@ describe('ThreadSession', () => {
         expect(ofType('session.started')[0]!.data).toMatchObject({
             claude_session_id: 'session-1',
             commands: [{ name: 'review', description: 'Review the diff', argument_hint: '[path]' }],
+            models: [
+                { value: 'default', display_name: 'Default (recommended)', description: 'Sonnet 5.5', resolved_model: 'claude-sonnet-5-5' },
+                { value: 'opus', display_name: 'Opus', description: 'Most capable', resolved_model: 'claude-opus-5-5' },
+            ],
         });
         expect(session.currentState).toBe('idle');
         await session.stop();

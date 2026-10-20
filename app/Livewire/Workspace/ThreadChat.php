@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Livewire\Workspace;
 
 use App\Enums\ApprovalStatus;
-use App\Enums\ClaudeModel;
 use App\Enums\PermissionMode;
 use App\Enums\ThreadEventType;
 use App\Enums\ThreadStatus;
@@ -19,6 +18,7 @@ use App\Models\ThreadEvent;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Workspace\AgentPool;
+use App\Services\Workspace\ModelCatalog;
 use App\Services\Workspace\ThreadAttachmentService;
 use App\Services\Workspace\ThreadCheckpointService;
 use App\Services\Workspace\ThreadReadService;
@@ -126,7 +126,7 @@ class ThreadChat extends Component
         $this->validate([
             'newTitle' => ['nullable', 'string', 'max:120'],
             'newAgentId' => ['required', 'string'],
-            'newModel' => ['nullable', 'string'],
+            'newModel' => ['nullable', 'string', 'max:90'],
             'newMode' => ['required', 'string'],
         ]);
 
@@ -329,7 +329,7 @@ class ThreadChat extends Component
     public function setModel(string $model): void
     {
         $thread = $this->activeThread();
-        if ($thread !== null && ClaudeModel::tryFrom($model) !== null) {
+        if ($thread !== null && ModelCatalog::isValidId($model)) {
             $this->attempt(fn () => app(ThreadService::class)->setModel($thread, $this->user(), $model));
         }
     }
@@ -471,7 +471,8 @@ class ThreadChat extends Component
             'canWrite' => $role?->canOperate() ?? false,
             'isOwner' => $role === WorkspaceRole::Owner,
             'agents' => $this->usableAgents(),
-            'models' => ClaudeModel::cases(),
+            'models' => app(ModelCatalog::class)->options($thread?->agentCredential, $thread?->model),
+            'newModels' => app(ModelCatalog::class)->options($this->usableAgents()->firstWhere('id', $this->newAgentId)),
             'modes' => PermissionMode::cases(),
             'busy' => $thread !== null && $thread->status->isBusy(),
             'user' => $this->user(),
