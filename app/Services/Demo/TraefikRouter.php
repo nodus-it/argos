@@ -59,6 +59,16 @@ class TraefikRouter
             $http['middlewares'] = $middlewares;
         }
 
+        $this->writeRouteFile($slug, $http);
+
+        return $this->urlForSlug($slug);
+    }
+
+    /**
+     * @param  array<string, mixed>  $http
+     */
+    private function writeRouteFile(string $slug, array $http): void
+    {
         $dir = $this->traefikDir();
         if (! is_dir($dir) && ! mkdir($dir, 0755, true) && ! is_dir($dir)) {
             throw new RuntimeException("Traefik dynamic-config dir not writable: {$dir}");
@@ -78,8 +88,49 @@ class TraefikRouter
             @unlink($tmp);
             throw new RuntimeException("Could not write Traefik route: {$path}");
         }
+    }
 
-        return $this->urlForSlug($slug);
+    /**
+     * Route `code-<slug>.<base>` to the workspace's OpenVSCode Server, guarded
+     * by forwardAuth against the workspace gate (membership check — the
+     * editor is a shell into the container, it is never public). Returns the
+     * editor URL.
+     */
+    public function writeCodeRoute(string $workspaceSlug, int $port = 3000): string
+    {
+        $key = self::codeKey($workspaceSlug);
+        $host = $key.'.'.config('argos.preview.base_domain', '127.0.0.1.nip.io');
+
+        $this->writeRouteFile($key, [
+            'routers' => [$key => [
+                'rule' => "Host(`{$host}`)",
+                'entryPoints' => ['web'],
+                'service' => $key,
+                'middlewares' => [$key.'-auth'],
+            ]],
+            'services' => [$key => [
+                'loadBalancer' => ['servers' => [['url' => 'http://argos-ws-'.$workspaceSlug.':'.$port]]],
+            ]],
+            'middlewares' => [$key.'-auth' => [
+                'forwardAuth' => [
+                    'address' => (string) config('argos.workspaces.gate_url', 'http://nginx:80/_argos/workspace-gate'),
+                    'trustForwardHeader' => true,
+                ],
+            ]],
+        ]);
+
+        return $this->urlForSlug($key);
+    }
+
+    public function removeCodeRoute(string $workspaceSlug): void
+    {
+        $this->removeRoute(self::codeKey($workspaceSlug));
+    }
+
+    /** Route/host key of a workspace editor. */
+    public static function codeKey(string $workspaceSlug): string
+    {
+        return 'code-'.$workspaceSlug;
     }
 
     /**

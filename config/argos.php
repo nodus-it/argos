@@ -189,6 +189,10 @@ return [
         'internal_url' => rtrim((string) $envOr('ARGOS_INTERNAL_URL', 'http://nginx'), '/'),
         // Docker network shared by the manager and workspace containers.
         'network' => $envOr('ARGOS_WORKSPACE_NETWORK', 'argos_ws'),
+        // forwardAuth target guarding code-<slug> (editor) and workspace demos.
+        'gate_url' => $envOr('ARGOS_WORKSPACE_GATE_URL', 'http://nginx:80/_argos/workspace-gate'),
+        // Lifetime of the editor access cookie set on code-<slug> hosts.
+        'editor_cookie_hours' => (int) $envOr('ARGOS_WORKSPACE_EDITOR_COOKIE_HOURS', 12),
         'daemon_port' => 7777,
         'editor_port' => 3000,
         'openvscode_version' => $envOr('ARGOS_OPENVSCODE_VERSION', '1.109.5'),

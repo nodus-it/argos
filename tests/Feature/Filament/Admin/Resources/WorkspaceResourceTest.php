@@ -135,4 +135,29 @@ class WorkspaceResourceTest extends TestCase
         Livewire::actingAs($owner)->test(ViewWorkspace::class, ['record' => $workspace->getKey()])
             ->assertActionHidden('members');
     }
+
+    public function test_code_tab_embeds_only_on_same_site_setups(): void
+    {
+        $me = User::factory()->create();
+        $workspace = $this->workspaceFor($me);
+        $openUrl = route('workspaces.open', ['workspace' => $workspace, 'target' => 'code']);
+
+        config(['app.url' => 'https://argos.example.com', 'argos.preview.base_domain' => 'argos.example.com']);
+        $this->actingAs($me)->get(ViewWorkspace::getUrl(['record' => $workspace]))
+            ->assertSee('<iframe class="ws-frame" src="'.$openUrl.'"', false);
+
+        config(['app.url' => 'http://127.0.0.1:8080', 'argos.preview.base_domain' => '127.0.0.1.nip.io']);
+        $this->actingAs($me)->get(ViewWorkspace::getUrl(['record' => $workspace]))
+            ->assertDontSee('<iframe class="ws-frame"', false)
+            ->assertSee(__('workspaces.tabs.open_editor'));
+    }
+
+    public function test_code_tab_explains_a_stopped_workspace(): void
+    {
+        $me = User::factory()->create();
+        $workspace = $this->workspaceFor($me, WorkspaceRole::Viewer, ['status' => WorkspaceStatus::Stopped]);
+
+        $this->actingAs($me)->get(ViewWorkspace::getUrl(['record' => $workspace]))
+            ->assertSee(__('workspaces.tabs.not_running'));
+    }
 }

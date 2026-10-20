@@ -11,6 +11,7 @@ use App\Events\Workspace\WorkspaceStopped;
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
 use App\Models\Thread;
 use App\Models\Workspace;
+use App\Services\Demo\TraefikRouter;
 use App\Services\Workflow\WorkerSidecarManager;
 use App\Workers\Compose\WorkerImageResolver;
 use App\Workers\Compose\WorkspaceImageBuilder;
@@ -31,6 +32,7 @@ class WorkspaceProvisioner
         private readonly WorkerSidecarManager $sidecars,
         private readonly WorkspaceDaemonClient $daemon,
         private readonly AgentPool $pool,
+        private readonly TraefikRouter $router,
     ) {}
 
     /**
@@ -48,6 +50,7 @@ class WorkspaceProvisioner
             $sidecars = $this->sidecars->startForWorkspace($workspace);
             $this->containers->run($workspace, $image, $sidecars);
             $this->containers->waitForHealth($workspace);
+            $this->router->writeCodeRoute($workspace->slug, (int) config('argos.workspaces.editor_port', 3000));
 
             $creator = $workspace->creator;
             $this->daemon->for($workspace, 600)->initWorkspace([
@@ -88,6 +91,7 @@ class WorkspaceProvisioner
                 $thread->forceFill(['status' => ThreadStatus::Closed])->save();
             });
 
+        $this->router->removeCodeRoute($workspace->slug);
         $this->containers->stop($workspace);
         $this->sidecars->stopWorkspaceContainers($workspace);
 

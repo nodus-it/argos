@@ -33,6 +33,22 @@ class WorkspaceProvisionerTest extends TestCase
 {
     use RefreshDatabase;
 
+    private string $traefikDir;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->traefikDir = sys_get_temp_dir().'/argos-traefik-'.uniqid();
+        config()->set('argos.preview.traefik_dir', $this->traefikDir);
+    }
+
+    protected function tearDown(): void
+    {
+        array_map('unlink', glob($this->traefikDir.'/*') ?: []);
+        @rmdir($this->traefikDir);
+        parent::tearDown();
+    }
+
     private function bindDocker(?callable $containers = null): void
     {
         $spec = (new \ReflectionClass(AgentSpec::class))->newInstanceWithoutConstructor();
@@ -74,6 +90,7 @@ class WorkspaceProvisionerTest extends TestCase
         $this->assertSame($workspace->repoProfile->url, $sent['repo_url']);
         $this->assertArrayNotHasKey('repo_token', $sent);
         Event::assertDispatched(WorkspaceStarted::class);
+        $this->assertFileExists($this->traefikDir.'/code-'.$workspace->slug.'.yml');
     }
 
     public function test_init_failures_mark_the_workspace_failed_with_a_readable_message(): void
@@ -132,5 +149,6 @@ class WorkspaceProvisionerTest extends TestCase
         $this->assertSame(ThreadStatus::Closed, $open->fresh()->status);
         $this->assertSame(ThreadStatus::Closed, $closed->fresh()->status);
         $this->assertSame(WorkspaceStatus::Stopped, $workspace->fresh()->status);
+        $this->assertFileDoesNotExist($this->traefikDir.'/code-'.$workspace->slug.'.yml');
     }
 }

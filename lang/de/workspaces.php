@@ -46,6 +46,11 @@ return [
         'failed' => 'Der Workspace konnte nicht starten.',
     ],
     'tabs' => [
+        'not_embeddable' => 'In diesem Setup kann der Browser Workspace-Hosts nicht einbetten (App und Workspace-Hosts liegen auf verschiedenen Sites). Öffne sie in einem eigenen Tab — der Zugriff funktioniert genauso.',
+        'open_editor' => 'VS Code öffnen',
+        'open_preview' => 'Preview öffnen',
+        'code_hint' => 'Änderungen landen direkt im Workspace und sind sofort für Claude sichtbar.',
+        'not_running' => 'Starte den Workspace, um Editor und Preview zu öffnen.',
         'code' => 'Code',
         'preview' => 'Preview',
         'open_new_tab' => 'In neuem Tab öffnen',

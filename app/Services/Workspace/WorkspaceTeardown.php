@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Workspace;
 
 use App\Services\Demo\DemoDeployer;
+use App\Services\Demo\TraefikRouter;
 use App\Services\Workflow\WorkerSidecarManager;
 
 /**
@@ -18,10 +19,12 @@ class WorkspaceTeardown
         private readonly WorkspaceContainerManager $containers,
         private readonly WorkerSidecarManager $sidecars,
         private readonly DemoDeployer $demos,
+        private readonly TraefikRouter $router,
     ) {}
 
     public function purge(string $slug): void
     {
+        $this->router->removeCodeRoute($slug);
         $this->containers->removeBySlug($slug);
         $this->sidecars->purgeWorkspace($slug);
         $this->demos->teardownBySlug('ws-'.$slug);

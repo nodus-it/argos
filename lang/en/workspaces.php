@@ -46,6 +46,11 @@ return [
         'failed' => 'The workspace failed to start.',
     ],
     'tabs' => [
+        'not_embeddable' => 'On this setup the browser cannot embed workspace hosts (the app and the workspace hosts are on different sites). Open them in their own tab — access works the same.',
+        'open_editor' => 'Open VS Code',
+        'open_preview' => 'Open preview',
+        'code_hint' => 'Changes are saved to the workspace and visible to Claude right away.',
+        'not_running' => 'Start the workspace to open the editor and the preview.',
         'code' => 'Code',
         'preview' => 'Preview',
         'open_new_tab' => 'Open in new tab',
