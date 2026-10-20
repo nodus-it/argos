@@ -169,6 +169,8 @@ the internal `argos_ws` network. The editor is served at
 | `ARGOS_WORKSPACE_NETWORK` | `argos_ws` | Docker network shared by the manager and workspace containers. |
 | `ARGOS_WORKSPACE_GATE_URL` | `http://nginx:80/_argos/workspace-gate` | forwardAuth target Traefik calls for `code-*` and `demo-ws-*` hosts (membership check). |
 | `ARGOS_WORKSPACE_EDITOR_COOKIE_HOURS` | `12` | Lifetime of the access cookie on workspace hosts. |
+| `ARGOS_WORKSPACE_PR_SYNC_MINUTES` | `15` | How often the state (open/merged/closed) of open workspace pull requests is re-read from the provider. Opening a workspace also refreshes it. |
+| `ARGOS_WORKSPACE_UPLOAD_MAX_MB` | `5` | Size limit per image attached to a thread message (up to 5 images per message). |
 | `ARGOS_OPENVSCODE_VERSION` | `1.109.5` | OpenVSCode Server release baked into the workspace image. |
 
 ## Realtime (Reverb)

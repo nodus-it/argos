@@ -17,11 +17,18 @@ ist der interaktive. Beide nutzen dieselben Projekte, Worker-Stacks und Agenten.
 - [Was du brauchst](#was-du-brauchst)
 - [Agenten und Abos](#agenten-und-abos)
 - [Einen Workspace anlegen](#einen-workspace-anlegen)
+- [Aus einem Issue starten](#aus-einem-issue-starten)
 - [Threads](#threads)
+- [Bilder, Dateien und Befehle](#bilder-dateien-und-befehle)
 - [Freigaben, Pläne und Fragen](#freigaben-plane-und-fragen)
 - [Zusammenarbeiten](#zusammenarbeiten)
+- [Übersicht und Benachrichtigungen](#ubersicht-und-benachrichtigungen)
 - [Der Code-Tab (VS Code)](#der-code-tab-vs-code)
 - [Der Preview-Tab](#der-preview-tab)
+- [Der Review-Tab](#der-review-tab)
+- [Quality-Gates](#quality-gates)
+- [Checkpoints und Zurücksetzen](#checkpoints-und-zurucksetzen)
+- [Ausliefern: Commit und Pull Request](#ausliefern-commit-und-pull-request)
 - [Lebenszyklus](#lebenszyklus)
 - [Sicherheit](#sicherheit)
 - [Konfiguration](#konfiguration)
@@ -78,6 +85,25 @@ Grund.
 dieselben Dateien. Für getrennte Arbeiten lege getrennte Workspaces an — jeder
 hat seinen eigenen Branch, Container, seine eigene Datenbank und Preview.
 
+## Aus einem Issue starten
+
+Hat das Projekt einen verbundenen Issue-Tracker (siehe
+[Task-Provider](SETUP-TASK-PROVIDERS.md)), bietet das Formular **Aus Issue** an:
+Durchsuche die offenen Issues nach Titel oder Nummer und wähle eines. Der
+Workspace heißt dann `#<Nummer> <Titel>`, sein Branch `ws/<Nummer>-<Titel>`
+(höchstens 50 Zeichen; ein zweiter Workspace für dasselbe Issue bekommt ein
+Suffix), und die Kopfzeile verlinkt das Issue.
+
+Der erste Thread, den du anlegst, trägt den Titel des Issues, und das
+Eingabefeld ist mit Titel, Text und Link des Issues **vorbefüllt — nicht
+abgeschickt**. Der Issue-Text ist als nicht vertrauenswürdige Eingabe markiert,
+damit Claude ihn als Daten behandelt, nicht als Anweisungen. Prüf ihn, ergänze,
+was du weißt, und schick ihn dann selbst ab.
+
+Beim Ausliefern enthält der Pull Request `Closes #<Nummer>` (GitHub, GitLab)
+bzw. den Link zum Issue (Linear), und Argos kommentiert den Link zum Pull
+Request im Issue. Geschlossen wird das Issue durch den Merge, nie durch Argos.
+
 ## Threads
 
 Die linke Hälfte der Workspace-Seite ist der Chat. Lege einen **Thread** an
@@ -103,6 +129,38 @@ kompakte Zeilen, die du aufklappen kannst.
   fortsetzen** dieselbe Claude-Unterhaltung fort.
 - Slash-Commands und die `CLAUDE.md` des Projekts werden wie in Claude Code
   geladen.
+
+Die **Thread-Liste** links zeigt jeden Thread mit seinem Status (arbeitet,
+wartet auf eine Entscheidung, bereit) und der Zahl ungelesener Einträge.
+Threads lassen sich umbenennen und archivieren; *Archivierte anzeigen* holt
+archivierte zurück. Auf schmalen Bildschirmen klappt die Liste ein.
+
+## Bilder, Dateien und Befehle
+
+- **Bilder:** Screenshots einfügen, hineinziehen oder anhängen (PNG, JPEG, GIF,
+  WebP; bis zu 5 pro Nachricht, je `ARGOS_WORKSPACE_UPLOAD_MAX_MB`). Claude sieht
+  sie mit der Nachricht; Mitglieder sehen sie als Vorschaubilder. Sie werden
+  privat gespeichert und mit dem Workspace gelöscht.
+- **`@`-Erwähnungen:** Tippe `@` und einen Teil eines Pfads, um eine Datei des
+  Workspaces auszuwählen (unscharfe Suche über getrackte und ungetrackte
+  Dateien; ignorierte bleiben außen vor). Der Pfad wird als Text eingefügt.
+- **`/`-Befehle:** Tippe `/` für eine Liste. Die eigenen Befehle von Argos
+  laufen im Browser und gehen nicht an Claude:
+
+  | Befehl | Wirkung |
+  |---|---|
+  | `/plan [Anfrage]` | In den Plan-Mode wechseln, optional die Anfrage senden. |
+  | `/ship` | Den Dialog für Commit und Pull Request öffnen. |
+  | `/preview`, `/review` | Den Preview- bzw. Review-Tab zeigen. |
+  | `/gates` | Die [Quality-Gates](#quality-gates) ausführen. |
+  | `/checkpoint [Name]` | Einen benannten [Checkpoint](#checkpoints-und-zurucksetzen) setzen. |
+
+  Alle anderen Befehle — die Commands und Skills des Projekts, `/compact` und
+  Co. — gehen so an Claude Code, wie du sie tippst.
+
+`Enter` sendet, `Shift+Enter` fügt eine Zeile ein; solange die Vorschlagsliste
+offen ist, übernehmen `Enter`/`Tab` den markierten Eintrag (ein vollständig
+getippter Befehl wird gesendet).
 
 ## Freigaben, Pläne und Fragen
 
@@ -134,6 +192,27 @@ Administratoren sehen alle Workspaces, treten zum Schreiben aber als Mitglied
 bei.
 
 Administratoren verwalten die Personen einer Installation unter **Benutzer**.
+
+## Übersicht und Benachrichtigungen
+
+Das Dashboard-Widget **Meine Workspaces** und die Workspace-Liste zeigen, was
+dich braucht: wie viele Threads arbeiten und welche auf eine Entscheidung
+warten (Filter *Wartet auf dich*). Beides aktualisiert sich live.
+
+Besitzer und Bearbeiter werden benachrichtigt, wenn
+
+| Art | Wann |
+|---|---|
+| Claude wartet auf eine Entscheidung | eine Freigabe, ein Plan oder eine Frage erscheint |
+| Claude hat einen längeren Turn beendet | ein Turn länger als 30 Sekunden gedauert hat |
+| Ein Abo hat sein Nutzungslimit erreicht | der Agent des Threads sein Limit meldet |
+| Fehler | ein Thread fehlschlägt |
+| Jemand hat einen Workspace ausgeliefert | ein anderes Mitglied committet und den Pull Request geöffnet/aktualisiert hat |
+
+Alles außer beendeten Turns landet auch in der Glocke. Im Browser erscheint
+eine Benachrichtigung (und ein Zähler im Tab-Titel) nur, wenn der betreffende
+Workspace nicht gerade vor dir offen ist; Browser-Benachrichtigungen erlaubst
+du in deinem **Profil**, wo du auch jede Art einzeln abschalten kannst.
 
 ## Der Code-Tab (VS Code)
 
@@ -169,6 +248,80 @@ gestartet.
 
 Previews brauchen `ARGOS_PREVIEW_ENABLED` und den Schalter *Live-Demo* im
 Projekt.
+
+## Der Review-Tab
+
+Der Review-Tab zeigt die Änderungen des Workspaces gegenüber dem Basis-Branch —
+Commits, nicht committete Änderungen und neue Dateien — Datei für Datei. Hat
+Claude einen Turn beendet, markiert er sich als *seit deinem Blick geändert*;
+**Aktualisieren** lädt neu.
+
+Klick auf eine Zeile, um Claude einen Kommentar zu hinterlassen. Kommentare
+werden gesammelt; **An Claude senden** schickt sie als eine Nachricht
+(`Pfad:Zeile — Kommentar`) in den gewählten Thread.
+
+## Quality-Gates
+
+**Gates prüfen** (im Review-Tab, im Menü der Kopfzeile oder per `/gates`) führt
+dieselben Quality-Gates aus wie die Implementierungsphase von Aufgaben
+(`worker/lib/quality.sh`): Artisan-Start, Pint auf geänderten Dateien,
+Pest/PHPUnit, PHPStan, Migrations-Syntax, Debug-Aufrufe und vorhandene Tests.
+Sie sind für PHP/Laravel-Projekte gemacht; bei anderen Stacks werden die Gates
+übersprungen.
+
+- Direkt nach dem Klonen des Workspaces erfasst Argos eine **Baseline** des
+  Basis-Branches: Pest und PHPStan zählen dann nur neue Fehler. Solange die
+  Baseline noch läuft oder wenn sie fehlgeschlagen ist, zählt jeder Fehler; das
+  Panel zeigt an, was gilt.
+- Ein Lauf gleichzeitig pro Workspace. Jedes Gate zeigt grün/rot/übersprungen
+  und das Ende seines Logs.
+- **Fehler an Agent senden** schickt denselben Fix-Prompt, den der
+  Aufgaben-Ablauf nutzt, in den gewählten Thread.
+- Der Commit-Dialog nennt das letzte Ergebnis (*Gates: 6/7 grün*).
+  Fehlgeschlagene Gates sind ein Warnhinweis, nie eine Sperre.
+
+Die Gate-Logs liegen in `.agent/logs/` im Workspace, das git lokal ignoriert.
+
+## Checkpoints und Zurücksetzen
+
+Bevor Claude eine Nachricht bearbeitet, legt Argos einen **Checkpoint** an:
+eine Momentaufnahme aller Dateien des Workspaces — getrackt, gestaged und
+ungetrackt, nicht ignoriert — gespeichert als Git-Ref
+(`refs/argos/checkpoints/<Thread>/<n>`). Branch, Index und deine Dateien bleiben
+unberührt. Ein Thread behält seine neuesten 200 Checkpoints.
+
+- **Bis hierhin zurücksetzen** an einer Nachricht (mit der Maus darüberfahren)
+  zeigt, was das Zurücksetzen verwirft, und setzt die Dateien auf den Stand vor
+  dieser Nachricht zurück. Solange Claude in diesem Thread arbeitet, wird das
+  abgelehnt — stoppe es zuerst.
+- Der aktuelle Stand wird vorher als Checkpoint gesichert; **Rückgängig** am
+  Hinweis zum Zurücksetzen holt ihn zurück.
+- Commits werden nie zurückgenommen: Wurden seitdem Commits erstellt, warnt der
+  Dialog, dass sie bestehen bleiben und nur die Dateien zurückgesetzt werden.
+- Der Chat-Verlauf bleibt. Das Zurücksetzen wird im Thread vermerkt, und Claude
+  erfährt es mit deiner nächsten Nachricht, damit es die Dateien neu liest.
+- `/checkpoint [Name]` setzt einen benannten Checkpoint, zu dem du später
+  zurückkehren kannst.
+
+## Ausliefern: Commit und Pull Request
+
+**Commit & PR** (Kopfzeile oder `/ship`) committet alles, was sich geändert hat,
+pusht den Branch und öffnet einen Pull Request (GitLab: Merge Request) gegen den
+Basis-Branch.
+
+- Claude entwirft die Commit-Message aus dem Diff und der Unterhaltung, auf
+  **deinem** Abo (dein erster nutzbarer Agent). Ohne Agent oder wenn das
+  fehlschlägt, schreibst du sie selbst.
+- *Als Entwurf öffnen* öffnet einen Draft-Pull-Request. Erneutes Ausliefern
+  pusht die neuen Commits und kommentiert den bestehenden Pull Request.
+- Hat sich der Remote-Branch bewegt, wird der Push abgelehnt; **Claude rebasen
+  lassen** (Menü der Kopfzeile) bittet den Agenten, zu fetchen, zu rebasen und
+  Konflikte zu lösen.
+- Die Kopfzeile zeigt den Pull Request und seinen Zustand (offen, gemergt,
+  geschlossen). Er wird alle `ARGOS_WORKSPACE_PR_SYNC_MINUTES` und beim Öffnen
+  des Workspaces aktualisiert.
+- Jeder offene Thread bekommt einen Hinweis mit dem Link; die anderen
+  Mitglieder werden benachrichtigt.
 
 ## Lebenszyklus
 
@@ -213,5 +366,7 @@ Projekt.
 | `ARGOS_WORKSPACE_MAX_ACTIVE` | `5` | Gleichzeitig laufende Workspaces. |
 | `ARGOS_WORKSPACE_IDLE_MINUTES` | `60` | Leerlaufzeit, bevor ein Workspace gestoppt wird (`0` deaktiviert). |
 | `ARGOS_WORKSPACE_CPUS` / `ARGOS_WORKSPACE_MEMORY` | `2` / `4g` | Limits pro Workspace-Container. |
+| `ARGOS_WORKSPACE_PR_SYNC_MINUTES` | `15` | Wie oft der Zustand offener Workspace-Pull-Requests aktualisiert wird. |
+| `ARGOS_WORKSPACE_UPLOAD_MAX_MB` | `5` | Größenlimit pro Bild, das an eine Nachricht angehängt wird. |
 
 Alle Einstellungen stehen unter [Konfiguration](CONFIGURATION.md#workspaces).

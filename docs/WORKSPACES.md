@@ -16,11 +16,18 @@ projects, worker stacks and agents.
 - [What you need](#what-you-need)
 - [Agents and subscriptions](#agents-and-subscriptions)
 - [Creating a workspace](#creating-a-workspace)
+- [Starting from an issue](#starting-from-an-issue)
 - [Threads](#threads)
+- [Images, files and commands](#images-files-and-commands)
 - [Approvals, plans and questions](#approvals-plans-and-questions)
 - [Working together](#working-together)
+- [Overview and notifications](#overview-and-notifications)
 - [The Code tab (VS Code)](#the-code-tab-vs-code)
 - [The Preview tab](#the-preview-tab)
+- [The Review tab](#the-review-tab)
+- [Quality gates](#quality-gates)
+- [Checkpoints and reset](#checkpoints-and-reset)
+- [Shipping: commit and pull request](#shipping-commit-and-pull-request)
 - [Lifecycle](#lifecycle)
 - [Security](#security)
 - [Configuration](#configuration)
@@ -76,6 +83,23 @@ The workspace page shows the progress and, if something fails, the reason.
 separate pieces of work create separate workspaces — each has its own branch,
 container, database and preview.
 
+## Starting from an issue
+
+If the project has a connected issue tracker (see [Task providers](SETUP-TASK-PROVIDERS.md)),
+the form offers **From issue**: search the open issues by title or number and
+pick one. The workspace is then named `#<number> <title>`, its branch is
+`ws/<number>-<title>` (at most 50 characters; a second workspace for the same
+issue gets a suffix), and the header links the issue.
+
+The first thread you create is titled after the issue, and the composer is
+**prefilled — not sent** — with the issue's title, text and link. The issue
+text is wrapped as untrusted input, so Claude treats it as data, not as
+instructions. Review it, add what you know, then send it yourself.
+
+When you ship, the pull request carries `Closes #<number>` (GitHub, GitLab) or
+the issue link (Linear), and Argos comments the pull request link on the
+issue. The issue is closed by merging, never by Argos.
+
 ## Threads
 
 The left half of the workspace page is the chat. Create a **thread** (title,
@@ -95,6 +119,36 @@ agent, model, mode), then write. Claude's answer streams in live; tool calls
 - If a session ended (container restart, crash), **Resume session** continues the
   same Claude conversation.
 - Slash commands and `CLAUDE.md` of the project are loaded like in Claude Code.
+
+The **thread list** on the left shows every thread with its status (working,
+waiting for a decision, idle) and the number of unread entries. Threads can be
+renamed and archived; *Show archived* brings archived ones back. On narrow
+screens the list folds away.
+
+## Images, files and commands
+
+- **Images:** paste, drop or attach screenshots (PNG, JPEG, GIF, WebP; up to 5
+  per message, `ARGOS_WORKSPACE_UPLOAD_MAX_MB` each). Claude sees them with the
+  message; members see them as thumbnails. They are stored privately and
+  deleted with the workspace.
+- **`@` mentions:** type `@` and part of a path to pick a file of the workspace
+  (fuzzy search over tracked and untracked files; ignored ones are left out). The path is inserted as text.
+- **`/` commands:** type `/` for a list. Argos' own commands run in the
+  browser and are not sent to Claude:
+
+  | Command | Does |
+  |---|---|
+  | `/plan [request]` | Switch to plan mode, optionally send the request. |
+  | `/ship` | Open the commit & pull request dialog. |
+  | `/preview`, `/review` | Show the Preview or Review tab. |
+  | `/gates` | Run the [quality gates](#quality-gates). |
+  | `/checkpoint [name]` | Set a named [checkpoint](#checkpoints-and-reset). |
+
+  All other commands — the project's commands and skills, `/compact` and
+  friends — go to Claude Code as typed.
+
+`Enter` sends, `Shift+Enter` adds a line; while the suggestion list is open,
+`Enter`/`Tab` pick the highlighted entry (a fully typed command is sent).
 
 ## Approvals, plans and questions
 
@@ -126,6 +180,27 @@ member to write.
 
 Administrators manage the people of an installation under **Users**.
 
+## Overview and notifications
+
+The dashboard widget **My workspaces** and the workspace list show what needs
+you: how many threads are working and which ones wait for a decision (filter
+*Waiting for you*). They update live.
+
+Owners and editors are notified when
+
+| Kind | When |
+|---|---|
+| Claude waits for a decision | an approval, plan or question appears |
+| Claude finished a longer turn | a turn took more than 30 seconds |
+| A subscription hit its usage limit | the thread's agent reports its limit |
+| Errors | a thread fails |
+| Someone shipped a workspace | another member committed and opened/updated the pull request |
+
+Everything except finished turns also lands in the notification bell. In the
+browser, a notification (and a counter in the tab title) only shows when the
+workspace in question is not open in front of you; allow browser notifications
+in your **profile**, where you can also switch each kind off.
+
 ## The Code tab (VS Code)
 
 The right half shows **VS Code** (OpenVSCode Server) on the workspace volume.
@@ -155,6 +230,76 @@ members-only (access mode `workspace`) and started on demand.
 - The preview TTL and the platform-wide concurrency cap of live demos apply.
 
 Previews need `ARGOS_PREVIEW_ENABLED` and the project's *Live demo* toggle.
+
+## The Review tab
+
+The Review tab shows the workspace's changes against its base branch —
+commits, uncommitted edits and new files — file by file. After Claude finished
+a turn it marks itself *changed since you looked*; **Refresh** reloads.
+
+Click a line to leave a comment for Claude. Comments are collected; **Send to
+Claude** posts them as one message (`path:line — comment`) into the thread
+you pick.
+
+## Quality gates
+
+**Check gates** (in the Review tab, the header menu or `/gates`) runs the same
+quality gates as the implement phase of tasks (`worker/lib/quality.sh`):
+Artisan boot, Pint on changed files, Pest/PHPUnit, PHPStan, migration syntax,
+debug calls and test presence. They are made for PHP/Laravel projects; on other
+stacks the gates are skipped.
+
+- Right after the workspace is cloned, Argos records a **baseline** of the base
+  branch: Pest and PHPStan then only count failures that are new. While the
+  baseline is still running or if it failed, every failure counts; the panel
+  says which applies.
+- One run at a time per workspace. Each gate shows pass/fail/skip and the end
+  of its log.
+- **Send errors to agent** posts the same fix prompt the task flow uses into
+  the selected thread.
+- The commit dialog mentions the last result (*Gates: 6/7 green*). Failed gates
+  are a warning, never a blocker.
+
+Gate logs live in `.agent/logs/` inside the workspace, which git ignores
+locally.
+
+## Checkpoints and reset
+
+Before Claude handles a message, Argos takes a **checkpoint**: a snapshot of
+all files of the workspace — tracked, staged and untracked, not ignored ones —
+stored as a git ref (`refs/argos/checkpoints/<thread>/<n>`). The branch, the
+index and your files are not touched. A thread keeps its newest 200
+checkpoints.
+
+- **Reset to here** on a message (hover it) shows what a reset would undo and
+  puts the files back to their state before that message. It is refused while
+  Claude works in that thread — stop it first.
+- The current state is saved as a checkpoint first, so **Undo** on the reset
+  notice brings it back.
+- Commits are never undone: if commits were made since, the dialog warns that
+  they stay and only the files are reset.
+- The chat history stays. The reset is noted in the thread, and Claude is told
+  with your next message, so it re-reads the files.
+- `/checkpoint [name]` sets a named checkpoint you can return to later.
+
+## Shipping: commit and pull request
+
+**Commit & PR** (header, or `/ship`) commits everything that changed, pushes the
+branch and opens a pull request (GitLab: merge request) against the base
+branch.
+
+- Claude drafts the commit message from the diff and the conversation, on
+  **your** subscription (your first usable agent). Without one, or if it fails,
+  you write it yourself.
+- *Open as draft* opens a draft pull request. Shipping again pushes the new
+  commits and comments on the existing pull request.
+- If the remote branch moved, the push is refused; **Ask Claude to rebase**
+  (header menu) asks the agent to fetch, rebase and resolve conflicts.
+- The header shows the pull request and its state (open, merged, closed). It
+  is refreshed every `ARGOS_WORKSPACE_PR_SYNC_MINUTES` and when you open the
+  workspace.
+- Every open thread gets a notice with the link; the other members are
+  notified.
 
 ## Lifecycle
 
@@ -196,5 +341,7 @@ Previews need `ARGOS_PREVIEW_ENABLED` and the project's *Live demo* toggle.
 | `ARGOS_WORKSPACE_MAX_ACTIVE` | `5` | Workspaces running at the same time. |
 | `ARGOS_WORKSPACE_IDLE_MINUTES` | `60` | Idle time before a workspace is stopped (`0` disables). |
 | `ARGOS_WORKSPACE_CPUS` / `ARGOS_WORKSPACE_MEMORY` | `2` / `4g` | Limits per workspace container. |
+| `ARGOS_WORKSPACE_PR_SYNC_MINUTES` | `15` | How often the state of open workspace pull requests is refreshed. |
+| `ARGOS_WORKSPACE_UPLOAD_MAX_MB` | `5` | Size limit per image attached to a message. |
 
 All settings are listed in [Configuration](CONFIGURATION.md#workspaces).

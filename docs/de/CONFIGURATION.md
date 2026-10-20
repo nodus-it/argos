@@ -172,6 +172,8 @@ Live-Demos).
 | `ARGOS_WORKSPACE_NETWORK` | `argos_ws` | Docker-Netz, das Manager und Workspace-Container teilen. |
 | `ARGOS_WORKSPACE_GATE_URL` | `http://nginx:80/_argos/workspace-gate` | forwardAuth-Ziel, das Traefik für `code-*`- und `demo-ws-*`-Hosts aufruft (Mitgliedschaftsprüfung). |
 | `ARGOS_WORKSPACE_EDITOR_COOKIE_HOURS` | `12` | Lebensdauer des Zugangs-Cookies auf Workspace-Hosts. |
+| `ARGOS_WORKSPACE_PR_SYNC_MINUTES` | `15` | Wie oft der Zustand (offen/gemergt/geschlossen) offener Workspace-Pull-Requests beim Provider neu gelesen wird. Das Öffnen eines Workspaces aktualisiert ihn ebenfalls. |
+| `ARGOS_WORKSPACE_UPLOAD_MAX_MB` | `5` | Größenlimit pro Bild, das an eine Thread-Nachricht angehängt wird (bis zu 5 Bilder pro Nachricht). |
 | `ARGOS_OPENVSCODE_VERSION` | `1.109.5` | Release von OpenVSCode Server, das ins Workspace-Image eingebaut wird. |
 
 ## Echtzeit (Reverb)
