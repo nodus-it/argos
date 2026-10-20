@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Filament\Admin\Resources\WorkspaceResource\Pages;
+namespace App\Filament\Workspaces\Resources\WorkspaceResource\Pages;
 
-use App\Filament\Admin\Resources\WorkspaceResource;
+use App\Filament\Workspaces\Resources\WorkspaceResource;
 use App\Support\DocsLinkAction;
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;

@@ -1380,11 +1380,23 @@ body,
 
 /* ── Workspaces (interactive threads, editor, preview) ─────────────────────── */
 .ws-meta{margin-bottom:16px;}
-.ws-layout{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,3fr);gap:16px;align-items:stretch;min-height:calc(100vh - 260px);}
-@media (max-width:1024px){.ws-layout{grid-template-columns:1fr;}}
-.ws-pane{display:flex;flex-direction:column;min-height:560px;overflow:hidden;}
+/* Desktop: the layout fills the viewport below its own top (measured by
+   argosWorkspaceLayout → --ws-top) so only the chat feed and the tool panes
+   scroll, never the page. The middle column is the drag gutter. */
+.ws-layout{display:grid;grid-template-columns:minmax(0,var(--ws-split,40%)) 10px minmax(0,1fr);align-items:stretch;height:calc(100dvh - var(--ws-top,12rem) - 32px);min-height:480px;}
+.ws-gutter{cursor:col-resize;display:flex;justify-content:center;touch-action:none;}
+.ws-gutter::after{content:"";width:2px;margin:24px 0;border-radius:2px;background:var(--border);transition:background .15s;}
+.ws-gutter:hover::after,.ws-gutter:focus-visible::after,.ws-layout.is-resizing .ws-gutter::after{background:var(--accent);}
+.ws-layout.is-resizing{cursor:col-resize;user-select:none;}
+.ws-layout.is-resizing iframe{pointer-events:none;}
+@media (max-width:1024px){
+  .ws-layout{grid-template-columns:1fr;gap:16px;height:auto;}
+  .ws-gutter{display:none;}
+  .ws-pane{height:80dvh;}
+}
+.ws-pane{display:flex;flex-direction:column;min-height:0;overflow:hidden;}
 .ws-pane-chat{padding:0;}
-.ws-chat{display:flex;flex-direction:column;height:100%;min-height:560px;}
+.ws-chat{display:flex;flex-direction:column;height:100%;min-height:0;}
 .ws-chat-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border);flex-wrap:wrap;}
 .ws-thread-picker{display:flex;align-items:center;gap:8px;min-width:0;}
 .ws-select{font:inherit;font-size:var(--t-sm);padding:6px 8px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);max-width:100%;}
@@ -1454,7 +1466,7 @@ body,
 .ws-tabs button svg{width:16px;height:16px;}
 .ws-tabs button.on{background:var(--surface-2);border-color:var(--border);color:var(--text);}
 .ws-tab-body{flex:1;display:flex;flex-direction:column;min-height:0;}
-.ws-frame{flex:1;width:100%;border:0;min-height:520px;background:var(--surface);}
+.ws-frame{flex:1;width:100%;border:0;min-height:0;background:var(--surface);}
 .ws-frame-bar{display:flex;gap:8px;align-items:center;justify-content:flex-end;padding:6px 8px;border-bottom:1px solid var(--border);font-size:var(--t-xs);}
 .ws-preview{display:flex;flex-direction:column;flex:1;min-height:0;}
 .ws-log{margin:8px;font-size:var(--t-xs);}

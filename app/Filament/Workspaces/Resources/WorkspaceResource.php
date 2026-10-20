@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace App\Filament\Admin\Resources;
+namespace App\Filament\Workspaces\Resources;
 
 use App\Enums\WorkspaceStatus;
-use App\Filament\Admin\Resources\WorkspaceResource\Pages\CreateWorkspace;
-use App\Filament\Admin\Resources\WorkspaceResource\Pages\ListWorkspaces;
-use App\Filament\Admin\Resources\WorkspaceResource\Pages\ViewWorkspace;
+use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\CreateWorkspace;
+use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ListWorkspaces;
+use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ViewWorkspace;
 use App\Models\RepoProfile;
 use App\Models\User;
 use App\Models\Workspace;

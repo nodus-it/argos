@@ -2,18 +2,19 @@
 
 declare(strict_types=1);
 
-namespace Tests\Feature\Filament\Admin\Resources;
+namespace Tests\Feature\Workspace;
 
 use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceStatus;
-use App\Filament\Admin\Resources\WorkspaceResource\Pages\CreateWorkspace;
-use App\Filament\Admin\Resources\WorkspaceResource\Pages\ListWorkspaces;
-use App\Filament\Admin\Resources\WorkspaceResource\Pages\ViewWorkspace;
+use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\CreateWorkspace;
+use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ListWorkspaces;
+use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ViewWorkspace;
 use App\Jobs\Workspace\ProvisionWorkspaceJob;
 use App\Models\RepoProfile;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceMember;
+use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
@@ -26,6 +27,8 @@ class WorkspaceResourceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // Workspace pages live in the workspaces panel (/w).
+        Filament::setCurrentPanel('workspaces');
         Queue::fake();
         RepoProfile::factory()->create();
     }

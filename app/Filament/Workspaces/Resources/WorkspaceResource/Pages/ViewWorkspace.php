@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace App\Filament\Admin\Resources\WorkspaceResource\Pages;
+namespace App\Filament\Workspaces\Resources\WorkspaceResource\Pages;
 
 use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceStatus;
-use App\Filament\Admin\Resources\WorkspaceResource;
+use App\Filament\Workspaces\Resources\WorkspaceResource;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Workspace\ThreadService;

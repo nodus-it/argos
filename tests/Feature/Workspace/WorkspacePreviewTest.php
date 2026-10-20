@@ -7,7 +7,7 @@ namespace Tests\Feature\Workspace;
 use App\Enums\DemoStatus;
 use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceStatus;
-use App\Filament\Admin\Resources\WorkspaceResource\Pages\ViewWorkspace;
+use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ViewWorkspace;
 use App\Jobs\Workspace\DeployWorkspaceDemoJob;
 use App\Jobs\Workspace\RerunWorkspaceDemoCommandsJob;
 use App\Jobs\Workspace\StopWorkspaceDemoJob;
@@ -20,6 +20,7 @@ use App\Models\WorkspaceMember;
 use App\Services\Demo\DemoDeployer;
 use App\Services\Workspace\WorkspaceException;
 use App\Services\Workspace\WorkspacePreviewService;
+use Filament\Facades\Filament;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
@@ -37,6 +38,8 @@ class WorkspacePreviewTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // Workspace pages live in the workspaces panel (/w).
+        Filament::setCurrentPanel('workspaces');
         Queue::fake();
         config(['argos.preview.enabled' => true]);
         $profile = RepoProfile::factory()->create(['live_demo_enabled' => true]);

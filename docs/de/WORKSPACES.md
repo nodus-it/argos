@@ -8,6 +8,12 @@ bearbeitest Dateien selbst in VS Code und klickst dich durch das Ergebnis in
 einer Live-Preview. Mehrere Personen können gleichzeitig im selben Workspace
 arbeiten.
 
+Workspaces haben einen eigenen Bereich unter **`/w`** (dorthin führt auch
+`/`): volle Breite, Navigation in der oberen Leiste, damit Chat, Editor und
+Preview den ganzen Bildschirm bekommen. **Verwaltung** in der oberen Leiste
+führt in den Admin-Bereich (`/admin`) mit Projekten, Agenten, Benutzern und
+Aufgaben; ein Login gilt für beide.
+
 Workspaces stehen neben den [Aufgaben](TASKS.md). Eine Aufgabe ist der
 automatische Ablauf (Konzept → Implementierung → Pull Request); ein Workspace
 ist der interaktive. Beide nutzen dieselben Projekte, Worker-Stacks und Agenten.
@@ -106,7 +112,10 @@ Request im Issue. Geschlossen wird das Issue durch den Merge, nie durch Argos.
 
 ## Threads
 
-Die linke Hälfte der Workspace-Seite ist der Chat. Lege einen **Thread** an
+Der linke Teil der Workspace-Seite ist der Chat; zieh den Trenner zwischen
+Chat und den Tabs, um die Aufteilung zu ändern (dein Browser merkt sie sich).
+Die Seite füllt das Fenster, und nur die Unterhaltung scrollt. Lege einen
+**Thread** an
 (Titel, Agent, Modell, Modus) und schreib los. Claudes Antwort erscheint live;
 Tool-Aufrufe (Dateien lesen, Befehle ausführen, bearbeiten) erscheinen als
 kompakte Zeilen, die du aufklappen kannst.

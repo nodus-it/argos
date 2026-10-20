@@ -9,7 +9,7 @@ use App\Enums\TaskProviderKind;
 use App\Enums\TaskProviderSyncStatus;
 use App\Enums\ThreadEventType;
 use App\Enums\WorkspaceStatus;
-use App\Filament\Admin\Resources\WorkspaceResource\Pages\CreateWorkspace;
+use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\CreateWorkspace;
 use App\Jobs\Workspace\ProvisionWorkspaceJob;
 use App\Livewire\Workspace\ThreadChat;
 use App\Models\AgentCredential;
@@ -24,6 +24,7 @@ use App\Services\Workspace\WorkspaceDaemonClient;
 use App\Services\Workspace\WorkspaceIssueService;
 use App\Services\Workspace\WorkspaceService;
 use App\Testing\FakeWorkspaceDaemon;
+use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Event;
@@ -47,6 +48,8 @@ class WorkspaceIssueTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // Workspace pages live in the workspaces panel (/w).
+        Filament::setCurrentPanel('workspaces');
         Bus::fake([ProvisionWorkspaceJob::class]);
         Event::fake([ThreadStream::class]);
         $this->app->singleton(WorkspaceDaemonClient::class, FakeWorkspaceDaemon::class);

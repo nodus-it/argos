@@ -5,6 +5,9 @@ declare(strict_types=1);
 return [
     'label' => 'Workspace',
     'plural' => 'Workspaces',
+    'panel' => [
+        'admin' => 'Verwaltung',
+    ],
     'fields' => [
         'issue' => 'Aus Issue',
         'issue_help' => 'Optional. Benennt Workspace und Branch nach dem Issue und füllt die erste Nachricht vor; der Pull-Request schließt es beim Merge.',
@@ -188,6 +191,7 @@ return [
         'claude' => 'Claude Code',
     ],
     'tabs' => [
+        'resize' => 'Breite von Chat und Werkzeugen ändern',
         'review' => 'Review',
         'code_viewer' => 'Der Editor steht Besitzern und Bearbeitern dieses Workspaces zur Verfügung.',
         'not_embeddable' => 'In diesem Setup kann der Browser Workspace-Hosts nicht einbetten (App und Workspace-Hosts liegen auf verschiedenen Sites). Öffne sie in einem eigenen Tab — der Zugriff funktioniert genauso.',

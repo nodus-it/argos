@@ -7,6 +7,11 @@ approve or deny the changes it wants to make, edit files yourself in VS Code,
 and click through the result in a live preview. Several people can work in the
 same workspace at once.
 
+Workspaces have their own area at **`/w`** (also where `/` leads): full
+width, navigation in the top bar, so chat, editor and preview get the whole
+screen. **Administration** in the top bar leads to the admin area (`/admin`)
+with projects, agents, users and tasks; one login covers both.
+
 Workspaces live next to [tasks](TASKS.md). A task is the hands-off flow (concept
 → implement → pull request); a workspace is the hands-on one. Both use the same
 projects, worker stacks and agents.
@@ -102,7 +107,9 @@ issue. The issue is closed by merging, never by Argos.
 
 ## Threads
 
-The left half of the workspace page is the chat. Create a **thread** (title,
+The left part of the workspace page is the chat; drag the divider between
+chat and the tabs to change the split (your browser remembers it). The page
+fills the window, and only the conversation scrolls. Create a **thread** (title,
 agent, model, mode), then write. Claude's answer streams in live; tool calls
 (reading files, running commands, editing) appear as compact rows you can expand.
 

@@ -11,7 +11,7 @@ async function openWorkspace(browser: Browser, email: string): Promise<Page> {
   const context = await browser.newContext();
   const page = await context.newPage();
   await login(page, email);
-  await page.goto('/admin/workspaces');
+  await page.goto('/w/workspaces');
   await page.getByText('E2E pairing').first().click();
   await page.waitForURL(/\/admin\/workspaces\/[0-9A-Za-z]+/);
   await expect(page.locator('.ws-chat')).toBeVisible();

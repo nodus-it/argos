@@ -29,6 +29,7 @@ class RedirectToOnboarding
             'filament.admin.resources.provider-oauth-configs.*',
             'filament.admin.resources.provider-credentials.*',
             'filament.admin.auth.logout',
+            'filament.workspaces.auth.logout',
         )) {
             return $next($request);
         }

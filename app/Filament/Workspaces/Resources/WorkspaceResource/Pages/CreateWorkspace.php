@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Filament\Admin\Resources\WorkspaceResource\Pages;
+namespace App\Filament\Workspaces\Resources\WorkspaceResource\Pages;
 
-use App\Filament\Admin\Resources\WorkspaceResource;
+use App\Filament\Workspaces\Resources\WorkspaceResource;
 use App\Models\RepoProfile;
 use App\Models\User;
 use App\Services\Workspace\WorkspaceException;

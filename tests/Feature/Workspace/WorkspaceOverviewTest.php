@@ -11,8 +11,8 @@ use App\Enums\ThreadStatus;
 use App\Enums\WorkspaceRole;
 use App\Filament\Admin\Pages\Dashboard;
 use App\Filament\Admin\Pages\Profile;
-use App\Filament\Admin\Resources\WorkspaceResource\Pages\ListWorkspaces;
 use App\Filament\Admin\Widgets\MyWorkspacesWidget;
+use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ListWorkspaces;
 use App\Livewire\Workspace\ThreadChat;
 use App\Models\RepoProfile;
 use App\Models\Thread;
@@ -24,6 +24,7 @@ use App\Models\WorkspaceMember;
 use App\Services\Workspace\ThreadEventIngestor;
 use App\Services\Workspace\ThreadReadService;
 use App\Services\Workspace\WorkspaceSummaryService;
+use Filament\Facades\Filament;
 use Filament\Notifications\DatabaseNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
@@ -48,6 +49,8 @@ class WorkspaceOverviewTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // Workspace pages live in the workspaces panel (/w).
+        Filament::setCurrentPanel('workspaces');
         Event::fake([ThreadStream::class, UserWorkspaceSignal::class]);
         // Filament's database notification is queued; assert what was sent.
         Notification::fake();

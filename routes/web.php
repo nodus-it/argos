@@ -11,9 +11,19 @@ use App\Http\Controllers\ThreadAttachmentController;
 use App\Http\Controllers\Webhooks\IssueWebhookController;
 use App\Http\Controllers\WorkspaceGateController;
 use App\Http\Controllers\WorkspaceOpenController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', fn () => redirect('/admin'));
+// Workspaces are the everyday surface; administration lives under /admin.
+Route::get('/', fn () => redirect(config('argos.workspaces.enabled', true) ? '/w' : '/admin'));
+
+// Workspaces moved from the admin panel to their own panel: keep old links
+// (notifications, pull request bodies) working.
+Route::get('/admin/workspaces/{path?}', fn (Request $request, ?string $path = null) => redirect(
+    '/w/workspaces'.($path !== null ? '/'.$path : '').($request->getQueryString() !== null ? '?'.$request->getQueryString() : ''),
+    301,
+))
+    ->where('path', '.*');
 
 // Traefik forwardAuth target for session-protected live demos. Public route
 // (no auth middleware) — it answers 204 when logged in, else redirects to the

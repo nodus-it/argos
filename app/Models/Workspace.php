@@ -92,6 +92,12 @@ class Workspace extends Model implements DemoTarget
         ];
     }
 
+    /** Link to the workspace page, optionally opened on a thread. */
+    public function url(?Thread $thread = null): string
+    {
+        return route('filament.workspaces.resources.workspaces.view', ['record' => $this->id] + ($thread !== null ? ['thread' => $thread->id] : []));
+    }
+
     /** @return BelongsTo<RepoProfile, $this> */
     public function repoProfile(): BelongsTo
     {

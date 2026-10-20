@@ -5,6 +5,9 @@ declare(strict_types=1);
 return [
     'label' => 'Workspace',
     'plural' => 'Workspaces',
+    'panel' => [
+        'admin' => 'Administration',
+    ],
     'fields' => [
         'issue' => 'From issue',
         'issue_help' => 'Optional. Names the workspace and branch after the issue and prefills the first message; the pull request closes it on merge.',
@@ -188,6 +191,7 @@ return [
         'claude' => 'Claude Code',
     ],
     'tabs' => [
+        'resize' => 'Resize chat and tools',
         'review' => 'Review',
         'code_viewer' => 'The editor is available to owners and editors of this workspace.',
         'not_embeddable' => 'On this setup the browser cannot embed workspace hosts (the app and the workspace hosts are on different sites). Open them in their own tab — access works the same.',

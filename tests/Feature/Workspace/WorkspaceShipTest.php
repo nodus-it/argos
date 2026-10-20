@@ -9,7 +9,7 @@ use App\Enums\GitProvider;
 use App\Enums\ThreadEventType;
 use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceStatus;
-use App\Filament\Admin\Resources\WorkspaceResource\Pages\ViewWorkspace;
+use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ViewWorkspace;
 use App\Integrations\WorkspaceDaemon\Requests\GitCommit;
 use App\Integrations\WorkspaceDaemon\Requests\GitDiff;
 use App\Integrations\WorkspaceDaemon\Requests\GitPush;
@@ -27,6 +27,7 @@ use App\Services\GitProvider\GitServiceFactory;
 use App\Services\Workspace\WorkspaceException;
 use App\Services\Workspace\WorkspaceIssueService;
 use App\Services\Workspace\WorkspaceShipService;
+use Filament\Facades\Filament;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
@@ -54,6 +55,8 @@ class WorkspaceShipTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // Workspace pages live in the workspaces panel (/w).
+        Filament::setCurrentPanel('workspaces');
         Event::fake([ThreadStream::class]);
         $profile = RepoProfile::factory()->create(['url' => 'https://gitlab.com/acme/sub/widget', 'platform' => GitProvider::GitLab, 'token' => 'glpat-x']);
         $this->workspace = Workspace::factory()->create(['repo_profile_id' => $profile->id, 'status' => WorkspaceStatus::Running, 'branch' => 'ws/login', 'base_branch' => 'main']);
@@ -118,7 +121,7 @@ class WorkspaceShipTest extends TestCase
         $thread = Thread::factory()->create(['workspace_id' => $this->workspace->id]);
         $this->git->shouldReceive('createPullRequest')->once()
             ->withArgs(fn ($owner, $repo, $title, $body, $head, $base, $options) => $owner === 'acme/sub' && $repo === 'widget' && $title === 'feat: add login'
-                && str_contains($body, 'Adds the login.') && str_contains($body, '/admin/workspaces/'.$this->workspace->id) && $head === 'ws/login' && $base === 'main' && $options === ['draft' => true])
+                && str_contains($body, 'Adds the login.') && str_contains($body, '/w/workspaces/'.$this->workspace->id) && $head === 'ws/login' && $base === 'main' && $options === ['draft' => true])
             ->andReturn(['iid' => 5, 'web_url' => 'https://gitlab.com/acme/sub/widget/-/merge_requests/5', 'state' => 'opened']);
 
         $url = $this->service()->ship($this->workspace, $this->editor, 'feat: add login', 'Adds the login.', true);

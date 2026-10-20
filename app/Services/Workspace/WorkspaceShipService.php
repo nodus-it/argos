@@ -210,7 +210,7 @@ class WorkspaceShipService
 
     private function pullRequestBody(Workspace $workspace, string $body): string
     {
-        $link = url('/admin/workspaces/'.$workspace->id);
+        $link = $workspace->url();
         $reference = $this->issues->pullRequestReference($workspace);
 
         return trim($body).($reference !== null ? "\n\n".$reference : '')."\n\n---\n".__('workspaces.ship.pr_footer', ['url' => $link]);

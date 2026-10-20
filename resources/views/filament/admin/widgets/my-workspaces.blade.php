@@ -4,13 +4,13 @@
          x-on:argos-workspace-signal.window="clearTimeout(timer); timer = setTimeout(() => $wire.$refresh(), 400)">
         <div class="ws-overview-head">
             <span class="fi-ta-argos-heading">@svg('heroicon-o-command-line', 'fi-ta-argos-heading-icon') <span>{{ __('workspaces.overview.heading') }}</span></span>
-            <a class="btn btn-ghost btn-sm" href="{{ \App\Filament\Admin\Resources\WorkspaceResource::getUrl('index') }}">{{ __('workspaces.overview.all') }}</a>
+            <a class="btn btn-ghost btn-sm" href="{{ \App\Filament\Workspaces\Resources\WorkspaceResource::getUrl('index', panel: 'workspaces') }}">{{ __('workspaces.overview.all') }}</a>
         </div>
         <div class="ws-overview-grid">
             @foreach ($rows as $row)
                 @php($ws = $row['workspace'])
                 @php($sum = $row['summary'])
-                <a @class(['ws-overview-card', 'card', 'is-waiting' => $sum['waiting_for_me']]) href="{{ \App\Filament\Admin\Resources\WorkspaceResource::getUrl('view', ['record' => $ws]) }}" wire:key="ws-{{ $ws->id }}">
+                <a @class(['ws-overview-card', 'card', 'is-waiting' => $sum['waiting_for_me']]) href="{{ $ws->url() }}" wire:key="ws-{{ $ws->id }}">
                     <div class="ws-overview-title">
                         <span>{{ $ws->name }}</span>
                         <span class="badge {{ \App\Support\BadgeClass::for($ws->status->color()) }}">{{ $ws->status->label() }}</span>

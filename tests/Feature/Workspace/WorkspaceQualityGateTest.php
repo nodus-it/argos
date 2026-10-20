@@ -9,7 +9,7 @@ use App\Enums\GateRunStatus;
 use App\Enums\ThreadEventType;
 use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceStatus;
-use App\Filament\Admin\Resources\WorkspaceResource\Pages\ViewWorkspace;
+use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ViewWorkspace;
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
 use App\Livewire\Workspace\ReviewPanel;
 use App\Livewire\Workspace\ThreadChat;
@@ -25,6 +25,7 @@ use App\Services\Workspace\WorkspaceDaemonClient;
 use App\Services\Workspace\WorkspaceException;
 use App\Services\Workspace\WorkspaceGateService;
 use App\Testing\FakeWorkspaceDaemon;
+use Filament\Facades\Filament;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
@@ -42,6 +43,8 @@ class WorkspaceQualityGateTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // Workspace pages live in the workspaces panel (/w).
+        Filament::setCurrentPanel('workspaces');
         Event::fake([ThreadStream::class]);
         $this->app->singleton(WorkspaceDaemonClient::class, FakeWorkspaceDaemon::class);
         $this->workspace = Workspace::factory()->create(['status' => WorkspaceStatus::Running]);

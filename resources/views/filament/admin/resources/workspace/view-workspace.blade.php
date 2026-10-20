@@ -49,10 +49,16 @@
         </div>
     @endif
 
-    <div class="ws-layout" x-data="{ tab: 'code' }" x-on:workspace-tab.window="tab = $event.detail.tab">
+    {{-- Fills the viewport below the header; the chat feed scrolls inside.
+         The gutter between the panes sets the split (remembered per browser). --}}
+    <div class="ws-layout" x-data="window.argosWorkspaceLayout ? argosWorkspaceLayout() : { tab: 'code', resizing: false, style() { return '' }, startResize() {}, nudge() {} }" x-on:workspace-tab.window="tab = $event.detail.tab"
+         :class="{ 'is-resizing': resizing }" :style="style()">
         <section class="ws-pane ws-pane-chat card">
             @livewire('workspace.thread-chat', ['workspaceId' => $workspace->id], key('chat-'.$workspace->id))
         </section>
+
+        <div class="ws-gutter" role="separator" aria-orientation="vertical" aria-label="{{ __('workspaces.tabs.resize') }}"
+             tabindex="0" x-on:pointerdown.prevent="startResize($event)" x-on:keydown.left.prevent="nudge(-2)" x-on:keydown.right.prevent="nudge(2)"></div>
 
         <section class="ws-pane ws-pane-tools card">
             <div class="ws-tabs" role="tablist">

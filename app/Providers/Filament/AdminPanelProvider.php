@@ -5,55 +5,27 @@ declare(strict_types=1);
 namespace App\Providers\Filament;
 
 use App\Filament\Admin\Pages\Dashboard;
-use App\Filament\Admin\Pages\Login;
-use App\Filament\Admin\Pages\Profile;
-use App\Http\Middleware\RedirectToOnboarding;
 use App\Http\Middleware\SetUserLocale;
-use DutchCodingCompany\FilamentDeveloperLogins\FilamentDeveloperLoginsPlugin;
-use Filament\Http\Middleware\Authenticate;
-use Filament\Http\Middleware\AuthenticateSession;
-use Filament\Http\Middleware\DisableBladeIconComponents;
-use Filament\Http\Middleware\DispatchServingFilamentEvent;
+use App\Providers\Filament\Concerns\ConfiguresArgosPanel;
 use Filament\Navigation\NavigationGroup;
 use Filament\Navigation\NavigationItem;
 use Filament\Panel;
 use Filament\PanelProvider;
-use Filament\Support\Colors\Color;
 use Filament\Support\Enums\Width;
 use Filament\Support\Icons\Heroicon;
 use Filament\View\PanelsRenderHook;
-use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
-use Illuminate\Cookie\Middleware\EncryptCookies;
-use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
-use Illuminate\Foundation\Vite;
-use Illuminate\Foundation\ViteManifestNotFoundException;
-use Illuminate\Routing\Middleware\SubstituteBindings;
-use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Blade;
-use Illuminate\Support\HtmlString;
-use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 class AdminPanelProvider extends PanelProvider
 {
+    use ConfiguresArgosPanel;
+
     public function panel(Panel $panel): Panel
     {
-        return $panel
+        return $this->configureArgosPanel($panel
+            ->default()
             ->id('admin')
-            ->path('admin')
-            ->brandLogo(fn () => view('components.argos-logo'))
-            ->brandLogoHeight('1.75rem')
-            ->favicon(asset('favicon.svg'))
-            ->colors([
-                // Terracotta primary + warm-sand gray ("Warm Paper" redesign;
-                // see docs/design/argos/ARGOS_REDESIGN.md §2.3).
-                'primary' => [
-                    50 => '251,243,239', 100 => '246,228,218', 200 => '238,199,180',
-                    300 => '227,164,134', 400 => '217,128,95', 500 => '207,100,70',
-                    600 => '187,80,52', 700 => '154,64,43', 800 => '124,55,39',
-                    900 => '104,47,35', 950 => '58,22,16',
-                ],
-                'gray' => Color::hex('#7d7565'),
-            ])
+            ->path('admin'))
             ->maxContentWidth(Width::SevenExtraLarge)
             ->sidebarWidth('14rem')
             ->collapsibleNavigationGroups(false)
@@ -76,6 +48,13 @@ class AdminPanelProvider extends PanelProvider
                 NavigationGroup::make()->label(fn (): string => __('navigation.groups.help')),
             ])
             ->navigationItems([
+                // Workspaces live in their own full-width panel (/w).
+                NavigationItem::make('workspaces')
+                    ->label(fn (): string => __('workspaces.plural'))
+                    ->icon(Heroicon::OutlinedCommandLine)
+                    ->url(fn (): string => url('/w'))
+                    ->visible(fn (): bool => (bool) config('argos.workspaces.enabled', true))
+                    ->sort(-2),
                 // Link to the auto-generated REST API docs (Scramble, served at
                 // /docs/api). Lives outside the Filament panel, so it opens in a
                 // new tab rather than as a panel page.
@@ -86,71 +65,6 @@ class AdminPanelProvider extends PanelProvider
                     ->url(fn (): string => url('docs/api'), shouldOpenInNewTab: true)
                     ->sort(99),
             ])
-            // The bell: workspace approvals, limits, errors and shipments.
-            ->databaseNotifications()
-            ->databaseNotificationsPolling('30s')
-            ->login(Login::class)
-            ->profile(Profile::class)
-            ->plugins([
-                // One-click developer login on the login screen. Hard-gated to
-                // the local environment — never renders in staging/production.
-                FilamentDeveloperLoginsPlugin::make()
-                    ->enabled(app()->environment('local'))
-                    ->switchable(false)
-                    ->users([
-                        'Admin' => (string) config('argos.dev_login_email'),
-                    ]),
-            ])
-            ->middleware([
-                EncryptCookies::class,
-                AddQueuedCookiesToResponse::class,
-                StartSession::class,
-                AuthenticateSession::class,
-                ShareErrorsFromSession::class,
-                PreventRequestForgery::class,
-                SubstituteBindings::class,
-                DisableBladeIconComponents::class,
-                DispatchServingFilamentEvent::class,
-            ])
-            ->authMiddleware([Authenticate::class, SetUserLocale::class, RedirectToOnboarding::class])
-            ->renderHook(
-                PanelsRenderHook::HEAD_END,
-                function (): HtmlString {
-                    $realtime = config('broadcasting.default') === 'reverb';
-
-                    try {
-                        $assets = app(Vite::class)(['resources/css/app.css', 'resources/js/app.js'])->toHtml();
-                    } catch (ViteManifestNotFoundException) {
-                        $assets = '';
-                    }
-
-                    if (! $realtime) {
-                        return new HtmlString($assets);
-                    }
-
-                    // Runtime realtime config for resources/js/app.js — images
-                    // are prebuilt, so nothing here can be a Vite build-time env.
-                    $config = json_encode([
-                        'key' => (string) config('broadcasting.connections.reverb.key'),
-                        'authEndpoint' => url('broadcasting/auth'),
-                        'csrfToken' => csrf_token(),
-                        'userId' => auth()->id(),
-                    ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
-
-                    return new HtmlString('<script>window.ArgosRealtime = '.$config.';</script>'.$assets);
-                }
-            )
-            ->renderHook(
-                // Slot the page breadcrumbs teleport into (see the overridden
-                // filament-panels::components.header view) — moves them from the
-                // content header into the topbar, matching the design.
-                PanelsRenderHook::TOPBAR_START,
-                fn (): string => '<div id="argos-topbar-breadcrumbs" class="fi-argos-topbar-breadcrumbs"></div>',
-            )
-            ->renderHook(
-                PanelsRenderHook::CONTENT_START,
-                fn (): string => Blade::render('@livewire(\'usage-limit-banner\')')
-            )
             ->renderHook(
                 PanelsRenderHook::SIDEBAR_FOOTER,
                 fn (): string => Blade::render('@livewire(\'anthropic-usage-sidebar\')')
@@ -158,10 +72,6 @@ class AdminPanelProvider extends PanelProvider
             ->renderHook(
                 PanelsRenderHook::FOOTER,
                 fn (): string => view('components.argos-source-footer')->render()
-            )
-            ->renderHook(
-                PanelsRenderHook::USER_MENU_BEFORE,
-                fn (): string => view('components.argos-feedback-button')->render()
             );
     }
 }

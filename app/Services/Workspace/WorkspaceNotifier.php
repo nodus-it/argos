@@ -30,7 +30,7 @@ class WorkspaceNotifier
 
     public function notify(Workspace $workspace, ?Thread $thread, string $kind, string $title, string $body = '', ?int $exceptUserId = null): void
     {
-        $url = url('/admin/workspaces/'.$workspace->id).($thread !== null ? '?thread='.$thread->id : '');
+        $url = $workspace->url($thread);
 
         foreach ($this->operators($workspace) as $user) {
             if ($user->id === $exceptUserId || ! $user->wantsNotification($kind)) {
@@ -54,7 +54,7 @@ class WorkspaceNotifier
     public function summaryChanged(Workspace $workspace, ?Thread $thread): void
     {
         foreach ($workspace->users()->get() as $user) {
-            $this->signal($user, $workspace, $thread, 'summary', '', '', url('/admin/workspaces/'.$workspace->id));
+            $this->signal($user, $workspace, $thread, 'summary', '', '', $workspace->url());
         }
     }
 

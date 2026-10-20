@@ -92,7 +92,7 @@
         <div class="card card-pad ws-new-thread">
             @if ($agents->isEmpty())
                 <p class="muted">{{ __('workspaces.thread.no_agent') }}</p>
-                <a class="btn btn-secondary btn-sm" href="{{ \App\Filament\Admin\Resources\AgentCredentialResource::getUrl('create') }}">{{ __('workspaces.thread.add_agent') }}</a>
+                <a class="btn btn-secondary btn-sm" href="{{ \App\Filament\Admin\Resources\AgentCredentialResource::getUrl('create', panel: 'admin') }}">{{ __('workspaces.thread.add_agent') }}</a>
             @else
                 <form wire:submit="createThread" class="ws-form">
                     <label class="ws-field">

@@ -8,7 +8,7 @@ use App\Broadcasting\ThreadStream;
 use App\Enums\ThreadEventType;
 use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceStatus;
-use App\Filament\Admin\Resources\WorkspaceResource\Pages\ViewWorkspace;
+use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ViewWorkspace;
 use App\Integrations\WorkspaceDaemon\Requests\GitDiff;
 use App\Integrations\WorkspaceDaemon\Requests\GitFetch;
 use App\Integrations\WorkspaceDaemon\Requests\GitStatus;
@@ -22,6 +22,7 @@ use App\Models\WorkspaceMember;
 use App\Services\Git\WorkspaceDiffService;
 use App\Services\Workspace\WorkspaceDaemonClient;
 use App\Testing\FakeWorkspaceDaemon;
+use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Livewire\Livewire;
@@ -40,6 +41,8 @@ class ReviewPanelTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // Workspace pages live in the workspaces panel (/w).
+        Filament::setCurrentPanel('workspaces');
         Event::fake([ThreadStream::class]);
         $this->workspace = Workspace::factory()->create(['status' => WorkspaceStatus::Running]);
         $this->editor = $this->member(WorkspaceRole::Editor, 'Ada');
