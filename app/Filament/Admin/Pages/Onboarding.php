@@ -7,6 +7,7 @@ namespace App\Filament\Admin\Pages;
 use App\Enums\AgentCredentialStatus;
 use App\Enums\AgentName;
 use App\Enums\AuthMethod;
+use App\Filament\Admin\Concerns\AdminOnly;
 use App\Models\AgentCredential;
 use App\Models\ConnectedAccount;
 use App\Models\ProviderCredential;
@@ -43,6 +44,8 @@ use Illuminate\Validation\Rules\Password;
  */
 class Onboarding extends Page
 {
+    use AdminOnly;
+
     public const TOTAL_STEPS = 4;
 
     /** Git providers usable as a repository source, mapped to their OAuth config key. */

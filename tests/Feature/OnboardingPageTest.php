@@ -28,7 +28,7 @@ class OnboardingPageTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->actingAs(User::factory()->create());
+        $this->actingAs(User::factory()->admin()->create());
         config(['argos.config_dir' => storage_path('framework/testing/argos-'.uniqid())]);
         config(['argos.claude_token' => null]);
         // The backfill migration may have created credentials from the developer's
@@ -94,7 +94,7 @@ class OnboardingPageTest extends TestCase
     public function test_security_step_shows_default_password_warning(): void
     {
         config(['argos.admin_password' => 'secret-default']);
-        $user = User::factory()->create(['password' => Hash::make('secret-default')]);
+        $user = User::factory()->admin()->create(['password' => Hash::make('secret-default')]);
         $this->actingAs($user);
 
         Livewire::test(Onboarding::class)
@@ -105,7 +105,7 @@ class OnboardingPageTest extends TestCase
     public function test_using_default_password_detects_seeded_default(): void
     {
         config(['argos.admin_password' => 'secret-default']);
-        $user = User::factory()->create(['password' => Hash::make('secret-default')]);
+        $user = User::factory()->admin()->create(['password' => Hash::make('secret-default')]);
         $this->actingAs($user);
 
         $this->assertTrue(Livewire::test(Onboarding::class)->instance()->usingDefaultPassword());
@@ -114,7 +114,7 @@ class OnboardingPageTest extends TestCase
     public function test_using_default_password_false_for_custom_password(): void
     {
         config(['argos.admin_password' => 'secret-default']);
-        $user = User::factory()->create(['password' => Hash::make('my-own-password')]);
+        $user = User::factory()->admin()->create(['password' => Hash::make('my-own-password')]);
         $this->actingAs($user);
 
         $this->assertFalse(Livewire::test(Onboarding::class)->instance()->usingDefaultPassword());
@@ -123,7 +123,7 @@ class OnboardingPageTest extends TestCase
     public function test_save_password_updates_the_user(): void
     {
         config(['argos.admin_password' => 'secret-default']);
-        $user = User::factory()->create(['password' => Hash::make('secret-default')]);
+        $user = User::factory()->admin()->create(['password' => Hash::make('secret-default')]);
         $this->actingAs($user);
 
         Livewire::test(Onboarding::class)
@@ -139,7 +139,7 @@ class OnboardingPageTest extends TestCase
 
     public function test_save_password_rejects_mismatched_confirmation(): void
     {
-        $user = User::factory()->create(['password' => Hash::make('old-password')]);
+        $user = User::factory()->admin()->create(['password' => Hash::make('old-password')]);
         $this->actingAs($user);
 
         Livewire::test(Onboarding::class)
@@ -153,7 +153,7 @@ class OnboardingPageTest extends TestCase
 
     public function test_save_password_rejects_too_short(): void
     {
-        $user = User::factory()->create(['password' => Hash::make('old-password')]);
+        $user = User::factory()->admin()->create(['password' => Hash::make('old-password')]);
         $this->actingAs($user);
 
         Livewire::test(Onboarding::class)
@@ -259,7 +259,7 @@ class OnboardingPageTest extends TestCase
 
     public function test_disconnect_provider_removes_connected_account(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
         $this->actingAs($user);
 
         $user->connectedAccounts()->create([

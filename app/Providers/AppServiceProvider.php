@@ -26,6 +26,7 @@ use App\Services\IssueTracker\Providers\GitHubIssueTracker;
 use App\Services\IssueTracker\Providers\GitLabIssueTracker;
 use App\Services\IssueTracker\Providers\LinearIssueTracker;
 use App\Services\OAuth\OAuthConfigHydrator;
+use App\Services\Workspace\WorkspaceMemberService;
 use App\Workers\Agents\AgentRegistry;
 use App\Workers\Agents\ClaudeCodeRunner;
 use App\Workers\Agents\CodexRunner;
@@ -185,6 +186,15 @@ class AppServiceProvider extends ServiceProvider
         // authenticated user by default; redefine this gate to restrict access
         // (e.g. role-based) without touching the User model or the panel.
         Gate::define('access-argos-panel', fn (User $user): bool => true);
+
+        // Platform administration (users, worker stacks, OAuth apps, settings,
+        // API clients, provider credentials). Redefine for finer roles.
+        Gate::define('administer-argos', fn (User $user): bool => $user->isAdmin());
+
+        // EE seam for pair programming: whether a workspace may have members
+        // besides its owner. Enforced in exactly one place
+        // (WorkspaceMemberService::add); redefine this gate to restrict it.
+        Gate::define(WorkspaceMemberService::COLLABORATION_GATE, fn (User $user): bool => (bool) config('argos.workspaces.collaboration', true));
     }
 
     /**

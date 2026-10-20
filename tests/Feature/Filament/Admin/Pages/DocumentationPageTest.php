@@ -19,7 +19,7 @@ class DocumentationPageTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->actingAs(User::factory()->create());
+        $this->actingAs(User::factory()->admin()->create());
         // A project exists so the onboarding redirect is out of the way for the
         // default-access tests (the pre-onboarding case has its own test).
         RepoProfile::factory()->create();

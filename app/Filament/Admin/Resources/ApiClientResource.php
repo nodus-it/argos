@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources;
 
+use App\Filament\Admin\Concerns\AdminOnly;
 use App\Filament\Admin\RelationManagers\ApiTokensRelationManager;
 use App\Filament\Admin\Resources\ApiClientResource\Pages\CreateApiClient;
 use App\Filament\Admin\Resources\ApiClientResource\Pages\EditApiClient;
@@ -22,6 +23,8 @@ use Filament\Tables\Table;
 
 class ApiClientResource extends Resource
 {
+    use AdminOnly;
+
     protected static ?string $model = ApiClient::class;
 
     protected static ?string $slug = 'api-clients';

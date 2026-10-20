@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Pages;
 
+use App\Filament\Admin\Concerns\AdminOnly;
 use Filament\Pages\Page;
 
 class Settings extends Page
 {
+    use AdminOnly;
+
     protected string $view = 'filament.admin.pages.settings';
 
     public static function getNavigationIcon(): string

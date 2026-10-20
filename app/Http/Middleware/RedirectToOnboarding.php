@@ -7,6 +7,7 @@ namespace App\Http\Middleware;
 use App\Models\RepoProfile;
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Symfony\Component\HttpFoundation\Response;
 
 class RedirectToOnboarding
@@ -33,6 +34,12 @@ class RedirectToOnboarding
         }
 
         if (RepoProfile::query()->exists()) {
+            return $next($request);
+        }
+
+        // Onboarding is admin-only; other users land on the (empty) dashboard
+        // until an administrator has set up the first project.
+        if (! Gate::allows('administer-argos')) {
             return $next($request);
         }
 

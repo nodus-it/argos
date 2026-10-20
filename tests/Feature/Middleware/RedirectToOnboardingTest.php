@@ -16,7 +16,7 @@ class RedirectToOnboardingTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->actingAs(User::factory()->create());
+        $this->actingAs(User::factory()->admin()->create());
     }
 
     public function test_dashboard_redirects_to_onboarding_when_no_profile(): void

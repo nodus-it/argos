@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Admin\Resources;
 
 use App\Enums\IntegrationProvider;
+use App\Filament\Admin\Concerns\AdminOnly;
 use App\Filament\Admin\Resources\ProviderOAuthConfigResource\Pages\CreateProviderOAuthConfig;
 use App\Filament\Admin\Resources\ProviderOAuthConfigResource\Pages\EditProviderOAuthConfig;
 use App\Filament\Admin\Resources\ProviderOAuthConfigResource\Pages\ListProviderOAuthConfigs;
@@ -32,6 +33,8 @@ use Illuminate\Validation\Rules\Unique;
 
 class ProviderOAuthConfigResource extends Resource
 {
+    use AdminOnly;
+
     protected static ?string $model = ProviderOAuthConfig::class;
 
     // Without this, Filament derives "provider-o-auth-configs" from the class

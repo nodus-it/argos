@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Admin\Resources;
 
 use App\Enums\WorkerImageEntityStatus;
+use App\Filament\Admin\Concerns\AdminOnly;
 use App\Filament\Admin\Resources\WorkerStackResource\Pages\CreateWorkerStack;
 use App\Filament\Admin\Resources\WorkerStackResource\Pages\EditWorkerStack;
 use App\Filament\Admin\Resources\WorkerStackResource\Pages\ListWorkerStacks;
@@ -33,6 +34,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class WorkerStackResource extends Resource
 {
+    use AdminOnly;
+
     protected static ?string $model = WorkerStack::class;
 
     public static function getNavigationIcon(): string

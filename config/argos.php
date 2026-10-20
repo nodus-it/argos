@@ -168,6 +168,33 @@ return [
     ],
 
     /*
+     * Interactive workspaces: a long-lived container per workspace running the
+     * workspace daemon (daemon/) and OpenVSCode Server. See docs/WORKSPACES.md.
+     */
+    'workspaces' => [
+        // Master switch for the workspace UI, jobs and routes.
+        'enabled' => filter_var($envOr('ARGOS_WORKSPACES_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
+        // Value behind the `workspace-collaboration` gate (pair programming:
+        // members besides the owner). Redefine the gate for finer control.
+        'collaboration' => filter_var($envOr('ARGOS_WORKSPACE_COLLABORATION', true), FILTER_VALIDATE_BOOLEAN),
+        // Cap on concurrently running workspace containers. Starting beyond it
+        // is refused — running workspaces are never evicted.
+        'max_active' => (int) $envOr('ARGOS_WORKSPACE_MAX_ACTIVE', 5),
+        // Stop idle workspaces (container only; volumes stay) after this many
+        // minutes without activity and without a busy thread.
+        'idle_minutes' => (int) $envOr('ARGOS_WORKSPACE_IDLE_MINUTES', 60),
+        'cpus' => (string) $envOr('ARGOS_WORKSPACE_CPUS', '2'),
+        'memory' => (string) $envOr('ARGOS_WORKSPACE_MEMORY', '4g'),
+        // Base URL the daemon uses to reach the manager on the argos_ws network.
+        'internal_url' => rtrim((string) $envOr('ARGOS_INTERNAL_URL', 'http://nginx'), '/'),
+        // Docker network shared by the manager and workspace containers.
+        'network' => $envOr('ARGOS_WORKSPACE_NETWORK', 'argos_ws'),
+        'daemon_port' => 7777,
+        'editor_port' => 3000,
+        'openvscode_version' => $envOr('ARGOS_OPENVSCODE_VERSION', '1.105.1'),
+    ],
+
+    /*
      * Set inside an Argos live-demo container (DemoDeployer injects ARGOS_DEMO=1
      * into the entry service). DatabaseSeeder reads this to seed the full demo
      * profile instead of the production-safe admin-only seed, so Argos' own live

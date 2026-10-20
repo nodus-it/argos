@@ -137,3 +137,31 @@ arch('no filesystem io in the presentation layer')
         'unlink',
         'mkdir',
     ]);
+
+// --- Workspace membership has a single writer ------------------------------
+// WorkspaceMemberService::add is the only enforcement point of the
+// `workspace-collaboration` gate (the EE seam for pair programming). Any other
+// writer of workspace_members would bypass it.
+it('writes workspace members only through WorkspaceMemberService', function (): void {
+    $root = dirname(__DIR__, 2);
+    $allowed = 'app/Services/Workspace/WorkspaceMemberService.php';
+    $offenders = [];
+
+    /** @var iterable<SplFileInfo> $iterator */
+    $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root.'/app', FilesystemIterator::SKIP_DOTS));
+    foreach ($iterator as $file) {
+        if ($file->getExtension() !== 'php') {
+            continue;
+        }
+        $relative = ltrim(str_replace($root, '', $file->getPathname()), '/');
+        if ($relative === $allowed) {
+            continue;
+        }
+        $source = (string) file_get_contents($file->getPathname());
+        if (preg_match('/WorkspaceMember::(query\(\)->)?(create|updateOrCreate|firstOrCreate|insert|upsert)\b|members\(\)\s*->\s*(create|save|attach|sync|updateOrCreate)|users\(\)\s*->\s*(attach|sync|syncWithoutDetaching)/', $source) === 1) {
+            $offenders[] = $relative;
+        }
+    }
+
+    expect($offenders)->toBe([]);
+});

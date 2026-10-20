@@ -6,6 +6,7 @@ namespace App\Filament\Admin\Resources;
 
 use App\Enums\IntegrationProvider;
 use App\Enums\ProviderCredentialStatus;
+use App\Filament\Admin\Concerns\AdminOnly;
 use App\Filament\Admin\Resources\ProviderCredentialResource\Pages\CreateProviderCredential;
 use App\Filament\Admin\Resources\ProviderCredentialResource\Pages\EditProviderCredential;
 use App\Filament\Admin\Resources\ProviderCredentialResource\Pages\ListProviderCredentials;
@@ -32,6 +33,8 @@ use Illuminate\Contracts\View\View;
 
 class ProviderCredentialResource extends Resource
 {
+    use AdminOnly;
+
     protected static ?string $model = ProviderCredential::class;
 
     // Pin the slug so route names, deep links, and the onboarding whitelist

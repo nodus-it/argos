@@ -6,6 +6,7 @@ namespace App\Filament\Admin\Resources;
 
 use App\Enums\AgentName;
 use App\Enums\WorkerImageBuildStatus;
+use App\Filament\Admin\Concerns\AdminOnly;
 use App\Filament\Admin\Resources\WorkerImageBuildResource\Pages\ListWorkerImageBuilds;
 use App\Filament\Admin\Resources\WorkerImageBuildResource\Pages\ViewWorkerImageBuild;
 use App\Jobs\BuildWorkerImageJob;
@@ -29,6 +30,8 @@ use Illuminate\Database\Eloquent\Builder;
 
 class WorkerImageBuildResource extends Resource
 {
+    use AdminOnly;
+
     protected static ?string $model = WorkerImageBuild::class;
 
     public static function getNavigationIcon(): string

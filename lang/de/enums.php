@@ -108,4 +108,49 @@ return [
         'active' => 'Aktiv',
         'error' => 'Fehler',
     ],
+
+    'workspace_status' => [
+        'provisioning' => 'Wird eingerichtet',
+        'starting' => 'Startet',
+        'running' => 'Läuft',
+        'stopping' => 'Stoppt',
+        'stopped' => 'Gestoppt',
+        'failed' => 'Fehlgeschlagen',
+    ],
+
+    'workspace_role' => [
+        'owner' => 'Besitzer',
+        'editor' => 'Bearbeiter',
+        'viewer' => 'Leser',
+    ],
+
+    'thread_status' => [
+        'closed' => 'Geschlossen',
+        'starting' => 'Startet',
+        'idle' => 'Bereit',
+        'running' => 'Arbeitet',
+        'waiting_input' => 'Wartet auf Eingabe',
+        'error' => 'Fehler',
+    ],
+
+    'permission_mode' => [
+        'default' => 'Vor Änderungen fragen',
+        'acceptEdits' => 'Änderungen annehmen',
+        'plan' => 'Plan-Mode',
+        'bypassPermissions' => 'Freigaben umgehen',
+    ],
+
+    'approval_kind' => [
+        'tool' => 'Tool-Aufruf',
+        'plan' => 'Plan',
+        'question' => 'Frage',
+    ],
+
+    'approval_status' => [
+        'pending' => 'Offen',
+        'allowed' => 'Erlaubt',
+        'denied' => 'Abgelehnt',
+        'answered' => 'Beantwortet',
+        'cancelled' => 'Abgebrochen',
+    ],
 ];

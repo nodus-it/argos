@@ -10,12 +10,22 @@ use Filament\Panel;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Passport\Contracts\OAuthenticatable;
 use Laravel\Passport\HasApiTokens;
 
+/**
+ * `is_admin` is deliberately not fillable: it is only set through
+ * UserService, never from request data.
+ *
+ * @property int $id
+ * @property string $name
+ * @property string $email
+ * @property bool $is_admin
+ */
 #[Fillable(['name', 'email', 'password', 'locale'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable implements FilamentUser, OAuthenticatable
@@ -31,6 +41,7 @@ class User extends Authenticatable implements FilamentUser, OAuthenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_admin' => 'boolean',
         ];
     }
 
@@ -40,6 +51,27 @@ class User extends Authenticatable implements FilamentUser, OAuthenticatable
     public function connectedAccounts(): HasMany
     {
         return $this->hasMany(ConnectedAccount::class);
+    }
+
+    public function isAdmin(): bool
+    {
+        return (bool) $this->is_admin;
+    }
+
+    /**
+     * Agents running on this user's own Claude subscription.
+     *
+     * @return HasMany<AgentCredential, $this>
+     */
+    public function agentCredentials(): HasMany
+    {
+        return $this->hasMany(AgentCredential::class);
+    }
+
+    /** @return BelongsToMany<Workspace, $this> */
+    public function workspaces(): BelongsToMany
+    {
+        return $this->belongsToMany(Workspace::class, 'workspace_members')->withPivot('role')->withTimestamps();
     }
 
     public function connectedAccount(string $provider): ?ConnectedAccount

@@ -25,7 +25,7 @@ class AgentCredentialResourceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->actingAs(User::factory()->create());
+        $this->actingAs(User::factory()->admin()->create());
     }
 
     /** Stub the on-save Claude token probe so these UI tests stay offline. */

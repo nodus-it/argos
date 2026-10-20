@@ -32,7 +32,7 @@ class DocsDeepLinksTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->actingAs(User::factory()->create());
+        $this->actingAs(User::factory()->admin()->create());
     }
 
     public function test_onboarding_links_to_the_setup_doc(): void

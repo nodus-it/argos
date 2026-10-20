@@ -108,4 +108,49 @@ return [
         'active' => 'Active',
         'error' => 'Error',
     ],
+
+    'workspace_status' => [
+        'provisioning' => 'Provisioning',
+        'starting' => 'Starting',
+        'running' => 'Running',
+        'stopping' => 'Stopping',
+        'stopped' => 'Stopped',
+        'failed' => 'Failed',
+    ],
+
+    'workspace_role' => [
+        'owner' => 'Owner',
+        'editor' => 'Editor',
+        'viewer' => 'Viewer',
+    ],
+
+    'thread_status' => [
+        'closed' => 'Closed',
+        'starting' => 'Starting',
+        'idle' => 'Idle',
+        'running' => 'Working',
+        'waiting_input' => 'Waiting for input',
+        'error' => 'Error',
+    ],
+
+    'permission_mode' => [
+        'default' => 'Ask before changes',
+        'acceptEdits' => 'Accept edits',
+        'plan' => 'Plan mode',
+        'bypassPermissions' => 'Bypass permissions',
+    ],
+
+    'approval_kind' => [
+        'tool' => 'Tool call',
+        'plan' => 'Plan',
+        'question' => 'Question',
+    ],
+
+    'approval_status' => [
+        'pending' => 'Pending',
+        'allowed' => 'Allowed',
+        'denied' => 'Denied',
+        'answered' => 'Answered',
+        'cancelled' => 'Cancelled',
+    ],
 ];

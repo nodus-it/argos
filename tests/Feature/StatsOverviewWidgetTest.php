@@ -25,7 +25,7 @@ class StatsOverviewWidgetTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->actingAs(User::factory()->create());
+        $this->actingAs(User::factory()->admin()->create());
     }
 
     public function test_widget_renders_without_error_when_empty(): void

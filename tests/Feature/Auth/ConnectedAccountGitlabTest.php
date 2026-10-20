@@ -26,7 +26,7 @@ class ConnectedAccountGitlabTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->user = User::factory()->create();
+        $this->user = User::factory()->admin()->create();
         $this->actingAs($this->user);
 
         // The OAuth callback re-verifies against the provider API — stub it offline.

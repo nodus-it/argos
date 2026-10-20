@@ -27,6 +27,13 @@ class CreateAgentCredential extends CreateRecord
     {
         $data = self::normaliseCredentials($data);
 
+        // A non-admin always creates a personal agent on their own subscription.
+        if (! AgentCredentialResource::isAdmin()) {
+            $data['user_id'] = auth()->id();
+            $data['agent_name'] = AgentName::ClaudeCode->value;
+            $data['max_concurrent_sessions'] = 1;
+        }
+
         // Only Claude has a cheap live probe; Codex is validated structurally
         // in normaliseCredentials() — there is no equivalent token endpoint.
         if (($data['agent_name'] ?? null) === AgentName::ClaudeCode->value) {

@@ -20,7 +20,7 @@ class ProviderOAuthConfigResourceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->actingAs(User::factory()->create());
+        $this->actingAs(User::factory()->admin()->create());
     }
 
     public function test_list_page_renders(): void

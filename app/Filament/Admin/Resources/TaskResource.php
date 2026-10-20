@@ -20,6 +20,7 @@ use App\Filament\Admin\Resources\TaskResource\RelationManagers\PhaseRunsRelation
 use App\Models\AgentCredential;
 use App\Models\RepoProfile;
 use App\Models\Task;
+use App\Models\User;
 use App\Models\WorkerStack;
 use App\Services\GitProvider\GitServiceFactory;
 use App\Support\DocsLinkAction;
@@ -267,7 +268,10 @@ class TaskResource extends Resource
      */
     private static function credentialOptionsForAgent(AgentName $agent): array
     {
+        $user = auth()->user();
+
         return AgentCredential::query()
+            ->when($user instanceof User, fn ($q) => $q->usableBy($user), fn ($q) => $q->shared())
             ->where('agent_name', $agent->value)
             ->where('status', AgentCredentialStatus::Active->value)
             ->orderBy('name')

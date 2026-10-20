@@ -224,7 +224,10 @@ class PhaseCommandBuilder
      */
     private function resolveDefaultCredential(AgentName $agentName): ?AgentCredential
     {
+        // Shared agents only: a personal agent (someone's own subscription)
+        // is never picked implicitly — only when chosen on the task.
         return AgentCredential::query()
+            ->shared()
             ->where('agent_name', $agentName->value)
             ->where('status', AgentCredentialStatus::Active->value)
             ->orderBy('created_at')
