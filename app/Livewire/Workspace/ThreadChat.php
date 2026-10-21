@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Livewire\Workspace;
 
+use App\Enums\ApprovalKind;
+use App\Enums\AutoThreadState;
 use App\Enums\PermissionMode;
 use App\Enums\ThreadEventType;
 use App\Enums\ThreadStatus;
@@ -17,6 +19,8 @@ use App\Models\ThreadEvent;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Workspace\AgentPool;
+use App\Services\Workspace\AutoSettings;
+use App\Services\Workspace\AutoThreadDriver;
 use App\Services\Workspace\ModelCatalog;
 use App\Services\Workspace\ThreadAttachmentService;
 use App\Services\Workspace\ThreadCheckpointService;
@@ -70,6 +74,17 @@ class ThreadChat extends Component
     public ?string $newAgentId = null;
 
     public ?string $newModel = null;
+
+    /** New thread as an auto-thread (AutoThreadDriver) — empty overrides use the project defaults. */
+    public bool $newAuto = false;
+
+    public string $newPrompt = '';
+
+    public ?string $newPlan = null;
+
+    public ?string $newShip = null;
+
+    public ?int $newMaxFixRounds = null;
 
     public string $newMode = 'default';
 
@@ -127,11 +142,34 @@ class ThreadChat extends Component
             'newAgentId' => ['required', 'string'],
             'newModel' => ['nullable', 'string', 'max:90'],
             'newMode' => ['required', 'string'],
+            'newPrompt' => [$this->newAuto ? 'required' : 'nullable', 'string', 'max:20000'],
+            'newPlan' => ['nullable', 'in:off,auto,approve'],
+            'newShip' => ['nullable', 'in:pr,draft_pr,none'],
+            'newMaxFixRounds' => ['nullable', 'integer', 'min:0', 'max:20'],
         ]);
 
         $agent = $this->usableAgents()->firstWhere('id', $this->newAgentId);
         if ($agent === null) {
             $this->addError('newAgentId', __('workspaces.errors.agent_unavailable'));
+
+            return;
+        }
+
+        if ($this->newAuto) {
+            $this->attempt(function () use ($agent): void {
+                $thread = app(AutoThreadDriver::class)->start(
+                    $this->workspace(),
+                    $this->user(),
+                    $agent,
+                    trim($this->newPrompt),
+                    trim($this->newTitle) !== '' ? trim($this->newTitle) : null,
+                    $this->newModel,
+                    ['plan' => $this->newPlan, 'ship' => $this->newShip, 'max_fix_rounds' => $this->newMaxFixRounds],
+                );
+                $this->threadId = $thread->id;
+                $this->creating = false;
+                $this->reset('newTitle', 'newPrompt', 'newAuto', 'newPlan', 'newShip', 'newMaxFixRounds');
+            });
 
             return;
         }
@@ -308,6 +346,22 @@ class ThreadChat extends Component
         }
     }
 
+    public function pauseAuto(): void
+    {
+        $thread = $this->activeThread();
+        if ($thread !== null) {
+            $this->attempt(fn () => app(AutoThreadDriver::class)->pause($thread, $this->user()));
+        }
+    }
+
+    public function resumeAuto(): void
+    {
+        $thread = $this->activeThread();
+        if ($thread !== null) {
+            $this->attempt(fn () => app(AutoThreadDriver::class)->resume($thread, $this->user()));
+        }
+    }
+
     public function interrupt(): void
     {
         $thread = $this->activeThread();
@@ -346,6 +400,13 @@ class ThreadChat extends Component
         $updatedInput = null;
         if ($answers !== null && $decision === 'allow') {
             $updatedInput = [...(array) ($approval->request['input'] ?? []), 'answers' => $answers];
+        }
+
+        // An auto-thread's plan: the driver decides and continues the run.
+        if ($approval->kind === ApprovalKind::Plan && $approval->thread->auto_state === AutoThreadState::AwaitingPlanApproval) {
+            $this->attempt(fn () => app(AutoThreadDriver::class)->decidePlan($approval->thread, $this->user(), $decision === 'allow', $message));
+
+            return;
         }
 
         $this->attempt(function () use ($approval, $decision, $message, $updatedInput, $nextMode): void {
@@ -476,6 +537,7 @@ class ThreadChat extends Component
             'busy' => $thread !== null && $thread->status->isBusy(),
             'user' => $this->user(),
             'commands' => $thread !== null ? $this->commandList() : [],
+            'autoDefaults' => AutoSettings::resolve($workspace->repoProfile),
             // user message id => checkpoint taken right before it
             'checkpoints' => $thread !== null
                 ? ThreadCheckpoint::query()->where('thread_id', $thread->id)->whereIn('thread_event_id', $events->pluck('id'))->orderBy('n')->get()->unique('thread_event_id')->pluck('id', 'thread_event_id')

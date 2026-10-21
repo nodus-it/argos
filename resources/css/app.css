@@ -1588,3 +1588,16 @@ a.ws-headline-item:hover{color:var(--accent);}
   .ws-thread-actions{display:flex;position:static;}
 }
 button.as-toggle{background:none;border:0;padding:0;font:inherit;font-size:var(--t-xs);}
+/* Auto-threads */
+.ws-auto-icon{display:inline-flex;color:var(--accent);}
+.ws-auto-icon svg{width:12px;height:12px;}
+.ws-auto-chip svg{width:12px;height:12px;}
+.ws-auto-chip.is-success{background:var(--ok-50);color:var(--ok-700);border-color:var(--ok-100);}
+.ws-auto-chip.is-warning{background:var(--wn-50);color:var(--wn-700);}
+.ws-auto-chip.is-danger{background:var(--dg-50);color:var(--dg-700);border-color:var(--dg-100);}
+.ws-auto-chip.is-info{background:color-mix(in srgb,var(--accent) 10%,var(--surface));color:var(--accent);}
+.ws-who .ws-chip svg{width:11px;height:11px;}
+.ws-auto-toggle{align-items:flex-start;font-size:var(--t-sm);padding:8px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface-2);}
+.ws-auto-toggle input{margin-top:3px;}
+.ws-auto-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;}
+.ws-auto-note{margin:8px 12px 0;}

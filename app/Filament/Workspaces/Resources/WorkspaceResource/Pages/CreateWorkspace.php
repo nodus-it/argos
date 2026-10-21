@@ -7,6 +7,8 @@ namespace App\Filament\Workspaces\Resources\WorkspaceResource\Pages;
 use App\Filament\Workspaces\Resources\WorkspaceResource;
 use App\Models\RepoProfile;
 use App\Models\User;
+use App\Services\Workspace\AgentPool;
+use App\Services\Workspace\AutoThreadDriver;
 use App\Services\Workspace\WorkspaceException;
 use App\Services\Workspace\WorkspaceIssueService;
 use App\Services\Workspace\WorkspaceService;
@@ -33,13 +35,28 @@ class CreateWorkspace extends CreateRecord
             $profile = RepoProfile::query()->findOrFail($data['repo_profile_id']);
             $issue = filled($data['issue'] ?? null) ? app(WorkspaceIssueService::class)->load($profile, (string) $data['issue']) : null;
 
-            return app(WorkspaceService::class)->createWorkspace(
+            $workspace = app(WorkspaceService::class)->createWorkspace(
                 $user,
                 $profile,
                 (string) $data['name'],
                 isset($data['base_branch']) ? (string) $data['base_branch'] : null,
                 $issue,
             );
+
+            // Start an auto-thread: it waits until the workspace is up.
+            if ((bool) ($data['auto_start'] ?? false)) {
+                $agent = app(AgentPool::class)->usableAgentsFor($user)->first();
+                if ($agent === null) {
+                    Notification::make()->title(__('workspaces.thread.no_agent'))->warning()->send();
+                } else {
+                    app(AutoThreadDriver::class)->start($workspace, $user, $agent, (string) $data['auto_prompt'], null, null, [
+                        'plan' => $data['auto_plan'] ?? null,
+                        'ship' => $data['auto_ship'] ?? null,
+                    ]);
+                }
+            }
+
+            return $workspace;
         } catch (WorkspaceException $e) {
             Notification::make()->title($e->getMessage())->danger()->send();
 

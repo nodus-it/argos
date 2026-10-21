@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Filament\Workspaces\Resources;
 
+use App\Enums\AutoPlanMode;
+use App\Enums\AutoShipMode;
 use App\Enums\WorkspaceStatus;
 use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\CreateWorkspace;
 use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ListWorkspaces;
@@ -11,11 +13,14 @@ use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ViewWorkspace;
 use App\Models\RepoProfile;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Services\Workspace\AutoSettings;
 use App\Services\Workspace\WorkspaceIssueService;
 use App\Services\Workspace\WorkspaceSummaryService;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
@@ -121,6 +126,34 @@ class WorkspaceResource extends Resource
                         ->helperText(__('workspaces.fields.base_branch_help'))
                         ->placeholder(fn ($get): ?string => RepoProfile::query()->find($get('repo_profile_id'))?->default_branch)
                         ->maxLength(255),
+                ]),
+
+            // Optional: start an auto-thread right away (replaces creating a task).
+            Section::make(__('workspaces.auto.toggle'))
+                ->description(__('workspaces.auto.toggle_help'))
+                ->icon('heroicon-o-bolt')
+                ->collapsible()
+                ->schema([
+                    Toggle::make('auto_start')
+                        ->label(__('workspaces.auto.start_with_workspace'))
+                        ->live(),
+                    Textarea::make('auto_prompt')
+                        ->label(__('workspaces.auto.prompt'))
+                        ->placeholder(__('workspaces.auto.prompt_placeholder'))
+                        ->rows(4)
+                        ->maxLength(20000)
+                        ->required(fn (Get $get): bool => (bool) $get('auto_start'))
+                        ->visible(fn (Get $get): bool => (bool) $get('auto_start')),
+                    Select::make('auto_plan')
+                        ->label(__('projects.fields.auto_plan'))
+                        ->options(collect(AutoPlanMode::cases())->mapWithKeys(fn (AutoPlanMode $m): array => [$m->value => $m->label()])->all())
+                        ->placeholder(fn (Get $get): string => __('workspaces.auto.project_default', ['value' => AutoPlanMode::from(AutoSettings::resolve(RepoProfile::query()->find($get('repo_profile_id')))['plan'])->label()]))
+                        ->visible(fn (Get $get): bool => (bool) $get('auto_start')),
+                    Select::make('auto_ship')
+                        ->label(__('projects.fields.auto_ship'))
+                        ->options(collect(AutoShipMode::cases())->mapWithKeys(fn (AutoShipMode $m): array => [$m->value => $m->label()])->all())
+                        ->placeholder(fn (Get $get): string => __('workspaces.auto.project_default', ['value' => AutoShipMode::from(AutoSettings::resolve(RepoProfile::query()->find($get('repo_profile_id')))['ship'])->label()]))
+                        ->visible(fn (Get $get): bool => (bool) $get('auto_start')),
                 ]),
         ]);
     }

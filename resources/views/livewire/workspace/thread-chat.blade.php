@@ -1,6 +1,7 @@
 @php
     use App\Enums\ApprovalKind;
     use App\Enums\ApprovalStatus;
+    use App\Enums\AutoThreadState;
     use App\Enums\PermissionMode;
     use App\Enums\ThreadEventType;
     use App\Livewire\Workspace\ThreadChat;
@@ -41,6 +42,9 @@
                     @else
                         <button type="button" class="ws-thread-link" wire:click="selectThread('{{ $t->id }}')">
                             <span class="ws-status-dot ws-status-{{ $t->status->value }}" role="img" aria-label="{{ $t->status->label() }}" title="{{ $t->status->label() }}"></span>
+                            @if ($t->auto_state)
+                                <span class="ws-auto-icon" role="img" aria-label="{{ __('workspaces.auto.label') }}" title="{{ __('workspaces.auto.label') }} · {{ $t->auto_state->label() }}">@svg('heroicon-s-bolt')</span>
+                            @endif
                             <span class="ws-thread-name">{{ $t->title }}</span>
                             @if (($unread[$t->id] ?? 0) > 0 && $thread?->id !== $t->id)
                                 <span class="ws-unread">{{ $unread[$t->id] }}</span>
@@ -76,6 +80,23 @@
                 @if ($thread)
                     <span class="ws-status-dot ws-status-{{ $thread->status->value }}" role="img" aria-label="{{ $thread->status->label() }}" title="{{ $thread->status->label() }}"></span>
                 @endif
+                @if ($thread?->auto_state)
+                    @php
+                        $autoRounds = $thread->auto_state === AutoThreadState::Fixing || $thread->auto_state === AutoThreadState::Gating
+                            ? ' · '.__('workspaces.auto.round', ['n' => (int) ($thread->auto_counters['fix_rounds'] ?? 0), 'max' => (int) ($thread->auto_config['max_fix_rounds'] ?? 0)])
+                            : '';
+                    @endphp
+                    <span class="ws-chip ws-auto-chip is-{{ $thread->auto_state->color() }}" title="{{ $thread->auto_message }}">
+                        @svg('heroicon-s-bolt') {{ $thread->auto_state->label() }}{{ $autoRounds }}
+                    </span>
+                    @if ($canWrite)
+                        @if ($thread->auto_state->isRunning())
+                            <button type="button" class="ws-tool-icon-btn" wire:click="pauseAuto" title="{{ __('workspaces.auto.pause') }}" aria-label="{{ __('workspaces.auto.pause') }}">@svg('heroicon-o-pause')</button>
+                        @elseif ($thread->auto_state !== AutoThreadState::Done)
+                            <button type="button" class="ws-tool-icon-btn" wire:click="resumeAuto" title="{{ __('workspaces.auto.resume') }}" aria-label="{{ __('workspaces.auto.resume') }}">@svg('heroicon-o-play')</button>
+                        @endif
+                    @endif
+                @endif
             </div>
 
             <div class="ws-presence" x-show="members && members.length" x-cloak>
@@ -86,6 +107,12 @@
             </div>
         </div>
 
+    @if ($thread?->auto_state && $thread->auto_message && ! $thread->auto_state->isRunning())
+        <div @class(['ws-alert', 'ws-auto-note', 'ws-alert-error' => in_array($thread->auto_state, [AutoThreadState::Failed, AutoThreadState::BudgetExceeded], true), 'ws-alert-warn' => $thread->auto_state === AutoThreadState::Paused]) role="status">
+            @svg('heroicon-o-bolt') <span>{{ $thread->auto_message }}</span>
+        </div>
+    @endif
+
     {{-- New thread form --}}
     @if ($creating && $canWrite)
         <div class="card card-pad ws-new-thread">
@@ -94,6 +121,41 @@
                 <a class="btn btn-secondary btn-sm" href="{{ \App\Filament\Admin\Resources\AgentCredentialResource::getUrl('create', panel: 'admin') }}">{{ __('workspaces.thread.add_agent') }}</a>
             @else
                 <form wire:submit="createThread" class="ws-form">
+                    <label class="ws-inline ws-auto-toggle">
+                        <input type="checkbox" wire:model.live="newAuto">
+                        <span><strong>{{ __('workspaces.auto.toggle') }}</strong> — {{ __('workspaces.auto.toggle_help') }}</span>
+                    </label>
+                    @if ($newAuto)
+                        <label class="ws-field">
+                            <span>{{ __('workspaces.auto.prompt') }}</span>
+                            <textarea class="respond-ta ws-ta" rows="4" wire:model="newPrompt" maxlength="20000" placeholder="{{ __('workspaces.auto.prompt_placeholder') }}" required></textarea>
+                            @error('newPrompt') <small class="t-err">{{ $message }}</small> @enderror
+                        </label>
+                        <div class="ws-auto-grid">
+                            <label class="ws-field">
+                                <span>{{ __('projects.fields.auto_plan') }}</span>
+                                <select class="ws-select" wire:model="newPlan">
+                                    <option value="">{{ __('workspaces.auto.project_default', ['value' => \App\Enums\AutoPlanMode::from($autoDefaults['plan'])->label()]) }}</option>
+                                    @foreach (\App\Enums\AutoPlanMode::cases() as $m)
+                                        <option value="{{ $m->value }}">{{ $m->label() }}</option>
+                                    @endforeach
+                                </select>
+                            </label>
+                            <label class="ws-field">
+                                <span>{{ __('projects.fields.auto_ship') }}</span>
+                                <select class="ws-select" wire:model="newShip">
+                                    <option value="">{{ __('workspaces.auto.project_default', ['value' => \App\Enums\AutoShipMode::from($autoDefaults['ship'])->label()]) }}</option>
+                                    @foreach (\App\Enums\AutoShipMode::cases() as $m)
+                                        <option value="{{ $m->value }}">{{ $m->label() }}</option>
+                                    @endforeach
+                                </select>
+                            </label>
+                            <label class="ws-field">
+                                <span>{{ __('projects.fields.auto_max_fix_rounds') }}</span>
+                                <input type="number" class="ws-input" wire:model="newMaxFixRounds" min="0" max="20" placeholder="{{ $autoDefaults['max_fix_rounds'] }}">
+                            </label>
+                        </div>
+                    @endif
                     <label class="ws-field">
                         <span>{{ __('workspaces.thread.title') }}</span>
                         <input type="text" class="ws-input" wire:model="newTitle" maxlength="120" placeholder="{{ __('workspaces.thread.title_default') }}">
@@ -116,7 +178,7 @@
                             @endforeach
                         </select>
                     </label>
-                    <label class="ws-field">
+                    <label class="ws-field" @if ($newAuto) hidden @endif>
                         <span>{{ __('workspaces.thread.mode') }}</span>
                         <select class="ws-select" wire:model="newMode">
                             @foreach ($modes as $mode)
@@ -129,7 +191,7 @@
                     @error('newAgentId') <p class="t-err">{{ $message }}</p> @enderror
                     <p class="muted ws-hint">{{ __('workspaces.thread.shared_files_hint') }}</p>
                     <div class="ws-form-actions">
-                        <button type="submit" class="btn btn-primary btn-sm">{{ __('workspaces.thread.create') }}</button>
+                        <button type="submit" class="btn btn-primary btn-sm">{{ $newAuto ? __('workspaces.auto.start') : __('workspaces.thread.create') }}</button>
                     </div>
                 </form>
             @endif
@@ -156,6 +218,9 @@
                             <div class="ws-bubble">
                                 <div class="ws-who">
                                     {{ $event->author_user_id === $user->id ? __('workspaces.events.you') : ($p['author_name'] ?? '') }}
+                                    @if (! empty($p['auto']))
+                                        <span class="ws-chip">@svg('heroicon-s-bolt') {{ __('workspaces.auto.automated') }}</span>
+                                    @endif
                                     @if (! isset($p['accepted_at']) && $busy)
                                         <span class="badge badge-draft">{{ __('workspaces.thread.queued') }}</span>
                                     @endif
