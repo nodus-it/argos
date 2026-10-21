@@ -204,16 +204,20 @@
                 <button type="button" class="wf-btn wf-btn-sm ws-older" wire:click="loadOlder">{{ __('workspaces.task.load_older') }}</button>
             @endif
 
+            @php
+                // The newest message a person wrote stands out (where the conversation stands).
+                $latestHumanId = collect($timeline)->filter(fn ($b) => $b['kind'] === 'user' && empty($b['event']->payload['auto']))->last()['event']->id ?? null;
+            @endphp
             @foreach ($timeline as $block)
                 @if ($block['kind'] === 'user')
                     @php $event = $block['event']; $p = $event->payload; $mine = $event->author_user_id === $user->id; @endphp
-                    <div @class(['wf-msg', 'ws-msg', 'is-other' => ! $mine && empty($p['auto']), 'is-author-'.((int) $event->author_user_id % 4) => ! $mine]) wire:key="ev-{{ $event->id }}">
+                    <div @class(['wf-msg', 'ws-msg', 'is-other' => ! $mine && empty($p['auto']), 'is-author-'.((int) $event->author_user_id % 4) => ! $mine, 'is-latest' => $event->id === $latestHumanId]) wire:key="ev-{{ $event->id }}">
                         <div class="wf-msg-meta">
                             @if ($mine)
-                                <span>{{ __('workspaces.events.you') }} · {{ $event->created_at?->diffForHumans() }}</span>
+                                <span title="{{ $event->created_at?->isoFormat('LLL') }}">{{ __('workspaces.events.you') }} · {{ $event->created_at?->format('H:i') }} · {{ $event->created_at?->diffForHumans() }}</span>
                             @else
                                 <span class="wf-msg-author"><span class="wf-avatar-xs" aria-hidden="true">{{ \App\Support\Initials::of((string) ($p['author_name'] ?? '?')) }}</span>{{ $p['author_name'] ?? '' }}</span>
-                                <span>· {{ $event->created_at?->diffForHumans() }}</span>
+                                <span title="{{ $event->created_at?->isoFormat('LLL') }}">· {{ $event->created_at?->format('H:i') }} · {{ $event->created_at?->diffForHumans() }}</span>
                             @endif
                             @if (! empty($p['auto']))
                                 <span class="wf-pill-tag"><x-wf.icon name="zap" :size="11" :stroke="2" /> {{ __('workspaces.auto.automated') }}</span>
@@ -247,6 +251,7 @@
                         <div class="wf-msg-meta">
                             <span class="wf-claude-badge" aria-hidden="true">C</span>
                             <span>{{ __('workspaces.events.claude') }}
+                                @if ($block['started_at'] !== null)<time title="{{ $block['started_at']->isoFormat('LLL') }}">· {{ $block['started_at']->format('H:i') }}</time>@endif
                                 @if ($block['running'])
                                     · <span x-data="{ s: {{ \App\Support\TaskTimeline::elapsed($block['started_at']) }} }" x-init="setInterval(() => s++, 1000)" x-text="@js(__('workspaces.chat.working_for', ['seconds' => '__S__'])).replace('__S__', s)">{{ __('workspaces.chat.working_for', ['seconds' => \App\Support\TaskTimeline::elapsed($block['started_at'])]) }}</span>
                                 @elseif ($block['duration_ms'] !== null)
@@ -378,7 +383,7 @@
 
             {{-- Live (not yet persisted) output, fed by the websocket. Before the
                  first event of a new turn arrives, it carries the turn head. --}}
-            <div class="wf-turn wf-live" x-show="live || thinking || (status === 'running' && @js(($timeline[array_key_last($timeline) ?? 0]['kind'] ?? 'user') === 'user'))" x-cloak>
+            <div class="wf-turn wf-turn-live" x-show="live || thinking || (status === 'running' && @js(($timeline[array_key_last($timeline) ?? 0]['kind'] ?? 'user') === 'user'))" x-cloak>
                 @if (($timeline[array_key_last($timeline) ?? 0]['kind'] ?? 'user') === 'user')
                     <div class="wf-msg-meta"><span class="wf-claude-badge" aria-hidden="true">C</span> <span>{{ __('workspaces.events.claude') }} · {{ __('workspaces.task.working') }}</span></div>
                 @endif
@@ -432,6 +437,19 @@
         {{-- Change tray + composer --}}
         @if ($canWrite)
             <div class="wf-bottom">
+                @php
+                    // What Claude does right now, always in sight above the composer.
+                    $runningBlock = collect($timeline)->last(fn ($b) => $b['kind'] === 'claude' && $b['running']);
+                    $lastStep = $runningBlock !== null ? collect($runningBlock['items'])->where('kind', 'steps')->flatMap(fn ($i) => $i['rows'])->last() : null;
+                    $runningFor = $runningBlock !== null ? \App\Support\TaskTimeline::elapsed($runningBlock['started_at']) : 0;
+                @endphp
+                <div class="wf-working-bar" role="status" x-show="status === 'running'" x-cloak
+                     x-data="{ s: {{ $runningFor }}, t: null }"
+                     x-effect="if (status === 'running') { t ??= setInterval(() => s++, 1000) } else { clearInterval(t); t = null; s = 0 }">
+                    <span class="wf-working-pulse" aria-hidden="true"></span>
+                    <span class="wf-working-text">{{ __('workspaces.chat.claude_working') }}@if ($lastStep !== null) · <span class="wf-working-step">{{ $lastStep['verb'] }} <span class="mono">{{ \Illuminate\Support\Str::limit($lastStep['target'], 80) }}</span></span>@endif</span>
+                    <span class="wf-working-time mono" x-text="s >= 60 ? Math.floor(s / 60) + ' min ' + (s % 60) + ' s' : s + ' s'"></span>
+                </div>
                 @if ($task !== null)
                     @livewire('workspace.change-tray', ['workspaceId' => $workspace->id, 'taskId' => $task->id], key('tray-'.$task->id))
                 @endif

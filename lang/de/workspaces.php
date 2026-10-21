@@ -129,6 +129,7 @@ return [
         'details' => 'Details',
     ],
     'chat' => [
+        'claude_working' => 'Claude arbeitet',
         'meta' => ':duration s · :cost',
         'meta_duration' => ':duration s',
         'working_for' => 'arbeitet seit :seconds s',
@@ -294,6 +295,10 @@ return [
         'closed' => 'geschlossen',
     ],
     'review' => [
+        'markdown_view' => 'Markdown-Ansicht',
+        'rendered' => 'Gerendert',
+        'diff' => 'Diff',
+        'rendered_hint' => 'Die Datei, wie sie jetzt aussieht. Im Diff siehst du die Änderungen und kannst Zeilen kommentieren.',
         'generated_group' => '{1} Generiert · :count|[0,*] Generiert · :count',
         'generated_hidden' => 'Generierte Datei (Lockfile, Build-Ausgabe) — der Diff ist ausgeblendet, damit der Review schnell bleibt.',
         'load_anyway' => 'Diff trotzdem laden',

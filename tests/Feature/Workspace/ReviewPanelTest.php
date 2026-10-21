@@ -84,6 +84,10 @@ class ReviewPanelTest extends TestCase
             ->assertDontSee('README.md')
             ->call('open')
             ->assertSee('README.md')
+            // Markdown reads rendered first; the diff is one click away.
+            ->assertSeeHtml('class="wf-md-preview"')
+            ->assertSee(__('workspaces.review.rendered_hint'))
+            ->call('setRendered', false)
             ->assertSee('Hello Argos')
             ->assertSeeHtml('class="wf-drow"');
 

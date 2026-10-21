@@ -109,7 +109,17 @@ class TaskChatTest extends TestCase
 
         $this->chat($this->owner)->set('taskId', $task->id)
             ->assertSee('Bob')
-            ->assertSee('Echo: [Bob]: from bob', false);
+            ->assertSee('Echo: [Bob]: from bob', false)
+            // The newest message a person wrote stands out; the working bar is ready above the composer.
+            ->assertSeeHtml('is-latest')
+            ->assertSeeHtml('wf-working-bar');
+    }
+
+    public function test_claude_is_told_not_to_write_concepts_unasked(): void
+    {
+        $task = $this->createTask();
+
+        $this->assertStringContainsString('only when someone asks for one', app(\App\Services\Workspace\TaskService::class)->systemPrompt($task));
     }
 
     public function test_approvals_are_decided_in_the_chat(): void

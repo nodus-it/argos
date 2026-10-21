@@ -716,6 +716,7 @@ class TaskService
             "Work only in this task's own folder ({$task->worktree_path}): it has its own branch, database and preview. Other tasks of the workspace have their own folders — leave them alone.",
             'Humans may edit files in the editor while you work — re-read a file before changing it if it might have moved on.',
             'Do not push and do not open pull requests: the humans ship through Argos. Commit only when someone asks you to.',
+            'Do what is asked directly in the code. Write a concept, plan or design document only when someone asks for one in so many words; when a request is unclear, ask in the chat instead.',
         ]);
     }
 

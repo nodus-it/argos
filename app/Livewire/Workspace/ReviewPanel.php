@@ -17,6 +17,7 @@ use App\Services\Workspace\WorkspaceDaemonClient;
 use App\Services\Workspace\WorkspaceGateService;
 use App\Support\GateAnnotations;
 use App\Support\ReviewDiff;
+use App\Support\TaskEventFormatter;
 use Filament\Notifications\Notification;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
@@ -45,6 +46,9 @@ class ReviewPanel extends Component
     public ?string $file = null;
 
     public string $view = 'split';
+
+    /** Markdown files show rendered (the diff is one click away for line comments). */
+    public bool $rendered = true;
 
     /** @var array<string, list<array{type: string, old_num: int, new_num: int, text: string}>> "path#hunk" => unchanged lines shown */
     public array $expanded = [];
@@ -93,6 +97,11 @@ class ReviewPanel extends Component
     public function selectFile(string $path): void
     {
         $this->file = $path;
+    }
+
+    public function setRendered(bool $rendered): void
+    {
+        $this->rendered = $rendered;
     }
 
     public function setView(string $view): void
@@ -266,8 +275,19 @@ class ReviewPanel extends Component
         $numbers = $comments->values()->mapWithKeys(fn (ReviewComment $c, int $i): array => [$c->id => $i + 1]);
         $here = $current !== null ? $comments->where('path', $current['path']) : collect();
 
+        $markdown = null;
+        if ($current !== null && $task !== null && $this->rendered && self::isMarkdown($current['path']) && $current['status'] !== 'D') {
+            try {
+                $markdown = TaskEventFormatter::markdown((string) app(WorkspaceDaemonClient::class)->for($workspace, 15)->fileContent($task->slug, $current['path'])['content']);
+            } catch (DaemonTransportException) {
+                $markdown = null;
+            }
+        }
+
         return view('livewire.workspace.review-panel', [
             'active' => true,
+            'isMarkdown' => $current !== null && self::isMarkdown($current['path']),
+            'markdown' => $markdown,
             'canWrite' => $task !== null && $this->user()->can('review', $task),
             'commentsAt' => $here->groupBy(fn (ReviewComment $c): string => $c->side.':'.$c->line_end),
             'commented' => $here->flatMap(fn (ReviewComment $c): array => array_map(fn (int $n): string => $c->side.':'.$n, range($c->line_start, $c->line_end)))->unique()->values()->all(),
@@ -320,6 +340,11 @@ class ReviewPanel extends Component
         ksort($lines);
 
         return $lines;
+    }
+
+    public static function isMarkdown(string $path): bool
+    {
+        return in_array(strtolower(pathinfo($path, PATHINFO_EXTENSION)), ['md', 'markdown', 'mdx'], true);
     }
 
     /** New-side line numbers the diff currently shows for a file (hunks + expanded gaps). */

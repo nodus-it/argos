@@ -1,5 +1,5 @@
 @php
-    /** @var list<array{id: int, state: string, verb: string, target: string, add: int|null, del: int|null, detail: string, input: mixed, output: string}> $rows */
+    /** @var list<array{id: int, state: string, verb: string, target: string, add: int|null, del: int|null, detail: string, input: mixed, output: string, at: string|null}> $rows */
     $limit = 3;
     $hidden = max(0, count($rows) - $limit);
     // Finished turns show the first steps, a running turn the latest ones.
@@ -30,6 +30,7 @@
                     <span class="wf-step-stat mono">@if ($row['add'] > 0)<span class="wf-add">+{{ $row['add'] }}</span>@endif @if ($row['del'] > 0)<span class="wf-del">−{{ $row['del'] }}</span>@endif</span>
                 @endif
                 @if ($row['detail'] !== '')<span class="wf-step-detail">{{ $row['detail'] }}</span>@endif
+                @if (! empty($row['at']))<time class="wf-step-time mono">{{ $row['at'] }}</time>@endif
             </button>
             <div class="wf-step-body mono" x-show="open" x-cloak>{{ \App\Support\TaskEventFormatter::json($row['input']) }}@if ($row['output'] !== '')
 

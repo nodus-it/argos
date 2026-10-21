@@ -116,7 +116,7 @@ final class TaskTimeline
     /**
      * One compact row: state, verb, target and a short detail.
      *
-     * @return array{id: int, state: string, verb: string, target: string, add: int|null, del: int|null, detail: string, input: mixed, output: string}
+     * @return array{id: int, state: string, verb: string, target: string, add: int|null, del: int|null, detail: string, input: mixed, output: string, at: string|null}
      */
     public static function step(TaskEvent $call, ?TaskEvent $result, bool $busy): array
     {
@@ -149,6 +149,7 @@ final class TaskTimeline
             'detail' => $detail,
             'input' => $input,
             'output' => $output,
+            'at' => $call->created_at?->format('H:i:s'),
         ];
     }
 

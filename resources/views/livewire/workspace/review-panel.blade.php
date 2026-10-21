@@ -92,6 +92,12 @@
                     <span class="mono wf-diff-path">{{ $current['path'] }}</span>
                     <span class="mono wf-diff-stat"><span class="wf-add">+{{ $current['additions'] }}</span> <span class="wf-del">−{{ $current['deletions'] }}</span></span>
                     <span class="wf-spacer"></span>
+                    @if ($isMarkdown)
+                        <div class="wf-seg wf-md-toggle" role="group" aria-label="{{ __('workspaces.review.markdown_view') }}">
+                            <button type="button" aria-pressed="{{ $rendered ? 'true' : 'false' }}" wire:click="setRendered(true)">{{ __('workspaces.review.rendered') }}</button>
+                            <button type="button" aria-pressed="{{ $rendered ? 'false' : 'true' }}" wire:click="setRendered(false)">{{ __('workspaces.review.diff') }}</button>
+                        </div>
+                    @endif
                     <label class="wf-seen-toggle">
                         <input type="checkbox" @checked(in_array($current['path'], $seen, true))
                                wire:change="toggleSeen(@js($current['path']), @js($current['hash']), $event.target.checked)">
@@ -130,6 +136,12 @@
                     </div>
                 @endif
 
+                @if ($markdown !== null)
+                    <div class="wf-md-preview">
+                        <p class="wf-muted wf-md-preview-hint">{{ __('workspaces.review.rendered_hint') }}</p>
+                        <article class="wf-md ws-md prose" wire:key="md-{{ md5($current['path']) }}">{{ $markdown }}</article>
+                    </div>
+                @else
                 <div @class(['wf-diff-body', 'mono', 'is-split' => $view === 'split', 'is-unified' => $view === 'unified']) wire:key="diff-{{ md5($current['path']) }}-{{ $view }}">
                     @if ($current['skipped'] === 'generated')
                         <div class="wf-diff-skipped">
@@ -169,6 +181,7 @@
                         </button>
                     @endif
                 </div>
+                @endif
 
                 <div class="wf-diff-foot">
                     <span class="wf-muted">{{ __('workspaces.review.tip') }}</span>

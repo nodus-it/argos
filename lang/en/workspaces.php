@@ -129,6 +129,7 @@ return [
         'details' => 'Details',
     ],
     'chat' => [
+        'claude_working' => 'Claude is working',
         'meta' => ':duration s · :cost',
         'meta_duration' => ':duration s',
         'working_for' => 'working for :seconds s',
@@ -294,6 +295,10 @@ return [
         'closed' => 'closed',
     ],
     'review' => [
+        'markdown_view' => 'Markdown view',
+        'rendered' => 'Rendered',
+        'diff' => 'Diff',
+        'rendered_hint' => 'The file as it reads now. Switch to the diff to see the changes and comment on lines.',
         'generated_group' => '{1} Generated · :count|[0,*] Generated · :count',
         'generated_hidden' => 'Generated file (lock file, build output) — its diff is hidden to keep the review fast.',
         'load_anyway' => 'Load the diff anyway',

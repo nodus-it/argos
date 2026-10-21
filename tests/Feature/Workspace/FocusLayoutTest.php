@@ -217,6 +217,8 @@ class FocusLayoutTest extends TestCase
         [$edit, $bash] = $turn['items'][0]['rows'];
         $this->assertSame([__('workspaces.steps.edited'), 'routes/web.php', 2, 1], [$edit['verb'], $edit['target'], $edit['add'], $edit['del']]);
         $this->assertSame([__('workspaces.steps.ran'), '2 routes', 'ok'], [$bash['verb'], $bash['detail'], $bash['state']]);
+        // Every step carries the time Claude took it.
+        $this->assertMatchesRegularExpression('/^\d{2}:\d{2}:\d{2}$/', (string) $edit['at']);
     }
 
     public function test_always_allow_asks_the_daemon_to_remember(): void
