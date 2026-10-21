@@ -1,9 +1,9 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { FileIndex, score } from '../src/files.js';
+import { FileIndex, readWorkspaceFile, score } from '../src/files.js';
 
 describe('FileIndex', () => {
     let dir: string;
@@ -43,5 +43,33 @@ describe('FileIndex', () => {
         expect(score('app/user.php', 'user.php')).toBe(1000);
         expect(score('app/user.php', 'use')).toBeGreaterThan(score('app/houses.php', 'use'));
         expect(score('a/b', 'zz')).toBe(0);
+    });
+});
+
+describe('readWorkspaceFile', () => {
+    let dir: string;
+    let outside: string;
+    beforeEach(() => {
+        dir = mkdtempSync(join(tmpdir(), 'argos-read-'));
+        outside = mkdtempSync(join(tmpdir(), 'argos-outside-'));
+        mkdirSync(join(dir, 'routes'));
+        writeFileSync(join(dir, 'routes/web.php'), "<?php\nRoute::view('/', 'welcome');\n");
+        writeFileSync(join(outside, 'secret.txt'), 'nope');
+        symlinkSync(join(outside, 'secret.txt'), join(dir, 'link.txt'));
+    });
+    afterEach(() => {
+        rmSync(dir, { recursive: true, force: true });
+        rmSync(outside, { recursive: true, force: true });
+    });
+
+    it('reads a file of the working tree', async () => {
+        expect(await readWorkspaceFile(dir, 'routes/web.php')).toEqual({ content: "<?php\nRoute::view('/', 'welcome');\n", truncated: false });
+    });
+
+    it('refuses paths outside the workspace', async () => {
+        await expect(readWorkspaceFile(dir, '../x')).rejects.toMatchObject({ code: 'invalid_path' });
+        await expect(readWorkspaceFile(dir, '/etc/passwd')).rejects.toMatchObject({ code: 'invalid_path' });
+        await expect(readWorkspaceFile(dir, 'link.txt')).rejects.toMatchObject({ code: 'invalid_path' });
+        await expect(readWorkspaceFile(dir, 'missing.php')).rejects.toMatchObject({ code: 'not_found' });
     });
 });

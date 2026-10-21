@@ -63,10 +63,22 @@
         </div>
         <ul class="wf-card wf-gates">
             @foreach ($gates as $gate)
-                <li class="wf-gate">
-                    <span @class(['wf-gate-dot', 'is-'.$gate['state']]) aria-hidden="true"></span>
-                    <span class="wf-gate-name">{{ $gate['label'] }}</span>
-                    <span @class(['wf-gate-state', 'is-'.$gate['state']])>{{ __('workspaces.focus.gate_state.'.$gate['state']) }}</span>
+                <li class="wf-gate-item" x-data="{ open: false }">
+                    <button type="button" class="wf-gate" @if ($gate['failed'] !== []) x-on:click="open = !open" :aria-expanded="open" @else disabled @endif>
+                        <span @class(['wf-gate-dot', 'is-'.$gate['state']]) aria-hidden="true"></span>
+                        <span class="wf-gate-name">{{ $gate['label'] }}</span>
+                        <span @class(['wf-gate-state', 'is-'.$gate['state']])>{{ __('workspaces.focus.gate_state.'.$gate['state']) }}</span>
+                    </button>
+                    @if ($gate['failed'] !== [])
+                        <div class="wf-gate-more" x-show="open" x-cloak>
+                            @if ($gate['log'] !== '')<pre class="wf-log mono">{{ $gate['log'] }}</pre>@endif
+                            @if ($canOperate)
+                                @foreach ($gate['failed'] as $failedGate)
+                                    <button type="button" class="wf-btn wf-btn-sm wf-btn-soft" wire:click="sendGateFix('{{ $failedGate }}')">{{ __('workspaces.gates.send_fix') }}@if (count($gate['failed']) > 1) ({{ $failedGate }})@endif</button>
+                                @endforeach
+                            @endif
+                        </div>
+                    @endif
                 </li>
             @endforeach
         </ul>

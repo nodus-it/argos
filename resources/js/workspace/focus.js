@@ -15,6 +15,15 @@ export function argosWorkspaceFocus() {
                 this.review = true;
             }
             window.addEventListener('review-open', (event) => this.openReview(event.detail?.file ?? null));
+            window.addEventListener('review-maximize', () => { this.maximized = !this.maximized; });
+            // `/review`, `/gates`, `/preview` and the gates action (Livewire `workspace-focus`).
+            window.addEventListener('workspace-focus', (event) => {
+                if (event.detail?.target === 'review') {
+                    this.openReview(null);
+                } else if (window.matchMedia('(max-width: 1100px)').matches) {
+                    this.drawer = true;
+                }
+            });
         },
 
         openReview(file = null) {
@@ -28,6 +37,7 @@ export function argosWorkspaceFocus() {
             this.review = false;
             this.maximized = false;
             this.syncUrl(null, true);
+            window.dispatchEvent(new CustomEvent('argos-review-closed'));
         },
 
         syncUrl(file, clear = false) {

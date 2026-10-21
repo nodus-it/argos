@@ -176,9 +176,12 @@ class FakeWorkspaceDaemon extends WorkspaceDaemonClient implements WorkspaceDaem
         return ['branch' => $this->workspace?->branch, 'upstream' => null, 'ahead' => 1, 'behind' => 0, 'dirty' => true, 'files' => [['path' => 'README.md', 'status' => 'M']]];
     }
 
+    /** The working tree's diff against the base branch (tests replace it). */
+    public static ?string $diff = null;
+
     public function gitDiff(string $base): array
     {
-        return ['diff' => "diff --git a/README.md b/README.md\n--- a/README.md\n+++ b/README.md\n@@ -1 +1 @@\n-Hello\n+Hello Argos\n", 'truncated' => false];
+        return ['diff' => self::$diff ?? "diff --git a/README.md b/README.md\n--- a/README.md\n+++ b/README.md\n@@ -1 +1 @@\n-Hello\n+Hello Argos\n", 'truncated' => false];
     }
 
     public function gitFetch(): void {}
@@ -188,6 +191,14 @@ class FakeWorkspaceDaemon extends WorkspaceDaemonClient implements WorkspaceDaem
         $all = ['README.md', 'app/Http/Controllers/LoginController.php', 'app/Models/User.php', 'routes/web.php'];
 
         return array_values(array_slice(array_filter($all, fn (string $f): bool => $query === '' || str_contains(strtolower($f), strtolower($query))), 0, $limit));
+    }
+
+    /** Files the fake working tree serves to the review (path => content). */
+    public static array $fileContents = [];
+
+    public function fileContent(string $path): array
+    {
+        return ['content' => self::$fileContents[$path] ?? implode("\n", array_map(fn (int $n): string => 'line '.$n, range(1, 60)))."\n", 'truncated' => false];
     }
 
     /** What the next gate runs report: `fail` (pest red) or `pass`. */

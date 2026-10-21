@@ -6,6 +6,7 @@ namespace App\Integrations\WorkspaceDaemon;
 
 use App\Integrations\WorkspaceDaemon\Requests\CreateCheckpoint;
 use App\Integrations\WorkspaceDaemon\Requests\GetCheckpointDiff;
+use App\Integrations\WorkspaceDaemon\Requests\GetFileContent;
 use App\Integrations\WorkspaceDaemon\Requests\GetGateFixPrompt;
 use App\Integrations\WorkspaceDaemon\Requests\GetHealth;
 use App\Integrations\WorkspaceDaemon\Requests\GitCommit;
@@ -153,6 +154,13 @@ class WorkspaceDaemonApi implements WorkspaceDaemonTransport
         $files = $this->call(new ListFiles($query, $limit))['files'] ?? [];
 
         return array_values(array_filter(is_array($files) ? $files : [], 'is_string'));
+    }
+
+    public function fileContent(string $path): array
+    {
+        $data = $this->call(new GetFileContent($path));
+
+        return ['content' => (string) ($data['content'] ?? ''), 'truncated' => (bool) ($data['truncated'] ?? false)];
     }
 
     public function runGates(string $runId): void

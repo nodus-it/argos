@@ -10,148 +10,166 @@ use App\Models\Thread;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Git\WorkspaceDiffService;
-use App\Services\Workspace\ThreadService;
-use App\Services\Workspace\WorkspaceException;
+use App\Services\Workspace\ReviewService;
+use App\Services\Workspace\WorkspaceDaemonClient;
 use App\Services\Workspace\WorkspaceGateService;
-use Filament\Notifications\Notification;
-use Illuminate\Auth\Access\AuthorizationException;
+use App\Support\ReviewDiff;
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Collection;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 /**
- * Review in the workbench: the workspace's diff against its base branch and
- * the quality gates. Line comments are collected in the browser and sent to
- * Claude as one message.
+ * Review mode: the workspace's changes against its base branch in the
+ * widened sidebar — toolbar (stats, seen progress, gate chips, split or
+ * unified, maximise), file tree and the diff of one file with "seen",
+ * expandable unchanged lines and previous/next file. Reads the diff only
+ * while the review is open; the file is part of the URL.
  */
 class ReviewPanel extends Component
 {
     #[Locked]
     public string $workspaceId;
 
-    /** Load the diff only once the review scrolls into view. */
-    public bool $loaded = false;
-
     public ?string $threadId = null;
+
+    public bool $active = false;
+
+    #[Url(as: 'file', except: null)]
+    public ?string $file = null;
+
+    public string $view = 'split';
+
+    /** @var array<string, list<array{type: string, old_num: int, new_num: int, text: string}>> "path#hunk" => unchanged lines shown */
+    public array $expanded = [];
 
     public function mount(string $workspaceId): void
     {
         $this->workspaceId = $workspaceId;
         abort_unless($this->user()->can('view', $this->workspace()), 403);
-        $this->threadId = $this->threads()->first()?->id;
+
+        $requested = request()->query('thread');
+        $this->threadId = is_string($requested) && $this->thread($requested) !== null
+            ? $requested
+            : Thread::query()->where('workspace_id', $workspaceId)->whereNull('archived_at')->latest('updated_at')->value('id');
+        $this->view = app(ReviewService::class)->diffView($this->user());
+        $this->active = request()->query('review') === '1';
     }
 
-    public function load(): void
+    #[On('thread-changed')]
+    public function threadChanged(?string $id): void
     {
-        $this->loaded = true;
+        $this->threadId = $id;
     }
 
-    /**
-     * @param  list<array{path: string, line: int|string, side?: string, text: string}>  $comments
-     */
-    public function sendComments(array $comments): bool
+    public function open(?string $file = null): void
     {
-        $thread = $this->threadId !== null ? $this->threads()->firstWhere('id', $this->threadId) : null;
+        $this->active = true;
+        if ($file !== null && $file !== '') {
+            $this->file = $file;
+        }
+    }
+
+    public function close(): void
+    {
+        $this->active = false;
+    }
+
+    public function selectFile(string $path): void
+    {
+        $this->file = $path;
+    }
+
+    public function setView(string $view): void
+    {
+        if (in_array($view, ReviewService::VIEWS, true)) {
+            $this->view = $view;
+            app(ReviewService::class)->setDiffView($this->user(), $view);
+        }
+    }
+
+    public function toggleSeen(string $path, string $hash, bool $seen): void
+    {
+        $thread = $this->threadId !== null ? $this->thread($this->threadId) : null;
         if ($thread === null) {
-            Notification::make()->title(__('workspaces.ship.no_thread'))->warning()->send();
-
-            return false;
+            return;
         }
-
-        $lines = [];
-        foreach ($comments as $comment) {
-            $text = trim((string) ($comment['text'] ?? ''));
-            $path = (string) ($comment['path'] ?? '');
-            if ($text === '' || $path === '') {
-                continue;
-            }
-            $lines[] = '- '.$path.':'.(int) ($comment['line'] ?? 0).' — '.$text;
-        }
-        if ($lines === []) {
-            return false;
-        }
-
-        try {
-            app(ThreadService::class)->send($thread, $this->user(), __('workspaces.review.message_heading')."\n".implode("\n", $lines));
-        } catch (WorkspaceException $e) {
-            Notification::make()->title($e->getMessage())->danger()->send();
-
-            return false;
-        } catch (AuthorizationException) {
-            Notification::make()->title(__('workspaces.thread.viewer_hint'))->warning()->send();
-
-            return false;
-        }
-
-        Notification::make()->title(__('workspaces.review.sent', ['count' => count($lines)]))->success()->send();
-
-        return true;
+        $seen
+            ? app(ReviewService::class)->markSeen($thread, $this->user(), $path, $hash)
+            : app(ReviewService::class)->unmarkSeen($thread, $this->user(), $path);
     }
 
-    /** Start a gate run (header button, the panel or `/gates`). */
-    #[On('workspace-run-gates')]
-    public function runGates(): void
+    /** Show the unchanged lines before hunk $index of $path. */
+    public function expand(string $path, int $index): void
     {
-        try {
-            app(WorkspaceGateService::class)->run($this->workspace(), $this->user());
-            Notification::make()->title(__('workspaces.gates.started'))->success()->send();
-        } catch (WorkspaceException $e) {
-            Notification::make()->title($e->getMessage())->warning()->send();
-        } catch (AuthorizationException) {
-            Notification::make()->title(__('workspaces.thread.viewer_hint'))->warning()->send();
-        }
-    }
-
-    /** Hand a failed gate to Claude with the worker's fix prompt. */
-    public function sendGateFix(string $gate): void
-    {
-        $run = app(WorkspaceGateService::class)->latest($this->workspace());
-        $thread = $this->threadId !== null ? $this->threads()->firstWhere('id', $this->threadId) : null;
-        if ($run === null || $thread === null) {
-            Notification::make()->title(__('workspaces.ship.no_thread'))->warning()->send();
-
+        $file = collect($this->files())->firstWhere('path', $path);
+        $gap = $file['hunks'][$index]['gap'] ?? null;
+        if ($gap === null) {
             return;
         }
 
         try {
-            app(WorkspaceGateService::class)->sendFixToAgent($run, $thread, $this->user(), $gate);
-            Notification::make()->title(__('workspaces.gates.fix_sent'))->success()->send();
-        } catch (WorkspaceException|DaemonTransportException $e) {
-            Notification::make()->title($e->getMessage())->danger()->send();
-        } catch (AuthorizationException) {
-            Notification::make()->title(__('workspaces.thread.viewer_hint'))->warning()->send();
+            $content = app(WorkspaceDaemonClient::class)->for($this->workspace(), 15)->fileContent($path)['content'];
+        } catch (DaemonTransportException) {
+            return;
         }
+        $this->expanded[$path.'#'.$index] = ReviewDiff::gapLines($content, $gap);
     }
 
     public function render(): View
     {
         $workspace = $this->workspace();
-        $diff = null;
+        if (! $this->active) {
+            return view('livewire.workspace.review-panel', ['active' => false]);
+        }
+
         $error = null;
-        if ($this->loaded && $workspace->status === WorkspaceStatus::Running) {
+        $files = [];
+        if ($workspace->status === WorkspaceStatus::Running) {
             try {
-                $diff = app(WorkspaceDiffService::class)->forWorkspace($workspace);
+                $files = $this->files();
             } catch (DaemonTransportException $e) {
                 $error = $e->getMessage();
             }
         }
 
+        $current = collect($files)->firstWhere('path', $this->file) ?? ($files[0] ?? null);
+        $index = $current !== null ? array_search($current['path'], array_column($files, 'path'), true) : false;
+        $thread = $this->threadId !== null ? $this->thread($this->threadId) : null;
+        $seen = $thread !== null
+            ? app(ReviewService::class)->seen($thread, $this->user(), array_column($files, 'hash', 'path'))
+            : [];
+
         return view('livewire.workspace.review-panel', [
-            'workspace' => $workspace,
-            'diff' => $diff,
+            'active' => true,
+            'running' => $workspace->status === WorkspaceStatus::Running,
             'error' => $error,
-            'threads' => $this->threads(),
-            'gateRun' => app(WorkspaceGateService::class)->latest($workspace),
-            'canWrite' => $workspace->roleOf($this->user())?->canOperate() ?? false,
+            'files' => $files,
+            'tree' => ReviewDiff::tree($files),
+            'current' => $current,
+            'previous' => $index !== false && $index > 0 ? $files[$index - 1]['path'] : null,
+            'next' => $index !== false && $index < count($files) - 1 ? $files[$index + 1]['path'] : null,
+            'seen' => $seen,
+            'additions' => array_sum(array_column($files, 'additions')),
+            'deletions' => array_sum(array_column($files, 'deletions')),
+            'gates' => array_values(array_filter(
+                ContextPanel::gateRows(app(WorkspaceGateService::class)->latest($workspace)),
+                fn (array $row): bool => in_array($row['state'], ['pass', 'fail', 'running'], true),
+            )),
+            'baseBranch' => $workspace->base_branch,
         ]);
     }
 
-    /** @return Collection<int, Thread> */
-    private function threads(): Collection
+    /** @return list<array<string, mixed>> */
+    private function files(): array
     {
-        return Thread::query()->where('workspace_id', $this->workspaceId)->whereNull('archived_at')->latest('updated_at')->get();
+        return ReviewDiff::files(app(WorkspaceDiffService::class)->forWorkspace($this->workspace())['files']);
+    }
+
+    private function thread(string $id): ?Thread
+    {
+        return Thread::query()->where('workspace_id', $this->workspaceId)->find($id);
     }
 
     private function workspace(): Workspace

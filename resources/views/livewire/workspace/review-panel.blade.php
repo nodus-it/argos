@@ -1,161 +1,117 @@
-@php
-    /** @var array{files: array<int, array<string, mixed>>, truncated: bool, ahead: int, uncommitted: int}|null $diff */
-    $additions = $diff ? array_sum(array_column($diff['files'], 'additions')) : 0;
-    $deletions = $diff ? array_sum(array_column($diff['files'], 'deletions')) : 0;
-@endphp
-
-<div class="ws-review"
-     x-data="{
-        comments: [],
-        draft: null,
-        stale: false,
-        open(path, line) { this.draft = { path, line, text: '' }; },
-        add() { if (this.draft && this.draft.text.trim() !== '') { this.comments.push({ ...this.draft }); } this.draft = null; },
-        remove(i) { this.comments.splice(i, 1); },
-        async send() { if (await $wire.sendComments(this.comments)) { this.comments = []; } },
-     }"
-     x-intersect.once="$wire.load()"
-     x-on:argos-turn-completed.window="stale = true"
-     x-on:argos-gates-updated.window="$wire.$refresh()">
-
-    <div class="ws-review-bar">
-        @if ($diff)
-            <span class="muted">
-                {{ __('workspaces.review.summary', ['files' => count($diff['files']), 'ahead' => $diff['ahead'], 'uncommitted' => $diff['uncommitted']]) }}
-                <span class="stat-add">+{{ $additions }}</span> <span class="stat-del">−{{ $deletions }}</span>
+{{-- Review mode: toolbar, file tree and the diff of one file. Opens and
+     closes with the page's review state (resources/js/workspace/focus.js). --}}
+<div class="wf-review"
+     x-on:argos-review-opened.window="$wire.open($event.detail.file)"
+     x-on:argos-review-closed.window="$wire.close()"
+     x-on:argos-turn-completed.window="if ($wire.active) $wire.$refresh()"
+     x-on:argos-gates-updated.window="if ($wire.active) $wire.$refresh()">
+@if ($active)
+    @php
+        /** @var list<array<string, mixed>> $files */
+        $seenCount = count($seen);
+    @endphp
+    <div class="wf-review-bar">
+        <span class="wf-review-title">{{ __('workspaces.review.changes') }}</span>
+        <span class="mono wf-review-stat"><span class="wf-add">+{{ $additions }}</span> <span class="wf-del">−{{ $deletions }}</span></span>
+        <span class="wf-muted wf-review-seen">{{ __('workspaces.review.seen_progress', ['seen' => $seenCount, 'total' => count($files)]) }}</span>
+        <span class="wf-spacer"></span>
+        @if ($gates !== [])
+            <span class="wf-gate-chips" role="group" aria-label="{{ __('workspaces.focus.gates') }}">
+                @foreach ($gates as $gate)
+                    <span @class(['wf-gate-chip', 'is-'.$gate['state']])>
+                        @if ($gate['state'] === 'pass') ✓ @elseif ($gate['state'] === 'fail') ! @else <span class="wf-spin"></span> @endif
+                        {{ explode(' ', $gate['label'])[0] }}
+                    </span>
+                @endforeach
             </span>
+            <span class="wf-vsep" aria-hidden="true"></span>
         @endif
-        <span class="ws-spacer"></span>
-        <span class="badge badge-running" x-show="stale" x-cloak>{{ __('workspaces.review.stale') }}</span>
-        <button type="button" class="btn btn-ghost btn-sm" x-on:click="stale = false; $wire.$refresh()" wire:loading.attr="disabled">
-            @svg('heroicon-o-arrow-path') {{ __('workspaces.review.refresh') }}
+        <span class="wf-seg" role="group" aria-label="{{ __('workspaces.review.layout') }}">
+            <button type="button" wire:click="setView('split')" aria-pressed="{{ $view === 'split' ? 'true' : 'false' }}">{{ __('workspaces.review.split') }}</button>
+            <button type="button" wire:click="setView('unified')" aria-pressed="{{ $view === 'unified' ? 'true' : 'false' }}">{{ __('workspaces.review.unified') }}</button>
+        </span>
+        <button type="button" class="wf-icon-btn wf-icon-btn-sm wf-max-btn" x-on:click="window.dispatchEvent(new CustomEvent('review-maximize'))"
+                :aria-label="maximized ? @js(__('workspaces.review.restore')) : @js(__('workspaces.review.maximize'))" :class="{ 'is-ink': maximized }">
+            <x-wf.icon name="maximize" :size="15" :stroke="2" x-show="!maximized" />
+            <x-wf.icon name="minimize" :size="15" :stroke="2" x-show="maximized" x-cloak />
         </button>
     </div>
 
-    {{-- Quality gates --}}
-    <section class="ws-gates" @if ($gateRun?->status === \App\Enums\GateRunStatus::Running) wire:poll.10s @endif>
-        <div class="ws-row">
-            <strong>{{ __('workspaces.gates.title') }}</strong>
-            @if ($gateRun && $gateRun->status !== \App\Enums\GateRunStatus::Running)
-                <span class="badge {{ $gateRun->status === \App\Enums\GateRunStatus::Passed ? 'badge-success' : 'badge-failed' }}">{{ $gateRun->status->label() }}</span>
-                @if ($gateRun->gates)
-                    <span class="muted">{{ __('workspaces.gates.result', ['passed' => $gateRun->passedCount(), 'total' => count($gateRun->ranGates())]) }}</span>
-                @endif
-            @endif
-            <span class="ws-spacer"></span>
-            @if ($canWrite && $workspace->status === \App\Enums\WorkspaceStatus::Running)
-                <button type="button" class="btn btn-ghost btn-sm" wire:click="runGates" wire:loading.attr="disabled" @disabled($gateRun?->status === \App\Enums\GateRunStatus::Running)>
-                    @svg('heroicon-o-shield-check') {{ __('workspaces.gates.run') }}
-                </button>
-            @endif
-        </div>
-
-        @if (! $gateRun)
-            <p class="muted">{{ __('workspaces.gates.never') }}</p>
-        @elseif ($gateRun->status === \App\Enums\GateRunStatus::Running)
-            <p class="muted">{{ __('workspaces.gates.running') }}</p>
-        @elseif ($gateRun->status === \App\Enums\GateRunStatus::Error)
-            <p class="t-err">{{ $gateRun->message }}</p>
-        @else
-            <p class="muted">{{ __('workspaces.gates.baseline_'.($gateRun->baseline ?? 'missing')) }}</p>
-            <ul class="ws-gate-list">
-                @foreach ($gateRun->gates ?? [] as $gate => $result)
-                    <li x-data="{ open: {{ $result === 'fail' ? 'true' : 'false' }} }">
-                        <div class="ws-row">
-                            <span class="badge {{ ['pass' => 'badge-success', 'fail' => 'badge-failed'][$result] ?? 'badge-draft' }}">{{ __('workspaces.gates.'.$result) }}</span>
-                            <span class="mono">{{ $gate }}</span>
-                            <span class="ws-spacer"></span>
-                            @if (($gateRun->logs[$gate] ?? '') !== '')
-                                <button type="button" class="btn btn-ghost btn-sm" x-on:click="open = ! open">{{ __('workspaces.gates.log') }}</button>
-                            @endif
-                            @if ($result === 'fail' && $canWrite)
-                                <button type="button" class="btn btn-ghost btn-sm" wire:click="sendGateFix('{{ $gate }}')">@svg('heroicon-o-sparkles') {{ __('workspaces.gates.send_fix') }}</button>
-                            @endif
-                        </div>
-                        @if (($gateRun->logs[$gate] ?? '') !== '')
-                            <pre class="ws-gate-log" x-show="open" x-cloak>{{ $gateRun->logs[$gate] }}</pre>
-                        @endif
-                    </li>
-                @endforeach
-            </ul>
-        @endif
-    </section>
-
-    {{-- Collected comments --}}
-    @if ($canWrite)
-        <div class="ws-review-comments" x-show="comments.length > 0" x-cloak>
-            <template x-for="(c, i) in comments" :key="i">
-                <div class="ws-review-comment">
-                    <span class="mono" x-text="c.path + ':' + c.line"></span>
-                    <span x-text="c.text"></span>
-                    <button type="button" class="btn btn-ghost btn-sm" x-on:click="remove(i)" title="{{ __('workspaces.review.remove') }}" aria-label="{{ __('workspaces.review.remove') }}">@svg('heroicon-o-x-mark')</button>
-                </div>
-            </template>
-            <div class="ws-row">
-                @if ($threads->count() > 1)
-                    <select class="ws-select ws-select-sm" wire:model="threadId" aria-label="{{ __('workspaces.thread.title') }}">
-                        @foreach ($threads as $t)
-                            <option value="{{ $t->id }}">{{ $t->title }}</option>
-                        @endforeach
-                    </select>
-                @endif
-                <button type="button" class="btn btn-primary btn-sm" x-on:click="send()">
-                    @svg('heroicon-o-paper-airplane') <span x-text="@js(__('workspaces.review.send')) + ' (' + comments.length + ')'"></span>
-                </button>
-            </div>
-        </div>
-    @endif
-
-    @if ($workspace->status !== \App\Enums\WorkspaceStatus::Running)
-        <div class="ws-tab-empty muted">{{ __('workspaces.tabs.not_running') }}</div>
+    @if (! $running)
+        <div class="wf-review-empty wf-muted">{{ __('workspaces.tabs.not_running') }}</div>
     @elseif ($error)
-        <div class="ws-alert ws-alert-error">@svg('heroicon-o-exclamation-triangle') <span>{{ $error }}</span></div>
-    @elseif ($diff === null)
-        <div class="ws-tab-empty"><span class="ws-dot"></span></div>
-    @elseif ($diff['files'] === [])
-        <div class="ws-tab-empty muted">{{ __('workspaces.review.no_changes', ['branch' => $workspace->base_branch]) }}</div>
+        <div class="wf-review-empty"><div class="wf-note-row is-error"><x-wf.icon name="alert" :size="15" :stroke="2" /> <span>{{ $error }}</span></div></div>
+    @elseif ($files === [])
+        <div class="wf-review-empty wf-muted">{{ __('workspaces.review.no_changes', ['branch' => $baseBranch]) }}</div>
     @else
-        <div class="ws-review-files">
-            @if ($diff['truncated'])
-                <div class="ws-alert ws-alert-warn">{{ __('workspaces.review.truncated') }}</div>
-            @endif
-            @foreach ($diff['files'] as $file)
-                @php $path = $file['to_path'] ?: $file['from_path']; @endphp
-                <div class="diff" wire:key="file-{{ md5($path) }}">
-                    <div class="diff-file">
-                        @svg('heroicon-o-document-text')
-                        @if ($file['is_new'] ?? false) <span class="chip">{{ __('workspaces.review.badge_new') }}</span>
-                        @elseif ($file['is_deleted'] ?? false) <span class="chip">{{ __('workspaces.review.badge_deleted') }}</span>
-                        @endif
-                        <span class="path">{{ $path }}</span>
-                        <span><span class="stat-add">+{{ $file['additions'] }}</span> <span class="stat-del">−{{ $file['deletions'] }}</span></span>
-                    </div>
-                    <div class="diff-body">
-                        @foreach ($file['hunks'] as $hunk)
-                            <div class="diff-row hunk"><span class="gut"><span></span><span></span></span><span class="code">{{ $hunk['header'] }}</span></div>
-                            @foreach ($hunk['lines'] as $line)
-                                @php $lineNo = $line['new_num'] ?? $line['old_num']; @endphp
-                                <div @class(['diff-row', 'add' => $line['type'] === 'add', 'del' => $line['type'] === 'del', 'ws-commentable' => $canWrite])
-                                     @if ($canWrite) x-on:click="open(@js($path), @js($lineNo))" x-on:keydown.enter.prevent="open(@js($path), @js($lineNo))" tabindex="0" role="button" title="{{ __('workspaces.review.comment') }}" @endif>
-                                    <span class="gut"><span>{{ $line['old_num'] ?? '' }}</span><span>{{ $line['new_num'] ?? '' }}</span></span>
-                                    <span class="code">{{ $line['type'] === 'add' ? '+' : ($line['type'] === 'del' ? '-' : ' ') }}{{ $line['text'] }}</span>
-                                </div>
-                                <template x-if="draft && draft.path === @js($path) && draft.line === @js($lineNo)">
-                                    <div class="ws-review-draft" x-on:click.stop>
-                                        <textarea class="respond-ta" rows="2" x-model="draft.text" x-init="$nextTick(() => $el.focus())"
-                                                  placeholder="{{ __('workspaces.review.comment_placeholder') }}"
-                                                  x-on:keydown.enter="if (!$event.shiftKey) { $event.preventDefault(); add(); }"></textarea>
-                                        <div class="ws-row">
-                                            <button type="button" class="btn btn-secondary btn-sm" x-on:click="add()">{{ __('workspaces.review.add') }}</button>
-                                            <button type="button" class="btn btn-ghost btn-sm" x-on:click="draft = null">{{ __('workspaces.review.cancel') }}</button>
-                                        </div>
-                                    </div>
-                                </template>
-                            @endforeach
-                        @endforeach
-                    </div>
+        <div class="wf-review-body">
+            <nav class="wf-tree" aria-label="{{ __('workspaces.focus.changed_files') }}">
+                @foreach ($tree as $dir => $dirFiles)
+                    <div class="wf-tree-dir mono">{{ $dir === '' ? '/' : $dir }}</div>
+                    @foreach ($dirFiles as $f)
+                        <button type="button" @class(['wf-tree-file', 'is-current' => $current['path'] === $f['path']])
+                                wire:click="selectFile(@js($f['path']))" @if ($current['path'] === $f['path']) aria-current="true" @endif title="{{ $f['path'] }}">
+                            <span @class(['wf-file-status', 'mono', 'is-'.strtolower($f['status'])])>{{ $f['status'] }}</span>
+                            <span class="wf-tree-name mono">{{ $f['name'] }}</span>
+                            @if (in_array($f['path'], $seen, true))
+                                <span class="wf-tree-seen" title="{{ __('workspaces.review.seen') }}"><x-wf.icon name="check" :size="13" :stroke="2.4" /></span>
+                            @endif
+                        </button>
+                    @endforeach
+                @endforeach
+            </nav>
+
+            <section class="wf-diff" aria-label="{{ $current['path'] }}">
+                <div class="wf-diff-head">
+                    <span class="mono wf-diff-path">{{ $current['path'] }}</span>
+                    <span class="mono wf-diff-stat"><span class="wf-add">+{{ $current['additions'] }}</span> <span class="wf-del">−{{ $current['deletions'] }}</span></span>
+                    <span class="wf-spacer"></span>
+                    <label class="wf-seen-toggle">
+                        <input type="checkbox" @checked(in_array($current['path'], $seen, true))
+                               wire:change="toggleSeen(@js($current['path']), @js($current['hash']), $event.target.checked)">
+                        {{ __('workspaces.review.seen') }}
+                    </label>
                 </div>
-            @endforeach
+
+                <div @class(['wf-diff-body', 'mono', 'is-split' => $view === 'split', 'is-unified' => $view === 'unified']) wire:key="diff-{{ md5($current['path']) }}-{{ $view }}">
+                    @foreach ($current['hunks'] as $hunk)
+                        @php $gapKey = $current['path'].'#'.$hunk['index']; @endphp
+                        @if ($hunk['gap'] !== null)
+                            @if (isset($expanded[$gapKey]))
+                                @foreach ($expanded[$gapKey] as $line)
+                                    @include('livewire.workspace.partials.diff-row', ['row' => ['left' => $line, 'right' => $line], 'line' => $line])
+                                @endforeach
+                            @else
+                                <button type="button" class="wf-diff-gap" wire:click="expand(@js($current['path']), {{ $hunk['index'] }})">
+                                    ⋯ {{ trans_choice('workspaces.review.unchanged', $hunk['gap']['to'] - $hunk['gap']['from'] + 1, ['count' => $hunk['gap']['to'] - $hunk['gap']['from'] + 1]) }}
+                                </button>
+                            @endif
+                        @endif
+                        <div class="wf-diff-hunk">{{ $hunk['header'] }}</div>
+                        @if ($view === 'split')
+                            @foreach ($hunk['split'] as $row)
+                                @include('livewire.workspace.partials.diff-row', ['row' => $row, 'line' => null])
+                            @endforeach
+                        @else
+                            @foreach ($hunk['lines'] as $line)
+                                @include('livewire.workspace.partials.diff-row', ['row' => null, 'line' => $line])
+                            @endforeach
+                        @endif
+                    @endforeach
+                </div>
+
+                <div class="wf-diff-foot">
+                    <span class="wf-muted">{{ __('workspaces.review.tip') }}</span>
+                    <span class="wf-spacer"></span>
+                    <button type="button" class="wf-btn wf-btn-sm" @disabled($previous === null) @if ($previous) wire:click="selectFile(@js($previous))" @endif>
+                        <x-wf.icon name="arrow-left" :size="14" :stroke="2" /> {{ __('workspaces.review.previous') }}
+                    </button>
+                    <button type="button" class="wf-btn wf-btn-sm" @disabled($next === null) @if ($next) wire:click="selectFile(@js($next))" @endif>
+                        {{ __('workspaces.review.next') }} <x-wf.icon name="arrow-right" :size="14" :stroke="2" />
+                    </button>
+                </div>
+            </section>
         </div>
     @endif
+@endif
 </div>

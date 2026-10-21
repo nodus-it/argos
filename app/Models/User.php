@@ -26,8 +26,9 @@ use Laravel\Passport\HasApiTokens;
  * @property string $email
  * @property bool $is_admin
  * @property array<string, bool>|null $notification_prefs
+ * @property array<string, string>|null $ui_prefs
  */
-#[Fillable(['name', 'email', 'password', 'locale', 'notification_prefs'])]
+#[Fillable(['name', 'email', 'password', 'locale', 'notification_prefs', 'ui_prefs'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable implements FilamentUser, OAuthenticatable
 {
@@ -44,6 +45,7 @@ class User extends Authenticatable implements FilamentUser, OAuthenticatable
             'password' => 'hashed',
             'is_admin' => 'boolean',
             'notification_prefs' => 'array',
+            'ui_prefs' => 'array',
         ];
     }
 

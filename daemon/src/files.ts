@@ -1,3 +1,6 @@
+import { realpath, readFile, stat } from 'node:fs/promises';
+import { isAbsolute, relative, resolve } from 'node:path';
+import { CodedError } from './errors.js';
 import { git } from './git.js';
 
 /**
@@ -71,4 +74,35 @@ export function score(path: string, needle: string): number {
     }
 
     return total;
+}
+
+/** Largest file the review reads in full (unchanged-lines expansion). */
+export const MAX_READ_BYTES = 1_000_000;
+
+/**
+ * Read a text file of the working tree for the review (expanding unchanged
+ * lines). Only paths inside the workspace; symlinks out of it are refused.
+ */
+export async function readWorkspaceFile(dir: string, path: string): Promise<{ content: string; truncated: boolean }> {
+    if (path === '' || isAbsolute(path) || path.split(/[\\/]/).includes('..')) {
+        throw new CodedError(422, 'invalid_path', 'Path must be relative to the workspace');
+    }
+    const root = await realpath(dir);
+    let real: string;
+    try {
+        real = await realpath(resolve(root, path));
+    } catch {
+        throw new CodedError(404, 'not_found', 'File not found');
+    }
+    const rel = relative(root, real);
+    if (rel === '' || rel.startsWith('..') || isAbsolute(rel)) {
+        throw new CodedError(422, 'invalid_path', 'Path must be inside the workspace');
+    }
+    const info = await stat(real);
+    if (!info.isFile()) {
+        throw new CodedError(404, 'not_found', 'Not a file');
+    }
+    const buffer = await readFile(real);
+
+    return { content: buffer.subarray(0, MAX_READ_BYTES).toString('utf8'), truncated: buffer.length > MAX_READ_BYTES };
 }

@@ -11,7 +11,7 @@ use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceStatus;
 use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ViewWorkspace;
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
-use App\Livewire\Workspace\ReviewPanel;
+use App\Livewire\Workspace\ContextPanel;
 use App\Livewire\Workspace\ThreadChat;
 use App\Models\AgentCredential;
 use App\Models\Thread;
@@ -166,10 +166,10 @@ class WorkspaceQualityGateTest extends TestCase
             ->set('newTitle', 'Gates')->call('createThread')->assertHasNoErrors();
         $thread = Thread::query()->sole();
 
-        $panel = Livewire::actingAs($this->editor)->test(ReviewPanel::class, ['workspaceId' => $this->workspace->id])
-            ->assertSee(__('workspaces.gates.never'))
+        $panel = Livewire::withoutLazyLoading()->withQueryParams(['thread' => $thread->id])->actingAs($this->editor)->test(ContextPanel::class, ['workspaceId' => $this->workspace->id])
+            ->assertSee(__('workspaces.focus.gate_state.open'))
             ->call('runGates')
-            ->assertSee(__('workspaces.gates.result', ['passed' => 2, 'total' => 3]))
+            ->assertSee(__('workspaces.focus.gate_state.fail'))
             ->assertSee(__('workspaces.gates.send_fix'))
             ->assertSee('LoginTest');
 
@@ -186,10 +186,11 @@ class WorkspaceQualityGateTest extends TestCase
     {
         WorkspaceGateRun::factory()->create(['workspace_id' => $this->workspace->id, 'status' => GateRunStatus::Failed, 'gates' => ['pest' => 'fail']]);
 
-        Livewire::actingAs($this->member(WorkspaceRole::Viewer, 'Vi'))->test(ReviewPanel::class, ['workspaceId' => $this->workspace->id])
-            ->assertSee('pest')
+        Livewire::withoutLazyLoading()->actingAs($this->member(WorkspaceRole::Viewer, 'Vi'))->test(ContextPanel::class, ['workspaceId' => $this->workspace->id])
+            ->assertSee('Pest / PHPUnit')
+            ->assertSee(__('workspaces.focus.gate_state.fail'))
             ->assertDontSee(__('workspaces.gates.send_fix'))
-            ->assertDontSee(__('workspaces.gates.run'));
+            ->assertDontSee(__('workspaces.focus.check_all'));
     }
 
     public function test_the_header_action_runs_the_gates(): void
@@ -197,7 +198,7 @@ class WorkspaceQualityGateTest extends TestCase
         Livewire::actingAs($this->editor)->test(ViewWorkspace::class, ['record' => $this->workspace->id])
             ->callAction('gates')
             ->assertNotified(__('workspaces.gates.started'))
-            ->assertDispatched('workspace-focus', target: 'review');
+            ->assertDispatched('workspace-focus', target: 'gates');
 
         $this->assertSame(GateRunStatus::Failed, WorkspaceGateRun::query()->sole()->status);
         $this->assertSame('2/3', $this->service()->summary($this->workspace));

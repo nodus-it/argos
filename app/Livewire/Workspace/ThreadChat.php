@@ -285,7 +285,7 @@ class ThreadChat extends Component
             'ship' => $this->dispatch('workspace-ship'),
             'preview' => $this->dispatch('workspace-focus', target: 'preview'),
             'review' => $this->dispatch('workspace-focus', target: 'review'),
-            'gates' => [$this->dispatch('workspace-focus', target: 'review'), $this->dispatch('workspace-run-gates')],
+            'gates' => [$this->dispatch('workspace-focus', target: 'gates'), $this->dispatch('workspace-run-gates')],
             'checkpoint' => $this->runCheckpoint($rest),
         };
 

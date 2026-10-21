@@ -45,7 +45,15 @@
         </button>
     </header>
 
-    <div class="wf-center">
+    {{-- Maximised review: the chat folds into a strip. --}}
+    <div class="wf-chat-strip" x-show="review && maximized" x-cloak>
+        <button type="button" class="wf-icon-btn" x-on:click="maximized = false" aria-label="{{ __('workspaces.review.chat_strip') }}" title="{{ __('workspaces.review.chat_strip') }}">
+            <x-wf.icon name="chevron-right" :size="16" :stroke="2" />
+        </button>
+        <span class="wf-strip-text">{{ __('workspaces.review.chat_strip') }}</span>
+    </div>
+
+    <div class="wf-center" x-show="!(review && maximized)">
         @if ($workspace->status !== WorkspaceStatus::Running)
             <div @class(['wf-banner', 'is-error' => $workspace->status === WorkspaceStatus::Failed]) role="status">
                 @if ($transitional) <span class="wf-spin"></span> @else <x-wf.icon name="alert" :size="16" /> @endif
@@ -60,7 +68,12 @@
     </div>
 
     <aside class="wf-context" aria-label="{{ __('workspaces.focus.context') }}">
-        @livewire('workspace.context-panel', ['workspaceId' => $workspace->id], key('context-'.$workspace->id))
+        <div x-show="!review">
+            @livewire('workspace.context-panel', ['workspaceId' => $workspace->id], key('context-'.$workspace->id))
+        </div>
+        <div x-show="review" x-cloak class="wf-review-host">
+            @livewire('workspace.review-panel', ['workspaceId' => $workspace->id], key('review-'.$workspace->id))
+        </div>
     </aside>
 
     <x-filament-actions::modals />

@@ -176,7 +176,7 @@ class ViewWorkspace extends ViewRecord
                 try {
                     app(WorkspaceGateService::class)->run($this->workspace(), $user);
                     Notification::make()->title(__('workspaces.gates.started'))->success()->send();
-                    $this->dispatch('workspace-focus', target: 'review');
+                    $this->dispatch('workspace-focus', target: 'gates');
                 } catch (WorkspaceException $e) {
                     Notification::make()->title($e->getMessage())->warning()->send();
                 }

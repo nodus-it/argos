@@ -9,7 +9,7 @@ import type { Outbox } from './outbox.js';
 import { ThreadSession, USER_PERMISSION_MODES, type QueryFactory, type SessionEnvironment } from './threadSession.js';
 import { initWorkspace } from './workspaceInit.js';
 import * as gitOps from './gitOps.js';
-import { FileIndex } from './files.js';
+import { FileIndex, readWorkspaceFile } from './files.js';
 import { runOneshot, type OneshotRunner } from './oneshot.js';
 import { GATE_NAME_PATTERN, GateRunner, type GateScript } from './gates.js';
 import { CheckpointStore, parseRef, type Checkpoint } from './checkpoints.js';
@@ -255,6 +255,12 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
         const query = z.object({ q: z.string().max(200).default(''), limit: z.coerce.number().int().min(1).max(50).default(20) }).parse(request.query);
 
         return { files: await fileIndex.search(query.q, query.limit) };
+    });
+
+    app.get('/files/content', async (request) => {
+        const query = z.object({ path: z.string().min(1).max(1000) }).parse(request.query);
+
+        return readWorkspaceFile(dir, query.path);
     });
 
     app.get('/git/status', async () => gitOps.status(dir));

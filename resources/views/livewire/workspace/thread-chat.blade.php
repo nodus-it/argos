@@ -197,6 +197,14 @@
                                 @endif
                             </span>
                         </div>
+                        @php
+                            $turnSteps = collect($block['items'])->where('kind', 'steps')->flatMap(fn ($i) => $i['rows']);
+                            $turnFiles = $turnSteps->filter(fn ($r) => $r['add'] !== null)->pluck('target')->unique()->count();
+                        @endphp
+                        @if ($turnSteps->isNotEmpty())
+                            {{-- Review mode shows the chat compact: steps fold into one line. --}}
+                            <div class="wf-turn-summary">{{ __('workspaces.review.turn_summary', ['steps' => trans_choice('workspaces.review.steps_count', $turnSteps->count(), ['count' => $turnSteps->count()]), 'files' => trans_choice('workspaces.tray.files', $turnFiles, ['count' => $turnFiles])]) }}</div>
+                        @endif
                         @foreach ($block['items'] as $item)
                             @if ($item['kind'] === 'steps')
                                 @include('livewire.workspace.partials.steps', ['rows' => $item['rows'], 'running' => $block['running'] && $loop->last])
