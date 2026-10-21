@@ -22,6 +22,7 @@ use App\Models\Workspace;
 use App\Models\WorkspaceMember;
 use App\Services\Workspace\WorkspaceMemberService;
 use Filament\Actions\CreateAction;
+use Filament\Actions\EditAction;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -257,6 +258,14 @@ class WorkspaceSettingsTest extends TestCase
         $this->assertSame('https://desk.example.com/argos', $binding->callback_url);
         $this->assertSame(48, strlen((string) $binding->webhook_secret));
         $this->assertSame(TaskProviderSyncStatus::Active, $binding->sync_status);
+
+        // Editing keeps the signing secret the receiver verifies with.
+        $secret = $binding->webhook_secret;
+        Livewire::actingAs($admin)->test(TaskProviderBindingsRelationManager::class, ['ownerRecord' => $workspace, 'pageClass' => EditWorkspaceSettings::class])
+            ->callAction(TestAction::make(EditAction::class)->table($binding), ['callback_url' => 'https://desk.example.com/argos/v2'])
+            ->assertHasNoActionErrors();
+        $this->assertSame($secret, $binding->fresh()->webhook_secret);
+        $this->assertSame('https://desk.example.com/argos/v2', $binding->fresh()->callback_url);
     }
 
     public function test_integration_managers_are_for_workspace_admins_only(): void

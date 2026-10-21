@@ -38,8 +38,7 @@ chat-client front door, the REST API is the scripting front door.
   (`/oauth/register`); discovery metadata lives under the
   `/.well-known/oauth-*` endpoints. You do not pre-register a client by hand.
 - The first connect opens a **browser login** as an Argos user plus a consent
-  screen for the `mcp:use` scope. Argos is single-user today, so this is just
-  your admin login.
+  screen for the `mcp:use` scope. The tools then act as that user.
 
 ## Prerequisites
 
@@ -61,8 +60,8 @@ claude mcp add --transport http argos https://your-argos.example.com/mcp
 ```
 
 Then, inside Claude Code, run `/mcp`, pick `argos`, and choose **Authenticate**.
-A browser opens at `${APP_URL}/oauth/authorize`; sign in as your Argos admin
-user and approve the `mcp:use` scope. The status flips to **connected** and the
+A browser opens at `${APP_URL}/oauth/authorize`; sign in with your Argos
+account and approve the `mcp:use` scope. The status flips to **connected** and the
 tools below become available.
 
 > Other clients that speak HTTP MCP with OAuth (Cursor, VS Code) work the same
@@ -72,9 +71,10 @@ tools below become available.
 
 ## Available tools
 
-The server exposes nine tools. A `workspace` argument accepts either the
-workspace's ULID **or** its exact name; a `task` argument takes the task's
-ULID.
+The server exposes nine tools — `workspace_*` for workspaces, `task_*` for
+tasks. A `workspace` argument accepts either the workspace's ULID **or** its
+exact name; a `task` argument takes the task's ULID. Creating workspaces is not
+possible over MCP (use the UI or the [REST API](REST-API.md#create-a-workspace)).
 
 ### Workspaces (read)
 
@@ -87,11 +87,11 @@ ULID.
 
 | Tool | What it does |
 | --- | --- |
-| `task_create` | Starts an automatic task in a workspace: plan (per `plan`: off / auto / approve), implement on its own branch, fix failing quality gates, open the pull request. Args: `workspace`, `prompt`, optional `title`, `issue`, `base_branch`, `plan`, `ship`. Returns immediately. |
-| `task_get` | One task — poll it to follow a run (`auto.state`, `pull_request`, `gates`). |
+| `task_create` | Starts an automatic task in a workspace: plan (per `plan`: `off` / `auto` / `approve`), implement on its own branch, fix failing quality gates, ship (per `ship`: `pr` / `draft_pr` / `none`). Args: `workspace`, `prompt`, optional `title`, `issue` (ticket number of the workspace's tracker), `base_branch`, `plan`, `ship`, `auto_merge` (switch on the provider's auto-merge, see [Pull Requests](PULL-REQUESTS.md#auto-merge)). Runs on your subscription; returns immediately. |
+| `task_get` | One task — status, owner, branch, pull request (state, checks, review, conflicts), gates, ticket and `auto.state`. Poll it to follow a run. |
 | `task_plan_decide` | Approves or rejects a waiting plan (`decision`, optional `feedback`). |
 | `task_message` | Writes into a task (`text`); `resume_auto` lets the run continue on its own afterwards. |
-| `task_pause` / `task_resume` | Pause automation / hand the task back to it. |
+| `task_pause` / `task_resume` | Pause automation / hand a paused, failed or budget-stopped task back to it (it checks the gates and ships). |
 | `task_ship` | Commits, pushes and opens/updates the task's pull request now (optional `draft`). |
 
 Tasks act for you: your Claude agent does the work and you own the task. You
@@ -110,7 +110,8 @@ A plan → PR round trip from a planning session:
 4. With `plan = approve` the run stops at `awaiting_plan_approval`:
    `task_plan_decide` approves or rejects (with feedback).
 5. When the run is done, `task_get` shows the pull request under
-   `pull_request`; check out its branch locally to review in your IDE.
+   `pull_request` with its checks and review state; check out its branch
+   locally to review in your IDE.
 6. `task_message` — send review feedback into the task; set `resume_auto` to
    let the run continue on its own. `task_ship` ships the current state on
    demand.
@@ -128,10 +129,9 @@ A plan → PR round trip from a planning session:
 - **Signing keys persist.** The Passport keys live on the persistent volume
   (`PASSPORT_KEYS_PATH`, `/data/passport` in compose), so an image rebuild does
   not silently invalidate every issued token.
-- **Single user today.** Argos is single-user, so the OAuth login is your admin
-  login. Anyone holding a valid `mcp:use` token has the same reach as that user
-  — treat the token like a password and revoke it from the Argos UI if a client
-  is lost.
+- **Acts as you.** Anyone holding a valid `mcp:use` token has the same reach
+  as the user who granted it — treat the token like a password and revoke it
+  from the Argos UI if a client is lost.
 
 ## Troubleshooting
 
@@ -146,7 +146,8 @@ A plan → PR round trip from a planning session:
   asynchronous. Confirm the queue worker (`queue` service) is up; re-read
   with `task_get` to see the state advance.
 - **`task_create` fails with "no usable agent"** — you need an active
-  Claude agent of your own (or a shared one) under *Agents*.
+  Claude agent of your own (or a shared one) under *Agents*, and the role
+  *admin* or *member* in the workspace.
 
 ## See also
 

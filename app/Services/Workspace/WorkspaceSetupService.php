@@ -165,7 +165,7 @@ class WorkspaceSetupService
      */
     public function start(Workspace $workspace, User $by): Task
     {
-        Gate::forUser($by)->authorize('update', $workspace);
+        Gate::forUser($by)->authorize('setup', $workspace);
         $open = $this->openTask($workspace);
         if ($open !== null) {
             return $open;
@@ -315,7 +315,7 @@ class WorkspaceSetupService
     /** "Rebuild": build the stack image again; the container picks it up on its next start. */
     public function rebuildImage(Workspace $workspace, User $by): void
     {
-        Gate::forUser($by)->authorize('update', $workspace);
+        Gate::forUser($by)->authorize('setup', $workspace);
 
         try {
             $resolved = app(WorkerImageResolver::class)->resolveForWorkspace($workspace, $workspace->setupRef());

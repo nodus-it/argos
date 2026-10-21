@@ -54,7 +54,7 @@ class WorkspaceIssueTest extends TestCase
         Event::fake([TaskStream::class]);
         $this->app->singleton(WorkspaceDaemonClient::class, FakeWorkspaceDaemon::class);
 
-        $this->workspace = Workspace::factory()->create(['default_branch' => 'main']);
+        $this->workspace = Workspace::factory()->create(['default_branch' => 'main', 'repo_url' => 'https://github.com/acme/widget', 'platform' => 'github']);
         $this->binding = TaskProviderBinding::factory()->create([
             'workspace_id' => $this->workspace->id,
             'kind' => TaskProviderKind::GitHub,
@@ -162,6 +162,10 @@ class WorkspaceIssueTest extends TestCase
         $task = $this->issueTask();
 
         $this->assertSame('Closes #42', $this->service()->pullRequestReference($task));
+        // An issue of another repository is referenced with its path.
+        $other = $task->replicate();
+        $other->external_ref = ['project' => 'tracker'] + $task->external_ref;
+        $this->assertSame('Closes acme/tracker#42', $this->service()->pullRequestReference($other));
 
         $this->tracker->shouldReceive('createComment')->once()
             ->withArgs(fn ($owner, $project, $number, $body) => $owner === 'acme' && $project === 'widget' && $number === '42' && str_contains($body, 'https://github.com/acme/widget/pull/3'));

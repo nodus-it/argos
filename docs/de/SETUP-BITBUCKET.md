@@ -7,12 +7,13 @@ Siehe [OAuth-Überblick](OAUTH.md) für einen Vergleich von PAT und OAuth und di
 Frage, welche Variante du wählen solltest.
 
 > **Hinweis zum Umfang — Bitbucket ist ausschließlich ein Code-Provider.** Argos
-> nutzt Bitbucket zum Klonen, für Branches und zum Erstellen von Pull Requests.
-> Bitbucket ist **nicht** als Issue-Trigger angebunden: Es gibt keine
-> Bitbucket-Option beim Anbinden einer Issue-Quelle, und Argos startet weder
-> Läufe aus Bitbucket-Issues noch registriert es Issue-Webhooks dafür. Siehe
-> [Issue-Trigger](SETUP-TASK-PROVIDERS.md) für die Provider, die aus Issues
-> tatsächlich automatische Läufe starten (GitHub, GitLab, Linear).
+> nutzt Bitbucket zum Klonen, für Branches und für Pull Requests. Bitbucket ist
+> **nicht** als Issue-Tracker angebunden: Unter den Issue-Trackern eines
+> Workspaces gibt es keine Bitbucket-Option, und Argos nutzt Bitbucket-Issues
+> weder als Tickets, noch startet es Aufgaben daraus oder registriert
+> Issue-Webhooks dafür. Siehe [Issue-Trigger](SETUP-TASK-PROVIDERS.md) für die
+> Provider, die aus Issues tatsächlich automatische Aufgaben starten (GitHub,
+> GitLab, Linear).
 
 ---
 
@@ -21,10 +22,12 @@ Frage, welche Variante du wählen solltest.
 | Funktion | Unterstützt |
 |---|---|
 | Repository klonen | Ja |
-| Repositories / Branches auflisten (für Dropdowns im Projektformular) | Ja |
+| Repositories / Branches auflisten (für Dropdowns im Workspace-Formular) | Ja |
 | Pull Requests erstellen / aktualisieren / kommentieren | Ja |
+| Zustand des Pull Requests, Build-Status, Reviews und Kommentare, Konflikte in der Aufgabe | Ja (keine Logs fehlgeschlagener Builds, kein Hinweis „Basis hat sich weiterbewegt“) |
+| Auto-Merge | **Nein** (Bitbucket Cloud hat keins) |
 | Default-Branch und Quelldateien lesen | Ja |
-| Issue-Trigger (ein Bitbucket-Issue startet einen automatischen Lauf) | **Nein** |
+| Issues als Tickets / Issue-Trigger (ein Bitbucket-Issue startet eine automatische Aufgabe) | **Nein** |
 | Issue-Webhooks / 👍-Freigabe-Fluss | **Nein** |
 
 ---
@@ -50,19 +53,20 @@ serverseitige OAuth-Konfiguration.
    - **Pull requests**: Read, Write
    - **Issues**: Read (optional — nur nötig, wenn Argos Issue-Inhalte aus dem
      Repo lesen soll; Bitbucket ist kein Issue-Trigger, daher starten daraus
-     keine Läufe)
+     keine Aufgaben)
 6. Klicke auf **Create** und kopiere das generierte Token — es wird nur einmal
    angezeigt.
 
-### Schritt 2: In Argos konfigurieren
+### Schritt 2: Workspace in Argos anlegen
 
-Unter **Projects → New Project**:
+Wähle als Argos-Administrator **Neuer Workspace** (in `/w` oder im Admin-Panel
+unter **Workspaces**):
 
-- **Platform**: Bitbucket
-- **Repo URL**: `https://bitbucket.org/<workspace>/<repository>`
+- **Plattform**: Bitbucket
+- **Repo-URL**: `https://bitbucket.org/<workspace>/<repository>`
 - **Token**: das Token direkt einfügen (kein Benutzername-Präfix)
 
-> **Wichtig**: Stelle deinem Benutzernamen **nicht** voran. Repository Access
+> **Wichtig**: Stelle **nicht** deinen Benutzernamen voran. Repository Access
 > Tokens werden als Bearer-Tokens verwendet — füge das Token einfach unverändert
 > ein. Argos erkennt den Auth-Modus (Basic vs. Bearer) an der Form des Tokens.
 
@@ -79,14 +83,14 @@ Atlassian API Token mit Basic-Authentifizierung verwenden:
 
 ## Option 2: OAuth (optional)
 
-OAuth aktiviert Repository- und Branch-Dropdowns im Projektformular sowie eine
-benutzerbezogene Konto-Anbindung — jeder Nutzer verbindet sein eigenes
-Bitbucket-Konto, statt ein Token einzufügen.
+OAuth aktiviert Repository- und Branch-Dropdowns im Workspace-Formular sowie
+eine Konto-Anbindung pro Person — alle verbinden ihr eigenes Bitbucket-Konto,
+statt ein Token einzufügen.
 
 OAuth-Apps werden **in der Argos-UI** verwaltet, nicht über Umgebungsvariablen.
 Es gibt kein `BITBUCKET_CLIENT_ID` / `BITBUCKET_CLIENT_SECRET` zu setzen. Der
 vollständige UI-Ablauf ist beschrieben unter
-[OAuth-Überblick → Die OAuth-App in Argos registrieren](OAUTH.md#registering-the-oauth-app-in-argos).
+[OAuth-Überblick → Die OAuth-App in Argos registrieren](OAUTH.md#die-oauth-app-in-argos-registrieren).
 
 ### Schritt 1: Einen OAuth Consumer auf Bitbucket erstellen
 
@@ -112,10 +116,10 @@ vollständige UI-Ablauf ist beschrieben unter
 
 ### Schritt 2: Die OAuth-App in Argos hinzufügen
 
-1. Öffne **Configuration → OAuth Apps** in der Argos-Administration.
+1. Öffne **Konfiguration → OAuth-Apps** in der Argos-Administration.
 2. Füge eine App für **Bitbucket** hinzu, trage deren **Key** (Client-ID) und
    **Secret** (Client-Secret) ein und aktiviere sie.
-3. Die im Formular angezeigte **Callback URL** ist schreibgeschützt und wird aus
+3. Die im Formular angezeigte **Callback-URL** ist schreibgeschützt und wird aus
    `APP_URL` abgeleitet — sie ist fest auf `${APP_URL}/auth/bitbucket/callback`
    gesetzt. Kopiere sie in die Callback URL des Bitbucket-OAuth-Consumers, falls
    noch nicht geschehen.
@@ -125,10 +129,10 @@ und sind sofort wirksam, ohne Neustart.
 
 ### Schritt 3: Dein Konto verbinden
 
-1. Gehe zu **Connected Accounts** im Argos-Admin-Panel.
-2. Klicke auf **Connect Bitbucket**.
+1. Gehe zu **Verknüpfte Accounts** im Argos-Admin-Panel.
+2. Klicke auf **Mit Bitbucket verbinden**.
 3. Autorisiere den OAuth Consumer in Bitbucket.
-4. Wähle beim Erstellen eines Projekts **Bitbucket** als Plattform und **OAuth**
+4. Wähle beim Anlegen eines Workspaces **Bitbucket** als Plattform und **OAuth**
    als Authentifizierungsmethode, um Repositories und Branches aus dem
    verbundenen Konto abzurufen.
 
@@ -141,5 +145,6 @@ und sind sofort wirksam, ohne Neustart.
 | 403 am Issues-Endpoint | Der Issue-Tracker ist für das Repository deaktiviert (Issues werden als leere Liste zurückgegeben) |
 | 401 beim Push | Dem Token fehlt die Repositories-Write-Berechtigung, oder das Token wurde versehentlich mit einem Benutzername-Präfix eingefügt |
 | PR-Erstellung liefert 409 | Ein PR für diesen Branch existiert bereits — Argos findet die bestehende URL und meldet sie |
-| OAuth-Redirect schlägt fehl | Die im OAuth Consumer registrierte Callback URL muss exakt mit `${APP_URL}/auth/bitbucket/callback` übereinstimmen — überprüfe `APP_URL` und ob die OAuth-App unter **Configuration → OAuth Apps** aktiviert ist |
-| Du erwartest, dass ein Bitbucket-Issue einen automatischen Lauf startet | Nicht unterstützt — Bitbucket ist ausschließlich ein Code-Provider. Verwende [GitHub/GitLab/Linear](SETUP-TASK-PROVIDERS.md) als Issue-Trigger |
+| OAuth-Redirect schlägt fehl | Die im OAuth Consumer registrierte Callback URL muss exakt mit `${APP_URL}/auth/bitbucket/callback` übereinstimmen — überprüfe `APP_URL` und ob die OAuth-App unter **Konfiguration → OAuth-Apps** aktiviert ist |
+| Du erwartest, dass ein Bitbucket-Issue eine automatische Aufgabe startet | Nicht unterstützt — Bitbucket ist ausschließlich ein Code-Provider. Verwende [GitHub/GitLab/Linear](SETUP-TASK-PROVIDERS.md) oder ein [eigenes Ticket-System](TICKETS.md#eigene-ticket-systeme) |
+| „Automatisch mergen“ lässt sich nicht einschalten | Bitbucket hat kein natives Auto-Merge; merge in Bitbucket |

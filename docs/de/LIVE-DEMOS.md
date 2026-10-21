@@ -1,165 +1,142 @@
-# Live-Demos
+# Previews
 
-Eine **Live-Demo** — im Workspace einfach **Preview** genannt — ist ein
-laufendes Deployment der aktuellen Dateien eines [Workspaces](WORKSPACES.md).
-Argos startet den Code in einem eigenen kleinen Container-Stack und
-veröffentlicht ihn unter einer temporären Subdomain, sodass du die Änderung im
-Browser durchklicken kannst, **bevor** der Pull Request gemergt wird.
-
-Diese Seite erklärt, was eine Preview ist, wie sie gebaut wird, wer sie öffnen
-darf und wie ihr Lebenszyklus (Build → Live → gestoppt) funktioniert.
+Eine **Preview** (Live-Demo) ist ein laufendes Deployment der aktuellen Dateien
+einer [Aufgabe](TASKS.md). Argos startet den Worktree der Aufgabe in einem
+eigenen kleinen Container-Stack und veröffentlicht ihn unter einer temporären
+Subdomain, sodass du die Änderung im Browser durchklicken kannst, **bevor** der
+Pull Request gemergt wird.
 
 ## Inhalt
 
-- [Was eine Live-Demo ist](#what-a-live-demo-is)
-- [Wann eine Preview verfügbar ist](#when-a-preview-is-available)
-- [Eine Preview starten und öffnen](#starting-and-opening-a-preview)
-- [Der Demo-Vertrag](#the-demo-contract)
-- [Zugriff](#access)
-- [Lebenszyklus](#lifecycle)
-- [Betreiber-Konfiguration](#operator-configuration)
+- [Was eine Preview ist](#was-eine-preview-ist)
+- [Wann eine Preview verfügbar ist](#wann-eine-preview-verfugbar-ist)
+- [Eine Preview starten und öffnen](#eine-preview-starten-und-offnen)
+- [Der Preview-Vertrag](#der-preview-vertrag)
+- [Zugriff](#zugriff)
+- [Lebenszyklus](#lebenszyklus)
+- [Konfiguration für Betreibende](#konfiguration-fur-betreibende)
 
-## Was eine Live-Demo ist
+## Was eine Preview ist
 
-Ein Workspace hält seinen Checkout in einem Docker-Volume (`ws_<workspace>`).
-Die Preview mountet **dieses Volume** in einen kleinen Container-Stack, führt
-die Setup-Befehle des Vertrags aus und veröffentlicht eine Route über Traefik,
-sodass das Deployment unter `demo-ws-<workspace>.<basisdomain>` erreichbar ist.
-Weil sie das Volume mountet, zeigt die Preview immer die aktuellen Dateien des
-Workspaces — PHP-Änderungen erscheinen ohne Neubau.
+Ein Workspace hält seinen Checkout in einem Docker-Volume; jede Aufgabe hat
+dort ihren Worktree. Die Preview mountet **nur den Worktree dieser Aufgabe** in
+einen kleinen Container-Stack, führt die Boot-Befehle des Vertrags aus und
+veröffentlicht eine Route über Traefik unter
+`demo-<workspace>-<task>.<base-domain>` (gekürzt auf 63 Zeichen). Weil sie den
+Worktree mountet, zeigt die Preview immer die aktuellen Dateien der Aufgabe —
+PHP-Änderungen erscheinen ohne Neubau.
 
-Eine Preview ist **kurzlebig** und gehört **zu einem Workspace**:
+Eine Preview ist **kurzlebig** und gehört **zu einer Aufgabe**:
 
-- Pro Workspace gibt es höchstens eine aktuelle Preview. **Neu bauen** ersetzt
-  sie sauber (alte Container, Volumes und Route werden zuerst abgebaut).
-- Eine Preview hat eine **Lebensdauer (TTL)**. Läuft sie ab, wird die Preview
-  automatisch gestoppt.
-- Sie läuft neben Argos selbst — gedacht für ein schnelles Review, nicht als
-  Produktiv-Deployment.
+- Höchstens eine Preview pro Aufgabe. **Neu bauen** ersetzt sie sauber (alte
+  Container, Volumes und Route werden zuerst abgebaut).
+- Sie hat ihre eigene Datenbank in ihrem Compose-Stack — nicht die
+  Arbeitsdatenbank der Aufgabe.
+- Sie hat eine **Lebensdauer (TTL)** und ist für ein schnelles Review gedacht,
+  nicht als Produktiv-Deployment.
 
 ## Wann eine Preview verfügbar ist
 
-Ein Workspace kann nur dann eine Preview starten, wenn **beides** zutrifft:
+Eine Aufgabe kann nur dann eine Preview starten, wenn **beides** zutrifft:
 
-1. **Live-Demos sind im Projekt aktiviert.** Jedes Projekt hat einen Schalter
-   *Live demo*. Siehe [PROJECTS.md](PROJECTS.md#live-demo).
-2. **Previews sind plattformweit aktiviert.** Der Betreiber muss die
-   Preview-Infrastruktur eingeschaltet haben (`ARGOS_PREVIEW_ENABLED`,
-   standardmäßig an — siehe [Betreiber-Konfiguration](#operator-configuration)).
+1. **Die Live-Demo ist für den Workspace aktiviert** (Einstellungen → Umgebung
+   → *Live-Demo aktivieren*). Siehe
+   [Workspace-Einstellungen](PROJECTS.md#live-demo).
+2. **Previews sind plattformweit aktiviert** (`ARGOS_PREVIEW_ENABLED`,
+   standardmäßig an).
 
-Ist eines davon aus, nennt die Werkbank den Grund und bietet keine Preview an.
+Ist eines davon aus, nennt die Seitenleiste den Grund und bietet keine Preview
+an.
 
 ## Eine Preview starten und öffnen
 
-Die Preview-Steuerung sitzt in der Leiste der Werkbank des Workspaces:
+Die Preview-Steuerung sitzt im Bereich **Umgebung** der Seitenleiste der
+Aufgabe (`/preview` zeigt die Seitenleiste):
 
-- **Starten** baut die Preview im Hintergrund; die Leiste zeigt *Preview wird
+- **Starten** baut die Preview im Hintergrund; die Zeile zeigt *Preview wird
   gebaut…*, bis sie live ist.
-- **Preview öffnen** öffnet sie in einem eigenen Browser-Tab (einer pro
-  Workspace, beim nächsten Klick wiederverwendet). Die Leiste zeigt, wann sie
-  abläuft.
+- **Öffnen** öffnet sie in einem eigenen Browser-Tab (einer pro Aufgabe, beim
+  nächsten Klick wiederverwendet). Die Zeile zeigt, wann sie abläuft.
 - **Neu bauen** ersetzt die laufende Preview durch einen frischen Build.
 - **Setup-Befehle erneut ausführen** führt die `commands` des Vertrags in der
-  laufenden Preview noch einmal aus — nach einer Migration, einer Änderung an
-  `composer`/`npm` oder an der Build-Konfiguration —, ohne neu zu bauen. Die
-  Ausgabe wird an das Build-Log angehängt.
+  laufenden Preview erneut aus — nach einer Migration, einer Änderung an
+  `composer`/`npm` oder an der Build-Konfiguration — ohne Neubau. Die Ausgabe
+  wird an das Build-Log angehängt.
 - **Preview stoppen** entfernt ihre Container, Volumes und Route.
-- Schlägt ein Build fehl, zeigt die Leiste das **Build-Log**.
+- Schlägt ein Build fehl, öffnet sich das **Build-Log**.
 
-Die Befehle des Vertrags laufen als Agent-Benutzer des Workspaces, damit die
-Dateien, die sie anlegen (z. B. `vendor/`, kompilierte Views), im Workspace
+Die Befehle des Vertrags laufen als Benutzer `agent` des Workspaces, sodass
+Dateien, die sie anlegen (z. B. `vendor/`, kompilierte Views), in der Aufgabe
 bearbeitbar bleiben.
 
-## Der Demo-Vertrag
+## Der Preview-Vertrag
 
-Wie eine Preview gebaut wird und was sie ausführt, legt ein **Demo-Vertrag**
-fest — zwei Dateien im Repository unter `.argos/`:
+Wie eine Preview gebaut wird, legen zwei Dateien im Repository fest:
 
 | Datei | Zweck |
 | --- | --- |
-| `.argos/demo.compose.yml` | Die Docker-Compose-Services, die die Preview ausführt (die App, ihre Datenbank, weitere Backing Services). |
-| `.argos/demo.yml` | Einstellungen: zu welchem Service/Port geroutet wird, wohin der Workspace gemountet wird, die auszuführenden Setup-Befehle und ein optionaler Health-Check. |
+| `.argos/demo.compose.yml` | Die Docker-Compose-Services, die die Preview ausführt (die App, ihre Datenbank, weitere Backing-Services). |
+| `.argos/demo.yml` | Einstellungen: zu welchem Service/Port geroutet wird, wo der Worktree gemountet wird, die Boot-Befehle und ein Health-Check. |
 
-Beide Dateien werden vom **Default-Branch** des Projekts gelesen. Sie müssen
-**gemeinsam** vorhanden sein — ein Repository, das nur eine davon mitliefert,
-gilt als Fehler, und der Build schlägt mit einer Meldung fehl, statt still auf
+Sie werden am Setup-Ref des Workspaces gelesen — dem Default-Branch oder einem
+getesteten, noch nicht gemergten Einrichtungs-Branch; die
+[Einrichtungs-Aufgabe](PREPARE-PROJECT.md#die-einrichtungs-aufgabe) zeigt
+ihren eigenen Branch als Preview. Beide müssen **zusammen** vorhanden sein; nur
+eine mitzuliefern lässt den Build mit einem Fehler scheitern, statt still auf
 den Standard zurückzufallen.
 
-Details zum Schreiben eines Vertrags und zu den Befehlen, die er ausführt,
-findest du in [PREPARE-PROJECT.md](PREPARE-PROJECT.md) und
-[EXECUTION-COMMANDS.md](EXECUTION-COMMANDS.md).
+Ohne beide Dateien nutzt Argos einen **mitgelieferten Laravel-Vertrag**: nginx
++ php-fpm + Node, eine MariaDB-Datenbank und einen Standard-Start (`composer
+install`, `.env` aus `.env.example`, `php artisan migrate --force --seed`,
+`npm ci && npm run build`, `php artisan storage:link`). Seine Datenbank nutzt
+die MySQL-Zugangsdaten des Workspaces, und ein Redis-Service kommt dazu, wenn
+der Workspace Redis aktiviert hat.
 
-### Standard-Laravel-Demo
-
-Liefert ein Repository **gar keine** `.argos/demo.*`-Dateien mit, verwendet
-Argos einen **eingebauten Standard-Vertrag für Laravel**. Er startet eine
-PHP-Laufzeit (nginx + php-fpm) plus eine MariaDB-Datenbank, mountet den
-Workspace und führt ein übliches Laravel-Setup aus — ungefähr:
-
-- `composer install`
-- `.env.example` nach `.env` kopieren, falls sie fehlt
-- `php artisan migrate --force --seed`
-- `npm ci && npm run build` (wenn eine `package.json` vorhanden ist)
-- `php artisan storage:link`
-
-Der Standard-Vertrag übernimmt die Backing-Service-Einstellungen des Projekts:
-Die Datenbank der Preview nutzt dieselben Zugangsdaten, die das Projekt für
-seinen MySQL-Service konfiguriert hat, und ein Redis-Service kommt automatisch
-hinzu, wenn das Projekt Redis aktiviert hat. Die Standard-Laufzeit routet auf
-den Service `app`, Port `80`.
-
-Ein Repository mit eigenem Vertrag behält die volle Kontrolle; diese
-Standardwerte greifen dann nicht.
+Wie du einen Vertrag schreibst:
+[Ein Repository vorbereiten](PREPARE-PROJECT.md#live-preview); die genauen
+Befehle: [EXECUTION-COMMANDS.md](EXECUTION-COMMANDS.md#der-preview-deployer).
 
 ## Zugriff
 
-Eine Preview ist **nur für Mitglieder** zugänglich. Jede Anfrage durchläuft die
-Forward-Auth-Prüfung von Traefik gegen das Workspace-Gate, das nur Mitglieder
-des Workspaces (Besitzer, Bearbeiter und Betrachter) durchlässt. Einen
+Eine Preview ist **nur für Mitglieder**. Jede Anfrage durchläuft den
+Forward-Auth-Check von Traefik gegen das Workspace-Gate, das nur Mitglieder des
+Workspaces (Admins, Mitglieder und Leser) und Argos-Admins durchlässt. Einen
 öffentlichen oder reinen Passwort-Modus gibt es nicht.
 
 ## Lebenszyklus
 
-Eine Preview durchläuft diese Zustände:
-
 | Zustand | Bedeutung |
 | --- | --- |
-| **Building** | Das Deployment wird gebaut (Container starten, Setup-Befehle, Health-Check). |
+| **Wird gebaut** | Container fahren hoch, Boot-Befehle und Health-Check laufen. |
 | **Live** | Die Preview ist unter ihrer URL erreichbar. |
-| **Failed** | Der Build ist fehlgeschlagen — das Build-Log nennt den Grund; halb gestartete Container werden aufgeräumt. |
-| **Stopped** | Container, Volumes und Route der Preview wurden entfernt. Sie lässt sich erneut starten. |
+| **Fehlgeschlagen** | Der Build ist fehlgeschlagen — das Build-Log erklärt, warum; halb gestartete Container werden aufgeräumt. |
+| **Gestoppt** | Container, Volumes und Route sind entfernt. Sie kann erneut gestartet werden. |
 
-So verlässt eine Preview den Zustand **Live**:
+Eine Preview verlässt den Zustand **Live** durch
 
-- **Ablauf der TTL.** Eine Preview lebt `ARGOS_PREVIEW_TTL_HOURS` (Standard 24
-  Stunden) ab ihrem Build. Ein geplanter Cleanup stoppt jede Preview, deren TTL
-  abgelaufen ist.
-- **Workspace stoppt.** Wird ein Workspace gestoppt (von Hand oder nach
-  Leerlauf), stoppt auch seine Preview; beim Löschen des Workspaces wird sie
-  entfernt.
-- **Obergrenze gleichzeitiger Previews.** Die Plattform begrenzt, wie viele
-  Previews gleichzeitig laufen (`ARGOS_PREVIEW_MAX_CONCURRENT`, Standard 10).
-  Würde eine neue die Grenze überschreiten, werden die **ältesten** laufenden
-  Previews *anderer* Workspaces gestoppt, um Platz zu schaffen. Das wird
-  protokolliert, nie stillschweigend. Mit `0` ist die Grenze aus.
-- **Manuell** mit **Preview stoppen**.
+- **Ablauf der TTL** — `ARGOS_PREVIEW_TTL_HOURS` (Standard 24) nach ihrem
+  Build; eine geplante Aufräumaufgabe stoppt sie,
+- **das Limit des Workspaces** — *Parallele Previews* (Einstellungen →
+  Ressourcen, Standard 3): Eine weitere zu starten stoppt die älteste Preview
+  des Workspaces,
+- **die Plattform-Obergrenze** — `ARGOS_PREVIEW_MAX_CONCURRENT` (Standard 10,
+  `0` schaltet sie ab): Die ältesten Previews anderer Aufgaben werden gestoppt,
+  um Platz zu machen (protokolliert, nie still),
+- **das Stoppen des Workspaces** (von Hand oder nach Leerlauf),
+- **das Aufräumen der Aufgabe** — `cleanup_after_days` nach Abschluss oder
+  Abbruch der Aufgabe oder wenn die Aufgabe gelöscht wird,
+- **Preview stoppen**.
 
-## Betreiber-Konfiguration
-
-Live-Demos werden über die `preview.*`-Einstellungen in `config/argos.php`
-gesteuert, die aus Umgebungsvariablen kommen. Die wichtigsten:
+## Konfiguration für Betreibende
 
 | Variable | Standard | Zweck |
 | --- | --- | --- |
 | `ARGOS_PREVIEW_ENABLED` | `true` | Plattformweiter Hauptschalter für Previews. |
 | `ARGOS_PREVIEW_TTL_HOURS` | `24` | Wie lange eine Preview lebt, bevor sie automatisch abgebaut wird. |
 | `ARGOS_PREVIEW_MAX_CONCURRENT` | `10` | Obergrenze gleichzeitig laufender Previews (`0` schaltet sie ab). |
-| `ARGOS_PREVIEW_BASE_DOMAIN` | aus `APP_URL` abgeleitet | Basisdomain, unter der Previews liegen (`demo-ws-<workspace>.<basisdomain>`). |
+| `ARGOS_PREVIEW_BASE_DOMAIN` | abgeleitet aus `APP_URL` | Basis-Domain, unter der Previews ausgeliefert werden. |
 
-Previews brauchen Preview-Infrastruktur auf dem Host (einen Traefik-Edge mit dem
-gemeinsamen Netzwerk `argos_edge` und eine Basisdomain mit Wildcard-DNS).
-Betreiber ohne diese Infrastruktur können Previews mit
-`ARGOS_PREVIEW_ENABLED=false` ganz abschalten.
-
-Die vollständige Liste der Einstellungen und wie du Umgebungsvariablen setzt,
-steht in [CONFIGURATION.md](CONFIGURATION.md).
+Previews brauchen einen Traefik-Edge mit dem gemeinsamen Netzwerk `argos_edge`
+und eine Basis-Domain, die Wildcards unterstützt. Ohne diese Infrastruktur
+schaltest du sie mit `ARGOS_PREVIEW_ENABLED=false` ab. Alle Einstellungen:
+[Konfiguration](CONFIGURATION.md#live-previews).

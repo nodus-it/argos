@@ -23,13 +23,13 @@ return [
 
     'client' => [
         'run_as' => 'Handelt als',
-        'run_as_help' => 'Automatische Läufe mit den Tokens dieses Clients handeln für diese Person: Ihr Claude-Agent arbeitet, und sie besitzt den Workspace. Für die Workspace-Endpunkte erforderlich.',
+        'run_as_help' => 'Automatische Aufgaben mit den Tokens dieses Clients handeln für diese Person: Sie besitzt die Aufgabe, und sie läuft auf ihrem Claude-Abo. Für die Workspace-Endpunkte erforderlich.',
         'label' => 'API-Client',
         'plural' => 'API-Clients',
         'section' => 'Identität',
         'section_description' => 'Ein wiedererkennbarer Name für diesen programmatischen Zugriff.',
         'name' => 'Name',
-        'name_help' => 'Frei wählbarer Name für den programmatischen Zugriff (z. B. „CI", „Skripte"). Token mit Vollzugriff über alle Projekte.',
+        'name_help' => 'Frei wählbarer Name für den programmatischen Zugriff (z. B. „CI“, „Skripte“). Tokens erreichen jeden Workspace, den der „Handelt als“-Nutzer sehen darf, begrenzt durch ihre Fähigkeiten.',
         'tokens' => 'Tokens',
     ],
 ];

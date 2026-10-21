@@ -1,32 +1,35 @@
-# What Argos runs — Workspace & Demo command reference
+# What Argos runs — Workspace & Preview command reference
 
 A precise list of the shell / Docker commands Argos executes on your behalf
 against a target repository, for operators who want to audit exactly what the
 agent does. There are two execution contexts:
 
-- **The workspace** — one long-lived container per workspace (clone, the
-  agent's sessions, quality gates, commit & push).
-- **The Demo deployer** — an ephemeral preview stack of a workspace, when live
-  previews are enabled for the project.
+- **The workspace** — one long-lived container per workspace (main clone, one
+  worktree per task, the agent's sessions, setup steps, quality gates, commit
+  & push).
+- **The preview deployer** — an ephemeral preview stack of a task, when live
+  previews are enabled for the workspace.
 
 > This is a snapshot for orientation. The commands live in code (see
 > [Where this lives](#where-this-lives) at the bottom); if in doubt, the source
-> is the truth. Placeholders like `<slug>`, `<branch>`, `<base>` are resolved
-> per workspace; `<service>`, `<port>` come from the demo contract.
+> is the truth. Placeholders like `<slug>` (workspace), `<task>` (task slug),
+> `<branch>`, `<base>` are resolved per workspace and task; `<service>`,
+> `<port>` come from the preview contract.
 
 ## Contents
 
 - [The workspace](#the-workspace)
   - [How it is launched](#how-it-is-launched)
-  - [Clone & branch](#clone--branch)
+  - [Main clone](#main-clone)
+  - [Preparing a task](#preparing-a-task)
   - [The agent session](#the-agent-session)
-  - [Quality / test gate](#quality--test-gate)
+  - [Quality / test gate](#quality-test-gate)
   - [Ship: commit, push, pull request](#ship-commit-push-pull-request)
-- [The Demo deployer](#the-demo-deployer)
+- [The preview deployer](#the-preview-deployer)
   - [Runtime image build](#runtime-image-build)
   - [Deploy lifecycle](#deploy-lifecycle)
-  - [Boot commands & health probe](#boot-commands--health-probe)
-  - [The demo contract](#the-demo-contract)
+  - [Boot commands & health probe](#boot-commands-health-probe)
+  - [The preview contract](#the-preview-contract)
   - [Teardown](#teardown)
 - [Configurable vs fixed](#configurable-vs-fixed)
 - [Where this lives](#where-this-lives)
@@ -43,9 +46,10 @@ gate helpers) plus the workspace daemon and OpenVSCode Server. The container
 runs as the non-root user `agent` (uid 1000) and has **no Docker socket**.
 
 ```
-docker run -d --name argos-ws-<slug> --network argos_ws --restart unless-stopped \
-  --label argos.workspace=<slug> \
-  --cpus <argos.workspaces.cpus> --memory <argos.workspaces.memory> \
+docker run -d --name argos-ws-<slug> --hostname argos-ws-<slug> --network argos_ws \
+  --restart unless-stopped --label argos.workspace=<slug> \
+  --cpus <workspace cpu_limit | argos.workspaces.cpus> \
+  --memory <workspace memory_limit_mb | argos.workspaces.memory> \
   -v ws_<slug>:/workspace \
   -v ws_<slug>_agents:/home/agent/.claude-agents \
   -v composer_cache:/home/agent/.composer/cache \
@@ -54,7 +58,7 @@ docker run -d --name argos-ws-<slug> --network argos_ws --restart unless-stopped
   -e ARGOS_DAEMON_PORT=7777 -e ARGOS_EDITOR_PORT=3000 \
   -e APP_KEY=<fixed dummy> \
   [DB_HOST/REDIS_HOST… when backing services are on] \
-  [project env: COMPOSER_AUTH + the project's custom secrets] \
+  [workspace env: COMPOSER_AUTH + the workspace's custom secrets] \
   <workspace-image>
 ```
 
@@ -62,63 +66,93 @@ Notes for auditing:
 
 - No repository token and no Claude token are in the container environment.
   Git asks the Argos credential helper, which fetches the token from the
-  manager on demand; the Claude token is handed to the daemon in memory when a
-  thread session starts.
+  manager on demand; the owner's Claude token is handed to the daemon in
+  memory when a task's session starts.
 - `APP_KEY` is a **fixed dummy** so the project's Laravel boots for artisan
-  and tests. The workspace volume holds nothing this key protects.
-- Backing services (MySQL / Redis), when the project enabled them, run as
+  and tests (the Laravel default setup steps also generate a key into a task's
+  `.env` when its `APP_KEY` is empty).
+- Backing services (MySQL / Redis), when the workspace enabled them, run as
   sidecars on a private per-workspace network (`ws_<slug>_svc`) the container
   joins. Their data volumes live until the workspace is deleted.
 
-### Clone & branch
+### Main clone
 
-On the first start the daemon clones into the empty volume and checks out the
-workspace branch:
+On the first start the daemon clones into `/workspace/repo` and leaves it
+detached on the default branch — it is only the base for the task worktrees:
 
 ```
-git clone --no-checkout <repo-url> /workspace     # token via the credential helper
-git checkout -B <branch> origin/<branch>          # branch exists on the remote
-git checkout -b <branch> origin/<base>            # otherwise: new branch off the base
+git ls-remote --heads <repo-url> <default-branch>   # token via the credential helper
+git clone --no-checkout <repo-url> /workspace/repo
+git checkout --detach origin/<default-branch>
 ```
 
-The branch is `ws/<slug>` (or `ws/<issue-number>-<slug>` for an issue
-trigger). `.agent/` is marked locally ignored. On later starts the existing
-checkout is left alone.
+`.agent/` is marked locally ignored. On later starts the existing clone is left
+alone.
+
+### Preparing a task
+
+A new task gets its database, worktree and setup steps before Claude starts:
+
+```
+# manager: the task database on the MySQL sidecar (when MySQL is enabled)
+CREATE DATABASE task_<task>        # on the sidecar, granted to the workspace user
+
+# daemon, in /workspace/repo
+git fetch --prune origin
+git worktree add -B <branch> /workspace/tasks/<task> origin/<branch>    # branch exists on the remote
+git worktree add --no-track -B <branch> /workspace/tasks/<task> <base commit of origin/<base>>   # otherwise
+
+# daemon: .env from .env.example (if missing) + the task's DB_*, REDIS_*, REDIS_PREFIX, CACHE_PREFIX
+#         the same values in .agent/task-env.json (they override the container env in the worktree)
+
+# daemon, in the worktree: task-setup.sh
+bash .argos/setup.sh                                   # if the repo has it (or from the unmerged setup branch)
+composer install --no-interaction --no-progress --prefer-dist   # otherwise the Laravel defaults …
+php artisan key:generate --force --no-interaction      # … when .env has an empty APP_KEY
+php artisan migrate --force --no-interaction
+```
+
+Removing a task (cleanup or delete) runs `git worktree remove --force` and
+`git worktree prune`, deletes the local branch and drops the task database.
 
 ### The agent session
 
-Each thread is a Claude Code session hosted by the daemon through the Claude
-Agent SDK, with the repository's project and local settings. The chosen model,
-permission mode and — for automatic runs — the turn budget come from the
-thread. The agent edits the working tree; it does **not** push.
+Each task is a Claude Code session hosted by the daemon through the Claude
+Agent SDK, with the worktree as working directory and the repository's project
+and local settings. The model, permission mode and — for automatic tasks —
+the turn budget come from the task. A `PreToolUse` hook asks before (in
+automatic tasks: refuses) file tools outside the worktree and `/tmp`. The agent
+edits the worktree; it does **not** push.
 
 ### Quality / test gate
 
-Gates run on request (the *Gates* panel, the API, or an automatic run after
-implementing). The daemon calls `run-gates.sh`, which sources the gate helpers
-(`worker/lib/quality.sh`). A baseline is captured on the fresh checkout
-(`composer install` when `vendor/` is missing, then the test and PHPStan
-baselines), so only **new** failures block. Each gate is **skipped** when its
-tool or trigger file is absent.
+Gates run on request (the sidebar, the API, or an automatic task after
+implementing) in the task's worktree. The daemon calls `run-gates.sh`, which
+sources the gate helpers (`worker/lib/quality.sh`). The test and PHPStan
+**baselines** are captured once per base commit in the main clone, stored under
+`/workspace/.argos/baselines/<commit>/` and copied into every worktree on that
+commit, so only **new** failures block. Each gate is **skipped** when its tool
+or trigger file is absent.
 
 | # | Gate | Command | Runs when | Blocks? |
 | --- | --- | --- | --- | --- |
-| 1 | artisan smoke | `php artisan list --no-ansi` | `/workspace/artisan` exists | yes |
+| 1 | artisan smoke | `php artisan list --no-ansi` | `artisan` exists | yes |
 | 2 | Pint (style) | `vendor/bin/pint --test <changed php files>` | `vendor/bin/pint` exists + changed PHP files | yes |
 | 3 | tests | `vendor/bin/pest --no-coverage --log-junit <…>.xml` (else `vendor/bin/phpunit --log-junit <…>.xml`) | the runner exists | yes, on **new** failures only |
-| 4 | PHPStan | `vendor/bin/phpstan analyse --no-progress` | `phpstan.neon`/`.dist` + `vendor/bin/phpstan` exist | yes |
+| 4 | PHPStan | `vendor/bin/phpstan analyse --no-progress` | `phpstan.neon`/`.dist` + `vendor/bin/phpstan` exist | yes, on **new** errors only |
 | 5 | migration syntax | `php -l <new migration file>` | new files under `database/migrations/` | yes |
 | 6 | debug-code | `grep -lE '\bdd\(\|\bdump\(\|\bray\(\|\bvar_dump\(\|\bddd\('` over changed non-test PHP | changed non-test PHP | yes |
 | 7 | test-presence | new `app/` classes checked for a matching `*Test.php` | new files under `app/` | no (warn only) |
 
 The gate commands are **fixed** — a project does not configure them; a tool is
 simply "off" when not installed. A failing gate can be sent to the agent as a
-fix prompt; an automatic run does that on its own, up to its fix-round limit.
+fix prompt; an automatic task does that on its own, up to its fix-round limit.
 
 ### Ship: commit, push, pull request
 
 Shipping drafts a commit message with a short one-shot session (Haiku, JSON
-output) over the diff, then:
+output, on the shipping person's subscription) over the diff, then, in the
+task's worktree:
 
 ```
 git add -A
@@ -127,16 +161,18 @@ git push --set-upstream origin HEAD:refs/heads/<branch>
 ```
 
 The pull / merge request is opened or updated by the **manager** over the
-provider API (GitHub, GitLab, Bitbucket), not from inside the container.
-Automatic runs with ship mode `none` stop after the push.
+provider API (GitHub, GitLab, Bitbucket) with the workspace's repository
+access, not from inside the container. Automatic tasks with ship mode `none`
+stop after the push. Afterwards the manager reads the pull request's state,
+checks and reviews over the same API (see [Pull Requests](PULL-REQUESTS.md)).
 
 ---
 
-## The Demo deployer
+## The preview deployer
 
-When live previews are enabled, a workspace can start an ephemeral preview
-stack. The code already lives in the workspace volume, so the deployer
-**mounts that volume** into the demo's entry service rather than
+When live previews are enabled, a task can start an ephemeral preview stack.
+The code already lives in the workspace volume, so the deployer **mounts the
+task's worktree** (a volume subpath) into the entry service rather than
 checking the repo out again. The stack is published under its own subdomain via
 a Traefik file-provider route. Manager-side only (it needs the Docker socket).
 
@@ -155,13 +191,14 @@ this build is skipped.
 
 ### Deploy lifecycle
 
-For each deploy (the compose project name is the demo key `demo-ws-<slug>`):
+For each deploy (the compose project name is the preview key `demo-<slug>-<task>`, cut to 63 characters):
 
 ```
-# 1. tear down any previous demo of this workspace (idempotent replace)
+# 1. tear down any previous preview of this task (idempotent replace)
 docker compose -p <slug> down -v --remove-orphans
 
-# 2. evict the oldest running demos if over argos.preview.max_concurrent
+# 2. evict the oldest running previews if over the workspace's max_previews
+#    or argos.preview.max_concurrent
 
 # 3. bring the stack up — repo (or default) compose + the Argos override
 docker compose -p <slug> \
@@ -177,7 +214,7 @@ docker compose -p <slug> \
 
 The **override** (`override.yml`, generated per demo by `DemoComposeBuilder`)
 carries no host `ports:` and no Traefik labels — routing is via the file
-provider. It mounts the workspace volume at the contract's
+provider. It mounts the task's worktree at the contract's
 `workspace_mount`, joins the shared `argos_edge` network under the demo alias,
 pins `APP_URL`/`ASSET_URL` to the public URL, injects a throwaway `APP_KEY` and
 a per-demo `SESSION_COOKIE`, sets `ARGOS_DEMO=1`, and caps CPU/memory from
@@ -215,9 +252,11 @@ this order (from `resources/stubs/demo/laravel/demo.yml`):
 The default entry service is `app` (nginx on port 80), the workspace mounts at
 `/var/www/html`, and the health path is `/` with a 120s timeout.
 
-### The demo contract
+### The preview contract
 
-A project controls its demo by shipping **two** files at the default branch —
+A repository controls its preview by shipping **two** files at the setup ref
+(the default branch, or a tested, unmerged setup branch; a setup task uses its
+own branch) —
 both are required together; a half-written contract is an error, not a silent
 fall-back to the default:
 
@@ -226,16 +265,16 @@ fall-back to the default:
 | `.argos/demo.compose.yml` | the compose services. May reference the built-in runtime via the `__ARGOS_DEMO_IMAGE__` placeholder, or ship its own image. |
 | `.argos/demo.yml` | settings: `entry.service`, `entry.port`, `workspace_mount`, the ordered `commands:` boot list, and `health.path` / `health.timeout`. |
 
-The project's `commands:` and `health` **replace** the defaults entirely. For
-the bundled default contract, the demo DB credentials and an optional Redis
-service follow the project's backing-service config (same credentials the
-workspace sidecars use).
+The repository's `commands:` and `health` **replace** the defaults entirely.
+For the bundled default contract, the preview DB credentials and an optional
+Redis service follow the workspace's backing-service config (same credentials
+the workspace sidecars use).
 
 ### Teardown
 
-A demo is torn down (on replace, eviction over the concurrency cap, or TTL
-expiry — `argos.preview.ttl_hours`) by slug, so it still works after the
-workspace row is gone. The route is always guarded by the workspace gate
+A preview is torn down (on replace, eviction over a cap, TTL expiry —
+`argos.preview.ttl_hours` —, the workspace stopping, or task cleanup) by slug,
+so it still works after the task row is gone. The route is always guarded by the workspace gate
 (members only):
 
 ```
@@ -247,13 +286,13 @@ docker compose -p <slug> down -v --remove-orphans   # containers + volumes
 
 ## Configurable vs fixed
 
-| Configurable by the project / run | Fixed by Argos |
+| Configurable by the repository / workspace / run | Fixed by Argos |
 | --- | --- |
 | Test runner & its outcome (whichever of pest/phpunit/pint/phpstan is installed) | The gate **command lines** and ordering |
 | Backing services (MySQL / Redis on/off, credentials) | Sidecars on a private per-workspace network |
-| Model, plan / ship mode and budgets of an automatic run | Branch naming, no-Docker-socket workspace, tokens never in the container env |
-| Project secrets / `COMPOSER_AUTH` injected into workspace & demo | Reserved Argos env keys (`REPO_TOKEN`, `APP_KEY`, `APP_URL`, …) can't be overridden |
-| The full demo contract (`commands`, `health`, services, image, entry) | The compose lifecycle (down → up → exec → probe → route) and the override-injected env |
+| Setup steps (`.argos/setup.sh`), branch pattern, model, plan / ship mode and budgets of an automatic task | Worktree layout, database per task, no-Docker-socket workspace, tokens never in the container env |
+| Workspace secrets / `COMPOSER_AUTH` injected into workspace & preview | Reserved Argos env keys (`REPO_TOKEN`, `APP_KEY`, `APP_URL`, …) can't be overridden |
+| The full preview contract (`commands`, `health`, services, image, entry) | The compose lifecycle (down → up → exec → probe → route) and the override-injected env |
 
 ---
 
@@ -262,13 +301,14 @@ docker compose -p <slug> down -v --remove-orphans   # containers + volumes
 | Area | Source |
 | --- | --- |
 | volumes + `docker run` of a workspace | `app/Services/Workspace/WorkspaceContainerManager.php` |
-| provisioning order (image → volumes → sidecars → container → clone) | `app/Services/Workspace/WorkspaceProvisioner.php` |
+| provisioning order (image → volumes → sidecars → container → main clone) | `app/Services/Workspace/WorkspaceProvisioner.php` |
+| task preparation (database, worktree, `.env`, setup) | `app/Services/Workspace/TaskPreparer.php`, `daemon/src/worktrees.ts`, `.tools/docker/worker/workspace/task-setup.sh` |
 | backing-service sidecars | `app/Services/Worker/WorkerSidecarManager.php` |
-| clone, git operations, agent sessions, gates | `daemon/src/{workspaceInit,gitOps,threadSession,gates}.ts` |
+| clone, git operations, agent sessions, file guard, gates | `daemon/src/{workspaceInit,gitOps,taskSession,guard,gates}.ts` |
 | gate script + helpers | `.tools/docker/worker/workspace/run-gates.sh`, `worker/lib/quality.sh` |
 | ship (commit message, push, pull request) | `app/Services/Workspace/WorkspaceShipService.php` |
-| images (toolchain, daemon, editor) | `.tools/docker/worker/Dockerfile.compose`, `.tools/docker/worker/stacks/Dockerfile.php-8.{3,4}`, `.tools/docker/worker/workspace/Dockerfile` |
-| demo deploy (compose lifecycle, boot, health, teardown) | `app/Services/Demo/DemoDeployer.php` |
-| demo override (volume mount, edge network, env) | `app/Services/Demo/DemoComposeBuilder.php` |
-| demo runtime image build | `app/Services/Demo/DemoImageBuilder.php` + `.tools/docker/demo/Dockerfile` |
-| demo contract default / detection | `app/Services/Demo/DemoContractBuilder.php`, `DemoConfigLocator.php`, `resources/stubs/demo/laravel/demo.{yml,compose.yml}` |
+| images (toolchain, daemon, editor) | `.tools/docker/worker/Dockerfile.compose`, `.tools/docker/worker/stacks/Dockerfile.{php-8.5,php-8.4,node-22}`, `.tools/docker/worker/workspace/Dockerfile` |
+| preview deploy (compose lifecycle, boot, health, teardown) | `app/Services/Demo/DemoDeployer.php` |
+| preview override (worktree mount, edge network, env) | `app/Services/Demo/DemoComposeBuilder.php` |
+| preview runtime image build | `app/Services/Demo/DemoImageBuilder.php` + `.tools/docker/demo/Dockerfile` |
+| preview contract default / detection | `app/Services/Demo/DemoContractBuilder.php`, `DemoConfigLocator.php`, `resources/stubs/demo/laravel/demo.{yml,compose.yml}` |

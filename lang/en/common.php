@@ -19,7 +19,7 @@ return [
         'section_auto' => 'Automatic tasks',
         'section_auto_description' => 'Whether issues assigned to you may start tasks on your own Claude subscription without you starting them.',
         'auto_task_consent' => 'Issues assigned to me may start automatically on my subscription',
-        'auto_task_consent_help' => 'When a workspace picks up an issue assigned to you, the task runs as yours and uses your Claude subscription. Off: such issues wait until you start them.',
+        'auto_task_consent_help' => 'When a workspace picks up an issue assigned to you, the task runs as yours and uses your Claude subscription. Off: the task runs as the workspace\'s automation user and you are invited to it.',
         'section_agents' => 'My Claude subscriptions',
         'section_agents_description' => 'Your own agents. Your tasks run on them; shared agents are managed by administrators.',
         'agents_empty' => 'You have no agent of your own yet. Add your Claude subscription to run tasks on it.',

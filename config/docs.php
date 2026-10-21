@@ -40,17 +40,21 @@ return [
             'title' => 'Getting Started',
             'pages' => [
                 ['slug' => 'setup', 'title' => 'Setup', 'file' => 'SETUP.md'],
-                ['slug' => 'prepare-project', 'title' => 'Preparing a Project', 'file' => 'PREPARE-PROJECT.md'],
+                ['slug' => 'prepare-project', 'title' => 'Preparing a Repository', 'file' => 'PREPARE-PROJECT.md'],
             ],
         ],
         [
             'title' => 'Concepts',
             'pages' => [
-                ['slug' => 'projects', 'title' => 'Projects', 'file' => 'PROJECTS.md'],
                 ['slug' => 'workspaces', 'title' => 'Workspaces', 'file' => 'WORKSPACES.md'],
-                ['slug' => 'worker-stacks', 'title' => 'Worker Stacks', 'file' => 'WORKER-STACKS.md'],
+                // Slug kept from the former "Projects" page (deep links); the workspace is the project now.
+                ['slug' => 'projects', 'title' => 'Workspace Settings', 'file' => 'PROJECTS.md'],
+                ['slug' => 'tasks', 'title' => 'Tasks', 'file' => 'TASKS.md'],
+                ['slug' => 'pull-requests', 'title' => 'Pull Requests', 'file' => 'PULL-REQUESTS.md'],
+                ['slug' => 'tickets', 'title' => 'Tickets', 'file' => 'TICKETS.md'],
+                ['slug' => 'worker-stacks', 'title' => 'Stacks and Images', 'file' => 'WORKER-STACKS.md'],
                 ['slug' => 'agents', 'title' => 'Agents', 'file' => 'AGENTS.md'],
-                ['slug' => 'live-demos', 'title' => 'Live Demos', 'file' => 'LIVE-DEMOS.md'],
+                ['slug' => 'live-demos', 'title' => 'Previews', 'file' => 'LIVE-DEMOS.md'],
                 ['slug' => 'byoi', 'title' => 'Custom Worker Image (BYOI)', 'file' => 'BYOI.md'],
             ],
         ],

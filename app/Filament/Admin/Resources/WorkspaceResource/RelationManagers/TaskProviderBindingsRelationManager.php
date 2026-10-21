@@ -60,24 +60,31 @@ class TaskProviderBindingsRelationManager extends RelationManager
 
     /**
      * Own systems need no credentials, mode or filters; they get a signing
-     * secret for the webhook instead.
+     * secret for the webhook instead — generated once on create; editing
+     * keeps it (the receiver verifies signatures with it).
      *
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
-    protected function applyCustom(array $data): array
+    protected function applyCustom(array $data, bool $creating = false): array
     {
         if (($data['kind'] ?? null) !== TaskProviderKind::Custom->value) {
             return $data;
         }
 
-        return [
+        $data = [
             ...$data,
             'mode' => TaskProviderMode::Webhook->value,
             'auth_method' => AuthMethod::Pat->value,
-            'webhook_secret' => $data['webhook_secret'] ?? bin2hex(random_bytes(24)),
             'sync_status' => TaskProviderSyncStatus::Active->value,
         ];
+        if ($creating) {
+            $data['webhook_secret'] = bin2hex(random_bytes(24));
+        } else {
+            unset($data['webhook_secret']);
+        }
+
+        return $data;
     }
 
     public function form(Schema $schema): Schema
@@ -357,7 +364,7 @@ class TaskProviderBindingsRelationManager extends RelationManager
             ])
             ->headerActions([
                 CreateAction::make()
-                    ->mutateDataUsing(fn (array $data): array => $this->applyCustom($this->applyCredentialRef($data))),
+                    ->mutateDataUsing(fn (array $data): array => $this->applyCustom($this->applyCredentialRef($data), creating: true)),
             ])
             ->actions([
                 EditAction::make()

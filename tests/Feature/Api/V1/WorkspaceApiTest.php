@@ -13,6 +13,7 @@ use App\Enums\WorkspaceStatus;
 use App\Jobs\SendTicketWebhookJob;
 use App\Jobs\Workspace\AdvanceAutoTaskJob;
 use App\Jobs\Workspace\ProvisionWorkspaceJob;
+use App\Jobs\Workspace\SetUpWorkspaceJob;
 use App\Models\AgentCredential;
 use App\Models\ApiClient;
 use App\Models\Task;
@@ -217,5 +218,39 @@ class WorkspaceApiTest extends TestCase
             ->assertStatus(202)->assertJsonPath('data.auto.state', 'queued')->assertJsonPath('data.auto.plan', 'off')
             ->assertJsonPath('data.base_branch', 'develop');
         $this->assertSame(2, Task::query()->count());
+    }
+
+    public function test_an_admin_client_creates_a_workspace(): void
+    {
+        Bus::fake([SetUpWorkspaceJob::class]);
+        $admin = User::factory()->create(['is_admin' => true]);
+        $payload = ['name' => 'Shop', 'repo_url' => 'https://github.com/acme/shop', 'platform' => 'github', 'default_branch' => 'main', 'auth_method' => 'pat', 'token' => 'test-token'];
+
+        $this->withToken($this->clientToken(['workspaces:write'], $admin))->postJson('/api/v1/workspaces', $payload)
+            ->assertCreated()->assertJsonPath('data.name', 'Shop')->assertJsonPath('data.repository', 'acme/shop');
+        Bus::assertDispatched(SetUpWorkspaceJob::class);
+
+        // Not an Argos admin, a read-only token, a workspace's own token: no.
+        $this->app['auth']->forgetGuards();
+        $this->withToken($this->clientToken(['workspaces:write']))->postJson('/api/v1/workspaces', $payload)->assertForbidden();
+        $this->app['auth']->forgetGuards();
+        $this->withToken($this->clientToken(['workspaces:read'], $admin))->postJson('/api/v1/workspaces', $payload)->assertForbidden();
+        $this->app['auth']->forgetGuards();
+        $this->withToken($this->workspace->createToken('ci', ['workspaces:write'])->plainTextToken)->postJson('/api/v1/workspaces', $payload)->assertForbidden();
+        $this->app['auth']->forgetGuards();
+        $this->withToken($this->clientToken(['workspaces:write'], $admin))->postJson('/api/v1/workspaces', ['name' => 'x'])->assertUnprocessable();
+    }
+
+    public function test_a_task_can_ask_for_auto_merge_and_reports_its_pull_request(): void
+    {
+        $response = $this->withToken($this->clientToken())->postJson("/api/v1/workspaces/{$this->workspace->id}/tasks", ['prompt' => 'Fix the login', 'auto_merge' => true])
+            ->assertStatus(202)->assertJsonPath('data.auto_merge', true)->assertJsonPath('data.kind', 'task');
+        $task = Task::query()->findOrFail($response->json('data.id'));
+        $task->forceFill(['pr_url' => 'https://x/1', 'pr_number' => 1, 'pr_state' => 'open', 'pr_checks' => ['state' => 'failure', 'url' => null, 'failed' => []], 'pr_review_state' => 'approved', 'pr_conflicts' => true])->save();
+
+        $this->withToken($this->clientToken())->getJson("/api/v1/tasks/{$task->id}")
+            ->assertJsonPath('data.pull_request.checks', 'failure')
+            ->assertJsonPath('data.pull_request.review', 'approved')
+            ->assertJsonPath('data.pull_request.conflicts', true);
     }
 }

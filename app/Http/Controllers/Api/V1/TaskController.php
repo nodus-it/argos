@@ -62,6 +62,7 @@ class TaskController extends Controller
                 'agent_id' => $request->input('agent_id'),
                 'model' => $request->input('model'),
                 'issue' => $issue,
+                'auto_merge' => $request->boolean('auto_merge'),
             ], $request->settings(), TaskOrigin::Api);
 
             return (new TaskResource($task->load(['workspace', 'owner'])))->response()->setStatusCode(202);

@@ -35,7 +35,7 @@ return [
 
     'fields' => [
         'automation_user' => 'Automatik-Nutzer',
-        'automation_user_helper' => 'Automatische Läufe über Tokens dieses Projekts und Issue-Trigger handeln für diese Person: Ihr Claude-Agent arbeitet, und sie besitzt den Workspace.',
+        'automation_user_helper' => 'Automatische Aufgaben über Tokens dieses Workspaces und Issue-Trigger handeln für diese Person: Sie besitzt die Aufgabe, und sie läuft auf ihrem Claude-Abo.',
         'auto_plan' => 'Plan',
         'auto_ship' => 'Wenn fertig',
         'auto_max_fix_rounds' => 'Gate-Fix-Runden',
@@ -55,9 +55,9 @@ return [
         'worker_source_standard' => 'Registrierter Stack',
         'worker_source_byoi' => 'Eigenes Dockerfile im Repo (BYOI)',
         'worker_byoi_hint_heading' => 'Repo definiert sein eigenes Image',
-        'worker_byoi_hint_body' => 'Argos liest .argos/worker.dockerfile aus dem Repo (am Basis-Branch) als Stack-Basis und schichtet Agent + Worker-Code automatisch darüber. Die nötigen Tools (bash, git, jq, …) müssen per FROM/RUN ins Image — kein COPY aus dem Repo (der Build-Context ist nicht das Repo).',
+        'worker_byoi_hint_body' => 'Argos liest .argos/worker.dockerfile aus dem Repo (Default-Branch oder ein getesteter Einrichtungs-Branch bis zu dessen Merge) als Stack-Basis und schichtet Agent + Worker-Code automatisch darüber. Die nötigen Tools (bash, git, jq, …) müssen per FROM/RUN ins Image — kein COPY aus dem Repo (der Build-Context ist nicht das Repo).',
         'live_demo_label' => 'Live-Demo aktivieren',
-        'live_demo_helper' => 'Workspaces können eine Live-Vorschau unter eigener Subdomain starten.',
+        'live_demo_helper' => 'Aufgaben können eine Live-Vorschau unter eigener Subdomain starten.',
         'live_demo_hint_heading' => 'Repo muss den Demo-Vertrag mitbringen',
         'live_demo_hint_body' => 'Erfordert .argos/demo.compose.yml (Laufzeit) und .argos/demo.yml (Einstellungen: Entry-Service/Port, Commands) am Basis-Branch. Fehlen sie, schlägt der Demo-Aufbau mit klarer Meldung fehl.',
         'worker_stack_label' => 'Worker-Stack',

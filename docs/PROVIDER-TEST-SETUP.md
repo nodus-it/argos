@@ -81,11 +81,11 @@ php artisan test:providers --seed-only
 
 Flow:
 
-1. **Phase A** seeds three `[contract-test] <provider>-pat` RepoProfiles into the local Argos DB
+1. **Phase A** seeds three `[contract-test] <provider>-pat` workspaces into the local Argos DB
    with the tokens from `.env.testing.external`.
 2. **Phase B** prints three OAuth connect URLs (`/auth/{provider}/redirect`) and polls the
    `connected_accounts` table until you have connected the accounts in the browser.
-3. **Phase C** seeds three `[contract-test] <provider>-oauth` RepoProfiles with an FK to the
+3. **Phase C** seeds three `[contract-test] <provider>-oauth` workspaces with an FK to the
    fresh `ConnectedAccount` entries.
 4. **Phase D** runs `phpunit.external.xml` twice — once with the PAT ENVs, once with the
    DB-resident OAuth tokens, which the command pulls from `connected_accounts.token` and passes

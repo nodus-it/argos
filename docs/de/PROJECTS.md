@@ -1,319 +1,213 @@
-# Projekte
+# Workspace-Einstellungen
 
-Ein **Projekt** in Argos ist ein konfiguriertes Git-Repository — die Einheit,
-an der Argos arbeitet. Bevor Sie Argos Arbeit übergeben können, legen Sie ein
-Projekt an, das festlegt, *welches* Repository verwendet wird, *wie*
-authentifiziert wird, *welche* Umgebung der Code zum Bauen und Testen benötigt
-und *welche* Standardwerte für automatische Läufe gelten. Jeder Workspace, den
-Sie öffnen, gehört zu genau einem Projekt und erbt diese Einstellungen.
+Ein Workspace ist das Projekt in Argos: das Repository plus alles, was es
+braucht — Zugang, Default-Branch, Stack, Services, Secrets, Preview, Grenzen,
+Automatik, Integrationen und Mitglieder. Diese Seite beschreibt jede
+Einstellung. Was ein Workspace ist und wer was darf, steht unter
+[Workspaces](WORKSPACES.md); die Repository-Seite (`.argos/`, die
+Einrichtungs-Aufgabe) unter [Ein Repository vorbereiten](PREPARE-PROJECT.md).
 
-Diese Anleitung erläutert jede Einstellung im Projektformular — was sie
-bedeutet, warum es sie gibt und wie Sie sie ausfüllen. Sie richtet sich an die
-Person, die ein Projekt anlegt und verwaltet, nicht an die Entwicklerin oder
-den Entwickler, die das Repository selbst vorbereiten; für den
-repository-seitigen Vertrag (`.argos/`-Dateien, das Quality Gate) siehe
-[PREPARE-PROJECT.md](PREPARE-PROJECT.md).
+**Wo:** Workspace-Admins (und Argos-Admins) öffnen die
+**Workspace-Einstellungen** über den Kopf des Workspaces, unter
+`/w/workspaces/{id}/settings`. Jeder Tab hat seinen eigenen
+**Speichern**-Button. Argos-Admins finden dasselbe Formular im Admin-Panel
+unter **Workspaces** (mit den Issue-Trackern und API-Tokens unter dem
+Formular). Neue Workspaces legen nur Argos-Admins an — siehe
+[Einen Workspace anlegen](WORKSPACES.md#einen-workspace-anlegen).
 
-Projekte finden Sie unter **Configuration → Projects** im Admin-Panel
-(`${APP_URL}/admin`).
-
-- [Was ein Projekt ist](#what-a-project-is)
-- [Ein Projekt anlegen und bearbeiten](#creating-and-editing-a-project)
-- [Tab „General“](#general-tab)
-  - [Plattform](#platform)
-  - [Authentifizierung](#authentication)
-  - [Allgemeine Einstellungen](#general-settings)
-  - [Repository](#repository)
-- [Tab „Worker“](#worker-tab)
-  - [Worker (Stack & Agent)](#worker-stack--agent)
-  - [Backing Services für Tests](#backing-services-for-tests)
+- [Anlegen: Plattform, Zugang, Repository](#anlegen-plattform-zugang-repository)
+- [Allgemein](#allgemein)
+- [Umgebung](#umgebung)
+  - [Worker: Image-Quelle und Stack](#worker-image-quelle-und-stack)
+  - [Backing Services](#backing-services)
   - [Live-Demo](#live-demo)
-  - [Umgebung & Secrets](#environment--secrets)
-- [Tab „Automation“](#automation-tab)
-- [Pflicht vs. optional — auf einen Blick](#required-vs-optional--at-a-glance)
+  - [Environment-Variablen und Platzhalter](#environment-variablen-und-platzhalter)
+  - [Einrichtung](#einrichtung)
+- [Ressourcen](#ressourcen)
+- [Integrationen](#integrationen)
+- [Automatik](#automatik)
+- [Mitglieder](#mitglieder)
 
-## Was ein Projekt ist
+## Anlegen: Plattform, Zugang, Repository
 
-Ein Projekt (intern ein `RepoProfile`) bündelt alles, was Argos braucht, um an
-einem Repository zu arbeiten:
+Diese Felder werden beim Anlegen des Workspaces gesetzt. Auf der
+Einstellungsseite in `/w` steht das Repository danach fest (es zu ändern würde
+jeden Aufgaben-Branch verwaisen lassen); das Bearbeitungsformular im
+Admin-Panel zeigt Plattform, Zugang und Repository weiterhin — nutze es, um
+einen abgelaufenen Token zu ersetzen, nicht um den Workspace auf ein anderes
+Repository zu richten.
 
-- Die **Repository-Adresse** und den **Default-Branch**, auf dem neue Arbeit
-  aufsetzt.
-- Die **Zugangsdaten**, mit denen Argos klont, pusht und Pull-/Merge-Requests
-  eröffnet.
-- Die **Worker-Konfiguration** — das Basis-Image und der Agent, aus denen das
-  Workspace-Image gebaut wird.
-- Die **Umgebung und Secrets**, die in Workspaces (und die Live-Vorschau)
-  eingespeist werden, damit Abhängigkeiten installiert werden und Tests
-  durchlaufen.
-- Optionale **Backing Services** (MySQL / Redis), die neben jedem Workspace
-  laufen.
-- Ob Workspaces eine **Live-Vorschau** starten dürfen.
-- Die **Automatisierungs**-Standardwerte für automatische Läufe (Auto-Threads)
-  und die Person, für die sie handeln.
+- **Plattform** — GitHub, GitLab (einschließlich selbst gehosteter Instanzen)
+  oder Bitbucket. Bis du eine auswählst, bleibt der Rest des Formulars
+  gesperrt. Ein Hinweis verlinkt die Plattform-Anleitung
+  ([GitHub](SETUP-GITHUB.md), [GitLab](SETUP-GITLAB.md),
+  [Bitbucket](SETUP-BITBUCKET.md)).
+- **Authentifizierung** — erscheint nur, wenn du für die Plattform ein
+  verbundenes Konto hast:
+  - **Personal Access Token (PAT)** — wird in den Workspace eingefügt und
+    verschlüsselt gespeichert. GitHub: Scope `repo`; GitLab: `api` und
+    `write_repository`; Bitbucket: ein Repository Access Token. Siehe
+    [Zugangs-Tokens](CREDENTIALS.md).
+  - **OAuth (verbundenes Konto)** — verwendet ein Git-Konto wieder, das du
+    einmal verbunden hast; Tokens werden automatisch erneuert. Siehe
+    [OAuth](OAUTH.md).
+- **Repository** — mit OAuth eine durchsuchbare Liste der Repositorys des
+  Kontos und ihrer Branches (der Default-Branch ist vorausgewählt); sonst die
+  Clone-URL (z. B. `https://github.com/owner/repo`, abschließendes `/` und
+  `.git` werden entfernt) plus der Token, danach lädt die Branch-Liste.
+- **Name** — wird mit dem Kurznamen des Repositorys vorausgefüllt, wenn du
+  eines auswählst.
 
-Ein Projekt hat viele **Workspaces**. Ein neuer Workspace klont das Repository
-des Projekts auf dessen Default-Branch (oder einem Branch Ihrer Wahl), läuft in
-einem Image, das aus der Worker-Konfiguration des Projekts gebaut wird, und
-authentifiziert sich mit den Zugangsdaten des Projekts. Siehe
-[WORKSPACES.md](WORKSPACES.md).
+Diesen Zugang nutzt Argos, um für **jede** Aufgabe des Workspaces zu klonen,
+Aufgaben-Branches zu pushen und Pull Requests zu öffnen.
 
-Ein Projekt hat außerdem auf seiner Bearbeitungsseite zwei zugehörige Listen:
-seine **Issue-Trigger-Bindungen** (siehe
-[SETUP-TASK-PROVIDERS.md](SETUP-TASK-PROVIDERS.md)) und seine **API-Tokens**
-(projektbezogene Sanctum-Tokens, z. B. für CI). Die Projektliste zeigt, wie
-viele Workspaces jedes Projekt hat.
+## Allgemein
 
-## Ein Projekt anlegen und bearbeiten
+| Feld | Bedeutung |
+|---|---|
+| Name | Anzeigename des Workspaces. |
+| Repository | Adresse und Plattform, schreibgeschützt. |
+| Default Branch | Neue Aufgaben zweigen davon ab, und ihre Pull Requests zielen darauf (sofern eine Aufgabe keine andere Basis wählt). |
+| Branch-Muster | Wie Aufgaben-Branches heißen. Platzhalter: `{ticket}` (der Ticket-Schlüssel, oder `argos` ohne Ticket) und `{title}` (der Titel der Aufgabe als Slug). Leer: `{ticket}-{title}` mit Ticket, `argos/{title}` ohne. Erlaubte Zeichen: Buchstaben, Ziffern, `. _ / - { }`; max. 60. Ein vergebener Name bekommt eine Nummer. |
 
-Öffnen Sie **Configuration → Projects** und wählen Sie **New project**, oder
-klicken Sie auf eine bestehende Projektzeile, um sie zu bearbeiten. Es gibt
-keine separate schreibgeschützte Detailansicht — die Zeile öffnet direkt das
-Bearbeitungsformular, in dem auch die zugehörigen Listen gerendert werden.
+## Umgebung
 
-Das Formular hat drei Tabs, **General**, **Worker** und **Automation**. Die allererste
-Entscheidung ist die **Plattform**; bis Sie eine auswählen, bleibt der Rest des
-Formulars gesperrt. Sobald eine Plattform gewählt ist, erscheinen die übrigen
-Abschnitte, angepasst an diese Plattform und daran, welche Konten Sie verbunden
-haben.
+### Worker: Image-Quelle und Stack
 
-## Tab „General“
+- **Image-Quelle**
+  - **Registrierter Stack** — einer der eingebauten Stacks.
+  - **Eigenes Dockerfile im Repo (BYOI)** — Argos baut
+    `.argos/worker.dockerfile` aus dem Repository (an der Einrichtungs-Ref:
+    dem Default-Branch oder einem getesteten, nicht gemergten
+    Einrichtungs-Branch). Siehe [Eigenes Worker-Image](BYOI.md).
+- **Worker-Stack** — *PHP 8.5*, *PHP 8.4* oder *Node 22* (bei BYOI
+  ausgeblendet). Leer: der Standard der Installation (`ARGOS_DEFAULT_STACK`,
+  `php-8.5`). Argos setzt ihn beim Anlegen des Workspaces anhand von
+  `composer.json` / `package.json` vor. Siehe
+  [Stacks und Images](WORKER-STACKS.md).
 
-### Plattform
+Ein bestandener Einrichtungstest, der eine `.argos/worker.dockerfile` gefunden
+hat, stellt die Image-Quelle von selbst auf BYOI um.
 
-Wählen Sie die Git-Plattform, auf der das Repository liegt:
+### Backing Services
 
-- **GitHub**
-- **GitLab** (einschließlich selbst gehosteter Instanzen)
-- **Bitbucket**
+*Backing-Services für Tests* startet Sidecars neben dem Workspace-Container in
+einem privaten Netz; ihre Daten bleiben erhalten, bis der Workspace gelöscht
+wird:
 
-Dies ist der Türöffner für das gesamte Formular. Die Plattform bestimmt, welche
-Authentifizierungsoptionen Sie erhalten, wie sich die Repository-Auswahl
-verhält und wie die Clone-URL gebildet wird. Sobald Sie eine Plattform wählen,
-erscheint ein kurzer Einrichtungshinweis mit einem Link zur passenden
-Plattform-Anleitung ([SETUP-GITHUB.md](SETUP-GITHUB.md),
-[SETUP-GITLAB.md](SETUP-GITLAB.md), [SETUP-BITBUCKET.md](SETUP-BITBUCKET.md)).
+| Wert | Service | Erreichbar unter |
+|---|---|---|
+| `mysql` | MySQL / MariaDB (`mariadb:11`) | Host `db`, Port `3306` |
+| `redis` | Redis (`redis:7-alpine`) | Host `redis`, Port `6379` |
 
-Für **selbst gehostetes GitLab** wird die Instanz über das verbundene Konto
-(OAuth) oder über `GITLAB_INSTANCE_URL` für manuelle Einrichtungen
-berücksichtigt — siehe [SETUP-GITLAB.md](SETUP-GITLAB.md).
+Jede Aufgabe bekommt ihre eigene MySQL-Datenbank (`task_<slug>`) und ihr
+eigenes Redis-Präfix; Argos schreibt sie in die `.env` und die Umgebung der
+Aufgabe (`DB_HOST`, `DB_DATABASE`, …, `REDIS_HOST`, `REDIS_PREFIX`,
+`CACHE_PREFIX`). Projekte mit den Standard-Laravel-Namen brauchen nichts
+weiter.
 
-### Authentifizierung
-
-Argos benötigt Zugangsdaten, um das Repository zu klonen und Branches zu
-pushen / PRs zu eröffnen. Es gibt zwei Methoden:
-
-- **Personal Access Token (PAT)** — Sie fügen einen Token direkt in das Projekt
-  ein. Der Token wird verschlüsselt gespeichert. Für GitHub genügt ein Token
-  mit dem Scope `repo`; GitLab benötigt `api` und `write_repository`; Bitbucket
-  verwendet einen gescopten **Repository Access Token** (direkt einfügen, ohne
-  Benutzernamen-Präfix). Siehe die Plattform-Anleitungen oben und
-  [CREDENTIALS.md](CREDENTIALS.md).
-- **OAuth (verbundenes Konto)** — Argos verwendet ein Git-Konto, das Sie einmal
-  zentral verbunden haben, und nutzt es projektübergreifend wieder.
-  OAuth-Tokens werden automatisch erneuert, bevor sie ablaufen. Siehe
-  [OAUTH.md](OAUTH.md).
-
-Der Abschnitt **Authentication**, in dem Sie die Methode und (bei OAuth) das
-verbundene Konto auswählen, erscheint nur, wenn Sie für die gewählte Plattform
-ein verbundenes Konto haben. Haben Sie kein verbundenes Konto, gibt es nichts
-auszuwählen — das Projekt verwendet dann einfach einen PAT, den Sie weiter
-unten im Abschnitt „Repository“ eingeben.
-
-Die Wahl von OAuth löscht jeden PAT und bindet das Projekt an das ausgewählte
-Konto; ein Wechsel zurück zu PAT löscht die Kontobindung. Bei GitHub und GitLab
-passt sich die Bezeichnung des OAuth-Kontos an die Plattform an; Bitbucket hat
-seine eigene OAuth-Option.
-
-### Allgemeine Einstellungen
-
-Diese erscheinen, sobald eine Plattform gewählt ist:
-
-- **Project Name** (Pflicht) — der Anzeigename im Panel. Wenn Sie ein
-  Repository über die OAuth-Auswahl wählen und den Namen leer lassen, füllt
-  Argos ihn mit dem Kurznamen des Repositorys vor.
-
-### Repository
-
-Wie Sie auf das Repository verweisen, hängt davon ab, ob Sie auf dem Pfad
-**OAuth (verbunden)** oder dem **manuellen** Pfad sind:
-
-**Verbundener Pfad** (Plattform + OAuth gewählt, mit passendem Konto):
-
-- **Repo URL** — ein durchsuchbares Dropdown der Repositorys, die das verbundene
-  Konto sehen kann. Die Auswahl eines Repositorys füllt die Clone-URL für Sie
-  aus (und den Namen, falls leer).
-- **Default Branch** — ein durchsuchbares Dropdown der Branches dieses
-  Repositorys; Argos wählt den von der API gemeldeten Default-Branch des
-  Repositorys vor.
-
-**Manueller Pfad** (PAT oder jede Plattform ohne verbundenes Konto):
-
-- **Repo URL** (Pflicht) — die vollständige Clone-URL, z. B.
-  `https://github.com/owner/repo`. Abschließende Schrägstriche und `.git` werden
-  beim Speichern normalisiert.
-- **Token (PAT)** (Pflicht) — der unter [Authentifizierung](#authentication)
-  beschriebene Access-Token. Verschlüsselt gespeichert; maskiert angezeigt.
-- **Default Branch** (Pflicht) — sobald eine gültige URL und ein gültiger Token
-  vorliegen, fragt Argos die Plattform ab und bietet die Branch-Liste als
-  durchsuchbares Dropdown an.
-
-Der **Default-Branch** ist der Branch, von dem Workspaces in diesem Projekt
-abzweigen (sofern Sie keinen anderen Basis-Branch wählen) und auf den sie mit
-ihrem Pull Request zielen.
-
-## Tab „Worker“
-
-### Worker (Stack & Agent)
-
-Dieser Abschnitt definiert das Image, in dem die Workspaces des Projekts
-laufen.
-
-- **Image source** — woher das Basis-Image des Workers stammt:
-  - **Registered stack** — verwenden Sie einen der in Argos konfigurierten
-    Worker-Stacks (ein Basis-Image mit einer PHP-Version und Werkzeugen). Siehe
-    [WORKER-STACKS.md](WORKER-STACKS.md).
-  - **Own Dockerfile in the repo (BYOI)** — Argos liest
-    `.argos/worker.dockerfile` aus Ihrem Repository (am Base-Branch) als Basis
-    und legt den Agent und die Workspace-Werkzeuge darüber. Benötigte Werkzeuge müssen
-    über `FROM`/`RUN` hereinkommen; kein `COPY` aus dem Repo (der Build-Kontext
-    ist nicht das Repo). Siehe [BYOI.md](BYOI.md).
-- **Worker Stack** — welcher registrierte Stack verwendet wird (nur bei der
-  Quelle *Registered stack* sichtbar). Leer lassen, um den
-  Argos-Standard-Stack zu verwenden.
-- **Agent** — welchen Coding-Agent das Worker-Image installiert. Claude Code ist
-  derzeit der einzige Agent; lassen Sie das Feld leer. Siehe
-  [AGENTS.md](AGENTS.md).
-
-### Backing Services für Tests
-
-Manche Test-Suites brauchen eine Datenbank oder einen Cache. Aktivieren Sie die
-Services, die Ihre Tests benötigen, und Argos fährt sie **neben jedem
-Workspace** hoch — im eigenen privaten Netzwerk des Workspaces, mit
-eingespeisten Zugangsdaten. Ihre Daten liegen in Volumes des Workspaces, sodass
-ein gestoppter und neu gestarteter Workspace seine Datenbank behält; beim
-Löschen des Workspaces werden sie entfernt:
-
-- **MySQL / MariaDB** — erreichbar unter Host `db`, Port `3306`.
-- **Redis** — erreichbar unter Host `redis`, Port `6379`.
-
-Projekte, die standardmäßige Laravel-Verbindungsnamen verwenden (`DB_HOST`,
-`DB_DATABASE`, `REDIS_HOST`, …), brauchen nichts weiter — Argos speist diese
-automatisch ein. Für abweichende Namen verdrahten Sie sie mit den Platzhaltern,
-die unter [Umgebung & Secrets](#environment--secrets) beschrieben sind.
-
-Wenn MySQL aktiviert ist, können Sie dessen Zugangsdaten überschreiben, damit
-sie zu dem passen, was Ihr Projekt fest verdrahtet hat:
-
-- **MySQL database** (Standard `argos`)
-- **MySQL user** (Standard `argos`)
-- **MySQL password** (Standard `argos`)
-
-Lassen Sie sie leer, um die Argos-Standardwerte zu verwenden. Host und Port sind
-fest und nicht konfigurierbar. Redis hat keine konfigurierbaren Zugangsdaten.
-
-Diese Services bedienen sowohl den Workspace (einschließlich seiner Quality
-Gates) als auch die Live-Vorschau, sodass beide aus derselben Definition
-hochfahren.
+Mit aktiviertem MySQL kannst du **MySQL-Datenbank**, **MySQL-User** und
+**MySQL-Passwort** setzen (jeweils Standard `argos`) — die Zugangsdaten, mit
+denen der Sidecar angelegt wird; sie befüllen auch die mitgelieferte
+Preview-Datenbank. Host und Port sind fest. Redis hat keine Zugangsdaten.
 
 ### Live-Demo
 
-- **Enable live demo** — wenn aktiviert, können Workspaces dieses Projekts eine
-  Live-Vorschau auf einer eigenen Subdomain starten.
+**Live-Demo aktivieren** erlaubt den Aufgaben dieses Workspaces, eine
+[Preview](LIVE-DEMOS.md) auf einer eigenen Subdomain zu starten. Sie nutzt
+`.argos/demo.compose.yml` + `.argos/demo.yml` aus dem Repository oder den
+mitgelieferten Laravel-Vertrag, wenn das Repository keine davon hat. Siehe
+[Ein Repository vorbereiten → Live-Preview](PREPARE-PROJECT.md#live-preview).
 
-Dies setzt voraus, dass Ihr Repository den Demo-Vertrag am Base-Branch
-mitliefert: `.argos/demo.compose.yml` (die Laufzeit) und `.argos/demo.yml`
-(Einstellungen wie Entry-Service, Port und Befehle). Fehlen sie, schlägt der
-Demo-Build mit einer klaren Meldung fehl. Siehe [LIVE-DEMOS.md](LIVE-DEMOS.md)
-und [PREPARE-PROJECT.md](PREPARE-PROJECT.md).
+### Environment-Variablen und Platzhalter
 
-### Umgebung & Secrets
+*Environment & Secrets* — **verschlüsselt** gespeichert, in den
+Workspace-Container (Einrichtungsschritte, Claudes Befehle, Gates) und in
+Previews eingespeist:
 
-Projektspezifische Secrets speichert Argos **verschlüsselt** und speist sie
-sowohl in den Workspace (Dependency-Install, Befehle von Claude, Quality Gates)
-als auch in die Live-Vorschau ein. Zwei Arten:
+- **Private Composer-Registries** — **Host** (Pflicht, z. B.
+  `packages.filamentphp.com`), **Username** (Standard `token`), **Token**
+  (Pflicht). Argos baut daraus einen `COMPOSER_AUTH`-HTTP-Basic-Blob.
+- **Weitere Environment-Variablen** — **Name** (Pflicht) und **Wert**.
 
-**Private Composer-Registries** — auth-geschützte Composer-Quellen (Private
-Packagist, Satis, Flux, Scramble, …). Für jede fügen Sie hinzu:
+Regeln:
 
-- **Host** (Pflicht) — z. B. `packages.filamentphp.com`
-- **Username** — optional; standardmäßig `token`, wenn leer gelassen
-- **Token** (Pflicht) — das Passwort/der Token der Registry
+- Ein von Hand gesetztes `COMPOSER_AUTH` **überschreibt** das generierte.
+- Argos-eigene Variablen (`REPO_TOKEN`, `APP_KEY`, `APP_URL`, die
+  Agent-Zugangsdaten, die Daemon-Verdrahtung, …) werden entfernt — ein Secret
+  überschreibt nie die Verdrahtung von Argos.
+- Mit aktivierten Backing Services dürfen Werte Platzhalter nutzen, die Argos
+  zur Laufzeit auflöst (das Formular listet die verfügbaren):
+  - MySQL: `${mysql.host}`, `${mysql.port}`, `${mysql.database}`,
+    `${mysql.username}`, `${mysql.password}`
+  - Redis: `${redis.host}`, `${redis.port}`
 
-Argos setzt diese zu einem einzigen `COMPOSER_AUTH`-HTTP-Basic-Blob zusammen,
-damit `composer install` die privaten Registries sowohl im Workspace als auch in
-der Vorschau erreicht.
+  Beispiel: `MY_DB_DSN=mysql://${mysql.username}:${mysql.password}@${mysql.host}/${mysql.database}`.
 
-**Zusätzliche Umgebungsvariablen** — beliebige Name/Wert-Paare (zusätzliche
-API-Keys, eigene Datenbanknamen usw.). Für jede:
+### Einrichtung
 
-- **Name** (Pflicht) — z. B. `MEILISEARCH_KEY`
-- **Value** — verschlüsselt gespeichert
+Nur auf der Einstellungsseite, schreibgeschützt plus Aktionen:
 
-Einige wichtige Regeln:
+- **Stand der Einrichtung** (*Einrichtung nötig*, *Wird eingerichtet*, *Wird
+  getestet*, *Eingerichtet*, *Test fehlgeschlagen*, *Braucht ein Claude-Abo*)
+  und, solange eine getestete Einrichtung nicht gemergt ist, der Branch, aus
+  dem sie stammt.
+- **Letzter Test** — jeder Schritt des letzten **Einrichtung testen** mit
+  ✓ / ✗.
+- **Aus dem Repository** — ob der Preview-Vertrag (`.argos/demo.yml`) und die
+  Einrichtungsschritte (`.argos/setup.sh`) *im Repository* liegen, vom
+  *Laravel-Standard* kommen, *fehlen* oder *nicht lesbar* sind.
+- **Image** — Zustand und Alter des aktuellen Image-Builds, sein **Build-Log**
+  und **Neu bauen** (der Workspace nutzt das neue Image ab seinem nächsten
+  Start).
+- **Einrichtung überarbeiten** / **Einrichtungs-Aufgabe öffnen** — siehe
+  [Die Einrichtungs-Aufgabe](PREPARE-PROJECT.md#die-einrichtungs-aufgabe).
 
-- Eine hier von Hand geschriebene `COMPOSER_AUTH`-Variable **überschreibt** die
-  aus den oben genannten Registries generierte — das ist das bewusste
-  Schlupfloch.
-- Argos-eigene Variablen können nicht überschrieben werden. Namen, die es selbst
-  setzt (z. B. `REPO_TOKEN`, `APP_KEY`, `APP_URL`, die Agent-Zugangsdaten, die
-  Verdrahtung des Workspace-Daemons, …), werden aus Ihrer Liste entfernt, sodass ein
-  Projekt-Secret niemals die eigene Verdrahtung von Argos überschreiben kann.
+## Ressourcen
 
-**Platzhalter für Backing Services.** Wenn Sie oben MySQL oder Redis aktiviert
-haben, können Sie deren aufgelöste Koordinaten in jedem Wert hier referenzieren,
-und Argos ersetzt zur Laufzeit den echten internen Host bzw. die echten
-Zugangsdaten. Das Formular zeigt die genauen Platzhalter, die für die von Ihnen
-aktivierten Services verfügbar sind. Sie lauten:
+| Feld | Standard | Bedeutung |
+|---|---|---|
+| Parallele Sessions | `3` | Wie viele Aufgaben gleichzeitig mit Claude sprechen dürfen (1–20). Weitere Nachrichten warten in der [Session-Warteschlange](TASKS.md#session-warteschlange). |
+| Parallele Previews | `3` | Gleichzeitig laufende Previews (1–20); eine weitere stoppt die älteste. |
+| CPU-Grenze (Kerne) | `ARGOS_WORKSPACE_CPUS` | Für den Workspace-Container, 0,25–64. |
+| Arbeitsspeicher-Grenze (MB) | `ARGOS_WORKSPACE_MEMORY` | Für den Workspace-Container, 512–262144. |
+| Erledigte Aufgaben aufräumen nach (Tagen) | `14` | Preview, Worktree und Datenbank einer erledigten oder abgebrochenen Aufgabe werden nach so vielen Tagen entfernt (1–365); Unterhaltung, Remote-Branch und Pull Request bleiben. |
 
-- MySQL: `${mysql.host}`, `${mysql.port}`, `${mysql.database}`,
-  `${mysql.username}`, `${mysql.password}`
-- Redis: `${redis.host}`, `${redis.port}`
+CPU und Arbeitsspeicher gelten ab dem nächsten Container-Start.
 
-Damit kann ein Projekt mit abweichenden Env-Namen zu den Sidecars überbrücken,
-ohne interne Hosts oder Zugangsdaten fest zu verdrahten — setzen Sie
-beispielsweise
-`MY_DB_DSN=mysql://${mysql.username}:${mysql.password}@${mysql.host}/${mysql.database}`.
+## Integrationen
 
-## Tab „Automation“
+- **Issue-Tracker** — GitHub-, GitLab- und Linear-Projekte, die dieser
+  Workspace beobachtet, und eigene Ticket-Systeme. Siehe
+  [Issue-Trigger](SETUP-TASK-PROVIDERS.md) und [Tickets](TICKETS.md).
+- **API-Tokens** — Sanctum-Tokens, die an diesen Workspace gebunden sind
+  (z. B. für CI oder ein eigenes Ticket-System). Sie erreichen nur diesen
+  Workspace, handeln als dessen Automatik-Nutzer und können
+  `workspaces:read`, `tasks:read` und `tasks:write` tragen (nie
+  `workspaces:write`). Der Token wird einmal angezeigt. Siehe
+  [REST-API](REST-API.md).
 
-Standardwerte für [Auto-Threads](WORKSPACES.md#auto-threads) — automatische
-Läufe, gestartet in der Oberfläche, über die [REST-API](REST-API.md),
-[MCP](SETUP-MCP.md) oder einen [Issue-Trigger](SETUP-TASK-PROVIDERS.md). Ein
-einzelner Lauf kann sie überschreiben; leere Felder verwenden die Standardwerte
-der Installation aus der [Konfiguration](CONFIGURATION.md#auto-threads).
+## Automatik
 
-- **Automation user** — die Person, für die automatische Läufe aus den
-  API-Tokens und Issue-Triggern dieses Projekts handeln: Ihr Claude-Agent
-  erledigt die Arbeit, und ihr gehört der Workspace. Ohne sie starten
-  Issue-Trigger nichts (die Bindung zeigt den Fehler).
-- **Plan** — *aus* (sofort umsetzen), *automatisch* (planen, dann weitermachen)
-  oder *auf Freigabe warten* (planen, dann anhalten, bis jemand freigibt).
-- **When done** — einen Pull Request, einen Draft-Pull-Request öffnen oder nur
-  committen und pushen.
-- **Gate fix rounds** — wie oft Claude versuchen darf, fehlschlagende Quality
-  Gates zu beheben, bevor trotzdem ausgeliefert wird.
-- **Max. turns**, **Max. cost (USD)**, **Max. runtime (minutes)** — Budgets, die
-  einen Lauf stoppen. Kosten von `0` bedeuten kein Limit.
+Standardwerte für [automatische Aufgaben](TASKS.md#automatische-aufgaben), die in
+der Oberfläche, über die [REST-API](REST-API.md), [MCP](SETUP-MCP.md) oder
+einen [Issue-Trigger](SETUP-TASK-PROVIDERS.md) gestartet werden. Ein einzelner
+Lauf kann sie überschreiben; leere Felder nutzen die Standardwerte der
+Installation aus der [Konfiguration](CONFIGURATION.md#automatische-aufgaben).
 
-## Pflicht vs. optional — auf einen Blick
+| Feld | Bedeutung |
+|---|---|
+| Automatik-Nutzer | Die Person, für die automatische Aufgaben der API-Tokens und Issue-Trigger dieses Workspaces handeln (sofern nicht die Person, der ein Issue zugewiesen ist, zugestimmt hat, sie zu übernehmen): Ihr Claude-Agent erledigt die Arbeit, und ihr gehört die Aufgabe. Ohne sie antworten Workspace-Tokens mit `no_actor`, und Issue-Trigger starten nichts. |
+| Plan | *Kein Plan — direkt umsetzen* (`off`), *Planen, dann automatisch weiter* (`auto`), *Planen, dann auf Freigabe warten* (`approve`). |
+| Wenn fertig | *Pull Request* (`pr`), *Entwurfs-Pull-Request* (`draft_pr`), *Nur committen und pushen* (`none`). |
+| Gate-Fix-Runden | Wie oft Claude versuchen darf, fehlschlagende Quality Gates zu beheben, bevor trotzdem ausgeliefert wird (0–20). |
+| Max. Turns, Max. Kosten (USD), Max. Laufzeit (Minuten) | Budgets, die einen Lauf stoppen. Kosten von `0` bedeuten kein Limit. |
 
-**Pflicht**
+## Mitglieder
 
-- Plattform
-- Project Name
-- Repository: entweder das OAuth-Repository + Branch oder (manueller Pfad) Repo
-  URL + Token (PAT) + Default Branch
-- Authentifizierungsmethode, wenn der Abschnitt „Authentication“ angezeigt wird
-  (Standard PAT); das verbundene Konto, wenn die Methode OAuth ist; Host und
-  Token einer privaten Composer-Registry, wenn Sie eine hinzufügen
-
-**Optional (mit sinnvollen Standardwerten)**
-
-- Image source (Standard Registered stack), Worker Stack (Standard
-  Argos-Stack), Agent (Standard Claude Code)
-- Backing Services und ihre MySQL-Zugangsdaten-Überschreibungen
-- Live-Demo (Standard aus)
-- Zusätzliche Umgebungsvariablen und Composer-Registries
-- Automation user und die Automatisierungs-Standardwerte (standardmäßig die
-  Einstellungen der Installation)
+Die Personen des Workspaces mit ihrer Rolle — *Admin*, *Mitglied* oder
+*Leser* (siehe [Rollen](WORKSPACES.md#rollen)): ein Mitglied hinzufügen, eine
+Rolle ändern, eine Person entfernen. Ein Workspace behält mindestens einen
+Admin. Personen hinzuzufügen erfordert `ARGOS_WORKSPACE_COLLABORATION`. Wird
+jemand entfernt, bleiben die Aufgaben, die der Person gehören; übergib sie,
+wenn jemand weitermachen soll.

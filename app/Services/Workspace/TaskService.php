@@ -30,6 +30,8 @@ use App\Models\Workspace;
 use App\Services\IssueTracker\IssueRunReporter;
 use App\Support\TaskRefs;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * Everything humans do in a task: open the session, write, interrupt,
@@ -574,6 +576,17 @@ class TaskService
         ])->save();
         $this->notice($task, 'cancelled', $by);
         app(IssueRunReporter::class)->closed($task);
+        $this->endPreview($task);
+    }
+
+    /** A finished task's preview ends with it (failures are only logged). */
+    public function endPreview(Task $task): void
+    {
+        try {
+            app(WorkspacePreviewService::class)->stop($task);
+        } catch (Throwable $e) {
+            Log::channel('argos')->info('Stopping the preview of a finished task failed', ['task' => $task->id, 'error' => $e->getMessage()]);
+        }
     }
 
     /**

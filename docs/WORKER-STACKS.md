@@ -1,230 +1,117 @@
-# Worker Stacks and Images
+# Stacks and Images
 
-When you work in a workspace, the actual work — cloning your repo, running
-the agent, running the quality gates — happens inside the workspace's Docker
-container. The environment that container runs in is described by a **Worker
-Stack**. The worker image is assembled on demand from the stack, an agent and
-the Argos gate helpers, and the workspace image is built on top of it.
-
-This document explains, in plain terms, what a stack is, how images get
-built, and how a project chooses the environment its workspaces run in. It is
-written for an operator picking or managing that environment — you do not
-need to read the worker source to follow it.
+Every workspace runs in one Docker container. Its image is assembled on
+demand from a **stack** — the operating system plus the toolchain the project
+needs — the Claude Code CLI, the Argos gate helpers and the workspace layer
+(daemon and VS Code). A workspace uses either one of the **three built-in
+stacks** or the repository's own **`.argos/worker.dockerfile`**. There is no
+stack editor: anything the built-ins don't cover goes into the repository's
+Dockerfile, which the [setup task](PREPARE-PROJECT.md#the-setup-task) can write
+for you.
 
 ## Contents
 
-- [What a Worker Stack is](#what-a-worker-stack-is)
+- [The built-in stacks](#the-built-in-stacks)
+- [The repository's own image](#the-repositorys-own-image)
+- [How a workspace gets its stack](#how-a-workspace-gets-its-stack)
 - [The layers of a workspace image](#the-layers-of-a-workspace-image)
-- [Built-in, custom, and repo-defined stacks](#built-in-custom-and-repo-defined-stacks)
-- [How images build on demand](#how-images-build-on-demand)
+- [How images build](#how-images-build)
 - [What triggers a rebuild](#what-triggers-a-rebuild)
-- [Where to see image builds](#where-to-see-image-builds)
-- [Agent version tracking](#agent-version-tracking)
-- [How a project selects its stack](#how-a-project-selects-its-stack)
-- [Reference: stack fields](#reference-stack-fields)
+- [Where to see the image](#where-to-see-the-image)
 
-## What a Worker Stack is
+## The built-in stacks
 
-A Worker Stack is the **base toolchain** a workspace runs in — the operating
-system plus the languages and tools your project needs to build and test
-(for example PHP, Composer, and Node). A stack is, at heart, a Dockerfile
-together with some metadata that describes it.
+| Stack | Slug | Base image | Toolchain |
+|---|---|---|---|
+| **PHP 8.5** (default) | `php-8.5` | `php:8.5-cli-bookworm` | PHP 8.5 CLI, Composer, Node 22 |
+| **PHP 8.4** | `php-8.4` | `php:8.4-cli-bookworm` | PHP 8.4 CLI, Composer, Node 22 |
+| **Node 22** | `node-22` | `node:22-bookworm` | Node 22 with Corepack (npm, yarn, pnpm) |
 
-Each stack carries:
+The PHP stacks carry the common extensions (`intl`, `pdo_mysql`,
+`pdo_sqlite`, `pdo_pgsql`, `zip`, `bcmath`, `gd`, `pcntl`, `sockets`, `exif`,
+`redis`) and no CLI memory limit. All stacks bring `git`, `gh`, `jq`, `curl`,
+`unzip`, a MySQL client and the non-root user `agent` (UID 1000).
 
-- A **slug** (`name`) — a unique identifier, e.g. `php-8.4`.
-- A **display name** (`label`) — what you see in the stack picker on
-  projects, e.g. `PHP 8.4`.
-- A **base image** — a reference-only note of the upstream `FROM` image
-  (e.g. `php:8.4-cli-bookworm`). The real `FROM` lives inside the Dockerfile;
-  this field just documents it for the overview.
-- A **Dockerfile body** — the full Dockerfile that becomes the stack image
-  at build time. This is the source of truth for what the environment
-  actually contains.
-- **Capabilities** — tags like `php`, `composer`, `node`. These are not
-  cosmetic: an agent checks them before it is allowed to run on a stack
-  (Claude Code, for instance, needs `node`). A stack that is missing an
-  agent's required capability is refused before any build runs.
-- **Common tools** — documentation-only tags for the extra tools installed
-  (`git`, `gh`, `jq`, `curl`, …). Informational only; not used for
-  validation.
-- A **status** — `active`, `deprecated`, or `disabled`. A disabled stack is
-  skipped by the resolver even when a project still references it.
+The stacks ship with Argos (`.tools/docker/worker/built-ins.php`) and are
+synced into the database after every migration; a stack that is removed from
+the manifest is marked deprecated rather than deleted. The default stack is
+pre-built when the app boots (`argos:warm-builtin-images`).
 
-Manage stacks in the admin panel under the **Worker** navigation group, at
-`${APP_URL}/admin/worker-stacks`.
+## The repository's own image
+
+When no built-in stack fits — another language, a PHP extension or system
+package the project cannot work without, a pinned base image — the
+repository ships `.argos/worker.dockerfile`. It replaces the **stack layer
+only**; Argos still adds the Claude Code CLI, the gate helpers and the
+workspace layer on top. The image must provide Node.js (for the CLI), the
+user `agent` with UID 1000 and the tools `bash`, `sh`, `jq`, `git`, `sed`,
+`grep`, `awk`, `curl`. The full contract is in
+[Custom Worker Image (BYOI)](BYOI.md).
+
+## How a workspace gets its stack
+
+1. **On creation** Argos inspects the repository: `composer.json` → PHP 8.5,
+   or PHP 8.4 when the PHP constraint pins 8.4 without allowing 8.5;
+   `package.json` without `composer.json` → Node 22; a
+   `.argos/worker.dockerfile` → the repository's image. With none of them, the
+   [setup task](PREPARE-PROJECT.md#the-setup-task) starts.
+2. **In the settings** (Settings → Environment → Worker) a workspace admin can
+   switch the **Image source** (*Registered stack* or *Own Dockerfile in the
+   repo (BYOI)*) and the **Worker Stack**.
+3. **A passed setup test** that built a `.argos/worker.dockerfile` switches the
+   image source to BYOI.
+4. Without a stack set, the installation default applies
+   (`ARGOS_DEFAULT_STACK`, default `php-8.5`).
+
+The repository's Dockerfile is read at the workspace's setup ref — the default
+branch, or a tested setup branch that is not merged yet.
 
 ## The layers of a workspace image
 
-The stack is only the bottom layer. The image a workspace runs is built in
-stacked layers, each cached independently:
-
-1. **Stack layer** — the base toolchain, built from the stack's Dockerfile
-   (`FROM php:8.4-…`, plus your tools). Tagged `argos-stack:<name>-<hash>`.
-2. **Agent layer** — the coding agent CLI (Claude Code), installed
-   on top of the stack. A change in agent version invalidates only this
-   layer. See [Agents](AGENTS.md) for what an agent is and how credentials
-   work.
-3. **Gate helpers** — the Argos quality-gate scripts (`worker/lib`). These
-   change only when you ship a new Argos version, so they are cached
-   aggressively.
+1. **Stack layer** — the built-in stack's Dockerfile, or the repository's
+   `.argos/worker.dockerfile`. Tagged `argos-stack:<name>-<hash>`.
+2. **Agent layer** — the Claude Code CLI (`@anthropic-ai/claude-code`),
+   installed on top. See [Agents](AGENTS.md).
+3. **Gate helpers** — the Argos quality-gate scripts (`worker/lib`).
 
 Together these form the **worker image**, tagged
-`argos-worker:<stack>-<stackHash>-<libHash>-<agent>-<version>`. On top of it
-sits the **workspace layer** — the workspace daemon and OpenVSCode Server —
-which makes the image a workspace runs. You never build these by hand — the
-manager assembles them when a workspace needs them (see below).
+`argos-worker:<stack>-<stackHash>-<libHash>-<agent>-<version>`. On top sits
+the **workspace layer** — the daemon and OpenVSCode Server. You never build
+these by hand.
 
-## Built-in, custom, and repo-defined stacks
+## How images build
 
-There are three ways a stack can come into being.
+Images are built lazily when a workspace starts and its image is missing:
 
-### Built-in stacks (synced automatically)
+1. Argos resolves the stack and computes the deterministic tag.
+2. If an image with that tag exists, the workspace uses it.
+3. Otherwise it builds the stack image (skipped when its hash is cached), the
+   worker image and the workspace image.
+4. A smoke test checks that `bash`, `sh`, `jq`, `git`, `sed`, `grep`, `awk`,
+   `curl` and the `claude` CLI are present. If anything is missing, the build
+   is marked **failed** and the image is untagged, so it is never reused.
 
-Argos ships with built-in stacks out of the box — currently **PHP 8.3** and
-**PHP 8.4**. These are defined in the Argos source manifest and **synced into
-the database automatically after every database migration**. The sync is
-idempotent: a stack whose definition hasn't changed is left alone; a changed
-definition updates the built-in fields; a built-in that is removed from the
-manifest is flipped to `deprecated` (never deleted, so projects that still
-reference it keep working).
-
-Built-in stacks are **read-only** in the UI — you cannot edit or delete them.
-To customise one, use the **Duplicate** action: it clones the stack into a
-fresh editable copy (forced to non-built-in, auto-suffixed name) that the
-automatic sync will never overwrite. This is the supported path for "I want
-PHP 8.4 but with an extra apt package".
-
-### Custom stacks
-
-A custom stack is any stack you create or duplicate yourself
-(`is_builtin = false`). You own its Dockerfile entirely, you can edit and
-delete it, and the built-in sync never touches it. Use a custom stack when
-your projects need a toolchain the built-ins don't cover (a different runtime,
-extra system packages, an in-house base image, …).
-
-### Repo-defined image (BYOI)
-
-A project can also bring its own image definition by shipping a Dockerfile in
-the repository itself — **Bring Your Own Image (BYOI)**. In that mode Argos
-reads the repo's Dockerfile and uses it as the stack base, then still layers
-the agent, the gate helpers and the workspace layer on top exactly like a
-normal stack. This keeps the
-environment definition versioned alongside the code it builds. See
-[BYOI](BYOI.md) for the file location and the full contract.
-
-## How images build on demand
-
-Images are **built lazily, on the first workspace that needs them** — there
-is no manual pre-build step in the normal flow (the default stack is
-pre-warmed at boot). When a workspace starts, the manager:
-
-1. **Resolves** the `(stack, agent)` pair for the project (see
-   [How a project selects its stack](#how-a-project-selects-its-stack)) and
-   computes the deterministic image tag.
-2. **Checks** whether an image with that exact tag already exists. If it does,
-   the workspace uses it immediately.
-3. **Builds** it if it is missing: first the stack image (skipped if its
-   content hash is already cached), then the worker image (stack + agent +
-   gate helpers), then the workspace image on top.
-4. **Validates** the fresh image with a smoke test — every baseline tool
-   (`bash`, `sh`, `jq`, `git`, `sed`, `grep`, `awk`, `curl`) plus the agent's
-   CLI binary must be present. If any are missing the build is marked
-   **failed** and the broken image is untagged, so it can't silently get
-   reused.
-
-Because the tag is content-derived, an unchanged environment is built exactly
-once and reused for every subsequent workspace.
+All tasks of a workspace share its container and therefore its image. The
+first start of a new image takes a few minutes; later starts reuse it.
 
 ## What triggers a rebuild
 
-The worker image tag is a **fingerprint** of everything that goes into the
-image. A new image is built whenever any of these three change:
+The tag is a fingerprint of everything in the image. A new image is built on
+the next workspace start when
 
-- **The stack** — specifically, a change to the stack's Dockerfile body. The
-  tag embeds an 8-character hash of that Dockerfile, so editing it produces a
-  new tag and a new build.
-- **The gate helpers** — a fingerprint (`libHash`) over `worker/lib` and the
-  worker Dockerfile. Shipping a new Argos version with changed helpers
-  rebuilds images even if the stack and agent are untouched.
-- **The agent version** — the agent name and its pinned version are part of
-  the tag, so moving the agent to a new version produces a new tag.
+- the **stack** changes — a new built-in stack Dockerfile shipped with Argos,
+  or a changed `.argos/worker.dockerfile` at the setup ref,
+- the **gate helpers** change (a new Argos version), or
+- the **agent version** pin changes.
 
-If none of these change, the existing image is reused — no rebuild, no wasted
-build time.
+**Rebuild** in Settings → Environment → Setup builds the current stack image
+again on demand (e.g. to pick up newer upstream packages); the workspace uses
+it from its next start.
 
-## Where to see image builds
+## Where to see the image
 
-Every build attempt is recorded as a **Worker Image Build** row, visible in
-the admin panel under the Worker group at `${APP_URL}/admin/worker-image-builds`.
-Each row shows:
-
-- The full image **tag**, the **stack** and **agent** it was built for.
-- A **status** — `queued`, `building`, `ready`, or `failed`.
-- The image **size** and **built at** timestamp.
-- The full **build log** (stack build + worker layer + validate step) on the
-  detail page — the first place to look when a build fails.
-- An **Update available** flag marking builds that have drifted out of date
-  (see below).
-
-From this screen you can **Rebuild** a single image, or **Rebuild all
-outdated** to refresh every drifted image in one action. Builds are not
-created by hand — the list is populated by the on-demand build pipeline.
-
-A build is flagged **outdated** when either:
-
-- **Stack drift** — the stack's Dockerfile has changed since the build was
-  made (the build's recorded hash no longer matches the current one), or
-- **Agent drift** — the agent has an update available and the build predates
-  the last version check.
-
-## Agent version tracking
-
-Agents (the CLI tools, such as Claude Code) are released independently of
-Argos. To keep you aware of new versions, Argos runs a **daily check** (at
-03:00, and on demand via `php artisan argos:check-agent-versions`) that polls
-the npm registry for each registered agent's package and compares the latest
-published version against the version Argos has pinned.
-
-The result is stored per agent and surfaces as an **Update available** signal
-in the panel — on the stack/build views and on the worker-updates dashboard
-widget. A pin of `latest` always reports an update whenever upstream moves;
-a fixed pin reports an update only when the published version differs.
-
-An update signal is informational — nothing rebuilds automatically. When you
-want to adopt the new version, use **Rebuild** / **Rebuild all outdated** on
-the image-builds screen, and the next build pulls the current agent during
-its install step.
-
-## How a project selects its stack
-
-A workspace resolves its stack in this order, first match wins:
-
-1. **Project (repo profile) setting** — BYOI (the repo's own Dockerfile) or
-   the stack configured on the project.
-2. **Configured default** — the default stack (`php-8.4` unless overridden
-   via `ARGOS_DEFAULT_STACK`).
-
-The agent is Claude Code — the agent the workspace daemon hosts.
-
-You set the project-level choice on the project's settings, under the worker
-environment options: a **Worker source** (standard stack vs. BYOI) and the
-**Worker stack** to use. When the source is BYOI
-the stack picker is hidden, because the environment comes from the repo's own
-Dockerfile instead. See [Projects](PROJECTS.md) for where these live, and
-[Configuration](CONFIGURATION.md) for the `ARGOS_DEFAULT_STACK` default.
-
-## Reference: stack fields
-
-| Field | Meaning |
-| --- | --- |
-| `name` (Slug) | Unique identifier, e.g. `php-8.4`. Read-only on built-ins. |
-| `label` | Human-readable display name shown in pickers. |
-| `base_image` | Reference-only note of the upstream `FROM` image. |
-| `dockerfile_body` | The full Dockerfile that becomes the stack image. |
-| `capabilities` | Tags an agent checks before it may run (e.g. `php`, `node`). |
-| `common_tools` | Documentation-only tags for installed tools. Not validated. |
-| `status` | `active`, `deprecated`, or `disabled` (disabled = skipped). |
-| `is_builtin` | Whether the stack is shipped + synced by Argos (read-only) or yours. |
-| `has_update` | Whether an update is available for the stack/agent. |
-| `last_built_at` | When an image for this stack was last built. |
+Settings → Environment → **Setup** shows the current image build of the
+workspace (state and age), its **Build log** (stack build, worker layer and
+smoke test) and **Rebuild**. A failed **Test setup** shows the build log of
+the repository's image in the setup task. There is no global image-build list
+in the admin panel.

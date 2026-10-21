@@ -148,10 +148,12 @@
                         @error('newBaseBranch') <small class="t-err">{{ $message }}</small> @enderror
                         <small class="muted">{{ __('workspaces.task.base_branch_help') }}</small>
                     </label>
+                    @if ($workspace->platform !== \App\Enums\GitProvider::Bitbucket)
                     <label class="ws-inline">
                         <input type="checkbox" wire:model="newAutoMerge" data-testid="new-auto-merge">
                         <span>{{ __('workspaces.pr.auto_merge') }} — <span class="muted">{{ __('workspaces.pr.auto_merge_help') }}</span></span>
                     </label>
+                    @endif
                     <label class="ws-field">
                         <span>{{ __('workspaces.task.agent') }}</span>
                         <select class="ws-select" wire:model.live="newAgentId">

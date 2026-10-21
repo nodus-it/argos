@@ -23,7 +23,7 @@ class AutoRunService
     ) {}
 
     /**
-     * @param  array{title?: string|null, base_branch?: string|null, agent_id?: string|null, model?: string|null, issue?: array<string, mixed>|null}  $options
+     * @param  array{title?: string|null, base_branch?: string|null, agent_id?: string|null, model?: string|null, issue?: array<string, mixed>|null, auto_merge?: bool}  $options
      * @param  array<string, mixed>  $settings  per-run overrides (AutoSettings keys)
      */
     public function launch(User $actor, Workspace $workspace, string $prompt, array $options = [], array $settings = [], TaskOrigin $origin = TaskOrigin::Api): Task
@@ -47,6 +47,7 @@ class AutoRunService
             'base_branch' => $options['base_branch'] ?? null,
             'external_ref' => $issue,
             'origin' => $origin,
+            'auto_merge' => (bool) ($options['auto_merge'] ?? false),
         ]);
     }
 }

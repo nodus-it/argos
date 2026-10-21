@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\RelationManagers;
 
+use App\Models\Workspace;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Forms\Components\CheckboxList;
@@ -13,7 +14,6 @@ use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
-use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Sanctum\Contracts\HasApiTokens;
@@ -31,9 +31,23 @@ class ApiTokensRelationManager extends RelationManager
     /** The abilities a token may carry (mirrors the REST route gates). */
     public const ABILITIES = [
         'workspaces:read' => 'workspaces:read',
+        'workspaces:write' => 'workspaces:write',
         'tasks:read' => 'tasks:read',
         'tasks:write' => 'tasks:write',
     ];
+
+    /**
+     * Abilities offered for this owner: a workspace's own token never
+     * creates workspaces.
+     *
+     * @return array<string, string>
+     */
+    private function abilities(): array
+    {
+        return $this->getOwnerRecord() instanceof Workspace
+            ? array_diff_key(self::ABILITIES, ['workspaces:write' => true])
+            : self::ABILITIES;
+    }
 
     public static function getTitle(Model $ownerRecord, string $pageClass): string
     {
@@ -60,7 +74,7 @@ class ApiTokensRelationManager extends RelationManager
 
             CheckboxList::make('abilities')
                 ->label(__('api_tokens.fields.abilities'))
-                ->options(self::ABILITIES)
+                ->options(fn (): array => $this->abilities())
                 ->required(),
         ]);
     }
@@ -100,7 +114,7 @@ class ApiTokensRelationManager extends RelationManager
 
                         CheckboxList::make('abilities')
                             ->label(__('api_tokens.fields.abilities'))
-                            ->options(self::ABILITIES)
+                            ->options(fn (): array => $this->abilities())
                             ->required(),
                     ])
                     ->action(function (array $data): void {

@@ -22,6 +22,7 @@ class StartAutoRunRequest extends FormRequest
         return [
             'prompt' => ['required', 'string', 'max:20000'],
             'base_branch' => ['nullable', 'string', 'max:255'],
+            'auto_merge' => ['nullable', 'boolean'],
             'issue' => ['nullable', 'string', 'max:64', 'prohibits:ticket'],
             // A ticket of an own system (custom integration of the workspace).
             'ticket' => ['nullable', 'array'],

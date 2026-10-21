@@ -17,7 +17,7 @@ return [
 
     'sections' => [
         'automation' => 'Automation',
-        'automation_description' => 'Defaults for auto-tasks in this project: started from the UI, the API, MCP or an issue, they plan, implement, check the quality gates and ship without a human. Each run can override them. Empty fields use the installation defaults.',
+        'automation_description' => 'Defaults for automatic tasks in this workspace: started from the UI, the API, MCP or an issue, they plan, implement, check the quality gates and ship without a human. Each run can override them. Empty fields use the installation defaults.',
         'platform' => 'Platform',
         'platform_description' => 'Choose a platform — the remaining fields will be unlocked afterwards.',
         'general' => 'General',
@@ -35,7 +35,7 @@ return [
 
     'fields' => [
         'automation_user' => 'Automation user',
-        'automation_user_helper' => 'Automatic runs from this project\'s tokens and issue triggers act for this person: their Claude agent does the work and they own the workspace.',
+        'automation_user_helper' => 'Automatic tasks from this workspace\'s tokens and issue triggers act for this person: they own the task and it runs on their Claude subscription.',
         'auto_plan' => 'Plan',
         'auto_ship' => 'When done',
         'auto_max_fix_rounds' => 'Gate fix rounds',
@@ -55,9 +55,9 @@ return [
         'worker_source_standard' => 'Registered stack',
         'worker_source_byoi' => 'Own Dockerfile in the repo (BYOI)',
         'worker_byoi_hint_heading' => 'Repo defines its own image',
-        'worker_byoi_hint_body' => 'Argos reads .argos/worker.dockerfile from the repo (at the base branch) as the stack base and layers the agent + worker code on top automatically. Required tools (bash, git, jq, …) must come in via FROM/RUN — no COPY from the repo (the build context is not the repo).',
+        'worker_byoi_hint_body' => 'Argos reads .argos/worker.dockerfile from the repo (the default branch, or a tested setup branch until it is merged) as the stack base and layers the agent + worker code on top automatically. Required tools (bash, git, jq, …) must come in via FROM/RUN — no COPY from the repo (the build context is not the repo).',
         'live_demo_label' => 'Enable live demo',
-        'live_demo_helper' => 'Lets workspaces start a live preview on its own subdomain.',
+        'live_demo_helper' => 'Lets tasks start a live preview on its own subdomain.',
         'live_demo_hint_heading' => 'Repo must ship the demo contract',
         'live_demo_hint_body' => 'Requires .argos/demo.compose.yml (runtime) and .argos/demo.yml (settings: entry service/port, commands) at the base branch. If they are missing, the demo build fails with a clear message.',
         'worker_stack_label' => 'Worker Stack',

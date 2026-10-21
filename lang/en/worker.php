@@ -3,47 +3,6 @@
 declare(strict_types=1);
 
 return [
-    'stacks' => [
-        'label' => 'Stack',
-        'plural' => 'Stacks',
-        'sections' => [
-            'definition' => 'Definition',
-            'definition_description' => 'Identity & capabilities of the stack — what it can do, which tools it ships with, whether it is active.',
-            'dockerfile' => 'Dockerfile',
-            'dockerfile_description' => 'The full Dockerfile that becomes the stack image at build time. Tab inserts four spaces.',
-            'status' => 'Status',
-        ],
-        'fields' => [
-            'name' => 'Slug',
-            'name_help' => 'Unique identifier for the DB — built-ins are php-8.4 / php-8.3. Copies are auto-suffixed with "-copy".',
-            'label' => 'Display name',
-            'label_help' => 'Human-readable — shown in the stack select on projects.',
-            'is_builtin' => 'Built-in',
-            'is_builtin_help' => 'Built-ins are mirrored from the Argos manifest on every migrate. User stacks stay untouched.',
-            'base_image' => 'Base image',
-            'base_image_help' => 'Reference-only hint. The actual FROM lives inside the Dockerfile — this field documents it for the overview (e.g. php:8.4-cli-bookworm).',
-            'capabilities' => 'Capabilities',
-            'capabilities_help' => 'Language / tool capabilities as tags — e.g. php, composer, node. Agents check this to decide whether they can run on the stack (claude-code needs node, for instance).',
-            'common_tools' => 'Common tools',
-            'common_tools_help' => 'Documentation-only tags for the additional tools installed (git, jq, gh …). Not used for validation — purely informational for stack selection.',
-            'dockerfile_body' => 'Dockerfile',
-            'status' => 'Status',
-            'status_help' => 'Disabled stacks are skipped by the resolver even when a project still references them.',
-            'has_update' => 'Update available',
-            'last_built_at' => 'Last built',
-            'last_checked_at' => 'Last checked',
-        ],
-        'actions' => [
-            'duplicate' => 'Duplicate',
-        ],
-        'notices' => [
-            'builtin_readonly' => 'Built-in stacks are read-only. Duplicate first to customise.',
-        ],
-        'notifications' => [
-            'duplicated' => 'Stack duplicated as ":name".',
-            'build_dispatched' => ':count image build(s) queued.',
-        ],
-    ],
 
     'agents' => [
         'label' => 'Agent',
@@ -87,40 +46,5 @@ return [
         ],
     ],
 
-    'image_builds' => [
-        'label' => 'Image build',
-        'plural' => 'Image builds',
-        'summary' => 'Summary',
-        'summary_description' => "This image build's tag, stack, agent, and status.",
-        'build_log_description' => 'Stdout/stderr from the stack build, the worker layer, and the post-build validate step.',
-        'empty_log' => 'No build log captured.',
-        'lines' => 'lines',
-        'fields' => [
-            'tag' => 'Tag',
-            'stack' => 'Stack',
-            'agent' => 'Agent',
-            'status' => 'Status',
-            'size_bytes' => 'Size',
-            'built_at' => 'Built at',
-            'build_log' => 'Build log',
-            'outdated' => 'Update available',
-        ],
-        'filters' => [
-            'outdated_all' => 'All',
-            'outdated_only' => 'Outdated only',
-            'outdated_current' => 'Current only',
-        ],
-        'actions' => [
-            'rebuild' => 'Rebuild',
-            'rebuild_dispatched' => 'Build job queued.',
-            'rebuild_all_outdated' => 'Rebuild all outdated',
-            'rebuild_all_outdated_confirm' => 'Rebuild :count outdated images?',
-            'rebuild_all_outdated_dispatched' => ':count build job(s) queued.',
-        ],
-    ],
 
-    'updates' => [
-        'widget_label' => 'Worker updates available',
-        'no_updates' => 'All worker images are up to date.',
-    ],
 ];

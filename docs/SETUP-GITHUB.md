@@ -12,7 +12,7 @@ pick.
 
 Recommended for single-user instances or when you just want to try Argos. PAT
 works without any server-side configuration — you only paste the token in the
-project form.
+workspace form.
 
 ### Step 1: Create a token
 
@@ -31,9 +31,10 @@ project form.
 > read/write access to **Contents**, **Pull requests**, and **Workflows** (if
 > applicable).
 
-### Step 2: Configure the project in Argos
+### Step 2: Create the workspace in Argos
 
-Under **Projects → New Project**:
+As an Argos administrator, choose **New workspace** (in `/w`, or under
+**Workspaces** in the admin panel):
 
 - **Platform**: GitHub
 - **Authentication**: Personal Access Token (PAT)
@@ -45,7 +46,7 @@ Under **Projects → New Project**:
 
 ## Option 2: OAuth (optional)
 
-OAuth enables repo and branch dropdowns in the project form and per-user
+OAuth enables repo and branch dropdowns in the workspace form and per-user
 account binding — no manual URL entry, and each user connects their own GitHub
 account.
 
@@ -98,16 +99,17 @@ provides.
 2. Go to **Connected Accounts** in the navigation.
 3. Click **Connect GitHub** — you are redirected to GitHub to authorize the
    app. After authorizing, you are returned to the Connected Accounts page.
-4. When creating a project, select **GitHub** as the platform and choose
+4. When creating a workspace, select **GitHub** as the platform and choose
    **OAuth** as the authentication method — the repo and branch dropdowns
    appear, populated from your connected account.
 
 ---
 
-## Option 3: Issue-Provider (Pull + Webhook)
+## Option 3: Issue trigger (poll or webhook)
 
-Argos can start automatic runs from GitHub Issues, via polling or webhooks. Each repository needs a **TaskProviderBinding** (one per GitHub repo)
-configured through the Filament admin interface.
+A workspace can use GitHub Issues as [tickets](TICKETS.md) and start automatic
+tasks from new issues, via polling or webhooks. The integration lives on the
+workspace (one per GitHub repository).
 
 ### Step 1: Required token scopes
 
@@ -120,34 +122,37 @@ configured through the Filament admin interface.
 > **Note**: `admin:repo_hook` is a sub-scope of `repo` in classic PATs.
 > Fine-grained tokens require "Webhooks: Read & Write" explicitly.
 
-### Step 2: Create a binding in Filament
+### Step 2: Create the integration
 
-1. Open the project under **Repo Profiles** → **Task-Provider** tab → **Create**.
-2. Set **Kind** to `GitHub` and choose the **Connected Account** that holds your
-   PAT or OAuth token.
-3. Enter the **External Project Ref** in `owner/repo` format, e.g.
-   `your-org/your-repo`.
+1. Open the workspace's **Settings → Integrations** → **Issue trackers** →
+   **New** (workspace admins; Argos administrators also find it on the
+   workspace in the admin panel).
+2. Set **Provider** to `GitHub` and choose the **Access** (OAuth account or
+   stored PAT).
+3. Pick the **Project / Team** — the repository in `owner/repo` format. Use
+   the workspace's own repository if merged pull requests should close the
+   issues.
 4. Choose a **Mode**:
-   - **Webhook** — real-time; requires `APP_URL` to be publicly reachable.
-   - **Poll** — periodic polling; works behind firewalls or in local development.
-5. Optionally set **Filters** (e.g. `state=open`, label filters) so only
-   relevant issues start automatic runs.
-6. Click **Save**. The binding starts in `Pending` state.
+   - **Webhook (push)** — real-time; requires `APP_URL` to be publicly
+     reachable.
+   - **Polling** — periodic; works behind firewalls or in local development.
+5. Optionally set a **Labels filter** so only relevant issues start automatic
+   tasks, and decide on **Close the ticket on merge**.
+6. Save. The integration starts in `Pending` state.
 
-### Step 3: Activate with "Einrichten"
+### Step 3: Activate with "Set up"
 
-Click the **Einrichten** (Setup) action on the binding row:
+Click **Set up** on the integration's row:
 
 - **Webhook mode**: Argos calls `POST /repos/{owner}/{repo}/hooks` on GitHub and
-  registers the callback URL `${APP_URL}/webhooks/issues/github/{binding-id}`
-  automatically. No manual URL entry needed. The binding moves to `Active` once
-  GitHub confirms the hook.
-- **Poll mode**: The binding moves to `Active` immediately. The poll scheduler
-  will fetch issues on the next run.
+  registers `${APP_URL}/webhooks/issues/github/{integration-id}`
+  automatically. The integration moves to `Active` once GitHub confirms the
+  hook.
+- **Poll mode**: The integration moves to `Active` immediately.
 
-If setup fails (invalid token, missing scopes, `APP_URL` not reachable), the
-binding stays `Pending` and the error message is shown in the **Last Error**
-column. Fix the issue and click **Einrichten** again.
+If setup fails (invalid token, missing scopes, `APP_URL` not reachable), it
+stays `Pending` and the error is shown in **Last error**. Fix it and click
+**Set up** again.
 
 ### Webhook vs. Poll
 
@@ -157,23 +162,33 @@ column. Fix the issue and click **Einrichten** again.
 | Requires public `APP_URL` | Yes | No |
 | GitHub rate limits | Not applicable | Counts against API quota |
 
-> **Tip**: Use Poll mode during local development or when `APP_URL` is not
-> publicly reachable (e.g. behind a VPN or NAT). Switch to Webhook mode in
-> production for real-time updates.
-
 ### Behaviour notes
 
 - **issue_comment** events are accepted by the webhook endpoint but ignored.
-  Only `issues` events (opened, edited, etc.) can start a run.
-- **Issue state and the workspace are independent.** Closing a GitHub issue
-  does not stop or delete its workspace; merging the pull request closes the
-  issue (`Closes #…`).
-- **Duplicate-safe**: the webhook endpoint ignores re-deliveries (identified by
-  the `X-GitHub-Delivery` header). Pull requests appearing in the issues list
-  are filtered out automatically.
+  Only `issues` events (opened, edited, etc.) can start a task. Comments reach
+  the task through the scheduled ticket-comment sync.
+- **Issue state and the task are independent.** Closing a GitHub issue does
+  not stop or cancel its task; merging the pull request closes the issue
+  (`Closes #…`) when *Close the ticket on merge* is on (otherwise the pull
+  request says `Refs #…`).
+- **Assignee:** a hand-over makes the new owner's GitHub login (their
+  connected account) the issue's assignee.
+- **Duplicate-safe**: re-deliveries (same `X-GitHub-Delivery`) are ignored.
+  Pull requests appearing in the issues list are filtered out.
 
-For the shared binding setup details, see
-[Issue Triggers](SETUP-TASK-PROVIDERS.md).
+For the shared details, see [Issue Triggers](SETUP-TASK-PROVIDERS.md) and
+[Tickets](TICKETS.md).
+
+---
+
+## Pull requests on GitHub
+
+- Argos reads check runs and commit statuses, reviews and review comments of
+  the task's pull request, and the job logs of failed GitHub Actions runs
+  (see [Pull Requests](PULL-REQUESTS.md)). A classic PAT with `repo` or the
+  OAuth `repo` scope covers this.
+- **Merge automatically** needs *Settings → General → Allow auto-merge* in the
+  repository.
 
 ---
 

@@ -260,8 +260,12 @@ class WorkspaceIssueService
 
         $closes = TaskProviderBinding::query()->whereKey($issue['binding_id'] ?? null)->value('close_on_merge') ?? true;
 
+        // An issue in another repository than the pull request's needs its path.
+        $issueRepo = trim(($issue['owner'] ?? '').'/'.($issue['project'] ?? ''), '/');
+        $prefix = $issueRepo !== '' && $issueRepo !== implode('/', $task->workspace->ownerAndRepo()) ? $issueRepo : '';
+
         return match (TaskProviderKind::tryFrom($issue['provider'])) {
-            TaskProviderKind::GitHub, TaskProviderKind::GitLab => ($closes ? 'Closes #' : 'Refs #').$issue['number'],
+            TaskProviderKind::GitHub, TaskProviderKind::GitLab => ($closes ? 'Closes ' : 'Refs ').$prefix.'#'.$issue['number'],
             default => $issue['url'] !== '' ? __('workspaces.issue.pr_reference', ['url' => $issue['url']]) : null,
         };
     }

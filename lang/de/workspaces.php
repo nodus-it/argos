@@ -8,7 +8,7 @@ return [
     'auto' => [
         'owner_gone' => 'Die Person, der diese Aufgabe gehört, gibt es nicht mehr.',
         'no_usable_agent' => 'Die Person, für die dieser Lauf handelt, hat keinen nutzbaren Agenten (Claude-Abo).',
-        'no_actor' => 'Dieses Token handelt für niemanden: Lege den Automatik-Nutzer des Projekts oder den „Handelt als“-Nutzer des API-Clients fest.',
+        'no_actor' => 'Dieses Token handelt für niemanden: Lege den Automatik-Nutzer des Workspaces oder den „Handelt als“-Nutzer des API-Clients fest.',
         'start_with_workspace' => 'Mit dem Workspace einen automatischen Lauf starten',
         'label' => 'Automatisch',
         'automated' => 'automatisch',
@@ -515,7 +515,7 @@ return [
         'transfer_needs_agent' => ':name hat kein nutzbares Claude-Abo, auf dem die Aufgabe laufen kann.',
         'preparing' => 'Diese Aufgabe wird noch vorbereitet (Arbeitskopie, Datenbank, Setup). Versuch es gleich noch einmal.',
         'daemon_unreachable' => 'Der Workspace hat nicht geantwortet: :message',
-        'bypass_owner_only' => 'Nur Besitzer des Workspaces dürfen Freigaben umgehen.',
+        'bypass_owner_only' => 'Nur Admins des Workspaces dürfen Freigaben umgehen.',
         'capacity' => 'Es laufen bereits :max Workspaces. Stoppe einen, bevor du einen weiteren startest.',
         'init_failed' => 'Das Einrichten des Repositorys ist fehlgeschlagen (:code): :message',
         'agent_unavailable' => 'Der Agent dieser Aufgabe ist nicht verfügbar.',
@@ -628,7 +628,7 @@ return [
         ],
         'integrations' => [
             'trackers' => 'Issue-Tracker',
-            'trackers_description' => 'Woher Aufgaben kommen: GitHub-, GitLab- oder Linear-Projekte, die dieser Workspace beobachtet.',
+            'trackers_description' => 'Woher Aufgaben kommen: GitHub-, GitLab- oder Linear-Projekte, die dieser Workspace beobachtet, oder ein eigenes Ticket-System.',
             'tokens' => 'API-Tokens',
             'tokens_description' => 'Tokens für CI oder Skripte. Sie erreichen nur diesen Workspace und handeln als dessen Automatik-Nutzer.',
             'members_description' => 'Admins ändern Einstellungen, Secrets und Mitglieder; Mitglieder legen Aufgaben an; Leser lesen und arbeiten in Aufgaben, zu denen sie eingeladen sind.',
@@ -663,7 +663,7 @@ return [
         'rebase' => 'Rebase durch Claude',
         'auto_merge' => 'Automatisch mergen',
         'auto_merge_help' => 'Mergt von selbst, sobald die Pipeline grün ist und die Reviews es erlauben.',
-        'auto_merge_unavailable' => 'Auto-Merge ist für dieses Repository nicht verfügbar (in den Repository-Einstellungen einschalten).',
+        'auto_merge_unavailable' => 'Auto-Merge ist nicht verfügbar: Auf GitHub „Allow auto-merge“ in den Repository-Einstellungen einschalten; GitLab setzt es nur, solange eine Pipeline läuft.',
         'auto_merge_failed' => 'Auto-Merge konnte nicht geändert werden.',
         'no_failed_checks' => 'Keine fehlgeschlagenen Checks zum Beheben.',
         'no_review' => 'Es gibt noch kein Review zum Übergeben.',
@@ -707,5 +707,8 @@ return [
         'revise' => 'Einrichtung überarbeiten',
         'open_task' => 'Einrichtungs-Aufgabe öffnen',
         'banner' => 'Diese Aufgabe richtet den Workspace ein. Wenn Claude fertig ist, „Einrichtung testen“ drücken.',
+    ],
+    'api' => [
+        'no_connected_account' => 'Der Nutzer des API-Clients hat kein verbundenes Konto auf dieser Plattform.',
     ],
 ];

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Workspace;
 
 use App\Enums\GateRunStatus;
+use App\Enums\GitProvider;
 use App\Enums\WorkspaceStatus;
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
 use App\Models\Task;
@@ -169,6 +170,8 @@ class ContextPanel extends Component
             'running' => $workspace->status === WorkspaceStatus::Running,
             'pr' => $task?->pr_number !== null ? app(PullRequestService::class)->details($task) : null,
             'canShip' => $task !== null && $this->user()->can('ship', $task),
+            // Bitbucket has no native auto-merge.
+            'autoMergeSupported' => $workspace->platform !== GitProvider::Bitbucket,
             'issueLabel' => $task !== null && $issue !== null ? TaskRefs::ticketLabel($task).' · '.$issue['title'] : null,
         ]);
     }

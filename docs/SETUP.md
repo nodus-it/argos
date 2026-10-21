@@ -3,7 +3,7 @@
 This is the install and setup guide for operators running an Argos instance.
 It covers prerequisites, the one-command installer and its release channels,
 what the stack runs, first boot and first login, the reverse-proxy / `APP_URL`
-note, updating, and where to go next (onboarding, OAuth, worker stacks).
+note, updating, and where to go next (onboarding, OAuth, stacks).
 
 For the complete environment-variable reference, see
 [CONFIGURATION.md](CONFIGURATION.md). For a quick try-out, the
@@ -20,7 +20,7 @@ with less detail.
 - [First login and onboarding](#first-login-and-onboarding)
 - [Reverse proxy and APP_URL](#reverse-proxy-and-app_url)
 - [OAuth (optional)](#oauth-optional)
-- [Choosing a worker stack and agent](#choosing-a-worker-stack-and-agent)
+- [Stacks and agents](#stacks-and-agents)
 - [Users and administrators](#users-and-administrators)
 - [Workspaces](#workspaces)
 - [Pre-seeding the Claude token](#pre-seeding-the-claude-token)
@@ -133,9 +133,9 @@ is pulled; worker images are built on demand on the host.
 | `app` | `ghcr.io/nodus-it/argos-app` | Web UI + [MCP server](SETUP-MCP.md) + REST API (PHP-FPM). Runs migrations on boot; mounts the Docker socket to start workspaces and previews. |
 | `traefik` | `traefik:v3.5` | The single port-80 entry point. Published on the host via `ARGOS_PORT`. Routes to nginx (and to live-demo containers). |
 | `nginx` | `nginx:1.27-alpine` | Serves static assets and proxies dynamic requests to `app:9000`. Sits behind Traefik. |
-| `queue` | `ghcr.io/nodus-it/argos-app` | Laravel Horizon worker — runs background jobs on Redis: workspace provisioning, image builds, previews, automatic runs. Same image as `app`. |
-| `scheduler` | `ghcr.io/nodus-it/argos-app` | Laravel scheduler (`schedule:work`) — dispatches recurring jobs (e.g. issue polling). Same image as `app`. |
-| workspace containers | built from `argos-worker:<stack>-<hash>-<agent>-<version>` | One container per running workspace, started by the `app`/`queue` services. **All AI runs here** — the manager never touches Claude directly. The image is built on demand from the `worker_stacks` row × the agent, plus the workspace daemon and VS Code. |
+| `queue` | `ghcr.io/nodus-it/argos-app` | Laravel Horizon worker — runs background jobs on Redis: workspace provisioning, task preparation, image builds, previews, automatic tasks, ticket webhooks. Same image as `app`. |
+| `scheduler` | `ghcr.io/nodus-it/argos-app` | Laravel scheduler (`schedule:work`) — dispatches recurring jobs (issue polling, pull-request and ticket-comment sync, idle stop, task cleanup). Same image as `app`. |
+| workspace containers | built from `argos-worker:<stack>-<hash>-<lib>-<agent>-<version>` | One container per running workspace, with a git worktree per task, started by the `app`/`queue` services. **All AI runs here** — the manager never touches Claude directly. The image is built on demand from the workspace's stack (built-in or `.argos/worker.dockerfile`) × the agent, plus the workspace daemon and VS Code. |
 
 The host port is set by **`ARGOS_PORT`** (default `8080`), mapped to
 **Traefik's** port 80. Everything not matched by a live-demo host rule falls
@@ -173,7 +173,7 @@ cached image.
 Open the admin UI:
 
 - `http://localhost:8080/admin` (or `${APP_URL}/admin`). Visiting `/`
-  redirects to `/admin`.
+  redirects to `/w` (your work), or to `/admin` when workspaces are disabled.
 
 Log in with the credentials from the installer summary:
 
@@ -186,9 +186,11 @@ step is **Security**: set your own password right there to replace the
 generated default. The step is optional and skippable, but while you still
 carry the default password a warning nudges you to change it (you can also
 change it anytime later under **Profile**). The wizard then walks you through
-pasting your Claude token and creating your first project. To make a target
-repository "Argos-ready" (a custom build environment or a live-demo contract),
-see [PREPARE-PROJECT.md](PREPARE-PROJECT.md).
+pasting your Claude token and creating your first workspace from a
+repository. Argos then inspects the repository and, if something is missing,
+starts a [setup task](PREPARE-PROJECT.md#the-setup-task) on your subscription.
+To make a repository "Argos-ready" by hand, see
+[Preparing a Repository](PREPARE-PROJECT.md).
 
 ## Reverse proxy and APP_URL
 
@@ -223,11 +225,11 @@ See the session/HTTPS variables (`SESSION_DOMAIN`, `SESSION_SECURE_COOKIE`) in
 ## OAuth (optional)
 
 By default Argos works with Personal Access Tokens (PATs) — paste a token per
-project and you're done. **OAuth** is the optional upgrade that enables:
+workspace and you're done. **OAuth** is the optional upgrade that enables:
 
-- Repository and branch dropdowns when creating a project
+- Repository and branch dropdowns when creating a workspace
 - Per-user authentication (each user connects their own accounts)
-- Self-hosted GitLab support without per-project token management
+- Self-hosted GitLab support without per-workspace token management
 
 OAuth client credentials are managed entirely in the UI (Configuration → OAuth
 Apps) and stored in the database — there is no ENV path. See:
@@ -237,28 +239,32 @@ Apps) and stored in the database — there is no ENV path. See:
 - [GitLab Setup](SETUP-GITLAB.md)
 - [Bitbucket Setup](SETUP-BITBUCKET.md)
 
-## Choosing a worker stack and agent
+## Stacks and agents
 
 Worker images are **not** pulled from GHCR — the manager builds them on demand
-from the `worker_stacks` table the first time a workspace with that combination
-of (stack × agent × version) starts. The first start takes 1–3 minutes;
-subsequent starts use the cached image.
+the first time a workspace with that combination of stack × agent × version
+starts (1–3 minutes; the default stack is pre-built at boot). Argos ships
+three built-in stacks — **PHP 8.5** (default), **PHP 8.4** and **Node 22** —
+and picks one per workspace from the repository; anything else comes from the
+repository's own `.argos/worker.dockerfile`. There is no stack editor. See
+[Stacks and Images](WORKER-STACKS.md).
 
-Manage stacks under **Worker → Stacks** and agents under **Agents** in the admin
-UI, then pick the stack per project. Built-in stacks (`php-8.3`, `php-8.4`, …) are mirrored from
-the repo manifest into the DB on every migration; you can add your own user
-stack in the same UI.
+Agents (Claude subscriptions) are managed under **Worker → Agents** in the
+admin UI; every user can add their own. See [Agents](AGENTS.md).
 
-To tailor a *target* repository to Argos — a custom build environment
-(`.argos/worker.dockerfile`) or a live-demo contract (`.argos/demo.*`) — see
-[PREPARE-PROJECT.md](PREPARE-PROJECT.md).
+To tailor a repository to Argos — setup steps (`.argos/setup.sh`), a custom
+image (`.argos/worker.dockerfile`) or a preview contract (`.argos/demo.*`) —
+see [Preparing a Repository](PREPARE-PROJECT.md).
 
 ## Users and administrators
 
-The admin account created on install is an **administrator**. Administrators
-manage users (*Configuration → Users*), worker stacks, image builds, OAuth apps,
-access tokens, API clients and settings, and see every workspace. Other users
-work with projects, their own agents and the workspaces they are members of. To restore the role from the command line:
+The admin account created on install is an **Argos administrator**.
+Administrators manage users (*Configuration → Users*), agents, OAuth apps,
+access tokens, API clients and settings, create workspaces and may do
+everything in every workspace. Other users work in the workspaces they are
+members of — as admin, member or viewer (see
+[Workspaces → Roles](WORKSPACES.md#roles)) — with their own agents. To restore
+the administrator role from the command line:
 
 ```bash
 docker compose exec app php artisan argos:user:admin someone@example.com
@@ -274,9 +280,9 @@ On upgrade, the first existing user becomes an administrator.
 - the `argos_ws` Docker network (created by compose) — workspace containers,
   the manager, nginx and Traefik share it; db and Redis do not,
 - wildcard DNS for `code-<workspace>.<base-domain>` and
-  `demo-ws-<workspace>.<base-domain>` (the same base domain as live demos).
+  `demo-<workspace>-<task>.<base-domain>` (the same base domain as previews).
 
-The first workspace of a project builds its image (worker image + workspace
+The first start of a workspace builds its image (worker image + workspace
 daemon + VS Code), which takes a few minutes.
 
 ## Pre-seeding the Claude token

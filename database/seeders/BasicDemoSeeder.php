@@ -10,7 +10,7 @@ use Illuminate\Database\Seeder;
 /**
  * Basic profile: the minimum to log in and START onboarding.
  *
- * Seeds only the admin user — deliberately NO RepoProfile and NO agent
+ * Seeds only the admin user — deliberately NO workspace and NO agent
  * credential, so RedirectToOnboarding fires and the user lands on onboarding
  * step 1. Use for verifying the onboarding flow from scratch.
  *

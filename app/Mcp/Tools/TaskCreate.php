@@ -31,6 +31,7 @@ class TaskCreate extends Tool
             'base_branch' => $schema->string()->description('Branch to start from (defaults to the workspace default)')->nullable(),
             'plan' => $schema->string()->description('off = implement right away, auto = plan then continue, approve = plan then wait for approval (default: workspace setting)')->nullable(),
             'ship' => $schema->string()->description('pr, draft_pr or none (default: workspace setting)')->nullable(),
+            'auto_merge' => $schema->boolean()->description('Merge the pull request on its own once the pipeline is green and reviews allow it (provider auto-merge)')->nullable(),
         ];
     }
 
@@ -44,6 +45,7 @@ class TaskCreate extends Tool
             'base_branch' => 'nullable|string|max:255',
             'plan' => 'nullable|in:off,auto,approve',
             'ship' => 'nullable|in:pr,draft_pr,none',
+            'auto_merge' => 'nullable|boolean',
         ]);
         $workspace = $this->findWorkspace((string) $request->get('workspace'));
         if ($workspace === null) {
@@ -56,6 +58,7 @@ class TaskCreate extends Tool
                 'title' => $request->get('title'),
                 'base_branch' => $request->get('base_branch'),
                 'issue' => $issue,
+                'auto_merge' => (bool) $request->get('auto_merge'),
             ], ['plan' => $request->get('plan'), 'ship' => $request->get('ship')], TaskOrigin::Mcp);
 
             return $this->taskJson($task);

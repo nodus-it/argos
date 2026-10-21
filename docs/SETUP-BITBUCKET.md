@@ -7,12 +7,12 @@ See [OAuth Overview](OAUTH.md) for how PAT and OAuth compare and which one to
 pick.
 
 > **Scope note — Bitbucket is a code provider only.** Argos uses Bitbucket for
-> cloning, branches, and pull-request creation. Bitbucket is **not** wired as an
-> issue trigger: there is no Bitbucket option when binding an issue source,
-> and Argos does not start runs from Bitbucket issues or register issue
-> webhooks for them. See
+> cloning, branches, and pull requests. Bitbucket is **not** wired as an
+> issue tracker: there is no Bitbucket option among a workspace's issue
+> trackers, and Argos does not use Bitbucket issues as tickets, start tasks
+> from them or register issue webhooks for them. See
 > [Issue Triggers](SETUP-TASK-PROVIDERS.md) for the providers that do start
-> automatic runs from issues (GitHub, GitLab, Linear).
+> automatic tasks from issues (GitHub, GitLab, Linear).
 
 ---
 
@@ -21,10 +21,12 @@ pick.
 | Capability | Supported |
 |---|---|
 | Clone repository | Yes |
-| List repositories / branches (for project form dropdowns) | Yes |
+| List repositories / branches (for workspace form dropdowns) | Yes |
 | Create / update / comment on pull requests | Yes |
+| Pull request state, build statuses, reviews and comments, conflicts in the task | Yes (no failed-build logs, no "base moved on" hint) |
+| Auto-merge | **No** (Bitbucket Cloud has none) |
 | Read the default branch and source files | Yes |
-| Issue trigger (a Bitbucket issue starting an automatic run) | **No** |
+| Issues as tickets / issue trigger (a Bitbucket issue starting an automatic task) | **No** |
 | Issue webhooks / 👍-approval flow | **No** |
 
 ---
@@ -50,12 +52,13 @@ OAuth configuration.
    - **Pull requests**: Read, Write
    - **Issues**: Read (optional — only needed if you want Argos to read issue
      content from the repo; Bitbucket is not an issue trigger, so this does not
-     start runs)
+     start tasks)
 6. Click **Create** and copy the generated token — it will only be shown once.
 
-### Step 2: Configure in Argos
+### Step 2: Create the workspace in Argos
 
-In **Projects → New Project**:
+As an Argos administrator, choose **New workspace** (in `/w`, or under
+**Workspaces** in the admin panel):
 
 - **Platform**: Bitbucket
 - **Repo URL**: `https://bitbucket.org/<workspace>/<repository>`
@@ -78,7 +81,7 @@ Token with Basic authentication:
 
 ## Option 2: OAuth (optional)
 
-OAuth enables repository and branch dropdowns in the project form and per-user
+OAuth enables repository and branch dropdowns in the workspace form and per-user
 account binding — each user connects their own Bitbucket account instead of
 pasting a token.
 
@@ -125,7 +128,7 @@ effect immediately, without a restart.
 1. Go to **Connected Accounts** in the Argos admin panel.
 2. Click **Connect Bitbucket**.
 3. Authorize the OAuth consumer in Bitbucket.
-4. When creating a project, select **Bitbucket** as the platform and choose
+4. When creating a workspace, select **Bitbucket** as the platform and choose
    **OAuth** as the authentication method to pull repositories and branches
    from the connected account.
 
@@ -139,4 +142,5 @@ effect immediately, without a restart.
 | 401 on push | Token missing Repositories Write permission, or token pasted with an accidental username prefix |
 | PR creation returns 409 | A PR for this branch already exists — Argos will find and report the existing URL |
 | OAuth redirect fails | The callback URL registered in the OAuth consumer must exactly match `${APP_URL}/auth/bitbucket/callback` — verify `APP_URL` and that the OAuth app is enabled under **Configuration → OAuth Apps** |
-| Expecting a Bitbucket issue to start an automatic run | Not supported — Bitbucket is a code provider only. Use [GitHub/GitLab/Linear](SETUP-TASK-PROVIDERS.md) as an issue trigger |
+| Expecting a Bitbucket issue to start an automatic task | Not supported — Bitbucket is a code provider only. Use [GitHub/GitLab/Linear](SETUP-TASK-PROVIDERS.md) or an [own ticket system](TICKETS.md#own-ticket-systems) |
+| "Merge automatically" cannot be switched on | Bitbucket has no native auto-merge; merge in Bitbucket |

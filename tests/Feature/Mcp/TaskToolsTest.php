@@ -48,8 +48,9 @@ class TaskToolsTest extends TestCase
     public function test_task_create_starts_an_automatic_task_in_the_workspace(): void
     {
         ArgosServer::actingAs($this->user)
-            ->tool(TaskCreate::class, ['workspace' => 'widget', 'prompt' => 'Add priorities', 'title' => 'Priorities', 'plan' => 'auto', 'base_branch' => 'develop'])
+            ->tool(TaskCreate::class, ['workspace' => 'widget', 'prompt' => 'Add priorities', 'title' => 'Priorities', 'plan' => 'auto', 'base_branch' => 'develop', 'auto_merge' => true])
             ->assertOk()
+            ->assertSee('"auto_merge": true')
             ->assertSee('"state": "queued"')
             ->assertSee('"origin": "mcp"');
 

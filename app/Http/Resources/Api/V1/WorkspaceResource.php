@@ -25,6 +25,7 @@ class WorkspaceResource extends JsonResource
             'platform' => $this->platform->value,
             'default_branch' => $this->default_branch,
             'status' => $this->status->value,
+            'setup' => $this->setup_status?->value,
             'tasks' => TaskResource::collection($this->whenLoaded('tasks')),
             'url' => $this->url(),
             'created_at' => $this->created_at,

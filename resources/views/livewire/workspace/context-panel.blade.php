@@ -109,10 +109,12 @@
                     @if ($prState === 'draft')
                         <button type="button" class="wf-btn wf-btn-sm wf-btn-primary" wire:click="prMarkReady" wire:loading.attr="disabled">{{ __('workspaces.pr.ready') }}</button>
                     @endif
+                    @if ($autoMergeSupported)
                     <label class="wf-check" title="{{ __('workspaces.pr.auto_merge_help') }}">
                         <input type="checkbox" @checked($task->auto_merge) wire:change="prAutoMerge($event.target.checked)" data-testid="pr-auto-merge">
                         <span>{{ __('workspaces.pr.auto_merge') }}</span>
                     </label>
+                    @endif
                 </div>
             @endif
         </div>

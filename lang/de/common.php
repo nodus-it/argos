@@ -19,7 +19,7 @@ return [
         'section_auto' => 'Automatische Aufgaben',
         'section_auto_description' => 'Ob dir zugewiesene Issues Aufgaben auf deinem eigenen Claude-Abo starten dürfen, ohne dass du sie startest.',
         'auto_task_consent' => 'Mir zugewiesene Issues dürfen automatisch auf meinem Abo starten',
-        'auto_task_consent_help' => 'Greift ein Workspace ein dir zugewiesenes Issue auf, läuft die Aufgabe als deine und nutzt dein Claude-Abo. Aus: Solche Issues warten, bis du sie startest.',
+        'auto_task_consent_help' => 'Greift ein Workspace ein dir zugewiesenes Issue auf, läuft die Aufgabe als deine und nutzt dein Claude-Abo. Aus: Die Aufgabe läuft als Automatik-Nutzer des Workspaces, und du wirst eingeladen.',
         'section_agents' => 'Meine Claude-Abos',
         'section_agents_description' => 'Deine eigenen Agenten. Deine Aufgaben laufen darauf; geteilte Agenten verwalten Admins.',
         'agents_empty' => 'Du hast noch keinen eigenen Agenten. Hinterlege dein Claude-Abo, um Aufgaben darauf laufen zu lassen.',

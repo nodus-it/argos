@@ -79,6 +79,7 @@ class PullRequestService
         if ($finished) {
             app(IssueRunReporter::class)->closed($task);
             app(WorkspaceSetupService::class)->pullRequestFinished($task);
+            $this->tasks->endPreview($task);
         }
 
         return $details;

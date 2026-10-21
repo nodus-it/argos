@@ -8,7 +8,7 @@ return [
     'auto' => [
         'owner_gone' => 'The owner of this task no longer exists.',
         'no_usable_agent' => 'The person this run acts for has no usable agent (Claude subscription).',
-        'no_actor' => 'This token acts for nobody: set the project\'s automation user or the API client\'s “runs as” user.',
+        'no_actor' => 'This token acts for nobody: set the workspace\'s automation user or the API client\'s “runs as” user.',
         'start_with_workspace' => 'Start an automatic run with the workspace',
         'label' => 'Automatic',
         'automated' => 'automatic',
@@ -515,7 +515,7 @@ return [
         'transfer_needs_agent' => ':name has no usable Claude subscription to run the task on.',
         'preparing' => 'This task is still being prepared (working copy, database, setup). Try again in a moment.',
         'daemon_unreachable' => 'The workspace did not respond: :message',
-        'bypass_owner_only' => 'Only workspace owners may bypass permissions.',
+        'bypass_owner_only' => 'Only workspace admins may bypass permissions.',
         'capacity' => 'Already :max workspaces are running. Stop one before starting another.',
         'init_failed' => 'Setting up the repository failed (:code): :message',
         'agent_unavailable' => 'The agent of this task is not available.',
@@ -628,7 +628,7 @@ return [
         ],
         'integrations' => [
             'trackers' => 'Issue trackers',
-            'trackers_description' => 'Where tasks come from: GitHub, GitLab or Linear projects this workspace watches.',
+            'trackers_description' => 'Where tasks come from: GitHub, GitLab or Linear projects this workspace watches, or your own ticket system.',
             'tokens' => 'API tokens',
             'tokens_description' => 'Tokens for CI or scripts. They only reach this workspace and act as its automation user.',
             'members_description' => 'Admins change settings, secrets and members; members create tasks; viewers read and work in tasks they are invited to.',
@@ -663,7 +663,7 @@ return [
         'rebase' => 'Rebase by Claude',
         'auto_merge' => 'Merge automatically',
         'auto_merge_help' => 'Merges on its own once the pipeline is green and the reviews allow it.',
-        'auto_merge_unavailable' => 'Auto-merge is not available for this repository (switch it on in the repository settings).',
+        'auto_merge_unavailable' => 'Auto-merge is not available: on GitHub switch on "Allow auto-merge" in the repository settings; GitLab arms it only while a pipeline runs.',
         'auto_merge_failed' => 'Auto-merge could not be changed.',
         'no_failed_checks' => 'No failed checks to fix.',
         'no_review' => 'There is no review to hand over yet.',
@@ -707,5 +707,8 @@ return [
         'revise' => 'Revise setup',
         'open_task' => 'Open the setup task',
         'banner' => 'This task sets up the workspace. When Claude is done, press "Test setup".',
+    ],
+    'api' => [
+        'no_connected_account' => 'The API client\'s user has no connected account on this platform.',
     ],
 ];

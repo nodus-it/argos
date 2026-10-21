@@ -109,7 +109,7 @@ then run:
 composer run test:external
 ```
 
-Or use the helper that seeds three RepoProfiles per provider (PAT + OAuth)
+Or use the helper that seeds three workspaces per provider (PAT + OAuth)
 and runs both auth modes:
 
 ```bash
@@ -200,7 +200,7 @@ For non-security bugs, open an issue on
 - Provider (GitHub / GitLab / Bitbucket) + auth mode (PAT / OAuth)
 - Reproduction steps and any logs from the affected workspace
 
-The agent's output is in the workspace threads; the manager log can be
+The agent's output is in the tasks of the workspace; the manager log can be
 downloaded under **Settings**.
 
 ## License

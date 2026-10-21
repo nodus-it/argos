@@ -18,6 +18,10 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function (): void {
         Route::get('workspaces/{workspace}', [WorkspaceController::class, 'show']);
     });
 
+    Route::middleware('abilities:workspaces:write')->group(function (): void {
+        Route::post('workspaces', [WorkspaceController::class, 'store']);
+    });
+
     Route::middleware('abilities:tasks:read')->group(function (): void {
         Route::get('workspaces/{workspace}/tasks', [TaskController::class, 'index']);
         Route::get('tasks/{task}', [TaskController::class, 'show']);
