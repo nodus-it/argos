@@ -161,6 +161,33 @@ export function argosThreadSwitcher() {
 export function argosReview(labelTemplate) {
     return {
         draft: null,
+        change: null,
+        changed: [],
+
+        /** Claude edited a file: hint, don't swap the diff under the reader. */
+        fileChanged(edit) {
+            if (!this.$wire.active || !edit?.path) {
+                return;
+            }
+            this.change = edit;
+            if (!this.changed.includes(edit.path)) {
+                this.changed = [...this.changed, edit.path];
+            }
+        },
+
+        changeText(template) {
+            return this.change ? template.replace('__F__', this.change.path.split('/').pop()).replace('__A__', this.change.add).replace('__D__', this.change.del) : '';
+        },
+
+        showChange(currentPath) {
+            const path = this.change?.path;
+            this.change = null;
+            if (path && path !== currentPath) {
+                this.$wire.selectFile(path);
+            } else {
+                this.$wire.$refresh();
+            }
+        },
 
         pick(side, line, event) {
             if (event.shiftKey && this.draft && this.draft.side === side) {

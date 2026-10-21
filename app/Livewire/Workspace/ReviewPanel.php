@@ -18,6 +18,7 @@ use App\Services\Workspace\WorkspaceException;
 use Filament\Notifications\Notification;
 use Illuminate\Auth\Access\AuthorizationException;
 use App\Services\Workspace\WorkspaceGateService;
+use App\Support\GateAnnotations;
 use App\Support\ReviewDiff;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Locked;
@@ -162,6 +163,38 @@ class ReviewPanel extends Component
         }
     }
 
+    /** "Send anyway" on an outdated comment. */
+    public function sendAnyway(string $id): void
+    {
+        $comment = $this->comment($id);
+        if ($comment !== null) {
+            app(ReviewCommentService::class)->sendAnyway($comment, $this->user());
+            $this->dispatch('review-comments-changed');
+        }
+    }
+
+    /** "Move to the new line": re-anchor an outdated comment on the current text. */
+    public function moveComment(string $id): void
+    {
+        $comment = $this->comment($id);
+        if ($comment === null) {
+            return;
+        }
+        try {
+            $content = app(WorkspaceDaemonClient::class)->for($this->workspace(), 15)->fileContent($comment->path)['content'];
+        } catch (DaemonTransportException) {
+            return;
+        }
+        app(ReviewCommentService::class)->moveToCurrent($comment, $this->user(), ReviewCommentService::numbered($content));
+        $this->dispatch('review-comments-changed');
+    }
+
+    /** "Let Claude fix it" on a gate finding: it joins the comment collection. */
+    public function fixWithClaude(string $path, int $line, string $gate, string $message): void
+    {
+        $this->addComment($path, 'new', max(1, $line), max(1, $line), __('workspaces.review.fix_body', ['gate' => $gate, 'message' => $message]));
+    }
+
     /** The composer changed the collection (removed a chip, sent the review). */
     #[On('review-comments-changed')]
     public function commentsChanged(): void {}
@@ -184,8 +217,15 @@ class ReviewPanel extends Component
         }
 
         $current = collect($files)->firstWhere('path', $this->file) ?? ($files[0] ?? null);
-        $index = $current !== null ? array_search($current['path'], array_column($files, 'path'), true) : false;
         $thread = $this->threadId !== null ? $this->thread($this->threadId) : null;
+        if ($current !== null && $thread !== null) {
+            $this->reanchor($thread, $current['path']);
+        }
+        $gateRun = app(WorkspaceGateService::class)->latest($workspace);
+        $annotations = GateAnnotations::fromRun($gateRun);
+        $phpstanHere = $current !== null ? collect($annotations['phpstan'][$current['path']] ?? []) : collect();
+        $shown = $current !== null ? $this->shownLines($current) : [];
+        $index = $current !== null ? array_search($current['path'], array_column($files, 'path'), true) : false;
         $seen = $thread !== null
             ? app(ReviewService::class)->seen($thread, $this->user(), array_column($files, 'hash', 'path'))
             : [];
@@ -212,9 +252,16 @@ class ReviewPanel extends Component
             'additions' => array_sum(array_column($files, 'additions')),
             'deletions' => array_sum(array_column($files, 'deletions')),
             'gates' => array_values(array_filter(
-                ContextPanel::gateRows(app(WorkspaceGateService::class)->latest($workspace)),
+                ContextPanel::gateRows($gateRun),
                 fn (array $row): bool => in_array($row['state'], ['pass', 'fail', 'running'], true),
             )),
+            'gateCounts' => ['phpstan' => array_sum(array_map('count', $annotations['phpstan'])), 'pint' => count($annotations['pint'])],
+            'firstFinding' => array_key_first($annotations['phpstan']) ?? ($annotations['pint'][0] ?? null),
+            'findingCounts' => GateAnnotations::counts($annotations),
+            'annotationsAt' => $phpstanHere->filter(fn (array $a): bool => in_array($a['line'], $shown, true))->groupBy('line'),
+            'outsideFindings' => $phpstanHere->reject(fn (array $a): bool => in_array($a['line'], $shown, true))->values(),
+            'pintFlagged' => $current !== null && in_array($current['path'], $annotations['pint'], true),
+            'firstChangedLine' => $current !== null ? (min($shown ?: [1])) : 1,
             'baseBranch' => $workspace->base_branch,
         ]);
     }
@@ -240,6 +287,27 @@ class ReviewPanel extends Component
         ksort($lines);
 
         return $lines;
+    }
+
+    /** New-side line numbers the diff currently shows for a file (hunks + expanded gaps). */
+    private function shownLines(array $file): array
+    {
+        return array_keys($this->lineTexts($file, 'new'));
+    }
+
+    /** Let the current file's comments follow Claude's edits (one daemon read). */
+    private function reanchor(Thread $thread, string $path): void
+    {
+        $service = app(ReviewCommentService::class);
+        if (! in_array($path, $service->anchoredPaths($thread), true)) {
+            return;
+        }
+        try {
+            $content = app(WorkspaceDaemonClient::class)->for($this->workspace(), 15)->fileContent($path)['content'];
+        } catch (DaemonTransportException) {
+            return;
+        }
+        $service->reanchor($thread, [$path => $content]);
     }
 
     private function comment(string $id): ?ReviewComment

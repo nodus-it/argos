@@ -364,8 +364,8 @@
                     @error('uploads') <p class="wf-note is-error">{{ $message }}</p> @enderror
 
                     @php
-                        $activeComments = $reviewComments->filter(fn ($c) => $c->status === \App\Enums\ReviewCommentStatus::Draft || in_array($c->id, $includeStale, true));
-                        $staleComments = $reviewComments->filter(fn ($c) => $c->status === \App\Enums\ReviewCommentStatus::Stale && ! in_array($c->id, $includeStale, true));
+                        $activeComments = $reviewComments->filter(fn ($c) => $c->status === \App\Enums\ReviewCommentStatus::Draft);
+                        $staleComments = $reviewComments->filter(fn ($c) => $c->status === \App\Enums\ReviewCommentStatus::Stale);
                     @endphp
                     @if ($reviewComments->isNotEmpty())
                         <div class="wf-chips">

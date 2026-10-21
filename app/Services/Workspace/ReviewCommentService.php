@@ -75,17 +75,113 @@ class ReviewCommentService
             ->get();
     }
 
+    /** "Send anyway": an outdated comment goes out, marked as referring to the previous version. */
+    public function sendAnyway(ReviewComment $comment, User $user): void
+    {
+        $this->authorizeOwn($comment, $user);
+        $comment->forceFill(['status' => ReviewCommentStatus::Draft, 'outdated' => true])->save();
+    }
+
     /**
-     * Send the active comments (and the stale ones asked for) with the free
-     * text as one message. Queued by the daemon while Claude works.
+     * "Move to the new line": re-anchor an outdated comment on what its lines
+     * say now.
      *
-     * @param  list<string>  $includeStale  ids of stale comments to send anyway
+     * @param  array<int, string>  $lines  current file, line number => text
+     */
+    public function moveToCurrent(ReviewComment $comment, User $user, array $lines): void
+    {
+        $this->authorizeOwn($comment, $user);
+        $end = min($comment->line_end, max($comment->line_start, count($lines)));
+        $comment->forceFill([
+            'line_end' => $end,
+            'anchor_hash' => self::anchor($lines, $comment->line_start, $end),
+            'snippet' => self::snippet($lines, $comment->line_start, $end),
+            'status' => ReviewCommentStatus::Draft,
+            'outdated' => false,
+        ])->save();
+    }
+
+    /**
+     * Follow Claude's edits: a comment whose lines still read the same moves
+     * with them (nearest match); otherwise it turns stale. Only the new side
+     * changes — removed lines belong to the base branch.
+     *
+     * @param  array<string, string>  $contents  path => current file content (files that vanished are missing)
+     * @return int comments changed
+     */
+    public function reanchor(Thread $thread, array $contents): int
+    {
+        $changed = 0;
+        $comments = ReviewComment::query()
+            ->where('thread_id', $thread->id)
+            ->where('status', ReviewCommentStatus::Draft->value)
+            ->where('outdated', false)
+            ->where('side', 'new')
+            ->get();
+
+        foreach ($comments as $comment) {
+            if (! array_key_exists($comment->path, $contents)) {
+                continue;
+            }
+            $lines = self::numbered($contents[$comment->path]);
+            $span = $comment->line_end - $comment->line_start;
+            if (self::anchor($lines, $comment->line_start, $comment->line_end) === $comment->anchor_hash) {
+                continue;
+            }
+
+            $best = null;
+            foreach (array_keys($lines) as $start) {
+                if (self::anchor($lines, $start, $start + $span) === $comment->anchor_hash
+                    && ($best === null || abs($start - $comment->line_start) < abs($best - $comment->line_start))) {
+                    $best = $start;
+                }
+            }
+
+            $comment->forceFill($best !== null
+                ? ['line_start' => $best, 'line_end' => $best + $span]
+                : ['status' => ReviewCommentStatus::Stale])->save();
+            $changed++;
+        }
+
+        return $changed;
+    }
+
+    /**
+     * Paths with comments that follow the working tree (for reanchor()).
+     *
+     * @return list<string>
+     */
+    public function anchoredPaths(Thread $thread): array
+    {
+        return ReviewComment::query()
+            ->where('thread_id', $thread->id)
+            ->where('status', ReviewCommentStatus::Draft->value)
+            ->where('outdated', false)
+            ->where('side', 'new')
+            ->distinct()
+            ->pluck('path')
+            ->all();
+    }
+
+    /** @return array<int, string> 1-based line number => text */
+    public static function numbered(string $content): array
+    {
+        $lines = explode("\n", $content);
+
+        return array_combine(range(1, count($lines)), $lines);
+    }
+
+    /**
+     * Send the collected comments (outdated ones only after "send anyway")
+     * with the free text as one message. Queued by the daemon while Claude
+     * works.
+     *
      * @return int number of comments sent
      */
-    public function send(Thread $thread, User $user, string $text, array $includeStale = []): int
+    public function send(Thread $thread, User $user, string $text): int
     {
         $comments = $this->open($thread, $user)->filter(
-            fn (ReviewComment $c): bool => $c->status === ReviewCommentStatus::Draft || in_array($c->id, $includeStale, true),
+            fn (ReviewComment $c): bool => $c->status === ReviewCommentStatus::Draft,
         )->values();
         if ($comments->isEmpty() && trim($text) === '') {
             return 0;
@@ -110,7 +206,7 @@ class ReviewCommentService
             $entries = [__('workspaces.review.message_heading')];
             foreach ($comments->values() as $i => $comment) {
                 $location = $comment->location().($comment->side === 'old' ? ' '.__('workspaces.review.removed_line') : '');
-                if ($comment->status === ReviewCommentStatus::Stale) {
+                if ($comment->status === ReviewCommentStatus::Stale || $comment->outdated) {
                     $location .= ' '.__('workspaces.review.previous_version');
                 }
                 $code = implode("\n", array_map(fn (string $l): string => '   '.$l, explode("\n", $comment->snippet)));

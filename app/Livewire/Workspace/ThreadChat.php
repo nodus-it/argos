@@ -203,9 +203,6 @@ class ThreadChat extends Component
         });
     }
 
-    /** Stale review comments the person chose to send anyway (ids). */
-    public array $includeStale = [];
-
     public function send(): void
     {
         $text = trim($this->draft);
@@ -217,9 +214,8 @@ class ThreadChat extends Component
         // Collected review comments go out with the text as one message.
         if ($this->collectedCount($thread) > 0) {
             $this->attempt(function () use ($thread, $text): void {
-                $sent = app(ReviewCommentService::class)->send($thread, $this->user(), $text, $this->includeStale);
+                $sent = app(ReviewCommentService::class)->send($thread, $this->user(), $text);
                 $this->draft = '';
-                $this->includeStale = [];
                 $this->dispatch('review-comments-changed');
                 Notification::make()->title(trans_choice('workspaces.review.sent_count', $sent, ['count' => $sent]))->success()->send();
             });
@@ -257,7 +253,6 @@ class ThreadChat extends Component
         $comment = $thread !== null ? app(ReviewCommentService::class)->open($thread, $this->user())->firstWhere('id', $id) : null;
         if ($comment !== null) {
             app(ReviewCommentService::class)->discard($comment, $this->user());
-            $this->includeStale = array_values(array_diff($this->includeStale, [$id]));
             $this->dispatch('review-comments-changed');
         }
     }
@@ -269,7 +264,7 @@ class ThreadChat extends Component
     private function collectedCount(Thread $thread): int
     {
         return app(ReviewCommentService::class)->open($thread, $this->user())
-            ->filter(fn ($c): bool => $c->status === \App\Enums\ReviewCommentStatus::Draft || in_array($c->id, $this->includeStale, true))
+            ->filter(fn ($c): bool => $c->status === \App\Enums\ReviewCommentStatus::Draft)
             ->count();
     }
 

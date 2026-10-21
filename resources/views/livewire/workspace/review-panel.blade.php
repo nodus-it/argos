@@ -3,7 +3,7 @@
 <div class="wf-review" x-data="argosReview(@js(__('workspaces.review.comment_on', ['line' => '__L__'])))"
      x-on:argos-review-opened.window="$wire.open($event.detail.file)"
      x-on:argos-review-closed.window="$wire.close()"
-     x-on:argos-turn-completed.window="if ($wire.active) $wire.$refresh()"
+     x-on:argos-file-changed.window="fileChanged($event.detail)"
      x-on:argos-gates-updated.window="if ($wire.active) $wire.$refresh()">
 @if ($active)
     @php
@@ -19,10 +19,18 @@
         @if ($gates !== [])
             <span class="wf-gate-chips" role="group" aria-label="{{ __('workspaces.focus.gates') }}">
                 @foreach ($gates as $gate)
-                    <span @class(['wf-gate-chip', 'is-'.$gate['state']])>
-                        @if ($gate['state'] === 'pass') ✓ @elseif ($gate['state'] === 'fail') ! @else <span class="wf-spin"></span> @endif
-                        {{ explode(' ', $gate['label'])[0] }}
-                    </span>
+                    @php $count = $gateCounts[$gate['key']] ?? 0; @endphp
+                    @if ($gate['state'] === 'fail' && $count > 0 && $firstFinding !== null)
+                        <button type="button" @class(['wf-gate-chip', 'is-'.$gate['state']]) wire:click="selectFile(@js($firstFinding))"
+                                x-on:click="$nextTick(() => setTimeout(() => $root.querySelector('.wf-annot')?.scrollIntoView({ block: 'center' }), 400))">
+                            ! {{ explode(' ', $gate['label'])[0] }} {{ $count }}
+                        </button>
+                    @else
+                        <span @class(['wf-gate-chip', 'is-'.$gate['state']])>
+                            @if ($gate['state'] === 'pass') ✓ @elseif ($gate['state'] === 'fail') ! @else <span class="wf-spin"></span> @endif
+                            {{ explode(' ', $gate['label'])[0] }}
+                        </span>
+                    @endif
                 @endforeach
             </span>
             <span class="wf-vsep" aria-hidden="true"></span>
@@ -54,6 +62,10 @@
                                 wire:click="selectFile(@js($f['path']))" x-on:click="draft = null" @if ($current['path'] === $f['path']) aria-current="true" @endif title="{{ $f['path'] }}">
                             <span @class(['wf-file-status', 'mono', 'is-'.strtolower($f['status'])])>{{ $f['status'] }}</span>
                             <span class="wf-tree-name mono">{{ $f['name'] }}</span>
+                            @if (($findingCounts[$f['path']] ?? 0) > 0)
+                                <span class="wf-tree-badge is-warn" title="{{ trans_choice('workspaces.review.findings', $findingCounts[$f['path']], ['count' => $findingCounts[$f['path']]]) }}">{{ $findingCounts[$f['path']] }}</span>
+                            @endif
+                            <span class="wf-tree-badge is-info" x-show="changed.includes(@js($f['path']))" x-cloak>{{ __('workspaces.review.new') }}</span>
                             @if (in_array($f['path'], $seen, true))
                                 <span class="wf-tree-seen" title="{{ __('workspaces.review.seen') }}"><x-wf.icon name="check" :size="13" :stroke="2.4" /></span>
                             @endif
@@ -73,6 +85,37 @@
                         {{ __('workspaces.review.seen') }}
                     </label>
                 </div>
+
+                <div class="wf-live" role="status" x-show="change" x-cloak>
+                    <x-wf.icon name="refresh" :size="15" :stroke="2" />
+                    <span class="wf-live-text" x-text="changeText(@js(__('workspaces.review.live_change', ['file' => '__F__', 'add' => '__A__', 'del' => '__D__'])))"></span>
+                    <button type="button" class="wf-live-btn" x-on:click="showChange(@js($current['path']))">{{ __('workspaces.review.show_change') }}</button>
+                </div>
+                @if ($pintFlagged || $outsideFindings->isNotEmpty())
+                    <div class="wf-findings">
+                        @if ($pintFlagged)
+                            <div class="wf-annot is-file">
+                                <span class="wf-annot-gate">Pint</span>
+                                <span class="wf-annot-msg">{{ __('workspaces.review.pint_flagged') }}</span>
+                                @if ($canWrite)
+                                    <button type="button" class="wf-annot-btn" wire:click="fixWithClaude(@js($current['path']), {{ $firstChangedLine }}, 'Pint', @js(__('workspaces.review.pint_flagged')))">{{ __('workspaces.review.fix') }}</button>
+                                @endif
+                            </div>
+                        @endif
+                        @if ($outsideFindings->isNotEmpty())
+                            <div class="wf-findings-title wf-muted">{{ __('workspaces.review.findings_outside') }}</div>
+                            @foreach ($outsideFindings as $finding)
+                                <div class="wf-annot">
+                                    <span class="wf-annot-gate">PHPStan</span>
+                                    <span class="wf-annot-msg"><span class="mono">:{{ $finding['line'] }}</span> {{ $finding['message'] }}</span>
+                                    @if ($canWrite)
+                                        <button type="button" class="wf-annot-btn" wire:click="fixWithClaude(@js($current['path']), {{ $finding['line'] }}, 'PHPStan', @js($finding['message']))">{{ __('workspaces.review.fix') }}</button>
+                                    @endif
+                                </div>
+                            @endforeach
+                        @endif
+                    </div>
+                @endif
 
                 <div @class(['wf-diff-body', 'mono', 'is-split' => $view === 'split', 'is-unified' => $view === 'unified']) wire:key="diff-{{ md5($current['path']) }}-{{ $view }}">
                     @foreach ($current['hunks'] as $hunk)

@@ -8,9 +8,10 @@ and click through the result in a live preview. Several people can work in the
 same workspace at once.
 
 Workspaces have their own area at **`/w`** (also where `/` leads): full
-width, navigation in the top bar, so chat, editor and preview get the whole
-screen. **Administration** in the top bar leads to the admin area (`/admin`)
-with projects, agents and users; one login covers both.
+width, with a slim **icon rail** on the left instead of a top bar — workspaces,
+**Administration** (the admin area at `/admin` with projects, agents and
+users), the notification bell and your user menu (profile, light/dark theme,
+sign out). One login covers both areas.
 
 Work does not have to be hands-on: an [auto-thread](#auto-threads) plans,
 implements, checks the quality gates and opens a pull request on its own —
@@ -28,7 +29,7 @@ an issue of a connected tracker.
 - [Approvals, plans and questions](#approvals-plans-and-questions)
 - [Working together](#working-together)
 - [Overview and notifications](#overview-and-notifications)
-- [The workbench: editor and preview](#the-workbench-editor-and-preview)
+- [The context sidebar: editor, preview and branch](#the-context-sidebar-editor-preview-and-branch)
 - [The review](#the-review)
 - [Quality gates](#quality-gates)
 - [Checkpoints and reset](#checkpoints-and-reset)
@@ -107,30 +108,57 @@ issue. The issue is closed by merging, never by Argos.
 
 ## Threads
 
-The left part of the workspace page is the chat; drag the divider between
-chat and the workbench to change the split (your browser remembers it). The page
-fills the window, and only the conversation scrolls. Create a **thread** (title,
-agent, model, mode), then write. Claude's answer streams in live; tool calls
-(reading files, running commands, editing) appear as compact rows you can expand.
+A workspace page has three parts: a **header** (workspace name and status,
+the thread switcher, *New thread*, *Commit & PR* and the **⋯** menu), the
+**chat** as a centred column, and the [context sidebar](#the-context-sidebar-editor-preview-and-branch)
+on the right. The page fills the window; only the conversation scrolls.
+
+Create a **thread** (title, agent, model, mode), then write. Claude's answer
+streams in live. Each turn of Claude starts with a small head — duration and
+cost of the turn, or *working for N s* while it runs — followed by its steps
+as a **compact timeline**: one row per tool call with its state, a verb
+(*Edited*, *Created*, *Ran*, …), the file or command and the changed lines or
+a short result. Click a row for the full input and output; more than three
+steps fold into *Show N more steps*. Calls that were simply allowed get no card
+of their own.
 
 - **Follow-ups while Claude works** are queued and picked up as soon as Claude is
-  ready — they show *queued* until then.
-- **Stop** interrupts the current turn. Open approvals are cancelled.
-- **Mode** controls how much Claude may do without asking:
+  ready — they show *queued* until then. The composer says so in its
+  placeholder.
+- **Stop** (it replaces the send button while Claude works) interrupts the
+  current turn. Open approvals are cancelled.
+- **Mode** (the first pill under the text field) controls how much Claude may
+  do without asking:
   - *Ask before changes* (default) — every edit and command needs an approval,
   - *Accept edits* — file edits run without asking, commands still ask,
   - *Plan mode* — Claude researches and proposes a plan before changing anything,
   - *Bypass permissions* — Claude runs every tool without asking. Only workspace
     owners can choose it.
-- **Model** can be switched at any time.
+- **Model** (the second pill) can be switched at any time. The thread's cost
+  sits next to the send button.
 - If a session ended (container restart, crash), **Resume session** continues the
   same Claude conversation.
 - Slash commands and `CLAUDE.md` of the project are loaded like in Claude Code.
 
-The **thread list** on the left shows every thread with its status (working,
-waiting for a decision, idle) and the number of unread entries. Threads can be
-renamed and archived; *Show archived* brings archived ones back. On narrow
-screens the list folds away.
+While there are uncommitted changes, a **change tray** above the text field
+shows how many files changed, the added/removed lines and the state of the
+[quality gates](#quality-gates), with **Check gates** and **Review**.
+
+### The thread switcher
+
+The button in the header shows the current thread and how many there are;
+click it or press **⌘J** / **Ctrl+J**. The switcher groups the threads into
+**Waiting for you**, **Running** and **Done**, each with one line of status
+(the open approval, the step Claude is on, or how many files the last turn
+changed) and the time of the last activity; *Done* shows the newest three
+and *Show N more*. Type to search by title, use the arrow keys and **Enter**
+to switch, **Esc** to close. Hover a thread to rename or archive it; the
+footer has *New thread* and the **Archive** with archived threads to restore.
+Unread entries show as a counter. The switcher updates live.
+
+When **another** thread waits for an approval, a yellow chip *N waits for
+approval* appears next to the switcher; a click takes you to that thread and
+its open card.
 
 ## Images, files and commands
 
@@ -147,7 +175,8 @@ screens the list folds away.
   |---|---|
   | `/plan [request]` | Switch to plan mode, optionally send the request. |
   | `/ship` | Open the commit & pull request dialog. |
-  | `/preview`, `/review` | Point at the preview controls or the review. |
+  | `/review` | Open the [review](#the-review). |
+  | `/preview` | Show the context sidebar (on narrow screens it is a drawer). |
   | `/gates` | Run the [quality gates](#quality-gates). |
   | `/checkpoint [name]` | Set a named [checkpoint](#checkpoints-and-reset). |
 
@@ -163,7 +192,7 @@ When Claude needs a decision, a card appears in the thread for everyone:
 
 | Card | What you can do |
 |---|---|
-| Tool call (e.g. *Edit*, *Bash*) | Allow, or deny with an optional reason. Edits show the change. |
+| Tool call (e.g. *Claude wants to run a command*) | **Allow**, **Always allow** or **Deny** (with an optional reason). Commands show in full, edits show the change. *Always allow* applies Claude Code's own rule suggestion for the rest of the session (e.g. this command), so the same call no longer asks. It is offered when Claude Code suggests such a rule. |
 | Plan (from plan mode) | Accept and choose the mode to continue in, or reject with feedback. |
 | Question | Pick an option per question or type your own answer. |
 
@@ -208,21 +237,32 @@ browser, a notification (and a counter in the tab title) only shows when the
 workspace in question is not open in front of you; allow browser notifications
 in your **profile**, where you can also switch each kind off.
 
-## The workbench: editor and preview
+## The context sidebar: editor, preview and branch
 
-The right part of the page is the workbench. Its bar opens the editor and the
-preview, each in **its own browser tab** — one per workspace, reused on the
-next click — so both get the whole window, keyboard shortcuts work and apps
-that refuse to be embedded still show. Below the bar sits the
-[review](#the-review) of the changes.
+The sidebar on the right has four parts. On screens narrower than about
+1100px it becomes a drawer (button at the right of the header); on phones the
+icon rail moves to the bottom.
+
+- **Environment** — VS Code and the preview, each with its state and a button.
+  Both open in **their own browser tab** — one per workspace, reused on the
+  next click — so they get the whole window, keyboard shortcuts work and apps
+  that refuse to be embedded still show.
+- **Branch** — the workspace branch, its base branch and project, and the
+  number of **uncommitted** files and **unpushed** commits. The pull request
+  and the issue the workspace came from are linked here.
+- **Quality gates** — Pint, Pest/PHPUnit, PHPStan and Artisan with their state
+  (open, running, ok, failed) and *Check all*; see
+  [Quality gates](#quality-gates).
+- **Changed files** — status letter (M/A/D/R), name and changed lines. A click
+  opens the [review](#the-review) on that file.
 
 ### VS Code
 
-**Open VS Code** opens VS Code (OpenVSCode Server) on the workspace volume.
-What you change is immediately visible to Claude and the other way round.
-Access to the editor host is checked against workspace membership on every
-request: Argos hands your browser a short-lived ticket that is traded for a
-cookie on the editor host.
+**Open** starts VS Code (OpenVSCode Server) on the workspace volume. What you
+change is immediately visible to Claude and the other way round. Access to the
+editor host is checked against workspace membership on every request: Argos
+hands your browser a short-lived ticket that is traded for a cookie on the
+editor host.
 
 ### Preview
 
@@ -231,8 +271,9 @@ contract (`.argos/demo.*` or the built-in Laravel default), but it mounts the
 **workspace volume**, so it always shows the current files. It is
 members-only and started on demand.
 
-- **Start preview** builds it, **Open preview** opens it, **Rebuild** replaces
-  it. The bar shows its state; a failed build shows the build log.
+- **Start** builds it, **Open** opens it, **Rebuild** replaces it. The row
+  shows its state; the build log is one click away (open by default after a
+  failed build).
 - **Re-run setup commands** runs the contract's commands again in the running
   preview — after a migration, a `composer`/`npm` change or a build-config edit.
   PHP changes show up without it.
@@ -244,17 +285,52 @@ Previews need `ARGOS_PREVIEW_ENABLED` and the project's *Live demo* toggle.
 
 ## The review
 
-The review shows the workspace's changes against its base branch —
-commits, uncommitted edits and new files — file by file. After Claude finished
-a turn it marks itself *changed since you looked*; **Refresh** reloads.
+**Review** in the change tray, a changed file in the sidebar or `/review`
+switches to the **review mode**: the sidebar widens into the review panel and
+the chat shrinks to a narrow column (steps fold into one line per turn).
+**Maximise** gives the diff the full width and folds the chat into a strip.
+**Close review** or **Esc** returns; the mode is part of the URL
+(`?review=1&file=…`), so a reload or a shared link opens the same file.
 
-Click a line to leave a comment for Claude. Comments are collected; **Send to
-Claude** posts them as one message (`path:line — comment`) into the thread
-you pick.
+The review shows the workspace's changes against its base branch — commits,
+uncommitted edits and new files:
+
+- The **toolbar** shows the added/removed lines, *X / N seen*, a chip per gate
+  (a failed gate with findings jumps to the first one), **Split** or
+  **Unified** — remembered for you — and maximise.
+- The **file tree** groups the files by directory with their status letter and
+  badges: findings of the gates (yellow), *new* (Claude changed the file while
+  you were reviewing) and a check mark for files you marked as seen.
+- The **diff** shows old and new line numbers; *⋯ N unchanged lines* between
+  the changed blocks expands. **Seen** marks a file as reviewed — it resets by
+  itself when the file changes again. *Previous* / *Next file* step through.
+- Claude keeps working while you review. When it changes a file, a blue hint
+  *Claude just changed X (+a −b)* appears; the diff does not jump —
+  **Show change** (or switching files) reloads it.
+
+### Line comments
+
+Hover a line and click **+** to comment on it (Shift-click a second line for a
+range). A saved comment is **not sent**: it appears in the diff (marked and
+numbered) and as a chip `file:line ×` in the composer, which now says *N
+comments collected* and offers **Send review (N)**. That sends all collected
+comments and the text you typed as **one** message — per comment the
+location, the code with a little context and your remark. While Claude works,
+the message is queued after the current step. Comments are stored per thread
+and person, so they survive a reload and closing the review; edit or discard
+them in the diff, or remove the chip.
+
+When Claude changes lines you commented on, the comment follows lines that
+only moved. If the commented lines themselves changed, the comment becomes
+**outdated** (dashed, *outdated* badge, the chip is struck through) and is not
+sent. Choose **Send anyway** (it goes out with the original code, marked as
+referring to the previous version), **Move to the new line** (it now refers to
+what the lines say) or **Discard**.
 
 ## Quality gates
 
-**Check gates** (in the review, the header menu or `/gates`) runs the same
+**Check gates** (in the change tray, *Check all* in the sidebar, the **⋯** menu
+or `/gates`) runs the same
 quality gates as automatic runs (`worker/lib/quality.sh`):
 Artisan boot, Pint on changed files, Pest/PHPUnit, PHPStan, migration syntax,
 debug calls and test presence. They are made for PHP/Laravel projects; on other
@@ -262,12 +338,15 @@ stacks the gates are skipped.
 
 - Right after the workspace is cloned, Argos records a **baseline** of the base
   branch: Pest and PHPStan then only count failures that are new. While the
-  baseline is still running or if it failed, every failure counts; the panel
-  says which applies.
-- One run at a time per workspace. Each gate shows pass/fail/skip and the end
-  of its log.
-- **Send errors to agent** posts a fix prompt with the failing gates' logs into
-  the selected thread — the same one automatic runs use.
+  baseline is still running or if it failed, every failure counts.
+- One run at a time per workspace. The sidebar shows each gate's state; a
+  failed gate unfolds the end of its log and **Let Claude fix it**, which posts
+  a fix prompt with the log into the current thread — the same one automatic
+  runs use.
+- In the [review](#the-review), PHPStan errors appear **at their line** and
+  Pint flags the file. **Let Claude fix it** there adds the finding (gate,
+  message, file and line) to your collected comments, so it goes out with the
+  next *Send review*.
 - The commit dialog mentions the last result (*Gates: 6/7 green*). Failed gates
   are a warning, never a blocker.
 

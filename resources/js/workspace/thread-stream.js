@@ -15,6 +15,7 @@ export function argosThreadStream(config) {
         channel: null,
         refreshTimer: null,
         threadsTimer: null,
+        pendingEdits: {},
         lastWhisper: 0,
         dragging: false,
         commands: [],
@@ -50,6 +51,14 @@ export function argosThreadStream(config) {
         onStream(payload) {
             // The switcher and the hint chip follow every thread of the workspace.
             this.announceThreads();
+            // File edits of any thread feed the review's live hint.
+            for (const event of payload.events ?? []) {
+                if (event.type === 'tool.started') {
+                    this.trackEdit(event.data);
+                } else if (event.type === 'tool.result') {
+                    this.announceEdit(event.data);
+                }
+            }
             if (payload.thread_id === '_workspace') {
                 // Workspace-level change (quality gates): the Review tab reloads.
                 window.dispatchEvent(new CustomEvent('argos-gates-updated'));
@@ -96,6 +105,34 @@ export function argosThreadStream(config) {
 
             if (persisted) {
                 this.scheduleRefresh();
+            }
+        },
+
+        /** Remember edits by tool id; the file changes once the result arrives. */
+        trackEdit(data) {
+            const input = data?.input ?? {};
+            const path = input.file_path ?? input.notebook_path;
+            if (!['Edit', 'MultiEdit', 'Write', 'NotebookEdit'].includes(data?.name) || typeof path !== 'string') {
+                return;
+            }
+            const lines = (text) => (typeof text === 'string' && text !== '' ? text.split('\n').length : 0);
+            const edits = data.name === 'MultiEdit' && Array.isArray(input.edits) ? input.edits : [input];
+            this.pendingEdits[data.tool_use_id] = {
+                path: path.replace(/^\/workspace\//, ''),
+                add: edits.reduce((n, e) => n + lines(e.new_string ?? e.content ?? ''), 0),
+                del: edits.reduce((n, e) => n + lines(e.old_string ?? ''), 0),
+            };
+        },
+
+        /** The review shows "Claude just changed X" (see review-panel.blade.php). */
+        announceEdit(data) {
+            const edit = this.pendingEdits[data?.tool_use_id];
+            if (!edit) {
+                return;
+            }
+            delete this.pendingEdits[data.tool_use_id];
+            if (!data.is_error) {
+                window.dispatchEvent(new CustomEvent('argos-file-changed', { detail: edit }));
             }
         },
 

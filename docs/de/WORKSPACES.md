@@ -9,10 +9,11 @@ einer Live-Preview. Mehrere Personen können gleichzeitig im selben Workspace
 arbeiten.
 
 Workspaces haben einen eigenen Bereich unter **`/w`** (dorthin führt auch
-`/`): volle Breite, Navigation in der oberen Leiste, damit Chat, Editor und
-Preview den ganzen Bildschirm bekommen. **Verwaltung** in der oberen Leiste
-führt in den Admin-Bereich (`/admin`) mit Projekten, Agenten und Benutzern; ein
-Login gilt für beide.
+`/`): volle Breite, links eine schmale **Icon-Leiste** statt einer oberen
+Leiste — Workspaces, **Verwaltung** (der Admin-Bereich unter `/admin` mit
+Projekten, Agenten und Benutzern), die Benachrichtigungsglocke und dein
+Benutzermenü (Profil, helles/dunkles Design, Abmelden). Ein Login gilt für
+beide Bereiche.
 
 Die Arbeit muss nicht interaktiv sein: Ein [Auto-Thread](#auto-threads) plant,
 setzt um, prüft die Quality-Gates und öffnet selbstständig einen Pull Request —
@@ -30,7 +31,7 @@ oder ein Issue eines verbundenen Trackers.
 - [Freigaben, Pläne und Fragen](#freigaben-plane-und-fragen)
 - [Zusammenarbeiten](#zusammenarbeiten)
 - [Übersicht und Benachrichtigungen](#ubersicht-und-benachrichtigungen)
-- [Der Arbeitsbereich: Editor und Preview](#der-arbeitsbereich-editor-und-preview)
+- [Die Kontext-Seitenleiste: Editor, Preview und Branch](#die-kontext-seitenleiste-editor-preview-und-branch)
 - [Das Review](#das-review)
 - [Quality-Gates](#quality-gates)
 - [Checkpoints und Zurücksetzen](#checkpoints-und-zurucksetzen)
@@ -112,19 +113,29 @@ Request im Issue. Geschlossen wird das Issue durch den Merge, nie durch Argos.
 
 ## Threads
 
-Der linke Teil der Workspace-Seite ist der Chat; zieh den Trenner zwischen
-Chat und dem Arbeitsbereich, um die Aufteilung zu ändern (dein Browser merkt sie sich).
-Die Seite füllt das Fenster, und nur die Unterhaltung scrollt. Lege einen
-**Thread** an
-(Titel, Agent, Modell, Modus) und schreib los. Claudes Antwort erscheint live;
-Tool-Aufrufe (Dateien lesen, Befehle ausführen, bearbeiten) erscheinen als
-kompakte Zeilen, die du aufklappen kannst.
+Eine Workspace-Seite hat drei Teile: eine **Kopfzeile** (Name und Status des
+Workspaces, der Thread-Wechsler, *Neuer Thread*, *Commit & PR* und das
+**⋯**-Menü), den **Chat** als zentrierte Spalte und rechts die
+[Kontext-Seitenleiste](#die-kontext-seitenleiste-editor-preview-und-branch).
+Die Seite füllt das Fenster; nur die Unterhaltung scrollt.
+
+Lege einen **Thread** an (Titel, Agent, Modell, Modus) und schreib los.
+Claudes Antwort erscheint live. Jeder Turn von Claude beginnt mit einem kleinen
+Kopf — Dauer und Kosten des Turns, oder *arbeitet seit N s*, solange er läuft —
+gefolgt von seinen Schritten als **kompakte Zeitleiste**: eine Zeile pro
+Tool-Aufruf mit Zustand, einem Verb (*Bearbeitet*, *Erstellt*, *Ausgeführt*,
+…), der Datei oder dem Befehl und den geänderten Zeilen oder einem kurzen
+Ergebnis. Ein Klick auf eine Zeile zeigt Ein- und Ausgabe vollständig; mehr als
+drei Schritte klappen zu *N weitere Schritte anzeigen* zusammen. Aufrufe, die
+einfach erlaubt wurden, bekommen keine eigene Karte.
 
 - **Folgenachrichten, während Claude arbeitet,** werden eingereiht und
   aufgenommen, sobald Claude bereit ist — bis dahin zeigen sie *in
-  Warteschlange*.
-- **Stopp** unterbricht den aktuellen Turn. Offene Freigaben werden abgebrochen.
-- **Modus** legt fest, wie viel Claude ohne Rückfrage tun darf:
+  Warteschlange*. Der Platzhalter im Eingabefeld weist darauf hin.
+- **Stopp** (ersetzt den Senden-Knopf, solange Claude arbeitet) unterbricht den
+  aktuellen Turn. Offene Freigaben werden abgebrochen.
+- **Modus** (die erste Pille unter dem Eingabefeld) legt fest, wie viel Claude
+  ohne Rückfrage tun darf:
   - *Vor Änderungen fragen* (Standard) — jede Änderung und jeder Befehl braucht
     eine Freigabe,
   - *Änderungen annehmen* — Dateiänderungen laufen ohne Rückfrage, Befehle
@@ -133,16 +144,35 @@ kompakte Zeilen, die du aufklappen kannst.
     etwas ändert,
   - *Freigaben umgehen* — Claude führt jedes Tool ohne Rückfrage aus. Nur
     Besitzer des Workspaces können das wählen.
-- Das **Modell** lässt sich jederzeit wechseln.
+- Das **Modell** (die zweite Pille) lässt sich jederzeit wechseln. Die Kosten
+  des Threads stehen neben dem Senden-Knopf.
 - Ist eine Session beendet (Container-Neustart, Absturz), setzt **Session
   fortsetzen** dieselbe Claude-Unterhaltung fort.
 - Slash-Commands und die `CLAUDE.md` des Projekts werden wie in Claude Code
   geladen.
 
-Die **Thread-Liste** links zeigt jeden Thread mit seinem Status (arbeitet,
-wartet auf eine Entscheidung, bereit) und der Zahl ungelesener Einträge.
-Threads lassen sich umbenennen und archivieren; *Archivierte anzeigen* holt
-archivierte zurück. Auf schmalen Bildschirmen klappt die Liste ein.
+Solange es nicht committete Änderungen gibt, zeigt eine **Änderungsleiste**
+über dem Eingabefeld, wie viele Dateien sich geändert haben, die
+hinzugefügten/entfernten Zeilen und den Stand der
+[Quality-Gates](#quality-gates), mit **Gates prüfen** und **Review**.
+
+### Der Thread-Wechsler
+
+Der Knopf in der Kopfzeile zeigt den aktuellen Thread und wie viele es gibt;
+klick darauf oder drück **⌘J** / **Strg+J**. Der Wechsler gruppiert die Threads
+in **Wartet auf dich**, **Läuft** und **Fertig**, jeweils mit einer Statuszeile
+(die offene Freigabe, der Schritt, an dem Claude gerade ist, oder wie viele
+Dateien der letzte Turn geändert hat) und der Zeit der letzten Aktivität;
+*Fertig* zeigt die drei neuesten und *N weitere anzeigen*. Tippen sucht im
+Titel, mit den Pfeiltasten und **Enter** wechselst du, **Esc** schließt. Fährst
+du über einen Thread, kannst du ihn umbenennen oder archivieren; unten gibt es
+*Neuer Thread* und das **Archiv** mit archivierten Threads zum
+Wiederherstellen. Ungelesene Einträge erscheinen als Zähler. Der Wechsler
+aktualisiert sich live.
+
+Wartet ein **anderer** Thread auf eine Freigabe, erscheint neben dem Wechsler
+ein gelber Chip *N wartet auf Freigabe*; ein Klick führt dich in diesen Thread
+zu seiner offenen Karte.
 
 ## Bilder, Dateien und Befehle
 
@@ -160,7 +190,8 @@ archivierte zurück. Auf schmalen Bildschirmen klappt die Liste ein.
   |---|---|
   | `/plan [Anfrage]` | In den Plan-Mode wechseln, optional die Anfrage senden. |
   | `/ship` | Den Dialog für Commit und Pull Request öffnen. |
-  | `/preview`, `/review` | Auf die Preview-Steuerung bzw. das Review zeigen. |
+  | `/review` | Das [Review](#das-review) öffnen. |
+  | `/preview` | Die Kontext-Seitenleiste zeigen (auf schmalen Bildschirmen ist sie eine Schublade). |
   | `/gates` | Die [Quality-Gates](#quality-gates) ausführen. |
   | `/checkpoint [Name]` | Einen benannten [Checkpoint](#checkpoints-und-zurucksetzen) setzen. |
 
@@ -177,7 +208,7 @@ Braucht Claude eine Entscheidung, erscheint für alle eine Karte im Thread:
 
 | Karte | Was du tun kannst |
 |---|---|
-| Tool-Aufruf (z. B. *Edit*, *Bash*) | Erlauben oder mit optionaler Begründung ablehnen. Änderungen werden angezeigt. |
+| Tool-Aufruf (z. B. *Claude möchte einen Befehl ausführen*) | **Erlauben**, **Immer erlauben** oder **Ablehnen** (mit optionaler Begründung). Befehle stehen vollständig da, Änderungen werden angezeigt. *Immer erlauben* übernimmt Claude Codes eigenen Regelvorschlag für den Rest der Session (z. B. diesen Befehl), sodass derselbe Aufruf nicht mehr fragt. Angeboten wird es, wenn Claude Code eine solche Regel vorschlägt. |
 | Plan (aus dem Plan-Mode) | Annehmen und den Modus wählen, in dem es weitergeht, oder mit Feedback ablehnen. |
 | Frage | Pro Frage eine Option wählen oder eine eigene Antwort eingeben. |
 
@@ -223,21 +254,32 @@ eine Benachrichtigung (und ein Zähler im Tab-Titel) nur, wenn der betreffende
 Workspace nicht gerade vor dir offen ist; Browser-Benachrichtigungen erlaubst
 du in deinem **Profil**, wo du auch jede Art einzeln abschalten kannst.
 
-## Der Arbeitsbereich: Editor und Preview
+## Die Kontext-Seitenleiste: Editor, Preview und Branch
 
-Der rechte Teil der Seite ist der Arbeitsbereich. Seine Leiste öffnet Editor und
-Preview jeweils in **einem eigenen Browser-Tab** — einer pro Workspace, beim
-nächsten Klick wiederverwendet. So bekommen beide das ganze Fenster,
-Tastenkürzel funktionieren, und auch Apps, die sich nicht einbetten lassen,
-werden angezeigt. Unter der Leiste liegt das [Review](#das-review) der
-Änderungen.
+Die Seitenleiste rechts hat vier Teile. Auf Bildschirmen schmaler als etwa
+1100 px wird sie zur Schublade (Knopf rechts in der Kopfzeile); auf dem Handy
+wandert die Icon-Leiste nach unten.
+
+- **Umgebung** — VS Code und die Preview, jeweils mit Zustand und Knopf. Beide
+  öffnen sich in **einem eigenen Browser-Tab** — einer pro Workspace, beim
+  nächsten Klick wiederverwendet. So bekommen sie das ganze Fenster,
+  Tastenkürzel funktionieren, und auch Apps, die sich nicht einbetten lassen,
+  werden angezeigt.
+- **Branch** — der Branch des Workspaces, sein Basis-Branch und das Projekt
+  sowie die Zahl **uncommitteter** Dateien und **ungepushter** Commits. Pull
+  Request und das Issue, aus dem der Workspace entstand, sind hier verlinkt.
+- **Quality Gates** — Pint, Pest/PHPUnit, PHPStan und Artisan mit ihrem
+  Zustand (offen, läuft, ok, Fehler) und *Alle prüfen*; siehe
+  [Quality-Gates](#quality-gates).
+- **Geänderte Dateien** — Statusbuchstabe (M/A/D/R), Name und geänderte
+  Zeilen. Ein Klick öffnet das [Review](#das-review) mit dieser Datei.
 
 ### VS Code
 
-**VS Code öffnen** öffnet VS Code (OpenVSCode Server) auf dem Workspace-Volume.
-Was du änderst, sieht Claude sofort und umgekehrt. Der Zugang zum Editor-Host
-wird bei jeder Anfrage gegen die Mitgliedschaft im Workspace geprüft: Argos gibt
-deinem Browser ein kurzlebiges Ticket, das gegen ein Cookie auf dem Editor-Host
+**Öffnen** startet VS Code (OpenVSCode Server) auf dem Workspace-Volume. Was du
+änderst, sieht Claude sofort und umgekehrt. Der Zugang zum Editor-Host wird bei
+jeder Anfrage gegen die Mitgliedschaft im Workspace geprüft: Argos gibt deinem
+Browser ein kurzlebiges Ticket, das gegen ein Cookie auf dem Editor-Host
 getauscht wird.
 
 ### Preview
@@ -247,9 +289,9 @@ Demo-Vertrag (`.argos/demo.*` oder der eingebaute Laravel-Standard), aber sie
 mountet das **Workspace-Volume** und zeigt daher immer die aktuellen Dateien.
 Sie ist nur für Mitglieder zugänglich und wird bei Bedarf gestartet.
 
-- **Preview starten** baut sie, **Preview öffnen** öffnet sie, **Neu bauen**
-  ersetzt sie. Die Leiste zeigt ihren Zustand; ein fehlgeschlagener Build zeigt
-  das Build-Log.
+- **Starten** baut sie, **Öffnen** öffnet sie, **Neu bauen** ersetzt sie. Die
+  Zeile zeigt ihren Zustand; das Build-Log ist einen Klick entfernt (nach einem
+  fehlgeschlagenen Build schon aufgeklappt).
 - **Setup-Befehle erneut ausführen** führt die Befehle des Vertrags in der
   laufenden Preview noch einmal aus — nach einer Migration, einer
   `composer`-/`npm`-Änderung oder einer geänderten Build-Konfiguration.
@@ -264,18 +306,58 @@ Projekt.
 
 ## Das Review
 
-Das Review zeigt die Änderungen des Workspaces gegenüber dem Basis-Branch —
-Commits, nicht committete Änderungen und neue Dateien — Datei für Datei. Hat
-Claude einen Turn beendet, markiert er sich als *seit deinem Blick geändert*;
-**Aktualisieren** lädt neu.
+**Review** in der Änderungsleiste, eine geänderte Datei in der Seitenleiste
+oder `/review` schalten in den **Review-Modus**: Die Seitenleiste wird zum
+Review-Panel, der Chat schrumpft auf eine schmale Spalte (Schritte werden zu
+einer Zeile pro Turn). **Maximieren** gibt dem Diff die volle Breite und klappt
+den Chat zu einem Streifen ein. **Review schließen** oder **Esc** kehrt zurück;
+der Modus steht in der URL (`?review=1&file=…`), sodass ein Neuladen oder ein
+geteilter Link dieselbe Datei öffnet.
 
-Klick auf eine Zeile, um Claude einen Kommentar zu hinterlassen. Kommentare
-werden gesammelt; **An Claude senden** schickt sie als eine Nachricht
-(`Pfad:Zeile — Kommentar`) in den gewählten Thread.
+Das Review zeigt die Änderungen des Workspaces gegenüber dem Basis-Branch —
+Commits, nicht committete Änderungen und neue Dateien:
+
+- Die **Werkzeugleiste** zeigt die hinzugefügten/entfernten Zeilen, *X / N
+  gesehen*, einen Chip pro Gate (ein fehlgeschlagenes Gate mit Befunden springt
+  zum ersten), **Split** oder **Unified** — für dich gespeichert — und
+  Maximieren.
+- Der **Dateibaum** gruppiert die Dateien nach Verzeichnis, mit Statusbuchstabe
+  und Badges: Befunde der Gates (gelb), *neu* (Claude hat die Datei geändert,
+  während du reviewst) und ein Haken für Dateien, die du als gesehen markiert
+  hast.
+- Der **Diff** zeigt alte und neue Zeilennummern; *⋯ N unveränderte Zeilen*
+  zwischen den geänderten Blöcken klappt auf. **Gesehen** markiert eine Datei
+  als geprüft — die Markierung verschwindet von selbst, sobald sich die Datei
+  wieder ändert. *Vorherige* / *Nächste Datei* blättern weiter.
+- Claude arbeitet weiter, während du reviewst. Ändert es eine Datei, erscheint
+  ein blauer Hinweis *Claude hat X gerade geändert (+a −b)*; der Diff springt
+  nicht um — **Änderung zeigen** (oder ein Dateiwechsel) lädt ihn neu.
+
+### Zeilen-Kommentare
+
+Fahr über eine Zeile und klick auf **+**, um sie zu kommentieren (Shift-Klick
+auf eine zweite Zeile wählt einen Bereich). Ein gespeicherter Kommentar wird
+**nicht gesendet**: Er erscheint im Diff (markiert und nummeriert) und als Chip
+`Datei:Zeile ×` im Eingabefeld, das nun *N Kommentare gesammelt* anzeigt und
+**Review senden (N)** anbietet. Das schickt alle gesammelten Kommentare und
+deinen Text als **eine** Nachricht — pro Kommentar die Stelle, der Code mit
+etwas Kontext und deine Anmerkung. Arbeitet Claude gerade, wird die Nachricht
+nach dem aktuellen Schritt eingereiht. Kommentare werden pro Thread und Person
+gespeichert, überstehen also ein Neuladen und das Schließen des Reviews;
+bearbeiten oder verwerfen kannst du sie im Diff, oder du entfernst den Chip.
+
+Ändert Claude Zeilen, die du kommentiert hast, wandert der Kommentar mit
+Zeilen, die nur verschoben wurden. Haben sich die kommentierten Zeilen selbst
+geändert, wird der Kommentar **veraltet** (gestrichelt, Badge *veraltet*, der
+Chip ist durchgestrichen) und nicht gesendet. Wähle **Trotzdem senden** (er geht
+mit dem ursprünglichen Code raus, markiert als bezogen auf die vorherige
+Version), **Auf neue Zeile verschieben** (er bezieht sich dann auf den
+aktuellen Text der Zeilen) oder **Verwerfen**.
 
 ## Quality-Gates
 
-**Gates prüfen** (im Review, im Menü der Kopfzeile oder per `/gates`) führt
+**Gates prüfen** (in der Änderungsleiste, *Alle prüfen* in der Seitenleiste, im
+**⋯**-Menü oder per `/gates`) führt
 dieselben Quality-Gates aus wie automatische Läufe
 (`worker/lib/quality.sh`): Artisan-Start, Pint auf geänderten Dateien,
 Pest/PHPUnit, PHPStan, Migrations-Syntax, Debug-Aufrufe und vorhandene Tests.
@@ -284,13 +366,15 @@ Sie sind für PHP/Laravel-Projekte gemacht; bei anderen Stacks werden die Gates
 
 - Direkt nach dem Klonen des Workspaces erfasst Argos eine **Baseline** des
   Basis-Branches: Pest und PHPStan zählen dann nur neue Fehler. Solange die
-  Baseline noch läuft oder wenn sie fehlgeschlagen ist, zählt jeder Fehler; das
-  Panel zeigt an, was gilt.
-- Ein Lauf gleichzeitig pro Workspace. Jedes Gate zeigt grün/rot/übersprungen
-  und das Ende seines Logs.
-- **Fehler an Agent senden** schickt einen Fix-Prompt mit den Logs der
-  fehlgeschlagenen Gates in den gewählten Thread — denselben, den automatische
-  Läufe nutzen.
+  Baseline noch läuft oder wenn sie fehlgeschlagen ist, zählt jeder Fehler.
+- Ein Lauf gleichzeitig pro Workspace. Die Seitenleiste zeigt den Zustand jedes
+  Gates; ein fehlgeschlagenes Gate klappt das Ende seines Logs und **Claude
+  fixen lassen** auf. Das schickt einen Fix-Prompt mit dem Log in den aktuellen
+  Thread — denselben, den automatische Läufe nutzen.
+- Im [Review](#das-review) erscheinen PHPStan-Fehler **an ihrer Zeile**, Pint
+  markiert die Datei. **Claude fixen lassen** legt den Befund dort (Gate,
+  Meldung, Datei und Zeile) zu deinen gesammelten Kommentaren, sodass er mit dem
+  nächsten *Review senden* rausgeht.
 - Der Commit-Dialog nennt das letzte Ergebnis (*Gates: 6/7 grün*).
   Fehlgeschlagene Gates sind ein Warnhinweis, nie eine Sperre.
 

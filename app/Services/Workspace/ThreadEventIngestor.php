@@ -9,6 +9,7 @@ use App\Enums\ApprovalStatus;
 use App\Enums\ThreadEventType;
 use App\Enums\ThreadStatus;
 use App\Models\AgentCredential;
+use App\Jobs\Workspace\ReanchorReviewCommentsJob;
 use App\Models\Thread;
 use App\Models\ThreadApproval;
 use App\Models\ThreadEvent;
@@ -146,6 +147,11 @@ class ThreadEventIngestor
             $thread = Thread::query()->find($threadId);
             if ($thread?->auto_state !== null) {
                 app(AutoThreadDriver::class)->onThreadEvents($thread, $outgoing);
+            }
+            // Claude may have changed lines that carry collected review comments.
+            if ($thread !== null && in_array('turn.completed', array_column($outgoing, 'type'), true)
+                && app(ReviewCommentService::class)->anchoredPaths($thread) !== []) {
+                ReanchorReviewCommentsJob::dispatch($thread->id);
             }
         }
 

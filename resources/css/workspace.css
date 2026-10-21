@@ -416,6 +416,19 @@ button.wf-gate-chip { cursor: pointer; }
 .wf-strip-comments { position: relative; background: var(--wf-raised); }
 .wf-strip-badge { position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; padding: 0 4px; box-sizing: border-box; border-radius: 999px; background: var(--wf-info); color: #fff; font-size: 11px; font-weight: 600; display: grid; place-items: center; }
 
+/* ---- Live hint, gate findings, outdated comments ---- */
+.wf-live { flex: none; display: flex; align-items: center; gap: 10px; padding: 8px 16px; border-bottom: 1px solid var(--wf-border); background: var(--wf-info-soft); color: var(--wf-info); font-size: 13px; }
+.wf-live-text { flex: 1; }
+.wf-live-btn { height: 26px; padding: 0 10px; border-radius: 6px; border: 1px solid currentColor; background: transparent; color: inherit; font: 12px var(--font-sans); cursor: pointer; white-space: nowrap; }
+.wf-findings { flex: none; display: flex; flex-direction: column; gap: 6px; padding: 10px 16px; border-bottom: 1px solid var(--wf-border); }
+.wf-findings-title { font-size: 12px; }
+.wf-annot { display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px; border-radius: 10px; background: var(--wf-warn-soft); color: var(--wf-warn); font: 13px/1.45 var(--font-sans); }
+.wf-annot-gate { font-weight: 600; white-space: nowrap; }
+.wf-annot-msg { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.wf-annot-btn { flex: none; height: 28px; padding: 0 12px; border-radius: 7px; border: 1px solid currentColor; background: transparent; color: inherit; font: 12.5px var(--font-sans); cursor: pointer; white-space: nowrap; }
+.wf-annot-btn:hover { background: color-mix(in oklab, var(--wf-warn) 10%, transparent); }
+.wf-dnote-hint { margin: 0; font-size: 12.5px; color: var(--wf-muted); }
+
 /* ---- Narrow: context becomes a drawer; phones: rail at the bottom ---- */
 .wf-drawer-toggle { display: none; }
 @media (max-width: 1100px) {

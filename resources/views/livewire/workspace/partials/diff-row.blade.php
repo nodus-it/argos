@@ -76,6 +76,19 @@
     @endforeach
 @endforeach
 @foreach ($cells as $cell)
+    @if ($cell['side'] === 'new' && $cell['num'] !== null && isset($annotationsAt[$cell['num']]))
+        @foreach ($annotationsAt[$cell['num']] as $finding)
+            <div @class(['wf-dnote-row', 'is-'.$cell['pos']])>
+                <div class="wf-annot">
+                    <span class="wf-annot-gate">PHPStan</span>
+                    <span class="wf-annot-msg">{{ $finding['message'] }}</span>
+                    @if ($canWrite)
+                        <button type="button" class="wf-annot-btn" wire:click="fixWithClaude(@js($current['path']), {{ $finding['line'] }}, 'PHPStan', @js($finding['message']))">{{ __('workspaces.review.fix') }}</button>
+                    @endif
+                </div>
+            </div>
+        @endforeach
+    @endif
     @if ($canWrite && $cell['num'] !== null && $cell['commentable'])
         <template x-if="draft && draft.side === @js($cell['side']) && draft.end === {{ $cell['num'] }}">
             <div @class(['wf-dnote-row', 'is-'.$cell['pos']])>

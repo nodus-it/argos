@@ -26,6 +26,7 @@ use Illuminate\Support\Carbon;
  * @property string $snippet
  * @property string $body
  * @property ReviewCommentStatus $status
+ * @property bool $outdated sent anyway although Claude changed the lines since
  * @property Carbon|null $sent_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
@@ -39,12 +40,13 @@ class ReviewComment extends Model
 
     use HasUlids;
 
-    protected $fillable = ['thread_id', 'user_id', 'path', 'side', 'line_start', 'line_end', 'anchor_hash', 'snippet', 'body', 'status', 'sent_at'];
+    protected $fillable = ['thread_id', 'user_id', 'path', 'side', 'line_start', 'line_end', 'anchor_hash', 'snippet', 'body', 'status', 'outdated', 'sent_at'];
 
     protected function casts(): array
     {
         return [
             'status' => ReviewCommentStatus::class,
+            'outdated' => 'boolean',
             'line_start' => 'integer',
             'line_end' => 'integer',
             'sent_at' => 'datetime',

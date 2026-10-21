@@ -12,6 +12,7 @@ use App\Models\Workspace;
 use App\Models\WorkspaceGateRun;
 use App\Services\Git\WorkspaceDiffService;
 use App\Services\Workspace\WorkspaceGateService;
+use App\Support\GateAnnotations;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Lazy;
 use Livewire\Attributes\Locked;
@@ -76,7 +77,12 @@ class ChangeTray extends Component
             return __('workspaces.tray.gates_green');
         }
 
-        return __('workspaces.tray.gates_failed', ['gates' => implode(', ', array_column($failed, 'label'))]);
+        $phpstan = array_sum(array_map('count', GateAnnotations::fromRun($run)['phpstan']));
+        $labels = array_map(fn (array $row): string => $row['key'] === 'phpstan' && $phpstan > 0
+            ? trans_choice('workspaces.tray.gate_errors', $phpstan, ['gate' => $row['label'], 'count' => $phpstan])
+            : $row['label'], $failed);
+
+        return __('workspaces.tray.gates_failed', ['gates' => implode(', ', $labels)]);
     }
 
     private function workspace(): Workspace
