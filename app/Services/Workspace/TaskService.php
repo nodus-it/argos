@@ -7,6 +7,7 @@ namespace App\Services\Workspace;
 use App\Enums\AgentName;
 use App\Enums\ApprovalKind;
 use App\Enums\ApprovalStatus;
+use App\Enums\Capability;
 use App\Enums\AutoTaskState;
 use App\Enums\PermissionMode;
 use App\Enums\SessionStatus;
@@ -17,11 +18,13 @@ use App\Enums\TaskStatus;
 use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceStatus;
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
+use App\Jobs\Workspace\DrainSessionQueueJob;
 use App\Jobs\Workspace\PrepareTaskJob;
 use App\Models\AgentCredential;
 use App\Models\Task;
 use App\Models\TaskApproval;
 use App\Models\TaskEvent;
+use App\Models\TaskMember;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\Gate;
@@ -105,7 +108,15 @@ class TaskService
             throw WorkspaceException::translated('workspaces.errors.preparing');
         }
 
-        $this->pool->acquire($task);
+        try {
+            $this->pool->acquire($task);
+        } catch (SessionsFullException $e) {
+            // A resting session makes room before anyone has to wait.
+            if (! $this->evictIdle($task, $e->scope)) {
+                throw $e;
+            }
+            $this->pool->acquire($task);
+        }
         $agent = $task->agentCredential;
         if ($agent === null) {
             $this->pool->release($task);
@@ -137,22 +148,32 @@ class TaskService
 
     /**
      * Post a message as `$author`. Opens the session on demand; while a turn
-     * is running the daemon queues it as a follow-up. A message the daemon
-     * never received is removed again, so history only shows delivered ones.
+     * is running the daemon queues it as a follow-up. Without a free session
+     * (workspace or subscription limit) the message waits in the session
+     * queue and goes out once one frees up. A message the daemon refused is
+     * removed again, so history only shows delivered or waiting ones.
      *
      * @param  list<array{media_type: string, data: string, path?: string}>  $images
      */
     public function send(Task $task, User $author, string $text, array $images = [], bool $automated = false): TaskEvent
     {
         Gate::forUser($author)->authorize('prompt', $task);
+        if ($task->status->isFinished()) {
+            throw WorkspaceException::translated('workspaces.errors.task_finished');
+        }
 
         // A human writing into a running auto-task takes over: automation pauses.
         if (! $automated && $task->auto_state?->isRunning() === true) {
             $task->forceFill(['auto_state' => AutoTaskState::Paused, 'auto_message' => __('workspaces.auto.paused_by', ['name' => $author->name])])->save();
         }
 
+        $queued = false;
         if (! $task->session_open) {
-            $this->open($task);
+            try {
+                $this->open($task);
+            } catch (SessionsFullException) {
+                $queued = true;
+            }
         }
 
         $event = TaskEvent::query()->create([
@@ -163,8 +184,14 @@ class TaskService
                 'text' => $text,
                 'author_name' => $author->name,
                 'images' => array_map(fn (array $image): array => ['media_type' => $image['media_type'], 'path' => $image['path'] ?? null], $images),
-            ] + ($automated ? ['auto' => true] : []),
+            ] + ($automated ? ['auto' => true] : []) + ($queued ? ['pending' => true] : []),
         ]);
+
+        if ($queued) {
+            $this->enqueue($task, $event, $author);
+
+            return $event;
+        }
 
         $payload = [
             'client_msg_id' => (string) $event->id,
@@ -311,8 +338,131 @@ class TaskService
         return true;
     }
 
-    /** End the session and free the agent slot. */
-    public function close(Task $task, ?User $by = null): void
+    /**
+     * Put a task whose message found no free session in the queue (keeps
+     * its place when it is already waiting).
+     */
+    private function enqueue(Task $task, TaskEvent $event, User $author): void
+    {
+        if ($task->queued_at === null) {
+            $task->forceFill(['queued_at' => now()])->save();
+        }
+        $position = $this->queuePosition($task);
+        $this->publisher->publish($task->workspace_id, $task->id, [[
+            'type' => 'user.message',
+            'event_id' => $event->id,
+            'data' => ['text' => (string) ($event->payload['text'] ?? ''), 'author_id' => $author->id, 'author_name' => $author->name, 'pending' => true, 'position' => $position],
+        ]]);
+        $this->workspaces->touch($task->workspace);
+    }
+
+    /** Place in the workspace's session queue (1 = next), null when not waiting. */
+    public function queuePosition(Task $task): ?int
+    {
+        if ($task->queued_at === null) {
+            return null;
+        }
+
+        return Task::query()
+            ->where('workspace_id', $task->workspace_id)
+            ->whereNotNull('queued_at')
+            ->where(fn ($q) => $q->where('queued_at', '<', $task->queued_at)
+                ->orWhere(fn ($q) => $q->where('queued_at', $task->queued_at)->where('id', '<', $task->id)))
+            ->count() + 1;
+    }
+
+    /**
+     * Give freed sessions to waiting tasks, oldest first: open the session
+     * and deliver the waiting messages. A task whose agent is still full
+     * keeps waiting without blocking the others; a full workspace stops.
+     */
+    public function drainQueue(string $workspaceId): void
+    {
+        $waiting = Task::query()->with('workspace')->where('workspace_id', $workspaceId)->whereNotNull('queued_at')->orderBy('queued_at')->orderBy('id')->get();
+        foreach ($waiting as $task) {
+            try {
+                $this->open($task);
+            } catch (SessionsFullException $e) {
+                if ($e->scope === 'workspace') {
+                    return;
+                }
+
+                continue;
+            } catch (WorkspaceException) {
+                continue;
+            }
+
+            $this->deliverPending($task);
+        }
+    }
+
+    /** Send the messages that waited for a session, in order. */
+    private function deliverPending(Task $task): void
+    {
+        $task->forceFill(['queued_at' => null])->save();
+        $pending = TaskEvent::query()->where('task_id', $task->id)->where('type', TaskEventType::UserMessage->value)->orderBy('id')->get()
+            ->filter(fn (TaskEvent $e): bool => ($e->payload['pending'] ?? false) === true);
+
+        foreach ($pending as $event) {
+            $text = (string) ($event->payload['text'] ?? '');
+            $payload = [
+                'client_msg_id' => (string) $event->id,
+                'author' => ['id' => $event->author_user_id, 'name' => (string) ($event->payload['author_name'] ?? '')],
+                'text' => $task->restore_note !== null ? '['.$task->restore_note."]\n\n".$text : $text,
+            ];
+            $images = app(TaskAttachmentService::class)->load(is_array($event->payload['images'] ?? null) ? $event->payload['images'] : []);
+            if ($images !== []) {
+                $payload['images'] = $images;
+            }
+
+            try {
+                $this->deliver($task, $payload);
+            } catch (WorkspaceException) {
+                // Back in line; the next freed session tries again.
+                $task->forceFill(['queued_at' => now()])->save();
+
+                return;
+            }
+
+            $event->forceFill(['payload' => array_diff_key($event->payload, ['pending' => true])])->save();
+            if ($task->restore_note !== null) {
+                $task->forceFill(['restore_note' => null])->save();
+            }
+            $this->publisher->publish($task->workspace_id, $task->id, [[
+                'type' => 'user.delivered',
+                'event_id' => $event->id,
+                'data' => [],
+            ]]);
+        }
+    }
+
+    /**
+     * Close the longest-resting session in the scope (an idle session nobody
+     * waits on) to make room. Resting tasks hold no session for long.
+     */
+    private function evictIdle(Task $for, string $scope): bool
+    {
+        $candidate = Task::query()
+            ->where('session_open', true)
+            ->where('session_status', SessionStatus::Idle->value)
+            ->whereKeyNot($for->id)
+            ->when($scope === 'workspace', fn ($q) => $q->where('workspace_id', $for->workspace_id))
+            ->when($scope !== 'workspace', fn ($q) => $q->where('agent_credential_id', $for->agent_credential_id))
+            ->whereDoesntHave('approvals', fn ($q) => $q->where('status', ApprovalStatus::Pending->value))
+            ->where(fn ($q) => $q->whereNull('auto_state')->orWhereIn('auto_state', [AutoTaskState::Paused->value, AutoTaskState::Done->value, AutoTaskState::Failed->value, AutoTaskState::BudgetExceeded->value]))
+            ->orderBy('updated_at')
+            ->first();
+        if ($candidate === null) {
+            return false;
+        }
+
+        $this->close($candidate, drain: false);
+
+        return true;
+    }
+
+    /** End the session and free the agent slot; waiting tasks get it. */
+    public function close(Task $task, ?User $by = null, bool $drain = true): void
     {
         if ($by !== null) {
             Gate::forUser($by)->authorize('update', $task);
@@ -327,6 +477,143 @@ class TaskService
         }
         $this->pool->release($task);
         $task->forceFill(['session_status' => SessionStatus::Closed])->save();
+        if ($drain) {
+            DrainSessionQueueJob::dispatch($task->workspace_id);
+        }
+    }
+
+    /**
+     * Invite a workspace member to collaborate (write, approve, review,
+     * ship). Readers of the workspace become collaborators of this task only.
+     */
+    public function invite(Task $task, User $by, User $member): void
+    {
+        Gate::forUser($by)->authorize('invite', $task);
+        // Working together on a task is pair programming: behind the same gate as workspace members.
+        if (! app(WorkspaceMemberService::class)->collaborationEnabled($by)) {
+            throw WorkspaceException::translated('workspaces.errors.collaboration_disabled');
+        }
+        if ($task->workspace->roleOf($member) === null) {
+            throw WorkspaceException::translated('workspaces.errors.not_a_member', ['name' => $member->name]);
+        }
+        if ($task->isOwnedBy($member) || $task->members()->where('user_id', $member->id)->exists()) {
+            return;
+        }
+
+        TaskMember::query()->create(['task_id' => $task->id, 'user_id' => $member->id, 'invited_by' => $by->id]);
+        $this->notice($task, 'invited', $by, ['member_name' => $member->name]);
+        app(WorkspaceNotifier::class)->notify($task->workspace, $task, 'invite', __('workspaces.notifications.invite', ['name' => $by->name]), $task->title, $by->id);
+    }
+
+    public function uninvite(Task $task, User $by, User $member): void
+    {
+        Gate::forUser($by)->authorize('invite', $task);
+        if ($task->members()->where('user_id', $member->id)->delete() > 0) {
+            $this->notice($task, 'uninvited', $by, ['member_name' => $member->name]);
+        }
+    }
+
+    /**
+     * Hand the task to another person: from now on it runs on their
+     * subscription (the open session ends). The previous owner stays on as a
+     * collaborator.
+     */
+    public function transfer(Task $task, User $by, User $newOwner, ?AgentCredential $agent = null): void
+    {
+        Gate::forUser($by)->authorize('transfer', $task);
+        if ($task->isOwnedBy($newOwner)) {
+            return;
+        }
+        $role = $task->workspace->roleOf($newOwner);
+        if ($role === null || ! $role->grants(Capability::TaskCreate)) {
+            throw WorkspaceException::translated('workspaces.errors.transfer_needs_member', ['name' => $newOwner->name]);
+        }
+        $agent ??= $this->pool->usableAgentsFor($newOwner)->first(fn (AgentCredential $a): bool => $a->user_id === $newOwner->id)
+            ?? $this->pool->usableAgentsFor($newOwner)->first();
+        if ($agent === null || ! Gate::forUser($newOwner)->allows('use', $agent)) {
+            throw WorkspaceException::translated('workspaces.errors.transfer_needs_agent', ['name' => $newOwner->name]);
+        }
+
+        if ($task->session_open) {
+            $this->close($task);
+        }
+        $previous = $task->owner;
+        $task->forceFill(['owner_user_id' => $newOwner->id, 'agent_credential_id' => $agent->id])->save();
+        $task->members()->where('user_id', $newOwner->id)->delete();
+        if ($previous !== null) {
+            TaskMember::query()->firstOrCreate(['task_id' => $task->id, 'user_id' => $previous->id], ['invited_by' => $by->id]);
+        }
+        $task->unsetRelation('members');
+
+        $this->notice($task, 'transferred', $by, ['owner_name' => $newOwner->name]);
+        app(WorkspaceNotifier::class)->notify($task->workspace, $task, 'invite', __('workspaces.notifications.transferred', ['name' => $by->name]), $task->title, $by->id);
+    }
+
+    /** Stop working on a task without merging (its pull request stays as it is). */
+    public function cancel(Task $task, User $by): void
+    {
+        Gate::forUser($by)->authorize('archive', $task);
+        if ($task->status->isFinished()) {
+            return;
+        }
+        if ($task->session_open) {
+            $this->close($task);
+        }
+        $task->forceFill([
+            'status' => TaskStatus::Cancelled,
+            'done_at' => now(),
+            'queued_at' => null,
+            'auto_state' => $task->auto_state?->isRunning() === true ? AutoTaskState::Paused : $task->auto_state,
+        ])->save();
+        $this->notice($task, 'cancelled', $by);
+    }
+
+    /**
+     * Delete a task for good: its session, preview, worktree and database go
+     * (the remote branch and pull request stay). Archiving is the normal way.
+     */
+    public function delete(Task $task, User $by): void
+    {
+        Gate::forUser($by)->authorize('delete', $task);
+        if ($task->session_open) {
+            $this->close($task);
+        }
+        app(TaskCleanup::class)->cleanup($task);
+        $task->delete();
+    }
+
+    /**
+     * Continue finished work in a new task: same ticket, a fresh branch from
+     * the current base, and a link to the earlier task.
+     */
+    public function followUp(Task $parent, User $by, AgentCredential $agent): Task
+    {
+        Gate::forUser($by)->authorize('view', $parent);
+
+        return $this->create($parent->workspace, $by, $agent, mb_substr(__('workspaces.task.follow_up_title', ['title' => $parent->title]), 0, 120), $parent->model, options: [
+            'base_branch' => $parent->base_branch,
+            'external_ref' => $parent->external_ref,
+            'parent_task_id' => $parent->id,
+        ]);
+    }
+
+    /**
+     * The first message of a follow-up: what the earlier task was about and
+     * where it ended (prefilled, never sent automatically).
+     */
+    public function followUpBrief(Task $task): string
+    {
+        $parent = $task->parent;
+        if ($parent === null) {
+            return '';
+        }
+        $last = TaskEvent::query()->where('task_id', $parent->id)->where('type', TaskEventType::AssistantMessage->value)->latest('id')->value('payload');
+
+        return trim(implode("\n\n", array_filter([
+            __('workspaces.task.follow_up_intro', ['title' => $parent->title, 'branch' => (string) $parent->branch]),
+            $parent->pr_url !== null ? __('workspaces.task.follow_up_pr', ['url' => $parent->pr_url, 'state' => (string) $parent->pr_state]) : null,
+            is_array($last) && trim((string) ($last['text'] ?? '')) !== '' ? __('workspaces.task.follow_up_last')."\n> ".str_replace("\n", "\n> ", mb_strimwidth(trim((string) $last['text']), 0, 1500, '…')) : null,
+        ])));
     }
 
     public function rename(Task $task, User $by, string $title): void

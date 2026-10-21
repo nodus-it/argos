@@ -56,6 +56,7 @@
         <server name="APP_KEY" value="base64:zTobRxr7TepBXVjM/E3kjKGAwnxWQ7QWMMXaInQYKKg=" force="true"/>
         <server name="APP_MAINTENANCE_DRIVER" value="file" force="true"/>
         <server name="BCRYPT_ROUNDS" value="4" force="true"/>
+        <server name="QUEUE_CONNECTION" value="sync" force="true"/>
         <server name="DB_CONNECTION" value="sqlite"/>
         <server name="DB_DATABASE" value=":memory:"/>
         <server name="DB_URL" value=""/>

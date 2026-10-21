@@ -9,14 +9,16 @@ use App\Enums\AgentName;
 use App\Models\AgentCredential;
 use App\Models\Task;
 use App\Models\User;
+use App\Models\Workspace;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Hands out agent session slots. An open task session occupies one slot of
- * its agent; an agent never runs more sessions than its
- * `max_concurrent_sessions`, which protects the owner's subscription limits.
+ * Hands out session slots. An open task session occupies one slot of its
+ * agent and one of its workspace: an agent never runs more sessions than its
+ * `max_concurrent_sessions` (the owner's subscription limits), a workspace
+ * never more than its `max_sessions` (the container's resources).
  */
 class AgentPool
 {
@@ -52,11 +54,20 @@ class AgentPool
             ->count();
     }
 
+    public function workspaceSessions(string $workspaceId): int
+    {
+        return Task::query()
+            ->where('workspace_id', $workspaceId)
+            ->where('session_open', true)
+            ->count();
+    }
+
     /**
-     * Occupy a slot for the task's agent. Idempotent for a task that
-     * already holds its slot.
+     * Occupy a slot for the task's agent and workspace. Idempotent for a
+     * task that already holds its slot.
      *
-     * @throws AgentBusyException when the agent is missing, limited or full
+     * @throws SessionsFullException when the agent or the workspace has no free slot
+     * @throws AgentBusyException when the agent is missing or usage-limited
      */
     public function acquire(Task $task): void
     {
@@ -81,10 +92,17 @@ class AgentPool
                 ]);
             }
             if ($this->activeSessions($agent) >= max(1, $agent->max_concurrent_sessions)) {
-                throw AgentBusyException::translated('workspaces.errors.agent_busy', [
+                throw SessionsFullException::translated('workspaces.errors.agent_busy', [
                     'agent' => $agent->name,
                     'max' => max(1, $agent->max_concurrent_sessions),
                 ]);
+            }
+            $workspace = Workspace::query()->whereKey($locked->workspace_id)->lockForUpdate()->firstOrFail();
+            if ($this->workspaceSessions($workspace->id) >= max(1, $workspace->max_sessions)) {
+                $full = SessionsFullException::translated('workspaces.errors.workspace_busy', ['max' => max(1, $workspace->max_sessions)]);
+                $full->scope = 'workspace';
+
+                throw $full;
             }
 
             $locked->forceFill(['session_open' => true])->save();

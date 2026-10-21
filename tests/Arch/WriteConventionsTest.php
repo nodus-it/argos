@@ -139,9 +139,10 @@ arch('no filesystem io in the presentation layer')
     ]);
 
 // --- Workspace membership has a single writer ------------------------------
-// WorkspaceMemberService::add is the only enforcement point of the
-// `workspace-collaboration` gate (the EE seam for pair programming). Any other
-// writer of workspace_members would bypass it.
+// WorkspaceMemberService::add is the enforcement point of the
+// `workspace-collaboration` gate (the EE seam for pair programming) for
+// workspace members; TaskService::invite checks it for task collaborators.
+// Any other writer of workspace_members would bypass it.
 it('writes workspace members only through WorkspaceMemberService', function (): void {
     $root = dirname(__DIR__, 2);
     $allowed = 'app/Services/Workspace/WorkspaceMemberService.php';

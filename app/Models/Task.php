@@ -49,6 +49,7 @@ use Illuminate\Support\Carbon;
  * @property int $last_seq
  * @property string $cost_usd
  * @property bool $session_open
+ * @property Carbon|null $queued_at
  * @property string|null $branch
  * @property string $base_branch
  * @property string|null $base_commit
@@ -105,6 +106,7 @@ class Task extends Model implements DemoTarget
         'last_seq',
         'cost_usd',
         'session_open',
+        'queued_at',
         'branch',
         'base_branch',
         'base_commit',
@@ -147,6 +149,7 @@ class Task extends Model implements DemoTarget
             'last_seq' => 'integer',
             'cost_usd' => 'decimal:4',
             'session_open' => 'boolean',
+            'queued_at' => 'datetime',
             'pr_number' => 'integer',
             'pr_checks' => 'array',
             'pr_conflicts' => 'boolean',

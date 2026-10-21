@@ -238,6 +238,7 @@ button.wf-gate:not([disabled]):hover { background: var(--wf-raised); }
 .wf-claude-badge { width: 18px; height: 18px; border-radius: 5px; display: grid; place-items: center; background: var(--wf-accent); color: var(--wf-on-accent); font-size: 10px; font-weight: 600; }
 .wf-pill-tag { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: 999px; background: var(--wf-raised); color: var(--wf-muted); font-size: 11.5px; }
 .wf-pill-tag.is-danger { background: var(--wf-danger-soft); color: var(--wf-danger); }
+.wf-pill-tag.is-warn { background: var(--wf-warn-soft); color: var(--wf-warn); }
 .wf-md { font-size: 15px; line-height: 1.6; color: var(--wf-text); max-width: none; }
 .wf-md :where(p) { margin: 0 0 10px; }
 .wf-md :where(ul, ol) { margin: 0 0 10px; padding-left: 20px; }

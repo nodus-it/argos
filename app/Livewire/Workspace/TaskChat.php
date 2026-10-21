@@ -570,6 +570,7 @@ class TaskChat extends Component
             'user' => $this->user(),
             'commands' => $task !== null ? $this->commandList() : [],
             'autoDefaults' => AutoSettings::resolve($workspace),
+            'queuePosition' => $task !== null ? app(TaskService::class)->queuePosition($task) : null,
             'reviewComments' => $task !== null && $canWrite ? app(ReviewCommentService::class)->open($task, $this->user()) : collect(),
             // user message id => checkpoint taken right before it
             'checkpoints' => $task !== null

@@ -120,7 +120,8 @@ export function argosTaskStream(config) {
             const lines = (text) => (typeof text === 'string' && text !== '' ? text.split('\n').length : 0);
             const edits = data.name === 'MultiEdit' && Array.isArray(input.edits) ? input.edits : [input];
             this.pendingEdits[data.tool_use_id] = {
-                path: path.replace(/^\/workspace\//, ''),
+                // Repo-relative: task worktrees live in /workspace/tasks/<slug>/.
+                path: path.replace(/^\/workspace\/(?:tasks\/[^/]+\/|repo\/)?/, ''),
                 add: edits.reduce((n, e) => n + lines(e.new_string ?? e.content ?? ''), 0),
                 del: edits.reduce((n, e) => n + lines(e.old_string ?? ''), 0),
             };

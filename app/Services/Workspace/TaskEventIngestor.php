@@ -8,6 +8,7 @@ use App\Enums\ApprovalKind;
 use App\Enums\ApprovalStatus;
 use App\Enums\SessionStatus;
 use App\Enums\TaskEventType;
+use App\Jobs\Workspace\DrainSessionQueueJob;
 use App\Jobs\Workspace\ReanchorReviewCommentsJob;
 use App\Models\AgentCredential;
 use App\Models\Task;
@@ -145,6 +146,10 @@ class TaskEventIngestor
             $this->notify($workspace, $taskId, $outgoing);
             // Resolved lazily: the driver depends on services that depend on this ingestor's peers.
             $task = Task::query()->find($taskId);
+            // A session ended: a waiting task can have it.
+            if (collect($events)->contains(fn (array $e): bool => ($e['type'] ?? '') === 'status' && (($e['data']['state'] ?? '') === 'closed'))) {
+                DrainSessionQueueJob::dispatch($workspace->id);
+            }
             if ($task !== null && in_array('prepare.completed', array_column($events, 'type'), true)) {
                 app(TaskPreparer::class)->afterPrepared($task);
             }

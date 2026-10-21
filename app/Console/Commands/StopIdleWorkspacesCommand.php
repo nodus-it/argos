@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Enums\AutoTaskState;
 use App\Enums\SessionStatus;
+use App\Enums\TaskStatus;
 use App\Enums\WorkspaceStatus;
 use App\Models\Workspace;
 use App\Services\Workspace\WorkspaceService;
@@ -34,7 +36,10 @@ class StopIdleWorkspacesCommand extends Command
             ->where('status', WorkspaceStatus::Running->value)
             ->where(fn ($q) => $q->where('last_activity_at', '<', now()->subMinutes($minutes))
                 ->orWhere(fn ($q) => $q->whereNull('last_activity_at')->where('updated_at', '<', now()->subMinutes($minutes))))
+            // Working, preparing or waiting tasks keep their container.
             ->whereDoesntHave('tasks', fn ($q) => $q->whereIn('session_status', [SessionStatus::Running->value, SessionStatus::WaitingInput->value]))
+            ->whereDoesntHave('tasks', fn ($q) => $q->where('status', TaskStatus::Preparing->value)->orWhereNotNull('queued_at'))
+            ->whereDoesntHave('tasks', fn ($q) => $q->whereNotNull('auto_state')->whereNotIn('auto_state', [AutoTaskState::Paused->value, AutoTaskState::Done->value, AutoTaskState::Failed->value, AutoTaskState::BudgetExceeded->value]))
             ->get();
 
         foreach ($idle as $workspace) {

@@ -163,7 +163,9 @@
                             @if (! empty($p['auto']))
                                 <span class="wf-pill-tag"><x-wf.icon name="zap" :size="11" :stroke="2" /> {{ __('workspaces.auto.automated') }}</span>
                             @endif
-                            @if (! isset($p['accepted_at']) && $busy)
+                            @if (! empty($p['pending']))
+                                <span class="wf-pill-tag is-warn">{{ __('workspaces.events.queued', ['position' => $queuePosition ?? 1]) }}</span>
+                            @elseif (! isset($p['accepted_at']) && $busy)
                                 <span class="wf-pill-tag">{{ __('workspaces.task.queued') }}</span>
                             @endif
                             @if ($canWrite && isset($checkpoints[$event->id]))
@@ -261,6 +263,10 @@
                                                 'prepare_step' => in_array($p['step'] ?? '', ['worktree', 'setup'], true) ? __('workspaces.events.prepare_step.'.$p['step']) : '',
                                                 'prepared' => ($p['setup'] ?? '') === 'failed' ? __('workspaces.events.prepared_setup_failed') : __('workspaces.events.prepared'),
                                                 'prepare_failed' => __('workspaces.events.prepare_failed', ['message' => $p['message'] ?? '']),
+                                                'invited' => __('workspaces.events.invited', ['name' => $p['author_name'] ?? '', 'member' => $p['member_name'] ?? '']),
+                                                'uninvited' => __('workspaces.events.uninvited', ['name' => $p['author_name'] ?? '', 'member' => $p['member_name'] ?? '']),
+                                                'transferred' => __('workspaces.events.transferred', ['name' => $p['author_name'] ?? '', 'owner' => $p['owner_name'] ?? '']),
+                                                'cancelled' => __('workspaces.events.cancelled', ['name' => $p['author_name'] ?? '']),
                                                 default => '',
                                             } }}
                                             @if (($p['kind'] ?? '') === 'prepare_failed' && $canWrite && $task->status === \App\Enums\TaskStatus::Preparing)
