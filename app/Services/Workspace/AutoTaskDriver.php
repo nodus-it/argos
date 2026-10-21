@@ -62,7 +62,7 @@ class AutoTaskDriver
      * Create an auto-task in `$workspace`, owned by `$by`, and start it.
      *
      * @param  array<string, mixed>  $overrides  per-run settings (AutoSettings keys)
-     * @param  array{base_branch?: string|null, external_ref?: array<string, mixed>|null, origin?: TaskOrigin}  $taskOptions  see TaskService::create()
+     * @param  array{base_branch?: string|null, external_ref?: array<string, mixed>|null, origin?: TaskOrigin, parent_task_id?: string|null, auto_merge?: bool}  $taskOptions  see TaskService::create()
      */
     public function start(Workspace $workspace, User $by, AgentCredential $agent, string $prompt, ?string $title = null, ?string $model = null, array $overrides = [], array $taskOptions = []): Task
     {

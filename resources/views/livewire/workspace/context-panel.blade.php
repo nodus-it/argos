@@ -60,6 +60,65 @@
     </section>
     @endif
 
+    @if ($task?->pr_number !== null)
+    @php
+        $checks = $pr?->checks['state'] ?? ($task->pr_checks['state'] ?? 'none');
+        $review = $pr?->reviewState ?? $task->pr_review_state;
+        $prState = $pr?->state ?? $task->pr_state;
+        $open = in_array($prState, ['open', 'draft'], true);
+    @endphp
+    <section class="wf-section wf-pr" data-testid="pr-section">
+        <div class="wf-section-head">
+            <h2 class="wf-section-title">{{ __('workspaces.pr.title') }} · #{{ $task->pr_number }}@if ($prState) · {{ __('workspaces.pr_state.'.$prState) }}@endif</h2>
+            <button type="button" class="wf-text-btn" wire:click="prRefresh" wire:loading.attr="disabled">{{ __('workspaces.pr.refresh') }}</button>
+        </div>
+        <div class="wf-card wf-pr-card">
+            <div class="wf-pr-row">
+                <span @class(['wf-gate-dot', 'is-pass' => $checks === 'success', 'is-fail' => $checks === 'failure', 'is-running' => $checks === 'pending', 'is-open' => $checks === 'none']) aria-hidden="true"></span>
+                <span class="wf-gate-name">{{ __('workspaces.pr.checks') }}</span>
+                @if (! empty($pr?->checks['url'] ?? $task->pr_checks['url'] ?? null))
+                    <a class="wf-link" href="{{ $pr?->checks['url'] ?? $task->pr_checks['url'] }}" target="_blank" rel="noopener">{{ __('workspaces.pr.checks_state.'.$checks) }} ↗</a>
+                @else
+                    <span class="wf-muted">{{ __('workspaces.pr.checks_state.'.$checks) }}</span>
+                @endif
+            </div>
+            @if ($checks === 'failure' && $canOperate && $open)
+                <button type="button" class="wf-btn wf-btn-sm wf-btn-soft" wire:click="prFixChecks" wire:loading.attr="disabled">{{ __('workspaces.pr.fix_checks') }}</button>
+            @endif
+
+            <div class="wf-pr-row">
+                <span @class(['wf-gate-dot', 'is-pass' => $review === 'approved', 'is-fail' => $review === 'changes_requested', 'is-open' => ! in_array($review, ['approved', 'changes_requested'], true)]) aria-hidden="true"></span>
+                <span class="wf-gate-name">{{ __('workspaces.pr.reviews') }}</span>
+                <span class="wf-muted">{{ $review !== null ? __('workspaces.pr.review_state.'.$review) : __('workspaces.pr.no_reviews_yet') }}</span>
+            </div>
+            @if ($pr !== null && ($pr->reviews !== [] || $pr->comments !== []) && $canOperate && $open)
+                <button type="button" class="wf-btn wf-btn-sm wf-btn-soft" wire:click="prSendReview" wire:loading.attr="disabled">{{ __('workspaces.pr.send_review') }}</button>
+            @endif
+
+            @if ($pr?->conflicts ?? $task->pr_conflicts)
+                <p class="wf-note is-warn">{{ __('workspaces.pr.conflicts', ['branch' => $task->base_branch]) }}</p>
+            @elseif ($pr?->behindBase)
+                <p class="wf-muted wf-note">{{ __('workspaces.pr.behind', ['branch' => $task->base_branch]) }}</p>
+            @endif
+            @if ((($pr?->conflicts ?? $task->pr_conflicts) || $pr?->behindBase) && $canOperate && $open)
+                <button type="button" class="wf-btn wf-btn-sm wf-btn-soft" wire:click="prRebase" wire:loading.attr="disabled">{{ __('workspaces.pr.rebase') }}</button>
+            @endif
+
+            @if ($open && $canShip)
+                <div class="wf-pr-actions">
+                    @if ($prState === 'draft')
+                        <button type="button" class="wf-btn wf-btn-sm wf-btn-primary" wire:click="prMarkReady" wire:loading.attr="disabled">{{ __('workspaces.pr.ready') }}</button>
+                    @endif
+                    <label class="wf-check" title="{{ __('workspaces.pr.auto_merge_help') }}">
+                        <input type="checkbox" @checked($task->auto_merge) wire:change="prAutoMerge($event.target.checked)" data-testid="pr-auto-merge">
+                        <span>{{ __('workspaces.pr.auto_merge') }}</span>
+                    </label>
+                </div>
+            @endif
+        </div>
+    </section>
+    @endif
+
     <section class="wf-section">
         <div class="wf-section-head">
             <h2 class="wf-section-title">{{ __('workspaces.focus.gates') }}</h2>

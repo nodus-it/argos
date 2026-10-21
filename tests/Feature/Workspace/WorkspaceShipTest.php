@@ -26,6 +26,7 @@ use App\Models\Workspace;
 use App\Models\WorkspaceMember;
 use App\Services\GitProvider\Contracts\GitServiceContract;
 use App\Services\GitProvider\GitServiceFactory;
+use App\Services\GitProvider\PullRequestDetails;
 use App\Services\Workspace\WorkspaceException;
 use App\Services\Workspace\WorkspaceIssueService;
 use App\Services\Workspace\WorkspaceShipService;
@@ -136,7 +137,7 @@ class WorkspaceShipTest extends TestCase
         $this->task->refresh();
         $this->assertSame(5, $this->task->pr_number);
         $this->assertSame('https://gitlab.com/acme/sub/widget/-/merge_requests/5', $this->task->pr_url);
-        $this->assertSame('open', $this->task->pr_state);
+        $this->assertSame('draft', $this->task->pr_state);
         $this->assertSame(TaskStatus::PrOpen, $this->task->status);
         $this->assertNotNull($this->task->shipped_at);
         $this->assertSame(['name' => 'Ada', 'email' => 'ada@example.com'], $this->sent['GitCommit'][0]['author']);
@@ -254,7 +255,7 @@ class WorkspaceShipTest extends TestCase
     public function test_sync_marks_a_merged_pull_request_done(): void
     {
         $this->task->forceFill(['pr_number' => 5, 'pr_url' => 'https://x/5', 'pr_state' => 'open', 'status' => TaskStatus::PrOpen])->save();
-        $this->git->shouldReceive('getPullRequest')->once()->with('acme/sub', 'widget', 5)->andReturn(['iid' => 5, 'web_url' => 'https://x/5', 'state' => 'merged']);
+        $this->git->shouldReceive('pullRequestDetails')->once()->with('acme/sub', 'widget', 5)->andReturn(new PullRequestDetails('merged', 'https://x/5'));
 
         $this->artisan('argos:tasks:sync-prs')->assertSuccessful();
 
@@ -267,7 +268,7 @@ class WorkspaceShipTest extends TestCase
     public function test_sync_cancels_a_task_whose_pull_request_was_closed(): void
     {
         $this->task->forceFill(['pr_number' => 5, 'pr_url' => 'https://x/5', 'pr_state' => 'open', 'status' => TaskStatus::PrOpen])->save();
-        $this->git->shouldReceive('getPullRequest')->once()->andReturn(['iid' => 5, 'web_url' => 'https://x/5', 'state' => 'closed']);
+        $this->git->shouldReceive('pullRequestDetails')->once()->andReturn(new PullRequestDetails('closed', 'https://x/5'));
 
         $this->service()->syncPullRequest($this->task);
 
@@ -280,7 +281,7 @@ class WorkspaceShipTest extends TestCase
     public function test_sync_keeps_an_open_pull_request_open(): void
     {
         $this->task->forceFill(['pr_number' => 5, 'pr_url' => 'https://x/5', 'pr_state' => 'draft', 'status' => TaskStatus::PrOpen])->save();
-        $this->git->shouldReceive('getPullRequest')->once()->andReturn(['iid' => 5, 'web_url' => 'https://x/5', 'state' => 'opened']);
+        $this->git->shouldReceive('pullRequestDetails')->once()->andReturn(new PullRequestDetails('open', 'https://x/5'));
 
         $this->service()->syncPullRequest($this->task);
 

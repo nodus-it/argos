@@ -132,7 +132,7 @@ class WorkspaceShipService
                 $task->forceFill([
                     'pr_url' => $info->url,
                     'pr_number' => $info->number,
-                    'pr_state' => $info->state ?? ($draft ? 'draft' : 'open'),
+                    'pr_state' => $draft ? 'draft' : ($info->state ?? 'open'),
                     'pr_synced_at' => now(),
                     'status' => TaskStatus::PrOpen,
                 ]);
@@ -148,49 +148,17 @@ class WorkspaceShipService
         }
 
         $task->forceFill(['shipped_at' => now()])->save();
+        app(PullRequestService::class)->applyAutoMerge($task);
         $this->tasks->notice($task, 'shipped', $by, ['url' => (string) $task->pr_url]);
         $this->notifier->notify($workspace, $task, 'ship', __('workspaces.notifications.ship', ['name' => $by->name]), (string) $task->pr_url, $by->id);
 
         return (string) $task->pr_url;
     }
 
-    /**
-     * Refresh the PR state from the provider; failures keep the old state.
-     * Merged finishes the task, closed without merge cancels it.
-     */
+    /** Refresh the PR state from the provider (see PullRequestService::refresh). */
     public function syncPullRequest(Task $task): void
     {
-        if ($task->pr_number === null) {
-            return;
-        }
-
-        $workspace = $task->workspace;
-        [$owner, $repo] = $workspace->ownerAndRepo();
-        try {
-            $info = PullRequestInfo::from($workspace->platform, $this->git->forWorkspace($workspace)->getPullRequest($owner, $repo, $task->pr_number));
-        } catch (Throwable $e) {
-            Log::channel('argos')->info('Pull request sync failed', ['task' => $task->id, 'error' => $e->getMessage()]);
-
-            return;
-        }
-
-        $state = $info->state ?? $task->pr_state;
-        $task->forceFill([
-            'pr_state' => $state,
-            'pr_url' => $info->url ?? $task->pr_url,
-            'pr_synced_at' => now(),
-        ]);
-        $finished = ! $task->status->isFinished() && in_array($state, ['merged', 'closed'], true);
-        if ($finished) {
-            $task->forceFill([
-                'status' => $state === 'merged' ? TaskStatus::Done : TaskStatus::Cancelled,
-                'done_at' => now(),
-            ]);
-        }
-        $task->save();
-        if ($finished) {
-            app(IssueRunReporter::class)->closed($task);
-        }
+        app(PullRequestService::class)->refresh($task);
     }
 
     /**

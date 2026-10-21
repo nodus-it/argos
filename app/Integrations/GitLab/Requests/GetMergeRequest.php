@@ -7,7 +7,10 @@ namespace App\Integrations\GitLab\Requests;
 use Saloon\Enums\Method;
 use Saloon\Http\Request;
 
-/** GET /projects/{path}/merge_requests/{iid} — state of a merge request. */
+/**
+ * GET /projects/{path}/merge_requests/{iid} — state of a merge request,
+ * optionally with `diverged_commits_count` (commits the target moved on by).
+ */
 class GetMergeRequest extends Request
 {
     protected Method $method = Method::GET;
@@ -16,6 +19,7 @@ class GetMergeRequest extends Request
         private readonly string $owner,
         private readonly string $repo,
         private readonly int|string $mergeRequestId,
+        private readonly bool $includeDivergedCommitsCount = false,
     ) {}
 
     public function resolveEndpoint(): string
@@ -23,5 +27,13 @@ class GetMergeRequest extends Request
         $path = urlencode("{$this->owner}/{$this->repo}");
 
         return "/projects/{$path}/merge_requests/{$this->mergeRequestId}";
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function defaultQuery(): array
+    {
+        return $this->includeDivergedCommitsCount ? ['include_diverged_commits_count' => 'true'] : [];
     }
 }

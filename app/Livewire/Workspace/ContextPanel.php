@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceGateRun;
 use App\Services\Git\WorkspaceDiffService;
+use App\Services\Workspace\PullRequestService;
 use App\Services\Workspace\WorkspaceException;
 use App\Services\Workspace\WorkspaceGateService;
 use App\Support\TaskRefs;
@@ -25,7 +26,7 @@ use Livewire\Component;
 
 /**
  * Context sidebar of the task shown in the chat: environment (VS Code,
- * preview), branch, quality gates and the changed files. Reads the diff
+ * preview), branch, the pull request, quality gates and the changed files. Reads the diff
  * through the daemon, so it renders lazily and refreshes when Claude
  * finishes a turn.
  */
@@ -83,6 +84,58 @@ class ContextPanel extends Component
         }
     }
 
+    public function prRefresh(): void
+    {
+        $this->prAction(fn (PullRequestService $pr, Task $task) => $pr->refresh($task));
+    }
+
+    public function prMarkReady(): void
+    {
+        $this->prAction(fn (PullRequestService $pr, Task $task) => $pr->markReady($task, $this->user()));
+    }
+
+    public function prAutoMerge(bool $on): void
+    {
+        $this->prAction(fn (PullRequestService $pr, Task $task) => $pr->setAutoMerge($task, $this->user(), $on));
+    }
+
+    public function prFixChecks(): void
+    {
+        $this->prAction(fn (PullRequestService $pr, Task $task) => $pr->fixChecks($task, $this->user()));
+    }
+
+    public function prSendReview(): void
+    {
+        $this->prAction(fn (PullRequestService $pr, Task $task) => $pr->sendReview($task, $this->user()));
+    }
+
+    public function prRebase(): void
+    {
+        $this->prAction(fn (PullRequestService $pr, Task $task) => $pr->rebase($task, $this->user()));
+    }
+
+    /**
+     * Run a pull request action (messages to Claude reach the chat through
+     * the task's broadcast).
+     *
+     * @param  callable(PullRequestService, Task): mixed  $action
+     */
+    private function prAction(callable $action): void
+    {
+        $task = $this->task();
+        if ($task === null) {
+            return;
+        }
+
+        try {
+            $action(app(PullRequestService::class), $task);
+        } catch (WorkspaceException $e) {
+            Notification::make()->title($e->getMessage())->warning()->send();
+        } catch (AuthorizationException) {
+            Notification::make()->title(__('workspaces.task.viewer_hint'))->warning()->send();
+        }
+    }
+
     public function placeholder(): string
     {
         return '<div class="wf-context-inner"><span class="wf-spin"></span></div>';
@@ -114,6 +167,8 @@ class ContextPanel extends Component
             'canOperate' => $task !== null && $this->user()->can('prompt', $task),
             'canEdit' => $this->user()->can('editor', $workspace),
             'running' => $workspace->status === WorkspaceStatus::Running,
+            'pr' => $task?->pr_number !== null ? app(PullRequestService::class)->details($task) : null,
+            'canShip' => $task !== null && $this->user()->can('ship', $task),
             'issueLabel' => $task !== null && $issue !== null ? TaskRefs::ticketLabel($task).' · '.$issue['title'] : null,
         ]);
     }

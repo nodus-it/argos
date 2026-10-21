@@ -137,6 +137,10 @@
                         @error('newBaseBranch') <small class="t-err">{{ $message }}</small> @enderror
                         <small class="muted">{{ __('workspaces.task.base_branch_help') }}</small>
                     </label>
+                    <label class="ws-inline">
+                        <input type="checkbox" wire:model="newAutoMerge" data-testid="new-auto-merge">
+                        <span>{{ __('workspaces.pr.auto_merge') }} — <span class="muted">{{ __('workspaces.pr.auto_merge_help') }}</span></span>
+                    </label>
                     <label class="ws-field">
                         <span>{{ __('workspaces.task.agent') }}</span>
                         <select class="ws-select" wire:model.live="newAgentId">
@@ -308,6 +312,8 @@
                                                 'ticket_linked' => __('workspaces.events.ticket_linked', ['name' => $p['author_name'] ?? '', 'ticket' => $p['ticket'] ?? '']),
                                                 'ticket_created' => __('workspaces.events.ticket_created', ['name' => $p['author_name'] ?? '', 'ticket' => $p['ticket'] ?? '']),
                                                 'ticket_comment' => __('workspaces.events.ticket_comment', ['name' => $p['author_name'] ?? '']),
+                                                'pr_ready', 'auto_merge_on', 'auto_merge_off' => __('workspaces.events.'.$p['kind'], ['name' => $p['author_name'] ?? '']),
+                                                'auto_merge_unavailable', 'pr_checks_failed', 'pr_checks_passed', 'pr_changes_requested', 'pr_approved', 'pr_merged', 'pr_closed' => __('workspaces.events.'.$p['kind']),
                                                 default => '',
                                             } }}
                                             @if (($p['kind'] ?? '') === 'prepare_failed' && $canWrite && $task->status === \App\Enums\TaskStatus::Preparing)
@@ -315,6 +321,9 @@
                                             @endif
                                             @if (($p['kind'] ?? '') === 'ticket_comment')
                                                 <blockquote class="wf-ticket-comment">{{ $p['body'] ?? '' }}@if (! empty($p['url'])) <a class="wf-link" href="{{ $p['url'] }}" target="_blank" rel="noopener">↗</a>@endif</blockquote>
+                                            @endif
+                                            @if (str_starts_with((string) ($p['kind'] ?? ''), 'pr_') && ! empty($p['url']))
+                                                <a class="wf-link" href="{{ $p['url'] }}" target="_blank" rel="noopener">↗</a>
                                             @endif
                                             @if (($p['kind'] ?? '') === 'ticket_created' && ! empty($p['url']))
                                                 <a class="wf-link" href="{{ $p['url'] }}" target="_blank" rel="noopener">{{ $p['url'] }}</a>

@@ -102,6 +102,9 @@ class TaskChat extends Component
 
     public string $newBaseBranch = '';
 
+    /** The pull request merges itself once the pipeline is green. */
+    public bool $newAutoMerge = false;
+
     /** Set when the new task continues a finished one. */
     #[Locked]
     public ?string $newParentId = null;
@@ -224,6 +227,7 @@ class TaskChat extends Component
             'base_branch' => trim($this->newBaseBranch) !== '' ? trim($this->newBaseBranch) : null,
             'external_ref' => $issue,
             'parent_task_id' => $this->newParentId,
+            'auto_merge' => $this->newAutoMerge ?: null,
         ], fn ($value): bool => $value !== null);
 
         if ($this->newAuto) {
@@ -240,7 +244,7 @@ class TaskChat extends Component
                 );
                 $this->taskId = $task->id;
                 $this->creating = false;
-                $this->reset('newTitle', 'newPrompt', 'newAuto', 'newPlan', 'newShip', 'newMaxFixRounds', 'newIssue', 'newIssueQuery', 'newBaseBranch', 'newParentId');
+                $this->reset('newTitle', 'newPrompt', 'newAuto', 'newPlan', 'newShip', 'newMaxFixRounds', 'newIssue', 'newIssueQuery', 'newBaseBranch', 'newParentId', 'newAutoMerge');
                 $this->announceTask();
             });
 
@@ -265,7 +269,7 @@ class TaskChat extends Component
             $this->draft = $task->parent_task_id !== null
                 ? app(TaskService::class)->followUpBrief($task)
                 : app(WorkspaceIssueService::class)->composerDraft($task);
-            $this->reset('newIssue', 'newIssueQuery', 'newBaseBranch', 'newParentId');
+            $this->reset('newIssue', 'newIssueQuery', 'newBaseBranch', 'newParentId', 'newAutoMerge');
         });
     }
 

@@ -52,7 +52,7 @@ class TaskService
      * @param  bool  $automated  an auto-task (AutoTaskDriver): it may run
      *                           in bypass mode — it is isolated in the container
      *                           and nobody is there to answer approvals
-     * @param  array{base_branch?: string|null, external_ref?: array<string, mixed>|null, origin?: TaskOrigin, kind?: TaskKind, parent_task_id?: string|null}  $options
+     * @param  array{base_branch?: string|null, external_ref?: array<string, mixed>|null, origin?: TaskOrigin, kind?: TaskKind, parent_task_id?: string|null, auto_merge?: bool}  $options
      */
     public function create(Workspace $workspace, User $by, AgentCredential $agent, string $title, ?string $model = null, PermissionMode $mode = PermissionMode::Default, bool $automated = false, array $options = []): Task
     {
@@ -89,6 +89,7 @@ class TaskService
             'last_seq' => 0,
             'cost_usd' => 0,
             'session_open' => false,
+            'auto_merge' => (bool) ($options['auto_merge'] ?? false),
         ])->save();
 
         // Worktree, database and setup commands; Claude starts after that.
@@ -710,6 +711,26 @@ class TaskService
         if ($mode === PermissionMode::BypassPermissions && ! $by->isAdmin() && $workspace->roleOf($by) !== WorkspaceRole::Admin) {
             throw WorkspaceException::translated('workspaces.errors.bypass_owner_only');
         }
+    }
+
+    /**
+     * A notice nobody in particular caused (pull request changes, Argos
+     * itself), persisted and broadcast.
+     *
+     * @param  array<string, mixed>  $extra
+     */
+    public function systemNotice(Task $task, string $kind, array $extra = []): void
+    {
+        $event = TaskEvent::query()->create([
+            'task_id' => $task->id,
+            'type' => TaskEventType::Notice,
+            'payload' => ['kind' => $kind, ...$extra],
+        ]);
+        $this->publisher->publish($task->workspace_id, $task->id, [[
+            'type' => 'notice',
+            'event_id' => $event->id,
+            'data' => ['kind' => $kind],
+        ]]);
     }
 
     /**

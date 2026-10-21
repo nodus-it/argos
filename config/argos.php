@@ -172,7 +172,7 @@ return [
         // Lifetime of the editor access cookie set on code-<slug> hosts.
         'editor_cookie_hours' => (int) $envOr('ARGOS_WORKSPACE_EDITOR_COOKIE_HOURS', 12),
         // How often open pull requests of workspaces are re-read (minutes).
-        'pr_sync_minutes' => (int) $envOr('ARGOS_WORKSPACE_PR_SYNC_MINUTES', 15),
+        'pr_sync_minutes' => (int) $envOr('ARGOS_WORKSPACE_PR_SYNC_MINUTES', 3),
         // Upload limit per image attached to a task message (MB).
         'upload_max_mb' => (int) $envOr('ARGOS_WORKSPACE_UPLOAD_MAX_MB', 5),
         // Defaults for auto-tasks; a project overrides them in its settings,

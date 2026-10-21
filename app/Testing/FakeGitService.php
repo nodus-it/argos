@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Testing;
 
 use App\Services\GitProvider\Contracts\GitProviderContract;
+use App\Services\GitProvider\PullRequestDetails;
 
 /**
  * Browser-E2E fake git provider: serves canonical repo/branch data so the
@@ -135,5 +136,48 @@ class FakeGitService implements GitProviderContract
     public function getPullRequest(string $owner, string $repo, int|string $pullRequestId): array
     {
         return ['number' => (int) $pullRequestId, 'html_url' => "https://example.test/{$owner}/{$repo}/pull/{$pullRequestId}", 'state' => 'open', 'merged' => false];
+    }
+
+    /**
+     * A healthy open PR: green checks, no conflicts, one inline review
+     * comment — enough for the review panel to render every section.
+     */
+    public function pullRequestDetails(string $owner, string $repo, int|string $number): PullRequestDetails
+    {
+        $url = "https://example.test/{$owner}/{$repo}/pull/{$number}";
+
+        return new PullRequestDetails(
+            state: PullRequestDetails::STATE_OPEN,
+            url: $url,
+            headSha: 'e2e0000000000000000000000000000000000000',
+            conflicts: false,
+            behindBase: false,
+            checks: ['state' => 'success', 'url' => "{$url}/checks", 'failed' => []],
+            reviewState: 'commented',
+            reviews: [
+                ['author' => 'e2e-reviewer', 'state' => 'commented', 'body' => 'Looks good overall.', 'submitted_at' => '2026-01-01T10:00:00Z'],
+            ],
+            comments: [
+                ['id' => '1', 'author' => 'e2e-reviewer', 'body' => 'Please add a test for this branch.', 'path' => 'app/Example.php', 'line' => 12, 'url' => "{$url}#discussion_r1", 'created_at' => '2026-01-01T10:00:00Z'],
+            ],
+            autoMerge: false,
+        );
+    }
+
+    public function markPullRequestReady(string $owner, string $repo, int|string $number): void {}
+
+    public function enableAutoMerge(string $owner, string $repo, int|string $number): bool
+    {
+        return true;
+    }
+
+    public function disableAutoMerge(string $owner, string $repo, int|string $number): bool
+    {
+        return true;
+    }
+
+    public function failedCheckLog(string $owner, string $repo, int|string $number): string
+    {
+        return '';
     }
 }
