@@ -1,29 +1,27 @@
-# What Argos runs — Worker & Demo command reference
+# What Argos runs — Workspace & Demo command reference
 
 A precise list of the shell / Docker commands Argos executes on your behalf
 against a target repository, for operators who want to audit exactly what the
 agent does. There are two execution contexts:
 
-- **The Worker** — one ephemeral container per task *phase* (clone, install
-  deps, run the agent, run quality gates, commit & push).
-- **The Demo deployer** — an ephemeral preview stack spun up *after* a
-  successful implement, when live previews are enabled for the project.
+- **The workspace** — one long-lived container per workspace (clone, the
+  agent's sessions, quality gates, commit & push).
+- **The Demo deployer** — an ephemeral preview stack of a workspace, when live
+  previews are enabled for the project.
 
 > This is a snapshot for orientation. The commands live in code (see
 > [Where this lives](#where-this-lives) at the bottom); if in doubt, the source
-> is the truth. Placeholders like `$BASE_BRANCH`, `$REPO_URL`, `$auth_header`,
-> `$feature_branch` are injected per task; `<slug>`, `<service>`, `<port>` are
-> resolved from the task / demo contract.
+> is the truth. Placeholders like `<slug>`, `<branch>`, `<base>` are resolved
+> per workspace; `<service>`, `<port>` come from the demo contract.
 
 ## Contents
 
-- [The Worker](#the-worker)
+- [The workspace](#the-workspace)
   - [How it is launched](#how-it-is-launched)
   - [Clone & branch](#clone--branch)
-  - [Dependency install](#dependency-install)
-  - [Per phase](#per-phase)
   - [The agent session](#the-agent-session)
   - [Quality / test gate](#quality--test-gate)
+  - [Ship: commit, push, pull request](#ship-commit-push-pull-request)
 - [The Demo deployer](#the-demo-deployer)
   - [Runtime image build](#runtime-image-build)
   - [Deploy lifecycle](#deploy-lifecycle)
@@ -35,145 +33,73 @@ agent does. There are two execution contexts:
 
 ---
 
-## The Worker
+## The workspace
 
 ### How it is launched
 
-The manager builds one `docker run` per phase and streams its output. The
-worker is a **single container**, runs as the non-root user `agent` (uid 1000),
-and has **no Docker socket** — it can only touch the repo, never the host
-daemon.
+The manager prepares two volumes (the checkout and the agent state) and starts
+one container from the workspace image — the worker image (stack + agent +
+gate helpers) plus the workspace daemon and OpenVSCode Server. The container
+runs as the non-root user `agent` (uid 1000) and has **no Docker socket**.
 
 ```
-docker run --rm \
-  -v <task-volume>:/workspace \
+docker run -d --name argos-ws-<slug> --network argos_ws --restart unless-stopped \
+  --label argos.workspace=<slug> \
+  --cpus <argos.workspaces.cpus> --memory <argos.workspaces.memory> \
+  -v ws_<slug>:/workspace \
+  -v ws_<slug>_agents:/home/agent/.claude-agents \
   -v composer_cache:/home/agent/.composer/cache \
   -v npm_cache:/home/agent/.npm \
-  --memory <argos.docker.memory_limit> --cpus <argos.docker.cpu_limit> \
-  -e PHASE=<phase> -e TASK_ID=<task> \
-  -e REPO_URL=… -e REPO_TOKEN=… -e REPO_PLATFORM=… -e BASE_BRANCH=… \
-  -e AGENT_NAME=… -e TASK_DESCRIPTION=… -e PHASE_FLAGS=<json> \
-  -e MAX_TURNS=… -e LOG_LEVEL=info \
-  -e CLAUDE_CONFIG_DIR=/workspace/.agent/claude-state -e CLAUDE_MODEL=… \
-  -e APP_KEY=<deterministic dummy> \
-  [agent credential env] \
-  [--network <run-net> + DB_HOST/REDIS_HOST… when backing services are on] \
+  -e ARGOS_DAEMON_TOKEN=… -e ARGOS_EVENTS_URL=… -e ARGOS_REPO_CREDENTIAL_URL=… \
+  -e ARGOS_DAEMON_PORT=7777 -e ARGOS_EDITOR_PORT=3000 \
+  -e APP_KEY=<fixed dummy> \
+  [DB_HOST/REDIS_HOST… when backing services are on] \
   [project env: COMPOSER_AUTH + the project's custom secrets] \
-  [-e RESUME_SESSION_ID=… on a --continue resume] \
-  [-e COMMIT_USER_NAME=… -e COMMIT_USER_EMAIL=… from the task creator] \
-  [-e FORCE_UNLOCK=1 when the run was force-unlocked] \
-  <worker-image> <phase> <task>
+  <workspace-image>
 ```
 
 Notes for auditing:
 
-- `REPO_TOKEN` and the agent credential are passed as env vars from the
-  database — never from mounted files. The git token never lands in the
-  `origin` URL or in `/workspace/.git/config`; it is supplied per-command via
-  `http.extraheader` and stripped from logs.
-- `APP_KEY` is a **fixed deterministic dummy** so the target repo's Laravel
-  boot pipeline (`package:discover`, `boost:mcp`) does not crash on
-  encrypted-cast code. The worker persists nothing, so it has no security role.
-- Backing services (MySQL / Redis), when the project enabled them, are booted
-  by the manager as ephemeral sidecars on a private per-run network *before*
-  the worker `docker run` and torn down afterwards — **only for the
-  `implement` and `respond` phases** (the phases that run tests). The worker
-  reaches them at the conventional hosts `db` / `redis`.
-
-Before a phase that consumes notes/feedback, the manager writes that text into
-the volume via a throwaway root helper (`alpine`), chowning back to uid 1000:
-
-```
-docker run --rm -i -v <task-volume>:/workspace alpine \
-  sh -c 'mkdir -p /workspace/.agent && cat > /workspace/.agent/<file> && chown -R 1000:1000 /workspace'
-```
-
-where `<file>` is `concept.notes.md` (concept), `implement.notes.md`
-(implement), or `respond.feedback.md` (respond).
+- No repository token and no Claude token are in the container environment.
+  Git asks the Argos credential helper, which fetches the token from the
+  manager on demand; the Claude token is handed to the daemon in memory when a
+  thread session starts.
+- `APP_KEY` is a **fixed dummy** so the project's Laravel boots for artisan
+  and tests. The workspace volume holds nothing this key protects.
+- Backing services (MySQL / Redis), when the project enabled them, run as
+  sidecars on a private per-workspace network (`ws_<slug>_svc`) the container
+  joins. Their data volumes live until the workspace is deleted.
 
 ### Clone & branch
 
-On the **first** run (concept, when `/workspace/.git` does not yet exist) the
-worker initialises the repo in-place — `git clone` would refuse the non-empty
-`/workspace` (the `.agent/` state dir already exists):
+On the first start the daemon clones into the empty volume and checks out the
+workspace branch:
 
 ```
-git init --quiet --initial-branch="$BASE_BRANCH"
-git remote add origin "$REPO_URL"          # token-less URL
-git -c "http.extraheader=$auth_header" fetch --quiet --depth=1 origin "$BASE_BRANCH"
-git checkout -B "$feature_branch" "origin/$BASE_BRANCH"
+git clone --no-checkout <repo-url> /workspace     # token via the credential helper
+git checkout -B <branch> origin/<branch>          # branch exists on the remote
+git checkout -b <branch> origin/<base>            # otherwise: new branch off the base
 ```
 
-`$feature_branch` is `feat/<task-name-slug>` (German umlauts transliterated,
-then stripped to a git-safe slug). The branch naming scheme is fixed. The
-`.agent/` state dir is marked locally ignored so later `git clean` never wipes
-it.
-
-### Dependency install
-
-On `implement` (and, best-effort, `concept`) the worker first seeds a `.env`
-from `.env.example` if missing and drops a Vite `public/hot` stub so artisan /
-Boost can boot without built assets, then:
-
-```
-composer install --no-interaction --prefer-dist --no-progress   # if composer.json exists
-npm ci --no-audit --no-fund                                     # implement only, if package-lock.json exists
-```
-
-On `concept`, a failing `composer install` is **non-fatal** (the plan can still
-be produced); on `implement` it aborts the phase.
-
-### Per phase
-
-| Phase | What the worker runs, in order |
-| --- | --- |
-| **concept** | clone & branch (first run) → `composer install` (best-effort) → archive any prior concept → [agent session](#the-agent-session) that writes `concept.md`. Read-only on the repo by design. |
-| **implement** | (default `--fresh`) `git fetch` + `git reset --hard origin/$BASE_BRANCH` + `git clean -fd` (keeps gitignored `vendor/`, `node_modules/`) → `composer install` / `npm ci` → **capture test baseline** on the clean checkout → agent session → **quality gate**; on a blocking gate failure, up to 3 focused agent fix sessions (`GATE_RETRY_LIMIT`). `--refine` skips the reset and builds on the prior iteration; `--continue` resumes the paused agent session. |
-| **diff** | read-only. `git diff [--stat] [-- <file>] origin/$BASE_BRANCH` (working tree vs base — implement leaves changes uncommitted) → `git status --short` → `git diff --numstat` + `git ls-files --others --exclude-standard` for the change counters. |
-| **push** | invoke the **commit-message** sub-phase → set git identity (`"<name> via Argos"`) → `git add -A` → `git commit -m "<subject>" [-m "<body>"]` → `git push -u --force-with-lease origin "$feature_branch"` → open / update the PR/MR over the provider API (see below). Skips entirely with status `no_changes` when there is nothing to push. |
-| **commit-message** | short agent session (`--max-turns 8`, JSON-schema output, Claude pinned to Haiku) over the concept + diff that produces the commit subject/body. Invoked only by `push`; a failure falls back to `chore: apply implementation changes (N files)`. |
-| **respond** | agent session over `respond.feedback.md` (review feedback from the UI) + concept → the same quality gate as implement. Applies the feedback to the existing feature branch; run `push` afterwards. |
-
-PR / MR creation in **push** is provider-specific:
-
-- **GitHub** — `curl POST https://api.github.com/repos/<owner>/<repo>/pulls`
-  (Bearer `REPO_TOKEN`). On HTTP 422 (PR exists) it looks the PR up and updates
-  the description + adds an iteration comment. It also `PATCH`es the repo to
-  squash-only + auto-delete-branch-on-merge (best-effort; a warning if the
-  token lacks admin rights).
-- **GitLab** — `curl POST …/api/v4/projects/<id>/merge_requests` (Bearer
-  `REPO_TOKEN`), mirroring the GitHub/Bitbucket paths. An existing open MR for
-  the branch is looked up and its description updated instead of recreated. This
-  replaces the former `-o merge_request.create` push options, which could not
-  carry a multi-line description.
-- **Bitbucket** — `curl POST …/2.0/repositories/<ws>/<slug>/pullrequests`
-  (Basic auth for a `user:app_password` token, else Bearer). HTTP 409 → looks
-  up the existing PR.
+The branch is `ws/<slug>` (or `ws/<issue-number>-<slug>` for an issue
+trigger). `.agent/` is marked locally ignored. On later starts the existing
+checkout is left alone.
 
 ### The agent session
 
-The agent session is the agent CLI (`claude` for `claude-code`, or `codex`),
-run with:
-
-- a per-phase **system prompt** (`worker/prompts/*.system.md`),
-- the task description / concept / feedback as the user prompt,
-- a per-phase turn budget `--max-turns "$MAX_TURNS"` (resolved task → project →
-  `config/argos.php`; defaults 30 for concept, 200 for implement/respond),
-- a model `CLAUDE_MODEL` (resolved task → project → agent default),
-- `--resume "$RESUME_SESSION_ID"` when continuing a paused session,
-
-streaming `stream-json` which the worker tees to the phase log and parses for
-the `result` event (session id, cost, token usage). A max-turns hit pauses the
-phase (resumable) rather than failing it. The session is expected to leave the
-working tree changed but **never commits or pushes** — that is the push phase's
-job.
+Each thread is a Claude Code session hosted by the daemon through the Claude
+Agent SDK, with the repository's project and local settings. The chosen model,
+permission mode and — for automatic runs — the turn budget come from the
+thread. The agent edits the working tree; it does **not** push.
 
 ### Quality / test gate
 
-Run by **implement** and **respond** after the agent session, then re-run after
-each fix session. Each gate is **skipped** when its tool or trigger file is
-absent. A test baseline is captured on the clean checkout first, so only
-**new** test failures (versus the repo's pre-existing red tests) block.
+Gates run on request (the *Gates* panel, the API, or an automatic run after
+implementing). The daemon calls `run-gates.sh`, which sources the gate helpers
+(`worker/lib/quality.sh`). A baseline is captured on the fresh checkout
+(`composer install` when `vendor/` is missing, then the test and PHPStan
+baselines), so only **new** failures block. Each gate is **skipped** when its
+tool or trigger file is absent.
 
 | # | Gate | Command | Runs when | Blocks? |
 | --- | --- | --- | --- | --- |
@@ -186,20 +112,31 @@ absent. A test baseline is captured on the clean checkout first, so only
 | 7 | test-presence | new `app/` classes checked for a matching `*Test.php` | new files under `app/` | no (warn only) |
 
 The gate commands are **fixed** — a project does not configure them; a tool is
-simply "off" when not installed. A gate that dies on infrastructure (OOM
-`exit 137`, broken config) is **skipped** rather than sent to remediation, so
-the fix-session budget isn't burned on an unfixable crash. The fix loop also
-bails early if a fix produces byte-identical gate output (no progress). The
-worker image ships the toolchain (PHP + extensions incl. `sockets`, Composer,
-Node, the MySQL client, …).
+simply "off" when not installed. A failing gate can be sent to the agent as a
+fix prompt; an automatic run does that on its own, up to its fix-round limit.
+
+### Ship: commit, push, pull request
+
+Shipping drafts a commit message with a short one-shot session (Haiku, JSON
+output) over the diff, then:
+
+```
+git add -A
+git -c user.name=<person> -c user.email=<email> commit --no-verify -m "<subject>\n\n<body>"
+git push --set-upstream origin HEAD:refs/heads/<branch>
+```
+
+The pull / merge request is opened or updated by the **manager** over the
+provider API (GitHub, GitLab, Bitbucket), not from inside the container.
+Automatic runs with ship mode `none` stop after the push.
 
 ---
 
 ## The Demo deployer
 
-When live previews are enabled, a successful implement triggers an ephemeral
-preview stack. The implemented code already lives in the task workspace volume,
-so the deployer **mounts that volume** into the demo's entry service rather than
+When live previews are enabled, a workspace can start an ephemeral preview
+stack. The code already lives in the workspace volume, so the deployer
+**mounts that volume** into the demo's entry service rather than
 checking the repo out again. The stack is published under its own subdomain via
 a Traefik file-provider route. Manager-side only (it needs the Docker socket).
 
@@ -218,11 +155,10 @@ this build is skipped.
 
 ### Deploy lifecycle
 
-For each deploy (the compose project name is the demo `<slug>`, derived from the
-task name):
+For each deploy (the compose project name is the demo key `demo-ws-<slug>`):
 
 ```
-# 1. tear down any previous demo of this task (idempotent replace)
+# 1. tear down any previous demo of this workspace (idempotent replace)
 docker compose -p <slug> down -v --remove-orphans
 
 # 2. evict the oldest running demos if over argos.preview.max_concurrent
@@ -239,9 +175,9 @@ docker compose -p <slug> \
 # 6. write the Traefik route → the demo is reachable under its subdomain
 ```
 
-The **override** (`override.yml`, generated per task by `DemoComposeBuilder`)
+The **override** (`override.yml`, generated per demo by `DemoComposeBuilder`)
 carries no host `ports:` and no Traefik labels — routing is via the file
-provider. It mounts the task workspace volume at the contract's
+provider. It mounts the workspace volume at the contract's
 `workspace_mount`, joins the shared `argos_edge` network under the demo alias,
 pins `APP_URL`/`ASSET_URL` to the public URL, injects a throwaway `APP_KEY` and
 a per-demo `SESSION_COOKIE`, sets `ARGOS_DEMO=1`, and caps CPU/memory from
@@ -293,13 +229,14 @@ fall-back to the default:
 The project's `commands:` and `health` **replace** the defaults entirely. For
 the bundled default contract, the demo DB credentials and an optional Redis
 service follow the project's backing-service config (same credentials the
-worker sidecar uses).
+workspace sidecars use).
 
 ### Teardown
 
 A demo is torn down (on replace, eviction over the concurrency cap, or TTL
-expiry — `argos.preview.ttl_hours`) by slug, so it still works after the task
-row is gone:
+expiry — `argos.preview.ttl_hours`) by slug, so it still works after the
+workspace row is gone. The route is always guarded by the workspace gate
+(members only):
 
 ```
 docker compose -p <slug> down -v --remove-orphans   # containers + volumes
@@ -310,12 +247,12 @@ docker compose -p <slug> down -v --remove-orphans   # containers + volumes
 
 ## Configurable vs fixed
 
-| Configurable by the project / task | Fixed by Argos |
+| Configurable by the project / run | Fixed by Argos |
 | --- | --- |
 | Test runner & its outcome (whichever of pest/phpunit/pint/phpstan is installed) | The gate **command lines** and ordering |
-| Backing services (MySQL / Redis on/off, credentials) | The set of phases that get sidecars (`implement`, `respond`) |
-| Agent, model per phase, and `max_turns` per phase | The phase flow concept → implement → push, branch naming, no-Docker-socket worker |
-| Project secrets / `COMPOSER_AUTH` injected into worker & demo | Reserved Argos env keys (`REPO_TOKEN`, `APP_KEY`, `APP_URL`, …) can't be overridden |
+| Backing services (MySQL / Redis on/off, credentials) | Sidecars on a private per-workspace network |
+| Model, plan / ship mode and budgets of an automatic run | Branch naming, no-Docker-socket workspace, tokens never in the container env |
+| Project secrets / `COMPOSER_AUTH` injected into workspace & demo | Reserved Argos env keys (`REPO_TOKEN`, `APP_KEY`, `APP_URL`, …) can't be overridden |
 | The full demo contract (`commands`, `health`, services, image, entry) | The compose lifecycle (down → up → exec → probe → route) and the override-injected env |
 
 ---
@@ -324,16 +261,14 @@ docker compose -p <slug> down -v --remove-orphans   # containers + volumes
 
 | Area | Source |
 | --- | --- |
-| `docker run` assembly for a phase | `app/Services/Workflow/PhaseCommandBuilder.php` |
-| phase execution, note/feedback writes, log streaming | `app/Services/Workflow/PhaseRunner.php` |
+| volumes + `docker run` of a workspace | `app/Services/Workspace/WorkspaceContainerManager.php` |
+| provisioning order (image → volumes → sidecars → container → clone) | `app/Services/Workspace/WorkspaceProvisioner.php` |
 | backing-service sidecars | `app/Services/Worker/WorkerSidecarManager.php` |
-| container entrypoint (credential materialise, dispatch) | `.tools/docker/worker/worker-entrypoint.sh` |
-| per-phase scripts | `worker/phases/{concept,implement,diff,push,commit-message,respond}.sh` |
-| quality gate | `worker/lib/quality.sh` |
-| worker image (toolchain) | `.tools/docker/worker/Dockerfile.compose` + `.tools/docker/worker/stacks/Dockerfile.php-8.{3,4}` |
+| clone, git operations, agent sessions, gates | `daemon/src/{workspaceInit,gitOps,threadSession,gates}.ts` |
+| gate script + helpers | `.tools/docker/worker/workspace/run-gates.sh`, `worker/lib/quality.sh` |
+| ship (commit message, push, pull request) | `app/Services/Workspace/WorkspaceShipService.php` |
+| images (toolchain, daemon, editor) | `.tools/docker/worker/Dockerfile.compose`, `.tools/docker/worker/stacks/Dockerfile.php-8.{3,4}`, `.tools/docker/worker/workspace/Dockerfile` |
 | demo deploy (compose lifecycle, boot, health, teardown) | `app/Services/Demo/DemoDeployer.php` |
 | demo override (volume mount, edge network, env) | `app/Services/Demo/DemoComposeBuilder.php` |
 | demo runtime image build | `app/Services/Demo/DemoImageBuilder.php` + `.tools/docker/demo/Dockerfile` |
 | demo contract default / detection | `app/Services/Demo/DemoContractBuilder.php`, `DemoConfigLocator.php`, `resources/stubs/demo/laravel/demo.{yml,compose.yml}` |
-</content>
-</invoke>

@@ -1,19 +1,18 @@
 # Argos REST API
 
 Argos stellt eine versionierte Server-zu-Server-REST-API bereit, mit der sich
-derselbe Task-Workflow steuern lässt, den Sie auch in der Web-UI verwenden —
-Projekte auflisten, Tasks erstellen und sie durch die Phasen Concept →
-Implement → Push (PR) führen, aus eigenen Skripten, CI-Pipelines oder anderer
-Automatisierung heraus.
+dieselben Workspaces steuern lassen, die Sie auch in der Web-UI verwenden —
+Projekte auflisten, **automatische Läufe** starten, die planen, implementieren,
+fehlschlagende Quality-Gates beheben und einen Pull Request öffnen, und diese
+aus eigenen Skripten, CI-Pipelines oder anderer Automatisierung heraus lenken.
 
-Die REST-API läuft gegen exakt dieselbe `TaskService`-Logik wie die Argos-UI
-und der [MCP-Server](SETUP-MCP.md). Alles, was Sie durch Klicken durch einen
-Task tun können, können Sie also auch über HTTP erledigen.
+Die REST-API läuft gegen exakt dieselbe Workspace-Logik wie die Argos-UI und
+der [MCP-Server](SETUP-MCP.md).
 
 Wenn Sie Argos lieber aus einem KI-Agenten heraus steuern möchten (Claude
 Desktop, eine IDE usw.), statt selbst HTTP-Aufrufe zu schreiben, lesen Sie
 [SETUP-MCP.md](SETUP-MCP.md) zum MCP-Server — er ist die alternative
-Automatisierungsschnittstelle auf denselben Workflow.
+Automatisierungsschnittstelle auf dieselben Workspaces.
 
 ## Basis-URL und Versionierung
 
@@ -83,8 +82,6 @@ Ability dem Token fehlt, wird abgewiesen.
 | Ability | Gewährt Zugriff auf |
 | --- | --- |
 | `projects:read` | Projekte auflisten und lesen |
-| `tasks:read` | Tasks auflisten und lesen |
-| `tasks:write` | Tasks erstellen und Phasen ausführen/fortsetzen (feedback, concept, implement, pr) |
 | `workspaces:read` | Workspaces und ihre Threads auflisten und lesen |
 | `workspaces:write` | Automatische Läufe starten, in Threads schreiben, Pläne entscheiden, pausieren/fortsetzen, ausliefern |
 
@@ -112,8 +109,8 @@ curl https://your-argos-host/api/v1/projects \
 
 ## Endpunkte
 
-Ein Pfadparameter `{task}` akzeptiert die ULID des Tasks. Ein Pfadparameter
-`{repoProfile}` akzeptiert die ULID des Projekts.
+Ein Pfadparameter `{repoProfile}`, `{workspace}` oder `{thread}` akzeptiert
+die ULID der jeweiligen Ressource.
 
 ### Projekte auflisten
 
@@ -139,9 +136,15 @@ curl https://your-argos-host/api/v1/projects \
       "url": "https://github.com/acme/my-service",
       "platform": "github",
       "default_branch": "main",
-      "auto_concept": false,
-      "auto_pr": false,
-      "open_tasks": 2,
+      "auto_settings": {
+        "plan": "auto",
+        "ship": "pr",
+        "max_fix_rounds": 3,
+        "max_turns": 60,
+        "max_cost_usd": 0,
+        "max_minutes": 120
+      },
+      "open_workspaces": 2,
       "created_at": "2026-06-13T10:00:00.000000Z",
       "updated_at": "2026-06-13T10:00:00.000000Z"
     }
@@ -150,6 +153,10 @@ curl https://your-argos-host/api/v1/projects \
 ```
 
 `platform` ist einer der Werte `github`, `gitlab`, `bitbucket`.
+`auto_settings` sind die wirksamen Vorgaben für automatische Läufe in diesem
+Projekt (Installationsvorgaben, überschrieben durch den Tab *Automation* des
+Projekts). `open_workspaces` zählt die Workspaces des Projekts, die weder
+gestoppt noch fehlgeschlagen sind.
 
 ### Ein Projekt abrufen
 
@@ -160,248 +167,6 @@ GET /api/v1/projects/{repoProfile}
 Erfordert `projects:read`. Liefert ein einzelnes Projekt in derselben Form wie
 der Listeneintrag oben. Ein projektgebundenes Token darf nur sein eigenes
 Projekt lesen; jede andere id liefert `404`.
-
-### Tasks auflisten
-
-```
-GET /api/v1/tasks
-```
-
-Erfordert `tasks:read`. Liefert Tasks neueste zuerst. Optionale
-Query-Parameter:
-
-| Parameter | Beschreibung |
-| --- | --- |
-| `project` | Nach Projekt-id oder Projektname filtern. Wird bei projektgebundenen Tokens ignoriert (bereits auf ihr Projekt beschränkt). |
-| `status` | Nach `workflow_status`-Wert filtern (siehe unten). |
-| `external_ref` | Nach der eigenen Referenz des Aufrufers filtern (siehe [Idempotenz](#idempotenz)). Damit lässt sich nachsehen, ob es zum eigenen Schlüssel schon einen Task gibt, ohne einen anzulegen. |
-
-```bash
-curl "https://your-argos-host/api/v1/tasks?project=my-service&status=in_review" \
-  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
-  -H "Accept: application/json"
-```
-
-```json
-{
-  "data": [
-    {
-      "id": "01J...",
-      "name": "Add rate limiting",
-      "external_ref": "https://tracker.example/issues/4711",
-      "project": { "id": "01J...", "name": "my-service" },
-      "workflow_status": "in_review",
-      "current_phase": "push",
-      "current_status": "completed",
-      "feature_branch": "argos/add-rate-limiting",
-      "pr_url": "https://github.com/acme/my-service/pull/42",
-      "created_at": "2026-06-13T10:00:00.000000Z"
-    }
-  ]
-}
-```
-
-`workflow_status` ist einer der Werte: `draft`, `concept_running`,
-`concept_review`, `implement_running`, `implement_paused`,
-`implement_completed`, `in_review`, `completed`, `failed`, `aborted`.
-
-### Einen Task abrufen
-
-```
-GET /api/v1/tasks/{task}
-```
-
-Erfordert `tasks:read`. Liefert das vollständige Task-Detail, einschließlich der
-Concept- und Implement-Texte, eines `checkout`-Blocks zum lokalen Klonen des
-Ergebnisses sowie der letzten Phasenläufe.
-
-```bash
-curl https://your-argos-host/api/v1/tasks/01J... \
-  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
-  -H "Accept: application/json"
-```
-
-```json
-{
-  "data": {
-    "id": "01J...",
-    "name": "Add rate limiting",
-    "external_ref": "https://tracker.example/issues/4711",
-    "description": "The plan text...",
-    "workflow_status": "in_review",
-    "current_phase": "push",
-    "current_status": "completed",
-    "project": { "id": "01J...", "name": "my-service" },
-    "concept_md": "# Concept\n...",
-    "concept_notes": "The plan text...",
-    "implement_summary_nontechnical": "...",
-    "implement_summary_technical": "...",
-    "checkout": {
-      "repo_url": "https://github.com/acme/my-service",
-      "base_branch": "main",
-      "feature_branch": "argos/add-rate-limiting"
-    },
-    "pr_url": "https://github.com/acme/my-service/pull/42",
-    "phase_runs": [
-      {
-        "phase": "push",
-        "iteration": 1,
-        "status": "completed",
-        "started_at": "2026-06-13T11:00:00.000000Z",
-        "finished_at": "2026-06-13T11:05:00.000000Z"
-      }
-    ],
-    "created_at": "2026-06-13T10:00:00.000000Z",
-    "updated_at": "2026-06-13T11:05:00.000000Z"
-  }
-}
-```
-
-### Einen Task erstellen
-
-```
-POST /api/v1/tasks
-```
-
-Erfordert `tasks:write`. Erstellt einen Task aus einem Plan und **startet
-sofort die Concept-Phase**. Da Phasen asynchron laufen, liefert dies umgehend
-`202 Accepted` mit dem neuen Task zurück; pollen Sie
-`GET /api/v1/tasks/{task}`, um den Fortschritt zu verfolgen.
-
-Request-Body:
-
-| Feld | Erforderlich | Beschreibung |
-| --- | --- | --- |
-| `name` | ja | Task-Name (max. 255 Zeichen). |
-| `plan` | ja | Der Plan. Wird sowohl als Task-Beschreibung als auch als Concept-Notizen gespeichert. |
-| `project` | bedingt | Projekt-id oder -name. Erforderlich für Tokens mit Vollzugriff; optional für projektgebundene Tokens. Wird er mit einem projektgebundenen Token angegeben, muss er dem Projekt des Tokens entsprechen. |
-| `base_branch` | nein | Branch, auf dem die Arbeit basieren soll (max. 255 Zeichen). Standardmäßig der Default-Branch des Projekts. |
-| `external_ref` | nein | Die eigene Referenz des Aufrufers für diesen Vorgang (max. 255 Zeichen). Eindeutig je Projekt — siehe [Idempotenz](#idempotenz). |
-
-```bash
-curl -X POST https://your-argos-host/api/v1/tasks \
-  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
-  -H "Accept: application/json" \
-  -H "Content-Type: application/json" \
-  -d '{
-        "name": "Add rate limiting",
-        "plan": "Add a rate limiter to the public API...",
-        "project": "my-service",
-        "base_branch": "main",
-        "external_ref": "https://tracker.example/issues/4711"
-      }'
-```
-
-Antwortet mit dem Task in derselben Form wie bei **Einen Task abrufen**,
-ergänzt um ein `created`-Flag neben dem `data`-Envelope:
-
-| Status | Bedeutung |
-| --- | --- |
-| `202` | Der Task wurde angelegt und die Concept-Phase gestartet (`created: true`). |
-| `200` | Unter dieser `external_ref` gab es den Task bereits; es wurde nichts angelegt und keine Phase gestartet (`created: false`). |
-
-### Idempotenz
-
-`external_ref` ist der **natürliche Schlüssel** des Vorgangs: derselbe
-Sachverhalt muss zwangsläufig denselben Wert ergeben, ohne dass sich der
-Aufrufer etwas merken muss.
-
-| Anwendungsfall | Schlüssel |
-| --- | --- |
-| Task aus einem anderen Tracker gespiegelt | dessen Task-URL oder -ID |
-| Arbeit aus einem Pull-Request | die PR-URL |
-| Ein Task je Issue | `<repo>#<issue-nummer>` |
-
-Die Eindeutigkeit garantiert der Server über einen Unique-Index auf
-`(Projekt, external_ref)` — nicht der Aufrufer. Ein zweiter Aufruf mit
-demselben Schlüssel legt nichts an, sondern gibt den bestehenden Task mit `200`
-und `created: false` zurück. Das gilt auch für zwei Läufe, die sich zeitlich
-überholen.
-
-Am meisten zählt das dort, wo niemand zusieht: Geht die *Antwort* auf einen
-Anlege-Aufruf verloren — Timeout, Verbindungsabbruch —, kann der Aufrufer nicht
-wissen, ob der Task existiert. Mit einem Schlüssel sendet er einfach nochmal;
-ohne ihn hat er die Wahl zwischen einem doppelten Implement-Lauf und einer
-Nachschau von Hand.
-
-Der Schlüssel gilt **je Projekt**: Zwei Automaten dürfen ihre Schlüssel aus
-demselben Namensraum bilden (eine Issue-Nummer, eine fremde Task-ID), und
-derselbe Schlüssel in einem anderen Projekt ist ein anderer Task.
-
-Ohne `external_ref` legt jeder Aufruf einen neuen Task an.
-
-### Feedback einreichen
-
-```
-POST /api/v1/tasks/{task}/feedback
-```
-
-Erfordert `tasks:write`. Sendet Review-Feedback, das die Respond-Phase ausführt.
-
-| Feld | Erforderlich | Beschreibung |
-| --- | --- | --- |
-| `feedback` | ja | Der Feedback-Text. |
-
-```bash
-curl -X POST https://your-argos-host/api/v1/tasks/01J.../feedback \
-  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
-  -H "Accept: application/json" \
-  -H "Content-Type: application/json" \
-  -d '{ "feedback": "Please also cover the websocket route." }'
-```
-
-Antwortet mit `202 Accepted` und dem Task.
-
-### Concept-Phase ausführen / fortsetzen
-
-```
-POST /api/v1/tasks/{task}/concept
-```
-
-Erfordert `tasks:write`. Startet die Concept-Phase oder — falls der vorherige
-Concept-Lauf pausiert ist — setzt ihn fort.
-
-| Feld | Erforderlich | Beschreibung |
-| --- | --- | --- |
-| `max_turns` | nein | Ganzzahl 10–1000. Gilt nur beim Fortsetzen eines pausierten Laufs; andernfalls werden Standardwerte verwendet. |
-
-Antwortet mit `202 Accepted` und dem Task.
-
-### Implement-Phase ausführen / fortsetzen
-
-```
-POST /api/v1/tasks/{task}/implement
-```
-
-Erfordert `tasks:write`. Startet die Implement-Phase oder setzt einen pausierten
-Implement-Lauf fort. **Erfordert zuvor einen abgeschlossenen Concept-Lauf** —
-andernfalls wird `409` zurückgegeben.
-
-| Feld | Erforderlich | Beschreibung |
-| --- | --- | --- |
-| `max_turns` | nein | Ganzzahl 10–1000. Gilt nur beim Fortsetzen eines pausierten Laufs. |
-
-Antwortet mit `202 Accepted` und dem Task.
-
-### Den Pull Request öffnen (Push-Phase)
-
-```
-POST /api/v1/tasks/{task}/pr
-```
-
-Erfordert `tasks:write`. Führt die Push-Phase aus, die den Pull Request öffnet.
-**Erfordert zuvor einen abgeschlossenen Implement-Lauf** — andernfalls wird
-`409` zurückgegeben.
-
-```bash
-curl -X POST https://your-argos-host/api/v1/tasks/01J.../pr \
-  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
-  -H "Accept: application/json"
-```
-
-Antwortet mit `202 Accepted` und dem Task. Sobald die Push-Phase abgeschlossen
-ist, lesen Sie den Task erneut, um die `pr_url` und den `checkout`-Block zu
-finden.
 
 ### Workspaces und automatische Läufe
 
@@ -456,27 +221,24 @@ und weitere, benannt nach dem Fehler.
 ## Typischer Ablauf
 
 1. `GET /api/v1/projects` — das Projekt finden, in dem gearbeitet werden soll.
-2. `POST /api/v1/tasks` — einen Task mit dem Plan erstellen (Concept startet
-   automatisch).
-3. `GET /api/v1/tasks/{task}` pollen, bis `workflow_status` den Wert
-   `concept_review` erreicht.
-4. `POST /api/v1/tasks/{task}/implement` — die Implementierung ausführen;
-   erneut pollen.
-5. `POST /api/v1/tasks/{task}/pr` — den Pull Request öffnen; auf `pr_url`
-   pollen.
-6. `POST /api/v1/tasks/{task}/feedback` — bei Bedarf Review-Feedback senden.
+2. `POST /api/v1/workspaces` — einen automatischen Lauf mit dem starten, was
+   umgesetzt werden soll.
+3. `GET /api/v1/workspaces/{workspace}` pollen und `auto.state` des Threads
+   verfolgen.
+4. Mit `plan` = `approve` den Plan entscheiden, sobald der Zustand
+   `awaiting_plan_approval` ist: `POST /api/v1/threads/{thread}/plan`.
+5. Ist der Zustand `done`, steht der Pull Request unter `pull_request`.
+6. `POST /api/v1/threads/{thread}/messages` — Feedback in den Thread schicken
+   (mit `resume_auto`, damit der Lauf selbstständig weitermacht).
 
 ## Antworten und Fehler
 
 - Erfolgreiche Lesezugriffe liefern `200` mit der in einer `data`-Hülle
   verpackten Ressource (einzelnes Objekt) oder einem `data`-Array
   (Sammlungen).
-- Schreibaktionen, die eine asynchrone Phase anstoßen, liefern `202 Accepted`
-  mit dem Task in der `data`-Hülle. Die Arbeit läuft im Hintergrund — lesen Sie
-  den Task erneut, um ihr zu folgen.
-- `POST /api/v1/tasks` antwortet stattdessen mit `200`, wenn eine
-  `external_ref` auf einen bestehenden Task passte: Es wurde nichts angelegt
-  und nichts gestartet. Siehe [Idempotenz](#idempotenz).
+- Schreibaktionen, die asynchrone Arbeit anstoßen, liefern `202 Accepted` mit
+  der Ressource in der `data`-Hülle. Die Arbeit läuft im Hintergrund — lesen
+  Sie den Workspace erneut, um ihr zu folgen.
 - Fehler liefern einen JSON-Body mit einem `message`-Feld und einem passenden
   HTTP-Status.
 
@@ -485,24 +247,15 @@ und weitere, benannt nach dem Fehler.
 | `401` | Fehlendes oder ungültiges Token. |
 | `403` | Dem Token fehlt die für diesen Endpunkt erforderliche Ability. |
 | `404` | Ressource nicht gefunden — oder vor einem projektgebundenen Token verborgen. |
-| `409` | Konfliktzustand, z. B. eine Phase läuft bereits, der Task ist abgeschlossen, oder eine erforderliche vorherige Phase ist nicht abgeschlossen. |
-| `422` | Validierungsfehler (fehlende/ungültige Felder). |
-
-Ein Beispiel für einen `409`-Konflikt:
-
-```json
-{
-  "message": "A phase is already running for this task."
-}
-```
+| `422` | Validierungsfehler (fehlende/ungültige Felder) oder ein fachlicher Fehler mit `code` (siehe oben). |
 
 Ein Beispiel für eine `422`-Validierung:
 
 ```json
 {
-  "message": "The name field is required.",
+  "message": "The prompt field is required.",
   "errors": {
-    "name": ["The name field is required."]
+    "prompt": ["The prompt field is required."]
   }
 }
 ```
@@ -522,5 +275,7 @@ die Dokumentation ist auf angemeldete Argos-Benutzer beschränkt.
 ## Siehe auch
 
 - [SETUP-MCP.md](SETUP-MCP.md) — der MCP-Server, die alternative
-  Automatisierungsschnittstelle auf denselben Task-Workflow, zum Steuern von
+  Automatisierungsschnittstelle auf dieselben Workspaces, zum Steuern von
   Argos aus einem KI-Agenten heraus.
+- [WORKSPACES.md](WORKSPACES.md#auto-threads) — wie automatische Läufe
+  funktionieren.

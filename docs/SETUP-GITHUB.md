@@ -122,7 +122,7 @@ configured through the Filament admin interface.
 
 ### Step 2: Create a binding in Filament
 
-1. Open **Argos Admin → Task Provider Bindings → New**.
+1. Open the project under **Repo Profiles** → **Task-Provider** tab → **Create**.
 2. Set **Kind** to `GitHub` and choose the **Connected Account** that holds your
    PAT or OAuth token.
 3. Enter the **External Project Ref** in `owner/repo` format, e.g.
@@ -173,7 +173,7 @@ column. Fix the issue and click **Einrichten** again.
   are filtered out automatically.
 
 For the shared binding setup details, see
-[Task Providers Setup](SETUP-TASK-PROVIDERS.md).
+[Issue Triggers](SETUP-TASK-PROVIDERS.md).
 
 ---
 

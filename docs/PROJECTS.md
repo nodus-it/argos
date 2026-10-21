@@ -3,9 +3,8 @@
 A **Project** in Argos is a configured Git repository — the unit Argos works on.
 Before you can hand Argos any work, you create a Project that tells it *which*
 repository, *how* to authenticate, *what* environment the code needs to build
-and test, and *which* defaults to use when it runs. Every Task you start is
-attached to exactly one Project and inherits these settings (most can still be
-overridden per task).
+and test, and *which* defaults to use for automatic runs. Every workspace you
+open belongs to exactly one Project and inherits these settings.
 
 This guide explains every setting on the Project form — what it means, why it
 exists, and how to fill it in. It is written for the person creating and
@@ -23,12 +22,12 @@ Projects live under **Configuration → Projects** in the admin panel
   - [Authentication](#authentication)
   - [General settings](#general-settings)
   - [Repository](#repository)
-- [Worker & models tab](#worker--models-tab)
+- [Worker tab](#worker-tab)
   - [Worker (stack & agent)](#worker-stack--agent)
   - [Backing services for tests](#backing-services-for-tests)
   - [Live demo](#live-demo)
   - [Environment & secrets](#environment--secrets)
-  - [Models](#models)
+- [Automation tab](#automation-tab)
 - [Required vs optional — at a glance](#required-vs-optional--at-a-glance)
 
 ## What a Project is
@@ -38,22 +37,25 @@ one repository:
 
 - The **repository address** and the **default branch** new work builds upon.
 - The **credentials** Argos uses to clone, push, and open pull/merge requests.
-- The **worker configuration** — the base image and the agent that run the
-  Concept / Implement / Push phases.
-- The **environment and secrets** injected into the worker (and the live demo)
-  so dependencies install and tests pass.
-- Optional **backing services** (MySQL / Redis) for the test run.
-- An optional **live demo** that spins up after each implement.
-- Per-project **model** and **turn-budget** defaults.
+- The **worker configuration** — the base image and the agent the workspace
+  image is built from.
+- The **environment and secrets** injected into workspaces (and the live
+  preview) so dependencies install and tests pass.
+- Optional **backing services** (MySQL / Redis) that run next to each
+  workspace.
+- Whether workspaces may start a **live preview**.
+- The **automation** defaults for automatic runs (auto-threads) and the person
+  they act for.
 
-A Project has many **Tasks**. When you create a Task, it clones the Project's
-repository at the Project's default branch, runs in a worker built from the
-Project's worker configuration, and authenticates with the Project's
-credentials. For the task lifecycle itself see [TASKS.md](TASKS.md).
+A Project has many **workspaces**. A new workspace clones the Project's
+repository at its default branch (or a branch you pick), runs in an image built
+from the Project's worker configuration, and authenticates with the Project's
+credentials. See [WORKSPACES.md](WORKSPACES.md).
 
-A Project also has, on its edit page, three related lists: its **Tasks**, its
-**task-provider bindings** (see [SETUP-TASK-PROVIDERS.md](SETUP-TASK-PROVIDERS.md)),
-and its **API tokens** (project-scoped Sanctum tokens, e.g. for CI).
+A Project also has, on its edit page, two related lists: its **issue-trigger
+bindings** (see [SETUP-TASK-PROVIDERS.md](SETUP-TASK-PROVIDERS.md)) and its
+**API tokens** (project-scoped Sanctum tokens, e.g. for CI). The project list
+shows how many workspaces each Project has.
 
 ## Creating and editing a Project
 
@@ -61,7 +63,7 @@ Open **Configuration → Projects** and choose **New project**, or click an
 existing Project row to edit it. There is no separate read-only detail view —
 the row opens straight into the edit form, where the related lists also render.
 
-The form has two tabs, **General** and **Worker & models**. The very first
+The form has three tabs, **General**, **Worker** and **Automation**. The very first
 choice is the **Platform**; until you pick one, the rest of the form stays
 locked. Once a platform is chosen, the remaining sections appear, adapted to
 that platform and to which accounts you have connected.
@@ -116,15 +118,6 @@ These appear once a platform is chosen:
 - **Project Name** (required) — the display name in the panel. When you pick a
   repository via the OAuth picker and leave the name empty, Argos pre-fills it
   with the repository's short name.
-- **Auto-start concept** — when on, the Concept phase starts automatically as
-  soon as a Task is created on this Project, instead of waiting for you to
-  start it manually.
-- **Auto-create PR** — when on, the Push phase (which opens the pull/merge
-  request) runs automatically after a successful implementation, instead of
-  waiting for your go-ahead.
-
-Both toggles are convenience automation; leave them off if you want to review
-between every phase.
 
 ### Repository
 
@@ -148,15 +141,14 @@ How you point at the repository depends on whether you are on the **OAuth
 - **Default Branch** (required) — once a valid URL and token are present, Argos
   queries the platform and offers the branch list as a searchable dropdown.
 
-The **default branch** is the branch every Task on this Project branches from
-and targets with its PR.
+The **default branch** is the branch workspaces on this Project branch from
+(unless you pick another base branch) and target with their pull request.
 
-## Worker & models tab
+## Worker tab
 
 ### Worker (stack & agent)
 
-This section defines the environment that runs the phases. It is the
-Project-wide default; individual settings can be overridden per task.
+This section defines the image the Project's workspaces run in.
 
 - **Image source** — where the worker's base image comes from:
   - **Registered stack** — use one of the worker stacks configured in Argos
@@ -164,21 +156,21 @@ Project-wide default; individual settings can be overridden per task.
     [WORKER-STACKS.md](WORKER-STACKS.md).
   - **Own Dockerfile in the repo (BYOI)** — Argos reads
     `.argos/worker.dockerfile` from your repository (at the base branch) as the
-    base and layers the agent and worker code on top. Required tools must come
+    base and layers the agent and the workspace tooling on top. Required tools must come
     in via `FROM`/`RUN`; no `COPY` from the repo (the build context is not the
     repo). See [BYOI.md](BYOI.md).
 - **Worker Stack** — which registered stack to use (only shown for the
   *Registered stack* source). Leave empty to use the Argos default stack.
-- **Agent** — which coding agent runs the phases (e.g. Claude Code). Leave
-  empty to use Claude Code. The available **models** below depend on the chosen
-  agent, so changing the agent clears any pinned model selections. See
-  [AGENTS.md](AGENTS.md).
+- **Agent** — which coding agent the worker image installs. Claude Code is the
+  only agent today; leave it empty. See [AGENTS.md](AGENTS.md).
 
 ### Backing services for tests
 
 Some test suites need a database or cache. Enable the services your tests
-require and Argos boots them **ephemerally** for each implement run — on their
-own private network, with credentials injected, and torn down afterwards:
+require and Argos boots them **next to each workspace** — on the workspace's
+own private network, with credentials injected. Their data lives in volumes of
+the workspace, so a stopped and restarted workspace keeps its database; deleting
+the workspace removes it:
 
 - **MySQL / MariaDB** — reachable at host `db`, port `3306`.
 - **Redis** — reachable at host `redis`, port `6379`.
@@ -198,13 +190,13 @@ project hardcodes:
 Leave them blank to use the Argos defaults. The host and port are fixed and not
 configurable. Redis has no configurable credentials.
 
-These services back both the worker test run and the live demo, so both boot
-from the same definition.
+These services back both the workspace (including its quality gates) and the
+live preview, so both boot from the same definition.
 
 ### Live demo
 
-- **Enable live demo** — when on, Argos automatically spins up a live demo on
-  its own subdomain after each implement.
+- **Enable live demo** — when on, workspaces of this Project can start a live
+  preview on its own subdomain.
 
 This requires your repository to ship the demo contract at the base branch:
 `.argos/demo.compose.yml` (the runtime) and `.argos/demo.yml` (settings such as
@@ -215,7 +207,8 @@ fails with a clear message. See [LIVE-DEMOS.md](LIVE-DEMOS.md) and
 ### Environment & secrets
 
 Project-specific secrets Argos stores **encrypted** and injects into both the
-worker (dependency install + quality gates) and the live demo. Two kinds:
+workspace (dependency install, Claude's commands, quality gates) and the live
+preview. Two kinds:
 
 **Private Composer registries** — auth-protected Composer sources (Private
 Packagist, Satis, Flux, Scramble, …). For each one you add:
@@ -225,8 +218,8 @@ Packagist, Satis, Flux, Scramble, …). For each one you add:
 - **Token** (required) — the registry password/token
 
 Argos assembles these into a single `COMPOSER_AUTH` HTTP-basic blob so
-`composer install` reaches the private registries in both the worker and the
-demo.
+`composer install` reaches the private registries in both the workspace and
+the preview.
 
 **Additional environment variables** — arbitrary name/value pairs (extra API
 keys, custom database names, etc.). For each:
@@ -239,8 +232,8 @@ A few important rules:
 - A hand-written `COMPOSER_AUTH` variable here **overrides** the one generated
   from the registries above — that is the deliberate escape hatch.
 - Argos-owned variables cannot be overridden. Names it sets itself (e.g.
-  `REPO_TOKEN`, `APP_KEY`, `APP_URL`, `TASK_ID`, `CLAUDE_MODEL`, the agent
-  credentials, …) are stripped from your list, so a project secret can never
+  `REPO_TOKEN`, `APP_KEY`, `APP_URL`, the agent credentials, the workspace
+  daemon's wiring, …) are stripped from your list, so a project secret can never
   clobber Argos's own wiring.
 
 **Backing-service placeholders.** When you have enabled MySQL or Redis above,
@@ -256,16 +249,26 @@ This lets a project with non-standard env names bridge to the sidecars without
 hardcoding internal hosts or credentials — for example set
 `MY_DB_DSN=mysql://${mysql.username}:${mysql.password}@${mysql.host}/${mysql.database}`.
 
-### Models
+## Automation tab
 
-Per-phase model and turn-budget defaults for this Project. All optional.
+Defaults for [auto-threads](WORKSPACES.md#auto-threads) — automatic runs
+started in the UI, through the [REST API](REST-API.md), [MCP](SETUP-MCP.md) or
+an [issue trigger](SETUP-TASK-PROVIDERS.md). A single run can override them;
+empty fields use the installation defaults from
+[Configuration](CONFIGURATION.md#auto-threads).
 
-- **Concept Model** / **Implement Model** — pick a model for each phase from
-  the options the chosen agent offers. Leave empty to use the agent's default
-  model for that phase. The form shows the default in the field's hint.
-- **Concept max-turns** / **Implement max-turns** — the turn budget for each
-  phase (between 10 and 1000). Leave empty for the global default. A Task can
-  still override these.
+- **Automation user** — the person automatic runs of this Project's API tokens
+  and issue triggers act for: their Claude agent does the work and they own the
+  workspace. Without one, issue triggers start nothing (the binding shows the
+  error).
+- **Plan** — *off* (implement right away), *automatic* (plan, then continue) or
+  *wait for approval* (plan, then stop until someone approves).
+- **When done** — open a pull request, a draft pull request, or only commit and
+  push.
+- **Gate fix rounds** — how often Claude may try to fix failing quality gates
+  before shipping anyway.
+- **Max. turns**, **Max. cost (USD)**, **Max. runtime (minutes)** — budgets
+  that stop a run. A cost of `0` means no limit.
 
 ## Required vs optional — at a glance
 
@@ -281,10 +284,10 @@ Per-phase model and turn-budget defaults for this Project. All optional.
 
 **Optional (with sensible defaults)**
 
-- Auto-start concept, Auto-create PR (default off)
 - Image source (default Registered stack), Worker Stack (default Argos stack),
   Agent (default Claude Code)
 - Backing services and their MySQL credential overrides
 - Live demo (default off)
 - Additional environment variables and Composer registries
-- Concept/Implement model and max-turns (default to the agent / global defaults)
+- Automation user and the automation defaults (default to the installation
+  settings)

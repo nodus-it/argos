@@ -79,14 +79,12 @@ branches from the connected account.
 
 Bitbucket and GitLab issue short-lived access tokens (~2h); GitHub OAuth Apps
 with token expiration enabled behave the same way. Argos refreshes the access
-token via the stored `refresh_token` whenever a connected account is used to
-build worker credentials and the token has less than 1h of validity left
-(`TokenRefresher::REFRESH_BUFFER_SECONDS`, sized to cover the worker's 3600s
-job timeout), so a freshly started job always begins with a token that survives
-the run.
+token via the stored `refresh_token` whenever a connected account is used — for
+example when a workspace's git asks for its repository credential — and the
+token has less than 1h of validity left (`TokenRefresher::REFRESH_BUFFER_SECONDS`),
+so a clone, fetch or push never starts with a token about to expire.
 
 If a refresh fails (revoked token, provider 4xx, missing `refresh_token`), the
-phase fails fast with a message asking you to reconnect the account. (The UI
-message is currently shown in German — "… bitte Account neu verbinden".)
-Reconnect the account on the **Connected Accounts** page to mint a fresh token
-+ refresh token pair, then re-run the task.
+git operation (or the workspace start) fails with a message asking you to
+reconnect the account. Reconnect the account on the **Connected Accounts** page
+to mint a fresh token + refresh token pair, then try again.

@@ -132,7 +132,7 @@ created through the Filament admin interface.
 ### Step 2: Create a binding in Filament
 
 1. In the admin panel, open the target project under **Repo Profiles**.
-2. Go to the **Task Provider Bindings** tab → **New Binding**.
+2. Go to the **Task-Provider** tab → **Create**.
 3. Fill in the fields:
 
 | Field | Description |
@@ -191,18 +191,7 @@ reachable), the binding stays `Pending` and the error appears in the
   polling is `opened`.
 
 For the shared binding setup details, see
-[Task Providers Setup](SETUP-TASK-PROVIDERS.md).
-
----
-
-## Worker: REPO_PLATFORM
-
-The manager passes `REPO_PLATFORM=gitlab` to the worker container as an
-environment variable. The push phase uses this to detect the platform reliably
-— even for self-hosted GitLab instances with non-obvious hostnames — and then
-creates the merge request over the GitLab REST API (`POST
-…/api/v4/projects/<id>/merge_requests`), so the MR carries the full multi-line
-description.
+[Issue Triggers](SETUP-TASK-PROVIDERS.md).
 
 ---
 
@@ -213,8 +202,9 @@ description.
   Bearer for both token types.
 - For gitlab.com, the `instance_url` in `connected_accounts` is stored empty
   (it defaults to `https://gitlab.com`).
-- Merge requests are opened through the GitLab API; their URL is stored on the
-  workspace.
+- Merge requests are opened through the GitLab REST API (`POST
+  …/api/v4/projects/<id>/merge_requests`), also for self-hosted instances;
+  their URL is stored on the workspace.
 
 ---
 

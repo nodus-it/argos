@@ -8,12 +8,19 @@ du sie brauchst.
 
 ## Was ist Argos
 
-Argos verwandelt eine **Aufgabenbeschreibung in einen geprüften Pull Request**.
-Du beschreibst, was du möchtest — ein Feature, einen Fix, ein Refactoring — und
-Argos entwirft ein Konzept, setzt es in einem isolierten Worker-Container um,
-führt die Quality Gates des Projekts aus, pusht einen Branch und öffnet den Pull
-Request. Du behältst die Kontrolle: Du prüfst das Konzept, bevor es gebaut wird,
-und den Pull Request, bevor er gemergt wird.
+Argos ist **Claude Code im Browser, für ein Team**. Du öffnest einen
+**Workspace** auf einem Repository — ein Branch, ein Container — und arbeitest
+mit Claude wie auf deinem eigenen Rechner: Du chattest mit Claude, während es
+arbeitet, gibst seine Änderungen frei, bearbeitest Dateien selbst in VS Code,
+klickst das Ergebnis in einer Live-Preview durch und lieferst einen Pull Request
+aus. Mehrere Personen können gleichzeitig im selben Workspace arbeiten.
+
+Die Arbeit muss nicht interaktiv sein: Ein **automatischer Lauf** (Auto-Thread)
+plant, setzt um, prüft die Quality Gates des Projekts, behebt, was fehlschlägt,
+und öffnet den Pull Request selbstständig — gestartet aus der Oberfläche, über
+die REST-API, MCP oder ein Issue in deinem Tracker. Du behältst die Kontrolle:
+Du kannst zusehen, den Plan freigeben oder jederzeit übernehmen, und du prüfst
+den Pull Request, bevor er gemergt wird.
 
 Zwei Dinge unterscheiden Argos davon, eine API in einer Schleife aufzurufen:
 
@@ -21,123 +28,125 @@ Zwei Dinge unterscheiden Argos davon, eine API in einer Schleife aufzurufen:
   Claude-Code-OAuth-Token aus `claude setup-token`, sodass dein bestehender
   Pro- / Max- / Team-Plan die Arbeit abdeckt — es gibt keine
   Pro-Token-API-Abrechnung.
-- **Jede Aufgabe läuft in ihrem eigenen Wegwerf-Container.** Der Agent berührt
-  niemals deinen Manager-Host oder deine anderen Aufgaben. Wenn die Arbeit
-  erledigt ist, ist der Container verschwunden.
+- **Jeder Workspace läuft in seinem eigenen Container.** Der Agent berührt
+  niemals deinen Manager-Host oder andere Workspaces; er bekommt das
+  Repository, eine eigene Datenbank und Preview, sonst nichts.
 
-> Argos ist derzeit auf PHP-/Laravel-Projekte abgestimmt — die Implement-Phase
-> bindet Composer, npm, Pint und Pest/PHPUnit als Quality Gates ein. Andere
-> Stacks funktionieren, aber die Prompts und Gates sind heute am schärfsten für
-> Laravel.
+> Argos ist derzeit auf PHP-/Laravel-Projekte abgestimmt — die Quality Gates
+> binden Composer, Pint, Pest/PHPUnit und PHPStan ein. Andere Stacks
+> funktionieren, dort werden die Gates aber übersprungen.
 
-## Das mentale Modell: Manager und Worker
+## Das mentale Modell: Manager und Workspaces
 
-Argos besteht aus zwei Hälften, und es hilft, sie im Kopf getrennt zu halten.
+Argos besteht aus zwei Hälften, und es hilft, sie gedanklich zu trennen.
 
 ### Der Manager — die App, die du nutzt
 
-Der Manager ist die Webanwendung, in die du dich unter `${APP_URL}/admin`
-einloggst. Er ist die Schaltzentrale: Hier verbindest du deine Accounts,
-definierst Projekte, erstellst Aufgaben, beobachtest ihren Lauf, liest den
-Live-Agent-Stream und prüfst die Ergebnisse. Der Manager hält alle deine Daten
-und entscheidet, *was* passieren soll.
+Der Manager ist die Webanwendung, in die du dich einloggst: Workspaces liegen
+unter `${APP_URL}/w`, die Verwaltung (Projekte, Agenten, Benutzer,
+Einstellungen) unter `${APP_URL}/admin`. Hier verbindest du deine Konten,
+legst Projekte an, öffnest Workspaces, verfolgst Claude live und prüfst die
+Ergebnisse. Der Manager hält alle deine Daten — Threads, Entscheidungen,
+Einstellungen — und entscheidet, *was* passieren darf.
 
-Wichtig: **Der Manager selbst führt die KI niemals aus.** Er hat keine eigene
-Claude-Session. Er orchestriert — er entscheidet, wann eine Phase laufen soll,
-und übergibt den Job an einen Worker.
+Wichtig: **Der Manager selbst führt niemals die KI aus.** Er hat keine eigene
+Claude-Session.
 
-### Der Worker — der Container, der die Arbeit erledigt
+### Der Workspace-Container — wo die Arbeit passiert
 
-Ein Worker ist ein **kurzlebiger Docker-Container**, den der Manager für eine
-einzelne Phase einer einzelnen Aufgabe hochfährt. Er klont das Repository, führt
-den Claude-Agenten aus, lässt die Quality Gates laufen und meldet zurück.
-Danach wird er abgebaut.
+Jeder Workspace ist ein **Docker-Container**, den der Manager für ihn startet.
+Er enthält den Checkout des Repositorys auf einem eigenen Branch, daneben die
+Backing Services des Projekts (MySQL / Redis), OpenVSCode Server für den Editor
+und einen kleinen **Daemon**, der die Claude-Sessions ausführt und ihre
+Ereignisse an den Manager weitergibt. Ein Workspace stoppt bei Leerlauf und
+startet wieder, wenn du ihn öffnest; seine Dateien und seine Datenbank bleiben
+erhalten, bis du ihn löschst.
 
-Der Worker ist bewusst gekapselt: Er erhält das Repository, die Credentials, die
-er als Umgebungsvariablen benötigt, und sonst nichts. Er hat **keinen
-Docker-Socket** und keinen Weg zurück in den Manager. Das Image, in dem er
-läuft, wird durch einen [Worker Stack](WORKER-STACKS.md) definiert — denke an
-„den Werkzeugkasten, den der Agent bekommt" — den du pro Projekt anpassen
-kannst.
+Der Container ist abgeschottet: Er bekommt das Repository, einen
+Repository-Zugang über einen Git-Helper und sonst nichts. Er hat **keinen
+Docker-Socket** und keinen Zugriff auf die Datenbank des Managers. Das Image,
+in dem er läuft, wird aus einem [Worker-Stack](WORKER-STACKS.md) gebaut — stell
+ihn dir als „den Werkzeugkasten, den der Agent bekommt“ vor —, den du pro
+Projekt anpassen kannst.
 
-Diese Trennung ist das Herzstück von Argos: ein stabiler, zustandsbehafteter
-Manager, mit dem du interagierst, und einweg-Worker, die die riskante, teure
-Arbeit isoliert erledigen.
+Diese Aufteilung ist das Herzstück von Argos: ein stabiler, zustandsbehafteter
+Manager, mit dem du interagierst, und isolierte Container, die die riskante,
+teure Arbeit erledigen.
 
 ## Der Kernablauf auf einen Blick
 
-Ein typisches Arbeitspaket durchläuft diese Schritte. Das meiste davon ist
-automatisch — deine Aufgabe sind die zwei Review-Gates.
-
-1. **Credentials verbinden.** Füge deinen Claude-Token ein und verknüpfe einen
-   Git-Account (oder einen Personal Access Token). Siehe
-   [Credentials](CREDENTIALS.md) und [OAuth Apps](OAUTH.md).
+1. **Zugangsdaten verbinden.** Lege deinen Claude-Agenten an (den Token aus
+   `claude setup-token`) und verknüpfe ein Git-Konto oder einen Personal Access
+   Token. Siehe [Credentials](CREDENTIALS.md) und [OAuth-Apps](OAUTH.md).
 2. **Ein Projekt anlegen.** Ein Projekt richtet Argos auf ein Repository aus und
-   trägt seine Defaults — von welchem Branch zu starten ist, welcher Worker
-   Stack, welche Modelle. Siehe [Projekte](PROJECTS.md).
-3. **Eine Aufgabe anlegen.** Beschreibe, was du möchtest. Die **Concept**-Phase
-   startet (entwirft einen Plan und erstellt den Feature-Branch), und du
-   erhältst ein schriftliches Konzept zur Prüfung.
-4. **Argos lässt die Phasen laufen.** Nachdem du das Konzept freigegeben hast,
-   schreibt die **Implement**-Phase den Code und führt die Quality Gates aus,
-   dann öffnet die **Push**-Phase den Pull Request:
+   trägt dessen Standardwerte — Default-Branch, Worker-Stack, Backing Services,
+   Automatisierung. Siehe [Projekte](PROJECTS.md).
+3. **Einen Workspace öffnen.** Wähle das Projekt und einen Namen; Argos baut das
+   Image, klont das Repository auf einen `ws/…`-Branch und startet den
+   Container. Siehe [Workspaces](WORKSPACES.md).
+4. **In Threads arbeiten.** Beschreibe, was du möchtest; Claude liest, bearbeitet
+   und führt Befehle aus und fragt dabei so nach Freigaben, wie es der Modus des
+   Threads verlangt. Prüfe die [Quality Gates](WORKSPACES.md#quality-gates), sieh
+   dir das [Review](WORKSPACES.md#the-review) und die [Preview](LIVE-DEMOS.md)
+   an.
+5. **Ausliefern.** **Commit & PR** pusht den Branch und öffnet den Pull Request.
 
-   ```
-   Concept  →  Implement  →  Push (Pull Request)
-   ```
+Oder lass es selbst laufen: Ein [Auto-Thread](WORKSPACES.md#auto-threads)
+erledigt die Schritte 4 und 5 allein —
 
-5. **Du prüfst.** Lies den Diff und den Pull Request. Wenn etwas geändert werden
-   muss, sende Feedback, und die **Respond**-Phase überarbeitet den Branch — in
-   so vielen Runden, wie du möchtest.
+```
+Plan  →  Umsetzen  →  Quality Gates ⇄ Beheben  →  Pull Request
+```
 
-Phasen laufen asynchron: Wenn du eine anstößt, reiht der Manager den Job ein und
-die Seite aktualisiert sich, während der Worker Fortschritte macht. Für die
-vollständige Durchführung — jeder Status, die Review-Docks, Retries und
-Feedback-Runden — siehe [Tasks](TASKS.md).
+— und ein [Issue-Trigger](SETUP-TASK-PROVIDERS.md) startet einen solchen Lauf
+für jedes neue passende Issue in GitHub, GitLab oder Linear.
 
 ## Glossar
 
 Eine einzeilige Definition jedes Kernkonzepts. Folge dem Link für die Details.
 
-- **[Projekt](PROJECTS.md)** — ein Repository plus seine Defaults (Base-Branch,
-  Worker Stack, Modelle, Auth). Jede Aufgabe gehört zu einem Projekt.
-- **[Task](TASKS.md)** — eine Arbeitseinheit, von der Beschreibung bis zum Pull
-  Request, die durch die Phasen läuft.
-- **[Phase](TASKS.md)** — ein einzelner Schritt im Leben einer Aufgabe: Concept
-  (Plan), Implement (Code schreiben), Push (PR öffnen) und Respond
-  (Überarbeitung auf Feedback). Jede Phase ist ein isolierter Worker-Lauf.
-- **[Worker Stack](WORKER-STACKS.md)** — die Docker-Image-Definition, in der ein
-  Worker läuft: das Base-Image plus die Tools, die der Agent bekommt. Bei Bedarf
-  gebaut, pro Projekt anpassbar (lege ein `.argos/worker.dockerfile` ab für
-  volle Kontrolle).
-- **[Agent](AGENTS.md)** — das KI-Coding-Tool, das der Worker im Container
-  steuert (Claude Code ist der Standard).
+- **[Projekt](PROJECTS.md)** — ein Repository plus seine Standardwerte
+  (Default-Branch, Worker-Stack, Backing Services, Automatisierung,
+  Authentifizierung). Jeder Workspace gehört zu einem Projekt.
+- **[Workspace](WORKSPACES.md)** — ein interaktiver Ort, um an einem Branch zu
+  arbeiten: ein Container mit dem Checkout, eigener Datenbank und Preview,
+  Threads und Mitgliedern.
+- **[Thread](WORKSPACES.md#threads)** — eine Unterhaltung mit Claude in einem
+  Workspace, auf einem Agenten. Die Threads eines Workspaces teilen sich seine
+  Dateien.
+- **[Auto-Thread](WORKSPACES.md#auto-threads)** — ein Thread, der selbstständig
+  läuft: planen, umsetzen, fehlschlagende Gates beheben, ausliefern.
+- **[Worker-Stack](WORKER-STACKS.md)** — die Docker-Image-Definition, in der ein
+  Workspace läuft: das Basis-Image plus die Werkzeuge, die der Agent bekommt.
+  Wird bei Bedarf gebaut und ist pro Projekt anpassbar (lege eine
+  `.argos/worker.dockerfile` ab für volle Kontrolle).
+- **[Agent](AGENTS.md)** — ein Claude-Code-Zugang, auf dem ein Thread läuft:
+  dein persönliches Abo oder ein geteiltes.
 - **[Credential](CREDENTIALS.md)** — ein gespeichertes Secret, das Argos
-  benötigt: deinen Claude-Token, um den Agenten auszuführen, und einen
-  Git-Token, um das Repository zu lesen und zu schreiben — entweder ein
-  **Personal Access Token (PAT)** oder eine vollständige **OAuth**-Account-
-  Bindung (die auch Repo-/Branch-Auswahllisten freischaltet). Siehe
-  [OAuth Apps](OAUTH.md).
-- **[Task Provider](SETUP-TASK-PROVIDERS.md)** — eine Verbindung zu einem
-  Issue-Tracker (GitHub, GitLab, Linear), sodass du Issues direkt als Aufgaben
-  in Argos importieren kannst.
-- **[Live Demo](LIVE-DEMOS.md)** — ein kurzlebiges, wegwerfbares Deployment des
-  implementierten Branches einer Aufgabe, sodass du die Änderung im Browser
-  durchklicken kannst, bevor du mergst.
-- **[MCP / REST API](SETUP-MCP.md)** — steuere Argos von außerhalb der Web-UI:
-  aus Claude Code über den eingebauten MCP-Server oder programmatisch über die
-  [REST API v1](REST-API.md) mit Sanctum-Bearer-Tokens.
+  braucht: dein Claude-Token, um den Agenten auszuführen, und ein Git-Token, um
+  das Repository zu lesen und zu schreiben — entweder ein **Personal Access
+  Token (PAT)** oder eine vollständige **OAuth**-Kontobindung (die außerdem die
+  Repo-/Branch-Auswahl freischaltet). Siehe [OAuth-Apps](OAUTH.md).
+- **[Issue-Trigger](SETUP-TASK-PROVIDERS.md)** — eine Verbindung zu einem
+  Issue-Tracker (GitHub, GitLab, Linear), die für jedes neue passende Issue
+  einen automatischen Lauf startet und im Issue Rückmeldung gibt.
+- **[Live-Demo / Preview](LIVE-DEMOS.md)** — ein Wegwerf-Deployment der
+  aktuellen Dateien eines Workspaces, damit du die Änderung vor dem Mergen im
+  Browser durchklicken kannst.
+- **[MCP / REST-API](SETUP-MCP.md)** — steuere Argos von außerhalb der
+  Weboberfläche: aus Claude Code über den eingebauten MCP-Server oder
+  programmatisch über die [REST-API v1](REST-API.md) mit Sanctum-Bearer-Tokens.
 
 ## Wohin als Nächstes
 
-- **Neue Installation?** Beginne mit [Setup](SETUP.md), um das Verbinden der
-  Accounts und die Konfiguration des Stacks abzuschließen.
-- **Repo-/Branch-Auswahllisten und Bindung pro Nutzer gewünscht?** Verbinde eine
-  [OAuth App](OAUTH.md).
-- **Ein Repository für Argos vorbereiten?** Siehe
-  [Ein Projekt vorbereiten](PREPARE-PROJECT.md) — behandelt die
-  Worker-Build-Umgebung und den Live-Demo-Vertrag.
-- **Bereit, etwas laufen zu lassen?** Geh zu [Projekte](PROJECTS.md), dann
-  [Tasks](TASKS.md).
-- **Automatisieren?** Binde den [MCP-Server](SETUP-MCP.md) oder die
-  [REST API](REST-API.md) ein.
+- **Neue Installation?** Beginne mit dem [Setup](SETUP.md), um Konten zu
+  verbinden und den Stack zu konfigurieren.
+- **Möchtest du Repo-/Branch-Auswahl und eine Bindung pro Benutzer?** Verbinde
+  eine [OAuth-App](OAUTH.md).
+- **Machst du ein Repository für Argos bereit?** Siehe
+  [Ein Projekt vorbereiten](PREPARE-PROJECT.md) — behandelt die Build-Umgebung
+  und den Live-Demo-Vertrag.
+- **Bereit, etwas laufen zu lassen?** Geh zu den [Projekten](PROJECTS.md), dann
+  zu den [Workspaces](WORKSPACES.md).
+- **Automatisierung?** Richte [Issue-Trigger](SETUP-TASK-PROVIDERS.md), den
+  [MCP-Server](SETUP-MCP.md) oder die [REST-API](REST-API.md) ein.

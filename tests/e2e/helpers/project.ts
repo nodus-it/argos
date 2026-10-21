@@ -1,6 +1,8 @@
 import { type Page, expect } from '@playwright/test';
-import { type AuthMethod, type Platform } from '../matrix';
 import { chooseSelect, fillField, gotoStable } from './filament';
+
+export type Platform = 'github' | 'gitlab' | 'bitbucket';
+export type AuthMethod = 'pat' | 'oauth';
 
 const PLATFORM_LABEL: Record<Platform, string> = {
   github: 'GitHub',

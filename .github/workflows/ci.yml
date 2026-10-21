@@ -238,8 +238,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
 
       - name: Run the gemockt browser-E2E suite
-        # full-flow.real self-skips unless ARGOS_E2E_REAL=1, so a plain run
-        # covers exactly the deterministic fake specs.
+        # Every spec runs against the fake stack (ARGOS_E2E_FAKE=1).
         run: npx playwright test
 
       - name: Dump container logs on failure

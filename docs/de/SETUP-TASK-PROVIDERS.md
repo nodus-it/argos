@@ -1,4 +1,4 @@
-# Task-Provider-Integration (Issue-Tracker)
+# Issue-Trigger
 
 Argos kann ein Projekt mit einem externen Issue-Tracker verbinden. Ein neues
 passendes Issue startet einen **automatischen Lauf** in einem Workspace
@@ -35,7 +35,7 @@ Als Issue-Trigger (Ingest, Kommentare, Plan-Freigabe):
 - **Linear** — siehe [SETUP-LINEAR.md](SETUP-LINEAR.md)
 
 Bitbucket lässt sich als *Code*-Provider mit Argos verbinden
-([SETUP-BITBUCKET.md](SETUP-BITBUCKET.md)), ist aber **nicht** als Task-Provider
+([SETUP-BITBUCKET.md](SETUP-BITBUCKET.md)), ist aber **nicht** als Issue-Trigger
 verdrahtet — im Binding-Formular gibt es keine Bitbucket-Option, und
 Webhook-Registrierung / Signaturprüfung sind dafür nicht implementiert. Erwarte
 keinen Issue-Ingest aus Bitbucket.
@@ -74,7 +74,7 @@ als *External Issue Link* festgehalten.
   [SETUP-GITLAB.md](SETUP-GITLAB.md) oder [SETUP-LINEAR.md](SETUP-LINEAR.md).
 - Das Projekt (**Repo Profile**) muss in Argos bereits existieren.
 - Der Scheduler muss für den Poll-Modus und die Plan-Freigabe laufen — sowohl
-  das Issue-Polling als auch die Konzept-Freigabe-Prüfung laufen über Laravels
+  das Issue-Polling als auch die Plan-Freigabe-Prüfung laufen über Laravels
   Schedule (siehe [Poll-Modus](#poll-mode)).
 
 Die OAuth-Scopes, die du für GitHub (`repo`) und GitLab (`api`) ohnehin
@@ -95,8 +95,7 @@ Webhooks ein Organisationsmitglied mit ausreichenden Berechtigungen; siehe
 | **Modus** (Mode) | `Webhook (Push)`, `Polling` oder `Deaktiviert` (Disabled) |
 | **Zugang** (Credential) | Das OAuth-Konto **oder** der gespeicherte Access Token (PAT) für diesen Provider |
 | **Projekt / Team** | Das externe Projekt/Team. Wird automatisch aus dem gewählten Credential geladen. GitHub/GitLab: ein Repository (`owner/repo`); Linear: ein Team |
-| **Labels-Filter** | Optional: Nur Issues, die mindestens eines dieser Labels tragen, werden importiert |
-| **Issue schließen bei Task-Abschluss** | Wird nicht mehr verwendet — der Merge des Pull Requests schließt das Issue. |
+| **Labels-Filter** | Optional: Nur Issues, die mindestens eines dieser Labels tragen, starten einen Lauf |
 
 4. Speichern → das Binding wird im Status **Pending** angelegt.
 5. Führe die Aktion **Einrichten** (Setup) in der Binding-Zeile aus → das
@@ -165,7 +164,7 @@ nötig:
 
 Auslieferungen werden anhand der Delivery-ID des Providers
 (`X-GitHub-Delivery` / `X-Gitlab-Event-UUID` / `Linear-Delivery`) für 24 h
-dedupliziert, sodass ein Provider-Retry keinen doppelten Task erzeugt.
+dedupliziert, sodass ein Provider-Retry keinen zweiten Lauf startet.
 
 ## Poll-Modus
 
@@ -237,7 +236,7 @@ Webhook-Modus, da Provider keine Reaktions-Events pushen.
 
 Die Filterung wird vor dem Ingest angewendet:
 
-- **Labels-Filter** — ODER-Semantik: Ein Issue wird nur importiert, wenn es
+- **Labels-Filter** — ODER-Semantik: Ein Issue startet nur dann einen Lauf, wenn es
   mindestens eines der konfigurierten Labels trägt. Sind keine Labels
   konfiguriert, passieren alle Issues den Label-Filter.
 - Ein Binding kann auch nach dem **Status** des Issues filtern (z. B. nur
@@ -259,7 +258,7 @@ Variablen sind:
 APP_URL=https://argos.example.com
 
 # How often (minutes) the scheduler polls issue providers and checks
-# concept-comment reactions. Default 5; clamped to 1–59. Set to 1 locally.
+# plan-comment reactions. Default 5; clamped to 1–59. Set to 1 locally.
 ARGOS_POLL_INTERVAL_MINUTES=5
 ```
 

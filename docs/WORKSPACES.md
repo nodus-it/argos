@@ -10,11 +10,12 @@ same workspace at once.
 Workspaces have their own area at **`/w`** (also where `/` leads): full
 width, navigation in the top bar, so chat, editor and preview get the whole
 screen. **Administration** in the top bar leads to the admin area (`/admin`)
-with projects, agents, users and tasks; one login covers both.
+with projects, agents and users; one login covers both.
 
-Workspaces live next to [tasks](TASKS.md). A task is the hands-off flow (concept
-→ implement → pull request); a workspace is the hands-on one. Both use the same
-projects, worker stacks and agents.
+Work does not have to be hands-on: an [auto-thread](#auto-threads) plans,
+implements, checks the quality gates and opens a pull request on its own —
+started in the UI, through the [REST API](REST-API.md), [MCP](SETUP-MCP.md) or
+an issue of a connected tracker.
 
 ## Contents
 
@@ -43,7 +44,7 @@ projects, worker stacks and agents.
   service — it carries the live updates to the browser.
 - **Wildcard DNS** for the preview base domain: the editor of a workspace is
   served at `code-<workspace>.<base-domain>` and its preview at
-  `demo-ws-<workspace>.<base-domain>`, next to the task demos. Locally the
+  `demo-ws-<workspace>.<base-domain>`. Locally the
   default `*.127.0.0.1.nip.io` needs a resolver that can reach nip.io.
 - An **agent** of your own (your Claude subscription) or a shared one — see
   below.
@@ -56,9 +57,8 @@ Every thread runs on one **agent**: a Claude Code credential created with
 - **personal** — they belong to one user and run on that user's Claude
   subscription. Every user can add their own under *Agents*. Users only ever
   see their own agents.
-- **shared** — they have no owner (administrators create them). Tasks use shared
-  agents when no agent is chosen explicitly; in workspaces everyone may pick
-  them.
+- **shared** — they have no owner (administrators create them); everyone may
+  pick them in workspaces.
 
 An agent runs at most **parallel sessions** threads at the same time (default
 `1`, set by an administrator). This protects the subscription's limits. When
@@ -84,13 +84,13 @@ and optionally a base branch (default: the project's default branch). Argos then
 
 The workspace page shows the progress and, if something fails, the reason.
 
-**One task per workspace.** All threads of a workspace share the same files. For
+**One piece of work per workspace.** All threads of a workspace share the same files. For
 separate pieces of work create separate workspaces — each has its own branch,
 container, database and preview.
 
 ## Starting from an issue
 
-If the project has a connected issue tracker (see [Task providers](SETUP-TASK-PROVIDERS.md)),
+If the project has a connected issue tracker (see [Issue triggers](SETUP-TASK-PROVIDERS.md)),
 the form offers **From issue**: search the open issues by title or number and
 pick one. The workspace is then named `#<number> <title>`, its branch is
 `ws/<number>-<title>` (at most 50 characters; a second workspace for the same
@@ -229,7 +229,7 @@ cookie on the editor host.
 The preview is a [live demo](LIVE-DEMOS.md) of the workspace: the same demo
 contract (`.argos/demo.*` or the built-in Laravel default), but it mounts the
 **workspace volume**, so it always shows the current files. It is
-members-only (access mode `workspace`) and started on demand.
+members-only and started on demand.
 
 - **Start preview** builds it, **Open preview** opens it, **Rebuild** replaces
   it. The bar shows its state; a failed build shows the build log.
@@ -255,7 +255,7 @@ you pick.
 ## Quality gates
 
 **Check gates** (in the review, the header menu or `/gates`) runs the same
-quality gates as the implement phase of tasks (`worker/lib/quality.sh`):
+quality gates as automatic runs (`worker/lib/quality.sh`):
 Artisan boot, Pint on changed files, Pest/PHPUnit, PHPStan, migration syntax,
 debug calls and test presence. They are made for PHP/Laravel projects; on other
 stacks the gates are skipped.
@@ -266,8 +266,8 @@ stacks the gates are skipped.
   says which applies.
 - One run at a time per workspace. Each gate shows pass/fail/skip and the end
   of its log.
-- **Send errors to agent** posts the same fix prompt the task flow uses into
-  the selected thread.
+- **Send errors to agent** posts a fix prompt with the failing gates' logs into
+  the selected thread — the same one automatic runs use.
 - The commit dialog mentions the last result (*Gates: 6/7 green*). Failed gates
   are a warning, never a blocker.
 
@@ -321,7 +321,7 @@ thread otherwise.
 
 **Starting one**
 
-- In a workspace: **New thread → Run automatically**, then describe the task.
+- In a workspace: **New thread → Run automatically**, then describe the work.
 - With a new workspace: **Start an automatic run with the workspace** in the
   form — the run waits until the workspace is up.
 - From outside: the [REST API](REST-API.md#workspaces-and-automatic-runs)
@@ -399,7 +399,7 @@ skipped.
   on that network.
 - Your Claude token is sent per thread and kept in memory; it never lands on
   disk or in the container's environment. Claude itself can technically read
-  it from inside the container — the same as in task workers — so treat a
+  it from inside the container, so treat a
   workspace like a machine you run Claude Code on.
 - The repository token reaches git through a credential helper and is never
   written to the repository. Claude is told not to push, but it technically can.

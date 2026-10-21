@@ -52,8 +52,8 @@ Optional, aber empfohlen für alles, was über einen lokalen Test hinausgeht:
   [Reverse-Proxy und APP_URL](#reverse-proxy-and-app_url).
 
 Du musst **nichts** vorab bauen. Das Manager-Image wird von GHCR bezogen;
-Worker-Images werden beim ersten Phasenlauf bedarfsgesteuert aus den lokalen
-Manifesten gebaut.
+Worker- und Workspace-Images werden bedarfsgesteuert aus den lokalen Manifesten
+gebaut, wenn der erste Workspace startet.
 
 ## Ein-Befehl-Installation
 
@@ -135,12 +135,12 @@ werden bedarfsgesteuert auf dem Host gebaut.
 |---|---|---|
 | `db` | `mariadb:11` | Anwendungsdatenbank. Die Daten liegen im Volume `argos-db`. |
 | `redis` | `redis:7-alpine` | Queue-Backend für Horizon. Daten im Volume `argos-redis`. |
-| `app` | `ghcr.io/nodus-it/argos-app` | Web-UI + [MCP-Server](SETUP-MCP.md) + REST-API (PHP-FPM). Führt beim Start Migrationen aus; bindet den Docker-Socket ein, um Worker zu starten. |
+| `app` | `ghcr.io/nodus-it/argos-app` | Web-UI + [MCP-Server](SETUP-MCP.md) + REST-API (PHP-FPM). Führt beim Start Migrationen aus; bindet den Docker-Socket ein, um Workspaces und Previews zu starten. |
 | `traefik` | `traefik:v3.5` | Der einzige Einstiegspunkt auf Port 80. Wird auf dem Host via `ARGOS_PORT` veröffentlicht. Leitet zu nginx (und zu Live-Demo-Containern) weiter. |
 | `nginx` | `nginx:1.27-alpine` | Liefert statische Assets aus und leitet dynamische Anfragen an `app:9000` weiter. Sitzt hinter Traefik. |
-| `queue` | `ghcr.io/nodus-it/argos-app` | Laravel-Horizon-Worker — führt die Task-Phasen (`RunPhaseJob`) auf Redis aus. Gleiches Image wie `app`. |
+| `queue` | `ghcr.io/nodus-it/argos-app` | Laravel-Horizon-Worker — führt Hintergrund-Jobs auf Redis aus: Workspace-Bereitstellung, Image-Builds, Previews, automatische Läufe. Gleiches Image wie `app`. |
 | `scheduler` | `ghcr.io/nodus-it/argos-app` | Laravel-Scheduler (`schedule:work`) — stößt wiederkehrende Jobs an (z. B. Issue-Polling). Gleiches Image wie `app`. |
-| `worker` (transient) | `argos-worker:<stack>-<hash>-<agent>-<version>` | Kurzlebiger Container, der pro Phase von den Diensten `app`/`queue` gestartet wird. **Hier läuft die gesamte KI** — der Manager berührt Claude niemals direkt. Wird bedarfsgesteuert aus der `worker_stacks`-Zeile × dem gewählten Agent gebaut. |
+| Workspace-Container | gebaut aus `argos-worker:<stack>-<hash>-<agent>-<version>` | Ein Container pro laufendem Workspace, gestartet von den Diensten `app`/`queue`. **Hier läuft die gesamte KI** — der Manager berührt Claude niemals direkt. Das Image wird bedarfsgesteuert aus der `worker_stacks`-Zeile × dem Agent gebaut, plus Workspace-Daemon und VS Code. |
 
 Der Host-Port wird über **`ARGOS_PORT`** (Standard `8080`) gesetzt und auf
 **Traefiks** Port 80 abgebildet. Alles, was nicht von einer Live-Demo-Host-Regel
@@ -171,10 +171,9 @@ die Schema-Arbeit — der Dienst `app` ist für Migrationen und Seeding zuständ
 
 Der `app`-Container meldet sich erst als gesund, sobald die Datenbank erreichbar
 **und** das Schema vollständig migriert ist; `nginx`, `queue` und `scheduler`
-warten auf dieses Tor. Die erste Phase, die eine frische Installation ausführt,
-baut ihr Worker-Image (1–3 Minuten kalt; der Pre-Warm-Schritt beim Start
-verbirgt das meiste davon), danach verwenden nachfolgende Läufe das gecachte
-Image.
+warten auf dieses Tor. Der erste Workspace, den eine frische Installation
+startet, baut sein Image (1–3 Minuten kalt; der Pre-Warm-Schritt beim Start
+verbirgt das meiste davon), danach verwenden spätere Starts das gecachte Image.
 
 ## Erste Anmeldung und Onboarding
 
@@ -253,13 +252,12 @@ OAuth Apps) und in der Datenbank gespeichert — es gibt keinen ENV-Pfad. Siehe:
 ## Auswahl von Worker-Stack und Agent
 
 Worker-Images werden **nicht** von GHCR bezogen — der Manager baut sie
-bedarfsgesteuert aus der Tabelle `worker_stacks`, sobald zum ersten Mal ein Task
-mit dieser Kombination aus (Stack × Agent × Version) läuft. Der erste Lauf dauert
-1–3 Minuten; nachfolgende Läufe verwenden das gecachte Image.
+bedarfsgesteuert aus der Tabelle `worker_stacks`, sobald zum ersten Mal ein
+Workspace mit dieser Kombination aus (Stack × Agent × Version) startet. Der erste
+Start dauert 1–3 Minuten; spätere Starts verwenden das gecachte Image.
 
-Wähle den Stack und den Agent unter **Worker → Stacks** und **Worker → Agent
-Credentials** in der Admin-UI, weise dann Standardwerte pro Projekt und
-(optional) Overrides pro Task zu. Eingebaute Stacks (`php-8.3`, `php-8.4`, …)
+Verwalte Stacks unter **Worker → Stacks** und Agenten unter **Agenten** in der
+Admin-UI und wähle dann den Stack pro Projekt. Eingebaute Stacks (`php-8.3`, `php-8.4`, …)
 werden bei jeder Migration aus dem Repo-Manifest in die DB gespiegelt; du kannst
 in derselben UI deinen eigenen Benutzer-Stack hinzufügen.
 
@@ -272,8 +270,8 @@ siehe [PREPARE-PROJECT.md](PREPARE-PROJECT.md).
 Das bei der Installation angelegte Admin-Konto ist **Administrator**.
 Administratoren verwalten Benutzer (*Konfiguration → Benutzer*), Worker-Stacks,
 Image-Builds, OAuth-Apps, Zugangstoken, API-Clients und Einstellungen und sehen
-alle Workspaces. Andere Benutzer arbeiten mit Projekten, Aufgaben, ihren eigenen
-Agenten und den Workspaces, in denen sie Mitglied sind. Die Rolle lässt sich
+alle Workspaces. Andere Benutzer arbeiten mit Projekten, ihren eigenen Agenten und
+den Workspaces, in denen sie Mitglied sind. Die Rolle lässt sich
 über die Kommandozeile wiederherstellen:
 
 ```bash

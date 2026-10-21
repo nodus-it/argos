@@ -5,7 +5,7 @@ import { type Page, expect } from '@playwright/test';
  * `->live()` fields are unlocked by a Livewire round-trip (e.g. blurring the
  * repo URL fires the fake branch fetch that reveals `default_branch`); under CI
  * load that round-trip routinely exceeds Playwright's 5s default, which was the
- * sole cause of the full-flow suite's "element(s) not found" flakes. The happy
+ * sole cause of the old full-flow suite's "element(s) not found" flakes. The happy
  * path (field already visible) returns immediately, so a generous ceiling only
  * costs wall-clock on a genuine failure.
  */

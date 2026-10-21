@@ -136,7 +136,7 @@ Verlauf des Laufs am Issue. Jedes Repository benötigt ein
 ### Schritt 2: Ein Binding in Filament erstellen
 
 1. Öffne im Admin-Panel das Zielprojekt unter **Repo Profiles**.
-2. Gehe zum Tab **Task Provider Bindings** → **New Binding**.
+2. Gehe zum Tab **Task-Provider** → **Create**.
 3. Fülle die Felder aus:
 
 | Feld | Beschreibung |
@@ -145,7 +145,7 @@ Verlauf des Laufs am Issue. Jedes Repository benötigt ein
 | **Mode** | `Webhook` (Echtzeit) oder `Poll` (alle 5 Min.) |
 | **Connected Account** | Ein OAuth- oder PAT-Konto mit dem `api`-Scope |
 | **Project / Team Ref** | Projektpfad im Format `group/project`, z. B. `acme/widget` |
-| **Filters** | Optional: nur Issues mit einem bestimmten Status oder bestimmten Labels importieren |
+| **Filters** | Optional: nur Issues mit einem bestimmten Status oder bestimmten Labels starten einen Lauf |
 
 4. Klicke auf **Save**. Das Binding startet im Zustand `Pending`.
 
@@ -196,18 +196,7 @@ in der Spalte **Last Error**. Behebe das Problem und klicke erneut auf
   Standardstatus beim Pollen ist `opened`.
 
 Details zum gemeinsamen Binding-Setup siehe
-[Task-Provider-Setup](SETUP-TASK-PROVIDERS.md).
-
----
-
-## Worker: REPO_PLATFORM
-
-Der Manager übergibt `REPO_PLATFORM=gitlab` als Umgebungsvariable an den
-Worker-Container. Die Push-Phase nutzt dies, um die Plattform zuverlässig zu
-erkennen — auch bei selbst gehosteten GitLab-Instanzen mit unauffälligen
-Hostnamen — und erstellt den Merge Request anschließend über die GitLab-REST-API
-(`POST …/api/v4/projects/<id>/merge_requests`), damit der MR die vollständige
-mehrzeilige Beschreibung trägt.
+[Issue-Trigger](SETUP-TASK-PROVIDERS.md).
 
 ---
 
@@ -218,8 +207,9 @@ mehrzeilige Beschreibung trägt.
   **nicht** verwendet — GitLab akzeptiert Bearer für beide Token-Typen.
 - Für gitlab.com wird die `instance_url` in `connected_accounts` leer gespeichert
   (Standardwert `https://gitlab.com`).
-- Merge Requests werden über die GitLab-API geöffnet; ihre URL wird am
-  Workspace gespeichert.
+- Merge Requests werden über die GitLab-REST-API geöffnet (`POST
+  …/api/v4/projects/<id>/merge_requests`), auch bei selbst gehosteten
+  Instanzen; ihre URL wird am Workspace gespeichert.
 
 ---
 

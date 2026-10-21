@@ -1,4 +1,4 @@
-# Task-Provider Integration (Issue Trackers)
+# Issue Triggers
 
 Argos can connect a project to an external issue tracker. A new matching issue
 starts an **automatic run** in a workspace ([auto-threads](WORKSPACES.md#auto-threads)):
@@ -33,8 +33,8 @@ As issue triggers (ingest, comments, plan approval):
 - **Linear** — see [SETUP-LINEAR.md](SETUP-LINEAR.md)
 
 Bitbucket can be connected to Argos as a *code* provider
-([SETUP-BITBUCKET.md](SETUP-BITBUCKET.md)), but it is **not** wired as a task
-provider — there is no Bitbucket option in the binding form, and webhook
+([SETUP-BITBUCKET.md](SETUP-BITBUCKET.md)), but it is **not** wired as an issue
+trigger — there is no Bitbucket option in the binding form, and webhook
 registration / signature verification are not implemented for it. Do not expect
 issue ingest from Bitbucket.
 
@@ -70,7 +70,7 @@ recorded as an *External Issue Link*.
   [SETUP-LINEAR.md](SETUP-LINEAR.md).
 - The project (**Repo Profile**) must already exist in Argos.
 - The scheduler must be running for poll mode and for plan approval — both
-  the issue poll and the concept-approval check run on Laravel's schedule (see
+  the issue poll and the plan-approval check run on Laravel's schedule (see
   [Poll mode](#poll-mode)).
 
 The OAuth scopes you already grant for GitHub (`repo`) and GitLab (`api`) cover
@@ -90,8 +90,7 @@ permissions; see [SETUP-LINEAR.md](SETUP-LINEAR.md).
 | **Modus** (Mode) | `Webhook (Push)`, `Polling`, or `Deaktiviert` (Disabled) |
 | **Zugang** (Credential) | The OAuth account **or** stored Access Token (PAT) for this provider |
 | **Projekt / Team** | The external project/team. Loaded automatically from the chosen credential. GitHub/GitLab: a repository (`owner/repo`); Linear: a team |
-| **Labels-Filter** | Optional: only issues carrying at least one of these labels are imported |
-| **Issue schließen bei Task-Abschluss** | No longer used — merging the pull request closes the issue. |
+| **Labels-Filter** | Optional: only issues carrying at least one of these labels start a run |
 
 4. Save → the binding is created in status **Pending**.
 5. Run the **Einrichten** (Setup) action on the binding row → the binding is
@@ -156,7 +155,7 @@ stored on the binding.
 
 Deliveries are deduplicated by the provider's delivery id
 (`X-GitHub-Delivery` / `X-Gitlab-Event-UUID` / `Linear-Delivery`) for 24h, so a
-provider retry does not create a duplicate task.
+provider retry does not start a second run.
 
 ## Poll mode
 
@@ -187,7 +186,7 @@ the binding's project and starts an automatic run in it:
 
 - The workspace is named `#<number> <title>`, its branch is
   `ws/<number>-<title>`.
-- The run's task is the issue's title, text and link, marked as untrusted input
+- The run's prompt is the issue's title, text and link, marked as untrusted input
   (Claude treats it as data, not instructions).
 - Plan mode, ship mode and budgets come from the project's **Automation**
   settings.
@@ -223,7 +222,7 @@ since providers do not push reaction events.
 
 Filtering is applied before ingest:
 
-- **Labels-Filter** — OR semantics: an issue is imported only if it carries at
+- **Labels-Filter** — OR semantics: an issue starts a run only if it carries at
   least one of the configured labels. With no labels configured, all issues
   pass the label filter.
 - A binding may also filter by issue **state** (e.g. only open issues), stored
@@ -244,7 +243,7 @@ are:
 APP_URL=https://argos.example.com
 
 # How often (minutes) the scheduler polls issue providers and checks
-# concept-comment reactions. Default 5; clamped to 1–59. Set to 1 locally.
+# plan-comment reactions. Default 5; clamped to 1–59. Set to 1 locally.
 ARGOS_POLL_INTERVAL_MINUTES=5
 ```
 

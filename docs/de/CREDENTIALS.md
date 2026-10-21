@@ -12,7 +12,7 @@ Personal Access Tokens (PATs)**. Die OAuth-Seite ist in [OAUTH.md](OAUTH.md)
 beschrieben.
 
 > Provider-Zugangsdaten sind *nicht* dasselbe wie Agent-Zugangsdaten (der
-> Claude-/Codex-Token, den der Worker zum Denken nutzt). Diese werden
+> Claude-Token, auf dem der Agent läuft). Diese werden
 > separat konfiguriert — siehe [AGENTS.md](AGENTS.md).
 
 ## Inhalt
@@ -178,7 +178,7 @@ Den vollständigen Ablauf der Projekt-Authentifizierung finden Sie in
 ## Wie ein Issue-Tracker Zugangsdaten nutzt
 
 Wenn Sie einen Issue-Tracker an ein Projekt anbinden (eine
-Task-Provider-Bindung), lässt Sie der **Access**-Auswähler entweder ein
+Issue-Trigger-Bindung), lässt Sie der **Access**-Auswähler entweder ein
 verbundenes OAuth-Konto oder eines Ihrer gespeicherten Access Tokens für diesen
 Provider in einer einheitlichen Liste wählen. Wenn Sie ein PAT wählen,
 referenziert die Bindung diese Zugangsdaten direkt, und der Issue-Tracker

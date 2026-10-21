@@ -81,14 +81,12 @@ Branches aus dem verbundenen Account zieht.
 Bitbucket und GitLab stellen kurzlebige Access-Tokens aus (~2 h); GitHub-OAuth-Apps
 mit aktivierter Token-Ablaufzeit verhalten sich genauso. Argos aktualisiert den
 Access-Token über den gespeicherten `refresh_token`, sobald ein verbundener Account
-genutzt wird, um Worker-Zugangsdaten aufzubauen, und der Token weniger als 1 h Gültigkeit
-übrig hat (`TokenRefresher::REFRESH_BUFFER_SECONDS`, bemessen, um das 3600s-
-Job-Timeout des Workers abzudecken), sodass ein frisch gestarteter Job immer mit einem
-Token beginnt, der den Lauf überdauert.
+genutzt wird — etwa wenn Git in einem Workspace seinen Repository-Zugang anfragt — und
+der Token weniger als 1 h Gültigkeit übrig hat (`TokenRefresher::REFRESH_BUFFER_SECONDS`),
+sodass Clone, Fetch oder Push nie mit einem Token beginnen, der gleich abläuft.
 
 Wenn eine Aktualisierung fehlschlägt (widerrufener Token, Provider-4xx, fehlender
-`refresh_token`), schlägt die Phase sofort fehl mit einer Meldung, die dich auffordert,
-den Account neu zu verbinden. (Die UI-Meldung wird derzeit auf Deutsch angezeigt —
-„… bitte Account neu verbinden".) Verbinde den Account auf der Seite
-**Connected Accounts** neu, um ein frisches Paar aus Token und Refresh-Token zu erzeugen,
-und führe die Aufgabe dann erneut aus.
+`refresh_token`), schlägt der Git-Vorgang (oder der Start des Workspaces) mit einer
+Meldung fehl, die dich auffordert, den Account neu zu verbinden. Verbinde den Account auf
+der Seite **Connected Accounts** neu, um ein frisches Paar aus Token und Refresh-Token zu
+erzeugen, und versuche es dann erneut.

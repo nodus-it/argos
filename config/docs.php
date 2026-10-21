@@ -47,7 +47,6 @@ return [
             'title' => 'Concepts',
             'pages' => [
                 ['slug' => 'projects', 'title' => 'Projects', 'file' => 'PROJECTS.md'],
-                ['slug' => 'tasks', 'title' => 'Tasks & Workflow', 'file' => 'TASKS.md'],
                 ['slug' => 'workspaces', 'title' => 'Workspaces', 'file' => 'WORKSPACES.md'],
                 ['slug' => 'worker-stacks', 'title' => 'Worker Stacks', 'file' => 'WORKER-STACKS.md'],
                 ['slug' => 'agents', 'title' => 'Agents', 'file' => 'AGENTS.md'],
@@ -64,7 +63,7 @@ return [
                 ['slug' => 'gitlab', 'title' => 'GitLab', 'file' => 'SETUP-GITLAB.md'],
                 ['slug' => 'bitbucket', 'title' => 'Bitbucket', 'file' => 'SETUP-BITBUCKET.md'],
                 ['slug' => 'linear', 'title' => 'Linear', 'file' => 'SETUP-LINEAR.md'],
-                ['slug' => 'task-providers', 'title' => 'Task Providers', 'file' => 'SETUP-TASK-PROVIDERS.md'],
+                ['slug' => 'task-providers', 'title' => 'Issue Triggers', 'file' => 'SETUP-TASK-PROVIDERS.md'],
             ],
         ],
         [
@@ -78,7 +77,7 @@ return [
             'title' => 'Operations',
             'pages' => [
                 ['slug' => 'configuration', 'title' => 'Configuration', 'file' => 'CONFIGURATION.md'],
-                ['slug' => 'execution-commands', 'title' => 'Worker & Demo Commands', 'file' => 'EXECUTION-COMMANDS.md'],
+                ['slug' => 'execution-commands', 'title' => 'Workspace & Demo Commands', 'file' => 'EXECUTION-COMMANDS.md'],
             ],
         ],
     ],

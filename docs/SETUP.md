@@ -49,8 +49,8 @@ Optional but recommended for anything beyond local trial:
   HTTPS. See [Reverse proxy and APP_URL](#reverse-proxy-and-app_url).
 
 You do **not** need to pre-build anything. The manager image is pulled from
-GHCR; worker images are built on demand from the local manifests on the first
-phase run.
+GHCR; worker and workspace images are built on demand from the local manifests
+when the first workspace starts.
 
 ## One-command install
 
@@ -130,12 +130,12 @@ is pulled; worker images are built on demand on the host.
 |---|---|---|
 | `db` | `mariadb:11` | Application database. Data lives in the `argos-db` volume. |
 | `redis` | `redis:7-alpine` | Queue backend for Horizon. Data in the `argos-redis` volume. |
-| `app` | `ghcr.io/nodus-it/argos-app` | Web UI + [MCP server](SETUP-MCP.md) + REST API (PHP-FPM). Runs migrations on boot; mounts the Docker socket to spawn workers. |
+| `app` | `ghcr.io/nodus-it/argos-app` | Web UI + [MCP server](SETUP-MCP.md) + REST API (PHP-FPM). Runs migrations on boot; mounts the Docker socket to start workspaces and previews. |
 | `traefik` | `traefik:v3.5` | The single port-80 entry point. Published on the host via `ARGOS_PORT`. Routes to nginx (and to live-demo containers). |
 | `nginx` | `nginx:1.27-alpine` | Serves static assets and proxies dynamic requests to `app:9000`. Sits behind Traefik. |
-| `queue` | `ghcr.io/nodus-it/argos-app` | Laravel Horizon worker — runs the task phases (`RunPhaseJob`) on Redis. Same image as `app`. |
+| `queue` | `ghcr.io/nodus-it/argos-app` | Laravel Horizon worker — runs background jobs on Redis: workspace provisioning, image builds, previews, automatic runs. Same image as `app`. |
 | `scheduler` | `ghcr.io/nodus-it/argos-app` | Laravel scheduler (`schedule:work`) — dispatches recurring jobs (e.g. issue polling). Same image as `app`. |
-| `worker` (transient) | `argos-worker:<stack>-<hash>-<agent>-<version>` | Short-lived container spawned per phase by the `app`/`queue` services. **All AI runs here** — the manager never touches Claude directly. Built on demand from the `worker_stacks` row × the chosen agent. |
+| workspace containers | built from `argos-worker:<stack>-<hash>-<agent>-<version>` | One container per running workspace, started by the `app`/`queue` services. **All AI runs here** — the manager never touches Claude directly. The image is built on demand from the `worker_stacks` row × the agent, plus the workspace daemon and VS Code. |
 
 The host port is set by **`ARGOS_PORT`** (default `8080`), mapped to
 **Traefik's** port 80. Everything not matched by a live-demo host rule falls
@@ -164,9 +164,9 @@ work — the `app` service owns migrations and seeding.
 
 The `app` container reports healthy only once the database is reachable **and**
 the schema is fully migrated; `nginx`, `queue`, and `scheduler` wait for that
-gate. The first phase a fresh install runs builds its worker image (1–3 minutes
-cold; the pre-warm step on boot hides most of this), then subsequent runs use
-the cached image.
+gate. The first workspace a fresh install starts builds its image (1–3 minutes
+cold; the pre-warm step on boot hides most of this), then later starts use the
+cached image.
 
 ## First login and onboarding
 
@@ -240,13 +240,12 @@ Apps) and stored in the database — there is no ENV path. See:
 ## Choosing a worker stack and agent
 
 Worker images are **not** pulled from GHCR — the manager builds them on demand
-from the `worker_stacks` table the first time a task with that combination of
-(stack × agent × version) runs. The first run takes 1–3 minutes; subsequent
-runs use the cached image.
+from the `worker_stacks` table the first time a workspace with that combination
+of (stack × agent × version) starts. The first start takes 1–3 minutes;
+subsequent starts use the cached image.
 
-Pick the stack and agent in **Worker → Stacks** and **Worker → Agent
-Credentials** in the admin UI, then assign defaults per project and (optionally)
-overrides per task. Built-in stacks (`php-8.3`, `php-8.4`, …) are mirrored from
+Manage stacks under **Worker → Stacks** and agents under **Agents** in the admin
+UI, then pick the stack per project. Built-in stacks (`php-8.3`, `php-8.4`, …) are mirrored from
 the repo manifest into the DB on every migration; you can add your own user
 stack in the same UI.
 
@@ -259,8 +258,7 @@ To tailor a *target* repository to Argos — a custom build environment
 The admin account created on install is an **administrator**. Administrators
 manage users (*Configuration → Users*), worker stacks, image builds, OAuth apps,
 access tokens, API clients and settings, and see every workspace. Other users
-work with projects, tasks, their own agents and the workspaces they are members
-of. To restore the role from the command line:
+work with projects, their own agents and the workspaces they are members of. To restore the role from the command line:
 
 ```bash
 docker compose exec app php artisan argos:user:admin someone@example.com

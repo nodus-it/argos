@@ -1,12 +1,11 @@
 # Projekte
 
 Ein **Projekt** in Argos ist ein konfiguriertes Git-Repository — die Einheit,
-an der Argos arbeitet. Bevor Sie Argos eine Aufgabe übergeben können, legen Sie
-ein Projekt an, das festlegt, *welches* Repository verwendet wird, *wie*
+an der Argos arbeitet. Bevor Sie Argos Arbeit übergeben können, legen Sie ein
+Projekt an, das festlegt, *welches* Repository verwendet wird, *wie*
 authentifiziert wird, *welche* Umgebung der Code zum Bauen und Testen benötigt
-und *welche* Standardwerte beim Ausführen gelten. Jede Aufgabe, die Sie
-starten, ist genau einem Projekt zugeordnet und erbt diese Einstellungen (die
-meisten lassen sich pro Aufgabe weiterhin überschreiben).
+und *welche* Standardwerte für automatische Läufe gelten. Jeder Workspace, den
+Sie öffnen, gehört zu genau einem Projekt und erbt diese Einstellungen.
 
 Diese Anleitung erläutert jede Einstellung im Projektformular — was sie
 bedeutet, warum es sie gibt und wie Sie sie ausfüllen. Sie richtet sich an die
@@ -25,12 +24,12 @@ Projekte finden Sie unter **Configuration → Projects** im Admin-Panel
   - [Authentifizierung](#authentication)
   - [Allgemeine Einstellungen](#general-settings)
   - [Repository](#repository)
-- [Tab „Worker & models“](#worker--models-tab)
+- [Tab „Worker“](#worker-tab)
   - [Worker (Stack & Agent)](#worker-stack--agent)
   - [Backing Services für Tests](#backing-services-for-tests)
   - [Live-Demo](#live-demo)
   - [Umgebung & Secrets](#environment--secrets)
-  - [Modelle](#models)
+- [Tab „Automation“](#automation-tab)
 - [Pflicht vs. optional — auf einen Blick](#required-vs-optional--at-a-glance)
 
 ## Was ein Projekt ist
@@ -42,25 +41,28 @@ einem Repository zu arbeiten:
   aufsetzt.
 - Die **Zugangsdaten**, mit denen Argos klont, pusht und Pull-/Merge-Requests
   eröffnet.
-- Die **Worker-Konfiguration** — das Basis-Image und der Agent, die die Phasen
-  Concept / Implement / Push ausführen.
-- Die **Umgebung und Secrets**, die in den Worker (und die Live-Demo)
+- Die **Worker-Konfiguration** — das Basis-Image und der Agent, aus denen das
+  Workspace-Image gebaut wird.
+- Die **Umgebung und Secrets**, die in Workspaces (und die Live-Vorschau)
   eingespeist werden, damit Abhängigkeiten installiert werden und Tests
   durchlaufen.
-- Optionale **Backing Services** (MySQL / Redis) für den Testlauf.
-- Eine optionale **Live-Demo**, die nach jedem Implement hochfährt.
-- Projektspezifische Standardwerte für **Modell** und **Turn-Budget**.
+- Optionale **Backing Services** (MySQL / Redis), die neben jedem Workspace
+  laufen.
+- Ob Workspaces eine **Live-Vorschau** starten dürfen.
+- Die **Automatisierungs**-Standardwerte für automatische Läufe (Auto-Threads)
+  und die Person, für die sie handeln.
 
-Ein Projekt hat viele **Aufgaben**. Wenn Sie eine Aufgabe anlegen, klont sie
-das Repository des Projekts auf dem Default-Branch des Projekts, läuft in einem
-Worker, der aus der Worker-Konfiguration des Projekts gebaut wird, und
-authentifiziert sich mit den Zugangsdaten des Projekts. Zum Lebenszyklus der
-Aufgabe selbst siehe [TASKS.md](TASKS.md).
+Ein Projekt hat viele **Workspaces**. Ein neuer Workspace klont das Repository
+des Projekts auf dessen Default-Branch (oder einem Branch Ihrer Wahl), läuft in
+einem Image, das aus der Worker-Konfiguration des Projekts gebaut wird, und
+authentifiziert sich mit den Zugangsdaten des Projekts. Siehe
+[WORKSPACES.md](WORKSPACES.md).
 
-Ein Projekt hat außerdem auf seiner Bearbeitungsseite drei zugehörige Listen:
-seine **Aufgaben**, seine **Task-Provider-Bindungen** (siehe
+Ein Projekt hat außerdem auf seiner Bearbeitungsseite zwei zugehörige Listen:
+seine **Issue-Trigger-Bindungen** (siehe
 [SETUP-TASK-PROVIDERS.md](SETUP-TASK-PROVIDERS.md)) und seine **API-Tokens**
-(projektbezogene Sanctum-Tokens, z. B. für CI).
+(projektbezogene Sanctum-Tokens, z. B. für CI). Die Projektliste zeigt, wie
+viele Workspaces jedes Projekt hat.
 
 ## Ein Projekt anlegen und bearbeiten
 
@@ -69,7 +71,7 @@ klicken Sie auf eine bestehende Projektzeile, um sie zu bearbeiten. Es gibt
 keine separate schreibgeschützte Detailansicht — die Zeile öffnet direkt das
 Bearbeitungsformular, in dem auch die zugehörigen Listen gerendert werden.
 
-Das Formular hat zwei Tabs, **General** und **Worker & models**. Die allererste
+Das Formular hat drei Tabs, **General**, **Worker** und **Automation**. Die allererste
 Entscheidung ist die **Plattform**; bis Sie eine auswählen, bleibt der Rest des
 Formulars gesperrt. Sobald eine Plattform gewählt ist, erscheinen die übrigen
 Abschnitte, angepasst an diese Plattform und daran, welche Konten Sie verbunden
@@ -130,15 +132,6 @@ Diese erscheinen, sobald eine Plattform gewählt ist:
 - **Project Name** (Pflicht) — der Anzeigename im Panel. Wenn Sie ein
   Repository über die OAuth-Auswahl wählen und den Namen leer lassen, füllt
   Argos ihn mit dem Kurznamen des Repositorys vor.
-- **Auto-start concept** — wenn aktiviert, startet die Concept-Phase
-  automatisch, sobald eine Aufgabe in diesem Projekt angelegt wird, statt
-  darauf zu warten, dass Sie sie manuell starten.
-- **Auto-create PR** — wenn aktiviert, läuft die Push-Phase (die den
-  Pull-/Merge-Request eröffnet) nach einer erfolgreichen Implementierung
-  automatisch, statt auf Ihre Freigabe zu warten.
-
-Beide Schalter sind Komfortautomatisierungen; lassen Sie sie aus, wenn Sie
-zwischen jeder Phase prüfen möchten.
 
 ### Repository
 
@@ -165,16 +158,16 @@ Wie Sie auf das Repository verweisen, hängt davon ab, ob Sie auf dem Pfad
   vorliegen, fragt Argos die Plattform ab und bietet die Branch-Liste als
   durchsuchbares Dropdown an.
 
-Der **Default-Branch** ist der Branch, von dem jede Aufgabe in diesem Projekt
-abzweigt und auf den sie mit ihrem PR zielt.
+Der **Default-Branch** ist der Branch, von dem Workspaces in diesem Projekt
+abzweigen (sofern Sie keinen anderen Basis-Branch wählen) und auf den sie mit
+ihrem Pull Request zielen.
 
-## Tab „Worker & models“
+## Tab „Worker“
 
 ### Worker (Stack & Agent)
 
-Dieser Abschnitt definiert die Umgebung, die die Phasen ausführt. Es ist der
-projektweite Standard; einzelne Einstellungen lassen sich pro Aufgabe
-überschreiben.
+Dieser Abschnitt definiert das Image, in dem die Workspaces des Projekts
+laufen.
 
 - **Image source** — woher das Basis-Image des Workers stammt:
   - **Registered stack** — verwenden Sie einen der in Argos konfigurierten
@@ -182,23 +175,24 @@ projektweite Standard; einzelne Einstellungen lassen sich pro Aufgabe
     [WORKER-STACKS.md](WORKER-STACKS.md).
   - **Own Dockerfile in the repo (BYOI)** — Argos liest
     `.argos/worker.dockerfile` aus Ihrem Repository (am Base-Branch) als Basis
-    und legt den Agent und den Worker-Code darüber. Benötigte Werkzeuge müssen
+    und legt den Agent und die Workspace-Werkzeuge darüber. Benötigte Werkzeuge müssen
     über `FROM`/`RUN` hereinkommen; kein `COPY` aus dem Repo (der Build-Kontext
     ist nicht das Repo). Siehe [BYOI.md](BYOI.md).
 - **Worker Stack** — welcher registrierte Stack verwendet wird (nur bei der
   Quelle *Registered stack* sichtbar). Leer lassen, um den
   Argos-Standard-Stack zu verwenden.
-- **Agent** — welcher Coding-Agent die Phasen ausführt (z. B. Claude Code). Leer
-  lassen, um Claude Code zu verwenden. Die unten verfügbaren **Modelle** hängen
-  vom gewählten Agent ab, daher löscht ein Wechsel des Agents alle fixierten
-  Modellauswahlen. Siehe [AGENTS.md](AGENTS.md).
+- **Agent** — welchen Coding-Agent das Worker-Image installiert. Claude Code ist
+  derzeit der einzige Agent; lassen Sie das Feld leer. Siehe
+  [AGENTS.md](AGENTS.md).
 
 ### Backing Services für Tests
 
 Manche Test-Suites brauchen eine Datenbank oder einen Cache. Aktivieren Sie die
-Services, die Ihre Tests benötigen, und Argos fährt sie für jeden
-Implement-Lauf **ephemer** hoch — in ihrem eigenen privaten Netzwerk, mit
-eingespeisten Zugangsdaten, und baut sie anschließend wieder ab:
+Services, die Ihre Tests benötigen, und Argos fährt sie **neben jedem
+Workspace** hoch — im eigenen privaten Netzwerk des Workspaces, mit
+eingespeisten Zugangsdaten. Ihre Daten liegen in Volumes des Workspaces, sodass
+ein gestoppter und neu gestarteter Workspace seine Datenbank behält; beim
+Löschen des Workspaces werden sie entfernt:
 
 - **MySQL / MariaDB** — erreichbar unter Host `db`, Port `3306`.
 - **Redis** — erreichbar unter Host `redis`, Port `6379`.
@@ -218,13 +212,14 @@ sie zu dem passen, was Ihr Projekt fest verdrahtet hat:
 Lassen Sie sie leer, um die Argos-Standardwerte zu verwenden. Host und Port sind
 fest und nicht konfigurierbar. Redis hat keine konfigurierbaren Zugangsdaten.
 
-Diese Services bedienen sowohl den Worker-Testlauf als auch die Live-Demo,
-sodass beide aus derselben Definition hochfahren.
+Diese Services bedienen sowohl den Workspace (einschließlich seiner Quality
+Gates) als auch die Live-Vorschau, sodass beide aus derselben Definition
+hochfahren.
 
 ### Live-Demo
 
-- **Enable live demo** — wenn aktiviert, fährt Argos nach jedem Implement
-  automatisch eine Live-Demo auf einer eigenen Subdomain hoch.
+- **Enable live demo** — wenn aktiviert, können Workspaces dieses Projekts eine
+  Live-Vorschau auf einer eigenen Subdomain starten.
 
 Dies setzt voraus, dass Ihr Repository den Demo-Vertrag am Base-Branch
 mitliefert: `.argos/demo.compose.yml` (die Laufzeit) und `.argos/demo.yml`
@@ -235,8 +230,8 @@ und [PREPARE-PROJECT.md](PREPARE-PROJECT.md).
 ### Umgebung & Secrets
 
 Projektspezifische Secrets speichert Argos **verschlüsselt** und speist sie
-sowohl in den Worker (Dependency-Install + Quality Gates) als auch in die
-Live-Demo ein. Zwei Arten:
+sowohl in den Workspace (Dependency-Install, Befehle von Claude, Quality Gates)
+als auch in die Live-Vorschau ein. Zwei Arten:
 
 **Private Composer-Registries** — auth-geschützte Composer-Quellen (Private
 Packagist, Satis, Flux, Scramble, …). Für jede fügen Sie hinzu:
@@ -246,8 +241,8 @@ Packagist, Satis, Flux, Scramble, …). Für jede fügen Sie hinzu:
 - **Token** (Pflicht) — das Passwort/der Token der Registry
 
 Argos setzt diese zu einem einzigen `COMPOSER_AUTH`-HTTP-Basic-Blob zusammen,
-damit `composer install` die privaten Registries sowohl im Worker als auch in
-der Demo erreicht.
+damit `composer install` die privaten Registries sowohl im Workspace als auch in
+der Vorschau erreicht.
 
 **Zusätzliche Umgebungsvariablen** — beliebige Name/Wert-Paare (zusätzliche
 API-Keys, eigene Datenbanknamen usw.). Für jede:
@@ -261,8 +256,8 @@ Einige wichtige Regeln:
   aus den oben genannten Registries generierte — das ist das bewusste
   Schlupfloch.
 - Argos-eigene Variablen können nicht überschrieben werden. Namen, die es selbst
-  setzt (z. B. `REPO_TOKEN`, `APP_KEY`, `APP_URL`, `TASK_ID`, `CLAUDE_MODEL`,
-  die Agent-Zugangsdaten, …), werden aus Ihrer Liste entfernt, sodass ein
+  setzt (z. B. `REPO_TOKEN`, `APP_KEY`, `APP_URL`, die Agent-Zugangsdaten, die
+  Verdrahtung des Workspace-Daemons, …), werden aus Ihrer Liste entfernt, sodass ein
   Projekt-Secret niemals die eigene Verdrahtung von Argos überschreiben kann.
 
 **Platzhalter für Backing Services.** Wenn Sie oben MySQL oder Redis aktiviert
@@ -280,18 +275,26 @@ ohne interne Hosts oder Zugangsdaten fest zu verdrahten — setzen Sie
 beispielsweise
 `MY_DB_DSN=mysql://${mysql.username}:${mysql.password}@${mysql.host}/${mysql.database}`.
 
-### Modelle
+## Tab „Automation“
 
-Phasenweise Standardwerte für Modell und Turn-Budget für dieses Projekt. Alle
-optional.
+Standardwerte für [Auto-Threads](WORKSPACES.md#auto-threads) — automatische
+Läufe, gestartet in der Oberfläche, über die [REST-API](REST-API.md),
+[MCP](SETUP-MCP.md) oder einen [Issue-Trigger](SETUP-TASK-PROVIDERS.md). Ein
+einzelner Lauf kann sie überschreiben; leere Felder verwenden die Standardwerte
+der Installation aus der [Konfiguration](CONFIGURATION.md#auto-threads).
 
-- **Concept Model** / **Implement Model** — wählen Sie für jede Phase ein
-  Modell aus den Optionen, die der gewählte Agent anbietet. Leer lassen, um das
-  Standardmodell des Agents für diese Phase zu verwenden. Das Formular zeigt den
-  Standard im Hinweis des Feldes.
-- **Concept max-turns** / **Implement max-turns** — das Turn-Budget für jede
-  Phase (zwischen 10 und 1000). Leer lassen für den globalen Standard. Eine
-  Aufgabe kann diese weiterhin überschreiben.
+- **Automation user** — die Person, für die automatische Läufe aus den
+  API-Tokens und Issue-Triggern dieses Projekts handeln: Ihr Claude-Agent
+  erledigt die Arbeit, und ihr gehört der Workspace. Ohne sie starten
+  Issue-Trigger nichts (die Bindung zeigt den Fehler).
+- **Plan** — *aus* (sofort umsetzen), *automatisch* (planen, dann weitermachen)
+  oder *auf Freigabe warten* (planen, dann anhalten, bis jemand freigibt).
+- **When done** — einen Pull Request, einen Draft-Pull-Request öffnen oder nur
+  committen und pushen.
+- **Gate fix rounds** — wie oft Claude versuchen darf, fehlschlagende Quality
+  Gates zu beheben, bevor trotzdem ausgeliefert wird.
+- **Max. turns**, **Max. cost (USD)**, **Max. runtime (minutes)** — Budgets, die
+  einen Lauf stoppen. Kosten von `0` bedeuten kein Limit.
 
 ## Pflicht vs. optional — auf einen Blick
 
@@ -307,11 +310,10 @@ optional.
 
 **Optional (mit sinnvollen Standardwerten)**
 
-- Auto-start concept, Auto-create PR (Standard aus)
 - Image source (Standard Registered stack), Worker Stack (Standard
   Argos-Stack), Agent (Standard Claude Code)
 - Backing Services und ihre MySQL-Zugangsdaten-Überschreibungen
 - Live-Demo (Standard aus)
 - Zusätzliche Umgebungsvariablen und Composer-Registries
-- Concept-/Implement-Modell und max-turns (standardmäßig die Standardwerte des
-  Agents / die globalen Standardwerte)
+- Automation user und die Automatisierungs-Standardwerte (standardmäßig die
+  Einstellungen der Installation)

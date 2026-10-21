@@ -1,6 +1,6 @@
 # Linear Setup Guide
 
-This guide is for **Argos operators** who want to connect **Linear** as a
+This guide is for **Argos operators** who want to connect **Linear** as an
 issue tracker: matching Linear issues start automatic runs, Argos comments on
 the issue as the run progresses, and a 👍 reaction approves the plan.
 
@@ -116,8 +116,7 @@ The Linear-specific field values:
 | **Modus** (Mode) | `Webhook (Push)`, `Polling`, or `Deaktiviert` |
 | **Zugang** (Credential) | The Linear OAuth account **or** the Linear API key (PAT) |
 | **Projekt / Team** | A Linear **team**, picked from a list loaded from the credential (the team key + name, e.g. `ENG — Engineering`). The team key is stored, not an `owner/repo` path |
-| **Labels-Filter** | Optional: import only issues carrying at least one of these labels |
-| **Issue schließen bei Task-Abschluss** | No longer used — merging the pull request closes the issue. |
+| **Labels-Filter** | Optional: only issues carrying at least one of these labels start a run |
 
 The **Projekt / Team** list is populated by querying Linear's `teams` API with
 the chosen credential, so pick the **Provider** and **Zugang** first. You can
@@ -151,7 +150,7 @@ controller verifies it with `hash_equals`; a mismatch or a missing secret
 returns `401`.
 
 Deliveries are de-duplicated by the `Linear-Delivery` header for 24 hours, so a
-Linear retry does not create a duplicate task.
+Linear retry does not start a second run.
 
 **Requirements for webhook mode:**
 
@@ -208,7 +207,7 @@ Linear–Git integration — Argos does not close it.
 
 Linear identifies issues by **UUID**. Argos stores that UUID as the
 `external_id` on the External Issue Link and uses it for all subsequent API
-calls (comment write-back, reaction polling, close). This is transparent — no
+calls (comment write-back, reaction polling). This is transparent — no
 configuration is needed.
 
 ## Troubleshooting
@@ -219,6 +218,6 @@ configuration is needed.
 | OAuth redirect fails / "Invalid OAuth state" | The callback URL on the Linear OAuth app must exactly match `${APP_URL}/auth/linear/callback`; mismatched or expired session state also triggers this |
 | Setup fails in webhook mode | The credential lacks permission to create a webhook on the team — use an OAuth account with the `admin` scope, or an API-key owner who is a team admin. The exact error is in **Letzter Fehler** |
 | Webhook deliveries rejected (401) | Signature/secret mismatch, or no secret stored. Re-run **Einrichten** to regenerate and re-register the secret |
-| No tasks appear in poll mode | The scheduler isn't running, the binding isn't **Active**, or the **Labels-Filter** excludes the issues. Check the **Letzter Poll** column |
-| 👍 does not start implement | The task must be in Concept Review, the reaction must be 👍, the reacting user must be an active non-guest Linear member, and the scheduler must be running the approval check |
+| No runs start in poll mode | The scheduler isn't running, the binding isn't **Active**, the project has no **automation user** with a usable agent, or the **Labels-Filter** excludes the issues. Check the **Letzter Poll** and **Letzter Fehler** columns |
+| 👍 does not approve the plan | The run must be waiting for plan approval, the reaction must be 👍 on Argos' plan comment, the reacting user must be an active non-guest Linear member, and the scheduler must be running the approval check |
 | `400` / `401` on API calls | A `lin_api_…` key sent with a `Bearer` prefix is rejected by Linear — Argos handles this automatically, but a revoked/expired token also fails. Reconnect the OAuth account or recreate the API key |

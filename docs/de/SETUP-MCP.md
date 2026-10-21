@@ -2,16 +2,16 @@
 
 Argos bringt einen eingebauten [MCP](https://modelcontextprotocol.io)-Server
 mit, sodass ein externer MCP-Client — insbesondere **Claude Code** — Argos
-direkt steuern kann: Projekte und Tasks auflisten, einen Plan als neuen Task
-übergeben, die Phasen Concept / Implement / Push ausführen und den
-resultierenden Feature-Branch lokal abrufen.
+direkt steuern kann: Projekte auflisten, das, was umgesetzt werden soll, als
+**automatischen Lauf** in einem neuen Workspace übergeben, ihn verfolgen, seinen
+Plan freigeben, ihn mit Feedback lenken und den Pull Request abholen.
 
 Das verwandelt die übliche Schleife („in Claude Code planen → in die Argos-UI
-kopieren → den Browser beobachten → den Branch-Namen kopieren") in einen
+kopieren → den Browser beobachten → den Pull-Request-Link kopieren") in einen
 einzigen Ablauf innerhalb der Session, ohne deinen Planungs-Client zu verlassen.
 
 Wenn du Argos lieber aus Skripten oder einer CI automatisieren möchtest als aus
-einem interaktiven MCP-Client, ist derselbe Workflow auch als schlichte
+einem interaktiven MCP-Client, sind dieselben Workspaces auch als schlichte
 HTTP-API verfügbar — siehe [REST-API.md](REST-API.md). Die beiden Schnittstellen
 sind gleichwertig; MCP ist der Eingang für Chat-Clients, die REST-API der
 Eingang für Skripte.
@@ -77,7 +77,7 @@ Der Status springt auf **connected** und die folgenden Tools werden verfügbar.
 
 ## Verfügbare Tools
 
-Der Server stellt neun Tools bereit. Ein `task`- oder `project`-Argument
+Der Server stellt zehn Tools bereit. Ein `project`- oder `workspace`-Argument
 akzeptiert stets entweder die ULID des Datensatzes **oder** seinen exakten Namen.
 
 ### Workspaces und automatische Läufe
@@ -98,51 +98,27 @@ Läufe handeln für dich: Dein Claude-Agent arbeitet, und dir gehört der Worksp
 
 | Tool | Was es tut |
 |---|---|
-| `project_list` | Listet die konfigurierten Repository-Profile (Projekte), gegen die Argos Tasks ausführen kann, mit ihren Workflow-Defaults und der Anzahl offener Tasks. |
-| `project_get` | Gibt ein Projekt zurück (per id oder Name) zusammen mit einer Übersicht seiner Tasks. |
-
-### Tasks (lesen)
-
-| Tool | Was es tut |
-|---|---|
-| `task_list` | Listet Tasks auf, optional gefiltert nach `project` und nach Workflow-`status`. |
-| `task_get` | Gibt das vollständige Detail eines Tasks zurück: Beschreibung, Concept, Implement-Zusammenfassungen, jüngste Phase-Runs, den **Checkout-Block** (`repo_url`, `base_branch`, `feature_branch`) und die PR-URL. |
-
-Der `status`-Filter akzeptiert einen Workflow-Status-String: `draft`,
-`concept_running`, `concept_review`, `implement_running`, `implement_paused`,
-`implement_completed`, `in_review`, `completed`, `failed`, `aborted`.
-
-### Workflow (schreiben)
-
-| Tool | Was es tut |
-|---|---|
-| `task_create` | Erstellt einen Task aus einem Plan und startet die Concept-Phase. Der Plan wird sowohl als Task-Beschreibung als auch als Concept-Notizen gespeichert, sodass der Concept-Run ihn berücksichtigt. Der Feature-Branch wird während der Concept-Phase angelegt. Args: `name`, `project`, `plan`, optional `base_branch`. |
-| `task_concept` | Führt die Concept-Phase aus (oder erneut). Ist der vorherige Concept-Run pausiert, wird er mit einem frischen Turn-Budget fortgesetzt. Optional `max_turns`. |
-| `task_implement` | Führt die Implement-Phase aus (oder erneut). Erfordert einen abgeschlossenen Concept-Run; setzt einen pausierten Run mit einem frischen Turn-Budget fort. Optional `max_turns`. |
-| `task_pr` | Führt die Push-Phase aus — pusht den Feature-Branch und öffnet einen Pull Request. Erfordert einen abgeschlossenen Implement-Run. |
-| `task_feedback` | Sendet Review-Feedback (`feedback`, Markdown) für einen Task und führt die Respond-Phase aus, die auf das Feedback reagiert. |
-
-Schreib-Tools, die eine Phase starten, kehren sofort zurück: Phasen laufen
-asynchron im Worker, daher kommst du voran, indem du `task_get` erneut liest,
-nicht indem du auf den Schreib-Aufruf wartest.
+| `project_list` | Listet die konfigurierten Repository-Profile (Projekte), an denen Argos arbeitet, mit ihren Automatisierungs-Vorgaben (`auto_settings`) und der Zahl offener Workspaces. |
+| `project_get` | Liefert ein Projekt (per id oder Name) mit seinen Automatisierungs-Vorgaben und einer Übersicht seiner Workspaces (Status, Herkunft, Branch, Pull Request). |
 
 ## Typischer Ablauf
 
 Ein Plan-zu-PR-Durchlauf aus einer Planungs-Session:
 
-1. `project_list` — wähle das Repository-Profil, in dem du arbeiten möchtest.
-2. `task_create` — übergib den Plan. Die Concept-Phase startet automatisch und
-   der Feature-Branch wird während dieses Runs angelegt.
-3. `task_get` — frage den Workflow-Status ab. Phasen laufen asynchron, daher
-   kehren Schreib-Tools sofort zurück; lies erneut, um den Fortschritt zu
-   verfolgen.
-4. `task_implement`, dann `task_pr` — gehe weiter, sobald die vorherige Phase
-   fertig ist (jeweils daran gekoppelt, dass die vorangehende Phase
-   abgeschlossen ist).
-5. Nach `task_pr` legt `task_get` den Checkout-Block offen, sodass du lokal
-   `git checkout <feature_branch>` ausführen und in deiner IDE reviewen kannst.
-6. `task_feedback` — sende Review-Feedback, das die Respond-Phase ausführt.
-   Wiederhole das, bis die Änderung mergebereit ist.
+1. `project_list` / `project_get` — wähle das Projekt, in dem du arbeiten
+   möchtest.
+2. `workspace_create` — übergib, was umgesetzt werden soll (`prompt`). Wähle
+   `plan` und `ship` oder überlass sie den Projektvorgaben. Das Tool kehrt
+   sofort zurück.
+3. `workspace_get` — frage den Lauf ab: `auto.state` des Threads geht von
+   queued → planning → implementing → gating/fixing → shipping → done.
+4. Mit `plan = approve` hält der Lauf bei `awaiting_plan_approval` an:
+   `thread_plan_decide` gibt frei oder lehnt ab (mit Feedback).
+5. Ist der Lauf fertig, zeigt `workspace_get` den Pull Request unter
+   `pull_request`; checke seinen Branch lokal aus, um in deiner IDE zu reviewen.
+6. `thread_message` — schick Review-Feedback in den Thread; mit `resume_auto`
+   macht der Lauf danach selbstständig weiter. `workspace_ship` liefert den
+   aktuellen Stand auf Anforderung aus.
 
 ## Sicherheit
 
@@ -175,13 +151,15 @@ Ein Plan-zu-PR-Durchlauf aus einer Planungs-Session:
 - **Token funktioniert nach einem Rebuild nicht mehr** — `PASSPORT_KEYS_PATH`
   liegt nicht auf einem persistenten Volume; im Standard-Compose-Stack zeigt es
   auf `/data/passport`.
-- **Tool-Aufrufe gelingen, aber in der UI passiert nichts** — Phasen laufen
+- **Tool-Aufrufe gelingen, aber in der UI passiert nichts** — Läufe sind
   asynchron. Prüfe, ob der Queue-Worker (`queue`-Service) läuft; lies mit
-  `task_get` erneut, um den Status weiterlaufen zu sehen.
+  `workspace_get` erneut, um den Zustand weiterlaufen zu sehen.
+- **`workspace_create` scheitert mit „kein nutzbarer Agent"** — du brauchst
+  einen aktiven eigenen (oder geteilten) Claude-Agenten unter *Agenten*.
 
 ## Siehe auch
 
-- [REST-API.md](REST-API.md) — derselbe Workflow als schlichte HTTP-API für
+- [REST-API.md](REST-API.md) — dieselben Workspaces als schlichte HTTP-API für
   Skripte und CI (der Nicht-MCP-Automatisierungspfad).
 - [OAUTH.md](OAUTH.md) — die OAuth-App-Verdrahtung, die Argos für git-Provider
   nutzt.

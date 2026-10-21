@@ -125,7 +125,7 @@ GitHub-Repo), das über die Filament-Administrationsoberfläche konfiguriert wir
 
 ### Schritt 2: Binding in Filament anlegen
 
-1. Öffne **Argos Admin → Task Provider Bindings → New**.
+1. Öffne das Projekt unter **Repo Profiles** → Tab **Task-Provider** → **Create**.
 2. Setze **Kind** auf `GitHub` und wähle das **Connected Account**, das deinen
    PAT- oder OAuth-Token enthält.
 3. Gib die **External Project Ref** im Format `owner/repo` ein, z. B.
@@ -177,7 +177,7 @@ Spalte **Last Error** angezeigt. Behebe das Problem und klicke erneut auf
   Issues-Liste auftauchen, werden automatisch herausgefiltert.
 
 Für die gemeinsamen Details zur Binding-Einrichtung siehe
-[Task Providers Setup](SETUP-TASK-PROVIDERS.md).
+[Issue-Trigger](SETUP-TASK-PROVIDERS.md).
 
 ---
 

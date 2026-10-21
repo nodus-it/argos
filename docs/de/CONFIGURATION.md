@@ -11,7 +11,7 @@ Betreiberreferenz für jede ENV-Variable, die Argos tatsächlich liest.
 >
 > - **`APP_KEY`** wird beim ersten Manager-Start automatisch erzeugt und
 >   persistiert; du setzt sie nur, wenn du ein Backup wiederherstellst.
-> - **OAuth-Apps und die Claude-/Codex-Credentials werden über die UI/DB
+> - **OAuth-Apps und die Claude-Agent-Zugangsdaten werden über die UI/DB
 >   verwaltet, nicht per ENV.** Siehe [OAuth & Credentials](#oauth--credentials-ui-managed)
 >   weiter unten.
 
@@ -21,7 +21,7 @@ Betreiberreferenz für jede ENV-Variable, die Argos tatsächlich liest.
 - [Sessions (Reverse Proxy / HTTPS)](#sessions-reverse-proxy--https)
 - [Datenbank](#database)
 - [Queue, Redis & Horizon](#queue-redis--horizon)
-- [Worker (Phasen-Container)](#worker-phase-containers)
+- [Worker-Image](#worker-image)
 - [Worker-Hintergrunddienste (Test-Sidecars)](#worker-backing-services-test-sidecars)
 - [Live-Demos (optional)](#live-demos-optional)
 - [Workspaces](#workspaces)
@@ -29,7 +29,7 @@ Betreiberreferenz für jede ENV-Variable, die Argos tatsächlich liest.
 - [Integrationen & Polling](#integrations--polling)
 - [OAuth & Credentials (UI-verwaltet)](#oauth--credentials-ui-managed)
 - [MCP-Server (Argos-API)](#mcp-server-argos-api)
-- [Zielprojekt-MCP (Laravel Boost)](#target-project-mcp-laravel-boost)
+- [Projekteinstellungen in Threads](#project-settings-in-threads)
 - [Logging](#logging)
 - [Compose-/OPS-Level-Schlüssel](#compose--ops-level-keys)
 
@@ -55,7 +55,7 @@ Beide Werte **leiten sich aus `APP_URL` ab** und müssen selten gesetzt werden:
 
 | Variable | Default | Zweck |
 |---|---|---|
-| `SESSION_DOMAIN` | abgeleitet: `.<APP_URL host>` für eine echte Domain, nur Host für localhost/IP/`nip.io` | Cookie-Domain. Der führende Punkt lässt die Session sich über Demo-Subdomains spannen (`demo-<task>.<host>`). Nur überschreiben, wenn Demos auf einer anderen Domain als die App liegen. |
+| `SESSION_DOMAIN` | abgeleitet: `.<APP_URL host>` für eine echte Domain, nur Host für localhost/IP/`nip.io` | Cookie-Domain. Der führende Punkt lässt die Session sich über Demo-Subdomains spannen (`demo-ws-<slug>.<host>`). Nur überschreiben, wenn Demos auf einer anderen Domain als die App liegen. |
 | `SESSION_SECURE_COOKIE` | abgeleitet: `true`, wenn `APP_URL` `https://` ist | Erzwingt `Secure` auf dem Session-Cookie. Nur explizit setzen, wenn TLS an einem Proxy terminiert wird, der das Schema umschreibt. |
 | `SESSION_COOKIE` | `argos_session` | Name des Session-Cookies. Wird selten geändert. |
 
@@ -79,7 +79,7 @@ oder einen externen Server zu verwenden. Der Compose-Stack setzt `mariadb`.
 
 ## Queue, Redis & Horizon
 
-Hintergrund-Jobs — Task-Phasenläufe und Issue-Polling — laufen über **Laravel
+Hintergrund-Jobs — Workspace-Bereitstellung, Image-Builds und Issue-Polling — laufen über **Laravel
 Horizon**, gestützt auf **Redis**. Im Compose-Stack werden der `redis`-Service
 sowie die `queue`-(Horizon-) + `scheduler`-Worker automatisch verdrahtet; du
 stimmst normalerweise nur die Prozessanzahlen ab.
@@ -91,42 +91,39 @@ stimmst normalerweise nur die Prozessanzahlen ab.
 | `ARGOS_REDIS_PORT` | fällt zurück auf `REDIS_PORT`, dann `6379` | Redis-Port. |
 | `ARGOS_REDIS_PASSWORD` | fällt zurück auf `REDIS_PASSWORD` | Redis-Passwort (falls dein Redis Authentifizierung verlangt). |
 | `ARGOS_QUEUE_DEFAULT_PROCESSES` | `5` | Horizon-Worker-Prozesse für die `default`-Queue (`minProcesses` = `maxProcesses`). |
-| `ARGOS_QUEUE_TASKS_PROCESSES` | `2` | Horizon-Worker-Prozesse für die `tasks`-Queue (Phasenläufe). |
+| `ARGOS_QUEUE_TASKS_PROCESSES` | `2` | Horizon-Worker-Prozesse für die `tasks`-Queue (Workspaces starten und stoppen). |
 
 > `ARGOS_REDIS_*` haben Vorrang; die einfachen Laravel-Defaults `REDIS_HOST` /
 > `REDIS_PORT` / `REDIS_PASSWORD` werden als Fallback berücksichtigt (und sind
 > das, was der Compose-Stack tatsächlich setzt).
 
-## Worker (Phasen-Container)
+## Worker-Image
 
-Jede Task-Phase läuft in einem ephemeren Worker-Container. Diese steuern die
-Image-Auswahl und die Ressourcenlimits pro Container.
+Das Worker-Image (Stack + Agent + Gate-Helfer) ist die Basis, aus der jedes
+Workspace-Image gebaut wird. Die Ressourcenlimits eines laufenden Workspaces
+stehen unter [Workspaces](#workspaces).
 
 | Variable | Default | Zweck |
 |---|---|---|
-| `ARGOS_DEFAULT_STACK` | `php-8.4` | Slug des Worker-Stacks, der verwendet wird, wenn weder der Task noch das Projekt einen festlegt. Muss zu einer Zeile in `worker_stacks` passen (Built-ins werden bei `migrate` gespiegelt). |
-| `ARGOS_MEM_LIMIT` | `4g` | Speicherlimit pro Worker-Container. |
-| `ARGOS_CPU_LIMIT` | `2` | CPU-Limit pro Worker-Container. |
-| `ARGOS_CONCEPT_MAX_TURNS_DEFAULT` | `50` | Standard-max-turns für die Concept-Phase (pro Task überschreibbar). max-turns ist eine Obergrenze, kein Budget — gut umrissene Tasks sind unabhängig davon früh fertig; große Repos brauchen den Spielraum, um zu erkunden *und* zu schreiben. |
-| `ARGOS_MAX_TURNS_DEFAULT` | `200` | Standard-max-turns für die Implement-Phase (pro Task überschreibbar). |
+| `ARGOS_DEFAULT_STACK` | `php-8.4` | Slug des Worker-Stacks, der verwendet wird, wenn das Projekt keinen festlegt. Muss zu einer Zeile in `worker_stacks` passen (Built-ins werden bei `migrate` gespiegelt). |
 
 ## Worker-Hintergrunddienste (Test-Sidecars)
 
-Argos kann ephemere Backing-Service-Sidecars hochfahren (ein privates Netzwerk
-pro Phasenlauf, anschließend wieder abgebaut), damit die Tests eines Projekts
-mit einem echten MySQL/Redis sprechen können. Ein Repo-Profil meldet sich pro
-Service an; nur die testlaufenden Phasen starten sie.
+Argos kann Backing-Service-Sidecars neben einem Workspace hochfahren (ein
+privates Netzwerk pro Workspace, die Daten bleiben bis zum Löschen des
+Workspaces), damit die Tests eines Projekts mit einem echten MySQL/Redis
+sprechen können. Ein Repo-Profil meldet sich pro Service an.
 
 | Variable | Default | Zweck |
 |---|---|---|
-| `ARGOS_WORKER_SERVICE_TIMEOUT` | `60` | Sekunden, die auf die Bereitschaft eines Backing-Service gewartet wird, bevor die Phase fehlschlägt. |
+| `ARGOS_WORKER_SERVICE_TIMEOUT` | `60` | Sekunden, die auf die Bereitschaft eines Backing-Service gewartet wird, bevor der Start des Workspaces fehlschlägt. |
 | `ARGOS_WORKER_MYSQL_IMAGE` | `mariadb:11` | Image für den MySQL-/MariaDB-Sidecar. |
 | `ARGOS_WORKER_REDIS_IMAGE` | `redis:7-alpine` | Image für den Redis-Sidecar. |
 
 ## Live-Demos (optional)
 
-Ephemere Demo-Deployments pro Task, geroutet von Traefik unter ihrer eigenen
-Subdomain. Standardmäßig auf Plattformebene aktiviert, aber ein Toggle pro
+Live-Vorschauen von Workspaces, geroutet von Traefik unter ihrer eigenen
+Subdomain und geschützt durch das Workspace-Gate (nur Mitglieder). Standardmäßig auf Plattformebene aktiviert, aber ein Toggle pro
 Projekt (*Live-Demo* / `live_demo_enabled`) ist das eigentliche Gate, das jedes
 Projekt freischaltet. Basis-Domain + Schema **leiten sich aus `APP_URL` ab** —
 nur überschreiben für eine Demo-Domain, die sich von der App unterscheidet.
@@ -136,16 +133,12 @@ Traefik- + `argos_edge`-Preview-Infrastruktur).
 | Variable | Default | Zweck |
 |---|---|---|
 | `ARGOS_PREVIEW_ENABLED` | `true` (Compose leitet `false` weiter) | Hauptschalter für die Live-Demo-Infrastruktur. Setze `false`, um plattformweit zu deaktivieren (z. B. keine Traefik-/Preview-Infrastruktur). |
-| `ARGOS_PREVIEW_BASE_DOMAIN` | abgeleitet vom `APP_URL`-Host (`127.0.0.1.nip.io` für bare/localhost) | Demos liegen unter `demo-<task>.<base_domain>`. |
+| `ARGOS_PREVIEW_BASE_DOMAIN` | abgeleitet vom `APP_URL`-Host (`127.0.0.1.nip.io` für bare/localhost) | Demos liegen unter `demo-ws-<slug>.<base_domain>`. |
 | `ARGOS_PREVIEW_SCHEME` | abgeleitet vom `APP_URL`-Schema | `http` oder `https`, das in der Demo-URL verwendet wird. |
 | `ARGOS_PREVIEW_PORT` | fällt zurück auf `ARGOS_PORT`, dann `8080` | Externer Port, unter dem die Demo-URL erreichbar ist (der öffentliche Endpunkt, unabhängig vom Host-Port, an den Traefik bindet). Hinter einem TLS-Proxy auf 443 setze `scheme=https` und `ARGOS_PREVIEW_PORT=443`, damit die URL den Port weglässt. |
 | `ARGOS_PREVIEW_TTL_HOURS` | `24` | Stunden, bevor eine inaktive Demo abgebaut wird. |
-| `ARGOS_PREVIEW_AUTH` | `none` | Stack-weiter Standard-Zugriffsschutz für Demos, die auf *inherit* gesetzt sind (`none` / `session` / `basic`); Überschreibungen pro Task gewinnen. |
-| `ARGOS_PREVIEW_BASIC_USER` | `demo` | HTTP-Basic-Benutzername für `basic`-geschützte Demos. |
-| `ARGOS_PREVIEW_BASIC_PASSWORD` | – | Globaler HTTP-Basic-Passwort-Fallback für Tasks, die lediglich den `basic`-Default erben (Passwörter pro Task werden erzeugt, wenn ein Task auf `basic` umgeschaltet wird). |
-| `ARGOS_PREVIEW_AUTH_GATE_URL` | `http://nginx:80/_argos/demo-gate` | Interne URL, die Traefiks forwardAuth-Middleware aufruft, um die Argos-Session für `session`-geschützte Demos zu validieren. |
-| `ARGOS_PREVIEW_MAX_CONCURRENT` | `10` | Obergrenze gleichzeitig laufender Demos (`0` = unbegrenzt; bei Überschreitung werden die ältesten Demos anderer Tasks verdrängt). |
-| `ARGOS_PREVIEW_CPU_LIMIT` | `1.0` | CPU-Limit pro Demo (getrennt von den Worker-Limits). |
+| `ARGOS_PREVIEW_MAX_CONCURRENT` | `10` | Obergrenze gleichzeitig laufender Demos (`0` = unbegrenzt; bei Überschreitung werden die ältesten Demos anderer Workspaces verdrängt). |
+| `ARGOS_PREVIEW_CPU_LIMIT` | `1.0` | CPU-Limit pro Demo (getrennt von den Workspace-Limits). |
 | `ARGOS_PREVIEW_MEM_LIMIT` | `1g` | Speicherlimit pro Demo. |
 | `ARGOS_PREVIEW_NETWORK` | `argos_edge` | Externes Docker-Netzwerk, das mit Traefik geteilt wird (definiert in `docker-compose.yml`). |
 | `ARGOS_PREVIEW_DEFAULT_IMAGE` | `argos-demo` | Eingebaute Standard-Demo-Laufzeitumgebung (php-fpm + nginx + node), verwendet, wenn ein Repo keinen `.argos/demo.*`-Vertrag mitliefert. Ein Content-Hash wird angehängt (`argos-demo:<hash>`). |
@@ -203,13 +196,13 @@ Compose-Datei setzt die Verbindung für dich.
 
 ## Integrationen & Polling
 
-Issue-/Task-Provider (GitHub, GitLab, Bitbucket, Linear) werden vom
+Issue-Provider (GitHub, GitLab, Bitbucket, Linear) werden vom
 `scheduler`-Worker nach einem Zeitplan gepollt. Die Provider-Verbindungen selbst
 werden über die UI/DB verwaltet — siehe [OAuth & Credentials](#oauth--credentials-ui-managed).
 
 | Variable | Default | Zweck |
 |---|---|---|
-| `ARGOS_POLL_INTERVAL_MINUTES` | `5` (auf 1–59 begrenzt) | Wie oft der Scheduler Issue-Provider pollt und Reaktionen auf Concept-Kommentare prüft. Der Default hält die API-Nutzung bei Skalierung niedrig; setze lokal `1` für schnelles Feedback. |
+| `ARGOS_POLL_INTERVAL_MINUTES` | `5` (auf 1–59 begrenzt) | Wie oft der Scheduler Issue-Provider pollt und Reaktionen auf Plan-Kommentare prüft (`argos:check-plan-approvals`). Der Default hält die API-Nutzung bei Skalierung niedrig; setze lokal `1` für schnelles Feedback. |
 
 ## OAuth & Credentials (UI-verwaltet)
 
@@ -225,12 +218,12 @@ registriere diese URL in der OAuth-App des Providers. Siehe
 ([GitHub](SETUP-GITHUB.md), [GitLab](SETUP-GITLAB.md),
 [Bitbucket](SETUP-BITBUCKET.md), [Linear](SETUP-LINEAR.md)).
 
-Die **Claude-/Codex-Agent-Credentials** sind ebenfalls **keine**
-Umgebungsvariablen — füge sie im Onboarding-Wizard / in der Credentials-UI hinzu,
-wo sie pro Agent in der Datenbank gespeichert werden.
+Die **Claude-Agent-Zugangsdaten** sind ebenfalls **keine**
+Umgebungsvariablen — füge sie im Onboarding-Wizard oder auf der Seite *Agenten*
+hinzu, wo sie in der Datenbank gespeichert werden.
 
 > Die `SEED_*`-Variablen (z. B. `SEED_USER_EMAIL`, `SEED_REPO_URL`,
-> `SEED_CLAUDE_OAUTH_TOKEN`, `SEED_CODEX_AUTH_JSON_B64`) sind **nur für
+> `SEED_CLAUDE_OAUTH_TOKEN`) sind **nur für
 > Entwicklung gedachte Seeding-Overrides**, die von `.tools/bin/dev-reset.sh`
 > gelesen werden. Sie sind keine Betreiberkonfiguration und haben außerhalb des
 > Seedings keine Wirkung.
@@ -249,28 +242,13 @@ Authentifizierung erfolgt über OAuth 2.1 via Laravel Passport (Scope `mcp:use`)
 Siehe den [MCP-Server-Leitfaden](SETUP-MCP.md) für den Connect-Ablauf und die
 verfügbaren Tools.
 
-## Zielprojekt-MCP (Laravel Boost)
+## Projekteinstellungen in Threads
 
-Der Worker prüft die `boost.json` des geklonten Zielprojekts auf `"mcp": true`.
-Ist sie vorhanden, hängt der aktive Agent-Runner vor jeder Session den
-MCP-Server des Projekts als lokalen `stdio`-Subprozess an
-(`php artisan boost:mcp`) — kein Netzwerkzugriff, keine Argos-Datenbankverbindung.
-Das Ziel-Repo entscheidet; kein Flag auf Manager-Seite.
-
-**Voraussetzungen am Zielprojekt:**
-- `laravel/boost ^2.4` in `composer.json`
-- `boost.json` mit `"mcp": true`
-- `composer install` wurde ausgeführt (Vendor-Verzeichnis vorhanden)
-
-**Verdrahtung pro Agent (automatisch erledigt):**
-- Claude Code: `claude --mcp-config <file>` mit einer generierten Config-Datei.
-- Codex: `-c mcp_servers.laravel-boost.{command,args}=…`-Overrides, die in den
-  `codex exec`-Aufruf eingefügt werden.
-
-Der MCP-Server läuft vollständig innerhalb des Worker-Containers. Er gibt dem
-Agent Zugriff auf Boost-Tools (z. B. `search-docs`, `database-schema`), die auf
-das Zielprojekt eingeschränkt sind. Zum Deaktivieren setze `"mcp": false` in
-`boost.json` oder entferne die Datei.
+Threads führen Claude Code mit den *Projekt*- und *lokalen* Einstellungen des
+Repositorys aus. Projektweite Konfiguration (`CLAUDE.md`,
+`.claude/settings.json`, `.mcp.json`) gilt also wie auf einem
+Entwicklerrechner. Es gibt kein Flag auf Manager-Seite; das Repository
+entscheidet.
 
 ## Logging
 

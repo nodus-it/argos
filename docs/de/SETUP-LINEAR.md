@@ -122,8 +122,7 @@ Die Linear-spezifischen Feldwerte:
 | **Modus** (Mode) | `Webhook (Push)`, `Polling` oder `Deaktiviert` |
 | **Zugang** (Credential) | Das Linear-OAuth-Konto **oder** der Linear-API-Key (PAT) |
 | **Projekt / Team** | Ein Linear-**Team**, ausgewählt aus einer Liste, die anhand der Zugangsdaten geladen wird (der Team-Key + Name, z. B. `ENG — Engineering`). Gespeichert wird der Team-Key, kein `owner/repo`-Pfad |
-| **Labels-Filter** | Optional: nur Issues importieren, die mindestens eines dieser Labels tragen |
-| **Issue schließen bei Task-Abschluss** | Wird nicht mehr verwendet — der Merge des Pull Requests schließt das Issue. |
+| **Labels-Filter** | Optional: nur Issues, die mindestens eines dieser Labels tragen, starten einen Lauf |
 
 Die **Projekt / Team**-Liste wird gefüllt, indem Linears `teams`-API mit den
 gewählten Zugangsdaten abgefragt wird — wähle also zuerst **Provider** und
@@ -158,7 +157,7 @@ Request-Body und sendet sie als **rohen Hex-Digest** im `Linear-Signature`-Heade
 Abweichung oder ein fehlendes Secret führt zu `401`.
 
 Auslieferungen werden 24 Stunden lang anhand des `Linear-Delivery`-Headers
-dedupliziert, sodass ein Linear-Retry keinen doppelten Task erzeugt.
+dedupliziert, sodass ein Linear-Retry keinen zweiten Lauf startet.
 
 **Voraussetzungen für den Webhook-Modus:**
 
@@ -220,8 +219,7 @@ deiner Linear–Git-Integration weiter — Argos schließt es nicht.
 
 Linear identifiziert Issues per **UUID**. Argos speichert diese UUID als
 `external_id` auf dem External Issue Link und verwendet sie für alle
-nachfolgenden API-Aufrufe (Kommentar-Rückschrieb, Reaktions-Polling,
-Schließen). Das geschieht transparent — keine Konfiguration erforderlich.
+nachfolgenden API-Aufrufe (Kommentar-Rückschrieb, Reaktions-Polling). Das geschieht transparent — keine Konfiguration erforderlich.
 
 ## Fehlerbehebung
 
@@ -231,6 +229,6 @@ Schließen). Das geschieht transparent — keine Konfiguration erforderlich.
 | OAuth-Redirect schlägt fehl / „Invalid OAuth state" | Die Callback-URL der Linear-OAuth-App muss exakt mit `${APP_URL}/auth/linear/callback` übereinstimmen; ein nicht passender oder abgelaufener Session-State löst dies ebenfalls aus |
 | Setup schlägt im Webhook-Modus fehl | Den Zugangsdaten fehlt die Berechtigung, einen Webhook auf dem Team zu erstellen — nutze ein OAuth-Konto mit dem `admin`-Scope oder einen API-Key-Besitzer, der Team-Admin ist. Der genaue Fehler steht in **Letzter Fehler** |
 | Webhook-Auslieferungen abgelehnt (401) | Signatur-/Secret-Abweichung oder kein Secret gespeichert. Führe **Einrichten** erneut aus, um das Secret neu zu erzeugen und zu registrieren |
-| Keine Tasks erscheinen im Poll-Modus | Der Scheduler läuft nicht, die Bindung ist nicht **Active** oder der **Labels-Filter** schließt die Issues aus. Prüfe die Spalte **Letzter Poll** |
-| 👍 startet Implement nicht | Der Task muss im Concept Review sein, die Reaktion muss 👍 sein, der reagierende Nutzer muss ein aktives nicht-Gast-Linear-Mitglied sein und der Scheduler muss die Approval-Prüfung ausführen |
+| Im Poll-Modus startet kein Lauf | Der Scheduler läuft nicht, die Bindung ist nicht **Active**, das Projekt hat keinen **Automation-User** mit nutzbarem Agenten, oder der **Labels-Filter** schließt die Issues aus. Prüfe die Spalten **Letzter Poll** und **Letzter Fehler** |
+| 👍 gibt den Plan nicht frei | Der Lauf muss auf die Plan-Freigabe warten, die Reaktion muss 👍 auf Argos' Plan-Kommentar sein, der reagierende Nutzer muss ein aktives Linear-Mitglied (kein Gast) sein und der Scheduler muss die Freigabe-Prüfung ausführen |
 | `400` / `401` bei API-Aufrufen | Ein `lin_api_…`-Key, der mit einem `Bearer`-Präfix gesendet wird, wird von Linear abgelehnt — Argos behandelt dies automatisch, aber auch ein widerrufenes/abgelaufenes Token schlägt fehl. Verbinde das OAuth-Konto neu oder erstelle den API-Key neu |

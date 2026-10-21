@@ -92,7 +92,7 @@ Flow:
    to the suite under the `*_PAT` ENVs (the suite is auth-mode-agnostic).
 
 The profiles remain in the DB after the run — you can use them in the Argos UI for manual
-smoke tests (create a task, start a phase run). `--reset` clears them out.
+smoke tests (open a workspace, start an automatic run). `--reset` clears them out.
 
 ## CI: GitHub Actions
 

@@ -28,10 +28,10 @@ one Argos reads.
 
 ## What "Argos-ready" means
 
-A repository is "Argos-ready" when Argos can, for any task, **clone it, install
-its dependencies, let the agent implement a change, and have that change pass
-the quality gate** — all inside one ephemeral worker container, fully offline
-except for the package registries you configure.
+A repository is "Argos-ready" when Argos can, in a workspace, **clone it,
+install its dependencies, let the agent implement a change, and have that
+change pass the quality gate** — all inside the workspace container, fully
+offline except for the package registries you configure.
 
 In practice that means:
 
@@ -41,22 +41,24 @@ In practice that means:
    services Argos can boot for you (MySQL/MariaDB, Redis), or runs on SQLite /
    in-memory.
 3. The [quality gate](#the-quality-gate-your-project-must-pass) can run and not
-   regress: a phase succeeds only when the gates the project supports pass.
+   regress: an automatic run ships only after the gates the project supports
+   pass (or its fix rounds are used up).
 
-Optionally, if you want a clickable preview after each implement, the repo also
+Optionally, if you want a clickable preview of a workspace, the repo also
 needs to satisfy the [live-demo contract](#part-b--live-demo).
 
 ## What Argos reads from your repo
 
 Argos integrates with a target repository through **two independent contracts**,
 both optional, both living under `.argos/` at the repository's **default
-branch** (the live demo) or the **task's base branch** (the worker image). They
+branch** (the live demo) or the **workspace's base branch** (the worker
+image). They
 are read via the Git provider API — Argos does not clone to detect them.
 
 | Contract | Files | What it controls | Default if absent |
 | --- | --- | --- | --- |
-| **A — Execution environment** | `.argos/worker.dockerfile` | The base image of the container the agent *works in* (clone, install deps, run quality gate). | Built-in stack `php-8.4` (PHP 8.4 CLI + Composer + Node 22). |
-| **B — Live demo** | `.argos/demo.compose.yml` + `.argos/demo.yml` | An ephemeral preview deployment spun up *after* a successful implement, routed under its own subdomain. | Bundled Laravel contract (`app` php-fpm/nginx + `mariadb` `db`). |
+| **A — Execution environment** | `.argos/worker.dockerfile` | The base image of the workspace container the agent *works in* (clone, install deps, run quality gate). | Built-in stack `php-8.4` (PHP 8.4 CLI + Composer + Node 22). |
+| **B — Live demo** | `.argos/demo.compose.yml` + `.argos/demo.yml` | An ephemeral preview deployment of a workspace, routed under its own subdomain. | Bundled Laravel contract (`app` php-fpm/nginx + `mariadb` `db`). |
 
 They are **orthogonal**: a repo can keep the default execution environment but
 ship a custom demo, or vice versa. The decision shape is the same for both:
@@ -82,14 +84,16 @@ Secrets are configured **per project in the Argos UI**, never committed under
 
 ### How Argos uses it
 
-For every task, Argos builds (on demand) one worker image and runs a single
-container. Inside it the agent:
+For every workspace, Argos builds (on demand) the image and runs one
+long-lived container. Inside it:
 
-1. Clones the repo and creates the feature branch.
-2. Installs the dependencies it detects: `composer install` when
-   `composer.json` exists, `npm ci` when a lockfile exists.
-3. Runs the agent (Claude Code / Codex) to implement the task.
-4. Runs the **quality gate** on the result (see below).
+1. The workspace daemon clones the repo and checks out the workspace branch.
+2. `composer install` runs when `composer.json` exists and `vendor/` is
+   missing (as part of capturing the gate baseline); the agent installs
+   anything else it needs, e.g. `npm ci`.
+3. The agent (Claude Code) works on the change in a thread.
+4. The **quality gate** runs on the result (see below) — on request, or
+   automatically in an automatic run.
 
 The default image is the built-in **`php-8.4`** stack: PHP 8.4 CLI with the
 common extensions (`pdo_mysql`, `pdo_pgsql`, `pdo_sqlite`, `intl`, `zip`,
@@ -97,16 +101,17 @@ common extensions (`pdo_mysql`, `pdo_pgsql`, `pdo_sqlite`, `intl`, `zip`,
 Node 22. A `php-8.3` stack exists too.
 
 For a precise, audit-level list of every shell/Docker command Argos runs in the
-worker (and the demo deployer), see
+workspace (and the demo deployer), see
 [EXECUTION-COMMANDS.md](EXECUTION-COMMANDS.md).
 
 ### The quality gate your project must pass
 
-After the agent implements, the worker runs a sequence of gates. A gate that
-applies to your repo must pass for the phase to succeed; gates that don't apply
-are skipped. The agent gets up to a few focused fix attempts per failing gate.
+The gates run a fixed sequence of checks. A gate that applies to your repo must
+pass; gates that don't apply are skipped. A failing gate can be handed to the
+agent as a fix prompt — an automatic run does that by itself, up to its
+fix-round limit.
 
-| Gate | Runs when… | Blocks the phase on failure? |
+| Gate | Runs when… | Blocks on failure? |
 | --- | --- | --- |
 | **artisan smoke** | `artisan` exists | yes — `php artisan list` must boot the app |
 | **Pint** (style) | `vendor/bin/pint` exists | yes — but only over files the agent **changed** |
@@ -120,7 +125,7 @@ Two things make this forgiving so the gate is achievable on real repos:
 
 - **Pest/PHPUnit baseline.** Before the agent touches anything, Argos records
   which tests are *already* red on the clean checkout. Only failures the agent
-  **newly introduces** block the phase — pre-existing red tests are reported but
+  **newly introduces** block — pre-existing red tests are reported but
   never block. (No baseline captured → strict gating, every failure counts.)
 - **Infra-crash skip.** If a test/PHPStan run dies on infrastructure (OOM,
   broken config, a missing binary) rather than a real finding, that gate is
@@ -128,11 +133,11 @@ Two things make this forgiving so the gate is achievable on real repos:
 
 What this means for "Argos-ready":
 
-- Your test suite must **run** in the worker (offline; SQLite/in-memory, or the
+- Your test suite must **run** in the workspace (offline; SQLite/in-memory, or the
   MySQL/Redis backing services). A suite that cannot even start fails the gate.
 - Pint runs only over changed files, so pre-existing style debt is fine.
 - If you ship a `phpstan.neon`, keep a `phpstan-baseline.neon` for pre-existing
-  issues — the agent is told to leave baselined entries untouched.
+  issues — PHPStan then only fails on new ones.
 
 ### Is my project ready as-is?
 
@@ -154,15 +159,15 @@ Any "no" → either a [custom image (BYOI)](#bring-your-own-image-byoi) or
 
 ### Backing services (MySQL / Redis)
 
-The worker container is single-image, but Argos can boot **backing services**
-alongside it for the test run. In the project's **Worker** tab, the field
+The workspace container is single-image, but Argos can boot **backing
+services** alongside it. In the project's **Worker** tab, the field
 **Backing services for tests** (`worker_services`) lets you toggle:
 
 - **MySQL / MariaDB** (image `mariadb:11`) — reachable at host `db`, port `3306`.
 - **Redis** (image `redis:7-alpine`) — reachable at host `redis`, port `6379`.
 
-Each enabled service comes up on a **private network per run** and is torn down
-afterwards. Argos injects the standard Laravel connection env automatically:
+Each enabled service comes up on a **private network per workspace**; its data
+volume is kept until the workspace is deleted. Argos injects the standard Laravel connection env automatically:
 
 - MySQL → `DB_HOST=db`, `DB_PORT=3306`, `DB_DATABASE`, `DB_USERNAME`,
   `DB_PASSWORD` (defaults `argos`/`argos`/`argos`, overridable in the form).
@@ -187,11 +192,11 @@ Auth-protected Composer registries (Private Packagist, Satis, Flux Pro,
 Filament plugins, Scramble Pro, …) and any other secret the build or tests need
 do **not** belong in `.argos/` — they go in the project's **Worker** tab, under
 the **Environment & secrets** section. Argos stores them encrypted and injects
-them into **both** the worker and the live demo.
+them into **both** the workspace and the live demo.
 
 - **Private Composer registries** (`composer_registries`) — host + username +
   token per row. Argos builds a single `COMPOSER_AUTH` http-basic blob from
-  them, so `composer install` reaches them in both the worker and the demo.
+  them, so `composer install` reaches them in both the workspace and the demo.
   (Username defaults to `token` when left blank.)
 - **Additional environment variables** (`worker_env`) — arbitrary `NAME` /
   value pairs (credentials, API keys, or a hand-written `COMPOSER_AUTH`, which
@@ -199,10 +204,10 @@ them into **both** the worker and the live demo.
   placeholders described above.
 
 Argos-owned keys cannot be overridden by a project secret — they are stripped
-before injection. These include `PHASE`, `TASK_ID`, `REPO_URL`, `REPO_TOKEN`,
-`REPO_PLATFORM`, `BASE_BRANCH`, `AGENT_NAME`, `APP_KEY`, `APP_URL`, `ASSET_URL`,
-`SESSION_COOKIE`, `ARGOS_DEMO`, `CLAUDE_CODE_OAUTH_TOKEN`,
-`CODEX_AUTH_JSON_CONTENT`, and the commit-identity vars.
+before injection. These include `REPO_URL`, `REPO_TOKEN`, `REPO_PLATFORM`,
+`BASE_BRANCH`, `APP_KEY`, `APP_URL`, `ASSET_URL`, `SESSION_COOKIE`,
+`ARGOS_DEMO`, `CLAUDE_CODE_OAUTH_TOKEN`, the commit-identity vars, and the
+workspace daemon wiring (`ARGOS_DAEMON_TOKEN`, `ARGOS_EVENTS_URL`, …).
 
 A project with private dependencies therefore needs **no** custom worker image
 just for registry auth.
@@ -211,8 +216,8 @@ just for registry auth.
 
 When the built-in stacks genuinely don't fit — an exotic runtime, a system
 package, a pinned base image — ship a `.argos/worker.dockerfile`. It replaces
-**only the base image**; Argos still layers the agent CLI and its own worker
-scripts on top, so do **not** add an `ENTRYPOINT`/`CMD` or install the agent
+**only the base image**; Argos still layers the agent CLI, its gate helpers and
+the workspace tools on top, so do **not** add an `ENTRYPOINT`/`CMD` or install the agent
 yourself, and the base must provide Node.js, a non-root `agent` user (UID
 `1000`), and the tools `bash`, `sh`, `jq`, `git`, `sed`, `grep`, `awk`, `curl`.
 
@@ -228,7 +233,7 @@ Often cheaper than a custom image — make the project fit the default stack:
 - Make the test suite run on SQLite / in-memory (a `sqlite` `:memory:`
   connection in `phpunit.xml` / `.env.testing`), or rely on the MySQL/Redis
   backing services.
-- Add a `.env.example` so config resolves in the worker.
+- Add a `.env.example` so config resolves in the workspace.
 - Remove hard dependencies on services Argos can't boot (mock them, or gate the
   affected tests).
 - If a single extra system package is all that's missing, prefer a three-line
@@ -240,10 +245,10 @@ Often cheaper than a custom image — make the project fit the default stack:
 
 ### How Argos uses it
 
-After a task's implement phase succeeds, Argos can deploy an **ephemeral
-preview** of the working branch: it mounts the task workspace into a container,
-runs your boot commands, and routes it at `demo-<task>.<base-domain>` via
-Traefik. The user clicks one URL and sees the change running.
+From a workspace, Argos can deploy an **ephemeral preview** of the working
+branch: it mounts the workspace volume into a container, runs your boot
+commands, and routes it at `demo-ws-<slug>.<base-domain>` via Traefik, guarded
+by the workspace gate (members only). One click and the change is running.
 
 Enable it per project with the **Enable live demo** toggle (`live_demo_enabled`)
 in the **Worker** tab → **Live demo** section. (Previews are on platform-side by
@@ -258,7 +263,7 @@ Argos reads two files from the **default branch**:
   it needs).
 
 On top of your compose, Argos layers an **override** (you don't write this) that
-mounts the task workspace, joins the `argos_edge` network, injects `APP_URL` /
+mounts the workspace volume, joins the `argos_edge` network, injects `APP_URL` /
 `ASSET_URL` / a throwaway `APP_KEY` / a per-demo `SESSION_COOKIE` / `ARGOS_DEMO=1`,
 and caps CPU/memory.
 
@@ -325,7 +330,7 @@ the compose file:
 `.argos/demo.compose.yml`:
 
 ```yaml
-# Stack for the post-implement preview. Argos layers an override on top
+# Stack for the workspace preview. Argos layers an override on top
 # (workspace mount, argos_edge alias, APP_URL/APP_KEY, resource limits).
 # Do NOT add host ports: or Traefik labels.
 services:
@@ -377,7 +382,7 @@ entry:
   service: app    # service name from demo.compose.yml
   port: 80        # internal HTTP port of that service
 
-# Where the task's checked-out workspace is mounted in the entry service.
+# Where the workspace checkout is mounted in the entry service.
 workspace_mount: /var/www/html
 
 # Run in order inside the entry container after `compose up`. First failure
@@ -420,7 +425,7 @@ If the project is *almost* a standard Laravel app, fix the gaps instead:
 3. **Part B** — decide: bundled demo OK? If not, ship the contract or adjust the
    project. Flip **Enable live demo** on if you want previews.
 4. If you created `.argos/` files, verify they are committed to the branch Argos
-   reads — the **default branch** for the demo contract, the **task's base
-   branch** for `worker.dockerfile`.
+   reads — the **default branch** for the demo contract, the **base branch** a
+   workspace starts from for `worker.dockerfile`.
 5. Never put secrets in `.argos/` files — tokens come from Argos credentials,
    and per-project secrets go in **Worker → Environment & secrets**.

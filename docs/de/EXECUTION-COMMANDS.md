@@ -1,31 +1,27 @@
-# Was Argos ausführt — Worker- & Demo-Befehlsreferenz
+# Was Argos ausführt — Workspace- & Demo-Befehlsreferenz
 
-Eine präzise Auflistung der Shell-/Docker-Befehle, die Argos in Ihrem Auftrag
+Eine präzise Auflistung der Shell-/Docker-Befehle, die Argos in deinem Auftrag
 gegen ein Ziel-Repository ausführt — für Betreiber, die exakt prüfen wollen,
 was der Agent tut. Es gibt zwei Ausführungskontexte:
 
-- **Der Worker** — ein kurzlebiger Container pro Task-*Phase* (Klonen,
-  Abhängigkeiten installieren, den Agenten ausführen, Quality-Gates ausführen,
-  committen & pushen).
-- **Der Demo-Deployer** — ein kurzlebiger Vorschau-Stack, der *nach* einem
-  erfolgreichen Implement hochgefahren wird, sofern Live-Vorschauen für das
-  Projekt aktiviert sind.
+- **Der Workspace** — ein langlebiger Container pro Workspace (Klonen, die
+  Sessions des Agenten, Quality-Gates, committen & pushen).
+- **Der Demo-Deployer** — ein kurzlebiger Vorschau-Stack eines Workspaces,
+  sofern Live-Vorschauen für das Projekt aktiviert sind.
 
 > Dies ist eine Momentaufnahme zur Orientierung. Die Befehle leben im Code (siehe
 > [Wo das liegt](#where-this-lives) am Ende); im Zweifel ist die Quelle
-> maßgeblich. Platzhalter wie `$BASE_BRANCH`, `$REPO_URL`, `$auth_header`,
-> `$feature_branch` werden pro Task eingespeist; `<slug>`, `<service>`, `<port>`
-> werden aus dem Task-/Demo-Vertrag aufgelöst.
+> maßgeblich. Platzhalter wie `<slug>`, `<branch>`, `<base>` werden pro
+> Workspace aufgelöst; `<service>`, `<port>` stammen aus dem Demo-Vertrag.
 
 ## Inhalt
 
-- [Der Worker](#the-worker)
+- [Der Workspace](#the-workspace)
   - [Wie er gestartet wird](#how-it-is-launched)
   - [Klonen & Branch](#clone--branch)
-  - [Abhängigkeitsinstallation](#dependency-install)
-  - [Pro Phase](#per-phase)
   - [Die Agenten-Session](#the-agent-session)
   - [Quality-/Test-Gate](#quality--test-gate)
+  - [Ship: Commit, Push, Pull Request](#ship-commit-push-pull-request)
 - [Der Demo-Deployer](#the-demo-deployer)
   - [Build des Runtime-Images](#runtime-image-build)
   - [Deploy-Lebenszyklus](#deploy-lifecycle)
@@ -37,151 +33,75 @@ was der Agent tut. Es gibt zwei Ausführungskontexte:
 
 ---
 
-## Der Worker
+## Der Workspace
 
 ### Wie er gestartet wird
 
-Der Manager baut pro Phase ein `docker run` und streamt dessen Ausgabe. Der
-Worker ist ein **einzelner Container**, läuft als der Nicht-Root-Benutzer `agent`
-(uid 1000) und hat **keinen Docker-Socket** — er kann nur auf das Repo zugreifen,
-niemals auf den Host-Daemon.
+Der Manager legt zwei Volumes an (Checkout und Agent-Zustand) und startet einen
+Container aus dem Workspace-Image — dem Worker-Image (Stack + Agent +
+Gate-Helfer) plus Workspace-Daemon und OpenVSCode Server. Der Container läuft
+als Nicht-Root-Benutzer `agent` (uid 1000) und hat **keinen Docker-Socket**.
 
 ```
-docker run --rm \
-  -v <task-volume>:/workspace \
+docker run -d --name argos-ws-<slug> --network argos_ws --restart unless-stopped \
+  --label argos.workspace=<slug> \
+  --cpus <argos.workspaces.cpus> --memory <argos.workspaces.memory> \
+  -v ws_<slug>:/workspace \
+  -v ws_<slug>_agents:/home/agent/.claude-agents \
   -v composer_cache:/home/agent/.composer/cache \
   -v npm_cache:/home/agent/.npm \
-  --memory <argos.docker.memory_limit> --cpus <argos.docker.cpu_limit> \
-  -e PHASE=<phase> -e TASK_ID=<task> \
-  -e REPO_URL=… -e REPO_TOKEN=… -e REPO_PLATFORM=… -e BASE_BRANCH=… \
-  -e AGENT_NAME=… -e TASK_DESCRIPTION=… -e PHASE_FLAGS=<json> \
-  -e MAX_TURNS=… -e LOG_LEVEL=info \
-  -e CLAUDE_CONFIG_DIR=/workspace/.agent/claude-state -e CLAUDE_MODEL=… \
-  -e APP_KEY=<deterministic dummy> \
-  [agent credential env] \
-  [--network <run-net> + DB_HOST/REDIS_HOST… when backing services are on] \
+  -e ARGOS_DAEMON_TOKEN=… -e ARGOS_EVENTS_URL=… -e ARGOS_REPO_CREDENTIAL_URL=… \
+  -e ARGOS_DAEMON_PORT=7777 -e ARGOS_EDITOR_PORT=3000 \
+  -e APP_KEY=<fixed dummy> \
+  [DB_HOST/REDIS_HOST… when backing services are on] \
   [project env: COMPOSER_AUTH + the project's custom secrets] \
-  [-e RESUME_SESSION_ID=… on a --continue resume] \
-  [-e COMMIT_USER_NAME=… -e COMMIT_USER_EMAIL=… from the task creator] \
-  [-e FORCE_UNLOCK=1 when the run was force-unlocked] \
-  <worker-image> <phase> <task>
+  <workspace-image>
 ```
 
-Hinweise zur Prüfung:
+Hinweise für die Prüfung:
 
-- `REPO_TOKEN` und die Agenten-Credentials werden als Umgebungsvariablen aus der
-  Datenbank übergeben — niemals aus gemounteten Dateien. Das Git-Token landet
-  weder in der `origin`-URL noch in `/workspace/.git/config`; es wird pro Befehl
-  via `http.extraheader` zugeführt und aus Logs entfernt.
-- `APP_KEY` ist ein **fester deterministischer Dummy**, damit die Laravel-
-  Boot-Pipeline des Ziel-Repos (`package:discover`, `boost:mcp`) bei
-  Encrypted-Cast-Code nicht abstürzt. Der Worker persistiert nichts, daher hat
-  der Schlüssel keine sicherheitsrelevante Rolle.
-- Backing-Services (MySQL / Redis) werden, sofern das Projekt sie aktiviert hat,
-  vom Manager als kurzlebige Sidecars in einem privaten Per-Run-Netzwerk *vor*
-  dem `docker run` des Workers hochgefahren und danach wieder abgebaut — **nur
-  für die Phasen `implement` und `respond`** (die Phasen, die Tests ausführen).
-  Der Worker erreicht sie unter den konventionellen Hosts `db` / `redis`.
-
-Vor einer Phase, die Notizen/Feedback konsumiert, schreibt der Manager diesen
-Text via eines Wegwerf-Root-Helfers (`alpine`) in das Volume und chownt zurück
-auf uid 1000:
-
-```
-docker run --rm -i -v <task-volume>:/workspace alpine \
-  sh -c 'mkdir -p /workspace/.agent && cat > /workspace/.agent/<file> && chown -R 1000:1000 /workspace'
-```
-
-wobei `<file>` entweder `concept.notes.md` (concept), `implement.notes.md`
-(implement) oder `respond.feedback.md` (respond) ist.
+- Weder Repository-Token noch Claude-Token stehen in der Container-Umgebung.
+  Git fragt den Argos-Credential-Helper, der den Token bei Bedarf vom Manager
+  holt; der Claude-Token erreicht den Daemon nur im Speicher, wenn eine
+  Thread-Session startet.
+- `APP_KEY` ist ein **fester Dummy**, damit das Laravel des Projekts für
+  artisan und Tests bootet. Das Workspace-Volume enthält nichts, was dieser
+  Schlüssel schützt.
+- Backing-Services (MySQL / Redis) laufen, wenn das Projekt sie aktiviert hat,
+  als Sidecars in einem privaten Netzwerk pro Workspace (`ws_<slug>_svc`), dem
+  der Container beitritt. Ihre Daten-Volumes bleiben, bis der Workspace
+  gelöscht wird.
 
 ### Klonen & Branch
 
-Beim **ersten** Lauf (concept, wenn `/workspace/.git` noch nicht existiert)
-initialisiert der Worker das Repo an Ort und Stelle — `git clone` würde das
-nicht-leere `/workspace` verweigern (das Verzeichnis `.agent/` mit dem State
-existiert bereits):
+Beim ersten Start klont der Daemon in das leere Volume und checkt den Branch
+des Workspaces aus:
 
 ```
-git init --quiet --initial-branch="$BASE_BRANCH"
-git remote add origin "$REPO_URL"          # token-less URL
-git -c "http.extraheader=$auth_header" fetch --quiet --depth=1 origin "$BASE_BRANCH"
-git checkout -B "$feature_branch" "origin/$BASE_BRANCH"
+git clone --no-checkout <repo-url> /workspace     # token via the credential helper
+git checkout -B <branch> origin/<branch>          # branch exists on the remote
+git checkout -b <branch> origin/<base>            # otherwise: new branch off the base
 ```
 
-`$feature_branch` ist `feat/<task-name-slug>` (deutsche Umlaute werden
-transliteriert, danach auf einen git-sicheren Slug reduziert). Das
-Branch-Namensschema ist festgelegt. Das State-Verzeichnis `.agent/` wird lokal
-als ignoriert markiert, damit ein späteres `git clean` es nie löscht.
-
-### Abhängigkeitsinstallation
-
-Bei `implement` (und, best-effort, `concept`) seedet der Worker zunächst eine
-`.env` aus `.env.example`, falls sie fehlt, und legt einen Vite-`public/hot`-Stub
-ab, damit artisan / Boost ohne gebaute Assets booten können, dann:
-
-```
-composer install --no-interaction --prefer-dist --no-progress   # if composer.json exists
-npm ci --no-audit --no-fund                                     # implement only, if package-lock.json exists
-```
-
-Bei `concept` ist ein fehlschlagendes `composer install` **nicht fatal** (der
-Plan kann trotzdem erstellt werden); bei `implement` bricht es die Phase ab.
-
-### Pro Phase
-
-| Phase | Was der Worker der Reihe nach ausführt |
-| --- | --- |
-| **concept** | Klonen & Branch (erster Lauf) → `composer install` (best-effort) → ein etwaiges vorheriges Concept archivieren → [Agenten-Session](#the-agent-session), die `concept.md` schreibt. Auf dem Repo bewusst read-only. |
-| **implement** | (Standard `--fresh`) `git fetch` + `git reset --hard origin/$BASE_BRANCH` + `git clean -fd` (behält gitignorierte `vendor/`, `node_modules/`) → `composer install` / `npm ci` → **Test-Baseline auf dem sauberen Checkout erfassen** → Agenten-Session → **Quality-Gate**; bei einem blockierenden Gate-Fehler bis zu 3 fokussierte Agenten-Fix-Sessions (`GATE_RETRY_LIMIT`). `--refine` überspringt den Reset und baut auf der vorherigen Iteration auf; `--continue` setzt die pausierte Agenten-Session fort. |
-| **diff** | read-only. `git diff [--stat] [-- <file>] origin/$BASE_BRANCH` (Working-Tree vs. Base — implement lässt Änderungen uncommitted) → `git status --short` → `git diff --numstat` + `git ls-files --others --exclude-standard` für die Änderungszähler. |
-| **push** | die Sub-Phase **commit-message** aufrufen → Git-Identität setzen (`"<name> via Argos"`) → `git add -A` → `git commit -m "<subject>" [-m "<body>"]` → `git push -u --force-with-lease origin "$feature_branch"` → den PR/MR über die Provider-API öffnen / aktualisieren (siehe unten). Überspringt komplett mit Status `no_changes`, wenn es nichts zu pushen gibt. |
-| **commit-message** | kurze Agenten-Session (`--max-turns 8`, JSON-Schema-Ausgabe, Claude auf Haiku gepinnt) über Concept + Diff, die Commit-Subject/Body erzeugt. Wird nur von `push` aufgerufen; ein Fehler fällt zurück auf `chore: apply implementation changes (N files)`. |
-| **respond** | Agenten-Session über `respond.feedback.md` (Review-Feedback aus der UI) + Concept → dasselbe Quality-Gate wie implement. Wendet das Feedback auf den bestehenden Feature-Branch an; danach `push` ausführen. |
-
-Die PR-/MR-Erstellung in **push** ist providerspezifisch:
-
-- **GitHub** — `curl POST https://api.github.com/repos/<owner>/<repo>/pulls`
-  (Bearer `REPO_TOKEN`). Bei HTTP 422 (PR existiert) wird der PR nachgeschlagen
-  und die Beschreibung aktualisiert + ein Iterationskommentar hinzugefügt. Es
-  `PATCH`t außerdem das Repo auf squash-only + auto-delete-branch-on-merge
-  (best-effort; eine Warnung, wenn dem Token Admin-Rechte fehlen).
-- **GitLab** — `curl POST …/api/v4/projects/<id>/merge_requests` (Bearer
-  `REPO_TOKEN`), analog zu den GitHub-/Bitbucket-Pfaden. Ein bereits offener MR
-  für den Branch wird nachgeschlagen und seine Beschreibung aktualisiert statt
-  neu erstellt. Das ersetzt die früheren `-o merge_request.create`-Push-Optionen,
-  die keine mehrzeilige Beschreibung tragen konnten.
-- **Bitbucket** — `curl POST …/2.0/repositories/<ws>/<slug>/pullrequests`
-  (Basic Auth für ein `user:app_password`-Token, sonst Bearer). HTTP 409 →
-  schlägt den bestehenden PR nach.
+Der Branch heißt `ws/<slug>` (bzw. `ws/<issue-nummer>-<slug>` bei einem
+Issue-Trigger). `.agent/` wird lokal ignoriert. Bei späteren Starts bleibt der
+vorhandene Checkout unangetastet.
 
 ### Die Agenten-Session
 
-Die Agenten-Session ist die Agent-CLI (`claude` für `claude-code`, oder `codex`),
-ausgeführt mit:
-
-- einem phasenspezifischen **System-Prompt** (`worker/prompts/*.system.md`),
-- der Task-Beschreibung / dem Concept / dem Feedback als User-Prompt,
-- einem phasenspezifischen Turn-Budget `--max-turns "$MAX_TURNS"` (aufgelöst
-  Task → Projekt → `config/argos.php`; Standardwerte 30 für concept, 200 für
-  implement/respond),
-- einem Modell `CLAUDE_MODEL` (aufgelöst Task → Projekt → Agenten-Standard),
-- `--resume "$RESUME_SESSION_ID"` beim Fortsetzen einer pausierten Session,
-
-streamt `stream-json`, das der Worker in das Phasen-Log tee't und auf das
-`result`-Event hin parst (Session-ID, Kosten, Token-Verbrauch). Ein Erreichen des
-Max-Turns-Limits pausiert die Phase (fortsetzbar), statt sie fehlschlagen zu
-lassen. Von der Session wird erwartet, dass sie den Working-Tree verändert
-hinterlässt, aber **niemals committet oder pusht** — das ist Aufgabe der
-Push-Phase.
+Jeder Thread ist eine Claude-Code-Session, die der Daemon über das Claude Agent
+SDK hostet — mit den Projekt- und lokalen Einstellungen des Repositorys.
+Modell, Berechtigungsmodus und — bei automatischen Läufen — das Turn-Budget
+kommen vom Thread. Der Agent ändert den Arbeitsbaum; er pusht **nicht**.
 
 ### Quality-/Test-Gate
 
-Wird von **implement** und **respond** nach der Agenten-Session ausgeführt und
-danach nach jeder Fix-Session erneut. Jedes Gate wird **übersprungen**, wenn sein
-Tool oder seine Trigger-Datei fehlt. Zuerst wird auf dem sauberen Checkout eine
-Test-Baseline erfasst, sodass nur **neue** Testfehler (gegenüber den bereits
-vorhandenen roten Tests des Repos) blockieren.
+Gates laufen auf Anforderung (das *Gates*-Panel, die API oder ein automatischer
+Lauf nach der Umsetzung). Der Daemon ruft `run-gates.sh` auf, das die
+Gate-Helfer (`worker/lib/quality.sh`) einbindet. Auf dem frischen Checkout wird
+eine Baseline erfasst (`composer install`, falls `vendor/` fehlt, danach die
+Test- und PHPStan-Baselines), sodass nur **neue** Fehler blockieren. Jedes Gate
+wird **übersprungen**, wenn sein Tool oder seine Trigger-Datei fehlt.
 
 | # | Gate | Befehl | Läuft, wenn | Blockiert? |
 | --- | --- | --- | --- | --- |
@@ -194,21 +114,32 @@ vorhandenen roten Tests des Repos) blockieren.
 | 7 | test-presence | neue `app/`-Klassen werden auf eine passende `*Test.php` geprüft | neue Dateien unter `app/` | nein (nur Warnung) |
 
 Die Gate-Befehle sind **festgelegt** — ein Projekt konfiguriert sie nicht; ein
-Tool ist schlicht "aus", wenn es nicht installiert ist. Ein Gate, das an der
-Infrastruktur stirbt (OOM `exit 137`, kaputte Konfiguration), wird
-**übersprungen** statt zur Behebung geschickt, damit das Fix-Session-Budget nicht
-an einem nicht behebbaren Absturz verbrannt wird. Die Fix-Schleife bricht
-außerdem früh ab, wenn ein Fix byte-identische Gate-Ausgabe erzeugt (kein
-Fortschritt). Das Worker-Image liefert die Toolchain mit (PHP + Extensions inkl.
-`sockets`, Composer, Node, den MySQL-Client, …).
+Tool ist schlicht „aus“, wenn es nicht installiert ist. Ein fehlgeschlagenes
+Gate lässt sich als Fix-Prompt an den Agenten schicken; ein automatischer Lauf
+tut das selbst, bis zu seinem Limit an Fix-Runden.
+
+### Ship: Commit, Push, Pull Request
+
+Beim Shippen entwirft eine kurze One-Shot-Session (Haiku, JSON-Ausgabe) die
+Commit-Nachricht aus dem Diff, danach:
+
+```
+git add -A
+git -c user.name=<person> -c user.email=<email> commit --no-verify -m "<subject>\n\n<body>"
+git push --set-upstream origin HEAD:refs/heads/<branch>
+```
+
+Den Pull- bzw. Merge-Request öffnet oder aktualisiert der **Manager** über die
+Provider-API (GitHub, GitLab, Bitbucket), nicht der Container. Automatische
+Läufe mit Ship-Modus `none` enden nach dem Push.
 
 ---
 
 ## Der Demo-Deployer
 
-Wenn Live-Vorschauen aktiviert sind, löst ein erfolgreiches Implement einen
-kurzlebigen Vorschau-Stack aus. Der implementierte Code liegt bereits im
-Task-Workspace-Volume, daher **mountet der Deployer dieses Volume** in den
+Wenn Live-Vorschauen aktiviert sind, kann ein Workspace einen kurzlebigen
+Vorschau-Stack starten. Der Code liegt bereits im Workspace-Volume, daher
+**mountet der Deployer dieses Volume** in den
 Entry-Service der Demo, statt das Repo erneut auszuchecken. Der Stack wird über
 eine Traefik-File-Provider-Route unter einer eigenen Subdomain veröffentlicht.
 Nur manager-seitig (es braucht den Docker-Socket).
@@ -229,11 +160,11 @@ eigenes Image bereit und dieser Build entfällt.
 
 ### Deploy-Lebenszyklus
 
-Für jedes Deploy (der Compose-Projektname ist der Demo-`<slug>`, abgeleitet aus
-dem Task-Namen):
+Für jedes Deploy (der Compose-Projektname ist der Demo-Schlüssel
+`demo-ws-<slug>`):
 
 ```
-# 1. tear down any previous demo of this task (idempotent replace)
+# 1. tear down any previous demo of this workspace (idempotent replace)
 docker compose -p <slug> down -v --remove-orphans
 
 # 2. evict the oldest running demos if over argos.preview.max_concurrent
@@ -250,9 +181,9 @@ docker compose -p <slug> \
 # 6. write the Traefik route → the demo is reachable under its subdomain
 ```
 
-Das **Override** (`override.yml`, pro Task vom `DemoComposeBuilder` generiert)
+Das **Override** (`override.yml`, pro Demo vom `DemoComposeBuilder` generiert)
 trägt keine Host-`ports:` und keine Traefik-Labels — das Routing läuft über den
-File-Provider. Es mountet das Task-Workspace-Volume am `workspace_mount` des
+File-Provider. Es mountet das Workspace-Volume am `workspace_mount` des
 Vertrags, tritt dem geteilten `argos_edge`-Netzwerk unter dem Demo-Alias bei,
 pinnt `APP_URL`/`ASSET_URL` auf die öffentliche URL, injiziert einen
 Wegwerf-`APP_KEY` und ein Per-Demo-`SESSION_COOKIE`, setzt `ARGOS_DEMO=1` und
@@ -306,13 +237,14 @@ ein Fehler, kein stiller Rückfall auf die Standardwerte:
 Die `commands:` und `health` des Projekts **ersetzen** die Standardwerte
 vollständig. Für den gebündelten Standard-Vertrag folgen die
 Demo-DB-Credentials und ein optionaler Redis-Service der Backing-Service-Konfig
-des Projekts (dieselben Credentials, die der Worker-Sidecar verwendet).
+des Projekts (dieselben Credentials, die die Workspace-Sidecars verwenden).
 
 ### Abbau
 
 Eine Demo wird (bei Replace, Eviction über das Concurrency-Limit oder
-TTL-Ablauf — `argos.preview.ttl_hours`) per Slug abgebaut, sodass es auch noch
-funktioniert, nachdem die Task-Zeile weg ist:
+TTL-Ablauf — `argos.preview.ttl_hours`) per Slug abgebaut, sodass das auch
+noch funktioniert, nachdem die Workspace-Zeile weg ist. Die Route ist immer
+durch das Workspace-Gate geschützt (nur Mitglieder):
 
 ```
 docker compose -p <slug> down -v --remove-orphans   # containers + volumes
@@ -323,12 +255,12 @@ docker compose -p <slug> down -v --remove-orphans   # containers + volumes
 
 ## Konfigurierbar vs. festgelegt
 
-| Vom Projekt / Task konfigurierbar | Von Argos festgelegt |
+| Vom Projekt / Lauf konfigurierbar | Von Argos festgelegt |
 | --- | --- |
 | Test-Runner & dessen Ergebnis (welcher von pest/phpunit/pint/phpstan installiert ist) | Die **Befehlszeilen** der Gates und deren Reihenfolge |
-| Backing-Services (MySQL / Redis an/aus, Credentials) | Die Menge der Phasen, die Sidecars erhalten (`implement`, `respond`) |
-| Agent, Modell pro Phase und `max_turns` pro Phase | Der Phasenfluss concept → implement → push, Branch-Naming, Worker ohne Docker-Socket |
-| Projekt-Secrets / `COMPOSER_AUTH`, in Worker & Demo injiziert | Reservierte Argos-Env-Keys (`REPO_TOKEN`, `APP_KEY`, `APP_URL`, …) lassen sich nicht überschreiben |
+| Backing-Services (MySQL / Redis an/aus, Credentials) | Sidecars in einem privaten Netzwerk pro Workspace |
+| Modell, Plan-/Ship-Modus und Budgets eines automatischen Laufs | Branch-Naming, Workspace ohne Docker-Socket, Tokens nie in der Container-Umgebung |
+| Projekt-Secrets / `COMPOSER_AUTH`, injiziert in Workspace & Demo | Reservierte Argos-Env-Keys (`REPO_TOKEN`, `APP_KEY`, `APP_URL`, …) lassen sich nicht überschreiben |
 | Der vollständige Demo-Vertrag (`commands`, `health`, Services, Image, Entry) | Der Compose-Lebenszyklus (down → up → exec → probe → route) und die vom Override injizierte Env |
 
 ---
@@ -337,13 +269,13 @@ docker compose -p <slug> down -v --remove-orphans   # containers + volumes
 
 | Bereich | Quelle |
 | --- | --- |
-| `docker run`-Zusammenbau für eine Phase | `app/Services/Workflow/PhaseCommandBuilder.php` |
-| Phasen-Ausführung, Notiz-/Feedback-Schreibvorgänge, Log-Streaming | `app/Services/Workflow/PhaseRunner.php` |
+| Volumes + `docker run` eines Workspaces | `app/Services/Workspace/WorkspaceContainerManager.php` |
+| Bereitstellungsreihenfolge (Image → Volumes → Sidecars → Container → Klonen) | `app/Services/Workspace/WorkspaceProvisioner.php` |
 | Backing-Service-Sidecars | `app/Services/Worker/WorkerSidecarManager.php` |
-| Container-Entrypoint (Credentials materialisieren, Dispatch) | `.tools/docker/worker/worker-entrypoint.sh` |
-| Per-Phase-Skripte | `worker/phases/{concept,implement,diff,push,commit-message,respond}.sh` |
-| Quality-Gate | `worker/lib/quality.sh` |
-| Worker-Image (Toolchain) | `.tools/docker/worker/Dockerfile.compose` + `.tools/docker/worker/stacks/Dockerfile.php-8.{3,4}` |
+| Klonen, Git-Operationen, Agenten-Sessions, Gates | `daemon/src/{workspaceInit,gitOps,threadSession,gates}.ts` |
+| Gate-Skript + Helfer | `.tools/docker/worker/workspace/run-gates.sh`, `worker/lib/quality.sh` |
+| Ship (Commit-Nachricht, Push, Pull Request) | `app/Services/Workspace/WorkspaceShipService.php` |
+| Images (Toolchain, Daemon, Editor) | `.tools/docker/worker/Dockerfile.compose`, `.tools/docker/worker/stacks/Dockerfile.php-8.{3,4}`, `.tools/docker/worker/workspace/Dockerfile` |
 | Demo-Deploy (Compose-Lebenszyklus, Boot, Health, Abbau) | `app/Services/Demo/DemoDeployer.php` |
 | Demo-Override (Volume-Mount, Edge-Netzwerk, Env) | `app/Services/Demo/DemoComposeBuilder.php` |
 | Build des Demo-Runtime-Images | `app/Services/Demo/DemoImageBuilder.php` + `.tools/docker/demo/Dockerfile` |

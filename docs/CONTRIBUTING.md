@@ -19,15 +19,18 @@ Argos), see [`CLAUDE.md`](../CLAUDE.md).
 
 ```
 app/                 ← Laravel application (controllers, models, services)
-worker/              ← Bash worker (phases, libs, prompts, schemas)
-.tools/docker/       ← Dockerfiles + compose for manager and worker
+daemon/              ← Workspace daemon (TypeScript, Claude Agent SDK)
+worker/              ← Gate helpers (libs), commit-message prompt + schema
+.tools/docker/       ← Dockerfiles + compose for manager, worker and workspace
 docs/                ← User-facing docs
 tests/               ← PHP feature & unit tests
-worker/tests/        ← Bash unit + integration tests (bats)
+worker/tests/        ← Bash unit tests (bats)
 ```
 
-The Laravel app lives in the repo root. Everything under `worker/` is the
-Bash runtime that runs *inside* the worker container.
+The Laravel app lives in the repo root. `worker/lib` holds the quality-gate
+helpers that run *inside* the workspace container (via
+`.tools/docker/worker/workspace/run-gates.sh`); `daemon/` is the process that
+hosts the agent sessions there.
 
 ## Local development
 
@@ -88,14 +91,12 @@ php artisan test --compact \
 ### Bash
 
 ```bash
-./worker/tests/run-tests.sh                # everything: shellcheck + bats + integration
+./worker/tests/run-tests.sh                # everything: shellcheck + bats
 ./worker/tests/run-tests.sh --bats         # unit tests only
-./worker/tests/run-tests.sh --integration  # phase lifecycle against mock-claude
 ./worker/tests/run-tests.sh --shellcheck   # lint
 ```
 
-Tests run **offline** — no real GitHub access, no real Claude API. The mock
-implementations live under `worker/tests/fixtures/`.
+Tests run **offline** — no real GitHub access, no real Claude API.
 
 ### External provider tests
 
@@ -146,7 +147,7 @@ high-level rules:
 Conventional Commits style:
 
 ```
-feat: add concept replay button
+feat: add thread replay button
 fix: handle 422 from GitHub PR creation
 docs: split README into landing + extended setup
 refactor: extract StackAgentCompatibility
@@ -197,9 +198,10 @@ For non-security bugs, open an issue on
 - Argos image tag (`:latest`, `:stage`, `:next`, `vX.Y.Z`)
 - Worker image tag if relevant
 - Provider (GitHub / GitLab / Bitbucket) + auth mode (PAT / OAuth)
-- Reproduction steps and any logs from the affected task
+- Reproduction steps and any logs from the affected workspace
 
-Logs are visible per-task in the UI under **Task → Logs**.
+The agent's output is in the workspace threads; the manager log can be
+downloaded under **Settings**.
 
 ## License
 

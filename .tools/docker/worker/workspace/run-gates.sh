@@ -2,7 +2,7 @@
 # run-gates.sh — run the worker's quality gates inside a workspace container.
 #
 # Called by the workspace daemon; reuses worker/lib/quality.sh unchanged so
-# workspaces and tasks judge code the same way.
+# every workspace judges code the same way.
 #
 # Usage:
 #   run-gates.sh --run <run-id>                 gates JSON on stdout

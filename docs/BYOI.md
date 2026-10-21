@@ -2,7 +2,8 @@
 
 BYOI lets a project supply its **own worker base image** through a single file
 in the repository — `.argos/worker.dockerfile`. Argos reads that file, builds it
-into the worker, and layers the agent CLI and its own worker scripts on top.
+into the worker image, and layers the agent CLI, its gate helpers and the
+workspace tools on top.
 Use it when the built-in worker stacks don't carry the toolchain your project
 needs.
 
@@ -22,19 +23,19 @@ page is the focused reference for the worker-image side.
 
 ## What BYOI is
 
-For every task, Argos runs the agent inside a single ephemeral worker container.
-That container's image is built in layers:
+Every workspace runs in a container whose image is built in layers:
 
 1. **Stack base** — the OS + language toolchain (PHP, Node, system packages).
-2. **Agent layer** — the agent CLI (Claude Code / Codex), installed via npm.
-3. **Worker code** — Argos's own phase scripts, libs, prompts, and schemas.
+2. **Agent layer** — the agent CLI (Claude Code), installed via npm.
+3. **Gate helpers** — Argos's quality-gate scripts (`worker/lib`).
+4. **Workspace layer** — the workspace daemon and OpenVSCode Server.
 
-BYOI replaces **only the stack base (layer 1)**. The agent layer and the worker
-code are still added by Argos automatically. The repo supplies the base recipe
+BYOI replaces **only the stack base (layer 1)**. The other layers are still
+added by Argos automatically. The repo supplies the base recipe
 as `.argos/worker.dockerfile`; everything else is unchanged.
 
 Argos reads the file through the Git provider API (GitHub, GitLab, Bitbucket) at
-the task's base branch — it does **not** need to clone the repo to detect or
+the workspace's base branch — it does **not** need to clone the repo to detect or
 read it. The file content is then built into a stack image and tagged by its
 content hash, so it flows through the same on-demand build / caching pipeline as
 the built-in stacks.
@@ -68,7 +69,7 @@ the project to fit the default) first; see
 ## The file you add to the repo
 
 Add **`.argos/worker.dockerfile`** at the repository's base branch (the project's
-default branch, or the branch a task starts from). Argos reads it from that ref
+default branch, or the base branch a workspace starts from). Argos reads it from that ref
 via the provider API.
 
 It is a normal Dockerfile, but it defines **only the base** — do not add an
@@ -77,7 +78,7 @@ those layers.
 
 ```dockerfile
 # .argos/worker.dockerfile — base image for the Argos worker.
-# Argos layers the agent CLI + worker scripts on top; provide only the base.
+# Argos layers the agent CLI, gate helpers and workspace tools on top; provide only the base.
 FROM python:3.12-bookworm
 
 # Tools the worker harness requires, plus Node for the agent CLI.
@@ -110,7 +111,7 @@ Required on `PATH`:
 
 Further expectations:
 
-- A non-root user **`agent` with UID `1000`** — the worker runs as this user.
+- A non-root user **`agent` with UID `1000`** — the workspace runs as this user.
 - **No `ENTRYPOINT`/`CMD`** and **no agent install** in your file — Argos owns
   those layers.
 - **No `COPY` from the repo.** The build context is not your repository
@@ -137,32 +138,32 @@ When you choose the BYOI option:
 - The **Worker stack** dropdown (`worker_stack_id`) is **hidden** — the repo
   defines the base, so there is nothing to pick.
 
-The **Worker agent** (`worker_agent_name`) and backing-service toggles still
-apply with BYOI exactly as with a registered stack.
+The backing-service toggles still apply with BYOI exactly as with a registered
+stack.
 
 Make sure `.argos/worker.dockerfile` is committed to the branch Argos reads
-(the base branch) **before** starting a task — otherwise the task fails (see
-Troubleshooting).
+(the base branch) **before** starting a workspace — otherwise the workspace
+start fails (see Troubleshooting).
 
 ## How the image is built and layered
 
-On the first phase run of a BYOI task:
+When a BYOI workspace starts and its image does not exist yet:
 
 1. Argos fetches `.argos/worker.dockerfile` from the repo via the provider API,
-   at the task's base branch (falling back to the project's default branch).
+   at the workspace's base branch.
 2. The file body is recorded as a worker stack named `byoi-<profile-id>` and
    built into a **stack image**, tagged by the content hash of the Dockerfile.
 3. Argos builds the final worker image from that stack base via
    `Dockerfile.compose`, which:
-   - installs the selected agent's CLI on top (its own cache layer), and
-   - copies in the worker scripts (`worker/lib`, `worker/phases`,
-     `worker/prompts`, `worker/schemas`) and the entrypoint.
+   - installs the agent's CLI on top (its own cache layer), and
+   - copies in the gate helpers (`worker/lib`).
 4. The smoke test (above) runs; on success the image is tagged ready, on failure
-   it is untagged and the task fails.
+   it is untagged and the workspace start fails.
+5. The workspace image (daemon + editor) is built on top of that worker image.
 
 The final worker image tag is content-addressed: it folds in the BYOI
 Dockerfile's hash, the agent name + pinned version, and a fingerprint of Argos's
-own worker code. Identical inputs reuse the cached image; any change produces a
+own gate helpers. Identical inputs reuse the cached image; any change produces a
 new tag and a fresh build.
 
 ## How rebuilds are triggered
@@ -171,23 +172,21 @@ There is no manual "rebuild" button — rebuilds are driven by the content-hashe
 tags. A new worker image is built automatically whenever:
 
 - **You change `.argos/worker.dockerfile`** in the repo (the stack hash changes
-  → new tag → rebuild on the next phase run). Commit the change to the branch the
-  task runs against.
-- **You switch the agent** (or its pinned version changes) — the agent layer is
-  part of the tag.
-- **Argos ships new worker code** — the worker-code fingerprint is part of the
-  tag.
+  → new tag → rebuild on the next workspace start). Commit the change to the
+  base branch the workspace starts from.
+- **The agent's pinned version changes** — the agent layer is part of the tag.
+- **Argos ships new gate helpers** — their fingerprint is part of the tag.
 
 Because the tag is keyed on the **content** of `.argos/worker.dockerfile`, the
 trigger is the commit, not a UI action: push the updated file to the base branch
-and the next task picks it up.
+and the next workspace picks it up.
 
 ## Troubleshooting
 
 **"BYOI is enabled for '<project>' but '.argos/worker.dockerfile' was not found
 on '<branch>'."**
-The file is missing (or empty) on the branch Argos read — the task's base branch,
-or the project default branch if the task didn't set one. Commit a non-empty
+The file is missing (or empty) on the branch Argos read — the workspace's base
+branch. Commit a non-empty
 `.argos/worker.dockerfile` to that branch and retry.
 
 **Build fails with "Worker image validation failed" listing `MISSING <tool>`.**
@@ -202,12 +201,11 @@ automatically; fixing the Dockerfile and retrying triggers a clean rebuild.
 The build context is not your repo checkout. Remove any `COPY` from the repo and
 fetch what you need over the network in a `RUN` instead.
 
-**The worker behaves as if running as root / permission errors.**
+**The workspace behaves as if running as root / permission errors.**
 Ensure the `agent` user exists with UID `1000`
 (`RUN useradd --create-home --shell /bin/bash --uid 1000 agent`). Argos runs the
-worker as that user.
+workspace as that user.
 
 **Changes to `.argos/worker.dockerfile` don't seem to take effect.**
-Confirm the change is committed to the branch the task actually runs against
-(the base branch). The image is keyed on the file's content at that ref — an
+Confirm the change is committed to the base branch the workspace starts from. The image is keyed on the file's content at that ref — an
 uncommitted local change, or a commit on a different branch, won't be seen.

@@ -10,7 +10,7 @@ This document is about the first one — **Provider Credentials, i.e. Personal
 Access Tokens (PATs)**. The OAuth side is covered in [OAUTH.md](OAUTH.md).
 
 > Provider credentials are *not* the same as agent credentials (the
-> Claude/Codex token the worker uses to think). Those are configured
+> Claude token the agent runs on). Those are configured
 > separately — see [AGENTS.md](AGENTS.md).
 
 ## Contents
@@ -163,7 +163,7 @@ For the full project-authentication walkthrough, see
 
 ## How an issue tracker uses a credential
 
-When you attach an issue tracker to a project (a task-provider binding), the
+When you attach an issue tracker to a project (an issue-trigger binding), the
 **Access** picker lets you choose either a connected OAuth account or one of
 your stored Access Tokens for that provider, in one unified list. If you choose
 a PAT, the binding references that credential directly, and the issue tracker

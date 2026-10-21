@@ -8,11 +8,11 @@ Frage, welche Variante du wählen solltest.
 
 > **Hinweis zum Umfang — Bitbucket ist ausschließlich ein Code-Provider.** Argos
 > nutzt Bitbucket zum Klonen, für Branches und zum Erstellen von Pull Requests.
-> Bitbucket ist **nicht** als Task-/Issue-Provider angebunden: Es gibt keine
-> Bitbucket-Option beim Anbinden einer Task-Quelle, und Argos liest weder
-> Bitbucket-Issues in Tasks ein noch registriert es Issue-Webhooks dafür. Siehe
-> [Task-Provider](SETUP-TASK-PROVIDERS.md) für die Provider, die den
-> Issue-→-Task-Fluss tatsächlich antreiben (GitHub, GitLab, Linear).
+> Bitbucket ist **nicht** als Issue-Trigger angebunden: Es gibt keine
+> Bitbucket-Option beim Anbinden einer Issue-Quelle, und Argos startet weder
+> Läufe aus Bitbucket-Issues noch registriert es Issue-Webhooks dafür. Siehe
+> [Issue-Trigger](SETUP-TASK-PROVIDERS.md) für die Provider, die aus Issues
+> tatsächlich automatische Läufe starten (GitHub, GitLab, Linear).
 
 ---
 
@@ -24,7 +24,7 @@ Frage, welche Variante du wählen solltest.
 | Repositories / Branches auflisten (für Dropdowns im Projektformular) | Ja |
 | Pull Requests erstellen / aktualisieren / kommentieren | Ja |
 | Default-Branch und Quelldateien lesen | Ja |
-| Issue-→-Task-Ingest (ein Bitbucket-Issue wird zu einem Argos-Task) | **Nein** |
+| Issue-Trigger (ein Bitbucket-Issue startet einen automatischen Lauf) | **Nein** |
 | Issue-Webhooks / 👍-Freigabe-Fluss | **Nein** |
 
 ---
@@ -49,8 +49,8 @@ serverseitige OAuth-Konfiguration.
    - **Repositories**: Read, Write
    - **Pull requests**: Read, Write
    - **Issues**: Read (optional — nur nötig, wenn Argos Issue-Inhalte aus dem
-     Repo lesen soll; Bitbucket ist kein Task-Provider, daher entstehen daraus
-     keine Tasks)
+     Repo lesen soll; Bitbucket ist kein Issue-Trigger, daher starten daraus
+     keine Läufe)
 6. Klicke auf **Create** und kopiere das generierte Token — es wird nur einmal
    angezeigt.
 
@@ -142,4 +142,4 @@ und sind sofort wirksam, ohne Neustart.
 | 401 beim Push | Dem Token fehlt die Repositories-Write-Berechtigung, oder das Token wurde versehentlich mit einem Benutzername-Präfix eingefügt |
 | PR-Erstellung liefert 409 | Ein PR für diesen Branch existiert bereits — Argos findet die bestehende URL und meldet sie |
 | OAuth-Redirect schlägt fehl | Die im OAuth Consumer registrierte Callback URL muss exakt mit `${APP_URL}/auth/bitbucket/callback` übereinstimmen — überprüfe `APP_URL` und ob die OAuth-App unter **Configuration → OAuth Apps** aktiviert ist |
-| Du erwartest, dass ein Bitbucket-Issue zu einem Argos-Task wird | Nicht unterstützt — Bitbucket ist ausschließlich ein Code-Provider. Verwende [GitHub/GitLab/Linear](SETUP-TASK-PROVIDERS.md) als Task-Provider |
+| Du erwartest, dass ein Bitbucket-Issue einen automatischen Lauf startet | Nicht unterstützt — Bitbucket ist ausschließlich ein Code-Provider. Verwende [GitHub/GitLab/Linear](SETUP-TASK-PROVIDERS.md) als Issue-Trigger |

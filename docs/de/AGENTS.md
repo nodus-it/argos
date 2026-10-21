@@ -1,242 +1,165 @@
 # Coding-Agents und Zugangsdaten
 
-Wenn Argos eine Aufgabe ausführt, übernehmen das Denken und das Tippen ein
-**Coding-Agent** — eine CLI für ein großes Sprachmodell, die innerhalb des
-Worker-Containers läuft, dein Repository liest, ein Konzept vorschlägt, die
-Implementierung schreibt und den Pull Request vorbereitet. Argos bringt kein
-eigenes Modell mit; es steuert einen Agenten, den du authentifizierst.
+Wenn du in einem Workspace arbeitest, übernimmt ein **Coding-Agent** das
+Denken und das Tippen — eine CLI für ein großes Sprachmodell, die im
+Workspace-Container läuft, dein Repository liest, plant, die Änderung schreibt
+und sie committet. Argos bringt kein eigenes Modell mit; es steuert einen
+Agenten, den du authentifizierst.
 
-Dieses Dokument erklärt in einfachen Worten, welche Agenten Argos unterstützt,
-wie sich jeder einzelne authentifiziert, wo du diese Zugangsdaten verwaltest und
-wie ein Projekt oder eine einzelne Aufgabe den Agenten auswählt, der sie
-ausführt. Es richtet sich an Nutzerinnen und Nutzer, die Argos einrichten — du
-musst den Worker-Quellcode nicht lesen, um es nachzuvollziehen.
+Dieses Dokument erklärt, welchen Agenten Argos unterstützt, wie er sich
+authentifiziert, wo du die Zugangsdaten verwaltest und wie ein Thread Agent
+und Modell auswählt. Es richtet sich an alle, die Argos einrichten — den
+Quellcode des Daemons musst du dafür nicht lesen.
 
 ## Inhalt
 
 - [Was ein Agent in Argos ist](#was-ein-agent-in-argos-ist)
 - [Claude Code](#claude-code)
-- [OpenAI Codex](#openai-codex)
 - [Agent-Zugangsdaten](#agent-zugangsdaten)
-- [Eine Zugangsdaten während des Onboardings hinzufügen](#eine-zugangsdaten-während-des-onboardings-hinzufügen)
+- [Zugangsdaten beim Onboarding hinzufügen](#zugangsdaten-beim-onboarding-hinzufügen)
 - [Zugangsdaten später verwalten](#zugangsdaten-später-verwalten)
 - [Status von Zugangsdaten](#status-von-zugangsdaten)
-- [Persönliche und geteilte Agenten](#personliche-und-geteilte-agenten)
-- [Wie ein Projekt seinen Agenten auswählt](#wie-ein-projekt-seinen-agenten-auswählt)
-- [Überschreibungen pro Aufgabe](#überschreibungen-pro-aufgabe)
+- [Persönliche und geteilte Agenten](#persönliche-und-geteilte-agenten)
 - [Modellauswahl](#modellauswahl)
+- [Weitere Agenten anbinden](#weitere-agenten-anbinden)
 - [Sicherheit](#sicherheit)
 
 ## Was ein Agent in Argos ist
 
 Ein **Agent** ist die Kombination aus einem Coding-Modell und dem
-Kommandozeilen-Werkzeug, das es steuert — installiert im Worker-Image und für
-jede Phase einer Aufgabe (Konzept, Implementierung, Push) ausgeführt. Argos
-liefert Unterstützung für zwei Agenten:
+Kommandozeilen-Tool, das es steuert. Die CLI wird ins Worker-Image installiert
+(die Basis jedes Workspace-Images); im laufenden Workspace hostet der
+Workspace-Daemon die Sessions des Agenten — eine pro Thread.
 
-| Agent | Identifier | CLI | Distribution |
+| Agent | Kennung | CLI | Distribution |
 |---|---|---|---|
 | Claude Code | `claude-code` | `claude` | `@anthropic-ai/claude-code` (npm) |
-| OpenAI Codex | `codex` | `codex` | `@openai/codex` (npm) |
 
-Beide Agenten benötigen einen Worker-Stack, der Node bereitstellt — die CLI wird
-zur Build-Zeit ins Image installiert. Siehe [WORKER-STACKS.md](WORKER-STACKS.md)
-dazu, wie der Agent in das lauffähige Image eingebacken wird.
-
-Jeder Agent benötigt **seine eigene Art von Zugangsdaten**, wie unten
-beschrieben. Die Zugangsdaten werden in Argos gespeichert und dem
-Worker-Container ausschließlich zur Laufzeit als Umgebungsvariablen übergeben —
-niemals ins Image geschrieben und niemals geloggt.
+Der Agent braucht einen Worker-Stack mit Node — die CLI wird beim Bauen des
+Images installiert. Wie der Agent ins Image kommt, steht in
+[WORKER-STACKS.md](WORKER-STACKS.md).
 
 ## Claude Code
 
-Claude Code ist der Standard-Agent. Sein entscheidender Vorteil: Er
-authentifiziert sich mit dem **OAuth-Token deines Claude-Abonnements** (Pro,
-Max oder Team), *nicht* mit einem nutzungsabhängig abgerechneten API-Key. Die
-von Argos geleistete Arbeit wird gegen deinen bestehenden Claude-Plan
-abgerechnet, nicht als separate API-Nutzung pro Token.
+Claude Code authentifiziert sich mit dem **OAuth-Token deines
+Claude-Abonnements** (Pro, Max oder Team), *nicht* mit einem abgerechneten
+API-Key. Was Argos tut, läuft über deinen bestehenden Claude-Plan und nicht
+als separate API-Nutzung pro Token.
 
-So erhältst du ein Token:
+So bekommst du einen Token:
 
-1. Führe `claude setup-token` in einem Terminal aus, in dem die Claude CLI
+1. Führe `claude setup-token` in einem Terminal aus, in dem die Claude-CLI
    angemeldet ist.
-2. Kopiere das ausgegebene Token.
-3. Füge es in Argos ein (während des Onboardings oder auf der Seite „Agent
-   Credentials").
+2. Kopiere den ausgegebenen Token.
+3. Füge ihn in Argos ein (beim Onboarding oder auf der Seite *Agenten*).
 
-Argos speichert das Token und übergibt es dem Worker als Umgebungsvariable
-`CLAUDE_CODE_OAUTH_TOKEN`. Wenn du das Token im Onboarding-Assistenten
-speicherst, validiert Argos es vor der Annahme gegen die Anthropic-API; ist die
-API nicht erreichbar, wird das Token dennoch gespeichert, aber als unvalidiert
+Beim Speichern prüft Argos den Token gegen die Anthropic-API. Ist die API
+nicht erreichbar, wird der Token trotzdem gespeichert, aber als ungeprüft
 markiert.
-
-Claude Code bietet drei Modelle, pro Phase auswählbar (siehe
-[Modellauswahl](#modellauswahl)):
-
-| Modell | Standard-Phase |
-|---|---|
-| Claude Opus 4.7 | Konzept |
-| Claude Sonnet 4.6 | Implementierung |
-| Claude Haiku 4.5 | Commit-Nachricht |
-
-## OpenAI Codex
-
-Codex ist der alternative Agent — für Nutzer, die die Modelle von OpenAI
-bevorzugen oder bereits einen ChatGPT-Plan haben, der Codex einschließt.
-
-Codex authentifiziert sich mit dem Inhalt seiner `auth.json`-Datei:
-
-1. Führe lokal `codex login` aus und melde dich an (mit ChatGPT oder einem
-   `OPENAI_API_KEY`).
-2. Öffne `~/.codex/auth.json` und kopiere den gesamten Inhalt.
-3. Füge das JSON in Argos ein.
-
-Argos speichert das JSON verschlüsselt und erstellt zur Laufzeit die
-`auth.json`-Datei im Worker-Container neu (übergeben über die Umgebungsvariable
-`CODEX_AUTH_JSON_CONTENT`, die der Worker auf die Festplatte schreibt und dann
-leert, bevor irgendeine Phase läuft). Anders als Claude Code hat Codex **keinen
-Fallback** — eine Aufgabe, die auf Codex aufgelöst wird, schlägt sofort fehl,
-wenn keine Codex-Zugangsdaten konfiguriert sind.
-
-Codex stellt derzeit ein einziges Modell bereit, GPT-5 Codex, das für jede Phase
-verwendet wird.
 
 ## Agent-Zugangsdaten
 
-Ein **Agent-Zugangsdatensatz** ist ein gespeicherter Eintrag, der einen Agenten
-mit einem Satz Authentifizierungsmaterial verknüpft:
+Ein **Agent-Zugang** (in der Oberfläche als *Agent* geführt) ist ein
+gespeicherter Datensatz, der den Agenten mit einem Satz Zugangsdaten
+verbindet:
 
-- **Agent** — Claude Code oder OpenAI Codex.
-- **Beschreibung** — ein frei wählbarer Name, um Zugangsdaten zu unterscheiden,
-  z. B. „Persönlich" oder „Team-Account".
-- **Secret** — für Claude Code das OAuth-Token; für Codex der Inhalt von
-  `auth.json`. Verschlüsselt in der Datenbank gespeichert.
-- **Status** — Active, Expired oder Revoked (siehe
+- **Agent** — Claude Code.
+- **Name** — ein frei wählbarer Name zur Unterscheidung, z. B. „Persönlich“
+  oder „Team-Konto“.
+- **Token** — der OAuth-Token, verschlüsselt in der Datenbank gespeichert.
+- **Status** — Aktiv, Abgelaufen oder Widerrufen (siehe
   [Status von Zugangsdaten](#status-von-zugangsdaten)).
-- **Zuletzt validiert** — wann das Secret zuletzt geprüft wurde.
+- **Besitzer**, **Parallele Sessions** und **Standardmodell** — siehe
+  [Persönliche und geteilte Agenten](#persönliche-und-geteilte-agenten).
+- **Zuletzt geprüft** — wann der Token zuletzt geprüft wurde.
 
-Du kannst mehr als einen Zugangsdatensatz pro Agent speichern (zum Beispiel ein
-persönliches und ein Team-Claude-Abonnement) und auswählen, welcher davon für
-eine Aufgabe verwendet wird.
+Du kannst mehrere Agenten anlegen (zum Beispiel ein persönliches und ein
+Team-Abo) und pro Thread wählen, welcher genutzt wird.
 
-## Eine Zugangsdaten während des Onboardings hinzufügen
+## Zugangsdaten beim Onboarding hinzufügen
 
-Der erste Schritt des Onboarding-Assistenten
-(`${APP_URL}/admin/onboarding`) ist „Agents". Du musst **mindestens einen**
-Agenten authentifizieren, bevor du fortfahren und ein Repository verbinden
-kannst.
+Der Agent-Schritt des Onboarding-Assistenten (`${APP_URL}/admin/onboarding`)
+fragt nach einem Claude-Token. Ohne Agent geht es nicht weiter zur
+Repository-Anbindung. Füge die Ausgabe von `claude setup-token` ein; Argos
+prüft sie und speichert sie als geteilten Agenten namens „Default“.
 
-- Für **Claude Code** fügst du die Ausgabe von `claude setup-token` ein. Argos
-  validiert sie und speichert sie als Zugangsdatensatz mit dem Namen „Default".
-- Für **OpenAI Codex** führst du `codex login` aus und fügst dann den Inhalt von
-  `~/.codex/auth.json` ein. Argos validiert, dass es sich um wohlgeformtes JSON
-  handelt, und speichert es.
-
-Du kannst Agenten später hinzufügen oder ändern — das Onboarding benötigt nur
-einen, um dich zu einem funktionierenden Projekt zu bringen. Siehe
-[SETUP.md](SETUP.md) für die vollständige Anleitung zum ersten Start.
+Den vollständigen Ersteinrichtungs-Ablauf beschreibt [SETUP.md](SETUP.md).
 
 ## Zugangsdaten später verwalten
 
-Nach dem Onboarding verwaltest du jeden Zugangsdatensatz auf der Seite **Agent
-Credentials** unter der Navigationsgruppe *Worker*
+Nach dem Onboarding verwaltest du Agenten auf der Seite **Agenten**
 (`${APP_URL}/admin/agent-credentials`). Dort kannst du:
 
-- Neue Zugangsdaten für einen der beiden Agenten hinzufügen.
-- Beschreibung, Secret oder Status eines bestehenden Zugangsdatensatzes
-  bearbeiten.
-- Die Liste nach Agent oder Status filtern.
-- Zugangsdaten löschen, die du nicht mehr benötigst.
-
-Das Formular zeigt das passende Secret-Feld für den gewählten Agenten: ein
-einblendbares Token-Eingabefeld für Claude Code oder ein mehrzeiliges
-`auth.json`-Einfügefeld für Codex.
+- neue Agenten anlegen,
+- Name, Token, Status, Besitzer oder Limits bearbeiten,
+- die Liste nach Agent oder Status filtern,
+- nicht mehr benötigte Agenten löschen.
 
 ## Status von Zugangsdaten
 
-Jeder Zugangsdatensatz trägt einen von drei Status:
+Jeder Agent hat einen von drei Status:
 
 | Status | Bedeutung |
 |---|---|
-| Active | Verwendbar. Nur Active-Zugangsdaten werden automatisch für eine Aufgabe ausgewählt. |
-| Expired | Zur Dokumentation aufbewahrt, aber nicht mehr gültig; nicht automatisch ausgewählt. |
-| Revoked | Deaktiviert; nicht automatisch ausgewählt. |
-
-Wenn eine Aufgabe keinen Zugangsdatensatz explizit benennt, verwendet Argos den
-**ersten aktiven Zugangsdatensatz** für den aufgelösten Agenten (nach
-Erstellungsdatum sortiert).
+| Aktiv | Für neue Threads nutzbar. |
+| Abgelaufen | Bleibt erhalten, ist aber nicht mehr gültig; wird nicht angeboten. |
+| Widerrufen | Deaktiviert; wird nicht angeboten. |
 
 ## Persönliche und geteilte Agenten
 
-Zugangsdaten sind entweder **persönlich** (sie haben einen Besitzer und laufen
-über dessen Abo) oder **geteilt** (kein Besitzer).
+Ein Agent ist entweder **persönlich** (er hat einen Besitzer und läuft auf
+dessen Abo) oder **geteilt** (ohne Besitzer).
 
-- Jeder Benutzer kann unter *Agenten* seinen **eigenen** Claude-Agenten
-  anlegen — füge die Ausgabe von `claude setup-token` ein. Benutzer sehen nur
-  ihre eigenen Agenten.
-- Administratoren sehen alle Agenten und können einen Besitzer zuweisen oder ihn
-  für einen geteilten Agenten leer lassen.
-- **Aufgaben** nutzen den in der Aufgabe gewählten Agenten, sonst den ersten
-  aktiven **geteilten** Agenten — ein persönlicher Agent wird nie stillschweigend
-  gewählt.
-- **Workspace-Threads** laufen auf einem persönlichen oder geteilten Agenten, der
-  beim Anlegen des Threads gewählt wird (siehe [Workspaces](WORKSPACES.md)).
-- **Parallele Sessions** (Administratoren) begrenzt, wie viele Workspace-Threads
+- Jede Nutzerin und jeder Nutzer kann unter *Agenten* einen **eigenen**
+  Claude-Agenten anlegen — mit der Ausgabe von `claude setup-token`. Man sieht
+  nur die eigenen Agenten.
+- Administratoren sehen alle Agenten und können einen Besitzer zuweisen oder
+  das Feld für einen geteilten Agenten leer lassen.
+- **Workspace-Threads** laufen auf einem persönlichen oder geteilten Agenten,
+  der beim Anlegen des Threads gewählt wird (siehe [Workspaces](WORKSPACES.md)).
+  Automatische Läufe über API, MCP oder einen Issue-Trigger nutzen den ersten
+  verfügbaren Agenten der Person, für die sie handeln.
+- **Parallele Sessions** (Administratoren) begrenzt, wie viele Threads
   gleichzeitig auf einem Agenten laufen dürfen (Standard `1`). Meldet Claude,
   dass das Abo sein Nutzungslimit erreicht hat, zeigt der Agent *Nutzungslimit
   bis …* und startet bis dahin keine neuen Sessions.
-- **Standardmodell** wählt das Modell für neue Workspace-Threads vor.
-
-## Wie ein Projekt seinen Agenten auswählt
-
-Jedes Projekt (Repo-Profil) kann in seinen **Worker**-Einstellungen einen
-Standard-Agenten festlegen. Lässt ein Projekt den Agenten ungesetzt, fallen
-Aufgaben auf **Claude Code** zurück. Der Projekt-Standard bestimmt auch, welche
-Modelle und Zugangsdaten für seine Aufgaben angeboten werden. Siehe
-[PROJECTS.md](PROJECTS.md) für die Projektkonfiguration.
-
-Der effektive Agent für eine Aufgabe wird in dieser Reihenfolge aufgelöst:
-
-1. Die Agent-Überschreibung der Aufgabe, falls gesetzt.
-2. Der Standard-Agent des Projekts, falls gesetzt.
-3. Claude Code.
-
-## Überschreibungen pro Aufgabe
-
-Im **Worker**-Tab einer Aufgabe kannst du die geerbten Standardwerte für genau
-diese eine Aufgabe überschreiben:
-
-- **Agent (Override)** — diese Aufgabe mit einem anderen Agenten als dem
-  Projekt-Standard ausführen. Bleibt das Feld leer, wird der Projekt-Standard
-  verwendet. Das Ändern des Agenten löscht alle zuvor gewählten Zugangsdaten und
-  fixierten Modelle, da sie zum alten Agenten gehörten.
-- **Agent Credential** — welchen gespeicherten Zugangsdatensatz der Agent
-  verwendet. Bleibt das Feld leer, wird der erste aktive Zugangsdatensatz für
-  den aufgelösten Agenten verwendet.
 
 ## Modellauswahl
 
-Für Agenten, die mehr als ein Modell anbieten (Claude Code), kannst du das
-Modell pro Phase fixieren — auf Projektebene oder, enger gefasst, pro Aufgabe:
+Claude Code meldet beim Start einer Session, welche Modelle das Abo nutzen
+darf; Argos merkt sich diese Liste pro Agent und bietet sie beim Anlegen eines
+Threads an. Vor der ersten Session eines Agenten stehen die Aliase (`sonnet`,
+`opus`, …) zur Wahl — sie zeigen immer auf das neueste Modell. Das
+**Standardmodell** des Agenten ist für neue Threads vorausgewählt; ohne
+Angabe nutzt Argos `sonnet`.
 
-- **Concept model** — wird verwendet, während der Agent den Ansatz erarbeitet.
-- **Implement model** — wird verwendet, während der Agent die Änderung schreibt.
+## Weitere Agenten anbinden
 
-Die Auflösungsreihenfolge für jede Phase lautet: Aufgaben-Überschreibung →
-Projekt-Standard → eingebauter Standard des Agenten für diese Phase. Bleiben
-beide Auswahlfelder leer, wird der Agent-Standard verwendet (für Claude Code:
-Opus 4.7 für Konzept, Sonnet 4.6 für Implementierung). Codex bietet ein einziges
-Modell, daher hat die Modellauswahl bei ihm keine Wirkung.
+Argos liefert nur Claude Code aus, die Nahtstellen für einen weiteren Agenten
+(etwa Codex) sind aber vorhanden:
+
+- **Gespeicherte Zugangsdaten** — `agent_credentials.agent_name` hält die
+  Kennung des Agenten, Zugangsdaten eines neuen Agenten passen also in die
+  bestehende Tabelle.
+- **Agent-Enum** — ein neuer Fall in `App\Enums\AgentName`. Dessen
+  `supportsWorkspaces()` entscheidet, ob Threads darauf laufen dürfen; der
+  Agent-Pool bietet nur Agenten an, deren Fall `true` liefert.
+- **Image** — ein `AgentRunner` mit seiner `AgentSpec` (npm-Paket, CLI,
+  benötigte Stack-Fähigkeiten) und ein Installationsskript unter
+  `.tools/docker/worker/agents/`, registriert in der `AgentRegistry`. Der Build
+  des Worker-Images installiert dann die CLI.
+- **Laufzeit** — der Workspace-Daemon kapselt den Agenten in `ThreadSession`
+  hinter einer `QueryFactory`. Ein neuer Agent ist eine zweite
+  Session-Implementierung mit denselben Events und denselben HTTP-Routen; die
+  Manager-Seite bleibt unverändert.
 
 ## Sicherheit
 
-- Secrets (Claude-OAuth-Tokens, Codex-`auth.json`) werden **verschlüsselt** in
-  der Datenbank gespeichert.
-- Tokens werden **niemals geloggt**, nicht einmal zu Diagnosezwecken.
-- Zugangsdaten werden dem Worker-Container nur zur Laufzeit als
-  Umgebungsvariablen übergeben, und die `auth.json`-Umgebungsvariable von Codex
-  wird auf der Festplatte geleert, bevor irgendein Phasenskript läuft. Nichts
-  Geheimes wird in das Worker-Image eingebacken.
+- Tokens werden **verschlüsselt** in der Datenbank gespeichert.
+- Tokens werden **nie geloggt**, auch nicht zur Diagnose.
+- Der Token erreicht den Workspace-Daemon nur im Speicher, wenn eine
+  Thread-Session startet — er landet nie auf der Platte, in der
+  Container-Umgebung oder im Image.
 
-Für einen Überblick darüber, wie Worker, Manager und Zugangsdaten
-zusammenpassen, siehe [OVERVIEW.md](OVERVIEW.md).
+Einen Überblick, wie Workspace, Manager und Zugangsdaten zusammenspielen,
+gibt [OVERVIEW.md](OVERVIEW.md).

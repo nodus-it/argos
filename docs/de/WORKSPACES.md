@@ -11,12 +11,13 @@ arbeiten.
 Workspaces haben einen eigenen Bereich unter **`/w`** (dorthin führt auch
 `/`): volle Breite, Navigation in der oberen Leiste, damit Chat, Editor und
 Preview den ganzen Bildschirm bekommen. **Verwaltung** in der oberen Leiste
-führt in den Admin-Bereich (`/admin`) mit Projekten, Agenten, Benutzern und
-Aufgaben; ein Login gilt für beide.
+führt in den Admin-Bereich (`/admin`) mit Projekten, Agenten und Benutzern; ein
+Login gilt für beide.
 
-Workspaces stehen neben den [Aufgaben](TASKS.md). Eine Aufgabe ist der
-automatische Ablauf (Konzept → Implementierung → Pull Request); ein Workspace
-ist der interaktive. Beide nutzen dieselben Projekte, Worker-Stacks und Agenten.
+Die Arbeit muss nicht interaktiv sein: Ein [Auto-Thread](#auto-threads) plant,
+setzt um, prüft die Quality-Gates und öffnet selbstständig einen Pull Request —
+gestartet in der Oberfläche, über die [REST-API](REST-API.md), [MCP](SETUP-MCP.md)
+oder ein Issue eines verbundenen Trackers.
 
 ## Inhalt
 
@@ -45,7 +46,7 @@ ist der interaktive. Beide nutzen dieselben Projekte, Worker-Stacks und Agenten.
   Dienstes `reverb` — er bringt die Live-Updates in den Browser.
 - **Wildcard-DNS** für die Preview-Basisdomain: Der Editor eines Workspaces
   liegt unter `code-<workspace>.<basisdomain>` und seine Preview unter
-  `demo-ws-<workspace>.<basisdomain>`, neben den Demos der Aufgaben. Lokal
+  `demo-ws-<workspace>.<basisdomain>`. Lokal
   braucht der Standard `*.127.0.0.1.nip.io` einen Resolver, der nip.io erreicht.
 - Einen eigenen **Agenten** (dein Claude-Abo) oder einen geteilten — siehe unten.
 
@@ -57,8 +58,7 @@ mit `claude setup-token`. Agenten sind entweder
 - **persönlich** — sie gehören einem Benutzer und laufen über dessen
   Claude-Abo. Jeder Benutzer kann unter *Agenten* seinen eigenen anlegen.
   Benutzer sehen immer nur ihre eigenen Agenten.
-- **geteilt** — sie haben keinen Besitzer (Administratoren legen sie an).
-  Aufgaben nutzen geteilte Agenten, wenn kein Agent ausdrücklich gewählt ist; in
+- **geteilt** — sie haben keinen Besitzer (Administratoren legen sie an); in
   Workspaces darf sie jeder auswählen.
 
 Ein Agent führt höchstens **parallele Sessions** Threads gleichzeitig aus
@@ -87,14 +87,14 @@ Projekts). Argos
 Die Workspace-Seite zeigt den Fortschritt und, falls etwas fehlschlägt, den
 Grund.
 
-**Eine Aufgabe pro Workspace.** Alle Threads eines Workspaces teilen sich
+**Eine Arbeit pro Workspace.** Alle Threads eines Workspaces teilen sich
 dieselben Dateien. Für getrennte Arbeiten lege getrennte Workspaces an — jeder
 hat seinen eigenen Branch, Container, seine eigene Datenbank und Preview.
 
 ## Aus einem Issue starten
 
 Hat das Projekt einen verbundenen Issue-Tracker (siehe
-[Task-Provider](SETUP-TASK-PROVIDERS.md)), bietet das Formular **Aus Issue** an:
+[Issue-Trigger](SETUP-TASK-PROVIDERS.md)), bietet das Formular **Aus Issue** an:
 Durchsuche die offenen Issues nach Titel oder Nummer und wähle eines. Der
 Workspace heißt dann `#<Nummer> <Titel>`, sein Branch `ws/<Nummer>-<Titel>`
 (höchstens 50 Zeichen; ein zweiter Workspace für dasselbe Issue bekommt ein
@@ -245,8 +245,7 @@ getauscht wird.
 Die Preview ist eine [Live-Demo](LIVE-DEMOS.md) des Workspaces: derselbe
 Demo-Vertrag (`.argos/demo.*` oder der eingebaute Laravel-Standard), aber sie
 mountet das **Workspace-Volume** und zeigt daher immer die aktuellen Dateien.
-Sie ist nur für Mitglieder zugänglich (Zugriffsmodus `workspace`) und wird bei
-Bedarf gestartet.
+Sie ist nur für Mitglieder zugänglich und wird bei Bedarf gestartet.
 
 - **Preview starten** baut sie, **Preview öffnen** öffnet sie, **Neu bauen**
   ersetzt sie. Die Leiste zeigt ihren Zustand; ein fehlgeschlagener Build zeigt
@@ -277,7 +276,7 @@ werden gesammelt; **An Claude senden** schickt sie als eine Nachricht
 ## Quality-Gates
 
 **Gates prüfen** (im Review, im Menü der Kopfzeile oder per `/gates`) führt
-dieselben Quality-Gates aus wie die Implementierungsphase von Aufgaben
+dieselben Quality-Gates aus wie automatische Läufe
 (`worker/lib/quality.sh`): Artisan-Start, Pint auf geänderten Dateien,
 Pest/PHPUnit, PHPStan, Migrations-Syntax, Debug-Aufrufe und vorhandene Tests.
 Sie sind für PHP/Laravel-Projekte gemacht; bei anderen Stacks werden die Gates
@@ -289,8 +288,9 @@ Sie sind für PHP/Laravel-Projekte gemacht; bei anderen Stacks werden die Gates
   Panel zeigt an, was gilt.
 - Ein Lauf gleichzeitig pro Workspace. Jedes Gate zeigt grün/rot/übersprungen
   und das Ende seines Logs.
-- **Fehler an Agent senden** schickt denselben Fix-Prompt, den der
-  Aufgaben-Ablauf nutzt, in den gewählten Thread.
+- **Fehler an Agent senden** schickt einen Fix-Prompt mit den Logs der
+  fehlgeschlagenen Gates in den gewählten Thread — denselben, den automatische
+  Läufe nutzen.
 - Der Commit-Dialog nennt das letzte Ergebnis (*Gates: 6/7 grün*).
   Fehlgeschlagene Gates sind ein Warnhinweis, nie eine Sperre.
 
@@ -346,7 +346,7 @@ ein ganz normaler Thread.
 
 **Einen starten**
 
-- In einem Workspace: **Neuer Thread → Automatisch umsetzen**, dann die Aufgabe
+- In einem Workspace: **Neuer Thread → Automatisch umsetzen**, dann die Arbeit
   beschreiben.
 - Mit einem neuen Workspace: **Mit dem Workspace einen automatischen Lauf
   starten** im Formular — der Lauf wartet, bis der Workspace bereit ist.
@@ -429,8 +429,7 @@ Fix-Runden übersprungen.
   nicht in diesem Netz.
 - Dein Claude-Token wird pro Thread übergeben und nur im Speicher gehalten; er
   landet weder auf der Platte noch in der Umgebung des Containers. Claude selbst
-  kann ihn im Container technisch auslesen — genau wie in den Workern der
-  Aufgaben —, behandle einen Workspace also wie einen Rechner, auf dem du Claude
+  kann ihn im Container technisch auslesen, behandle einen Workspace also wie einen Rechner, auf dem du Claude
   Code ausführst.
 - Der Repository-Token erreicht git über einen Credential-Helper und wird nie ins
   Repository geschrieben. Claude ist angewiesen, nicht zu pushen, kann es

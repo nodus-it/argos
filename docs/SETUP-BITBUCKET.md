@@ -7,12 +7,12 @@ See [OAuth Overview](OAUTH.md) for how PAT and OAuth compare and which one to
 pick.
 
 > **Scope note — Bitbucket is a code provider only.** Argos uses Bitbucket for
-> cloning, branches, and pull-request creation. Bitbucket is **not** wired as a
-> task/issue provider: there is no Bitbucket option when binding a task source,
-> and Argos does not ingest Bitbucket issues into tasks or register issue
+> cloning, branches, and pull-request creation. Bitbucket is **not** wired as an
+> issue trigger: there is no Bitbucket option when binding an issue source,
+> and Argos does not start runs from Bitbucket issues or register issue
 > webhooks for them. See
-> [Task Providers](SETUP-TASK-PROVIDERS.md) for the providers that do drive
-> the issue → task flow (GitHub, GitLab, Linear).
+> [Issue Triggers](SETUP-TASK-PROVIDERS.md) for the providers that do start
+> automatic runs from issues (GitHub, GitLab, Linear).
 
 ---
 
@@ -24,7 +24,7 @@ pick.
 | List repositories / branches (for project form dropdowns) | Yes |
 | Create / update / comment on pull requests | Yes |
 | Read the default branch and source files | Yes |
-| Issue → task ingest (a Bitbucket issue becoming an Argos task) | **No** |
+| Issue trigger (a Bitbucket issue starting an automatic run) | **No** |
 | Issue webhooks / 👍-approval flow | **No** |
 
 ---
@@ -49,8 +49,8 @@ OAuth configuration.
    - **Repositories**: Read, Write
    - **Pull requests**: Read, Write
    - **Issues**: Read (optional — only needed if you want Argos to read issue
-     content from the repo; Bitbucket is not a task provider, so this does not
-     create tasks)
+     content from the repo; Bitbucket is not an issue trigger, so this does not
+     start runs)
 6. Click **Create** and copy the generated token — it will only be shown once.
 
 ### Step 2: Configure in Argos
@@ -139,4 +139,4 @@ effect immediately, without a restart.
 | 401 on push | Token missing Repositories Write permission, or token pasted with an accidental username prefix |
 | PR creation returns 409 | A PR for this branch already exists — Argos will find and report the existing URL |
 | OAuth redirect fails | The callback URL registered in the OAuth consumer must exactly match `${APP_URL}/auth/bitbucket/callback` — verify `APP_URL` and that the OAuth app is enabled under **Configuration → OAuth Apps** |
-| Expecting a Bitbucket issue to become an Argos task | Not supported — Bitbucket is a code provider only. Use [GitHub/GitLab/Linear](SETUP-TASK-PROVIDERS.md) as a task provider |
+| Expecting a Bitbucket issue to start an automatic run | Not supported — Bitbucket is a code provider only. Use [GitHub/GitLab/Linear](SETUP-TASK-PROVIDERS.md) as an issue trigger |
