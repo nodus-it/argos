@@ -78,6 +78,7 @@ class PullRequestService
         $this->announceChanges($task, $before, $details);
         if ($finished) {
             app(IssueRunReporter::class)->closed($task);
+            app(WorkspaceSetupService::class)->pullRequestFinished($task);
         }
 
         return $details;

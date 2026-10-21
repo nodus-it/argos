@@ -84,7 +84,7 @@ class WorkspaceResource extends Resource
 
                     TextEntry::make('workerStack.label')
                         ->label(__('projects.infolist.worker_stack'))
-                        ->placeholder(__('projects.infolist.worker_stack_placeholder', ['stack' => (string) config('argos.compose.default_stack', 'php-8.4')])),
+                        ->placeholder(__('projects.infolist.worker_stack_placeholder', ['stack' => (string) config('argos.compose.default_stack', 'php-8.5')])),
 
                 ]),
 

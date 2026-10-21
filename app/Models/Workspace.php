@@ -8,6 +8,7 @@ use App\Enums\AuthMethod;
 use App\Enums\BackingService;
 use App\Enums\GitProvider;
 use App\Enums\WorkerSource;
+use App\Enums\WorkspaceSetupStatus;
 use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceStatus;
 use App\Services\OAuth\TokenRefresher;
@@ -48,7 +49,9 @@ use Laravel\Sanctum\HasApiTokens;
  * @property array<int, string>|null $worker_services
  * @property array<string, array<string, string>>|null $worker_service_config
  * @property bool $live_demo_enabled
- * @property string|null $setup_status
+ * @property WorkspaceSetupStatus|null $setup_status
+ * @property string|null $setup_branch
+ * @property list<array{step: string, ok: bool, log: string}>|null $setup_check
  * @property int $max_sessions
  * @property int $max_previews
  * @property string|null $cpu_limit
@@ -104,6 +107,8 @@ class Workspace extends Model implements HasApiTokensContract
         'worker_service_config',
         'live_demo_enabled',
         'setup_status',
+        'setup_branch',
+        'setup_check',
         'max_sessions',
         'max_previews',
         'cpu_limit',
@@ -128,6 +133,8 @@ class Workspace extends Model implements HasApiTokensContract
             'auth_method' => AuthMethod::class,
             'token' => 'encrypted',
             'worker_source' => WorkerSource::class,
+            'setup_status' => WorkspaceSetupStatus::class,
+            'setup_check' => 'array',
             'composer_registries' => 'encrypted:array',
             'worker_env' => 'encrypted:array',
             'worker_services' => 'array',
@@ -272,6 +279,15 @@ class Workspace extends Model implements HasApiTokensContract
         }
 
         return app(TokenRefresher::class)->refreshIfNeeded($account)->token;
+    }
+
+    /**
+     * Where the `.argos/` setup comes from: a tested but unmerged setup
+     * branch, else the default branch.
+     */
+    public function setupRef(): string
+    {
+        return $this->setup_branch ?? $this->default_branch;
     }
 
     /**

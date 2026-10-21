@@ -99,7 +99,7 @@ return [
      * from the built-in manifest by BuiltinSync on every `migrate`.
      */
     'compose' => [
-        'default_stack' => env('ARGOS_DEFAULT_STACK', 'php-8.4'),
+        'default_stack' => env('ARGOS_DEFAULT_STACK', 'php-8.5'),
     ],
 
     // Live previews of workspaces, routed by Traefik under their own

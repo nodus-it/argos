@@ -67,6 +67,21 @@ class WorkerImageResolver
         return $this->resolveFor($stack, $agentName);
     }
 
+    /**
+     * The image a repo's `.argos/worker.dockerfile` at `$ref` describes, or
+     * null when the repo has none there (the setup check of a branch).
+     */
+    public function resolveRepoImage(Workspace $profile, string $ref): ?ResolvedWorkerImage
+    {
+        $dockerfile = app(GitServiceFactory::class)->forWorkspace($profile)
+            ->getFileContents($profile->getOwnerRepo(), self::BYOI_DOCKERFILE_PATH, $ref);
+        if ($dockerfile === null || trim($dockerfile) === '') {
+            return null;
+        }
+
+        return $this->resolveFor($this->resolveByoiStack($profile, $ref, AgentName::ClaudeCode), AgentName::ClaudeCode);
+    }
+
     /** Repo-relative path of a BYOI stack-base recipe. */
     private const BYOI_DOCKERFILE_PATH = '.argos/worker.dockerfile';
 
@@ -123,7 +138,7 @@ class WorkerImageResolver
 
     private function defaultStack(): WorkerStack
     {
-        $name = (string) config('argos.compose.default_stack', 'php-8.4');
+        $name = (string) config('argos.compose.default_stack', 'php-8.5');
 
         $stack = WorkerStack::query()
             ->where('name', $name)

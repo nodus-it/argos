@@ -55,3 +55,31 @@ SH
     [[ "$output" == *"[setup] composer not available"* ]]
     [[ "$output" == *"[setup] done"* ]]
 }
+
+@test "runs .argos/setup.sh from the unmerged setup branch when the worktree has none" {
+    git init -q -b main .
+    git -c user.name=t -c user.email=t@t commit -q --allow-empty -m base
+    mkdir -p .argos
+    printf 'echo "setup from branch in $PWD"\n' > .argos/setup.sh
+    git add .argos/setup.sh
+    git -c user.name=t -c user.email=t@t commit -q -m setup
+    git update-ref refs/remotes/origin/argos/setup HEAD
+    git reset -q --hard HEAD~1
+    [ ! -f .argos/setup.sh ]
+
+    ARGOS_SETUP_REF=argos/setup run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"[setup] running .argos/setup.sh from argos/setup"* ]]
+    [[ "$output" == *"setup from branch in $TASK_DIR"* ]]
+    [[ "$output" != *"[setup] done"* ]]
+}
+
+@test "falls back to the defaults when the setup branch has no .argos/setup.sh" {
+    git init -q -b main .
+    git -c user.name=t -c user.email=t@t commit -q --allow-empty -m base
+    git update-ref refs/remotes/origin/argos/setup HEAD
+
+    ARGOS_SETUP_REF=argos/setup run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [ "$output" = "[setup] done" ]
+}

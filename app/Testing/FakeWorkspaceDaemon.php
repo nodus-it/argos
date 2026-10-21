@@ -182,6 +182,8 @@ class FakeWorkspaceDaemon extends WorkspaceDaemonClient implements WorkspaceDaem
         self::$diff = null;
         self::$fileContents = [];
         self::$gateOutcome = 'fail';
+        self::$setupCheck = ['setup' => 'ok', 'log' => "[setup] done\n"];
+        self::$setupChecks = [];
     }
 
     /** What the next preparations report: `ok`, `setup_failed` or `failed`. */
@@ -192,6 +194,19 @@ class FakeWorkspaceDaemon extends WorkspaceDaemonClient implements WorkspaceDaem
 
     /** @var list<string> */
     public static array $removed = [];
+
+    /** @var array{setup: string, log: string} What the next setup check reports. */
+    public static array $setupCheck = ['setup' => 'ok', 'log' => "[setup] done\n"];
+
+    /** @var list<array{ref: string, env: array<string, string>}> */
+    public static array $setupChecks = [];
+
+    public function setupCheck(string $ref, array $env): array
+    {
+        self::$setupChecks[] = ['ref' => $ref, 'env' => $env];
+
+        return self::$setupCheck;
+    }
 
     /** Prepares synchronously: the worktree is "there" right away. */
     public function prepareWorktree(string $worktree, array $payload): void

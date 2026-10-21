@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Integrations\WorkspaceDaemon;
 
+use App\Integrations\WorkspaceDaemon\Requests\CheckSetup;
 use App\Integrations\WorkspaceDaemon\Requests\CreateCheckpoint;
 use App\Integrations\WorkspaceDaemon\Requests\GetCheckpointDiff;
 use App\Integrations\WorkspaceDaemon\Requests\GetFileContent;
@@ -112,6 +113,13 @@ class WorkspaceDaemonApi implements WorkspaceDaemonTransport
     public function prepareWorktree(string $worktree, array $payload): void
     {
         $this->call(new PrepareWorktree($worktree, $payload));
+    }
+
+    public function setupCheck(string $ref, array $env): array
+    {
+        $body = $this->call(new CheckSetup(['ref' => $ref, 'env' => (object) $env]));
+
+        return ['setup' => (string) ($body['setup'] ?? 'failed'), 'log' => (string) ($body['log'] ?? '')];
     }
 
     public function removeWorktree(string $worktree): void

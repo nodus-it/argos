@@ -1,13 +1,13 @@
 # syntax=docker/dockerfile:1.7
 #
-# stacks/Dockerfile.php-8.3 — Argos worker stack: PHP 8.3 + common tools.
+# stacks/Dockerfile.php-8.5 — Argos worker stack: PHP 8.5 + common tools.
 #
 # This is a *stack* image: language runtime + common tools + non-root user.
 # Agent installation (claude-code, codex, ...) happens in Dockerfile.compose
 # as a later layer; worker code is also added there. The result is reusable
-# across agents — `argos-worker:php-8.3-claude-code`,
-# `argos-worker:php-8.3-codex`, etc. all share this stack image.
-FROM php:8.3-cli-bookworm
+# across agents — `argos-worker:php-8.5-claude-code`,
+# `argos-worker:php-8.5-codex`, etc. all share this stack image.
+FROM php:8.5-cli-bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive
 

@@ -57,6 +57,17 @@
         </div>
     @endif
 
+    @if ($task !== null && $task->kind === \App\Enums\TaskKind::Setup && ! $task->status->isFinished())
+        <div class="ws-alert ws-setup-note" role="status" data-testid="setup-banner">
+            @svg('heroicon-o-wrench-screwdriver')
+            <span>{{ __('workspaces.setup.banner') }}@if ($task->workspace->setup_status) · <strong>{{ $task->workspace->setup_status->label() }}</strong>@endif</span>
+            @if ($canWrite)
+                <button type="button" class="wf-btn wf-btn-sm wf-btn-primary" wire:click="testSetup" wire:loading.attr="disabled" title="{{ __('workspaces.setup.test_help') }}"
+                        @disabled($task->workspace->setup_status === \App\Enums\WorkspaceSetupStatus::Testing)>{{ __('workspaces.setup.test') }}</button>
+            @endif
+        </div>
+    @endif
+
     {{-- New task form --}}
     @if ($creating && $canWrite)
         <div class="card card-pad ws-new-task">
@@ -314,8 +325,16 @@
                                                 'ticket_comment' => __('workspaces.events.ticket_comment', ['name' => $p['author_name'] ?? '']),
                                                 'pr_ready', 'auto_merge_on', 'auto_merge_off' => __('workspaces.events.'.$p['kind'], ['name' => $p['author_name'] ?? '']),
                                                 'auto_merge_unavailable', 'pr_checks_failed', 'pr_checks_passed', 'pr_changes_requested', 'pr_approved', 'pr_merged', 'pr_closed' => __('workspaces.events.'.$p['kind']),
+                                                'setup_testing', 'setup_passed', 'setup_failed' => __('workspaces.events.'.$p['kind']),
                                                 default => '',
                                             } }}
+                                            @if (in_array($p['kind'] ?? '', ['setup_passed', 'setup_failed'], true) && ! empty($p['steps']))
+                                                <ul class="wf-setup-steps">
+                                                    @foreach ($p['steps'] as $step)
+                                                        <li @class(['is-ok' => $step['ok'], 'is-fail' => ! $step['ok']])>{{ $step['ok'] ? '✓' : '✗' }} {{ __('workspaces.setup.steps.'.$step['step']) }}</li>
+                                                    @endforeach
+                                                </ul>
+                                            @endif
                                             @if (($p['kind'] ?? '') === 'prepare_failed' && $canWrite && $task->status === \App\Enums\TaskStatus::Preparing)
                                                 <button type="button" class="wf-link" wire:click="retryPreparation">{{ __('workspaces.events.prepare_retry') }}</button>
                                             @endif

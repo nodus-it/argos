@@ -127,6 +127,15 @@ return [
         'cancelled' => 'Abgebrochen',
         'archived' => 'Archiviert',
     ],
+    'workspace_setup_status' => [
+        'needed' => 'Einrichtung nötig',
+        'running' => 'Wird eingerichtet',
+        'testing' => 'Wird getestet',
+        'ready' => 'Eingerichtet',
+        'failed' => 'Test fehlgeschlagen',
+        'needs_agent' => 'Braucht ein Claude-Abo',
+    ],
+
     'task_kind' => [
         'task' => 'Aufgabe',
         'setup' => 'Einrichtung',

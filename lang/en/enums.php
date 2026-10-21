@@ -127,6 +127,15 @@ return [
         'cancelled' => 'Cancelled',
         'archived' => 'Archived',
     ],
+    'workspace_setup_status' => [
+        'needed' => 'Needs setting up',
+        'running' => 'Being set up',
+        'testing' => 'Being tested',
+        'ready' => 'Set up',
+        'failed' => 'Test failed',
+        'needs_agent' => 'Needs a Claude subscription',
+    ],
+
     'task_kind' => [
         'task' => 'Task',
         'setup' => 'Setup',

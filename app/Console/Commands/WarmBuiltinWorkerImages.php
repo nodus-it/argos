@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Enums\WorkerImageEntityStatus;
-use App\Filament\Admin\Support\WorkerStackBuildDispatcher;
+use App\Services\Worker\WorkerStackBuildDispatcher;
 use App\Models\WorkerStack;
 use App\Workers\Agents\AgentRegistry;
 use App\Workers\Compose\WorkerImageBuilder;
@@ -81,7 +81,7 @@ class WarmBuiltinWorkerImages extends Command
             ->where('status', '!=', WorkerImageEntityStatus::Disabled);
 
         if ($this->option('default-only')) {
-            $name = (string) config('argos.compose.default_stack', 'php-8.4');
+            $name = (string) config('argos.compose.default_stack', 'php-8.5');
             $query->where('name', $name);
         }
 

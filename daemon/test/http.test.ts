@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { EventBatch } from '../src/events.js';
@@ -151,6 +151,31 @@ describe('daemon HTTP API', () => {
         const status = await app.inject({ method: 'GET', url: '/worktrees/fix-login/git/status', headers: auth });
         expect(status.statusCode).toBe(200);
         expect(status.json()).toMatchObject({ branch: 'argos/fix-login' });
+        outbox.stop();
+    }, 20_000);
+
+    it('passes the setup branch to the setup script', async () => {
+        const { app, outbox } = make(async function* () {});
+        const response = await app.inject({ method: 'POST', url: '/worktrees/fix-login/prepare', headers: auth, payload: { ...prepareBody('t1', 'argos/fix-login'), setup_ref: 'argos/setup' } });
+        expect(response.statusCode).toBe(202);
+        await waitFor(() => distinct('prepare.completed', 't1').length === 1, 10_000);
+        expect(setupCalls[0]!.env).toEqual({ DB_DATABASE: 'db_t1', ARGOS_SETUP_REF: 'argos/setup' });
+        // The setup branch is not written into the task's .env.
+        expect(readFileSync(join(ws.layout.tasksDir, 'fix-login', '.env'), 'utf8')).not.toContain('ARGOS_SETUP_REF');
+        outbox.stop();
+    }, 20_000);
+
+    it('checks the setup steps of a branch in a throwaway worktree', async () => {
+        const { app, outbox } = make(async function* () {});
+        const response = await app.inject({ method: 'POST', url: '/setup/check', headers: auth, payload: { ref: 'main', env: { DB_DATABASE: 'db_check' } } });
+        expect(response.statusCode).toBe(200);
+        expect(response.json()).toEqual({ setup: 'ok', log: 'composer install\nsetup done\n' });
+        expect(setupCalls).toEqual([{ dir: join(ws.layout.tasksDir, 'argos-setup-check'), env: { DB_DATABASE: 'db_check' } }]);
+        expect(existsSync(join(ws.layout.tasksDir, 'argos-setup-check'))).toBe(false);
+
+        const missing = await app.inject({ method: 'POST', url: '/setup/check', headers: auth, payload: { ref: 'nope' } });
+        expect(missing.statusCode).toBe(422);
+        expect(missing.json().error.code).toBe('branch_not_found');
         outbox.stop();
     }, 20_000);
 

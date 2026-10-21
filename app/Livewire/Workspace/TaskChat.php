@@ -34,6 +34,7 @@ use App\Services\Workspace\TaskService;
 use App\Services\Workspace\WorkspaceDaemonClient;
 use App\Services\Workspace\WorkspaceException;
 use App\Services\Workspace\WorkspaceIssueService;
+use App\Services\Workspace\WorkspaceSetupService;
 use App\Support\TaskTimeline;
 use Filament\Notifications\Notification;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -270,6 +271,20 @@ class TaskChat extends Component
                 ? app(TaskService::class)->followUpBrief($task)
                 : app(WorkspaceIssueService::class)->composerDraft($task);
             $this->reset('newIssue', 'newIssueQuery', 'newBaseBranch', 'newParentId', 'newAutoMerge');
+        });
+    }
+
+    /** "Test setup" on the setup task. */
+    public function testSetup(): void
+    {
+        $task = $this->activeTask();
+        if ($task === null) {
+            return;
+        }
+
+        $this->attempt(function () use ($task): void {
+            app(WorkspaceSetupService::class)->requestTest($task, $this->user());
+            Notification::make()->title(__('workspaces.setup.test_queued'))->success()->send();
         });
     }
 

@@ -53,6 +53,15 @@ interface WorkspaceDaemonTransport
      */
     public function prepareWorktree(string $worktree, array $payload): void;
 
+    /**
+     * Run the setup steps of `$ref` in a throwaway worktree (setup check);
+     * answers when they are done.
+     *
+     * @param  array<string, string>  $env
+     * @return array{setup: string, log: string}
+     */
+    public function setupCheck(string $ref, array $env): array;
+
     /** Remove a task's worktree and local branch (remote branch stays). */
     public function removeWorktree(string $worktree): void;
 

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Filament\Admin\Support;
+namespace App\Services\Worker;
 
 use App\Enums\WorkerImageEntityStatus;
 use App\Jobs\BuildWorkerImageJob;
@@ -11,10 +11,8 @@ use App\Workers\Agents\AgentRegistry;
 use App\Workers\Compose\StackAgentCompatibility;
 
 /**
- * Helper used by Create/Edit WorkerStack pages to fan out build jobs
- * for every registered agent that is compatible with the stack. Lives
- * outside the Filament page classes so the unit tests can hit it
- * directly (Filament page classes need a live Livewire component).
+ * Fans out build jobs for every registered agent that is compatible with
+ * a stack — used by image warming and the workspace's "Rebuild".
  */
 class WorkerStackBuildDispatcher
 {

@@ -8,6 +8,7 @@ use App\Enums\WorkspaceStatus;
 use App\Events\Workspace\WorkspaceCreated;
 use App\Events\Workspace\WorkspaceDeleted;
 use App\Jobs\Workspace\ProvisionWorkspaceJob;
+use App\Jobs\Workspace\SetUpWorkspaceJob;
 use App\Jobs\Workspace\StopWorkspaceJob;
 use App\Models\User;
 use App\Models\Workspace;
@@ -48,7 +49,11 @@ class WorkspaceService extends EntityService
     {
         Gate::forUser($creator)->authorize('create', Workspace::class);
 
-        return $this->register($creator, $attributes);
+        $workspace = $this->register($creator, $attributes);
+        // Check the repo and start the setup task when something is missing.
+        SetUpWorkspaceJob::dispatch($workspace->id, $creator->id)->afterCommit();
+
+        return $workspace;
     }
 
     /**

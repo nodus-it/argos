@@ -21,6 +21,13 @@ use App\Services\Workspace\AutoSettings;
 use App\Support\DocLink;
 use App\Support\DocsLinkAction;
 use App\Support\RepoUrlBuilder;
+use App\Enums\WorkspaceSetupStatus;
+use App\Filament\Workspaces\Resources\WorkspaceResource;
+use App\Services\Workspace\WorkspaceException;
+use App\Services\Workspace\WorkspaceSetupService;
+use Filament\Actions\Action;
+use Filament\Notifications\Notification;
+use Filament\Schemas\Components\Actions;
 use Closure;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Repeater;
@@ -402,7 +409,7 @@ final class WorkspaceForm
                     ->label(__('projects.fields.worker_stack_label'))
                     ->helperText(__('projects.fields.worker_stack_helper'))
                     ->options(fn (): array => self::stackOptions())
-                    ->placeholder(__('projects.fields.worker_stack_placeholder', ['stack' => (string) config('argos.compose.default_stack', 'php-8.4')]))
+                    ->placeholder(__('projects.fields.worker_stack_placeholder', ['stack' => (string) config('argos.compose.default_stack', 'php-8.5')]))
                     ->searchable()
                     ->native(false)
                     // Hidden for BYOI — the repo defines its own image.
@@ -526,7 +533,11 @@ final class WorkspaceForm
             ]);
     }
 
-    /** Setup state (read-only) and where the setup commands live. */
+    /**
+     * Setup state, the last setup check, the stack image and where the setup
+     * commands live; "Revise setup" and "Rebuild" act through
+     * WorkspaceSetupService.
+     */
     public static function setupSection(): Section
     {
         return Section::make(__('workspaces.settings.sections.setup'))
@@ -538,11 +549,77 @@ final class WorkspaceForm
                     ->label(__('workspaces.settings.fields.setup_status'))
                     ->state(fn (?Workspace $record): string => self::setupStatusLabel($record?->setup_status))
                     ->badge()
-                    ->color(fn (?Workspace $record): string => in_array($record?->setup_status, [null, ''], true) ? 'gray' : 'info'),
+                    ->color(fn (?Workspace $record): string => $record?->setup_status?->color() ?? 'gray'),
+                TextEntry::make('setup_branch_state')
+                    ->hiddenLabel()
+                    ->visible(fn (?Workspace $record): bool => $record?->setup_branch !== null)
+                    ->state(fn (?Workspace $record): string => (string) __('workspaces.setup.branch_applies', ['branch' => (string) $record?->setup_branch])),
+                TextEntry::make('setup_check_state')
+                    ->label(__('workspaces.setup.last_check'))
+                    ->visible(fn (?Workspace $record): bool => ($record?->setup_check ?? []) !== [])
+                    ->state(fn (?Workspace $record): array => array_map(
+                        fn (array $r): string => ($r['ok'] ? '✓ ' : '✗ ').__('workspaces.setup.steps.'.$r['step']),
+                        $record->setup_check ?? [],
+                    ))
+                    ->listWithLineBreaks(),
+                TextEntry::make('sources_state')
+                    ->label(__('workspaces.setup.sources'))
+                    ->state(function (?Workspace $record): array {
+                        $sources = $record !== null ? app(WorkspaceSetupService::class)->sources($record) : ['preview' => 'unknown', 'setup' => 'unknown'];
+
+                        return [
+                            __('workspaces.setup.source_preview').': '.__('workspaces.setup.source.'.$sources['preview']),
+                            __('workspaces.setup.source_setup').': '.__('workspaces.setup.source.'.$sources['setup']),
+                        ];
+                    })
+                    ->listWithLineBreaks(),
+                TextEntry::make('image_state')
+                    ->label(__('workspaces.setup.image'))
+                    ->state(function (?Workspace $record): string {
+                        $build = $record !== null ? app(WorkspaceSetupService::class)->currentImage($record) : null;
+
+                        return $build === null
+                            ? (string) __('workspaces.setup.image_none')
+                            : $build->status->label().($build->built_at !== null ? ' · '.$build->built_at->diffForHumans() : '');
+                    })
+                    ->hintActions([
+                        Action::make('imageLog')
+                            ->label(__('workspaces.setup.image_log'))
+                            ->link()
+                            ->visible(fn (?Workspace $record): bool => $record !== null && app(WorkspaceSetupService::class)->currentImage($record)?->build_log !== null)
+                            ->modalHeading(__('workspaces.setup.image_log'))
+                            ->modalSubmitAction(false)
+                            ->modalContent(fn (?Workspace $record): HtmlString => new HtmlString('<pre class="wf-log" style="max-height:60vh;overflow:auto;white-space:pre-wrap;font-size:12px">'.e(mb_substr((string) app(WorkspaceSetupService::class)->currentImage($record)?->build_log, -40_000)).'</pre>')),
+                        Action::make('rebuildImage')
+                            ->label(__('workspaces.setup.rebuild'))
+                            ->link()
+                            ->action(function (?Workspace $record): void {
+                                try {
+                                    app(WorkspaceSetupService::class)->rebuildImage($record, self::currentUser());
+                                    Notification::make()->title(__('workspaces.setup.rebuild_queued'))->success()->send();
+                                } catch (WorkspaceException $e) {
+                                    Notification::make()->title($e->getMessage())->warning()->send();
+                                }
+                            }),
+                    ]),
                 Callout::make(__('workspaces.settings.fields.setup_commands_heading'))
                     ->color('gray')
                     ->icon('heroicon-o-command-line')
                     ->description(__('workspaces.settings.fields.setup_commands_body')),
+                Actions::make([
+                    Action::make('reviseSetup')
+                        ->label(fn (?Workspace $record): string => $record !== null && app(WorkspaceSetupService::class)->openTask($record) !== null ? __('workspaces.setup.open_task') : __('workspaces.setup.revise'))
+                        ->icon('heroicon-o-sparkles')
+                        ->color('gray')
+                        ->action(function (?Workspace $record, $livewire): void {
+                            try {
+                                $task = app(WorkspaceSetupService::class)->start($record, self::currentUser());
+                                $livewire->redirect(WorkspaceResource::getUrl('view', ['record' => $record]).'?task='.$task->id);
+                            } catch (WorkspaceException $e) {
+                                Notification::make()->title($e->getMessage())->warning()->send();
+                            }
+                        }),
+                ])->key('setupActions'),
             ]);
     }
 
@@ -762,14 +839,17 @@ final class WorkspaceForm
         return $path !== '' ? $path : null;
     }
 
-    public static function setupStatusLabel(?string $status): string
+    public static function setupStatusLabel(?WorkspaceSetupStatus $status): string
     {
-        if ($status === null || $status === '') {
-            return (string) __('workspaces.settings.setup_status.none');
-        }
-        $key = 'workspaces.settings.setup_status.'.$status;
+        return $status?->label() ?? (string) __('workspaces.settings.setup_status.none');
+    }
 
-        return __($key) !== $key ? (string) __($key) : $status;
+    private static function currentUser(): User
+    {
+        /** @var User $user */
+        $user = Auth::user();
+
+        return $user;
     }
 
     /**
@@ -1077,8 +1157,9 @@ final class WorkspaceForm
     private static function stackOptions(): array
     {
         return WorkerStack::query()
-            ->where('status', '!=', WorkerImageEntityStatus::Disabled)
-            ->orderBy('name')
+            ->where('is_builtin', true)
+            ->where('status', WorkerImageEntityStatus::Active)
+            ->orderBy('label')
             ->get()
             ->mapWithKeys(fn (WorkerStack $stack): array => [
                 $stack->id => $stack->label !== '' ? "{$stack->label} ({$stack->name})" : $stack->name,

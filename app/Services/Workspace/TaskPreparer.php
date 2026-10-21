@@ -7,6 +7,7 @@ namespace App\Services\Workspace;
 use App\Enums\AutoTaskState;
 use App\Enums\BackingService;
 use App\Enums\TaskEventType;
+use App\Enums\TaskKind;
 use App\Enums\TaskStatus;
 use App\Enums\WorkspaceStatus;
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
@@ -70,6 +71,8 @@ class TaskPreparer
                 'base_branch' => $task->base_branch,
                 'env' => $this->environment->values($task),
                 'seq_offset' => $task->last_seq,
+                // An unmerged workspace setup: its setup steps apply already.
+                ...($workspace->setup_branch !== null && $workspace->setup_branch !== $task->branch ? ['setup_ref' => $workspace->setup_branch] : []),
             ]);
         } catch (DaemonTransportException $e) {
             $this->failed($task, $e->errorCode ?? 'daemon', $e->getMessage());
@@ -111,6 +114,9 @@ class TaskPreparer
     /** After the ingest committed: let a waiting auto-task go on. */
     public function afterPrepared(Task $task): void
     {
+        if ($task->status === TaskStatus::Active && $task->kind === TaskKind::Setup) {
+            app(WorkspaceSetupService::class)->begin($task);
+        }
         if ($task->status === TaskStatus::Active && $task->auto_state === AutoTaskState::Queued) {
             AdvanceAutoTaskJob::dispatch($task->id, 'begin');
         }

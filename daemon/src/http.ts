@@ -91,7 +91,17 @@ const prepareSchema = z.object({
     base_branch: z.string().min(1).max(255).regex(/^[A-Za-z0-9._\/-]+$/).refine((ref) => !ref.startsWith('-') && !ref.includes('..'), 'invalid branch'),
     env: z.record(z.string().regex(/^[A-Z][A-Z0-9_]*$/), z.string().max(4000)).default({}),
     seq_offset: z.number().int().min(0).default(0),
+    /** Branch of a workspace setup that is not merged yet: its setup steps apply. */
+    setup_ref: refSchema.optional(),
 });
+
+const setupCheckSchema = z.object({
+    ref: refSchema,
+    env: z.record(z.string().regex(/^[A-Z][A-Z0-9_]*$/), z.string().max(4000)).default({}),
+});
+
+/** Worktree the setup check uses; never a task's. */
+const SETUP_CHECK_SLUG = 'argos-setup-check';
 
 const commitSchema = z.object({
     subject: z.string().min(1).max(200),
@@ -272,7 +282,8 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
                 let log = '';
                 if (worktree.created && deps.setupScript !== undefined) {
                     emit('prepare.step', { step: 'setup' });
-                    const result = await deps.setupScript(worktree.path, body.env, SETUP_TIMEOUT_MS);
+                    const scriptEnv = body.setup_ref !== undefined ? { ...body.env, ARGOS_SETUP_REF: body.setup_ref } : body.env;
+                    const result = await deps.setupScript(worktree.path, scriptEnv, SETUP_TIMEOUT_MS);
                     setup = result.code === 0 ? 'ok' : 'failed';
                     log = result.output.length > 8192 ? result.output.slice(-8192) : result.output;
                 }
@@ -291,6 +302,33 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
         })();
 
         return reply.code(202).send({ status: 'preparing' });
+    });
+
+    /**
+     * Run the setup steps of `ref` in a fresh worktree and remove it again —
+     * the "setup commands work" part of testing a workspace setup. Answers
+     * when done (up to the setup timeout).
+     */
+    app.post('/setup/check', async (request) => {
+        const body = setupCheckSchema.parse(request.body);
+        if (deps.setupScript === undefined) {
+            return { setup: 'skipped', log: '' };
+        }
+        if (preparing.has(SETUP_CHECK_SLUG)) {
+            throw new CodedError(409, 'setup_check_running', 'A setup check is already running');
+        }
+        preparing.add(SETUP_CHECK_SLUG);
+        try {
+            await removeWorktree(layout, SETUP_CHECK_SLUG);
+            const worktree = await prepareWorktree(layout, { slug: SETUP_CHECK_SLUG, branch: 'argos/setup-check', baseBranch: body.ref, env: body.env });
+            writeEnv(worktree.path, body.env);
+            const result = await deps.setupScript(worktree.path, body.env, SETUP_TIMEOUT_MS);
+
+            return { setup: result.code === 0 ? 'ok' : 'failed', log: result.output.length > 8192 ? result.output.slice(-8192) : result.output };
+        } finally {
+            await removeWorktree(layout, SETUP_CHECK_SLUG);
+            preparing.delete(SETUP_CHECK_SLUG);
+        }
     });
 
     app.delete('/worktrees/:slug', async (request, reply) => {

@@ -17,8 +17,6 @@ class AdminAreaAccessTest extends TestCase
     private function adminRoutes(): array
     {
         return [
-            'filament.admin.resources.worker-stacks.index',
-            'filament.admin.resources.worker-image-builds.index',
             'filament.admin.resources.provider-o-auth-configs.index',
             'filament.admin.resources.api-clients.index',
             'filament.admin.resources.provider-credentials.index',

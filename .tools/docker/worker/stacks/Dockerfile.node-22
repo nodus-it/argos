@@ -1,0 +1,39 @@
+# syntax=docker/dockerfile:1.7
+#
+# stacks/Dockerfile.node-22 — Argos worker stack: Node 22 + common tools.
+#
+# The stack for JavaScript/TypeScript projects without PHP. See
+# stacks/Dockerfile.php-8.5 for the architectural notes; agent and worker
+# code are added by Dockerfile.compose on top of this image.
+FROM node:22-bookworm
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        gnupg \
+        git \
+        unzip \
+        jq \
+        default-mysql-client \
+        coreutils \
+        vim \
+        nano \
+        less; \
+    install -m 0755 -d /etc/apt/keyrings; \
+    curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+        -o /etc/apt/keyrings/githubcli-archive-keyring.gpg; \
+    chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg; \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+        > /etc/apt/sources.list.d/github-cli.list; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends gh; \
+    rm -rf /var/lib/apt/lists/*; \
+    corepack enable
+
+# The base image ships a `node` user with uid 1000; Argos expects `agent`.
+RUN usermod --login agent --move-home --home /home/agent node \
+    && groupmod --new-name agent node

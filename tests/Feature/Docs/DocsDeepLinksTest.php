@@ -10,7 +10,6 @@ use App\Filament\Admin\Resources\AgentCredentialResource\Pages\ListAgentCredenti
 use App\Filament\Admin\Resources\ApiClientResource\Pages\ListApiClients;
 use App\Filament\Admin\Resources\ProviderCredentialResource\Pages\ListProviderCredentials;
 use App\Filament\Admin\Resources\ProviderOAuthConfigResource\Pages\ListProviderOAuthConfigs;
-use App\Filament\Admin\Resources\WorkerStackResource\Pages\ListWorkerStacks;
 use App\Filament\Admin\Resources\WorkspaceResource\Pages\CreateWorkspace;
 use App\Filament\Admin\Resources\WorkspaceResource\Pages\ListWorkspaces;
 use App\Models\User;
@@ -60,7 +59,6 @@ class DocsDeepLinksTest extends TestCase
     {
         $landings = [
             [ListWorkspaces::class, 'projects'],
-            [ListWorkerStacks::class, 'worker-stacks'],
             [ListAgentCredentials::class, 'agents'],
             [ListProviderCredentials::class, 'credentials'],
             [ListApiClients::class, 'rest-api'],

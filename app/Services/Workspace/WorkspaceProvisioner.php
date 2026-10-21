@@ -45,7 +45,7 @@ class WorkspaceProvisioner
     public function boot(Workspace $workspace): void
     {
         try {
-            $resolved = $this->images->resolveForWorkspace($workspace, $workspace->default_branch);
+            $resolved = $this->images->resolveForWorkspace($workspace, $workspace->setupRef());
             $image = $this->imageBuilder->ensure($resolved)['tag'];
 
             $this->containers->prepareVolumes($workspace);

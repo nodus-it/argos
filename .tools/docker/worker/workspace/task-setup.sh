@@ -5,7 +5,8 @@
 # after it wrote the task's values (database, Redis prefix, …) into .env.
 # A project can bring its own steps in .argos/setup.sh (run with bash, from
 # the worktree root); without one the Laravel defaults run: composer install,
-# an APP_KEY and the migrations. Output goes to stdout/stderr; a non-zero
+# an APP_KEY and the migrations. While a workspace setup is not merged yet,
+# ARGOS_SETUP_REF names its branch and the steps come from there. Output goes to stdout/stderr; a non-zero
 # exit marks the setup as failed (the task stays usable).
 set -euo pipefail
 IFS=$'\n\t'
@@ -42,6 +43,15 @@ setup_migrate() {
 if [[ -f .argos/setup.sh ]]; then
     setup_log "running .argos/setup.sh"
     exec bash .argos/setup.sh
+fi
+
+if [[ -n "${ARGOS_SETUP_REF:-}" ]] && git cat-file -e "origin/${ARGOS_SETUP_REF}:.argos/setup.sh" 2>/dev/null; then
+    setup_log "running .argos/setup.sh from ${ARGOS_SETUP_REF}"
+    script="$(mktemp)"
+    git show "origin/${ARGOS_SETUP_REF}:.argos/setup.sh" > "$script"
+    trap 'rm -f "$script"' EXIT
+    bash "$script"
+    exit $?
 fi
 
 setup_composer

@@ -15,8 +15,7 @@ class BuiltinManifestTest extends TestCase
         $manifest = BuiltinManifest::default();
 
         $names = array_column($manifest->stacks(), 'name');
-        $this->assertContains('php-8.3', $names);
-        $this->assertContains('php-8.4', $names);
+        $this->assertSame(['php-8.5', 'php-8.4', 'node-22'], $names);
     }
 
     public function test_default_manifest_referenced_files_exist(): void

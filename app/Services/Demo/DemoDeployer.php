@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Demo;
 
 use App\Enums\DemoStatus;
+use App\Enums\TaskKind;
 use App\Models\Demo;
 use App\Models\Task;
 use App\Models\Workspace;
@@ -68,7 +69,7 @@ class DemoDeployer
 
         $log = '';
         try {
-            [$composeYaml, $settings] = $this->readContract($profile);
+            [$composeYaml, $settings] = $this->readContract($profile, $this->contractRef($target));
 
             // Resolve the built-in runtime-image placeholder to the content-
             // hashed, build-on-demand tag whenever a contract references it. The
@@ -142,7 +143,7 @@ class DemoDeployer
 
         $profile = $target->demoWorkspace();
 
-        [, $settings] = $this->readContract($profile);
+        [, $settings] = $this->readContract($profile, $this->contractRef($target));
         $entry = $this->parseEntry($settings);
 
         $log = "\n[rerun ".now()->toIso8601String()."]\n";
@@ -255,11 +256,10 @@ class DemoDeployer
      *
      * @return array{0: string, 1: array<string, mixed>} [composeYaml, settings]
      */
-    private function readContract(Workspace $profile): array
+    private function readContract(Workspace $profile, string $ref): array
     {
         $service = $this->gitFactory->forWorkspace($profile);
         $ownerRepo = $profile->getOwnerRepo();
-        $ref = $profile->default_branch;
 
         $composeYaml = $service->getFileContents($ownerRepo, DemoConfigLocator::COMPOSE_PATH, $ref);
         $settingsYaml = $service->getFileContents($ownerRepo, DemoConfigLocator::SETTINGS_PATH, $ref);
@@ -283,6 +283,20 @@ class DemoDeployer
         }
 
         return [$composeYaml, $settings];
+    }
+
+    /**
+     * The branch the contract is read from: a setup task tests its own
+     * branch; everything else uses the workspace's setup (an unmerged setup
+     * branch, else the default branch).
+     */
+    private function contractRef(DemoTarget $target): string
+    {
+        if ($target instanceof Task && $target->kind === TaskKind::Setup && $target->branch !== null) {
+            return $target->branch;
+        }
+
+        return $target->demoWorkspace()->setupRef();
     }
 
     /**

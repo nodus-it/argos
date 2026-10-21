@@ -648,3 +648,11 @@ a.wf-ref-chip:hover { text-decoration: underline; }
 .wf-pr-card > .wf-btn { align-self: flex-start; }
 .wf-pr-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding-top: 6px; border-top: 1px solid var(--wf-border); }
 .wf-pr-actions .wf-check { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; cursor: pointer; }
+
+/* Setup task: banner and test result */
+.ws-setup-note { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ws-setup-note > span { flex: 1; min-width: 12rem; }
+.ws-setup-note .wf-btn { min-height: 44px; }
+.wf-setup-steps { margin: 6px 0 0; padding: 0; list-style: none; font-size: 13px; }
+.wf-setup-steps .is-ok { color: var(--wf-ok); }
+.wf-setup-steps .is-fail { color: var(--wf-danger); }

@@ -69,9 +69,8 @@ class StatsOverviewWidget extends BaseWidget
                     ? __('widgets.stats.worker_updates_pending')
                     : __('widgets.stats.worker_updates_clean'))
                 ->descriptionIcon($pendingUpdates > 0 ? 'heroicon-m-arrow-up-circle' : 'heroicon-m-check-circle')
-                ->color($pendingUpdates > 0 ? 'warning' : 'success')
-                // Links to the image builds list, which has the per-row rebuild.
-                ->url($pendingUpdates > 0 ? route('filament.admin.resources.worker-image-builds.index') : null),
+                // Outdated images rebuild on the next workspace start.
+                ->color($pendingUpdates > 0 ? 'warning' : 'success'),
         ];
     }
 }
