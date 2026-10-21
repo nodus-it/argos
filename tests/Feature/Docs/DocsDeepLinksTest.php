@@ -12,7 +12,6 @@ use App\Filament\Admin\Resources\ProviderCredentialResource\Pages\ListProviderCr
 use App\Filament\Admin\Resources\ProviderOAuthConfigResource\Pages\ListProviderOAuthConfigs;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\CreateRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\ListRepoProfiles;
-use App\Filament\Admin\Resources\TaskResource\Pages\CreateTask;
 use App\Filament\Admin\Resources\WorkerStackResource\Pages\ListWorkerStacks;
 use App\Models\User;
 use App\Support\DocLink;
@@ -79,10 +78,6 @@ class DocsDeepLinksTest extends TestCase
         Livewire::test(CreateRepoProfile::class)
             ->assertSuccessful()
             ->assertSee(DocLink::url('projects'), escape: false);
-
-        Livewire::test(CreateTask::class)
-            ->assertSuccessful()
-            ->assertSee(DocLink::url('tasks'), escape: false);
     }
 
     public function test_connected_accounts_links_to_in_app_docs_not_github(): void

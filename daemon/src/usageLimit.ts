@@ -2,9 +2,8 @@
  * Usage/rate-limit detection for Claude subscription sessions.
  *
  * Primary signal is the SDK's structured `rate_limit_event` (status
- * `rejected`, `resetsAt` in epoch seconds). The text heuristics are a port of
- * `worker/lib/claude.sh` (`_claude_is_usage_limit_msg` /
- * `_claude_extract_reset_at`) and cover error messages and results that only
+ * `rejected`, `resetsAt` in epoch seconds). The text heuristics (ported
+ * from the former Bash worker) cover error messages and results that only
  * carry prose.
  */
 

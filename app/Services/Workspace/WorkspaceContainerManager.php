@@ -19,7 +19,7 @@ use Symfony\Component\Process\Process;
  */
 class WorkspaceContainerManager
 {
-    /** Same uid/gid as the worker images' `agent` user (see PhaseRunner). */
+    /** Same uid/gid as the worker images' `agent` user (see Dockerfile.compose). */
     private const AGENT_UID = '1000:1000';
 
     public function __construct(private readonly WorkspaceDaemonClient $daemon) {}

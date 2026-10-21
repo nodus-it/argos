@@ -13,13 +13,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 
 /**
- * An ephemeral live-demo deployment for a task — one per task, replaced on the
- * next implement run. Orchestrated by the manager after implement completes
- * (see live-demo-concept.md).
+ * An ephemeral live-demo (preview) deployment of a workspace — one current
+ * demo per workspace, replaced on the next build.
  *
  * @property string $id
- * @property string|null $task_id
- * @property string|null $workspace_id
+ * @property string $workspace_id
  * @property DemoStatus $status
  * @property string|null $url
  * @property string|null $compose_project
@@ -28,7 +26,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $build_log
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
- * @property-read Task $task
+ * @property-read Workspace|null $workspace
  */
 class Demo extends Model
 {
@@ -38,7 +36,6 @@ class Demo extends Model
     use HasUlids;
 
     protected $fillable = [
-        'task_id',
         'workspace_id',
         'status',
         'url',
@@ -58,14 +55,6 @@ class Demo extends Model
     }
 
     /**
-     * @return BelongsTo<Task, $this>
-     */
-    public function task(): BelongsTo
-    {
-        return $this->belongsTo(Task::class);
-    }
-
-    /**
      * @return BelongsTo<Workspace, $this>
      */
     public function workspace(): BelongsTo
@@ -73,9 +62,9 @@ class Demo extends Model
         return $this->belongsTo(Workspace::class);
     }
 
-    /** What the demo was built for (task or workspace), if still present. */
-    public function target(): Task|Workspace|null
+    /** What the demo was built for, if still present. */
+    public function target(): ?Workspace
     {
-        return $this->task ?? $this->workspace;
+        return $this->workspace;
     }
 }

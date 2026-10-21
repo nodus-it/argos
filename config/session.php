@@ -8,7 +8,7 @@ $appUrl = (string) env('APP_URL', 'http://localhost');
 $appHost = parse_url($appUrl, PHP_URL_HOST) ?: 'localhost';
 
 // A leading-dot cookie domain (.example.com) lets the Argos session span demo
-// subdomains (demo-<task>.example.com) — required for session-protected demos.
+// subdomains (demo-ws-<slug>.example.com) — required for session-protected demos.
 // Only valid for a real registrable domain; bare localhost / IPs / *.nip.io
 // (dev) must stay host-only (null) or browsers reject the cookie.
 $bareHost = $appHost === 'localhost'
@@ -38,7 +38,7 @@ return [
 
     // Env-overridable only so Argos-deployed-as-its-own-live-demo can pick a
     // distinct name (.argos/demo.compose.yml sets SESSION_COOKIE). The main app
-    // sets a leading-dot `.{domain}` cookie that spans demo-<task>.{domain}; if
+    // sets a leading-dot `.{domain}` cookie that spans demo-ws-<slug>.{domain}; if
     // the demo is also an Argos instance it would otherwise reuse `argos_session`
     // too, the browser would send the main app's cookie to the demo, the demo
     // couldn't decrypt it (different APP_KEY) and would reset the session every

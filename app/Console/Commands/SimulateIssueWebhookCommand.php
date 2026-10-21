@@ -21,7 +21,7 @@ use Illuminate\Support\Str;
     {--state=open : Issue state (open/closed)}
     {--label=* : Label name(s) to attach; repeat the flag for several}
     {--id= : Addressable issue id stored as external_id — GitHub/GitLab number, Linear node id (default: random)}')]
-#[Description('Deliver a signed, fake provider issue webhook to a binding locally — no public URL, tunnel, or external account needed. Runs the real controller (signature check, idempotency, job dispatch) so you can watch a Task appear.')]
+#[Description('Deliver a signed, fake provider issue webhook to a binding locally — no public URL, tunnel, or external account needed. Runs the real controller (signature check, idempotency, job dispatch) so you can watch an automatic run start.')]
 final class SimulateIssueWebhookCommand extends Command
 {
     public function __construct(private readonly IssueWebhookController $controller)
@@ -87,18 +87,18 @@ final class SimulateIssueWebhookCommand extends Command
 
         if ($link === null) {
             $this->warn('Webhook accepted, but no ExternalIssueLink appeared yet.');
-            $this->line('If your queue is async, the worker may still be processing — check the Tasks list in a moment.');
+            $this->line('If your queue is async, the worker may still be processing — check the workspaces in a moment.');
 
             return self::SUCCESS;
         }
 
-        if ($link->task_id === null) {
-            $this->info("Issue ingested, but filtered out (no Task created) — labels did not pass the binding filter. Link #{$link->id}.");
+        if ($link->workspace_id === null) {
+            $this->info("Issue ingested, but no run started — the labels did not pass the binding filter, or the project has no automation user (see the binding's last error). Link #{$link->id}.");
 
             return self::SUCCESS;
         }
 
-        $this->info("Task #{$link->task_id} created from the simulated issue (link #{$link->id}). Open the Tasks list to see it.");
+        $this->info("Automatic run started in workspace {$link->workspace_id} from the simulated issue (link #{$link->id}).");
 
         return self::SUCCESS;
     }

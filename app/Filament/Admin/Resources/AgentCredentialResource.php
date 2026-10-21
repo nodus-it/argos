@@ -19,7 +19,6 @@ use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Select;
-use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
@@ -141,24 +140,6 @@ class AgentCredentialResource extends Resource
                         ->revealable()
                         ->required(fn (Get $get): bool => self::isClaudeAgent($get))
                         ->visible(fn (Get $get): bool => self::isClaudeAgent($get)),
-
-                    // Codex: paste full auth.json contents. Stored verbatim
-                    // (decoded → encrypted JSON array). The form keeps the
-                    // raw text in a virtual field; we encode/decode in the
-                    // mutate hooks (see Pages\Edit/CreateAgentCredential).
-                    Textarea::make('credentials_json')
-                        ->label(__('worker.credentials.fields.auth_json'))
-                        ->helperText(__('worker.credentials.fields.auth_json_help'))
-                        ->rows(12)
-                        ->extraInputAttributes([
-                            'style' => 'font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px;',
-                            'spellcheck' => 'false',
-                        ])
-                        ->required(fn (Get $get): bool => self::isCodexAgent($get))
-                        ->visible(fn (Get $get): bool => self::isCodexAgent($get)),
-                    // NOT dehydrated(false) — we need the raw text in
-                    // $data so the page's mutate-hook can decode it
-                    // into the `credentials` (encrypted-array) column.
                 ]),
         ]);
     }
@@ -263,11 +244,6 @@ class AgentCredentialResource extends Resource
     public static function isClaudeAgent(Get $get): bool
     {
         return $get('agent_name') === AgentName::ClaudeCode->value;
-    }
-
-    public static function isCodexAgent(Get $get): bool
-    {
-        return $get('agent_name') === AgentName::Codex->value;
     }
 
     public static function getPages(): array

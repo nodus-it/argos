@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace App\Mcp\Tools;
 
 use App\Models\RepoProfile;
-use App\Models\Task;
+use App\Models\Workspace;
+use App\Services\Workspace\AutoSettings;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -17,7 +18,7 @@ class ProjectGet extends Tool
 {
     protected string $name = 'project_get';
 
-    protected string $description = 'Returns one repository profile (by id or name) together with an overview of its tasks.';
+    protected string $description = 'Returns one repository profile (by id or name) together with an overview of its workspaces.';
 
     public function schema(JsonSchema $schema): array
     {
@@ -40,16 +41,16 @@ class ProjectGet extends Tool
             return Response::error("Project not found: {$reference}");
         }
 
-        $tasks = $project->tasks()
+        $workspaces = $project->workspaces()
             ->orderByDesc('created_at')
             ->get()
-            ->map(fn (Task $t): array => [
-                'id' => $t->id,
-                'name' => $t->name,
-                'workflow_status' => $t->workflow_status->value,
-                'current_phase' => $t->current_phase?->value,
-                'feature_branch' => $t->feature_branch,
-                'pr_url' => $t->pr_url,
+            ->map(fn (Workspace $w): array => [
+                'id' => $w->id,
+                'name' => $w->name,
+                'status' => $w->status->value,
+                'origin' => $w->origin->value,
+                'branch' => $w->branch,
+                'pr_url' => $w->pr_url,
             ])
             ->all();
 
@@ -59,9 +60,8 @@ class ProjectGet extends Tool
             'url' => $project->url,
             'platform' => $project->platform->value,
             'default_branch' => $project->default_branch,
-            'auto_concept' => $project->auto_concept,
-            'auto_pr' => $project->auto_pr,
-            'tasks' => $tasks,
+            'auto_settings' => AutoSettings::resolve($project),
+            'workspaces' => $workspaces,
         ];
 
         return Response::text(json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT));

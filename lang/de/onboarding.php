@@ -26,10 +26,6 @@ return [
         'invalid_token_body' => 'Der eingegebene Token wurde von der API abgelehnt.',
         'saved_title' => 'Token gespeichert',
         'saved_unreachable_body' => 'Hinweis: Token konnte nicht gegen die API geprüft werden — Verbindung nicht erreichbar.',
-        'empty_codex' => 'Bitte den Inhalt von auth.json einfügen',
-        'invalid_codex_title' => 'auth.json ungültig',
-        'invalid_codex_body' => 'Der eingefügte Inhalt ist kein gültiges JSON.',
-        'codex_saved' => 'Codex-Credential gespeichert',
         'disconnected' => ':provider getrennt',
         'need_agent' => 'Bitte zuerst mindestens einen Agenten authentifizieren',
         'repo_incomplete' => 'Bitte Repository und Branch wählen',
@@ -57,10 +53,6 @@ return [
         'gate_hint' => 'Mindestens ein Agent erforderlich',
         'claude_label' => 'Claude Code',
         'claude_hint' => 'Token via <code class="text-xs">claude setup-token</code> erzeugen und unten einfügen.',
-        'codex_label' => 'OpenAI Codex',
-        'codex_hint' => '<code class="text-xs">codex login</code> ausführen, dann Inhalt von <code class="text-xs">~/.codex/auth.json</code> unten einfügen.',
-        'codex_placeholder' => '{"OPENAI_API_KEY": null, "tokens": {…}, …}',
-        'codex_saved_short' => 'Gespeichert — neuen Inhalt einfügen, um zu überschreiben.',
     ],
 
     'token' => [
@@ -108,7 +100,7 @@ return [
     'done' => [
         'heading' => 'Argos ist startklar',
         'description' => 'Dein erstes Projekt ist verbunden. Lege eine Aufgabe an, damit ein Agent aus einem Plan einen Pull Request macht.',
-        'create_task' => 'Erste Aufgabe anlegen',
+        'create_workspace' => 'Ersten Workspace öffnen',
         'view_project' => 'Projekt ansehen',
     ],
 ];

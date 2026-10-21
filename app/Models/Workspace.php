@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Enums\DemoAccessMode;
 use App\Enums\WorkspaceOrigin;
 use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceStatus;
@@ -161,8 +160,7 @@ class Workspace extends Model implements DemoTarget
     }
 
     /**
-     * Key for the workspace's live demo. Prefixed so it can never collide
-     * with a task demo (`demo-<task-slug>`).
+     * Key for the workspace's live demo (compose project, route, subdomain).
      */
     public function demoKey(): string
     {
@@ -190,18 +188,7 @@ class Workspace extends Model implements DemoTarget
         return $this->repoProfile;
     }
 
-    /** Workspace previews are members-only, like the editor. */
-    public function demoAccessMode(): DemoAccessMode
-    {
-        return DemoAccessMode::Workspace;
-    }
-
-    public function demoBasicPassword(): ?string
-    {
-        return null;
-    }
-
-    /** The agent user of the worker image (see PhaseRunner / prepareVolumes). */
+    /** The agent user of the worker image. */
     public function demoExecUser(): ?string
     {
         return '1000:1000';
@@ -227,8 +214,7 @@ class Workspace extends Model implements DemoTarget
     }
 
     /**
-     * Unique slug for a new workspace. Also checked against task slugs: the
-     * workspace demo key `ws-<slug>` shares the demo namespace with tasks.
+     * Unique slug for a new workspace (soft-deleted ones included).
      */
     public static function generateSlug(string $name): string
     {
@@ -239,7 +225,7 @@ class Workspace extends Model implements DemoTarget
 
         $slug = $base;
         $suffix = 2;
-        while (self::withTrashed()->where('slug', $slug)->exists() || Task::query()->where('slug', 'ws-'.$slug)->exists()) {
+        while (self::withTrashed()->where('slug', $slug)->exists()) {
             $slug = $base.'-'.$suffix++;
         }
 

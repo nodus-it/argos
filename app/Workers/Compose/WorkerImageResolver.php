@@ -8,18 +8,16 @@ use App\Enums\AgentName;
 use App\Enums\WorkerImageEntityStatus;
 use App\Enums\WorkerSource;
 use App\Models\RepoProfile;
-use App\Models\Task;
 use App\Models\WorkerStack;
 use App\Services\GitProvider\GitServiceFactory;
 use App\Workers\Agents\AgentSpec;
 use RuntimeException;
 
 /**
- * Resolves the (stack × agent) pair that should run for a task and
- * computes deterministic image tags. Used by PhaseRunner.
+ * Resolves the (stack × agent) pair a workspace image is built from and
+ * computes deterministic image tags.
  *
- * Resolution order for stack and agent: task-level override →
- * RepoProfile setting → config default.
+ * Stack resolution: RepoProfile setting (BYOI or stack) → config default.
  */
 class WorkerImageResolver
 {
@@ -28,21 +26,9 @@ class WorkerImageResolver
     ) {}
 
     /**
-     * Pure resolution — picks stack/agent and computes tags. Does not
-     * touch Docker. Throws IncompatibleStackAgentException if the pair
-     * doesn't satisfy the agent's required stack capabilities.
-     */
-    public function resolve(Task $task): ResolvedWorkerImage
-    {
-        return $this->resolveFor(
-            $this->resolveStack($task),
-            $this->resolveAgentName($task),
-        );
-    }
-
-    /**
-     * Stack/agent-direct variant — used by the rebuild job and tests
-     * where there is no task in scope.
+     * Pick stack/agent and compute tags. Does not touch Docker. Throws
+     * IncompatibleStackAgentException if the pair doesn't satisfy the
+     * agent's required stack capabilities.
      */
     public function resolveFor(WorkerStack $stack, AgentName $agentName): ResolvedWorkerImage
     {
@@ -66,10 +52,9 @@ class WorkerImageResolver
     }
 
     /**
-     * Resolution for a project without a task in scope (interactive
-     * workspaces): the project's stack (BYOI read at `$ref`) with the
-     * project's agent, falling back to Claude Code. Workspaces always run
-     * Claude, so a project configured for another agent still gets Claude.
+     * Resolution for a project (interactive workspaces): the project's stack
+     * (BYOI read at `$ref`) with Claude Code, the agent the workspace daemon
+     * hosts.
      */
     public function resolveForRepoProfile(RepoProfile $profile, string $ref): ResolvedWorkerImage
     {
@@ -82,52 +67,14 @@ class WorkerImageResolver
         return $this->resolveFor($stack, $agentName);
     }
 
-    /**
-     * Resolution + build-on-demand. Returns the worker image tag ready
-     * for `docker run`. Builds synchronously when the image is missing.
-     */
-    public function resolveOrBuild(Task $task): string
-    {
-        $resolved = $this->resolve($task);
-
-        if (! $this->builder->workerImageExists($resolved->workerTag)) {
-            $this->builder->build($resolved);
-        }
-
-        return $resolved->workerTag;
-    }
-
     /** Repo-relative path of a BYOI stack-base recipe. */
     private const BYOI_DOCKERFILE_PATH = '.argos/worker.dockerfile';
-
-    private function resolveStack(Task $task): WorkerStack
-    {
-        // An explicit per-task stack override always wins.
-        if ($task->workerStackOverride !== null) {
-            return $task->workerStackOverride;
-        }
-
-        $profile = $task->repoProfile;
-
-        // BYOI: the repo ships its own stack-base recipe under
-        // .argos/worker.dockerfile. Argos still layers the agent + worker code
-        // on top (Dockerfile.compose), so this only replaces the FROM base.
-        if ($profile?->worker_source === WorkerSource::Byoi) {
-            return $this->resolveByoiStack(
-                $profile,
-                $task->base_branch ?? $profile->default_branch,
-                $this->resolveAgentName($task),
-            );
-        }
-
-        return $profile?->workerStack ?? $this->defaultStack();
-    }
 
     /**
      * Materialise the repo's .argos/worker.dockerfile as a WorkerStack so the
      * normal build pipeline (content-hash tag, on-demand build, image-build
      * tracking) applies unchanged. The file is read via the provider API at the
-     * task's base branch — before any worker image (and thus any clone) exists.
+     * workspace's base branch — before any image (and thus any clone) exists.
      */
     private function resolveByoiStack(RepoProfile $profile, string $ref, AgentName $agentName): WorkerStack
     {
@@ -172,13 +119,6 @@ class WorkerImageResolver
         }
 
         return 'byoi';
-    }
-
-    private function resolveAgentName(Task $task): AgentName
-    {
-        return $task->worker_agent_name_override
-            ?? $task->repoProfile?->worker_agent_name
-            ?? AgentName::ClaudeCode;
     }
 
     private function defaultStack(): WorkerStack
@@ -228,10 +168,6 @@ class WorkerImageResolver
     {
         return [
             'worker/lib',
-            'worker/phases',
-            'worker/prompts',
-            'worker/schemas',
-            '.tools/docker/worker/worker-entrypoint.sh',
             '.tools/docker/worker/Dockerfile.compose',
         ];
     }
@@ -239,8 +175,8 @@ class WorkerImageResolver
     /**
      * Hash of every file the worker Dockerfile copies into the image. Without
      * it the image tag would only react to the *stack* dockerfile, leaving
-     * worker/lib/, worker/phases/, prompts/, schemas/ and the worker
-     * Dockerfile/entrypoint changes silently cached behind the same tag.
+     * worker/lib/ (the gate helpers) and Dockerfile changes silently cached
+     * behind the same tag.
      */
     private function workerLibFingerprint(): string
     {

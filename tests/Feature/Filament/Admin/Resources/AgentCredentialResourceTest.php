@@ -7,7 +7,6 @@ namespace Tests\Feature\Filament\Admin\Resources;
 use App\Enums\AgentCredentialStatus;
 use App\Enums\AgentName;
 use App\Filament\Admin\Resources\AgentCredentialResource\Pages\CreateAgentCredential;
-use App\Filament\Admin\Resources\AgentCredentialResource\Pages\EditAgentCredential;
 use App\Filament\Admin\Resources\AgentCredentialResource\Pages\ListAgentCredentials;
 use App\Models\AgentCredential;
 use App\Models\User;
@@ -80,63 +79,5 @@ class AgentCredentialResourceTest extends TestCase
             ->assertNotified();
 
         $this->assertDatabaseMissing('agent_credentials', ['name' => 'Bad Claude']);
-    }
-
-    public function test_create_persists_codex_auth_json_from_textarea(): void
-    {
-        $authJson = json_encode([
-            'OPENAI_API_KEY' => null,
-            'tokens' => ['access_token' => 'sk-xyz', 'refresh_token' => 'rt-abc'],
-            'last_refresh' => '2026-05-09T00:00:00Z',
-        ]);
-
-        Livewire::test(CreateAgentCredential::class)
-            ->fillForm([
-                'agent_name' => AgentName::Codex->value,
-                'name' => 'My Codex',
-                'status' => AgentCredentialStatus::Active->value,
-                'credentials_json' => $authJson,
-            ])
-            ->call('create')
-            ->assertHasNoFormErrors();
-
-        $cred = AgentCredential::query()->where('name', 'My Codex')->first();
-        $this->assertNotNull($cred);
-        $this->assertSame(AgentName::Codex, $cred->agent_name);
-        $this->assertSame('sk-xyz', $cred->credentials['tokens']['access_token']);
-    }
-
-    public function test_create_rejects_invalid_codex_json(): void
-    {
-        $this->expectException(\RuntimeException::class);
-
-        Livewire::test(CreateAgentCredential::class)
-            ->fillForm([
-                'agent_name' => AgentName::Codex->value,
-                'name' => 'Broken Codex',
-                'status' => AgentCredentialStatus::Active->value,
-                'credentials_json' => 'not-json{{{',
-            ])
-            ->call('create');
-    }
-
-    public function test_edit_codex_credential_round_trips_json(): void
-    {
-        $cred = AgentCredential::factory()->create([
-            'agent_name' => AgentName::Codex,
-            'name' => 'Codex original',
-            'credentials' => ['tokens' => ['access_token' => 'sk-old']],
-        ]);
-
-        Livewire::test(EditAgentCredential::class, ['record' => $cred->getKey()])
-            ->fillForm([
-                'credentials_json' => json_encode([
-                    'tokens' => ['access_token' => 'sk-new', 'refresh_token' => 'rt-new'],
-                ]),
-            ])
-            ->call('save')
-            ->assertHasNoFormErrors();
-
-        $this->assertSame('sk-new', $cred->fresh()->credentials['tokens']['access_token']);
     }
 }

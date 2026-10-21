@@ -216,7 +216,6 @@ class TestProvidersCommand extends Command
                     'auth_method' => 'pat',
                     'token' => $token,
                     'connected_account_id' => null,
-                    'auto_concept' => false,
                     'auto_pr' => false,
                 ],
             );
@@ -296,7 +295,6 @@ class TestProvidersCommand extends Command
                     'auth_method' => 'oauth',
                     'token' => null,
                     'connected_account_id' => $account->id,
-                    'auto_concept' => false,
                     'auto_pr' => false,
                 ],
             );

@@ -20,7 +20,7 @@ class ProjectController extends Controller
         $scoped = $this->scopedProjectId($request);
 
         $projects = RepoProfile::query()
-            ->withCount('openTasks')
+            ->withCount('openWorkspaces')
             ->when($scoped !== null, fn ($query) => $query->whereKey($scoped))
             ->orderBy('name')
             ->get();
@@ -32,7 +32,7 @@ class ProjectController extends Controller
     {
         $this->assertProjectVisible($request, $repoProfile);
 
-        $repoProfile->loadCount('openTasks');
+        $repoProfile->loadCount('openWorkspaces');
 
         return new ProjectResource($repoProfile);
     }

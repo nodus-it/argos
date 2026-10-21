@@ -10,15 +10,13 @@ use App\Filament\Admin\Resources\RepoProfileResource;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\CreateRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\EditRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\ListRepoProfiles;
-use App\Filament\Admin\Resources\RepoProfileResource\Pages\ViewRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\RelationManagers\TaskProviderBindingsRelationManager;
-use App\Filament\Admin\Resources\RepoProfileResource\RelationManagers\TasksRelationManager;
 use App\Models\ConnectedAccount;
 use App\Models\ProviderCredential;
 use App\Models\RepoProfile;
-use App\Models\Task;
 use App\Models\TaskProviderBinding;
 use App\Models\User;
+use App\Models\Workspace;
 use Filament\Actions\CreateAction;
 use Filament\Actions\Testing\TestAction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -69,8 +67,6 @@ class RepoProfileResourceTest extends TestCase
                 'platform' => 'github',
                 'token' => 'pat-123',
                 'default_branch' => 'main',
-                'auto_concept' => false,
-                'auto_pr' => false,
             ])
             ->call('create')
             ->assertHasNoFormErrors()
@@ -79,28 +75,6 @@ class RepoProfileResourceTest extends TestCase
         $this->assertDatabaseHas(RepoProfile::class, [
             'name' => 'Test Projekt',
             'platform' => 'github',
-        ]);
-    }
-
-    public function test_can_set_per_project_max_turns(): void
-    {
-        Saloon::fake([
-            'api.github.com/repos/test-org/test-repo/branches*' => MockResponse::make([['name' => 'main']]),
-        ]);
-        $profile = RepoProfile::factory()->create(['default_branch' => 'main']);
-
-        Livewire::test(EditRepoProfile::class, ['record' => $profile->getKey()])
-            ->fillForm([
-                'max_turns_concept' => 80,
-                'max_turns_implement' => 300,
-            ])
-            ->call('save')
-            ->assertHasNoFormErrors();
-
-        $this->assertDatabaseHas(RepoProfile::class, [
-            'id' => $profile->id,
-            'max_turns_concept' => 80,
-            'max_turns_implement' => 300,
         ]);
     }
 
@@ -196,11 +170,11 @@ class RepoProfileResourceTest extends TestCase
         $profile = RepoProfile::factory()->create();
 
         Livewire::test(EditRepoProfile::class, ['record' => $profile->getKey()])
-            ->fillForm(['name' => 'Umbenannt', 'auto_pr' => true])
+            ->fillForm(['name' => 'Umbenannt'])
             ->call('save')
             ->assertHasNoFormErrors();
 
-        $this->assertDatabaseHas(RepoProfile::class, ['id' => $profile->id, 'name' => 'Umbenannt', 'auto_pr' => true]);
+        $this->assertDatabaseHas(RepoProfile::class, ['id' => $profile->id, 'name' => 'Umbenannt']);
     }
 
     public function test_can_delete_repo_profile(): void
@@ -443,13 +417,22 @@ class RepoProfileResourceTest extends TestCase
             ->assertSee($profile->name);
     }
 
-    public function test_edit_page_includes_tasks_relation_manager(): void
+    public function test_edit_page_includes_task_provider_bindings_relation_manager(): void
     {
         $profile = RepoProfile::factory()->create();
 
         Livewire::test(EditRepoProfile::class, ['record' => $profile->getKey()])
             ->assertSuccessful()
-            ->assertSeeLivewire(TasksRelationManager::class);
+            ->assertSeeLivewire(TaskProviderBindingsRelationManager::class);
+    }
+
+    public function test_table_counts_workspaces_per_project(): void
+    {
+        $profile = RepoProfile::factory()->create();
+        Workspace::factory()->count(2)->for($profile, 'repoProfile')->create();
+
+        Livewire::test(ListRepoProfiles::class)
+            ->assertTableColumnStateSet('workspaces_count', 2, $profile);
     }
 
     public function test_resource_registers_task_provider_bindings_relation_manager(): void
@@ -574,35 +557,6 @@ class RepoProfileResourceTest extends TestCase
                 'credential_ref' => "oauth:{$githubAccount->id}",
             ])
             ->assertHasActionErrors(['credential_ref']);
-    }
-
-    public function test_tasks_relation_manager_shows_tasks(): void
-    {
-        $profile = RepoProfile::factory()->create();
-        $tasks = Task::factory()->count(2)->create(['repo_profile_id' => $profile->id]);
-
-        Livewire::test(TasksRelationManager::class, [
-            'ownerRecord' => $profile,
-            'pageClass' => ViewRepoProfile::class,
-        ])
-            ->assertSuccessful()
-            ->assertCanSeeTableRecords($tasks);
-    }
-
-    public function test_tasks_relation_manager_does_not_show_other_profile_tasks(): void
-    {
-        $profile = RepoProfile::factory()->create();
-        $otherProfile = RepoProfile::factory()->create();
-        $ownTask = Task::factory()->create(['repo_profile_id' => $profile->id]);
-        $foreignTask = Task::factory()->create(['repo_profile_id' => $otherProfile->id]);
-
-        Livewire::test(TasksRelationManager::class, [
-            'ownerRecord' => $profile,
-            'pageClass' => ViewRepoProfile::class,
-        ])
-            ->assertSuccessful()
-            ->assertCanSeeTableRecords([$ownTask])
-            ->assertCanNotSeeTableRecords([$foreignTask]);
     }
 
     public function test_can_create_bitbucket_repo_profile_with_pat(): void

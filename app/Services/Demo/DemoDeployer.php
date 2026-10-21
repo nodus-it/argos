@@ -7,7 +7,6 @@ namespace App\Services\Demo;
 use App\Enums\DemoStatus;
 use App\Models\Demo;
 use App\Models\RepoProfile;
-use App\Models\Task;
 use App\Models\Workspace;
 use App\Services\GitProvider\GitServiceFactory;
 use Illuminate\Support\Facades\Log;
@@ -17,11 +16,10 @@ use Symfony\Component\Yaml\Yaml;
 use Throwable;
 
 /**
- * Deploys an ephemeral live demo for a task after a successful implement run.
+ * Deploys an ephemeral live demo (preview) for a workspace.
  *
- * The implemented code already lives in the task workspace volume
- * (`task_ws_{id}`); rather than checking it out again, the deployer MOUNTS that
- * volume into the entry service of the repo-supplied `.argos/demo.compose.yml`,
+ * The code already lives in the workspace volume; rather than checking it out
+ * again, the deployer MOUNTS that volume into the entry service of the repo-supplied `.argos/demo.compose.yml`,
  * runs the configured `commands` inside the container, and publishes a Traefik
  * file-provider route so the demo is reachable under its own subdomain.
  *
@@ -44,7 +42,7 @@ class DemoDeployer
     ) {}
 
     /**
-     * Build (or rebuild) the live demo for a task or workspace. Always replaces
+     * Build (or rebuild) the live demo for a target. Always replaces
      * a previous demo of the same target. Returns the persisted Demo row (live
      * or failed).
      */
@@ -58,8 +56,8 @@ class DemoDeployer
         $slug = $target->demoSlug();
         $project = $slug;
 
-        // A task has exactly one current demo — tear the old one down first so
-        // a re-implement cleanly replaces it (containers, volumes, route).
+        // A target has exactly one current demo — tear the old one down first so
+        // a rebuild cleanly replaces it (containers, volumes, route).
         $this->teardownBySlug($slug);
 
         $demo = Demo::query()->create([
@@ -73,14 +71,6 @@ class DemoDeployer
 
         $log = '';
         try {
-            // Pull external commits a user pushed to the feature branch into the
-            // volume first, so the demo reflects the current remote state (I2).
-            // No-op on a dirty tree — see DemoWorkspaceSync.
-            // Workspaces are the source of truth themselves — never sync them.
-            if ($target instanceof Task) {
-                app(DemoWorkspaceSync::class)->syncToRemote($target);
-            }
-
             [$composeYaml, $settings] = $this->readContract($profile);
 
             // Resolve the built-in runtime-image placeholder to the content-
@@ -105,12 +95,7 @@ class DemoDeployer
             $log .= $this->runCommands($project, $entry['service'], $settings['commands'] ?? [], $target->demoExecUser());
             $log .= $this->probeHealth($project, $entry, $settings['health'] ?? null);
 
-            $url = $router->writeRoute(
-                $slug,
-                $entry['port'],
-                $target->demoAccessMode(),
-                $target->demoBasicPassword(),
-            );
+            $url = $router->writeRoute($slug, $entry['port']);
 
             $demo->forceFill([
                 'status' => DemoStatus::Live,
@@ -186,7 +171,6 @@ class DemoDeployer
     private function ownerColumns(DemoTarget $target): array
     {
         return [
-            'task_id' => $target instanceof Task ? $target->id : null,
             'workspace_id' => $target instanceof Workspace ? $target->id : null,
         ];
     }
@@ -197,10 +181,8 @@ class DemoDeployer
     }
 
     /**
-     * Tear a demo stack down by its slug alone — no Task row required, so this
-     * still works after the task (and its demo row) has been deleted. The slug
-     * is derived deterministically from the task name (demoSlug), so a deleted
-     * task's stack stays addressable.
+     * Tear a demo stack down by its slug alone, so this still works after the
+     * target (and its demo row) has been deleted.
      */
     public function teardownBySlug(string $slug): void
     {
@@ -216,7 +198,7 @@ class DemoDeployer
     }
 
     /**
-     * Honour preview.max_concurrent: if running demos of OTHER tasks would push
+     * Honour preview.max_concurrent: if running demos of OTHER targets would push
      * the total over the cap (counting the one we're about to start), evict the
      * oldest ones until there is room. Evictions are logged — never silent.
      */
@@ -230,9 +212,7 @@ class DemoDeployer
         $own = $this->ownerColumns($current);
         $active = Demo::query()
             ->whereIn('status', [DemoStatus::Building->value, DemoStatus::Live->value])
-            ->where(fn ($q) => $q
-                ->where(fn ($t) => $own['task_id'] === null ? $t->whereNotNull('task_id') : $t->where('task_id', '!=', $own['task_id']))
-                ->orWhere(fn ($w) => $own['workspace_id'] === null ? $w->whereNotNull('workspace_id') : $w->where('workspace_id', '!=', $own['workspace_id'])))
+            ->when($own['workspace_id'] !== null, fn ($q) => $q->where('workspace_id', '!=', $own['workspace_id']))
             ->orderBy('created_at')
             ->get();
 
@@ -250,11 +230,9 @@ class DemoDeployer
             }
             $demo->update(['status' => DemoStatus::Stopped, 'url' => null]);
 
-            $owner = $demo->task_id !== null ? "task {$demo->task_id}" : "workspace {$demo->workspace_id}";
-            $log .= "[cap] evicted demo {$demo->id} ({$owner}) to stay under max_concurrent={$max}\n";
+            $log .= "[cap] evicted demo {$demo->id} (workspace {$demo->workspace_id}) to stay under max_concurrent={$max}\n";
             Log::channel('argos')->info('Evicted demo to honour concurrency cap', [
                 'demo' => $demo->id,
-                'task' => $demo->task_id,
                 'workspace' => $demo->workspace_id,
                 'max' => $max,
             ]);
@@ -445,50 +423,6 @@ class DemoDeployer
         }
 
         throw new RuntimeException("Demo health check failed after {$timeout}s ({$url}): {$lastErr}");
-    }
-
-    /**
-     * Re-write the live demo's route for a task after its access mode (or basic
-     * password) changed — applies the new protection without a full redeploy.
-     * No-op when the task has no live demo with a known entry port.
-     */
-    public function applyAccessMode(Task $task): void
-    {
-        $demo = $task->currentDemo();
-        if ($demo === null || $demo->status !== DemoStatus::Live) {
-            return;
-        }
-
-        $slug = $this->demoSlug($task);
-        $router = app(TraefikRouter::class);
-
-        // Demos deployed before the `port` column existed have a null port —
-        // recover it from the live route file so the toggle still works.
-        $port = $demo->port ?? $router->existingRoutePort($slug);
-        if ($port === null) {
-            return;
-        }
-
-        if ($demo->port === null) {
-            $demo->forceFill(['port' => $port])->save();
-        }
-
-        $router->writeRoute(
-            $slug,
-            $port,
-            $task->effectiveDemoAccessMode(),
-            $task->demo_basic_password,
-        );
-    }
-
-    /**
-     * DNS-safe demo slug derived from the task name. Used identically as the
-     * compose project name, the edge-network alias, the Traefik router/service
-     * name, and the subdomain label — so they always line up.
-     */
-    public function demoSlug(Task $task): string
-    {
-        return $task->demoSlug();
     }
 
     /** Truncate an overly long build log to keep the DB row reasonable (head+tail). */

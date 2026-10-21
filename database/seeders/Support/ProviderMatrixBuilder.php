@@ -24,7 +24,7 @@ use Illuminate\Console\Command;
  *     its own profile, GitLab on its own profile, and Linear (which has no git
  *     repo) hung off the Bitbucket profile.
  *
- * So every git provider has a repo profile and every task provider has a
+ * So every git provider has a repo profile and every issue provider has a
  * binding. Demo refs default to the committed coordinates in
  * tests/External/providers.defaults.php; the SEED_*_REF / SEED_GITLAB_INSTANCE
  * env vars override them (e.g. to point GitLab at a self-hosted instance), and
@@ -72,7 +72,7 @@ final class ProviderMatrixBuilder
         }
 
         // …and Linear (no git repo of its own) on the Bitbucket profile, so
-        // every task provider is covered.
+        // every issue provider is covered.
         $this->seedLinear($user, $label, $bitbucketProfile, $defaults);
 
         return [
@@ -99,8 +99,6 @@ final class ProviderMatrixBuilder
                 'default_branch' => 'main',
                 'auth_method' => $account !== null ? AuthMethod::OAuth->value : AuthMethod::Pat->value,
                 'connected_account_id' => $account?->id,
-                'auto_concept' => false,
-                'auto_pr' => false,
             ],
         );
     }

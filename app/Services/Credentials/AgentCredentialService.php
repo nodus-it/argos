@@ -8,7 +8,7 @@ use App\Models\AgentCredential;
 use App\Services\EntityService;
 
 /**
- * Operations on a stored agent credential (the Claude/Codex auth the worker
+ * Operations on a stored agent credential (the Claude auth the worker
  * runs with). Plain CRUD via the base today; form-side input normalisation and
  * the live token probe still run in the resource's save hooks.
  */

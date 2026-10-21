@@ -34,7 +34,7 @@ class RedirectToCanonicalHostTest extends TestCase
         $this->get('http://nginx/up')->assertOk();
         // The gate answers for itself (404: unknown host) — never a redirect.
         $this->withHeaders(['Accept' => 'text/html'])->get('http://nginx/_argos/workspace-gate')->assertNotFound();
-        $this->getJson('http://nginx/api/v1/tasks')->assertUnauthorized();
+        $this->getJson('http://nginx/api/v1/workspaces')->assertUnauthorized();
         $this->withHeaders(['Accept' => 'text/html'])->post('http://nginx/webhooks/issues/github/x')->assertNotFound();
     }
 

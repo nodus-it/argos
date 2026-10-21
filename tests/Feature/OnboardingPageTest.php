@@ -209,7 +209,7 @@ class OnboardingPageTest extends TestCase
 
     public function test_github_connect_button_only_visible_when_oauth_configured(): void
     {
-        $this->configureCodexAgent();
+        $this->configureClaudeAgent();
         config(['services.github.client_id' => null, 'services.github.client_secret' => null]);
 
         Livewire::test(Onboarding::class)
@@ -224,7 +224,7 @@ class OnboardingPageTest extends TestCase
 
     public function test_gitlab_connect_button_visible_when_gitlab_oauth_configured(): void
     {
-        $this->configureCodexAgent();
+        $this->configureClaudeAgent();
         config([
             'services.gitlab.client_id' => 'gl-cid',
             'services.gitlab.client_secret' => 'gl-cs',
@@ -236,7 +236,7 @@ class OnboardingPageTest extends TestCase
 
     public function test_bitbucket_connect_button_visible_when_bitbucket_oauth_configured(): void
     {
-        $this->configureCodexAgent();
+        $this->configureClaudeAgent();
         config([
             'services.bitbucket.client_id' => 'bb-cid',
             'services.bitbucket.client_secret' => 'bb-cs',
@@ -246,13 +246,13 @@ class OnboardingPageTest extends TestCase
             ->assertSee('Connect with Bitbucket');
     }
 
-    /** Create a Codex credential so the wizard's agent gate is satisfied. */
-    private function configureCodexAgent(): void
+    /** Create a Claude credential so the wizard's agent gate is satisfied. */
+    private function configureClaudeAgent(): void
     {
         AgentCredential::create([
-            'agent_name' => AgentName::Codex->value,
+            'agent_name' => AgentName::ClaudeCode->value,
             'name' => 'Default',
-            'credentials' => ['tokens' => ['access_token' => 'sk-codex-test']],
+            'credentials' => ['token' => 'oat-test'],
             'status' => AgentCredentialStatus::Active->value,
         ]);
     }
@@ -279,7 +279,7 @@ class OnboardingPageTest extends TestCase
 
     public function test_onboarding_offers_self_hosted_gitlab_oauth(): void
     {
-        $this->configureCodexAgent();
+        $this->configureClaudeAgent();
         ProviderOAuthConfig::factory()->create([
             'provider' => IntegrationProvider::GitLab,
             'instance_url' => 'https://git.example.com',
@@ -297,7 +297,7 @@ class OnboardingPageTest extends TestCase
 
     public function test_onboarding_lists_stored_tokens_in_authorize_step(): void
     {
-        $this->configureCodexAgent();
+        $this->configureClaudeAgent();
         ProviderCredential::factory()->create([
             'provider' => IntegrationProvider::GitLab,
             'label' => 'CI token',
@@ -319,7 +319,7 @@ class OnboardingPageTest extends TestCase
             ->call('nextStep')
             ->assertSet('currentStep', 2);
 
-        $this->configureCodexAgent();
+        $this->configureClaudeAgent();
 
         Livewire::test(Onboarding::class)
             ->call('goToStep', 2)
@@ -336,7 +336,7 @@ class OnboardingPageTest extends TestCase
 
     public function test_step2_renders_with_credential_setup_links_when_no_oauth_configured(): void
     {
-        $this->configureCodexAgent();
+        $this->configureClaudeAgent();
         config([
             'services.github.client_id' => null,
             'services.gitlab.client_id' => null,
@@ -354,7 +354,7 @@ class OnboardingPageTest extends TestCase
 
     public function test_step2_offers_adding_more_oauth_apps_when_one_is_configured(): void
     {
-        $this->configureCodexAgent();
+        $this->configureClaudeAgent();
         config(['services.github.client_id' => 'cid', 'services.github.client_secret' => 'cs']);
 
         // Even with GitHub configured, the "add another OAuth app" route must be
@@ -367,7 +367,7 @@ class OnboardingPageTest extends TestCase
 
     public function test_inline_create_with_oauth_account_creates_repo_profile(): void
     {
-        $this->configureCodexAgent();
+        $this->configureClaudeAgent();
 
         /** @var User $user */
         $user = auth()->user();
@@ -396,7 +396,9 @@ class OnboardingPageTest extends TestCase
             ->set('selectedBranch', 'main')
             ->set('projectName', 'widget')
             ->call('createProject')
-            ->assertSet('currentStep', 4);
+            ->assertSet('currentStep', 4)
+            ->assertSee(__('onboarding.done.create_workspace'))
+            ->assertSee('/w/workspaces/create');
 
         $this->assertDatabaseHas(RepoProfile::class, [
             'name' => 'widget',
@@ -410,7 +412,7 @@ class OnboardingPageTest extends TestCase
 
     public function test_inline_create_with_pat_credential_creates_repo_profile(): void
     {
-        $this->configureCodexAgent();
+        $this->configureClaudeAgent();
 
         $credential = ProviderCredential::factory()->create([
             'provider' => IntegrationProvider::GitHub,
@@ -443,7 +445,7 @@ class OnboardingPageTest extends TestCase
 
     public function test_inline_create_rejects_duplicate_name(): void
     {
-        $this->configureCodexAgent();
+        $this->configureClaudeAgent();
         RepoProfile::factory()->create(['name' => 'widget']);
 
         $credential = ProviderCredential::factory()->create([
@@ -473,75 +475,5 @@ class OnboardingPageTest extends TestCase
     public function test_onboarding_visible_in_nav_when_no_project(): void
     {
         $this->assertTrue(Onboarding::shouldRegisterNavigation());
-    }
-
-    public function test_onboarding_shows_codex_setup_box_when_no_codex_credential(): void
-    {
-        Livewire::test(Onboarding::class)
-            ->call('goToStep', 2)
-            ->assertSet('codexConfigured', false)
-            ->assertSee('OpenAI Codex')
-            ->assertSee('codex login')
-            ->assertSeeHtml('wire:click="saveCodexAuthJson"');
-    }
-
-    public function test_onboarding_marks_agents_done_when_only_codex_credential_present(): void
-    {
-        AgentCredential::create([
-            'agent_name' => AgentName::Codex->value,
-            'name' => 'Default',
-            'credentials' => ['tokens' => ['access_token' => 'sk-codex-test']],
-            'status' => AgentCredentialStatus::Active->value,
-        ]);
-
-        // With one agent configured, the gate is satisfied and the wizard
-        // resumes on the repository step.
-        Livewire::test(Onboarding::class)
-            ->assertSet('codexConfigured', true)
-            ->assertSet('tokenSource', 'none')
-            ->assertSet('currentStep', 3);
-    }
-
-    public function test_save_codex_auth_json_persists_and_clears_input(): void
-    {
-        $authJson = json_encode([
-            'OPENAI_API_KEY' => null,
-            'tokens' => ['access_token' => 'sk-codex-test', 'id_token' => 'id-test'],
-        ]);
-
-        Livewire::test(Onboarding::class)
-            ->set('codexAuthJson', $authJson)
-            ->call('saveCodexAuthJson')
-            ->assertSet('codexConfigured', true)
-            ->assertSet('codexAuthJson', '');
-
-        $cred = AgentCredential::query()
-            ->where('agent_name', AgentName::Codex->value)
-            ->where('status', AgentCredentialStatus::Active->value)
-            ->first();
-        $this->assertNotNull($cred);
-        $this->assertSame('sk-codex-test', $cred->credentials['tokens']['access_token']);
-    }
-
-    public function test_save_codex_auth_json_rejects_invalid_json(): void
-    {
-        Livewire::test(Onboarding::class)
-            ->set('codexAuthJson', 'not-json {')
-            ->call('saveCodexAuthJson')
-            ->assertSet('codexConfigured', false);
-
-        $this->assertFalse(
-            AgentCredential::query()
-                ->where('agent_name', AgentName::Codex->value)
-                ->exists(),
-        );
-    }
-
-    public function test_save_codex_auth_json_rejects_empty_input(): void
-    {
-        Livewire::test(Onboarding::class)
-            ->set('codexAuthJson', '   ')
-            ->call('saveCodexAuthJson')
-            ->assertSet('codexConfigured', false);
     }
 }

@@ -24,8 +24,8 @@ class AgentPool
     private const DEFAULT_LIMIT_MINUTES = 60;
 
     /**
-     * Claude agents the user may start a thread on: own and shared ones that
-     * are active and not usage-limited right now.
+     * Agents the user may start a thread on: own and shared ones whose agent
+     * the workspace daemon supports, active and not usage-limited right now.
      *
      * @return Collection<int, AgentCredential>
      */
@@ -33,7 +33,10 @@ class AgentPool
     {
         return AgentCredential::query()
             ->usableBy($user)
-            ->where('agent_name', AgentName::ClaudeCode->value)
+            ->whereIn('agent_name', array_map(
+                fn (AgentName $name): string => $name->value,
+                array_filter(AgentName::cases(), fn (AgentName $name): bool => $name->supportsWorkspaces()),
+            ))
             ->where('status', AgentCredentialStatus::Active->value)
             ->where(fn ($q) => $q->whereNull('usage_limited_until')->orWhere('usage_limited_until', '<=', now()))
             ->orderByRaw('user_id is null')

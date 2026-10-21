@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Demo;
 
-use App\Models\Task;
+use App\Models\RepoProfile;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -42,8 +42,8 @@ class ArgosDemoSeedingTest extends TestCase
 
         $this->seed(DatabaseSeeder::class);
 
-        // FullDemoSeeder ran (admin-only DatabaseSeeder creates no tasks).
-        $this->assertGreaterThan(0, Task::query()->count());
+        // FullDemoSeeder ran (admin-only DatabaseSeeder creates no projects).
+        $this->assertGreaterThan(0, RepoProfile::query()->count());
         $this->assertDatabaseHas('users', ['email' => 'admin@argos.local']);
     }
 
@@ -55,7 +55,7 @@ class ArgosDemoSeedingTest extends TestCase
 
         // Production-safe default: just the admin user, no demo data.
         $this->assertSame(1, User::query()->count());
-        $this->assertSame(0, Task::query()->count());
+        $this->assertSame(0, RepoProfile::query()->count());
         $this->assertDatabaseHas('users', ['email' => 'admin@argos.local']);
     }
 }

@@ -192,6 +192,8 @@ return [
         'closed' => 'geschlossen',
     ],
     'review' => [
+        'badge_new' => 'NEU',
+        'badge_deleted' => 'GELÖSCHT',
         'remove' => 'Kommentar entfernen',
         'summary' => ':files Datei(en) · :ahead nicht gepushte(r) Commit(s) · :uncommitted nicht committete Datei(en)',
         'refresh' => 'Aktualisieren',

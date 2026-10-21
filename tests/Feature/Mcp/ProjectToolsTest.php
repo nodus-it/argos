@@ -8,8 +8,8 @@ use App\Mcp\Servers\ArgosServer;
 use App\Mcp\Tools\ProjectGet;
 use App\Mcp\Tools\ProjectList;
 use App\Models\RepoProfile;
-use App\Models\Task;
 use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Passport\Passport;
 
@@ -23,29 +23,30 @@ function projectMcpUser(): User
     return $user;
 }
 
-test('project_list returns the configured projects with open task counts', function () {
+test('project_list returns the configured projects with open workspace counts', function () {
     $user = projectMcpUser();
     $project = RepoProfile::factory()->create(['name' => 'argos-repo']);
-    Task::factory()->for($project, 'repoProfile')->create();
-    Task::factory()->for($project, 'repoProfile')->completed()->create();
+    Workspace::factory()->for($project, 'repoProfile')->create();
+    Workspace::factory()->for($project, 'repoProfile')->stopped()->create();
 
     ArgosServer::actingAs($user)
         ->tool(ProjectList::class, [])
         ->assertOk()
         ->assertSee('argos-repo')
-        ->assertSee('"open_tasks": 1');
+        ->assertSee('"open_workspaces": 1')
+        ->assertSee('"auto_settings"');
 });
 
-test('project_get resolves a project by name and lists its tasks', function () {
+test('project_get resolves a project by name and lists its workspaces', function () {
     $user = projectMcpUser();
     $project = RepoProfile::factory()->create(['name' => 'argos-repo']);
-    Task::factory()->for($project, 'repoProfile')->create(['name' => 'task-alpha']);
+    Workspace::factory()->for($project, 'repoProfile')->create(['name' => 'ws-alpha']);
 
     ArgosServer::actingAs($user)
         ->tool(ProjectGet::class, ['project' => 'argos-repo'])
         ->assertOk()
         ->assertSee('argos-repo')
-        ->assertSee('task-alpha');
+        ->assertSee('ws-alpha');
 });
 
 test('project_get returns an error for an unknown project', function () {

@@ -20,9 +20,8 @@ class RedirectToOnboarding
             // first RepoProfile exists, so onboarding can link into them.
             'filament.admin.pages.docs',
             'filament.admin.resources.repo-profiles.create',
-            // Onboarding links into agent-credentials/create for the Codex
-            // setup flow — both create and the post-save edit route must be
-            // reachable while no RepoProfile exists yet.
+            // Agents are set up before the first RepoProfile exists — both
+            // create and the post-save edit route must be reachable.
             'filament.admin.resources.agent-credentials.*',
             // OAuth apps and Personal Access Tokens are set up before the first
             // RepoProfile exists, so the onboarding flow can reach them too.

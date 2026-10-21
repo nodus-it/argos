@@ -23,7 +23,6 @@ use Illuminate\Foundation\Vite;
 use Illuminate\Foundation\ViteManifestNotFoundException;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
-use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\HtmlString;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 
@@ -85,10 +84,6 @@ trait ConfiguresArgosPanel
                 // content header into the topbar, matching the design.
                 PanelsRenderHook::TOPBAR_START,
                 fn (): string => '<div id="argos-topbar-breadcrumbs" class="fi-argos-topbar-breadcrumbs"></div>',
-            )
-            ->renderHook(
-                PanelsRenderHook::CONTENT_START,
-                fn (): string => Blade::render('@livewire(\'usage-limit-banner\')')
             )
             ->renderHook(
                 PanelsRenderHook::USER_MENU_BEFORE,

@@ -4,29 +4,12 @@ declare(strict_types=1);
 
 namespace App\Workers\Agents;
 
-use App\Models\AgentCredential;
-
 /**
- * Manager-side agent runner contract.
- *
- * Implementations describe an agent (Claude Code, Codex, …) statically
- * via spec() and translate a stored AgentCredential into the env-vars
- * the worker container needs at runtime via materializeCredential().
- *
- * The Bash-side runner (worker/lib/agents/<name>.sh) is the worker
- * container's counterpart; both are kept in sync via convention, not
- * a shared interface (different runtimes).
+ * Manager-side agent contract: a static description of the agent (Claude
+ * Code, …) that the worker image build installs. The workspace daemon hosts
+ * the agent at runtime.
  */
 interface AgentRunner
 {
     public static function spec(): AgentSpec;
-
-    /**
-     * Translate a stored AgentCredential into the env-vars the worker
-     * needs. Implementations may fall back to the legacy on-disk token
-     * file when $credential is null.
-     *
-     * @throws \RuntimeException when no credential can be resolved.
-     */
-    public function materializeCredential(?AgentCredential $credential): MaterializedAgentCredential;
 }

@@ -9,7 +9,7 @@ use Illuminate\Encryption\Encrypter;
 use Symfony\Component\Yaml\Yaml;
 
 /**
- * Builds the per-task `docker compose` override for a live demo: mounts the task
+ * Builds the `docker compose` override for a live demo: mounts the
  * workspace volume into the entry service, joins the Traefik edge network under
  * a unique alias, pins the external URL + a throwaway app key + a per-demo
  * session cookie, and caps resources. Split out of DemoDeployer so the
@@ -19,7 +19,7 @@ use Symfony\Component\Yaml\Yaml;
 class DemoComposeBuilder
 {
     /**
-     * Generate the per-task compose override. Deliberately carries NO Traefik
+     * Generate the compose override. Deliberately carries NO Traefik
      * labels — routing is done via the file provider, not the docker provider.
      *
      * @param  array{service: string, port: int, workspace_mount: string}  $entry
@@ -103,7 +103,7 @@ class DemoComposeBuilder
                     'external' => true,
                 ],
             ],
-            // The task workspace volume is created by the worker and pre-exists;
+            // The workspace volume pre-exists;
             // declare it external so compose mounts it instead of erroring on an
             // "undefined volume".
             'volumes' => [

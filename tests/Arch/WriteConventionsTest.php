@@ -84,7 +84,7 @@ function presentationSourceFiles(): array
                 continue;
             }
 
-            $relative = ltrim(str_replace($root, '', $file->getPathname()), '/');
+            $relative = substr($file->getPathname(), strlen($root) + 1);
             if (in_array($relative, $exempt, true)) {
                 continue;
             }
@@ -153,7 +153,7 @@ it('writes workspace members only through WorkspaceMemberService', function (): 
         if ($file->getExtension() !== 'php') {
             continue;
         }
-        $relative = ltrim(str_replace($root, '', $file->getPathname()), '/');
+        $relative = substr($file->getPathname(), strlen($root) + 1);
         if ($relative === $allowed) {
             continue;
         }

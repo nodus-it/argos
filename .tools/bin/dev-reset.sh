@@ -5,11 +5,11 @@
 # Profile:
 #   basic — nur Admin-User; Onboarding startet bei null (BasicDemoSeeder)
 #   full  — jede Ansicht mit allen Varianten gefüllt (FullDemoSeeder)
-#   live  — echtes OAuth aus .env, ein echter Task startklar (LiveReadySeeder)
+#   live  — echtes OAuth aus .env, ein echtes Projekt startklar (LiveReadySeeder)
 #
 # Pipeline:
 #   1. migrate:fresh + <Profil>-Seeder im app-Container
-#   2. Task-Workspace-Volumes (task_ws_*) entfernen
+#   2. Workspace-Volumes (ws_*) samt Containern entfernen
 #   3. Worker-Images (argos-worker:*, argos-stack:*) entfernen
 #   4. Laravel-Cache leeren + queue-Worker neustarten
 #
@@ -45,12 +45,11 @@ compose() {
 echo "==> migrate:fresh + ${SEEDER} (${MODE} profile)"
 compose exec -T app php artisan migrate:fresh --force --seed --seeder="$SEEDER"
 
-echo "==> rm task_ws_* volumes"
-mapfile -t volumes < <(docker volume ls --filter 'name=task_ws_' --format '{{.Name}}')
+echo "==> rm ws_* volumes"
+mapfile -t volumes < <(docker volume ls --filter 'name=ws_' --format '{{.Name}}' | grep '^ws_' || true)
 if [[ ${#volumes[@]} -gt 0 ]]; then
     for vol in "${volumes[@]}"; do
-        # A leftover worker/live-demo container (e.g. argos-demo:* from a live
-        # preview) may still mount the workspace volume and block its removal.
+        # A workspace or live-demo container may still mount the workspace volume and block its removal.
         # Force-remove any such container first, then drop the volume. Cleanup
         # is best-effort: a single failure must not abort the whole reset.
         mapfile -t holders < <(docker ps -aq --filter "volume=${vol}")

@@ -14,11 +14,8 @@ use Illuminate\Foundation\Queue\Queueable;
 /**
  * Queue wrapper around WorkerImageBuilder for UI-driven rebuilds.
  *
- * The PhaseRunner-driven path uses WorkerImageResolver::resolveOrBuild()
- * synchronously inside its own queue job — that is fine because
- * RunPhaseJob already runs in a worker with a long timeout. This job
- * exists for cases where Filament (step 6) wants to trigger a rebuild
- * without going through a task: bumping a pinned agent version, forcing
+ * Workspace provisioning builds missing images inline. This job exists for
+ * rebuilds triggered from the admin: bumping a pinned agent version, forcing
  * a cache-bust after a stack edit, or pre-warming a (stack, agent) pair.
  */
 class BuildWorkerImageJob implements ShouldQueue

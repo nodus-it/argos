@@ -6,13 +6,6 @@ namespace App\Mcp\Servers;
 
 use App\Mcp\Tools\ProjectGet;
 use App\Mcp\Tools\ProjectList;
-use App\Mcp\Tools\TaskConcept;
-use App\Mcp\Tools\TaskCreate;
-use App\Mcp\Tools\TaskFeedback;
-use App\Mcp\Tools\TaskGet;
-use App\Mcp\Tools\TaskImplement;
-use App\Mcp\Tools\TaskList;
-use App\Mcp\Tools\TaskPr;
 use App\Mcp\Tools\ThreadMessage;
 use App\Mcp\Tools\ThreadPause;
 use App\Mcp\Tools\ThreadPlanDecide;
@@ -47,9 +40,6 @@ use Laravel\Mcp\Server\Tool;
     5. `thread_message` sends feedback into the thread; set `resume_auto` to let
        the run continue on its own. `thread_pause` / `thread_resume` control it.
     6. `workspace_ship` ships the current state on demand.
-
-    The older task tools (task_*) still work but are being replaced by
-    workspaces.
     TXT)]
 class ArgosServer extends Server
 {
@@ -67,13 +57,6 @@ class ArgosServer extends Server
         ThreadPlanDecide::class,
         ThreadPause::class,
         ThreadResume::class,
-        TaskList::class,
-        TaskGet::class,
-        TaskCreate::class,
-        TaskFeedback::class,
-        TaskConcept::class,
-        TaskImplement::class,
-        TaskPr::class,
     ];
 
     /** @var array<int, class-string> */

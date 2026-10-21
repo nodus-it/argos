@@ -26,10 +26,6 @@ return [
         'invalid_token_body' => 'The entered token was rejected by the API.',
         'saved_title' => 'Token saved',
         'saved_unreachable_body' => 'Note: Token could not be verified against the API — connection not reachable.',
-        'empty_codex' => 'Please paste the auth.json content',
-        'invalid_codex_title' => 'auth.json invalid',
-        'invalid_codex_body' => 'The pasted content is not valid JSON.',
-        'codex_saved' => 'Codex credential saved',
         'disconnected' => ':provider disconnected',
         'need_agent' => 'Authenticate at least one agent first',
         'repo_incomplete' => 'Please pick a repository and branch',
@@ -57,10 +53,6 @@ return [
         'gate_hint' => 'At least one agent required',
         'claude_label' => 'Claude Code',
         'claude_hint' => 'Generate a token with <code class="text-xs">claude setup-token</code> and paste it below.',
-        'codex_label' => 'OpenAI Codex',
-        'codex_hint' => 'Run <code class="text-xs">codex login</code>, then paste the contents of <code class="text-xs">~/.codex/auth.json</code> below.',
-        'codex_placeholder' => '{"OPENAI_API_KEY": null, "tokens": {…}, …}',
-        'codex_saved_short' => 'Saved — paste new content to overwrite.',
     ],
 
     'token' => [
@@ -107,8 +99,8 @@ return [
 
     'done' => [
         'heading' => 'Argos is ready',
-        'description' => 'Your first project is connected. Create a task to let an agent turn a plan into a pull request.',
-        'create_task' => 'Create first task',
+        'description' => 'Your first project is connected. Open a workspace to work on it with Claude, or start an automatic run that ends in a pull request.',
+        'create_workspace' => 'Open first workspace',
         'view_project' => 'View project',
     ],
 ];

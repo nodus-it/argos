@@ -8,10 +8,9 @@ use App\Enums\GitProvider;
 use App\Models\RepoProfile;
 
 /**
- * The repository token a worker or workspace authenticates git with, and its
- * git credential form. Shared by PhaseCommandBuilder (tasks) and the
- * workspace credential endpoint so both resolve — and refresh — tokens the
- * same way.
+ * The repository token a workspace authenticates git with, and its git
+ * credential form. Used by the workspace credential endpoint, which resolves
+ * — and refreshes — tokens through it.
  */
 class RepoTokenResolver
 {
@@ -23,7 +22,7 @@ class RepoTokenResolver
 
     /**
      * Username/password pair for git's credential protocol. Mirrors
-     * `git_auth_header` (worker/lib/credentials.sh): a token that already
+     * `git_auth_header` (the workspace git credential helper): a token that already
      * carries `user:secret` is split, Bitbucket uses `x-token-auth`, every
      * other provider accepts `oauth2`.
      *

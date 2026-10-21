@@ -41,10 +41,10 @@ return [
         /*
          * Description rendered on the home page of the API documentation (`/docs/api`).
          */
-        'description' => 'Server-to-server REST API onto the same task workflow as the '
+        'description' => 'Server-to-server REST API onto the same workspaces and automatic runs as the '
             .'Argos UI and MCP server. Authenticate with a Sanctum bearer token '
             .'(personal access token) carrying the required abilities '
-            .'(`projects:read`, `tasks:read`, `tasks:write`).',
+            .'(`projects:read`, `workspaces:read`, `workspaces:write`).',
     ],
 
     'ui' => [

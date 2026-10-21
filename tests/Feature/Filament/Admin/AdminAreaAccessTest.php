@@ -45,13 +45,12 @@ class AdminAreaAccessTest extends TestCase
         }
     }
 
-    public function test_projects_tasks_and_agents_stay_open_to_everyone(): void
+    public function test_projects_and_agents_stay_open_to_everyone(): void
     {
         RepoProfile::factory()->create();
         $this->actingAs(User::factory()->create());
 
         $this->get(route('filament.admin.resources.repo-profiles.index'))->assertOk();
-        $this->get(route('filament.admin.resources.tasks.index'))->assertOk();
         $this->get(route('filament.admin.resources.agent-credentials.index'))->assertOk();
     }
 

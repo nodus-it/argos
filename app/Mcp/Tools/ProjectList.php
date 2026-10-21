@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Mcp\Tools;
 
 use App\Models\RepoProfile;
+use App\Services\Workspace\AutoSettings;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
-use Illuminate\Database\Eloquent\Builder;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
@@ -17,7 +17,7 @@ class ProjectList extends Tool
 {
     protected string $name = 'project_list';
 
-    protected string $description = 'Lists the configured repository profiles (projects) Argos can run tasks against, including their workflow defaults and the number of open tasks.';
+    protected string $description = 'Lists the configured repository profiles (projects) Argos works on, including their automation defaults and the number of open workspaces.';
 
     public function schema(JsonSchema $schema): array
     {
@@ -27,7 +27,7 @@ class ProjectList extends Tool
     public function handle(Request $request): Response
     {
         $projects = RepoProfile::query()
-            ->withCount(['tasks as open_tasks' => fn (Builder $q) => $q->where('workflow_status', '!=', 'completed')])
+            ->withCount('openWorkspaces')
             ->orderBy('name')
             ->get()
             ->map(fn (RepoProfile $p): array => [
@@ -36,9 +36,8 @@ class ProjectList extends Tool
                 'url' => $p->url,
                 'platform' => $p->platform->value,
                 'default_branch' => $p->default_branch,
-                'auto_concept' => $p->auto_concept,
-                'auto_pr' => $p->auto_pr,
-                'open_tasks' => (int) $p->getAttribute('open_tasks'),
+                'auto_settings' => AutoSettings::resolve($p),
+                'open_workspaces' => (int) $p->getAttribute('open_workspaces_count'),
             ])
             ->all();
 

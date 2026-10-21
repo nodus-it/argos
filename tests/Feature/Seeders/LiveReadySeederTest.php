@@ -6,7 +6,6 @@ use App\Enums\AuthMethod;
 use App\Models\AgentCredential;
 use App\Models\ConnectedAccount;
 use App\Models\RepoProfile;
-use App\Models\Task;
 use App\Models\User;
 use Database\Seeders\LiveReadySeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -59,7 +58,7 @@ it('skips wiring cleanly when required env is unset but keeps the admin user', f
     expect(ConnectedAccount::count())->toBe(0);
 });
 
-it('wires a runnable github-oauth task when env is set', function () {
+it('wires a runnable github-oauth project when env is set', function () {
     $this->app->detectEnvironment(fn () => 'local');
     setSeedEnv([
         'SEED_GITHUB_OAUTH_TOKEN' => 'gho_live_token',
@@ -83,7 +82,7 @@ it('wires a runnable github-oauth task when env is set', function () {
     expect($profile->live_demo_enabled)->toBeTrue();
 
     expect(AgentCredential::where('name', 'live')->where('status', 'active')->exists())->toBeTrue();
-    expect(Task::where('name', 'Live demo task')->where('workflow_status', 'draft')->exists())->toBeTrue();
+    expect($profile->automation_user_id)->toBe(User::where('email', 'admin@argos.local')->value('id'));
 
     // expires_at=null ⇒ no refresh round-trip ⇒ the seeded token is returned offline.
     expect($profile->resolveToken())->toBe('gho_live_token');

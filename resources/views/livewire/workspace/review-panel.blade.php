@@ -124,8 +124,8 @@
                 <div class="diff" wire:key="file-{{ md5($path) }}">
                     <div class="diff-file">
                         @svg('heroicon-o-document-text')
-                        @if ($file['is_new'] ?? false) <span class="chip">{{ __('tasks.view.diff.badge_new') }}</span>
-                        @elseif ($file['is_deleted'] ?? false) <span class="chip">{{ __('tasks.view.diff.badge_deleted') }}</span>
+                        @if ($file['is_new'] ?? false) <span class="chip">{{ __('workspaces.review.badge_new') }}</span>
+                        @elseif ($file['is_deleted'] ?? false) <span class="chip">{{ __('workspaces.review.badge_deleted') }}</span>
                         @endif
                         <span class="path">{{ $path }}</span>
                         <span><span class="stat-add">+{{ $file['additions'] }}</span> <span class="stat-del">−{{ $file['deletions'] }}</span></span>

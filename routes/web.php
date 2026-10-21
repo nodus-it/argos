@@ -5,8 +5,7 @@ declare(strict_types=1);
 use App\Http\Controllers\Auth\BitbucketConnectedAccountController;
 use App\Http\Controllers\Auth\ConnectedAccountController;
 use App\Http\Controllers\Auth\LinearConnectedAccountController;
-use App\Http\Controllers\DemoGateController;
-use App\Http\Controllers\TaskLogController;
+use App\Http\Controllers\SystemLogController;
 use App\Http\Controllers\ThreadAttachmentController;
 use App\Http\Controllers\Webhooks\IssueWebhookController;
 use App\Http\Controllers\WorkspaceGateController;
@@ -24,11 +23,6 @@ Route::get('/admin/workspaces/{path?}', fn (Request $request, ?string $path = nu
     301,
 ))
     ->where('path', '.*');
-
-// Traefik forwardAuth target for session-protected live demos. Public route
-// (no auth middleware) — it answers 204 when logged in, else redirects to the
-// Argos login. See DemoGateController.
-Route::get('/_argos/demo-gate', DemoGateController::class)->name('demo.gate');
 
 // Traefik forwardAuth target for workspace hosts (code-<slug> editor and
 // workspace demos). Checks membership, not just a login. See
@@ -56,13 +50,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/workspaces/{workspace}/open/{target}', WorkspaceOpenController::class)
         ->whereIn('target', ['code', 'preview'])
         ->name('workspaces.open');
-    Route::get('/tasks/{task}/logs/download', [TaskLogController::class, 'downloadPhaseLog'])
-        ->name('tasks.logs.download');
-
-    Route::get('/tasks/{task}/logs/bundle', [TaskLogController::class, 'downloadBundle'])
-        ->name('tasks.logs.bundle');
-
-    Route::get('/system/log/download', [TaskLogController::class, 'downloadAppLog'])
+    Route::get('/system/log/download', SystemLogController::class)
         ->name('system.log.download');
 });
 

@@ -139,29 +139,6 @@
                         </div>
                     </div>
 
-                    {{-- Codex --}}
-                    <div class="rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-4 space-y-3">
-                        <div class="flex items-center gap-2">
-                            @if($codexConfigured)
-                                <x-heroicon-o-check-circle class="h-5 w-5 text-emerald-500 flex-shrink-0" />
-                            @else
-                                <x-heroicon-o-key class="h-5 w-5 text-gray-400 flex-shrink-0" />
-                            @endif
-                            <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">{{ __('onboarding.agents.codex_label') }}</span>
-                        </div>
-
-                        <p class="text-xs text-gray-500 dark:text-gray-400">{!! __('onboarding.agents.codex_hint') !!}</p>
-                        @if($codexConfigured)
-                            <p class="text-xs text-emerald-600 dark:text-emerald-400">{{ __('onboarding.agents.codex_saved_short') }}</p>
-                        @endif
-                        <div class="flex gap-2 items-start">
-                            <textarea wire:model="codexAuthJson" rows="3" placeholder="{{ __('onboarding.agents.codex_placeholder') }}" autocomplete="off" spellcheck="false"
-                                class="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-xs font-mono text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"></textarea>
-                            <x-filament::button wire:click="saveCodexAuthJson" type="button">
-                                {{ __('onboarding.token.save_button') }}
-                            </x-filament::button>
-                        </div>
-                    </div>
                 </div>
 
                 <div class="px-6 py-4 bg-gray-50 dark:bg-gray-800/50 flex items-center justify-between">
@@ -377,8 +354,8 @@
                     <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ __('onboarding.done.heading') }}</h2>
                     <p class="text-sm text-gray-500 dark:text-gray-400 max-w-md mx-auto">{{ __('onboarding.done.description') }}</p>
                     <div class="flex items-center justify-center gap-3 pt-2">
-                        <x-filament::button tag="a" href="{{ route('filament.admin.resources.tasks.create') }}" icon="heroicon-o-plus">
-                            {{ __('onboarding.done.create_task') }}
+                        <x-filament::button tag="a" href="{{ \App\Filament\Workspaces\Resources\WorkspaceResource::getUrl('create', panel: 'workspaces') }}" icon="heroicon-o-plus">
+                            {{ __('onboarding.done.create_workspace') }}
                         </x-filament::button>
                         @if ($createdProfileId)
                             <x-filament::button tag="a" color="gray" href="{{ route('filament.admin.resources.repo-profiles.edit', ['record' => $createdProfileId]) }}">

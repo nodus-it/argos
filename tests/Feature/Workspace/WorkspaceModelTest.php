@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Workspace;
 
-use App\Models\Task;
 use App\Models\Workspace;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -21,13 +20,10 @@ class WorkspaceModelTest extends TestCase
         $this->assertStringEndsNotWith('-', Workspace::slugify(str_repeat('ab-', 40)));
     }
 
-    public function test_generated_slugs_avoid_workspace_and_task_demo_collisions(): void
+    public function test_generated_slugs_avoid_workspace_collisions(): void
     {
         Workspace::factory()->create(['slug' => 'login']);
         $this->assertSame('login-2', Workspace::generateSlug('Login'));
-
-        Task::factory()->create(['slug' => 'ws-checkout']);
-        $this->assertSame('checkout-2', Workspace::generateSlug('Checkout'));
 
         $trashed = Workspace::factory()->create(['slug' => 'billing']);
         $trashed->delete();

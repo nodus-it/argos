@@ -56,21 +56,10 @@ return [
         ],
     ],
 
-    'task' => [
-        'description' => [
-            'title' => 'Tipps für gute Task-Beschreibungen',
-            'body' => 'Konkrete Akzeptanzkriterien führen zu besseren PRs. Schreibe was getan werden soll, *warum*, und woran du das Ergebnis erkennst. Lass den User-Story-Style weg — der Agent ist kein PM.',
-        ],
-        'no_projects' => [
-            'title' => 'Noch kein Projekt',
-            'body' => 'Du brauchst zuerst ein Projekt mit Repo und Token, bevor du einen Task anlegen kannst.',
-        ],
-    ],
-
     'claude_token' => [
         'expiry' => [
             'title' => 'Token-Ablauf',
-            'body' => 'Der Claude-Token läuft nach einigen Wochen ab. Wenn Tasks plötzlich mit "401 Unauthorized" fehlschlagen: <code>claude setup-token</code> erneut ausführen und neu eintragen.',
+            'body' => 'Der Claude-Token läuft nach einigen Wochen ab. Wenn Threads plötzlich mit "401 Unauthorized" fehlschlagen: <code>claude setup-token</code> erneut ausführen und neu eintragen.',
             'doc_label' => 'Claude Code Quickstart',
             'doc_url' => ':claude_setup_token',
         ],

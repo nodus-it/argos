@@ -84,10 +84,6 @@ x-preview-env: &preview-env
   ARGOS_PREVIEW_CPU_LIMIT:      "${ARGOS_PREVIEW_CPU_LIMIT:-}"
   ARGOS_PREVIEW_MEM_LIMIT:      "${ARGOS_PREVIEW_MEM_LIMIT:-}"
   ARGOS_PREVIEW_DEFAULT_IMAGE:  "${ARGOS_PREVIEW_DEFAULT_IMAGE:-}"
-  ARGOS_PREVIEW_AUTH:           "${ARGOS_PREVIEW_AUTH:-}"
-  ARGOS_PREVIEW_BASIC_USER:     "${ARGOS_PREVIEW_BASIC_USER:-}"
-  ARGOS_PREVIEW_BASIC_PASSWORD: "${ARGOS_PREVIEW_BASIC_PASSWORD:-}"
-  ARGOS_PREVIEW_AUTH_GATE_URL:  "${ARGOS_PREVIEW_AUTH_GATE_URL:-}"
 
 # Realtime (Laravel Reverb). Server-side publishing goes straight to the
 # reverb service; browsers connect through Traefik at /app on the Argos host.
@@ -166,10 +162,10 @@ services:
       APP_KEY:                           "${APP_KEY:-}"
       ADMIN_PASSWORD:                    "${ADMIN_PASSWORD:-}"
       # Browser-E2E only: boots E2eFakeServiceProvider (offline fakes for the
-      # worker run + external validations). Empty by default; double-gated in
-      # AppServiceProvider (set AND not-production), so production is never
-      # affected even if it leaks in. Forwarded to app + queue because the
-      # FakePhaseRunner runs in the queued RunPhaseJob.
+      # workspace runtime + external validations). Empty by default; double-
+      # gated in AppServiceProvider (set AND not-production), so production is
+      # never affected even if it leaks in. Forwarded to app + queue because
+      # workspace jobs run queued.
       ARGOS_E2E_FAKE:                    "${ARGOS_E2E_FAKE:-}"
       ARGOS_CONFIG_DIR:                  /data/config
       ARGOS_TRAEFIK_DIR:                 /data/traefik

@@ -31,18 +31,6 @@ class RepoProfileWorkerColumnsTest extends TestCase
         $this->assertSame(WorkerSource::Byoi, $profile->fresh()->worker_source);
     }
 
-    public function test_worker_config_round_trips_as_array(): void
-    {
-        $profile = RepoProfile::factory()->create([
-            'worker_config' => ['dockerfile_path' => '.argos/worker.dockerfile'],
-        ]);
-
-        $this->assertSame(
-            ['dockerfile_path' => '.argos/worker.dockerfile'],
-            $profile->fresh()->worker_config,
-        );
-    }
-
     public function test_worker_stack_relation_loads(): void
     {
         $stack = WorkerStack::factory()->create();

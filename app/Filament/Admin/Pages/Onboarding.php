@@ -92,11 +92,7 @@ class Onboarding extends Page
     /** 'agent_credential' | 'none' — drives which Claude UI is shown. */
     public string $tokenSource = 'none';
 
-    public bool $codexConfigured = false;
-
     public string $claudeToken = '';
-
-    public string $codexAuthJson = '';
 
     // ── Step 3: repository ──────────────────────────────────────────────────
 
@@ -153,10 +149,6 @@ class Onboarding extends Page
     private function refreshState(): void
     {
         $this->tokenSource = $this->detectTokenSource();
-        $this->codexConfigured = AgentCredential::query()
-            ->where('agent_name', AgentName::Codex->value)
-            ->where('status', AgentCredentialStatus::Active->value)
-            ->exists();
 
         /** @var User|null $user */
         $user = Auth::user();
@@ -392,47 +384,9 @@ class Onboarding extends Page
         }
     }
 
-    public function saveCodexAuthJson(): void
-    {
-        $raw = trim($this->codexAuthJson);
-
-        if ($raw === '') {
-            Notification::make()->title(__('onboarding.notifications.empty_codex'))->warning()->send();
-
-            return;
-        }
-
-        $decoded = json_decode($raw, true);
-        if (! is_array($decoded)) {
-            Notification::make()
-                ->title(__('onboarding.notifications.invalid_codex_title'))
-                ->body(__('onboarding.notifications.invalid_codex_body'))
-                ->danger()
-                ->send();
-
-            return;
-        }
-
-        app(AgentCredentialService::class)->upsert(
-            [
-                'agent_name' => AgentName::Codex->value,
-                'name' => self::ONBOARDING_CREDENTIAL_NAME,
-            ],
-            [
-                'credentials' => $decoded,
-                'status' => AgentCredentialStatus::Active->value,
-            ],
-        );
-
-        $this->codexAuthJson = '';
-        $this->refreshState();
-
-        Notification::make()->title(__('onboarding.notifications.codex_saved'))->success()->send();
-    }
-
     public function isAnyAgentConfigured(): bool
     {
-        return $this->tokenSource !== 'none' || $this->codexConfigured;
+        return $this->tokenSource !== 'none';
     }
 
     // ── Step 3: repository source + picker ────────────────────────────────────
@@ -787,10 +741,6 @@ class Onboarding extends Page
     {
         if ($this->tokenSource !== 'none') {
             return AgentName::ClaudeCode->value;
-        }
-
-        if ($this->codexConfigured) {
-            return AgentName::Codex->value;
         }
 
         return null;

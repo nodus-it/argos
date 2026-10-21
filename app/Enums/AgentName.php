@@ -20,7 +20,6 @@ use App\Workers\Agents\AgentSpec;
 enum AgentName: string
 {
     case ClaudeCode = 'claude-code';
-    case Codex = 'codex';
 
     public function label(): string
     {
@@ -35,5 +34,17 @@ enum AgentName: string
     public function spec(): AgentSpec
     {
         return ($this->runner())::spec();
+    }
+
+    /**
+     * Whether the workspace daemon can host this agent. A new agent becomes
+     * usable in workspaces once the daemon has a session implementation for
+     * it (same events, same HTTP routes) — see docs/AGENTS.md.
+     */
+    public function supportsWorkspaces(): bool
+    {
+        return match ($this) {
+            self::ClaudeCode => true,
+        };
     }
 }

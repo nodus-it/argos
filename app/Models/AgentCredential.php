@@ -7,7 +7,6 @@ namespace App\Models;
 use App\Enums\AgentCredentialStatus;
 use App\Enums\AgentName;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -29,7 +28,6 @@ use Illuminate\Support\Carbon;
  * @property-read User|null $user
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
- * @property-read Collection<int, Task> $tasks
  */
 class AgentCredential extends Model
 {
@@ -61,9 +59,6 @@ class AgentCredential extends Model
     }
 
     /**
-     * @return HasMany<Task, $this>
-     */
-    /**
      * Owner whose subscription the agent runs on; null for shared agents.
      *
      * @return BelongsTo<User, $this>
@@ -90,7 +85,7 @@ class AgentCredential extends Model
     }
 
     /**
-     * Shared agents only (no owner) — what tasks fall back to.
+     * Shared agents only (no owner).
      *
      * @param  Builder<AgentCredential>  $query
      */
@@ -107,10 +102,5 @@ class AgentCredential extends Model
     public function scopeUsableBy(Builder $query, User $user): void
     {
         $query->where(fn (Builder $q) => $q->whereNull('user_id')->orWhere('user_id', $user->id));
-    }
-
-    public function tasks(): HasMany
-    {
-        return $this->hasMany(Task::class);
     }
 }

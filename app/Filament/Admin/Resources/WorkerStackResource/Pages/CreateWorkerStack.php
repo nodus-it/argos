@@ -33,7 +33,7 @@ class CreateWorkerStack extends CreateRecord
     /**
      * Auto-dispatch build jobs for the new stack so the user gets fast
      * "did my dockerfile build?" feedback instead of waiting until the
-     * next phase run. Skipped when no compatible agents are registered.
+     * next workspace start. Skipped when no compatible agents are registered.
      */
     protected function afterCreate(): void
     {

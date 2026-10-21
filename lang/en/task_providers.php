@@ -14,8 +14,6 @@ return [
         'project_placeholder' => 'Choose provider and access first',
         'project_help' => 'Loaded automatically from the chosen access.',
         'labels_filter' => 'Labels filter',
-        'close_on_complete' => 'Close issue on task completion',
-        'close_on_complete_help' => 'Closes/resolves the source issue once the Argos task is marked done.',
         'groups' => [
             'oauth' => 'OAuth accounts',
             'pat' => 'Access tokens (PAT)',

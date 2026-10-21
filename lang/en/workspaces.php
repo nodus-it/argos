@@ -192,6 +192,8 @@ return [
         'closed' => 'closed',
     ],
     'review' => [
+        'badge_new' => 'NEW',
+        'badge_deleted' => 'DELETED',
         'remove' => 'Remove comment',
         'summary' => ':files file(s) · :ahead unpushed commit(s) · :uncommitted uncommitted file(s)',
         'refresh' => 'Refresh',

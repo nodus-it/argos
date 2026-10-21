@@ -7,13 +7,6 @@ namespace Tests\Feature\Mcp;
 use App\Mcp\Servers\ArgosServer;
 use App\Mcp\Tools\ProjectGet;
 use App\Mcp\Tools\ProjectList;
-use App\Mcp\Tools\TaskConcept;
-use App\Mcp\Tools\TaskCreate;
-use App\Mcp\Tools\TaskFeedback;
-use App\Mcp\Tools\TaskGet;
-use App\Mcp\Tools\TaskImplement;
-use App\Mcp\Tools\TaskList;
-use App\Mcp\Tools\TaskPr;
 use App\Mcp\Tools\ThreadMessage;
 use App\Mcp\Tools\ThreadPause;
 use App\Mcp\Tools\ThreadPlanDecide;
@@ -41,7 +34,7 @@ test('the argos server registers the workspace and task tools', function () {
     $reflection = new \ReflectionClass(ArgosServer::class);
     $tools = $reflection->getDefaultProperties()['tools'];
 
-    expect($tools)->toHaveCount(17)
+    expect($tools)->toHaveCount(10)
         ->toContain(WorkspaceList::class)
         ->toContain(WorkspaceGet::class)
         ->toContain(WorkspaceCreate::class)
@@ -51,12 +44,5 @@ test('the argos server registers the workspace and task tools', function () {
         ->toContain(ThreadPause::class)
         ->toContain(ThreadResume::class)
         ->toContain(ProjectList::class)
-        ->toContain(ProjectGet::class)
-        ->toContain(TaskList::class)
-        ->toContain(TaskGet::class)
-        ->toContain(TaskCreate::class)
-        ->toContain(TaskFeedback::class)
-        ->toContain(TaskConcept::class)
-        ->toContain(TaskImplement::class)
-        ->toContain(TaskPr::class);
+        ->toContain(ProjectGet::class);
 });

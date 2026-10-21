@@ -97,14 +97,14 @@ class WorkspacePreviewTest extends TestCase
             Queue::assertNotPushed(RerunWorkspaceDemoCommandsJob::class);
         }
 
-        Demo::factory()->create(['task_id' => null, 'workspace_id' => $this->workspace->id, 'status' => DemoStatus::Live]);
+        Demo::factory()->create(['workspace_id' => $this->workspace->id, 'status' => DemoStatus::Live]);
         $this->service()->rerunCommands($this->workspace, $this->editor);
         Queue::assertPushed(RerunWorkspaceDemoCommandsJob::class);
     }
 
     public function test_stop_tears_down_and_marks_stopped(): void
     {
-        $demo = Demo::factory()->create(['task_id' => null, 'workspace_id' => $this->workspace->id, 'status' => DemoStatus::Live, 'url' => 'http://x']);
+        $demo = Demo::factory()->create(['workspace_id' => $this->workspace->id, 'status' => DemoStatus::Live, 'url' => 'http://x']);
         $this->mock(DemoDeployer::class)->shouldReceive('teardown')->once();
 
         $this->service()->stop($this->workspace, $this->editor);
@@ -129,7 +129,7 @@ class WorkspacePreviewTest extends TestCase
 
     public function test_the_panel_shows_live_previews_with_their_actions(): void
     {
-        Demo::factory()->create(['task_id' => null, 'workspace_id' => $this->workspace->id, 'status' => DemoStatus::Live, 'ttl_until' => now()->addDay(), 'build_log' => 'built ok']);
+        Demo::factory()->create(['workspace_id' => $this->workspace->id, 'status' => DemoStatus::Live, 'ttl_until' => now()->addDay(), 'build_log' => 'built ok']);
 
         Livewire::actingAs($this->editor)
             ->test(PreviewPanel::class, ['workspaceId' => $this->workspace->id])
@@ -147,7 +147,7 @@ class WorkspacePreviewTest extends TestCase
 
     public function test_expired_workspace_previews_are_stopped_by_the_cleanup(): void
     {
-        $demo = Demo::factory()->create(['task_id' => null, 'workspace_id' => $this->workspace->id, 'status' => DemoStatus::Live, 'ttl_until' => now()->subMinute()]);
+        $demo = Demo::factory()->create(['workspace_id' => $this->workspace->id, 'status' => DemoStatus::Live, 'ttl_until' => now()->subMinute()]);
 
         $this->artisan('argos:cleanup-demos')->assertSuccessful();
 

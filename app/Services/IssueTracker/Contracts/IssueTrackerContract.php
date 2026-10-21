@@ -51,8 +51,8 @@ interface IssueTrackerContract
     public function commentId(array $createResult): ?string;
 
     /**
-     * Close / resolve the source issue — the outbound status-sync that fires
-     * when an Argos task is marked completed. Providers map this to their
+     * Close / resolve the source issue. Not called by Argos today (merging the
+     * pull request closes the issue); kept for providers. Providers map this to their
      * native "done" state (GitHub/GitLab close, Bitbucket resolved, Linear's
      * first completed-type workflow state).
      */

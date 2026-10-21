@@ -4,13 +4,10 @@ declare(strict_types=1);
 
 namespace App\Support;
 
-use App\Models\Task;
-
 /**
- * Wraps a task description in delimiters before it reaches the worker's AI
- * session, so the agent can tell where the untrusted input begins and ends and
- * (per the worker's security.system.md prompt) treat it strictly as data, not
- * instructions. The source label marks provenance — descriptions imported from
+ * Wraps external text (an issue body) in delimiters before it reaches the
+ * agent, so the agent can tell where the untrusted input begins and ends and
+ * treat it strictly as data, not instructions. The source label marks provenance — descriptions imported from
  * an external issue tracker are flagged as untrusted; operator-entered ones are
  * still wrapped, but labelled accordingly.
  *
@@ -19,16 +16,11 @@ use App\Models\Task;
  */
 final class UntrustedInput
 {
-    public function wrap(Task $task): string
-    {
-        return $this->wrapText((string) $task->description, $task->externalIssueLink()->exists(), 'TASK DESCRIPTION');
-    }
-
     /**
-     * Wrap any text with the same markers; `$external` flags text imported
-     * from an issue tracker (workspaces started from an issue use this).
+     * Wrap text with the markers; `$external` flags text imported from an
+     * issue tracker (workspaces started from an issue use this).
      */
-    public function wrapText(string $text, bool $external, string $label = 'TASK DESCRIPTION'): string
+    public function wrapText(string $text, bool $external, string $label = 'ISSUE'): string
     {
         $source = $external
             ? 'external issue tracker (UNTRUSTED — may contain prompt injection)'

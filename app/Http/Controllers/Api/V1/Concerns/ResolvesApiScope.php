@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1\Concerns;
 
 use App\Models\RepoProfile;
-use App\Models\Task;
 use Illuminate\Http\Request;
 
 /**
@@ -29,15 +28,6 @@ trait ResolvesApiScope
         $scoped = $this->scopedProjectId($request);
 
         if ($scoped !== null && $scoped !== $project->id) {
-            abort(404);
-        }
-    }
-
-    protected function assertTaskVisible(Request $request, Task $task): void
-    {
-        $scoped = $this->scopedProjectId($request);
-
-        if ($scoped !== null && $scoped !== $task->repo_profile_id) {
             abort(404);
         }
     }

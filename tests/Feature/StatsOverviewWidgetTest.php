@@ -5,16 +5,15 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Enums\AgentName;
-use App\Enums\WorkflowStatus;
+use App\Enums\AutoThreadState;
 use App\Filament\Admin\Widgets\StatsOverviewWidget;
-use App\Jobs\RunPhaseJob;
 use App\Models\AgentVersion;
-use App\Models\Task;
+use App\Models\Thread;
 use App\Models\User;
 use App\Models\WorkerImageBuild;
 use App\Models\WorkerStack;
+use App\Models\Workspace;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -32,8 +31,8 @@ class StatsOverviewWidgetTest extends TestCase
     {
         Livewire::test(StatsOverviewWidget::class)
             ->assertSuccessful()
-            ->assertSee('Running Workers')
-            ->assertSee('In Progress')
+            ->assertSee('Running Workspaces')
+            ->assertSee('Automatic Runs')
             ->assertSee('Waiting for you')
             ->assertSee('Worker Updates');
     }
@@ -55,16 +54,17 @@ class StatsOverviewWidgetTest extends TestCase
             'built_at' => now(),
         ]);
 
-        // Plus one agent-drift on a different agent
-        $currentHash = substr(hash('sha256', $stack->dockerfile_body), 0, 8);
+        // Plus one agent-drift build on a different stack
+        $other = WorkerStack::factory()->create();
+        $otherHash = substr(hash('sha256', $other->dockerfile_body), 0, 8);
         AgentVersion::factory()->withUpdate()->create([
-            'agent_name' => AgentName::Codex,
+            'agent_name' => AgentName::ClaudeCode,
             'last_checked_at' => now(),
         ]);
         WorkerImageBuild::factory()->ready()->create([
-            'worker_stack_id' => $stack->id,
-            'agent_name' => AgentName::Codex,
-            'stack_hash' => $currentHash,
+            'worker_stack_id' => $other->id,
+            'agent_name' => AgentName::ClaudeCode,
+            'stack_hash' => $otherHash,
             'built_at' => now()->subHour(),
         ]);
 
@@ -82,90 +82,46 @@ class StatsOverviewWidgetTest extends TestCase
             ->assertSee('All up to date');
     }
 
-    public function test_running_workers_counts_only_reserved_phase_jobs(): void
+    public function test_running_workspaces_counts_only_running_containers(): void
     {
-        config(['queue.default' => 'database']);
-
-        // Reserved RunPhaseJob → counts as a running worker.
-        DB::table('jobs')->insert([
-            'queue' => 'default',
-            'payload' => json_encode(['displayName' => RunPhaseJob::class]),
-            'attempts' => 1,
-            'reserved_at' => now()->timestamp,
-            'available_at' => now()->timestamp,
-            'created_at' => now()->timestamp,
-        ]);
-
-        // Queued but not reserved → does not count.
-        DB::table('jobs')->insert([
-            'queue' => 'default',
-            'payload' => json_encode(['displayName' => RunPhaseJob::class]),
-            'attempts' => 0,
-            'reserved_at' => null,
-            'available_at' => now()->timestamp,
-            'created_at' => now()->timestamp,
-        ]);
-
-        // Reserved job for an unrelated class → does not count.
-        DB::table('jobs')->insert([
-            'queue' => 'default',
-            'payload' => json_encode(['displayName' => 'App\\Jobs\\OtherJob']),
-            'attempts' => 1,
-            'reserved_at' => now()->timestamp,
-            'available_at' => now()->timestamp,
-            'created_at' => now()->timestamp,
-        ]);
+        Workspace::factory()->create();
+        Workspace::factory()->stopped()->create();
 
         Livewire::test(StatsOverviewWidget::class)
-            ->assertSee('Running Workers')
-            ->assertSee('Containers working');
+            ->assertSee('Running Workspaces')
+            ->assertSee('Containers up');
     }
 
-    public function test_running_workers_returns_zero_when_queue_is_not_database(): void
+    public function test_in_progress_counts_running_auto_threads(): void
     {
-        config(['queue.default' => 'sync']);
+        Thread::factory()->create(['auto_state' => AutoThreadState::Implementing]);
+        Thread::factory()->create(['auto_state' => AutoThreadState::Gating]);
+        Thread::factory()->create(['auto_state' => AutoThreadState::Done]);
+        Thread::factory()->create(['auto_state' => AutoThreadState::Paused]);
+        Thread::factory()->create(); // manual thread
 
         Livewire::test(StatsOverviewWidget::class)
-            ->assertSee('No active workers');
+            ->assertSee('Automatic Runs')
+            ->assertSee('2 runs in progress');
     }
 
-    public function test_in_progress_counts_tasks_with_running_workflow_status(): void
+    public function test_waiting_for_input_counts_plan_approvals_and_paused_runs(): void
     {
-        Task::factory()->create(['workflow_status' => WorkflowStatus::ConceptRunning]);
-        Task::factory()->create(['workflow_status' => WorkflowStatus::ImplementRunning]);
-        Task::factory()->create(['workflow_status' => WorkflowStatus::Draft]);
+        Thread::factory()->create(['auto_state' => AutoThreadState::AwaitingPlanApproval]);
+        Thread::factory()->create(['auto_state' => AutoThreadState::Paused]);
+        Thread::factory()->create(['auto_state' => AutoThreadState::Failed]); // final, not counted
 
+        $stats = (fn () => $this->getStats())->call(new StatsOverviewWidget);
+
+        $this->assertSame(2, $stats[2]->getValue());
         Livewire::test(StatsOverviewWidget::class)
-            ->assertSee('In Progress')
-            ->assertSee('2 tasks running');
-    }
-
-    public function test_waiting_for_input_counts_review_and_failed_tasks(): void
-    {
-        Task::factory()->create(['workflow_status' => WorkflowStatus::ConceptReview]);
-        Task::factory()->create(['workflow_status' => WorkflowStatus::InReview]);
-        Task::factory()->create(['workflow_status' => WorkflowStatus::Failed]);
-        Task::factory()->create(['workflow_status' => WorkflowStatus::Completed]);
-
-        Livewire::test(StatsOverviewWidget::class)
-            ->assertSee('Waiting for you')
-            ->assertSee('3');
-    }
-
-    public function test_waiting_for_input_counts_implement_paused_tasks(): void
-    {
-        Task::factory()->create(['workflow_status' => WorkflowStatus::ImplementPaused]);
-        Task::factory()->create(['workflow_status' => WorkflowStatus::Draft]); // not counted
-
-        Livewire::test(StatsOverviewWidget::class)
-            ->assertSee('Review or response pending')
-            ->assertSee('1');
+            ->assertSee('Plan approval or paused run');
     }
 
     public function test_zero_states_render_calm_messages(): void
     {
         Livewire::test(StatsOverviewWidget::class)
-            ->assertSee('No active workers')
+            ->assertSee('No workspace running')
             ->assertSee('Nothing to do');
     }
 }

@@ -60,8 +60,7 @@ interface GitServiceContract
     public function getFileContents(string $ownerRepo, string $path, string $ref): ?string;
 
     /**
-     * Posts a comment on the given pull/merge request. Used by the worker's
-     * push phase to log iteration progress on the PR. PR identifier types
+     * Posts a comment on the given pull/merge request. PR identifier types
      * differ per provider (GitHub `int $number`, GitLab `int $iid`,
      * Bitbucket `int $id`) — `int|string` keeps the contract agnostic.
      *
@@ -76,8 +75,6 @@ interface GitServiceContract
 
     /**
      * Updates the title and description of an existing pull/merge request.
-     * Used by the worker's push phase when re-opening or refreshing a PR
-     * after an additional implementation iteration.
      *
      * @return array<string, mixed>
      */

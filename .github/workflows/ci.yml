@@ -27,14 +27,12 @@ jobs:
         run: |
           docker run --rm -v "$PWD:/mnt" -w /mnt koalaman/shellcheck:stable \
             --severity=warning \
-            .tools/docker/worker/worker-entrypoint.sh \
             .tools/docker/worker/workspace/workspace-entrypoint.sh \
             .tools/docker/worker/workspace/git-credential-argos \
             .tools/docker/worker/workspace/run-gates.sh \
             worker/tests/run-tests.sh \
             worker/tests/run-bats.sh \
             worker/lib/*.sh \
-            worker/phases/*.sh \
             .tools/install.sh \
             .tools/tests/run-bats.sh \
             .tools/bin/dev-reload.sh \
@@ -46,7 +44,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - name: bats unit tests (via Docker, includes jq + check-jsonschema)
+      - name: bats unit tests (via Docker, includes jq)
         run: bash worker/tests/run-bats.sh
 
   daemon:

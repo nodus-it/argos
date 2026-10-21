@@ -39,7 +39,7 @@ test('the OpenAPI document describes the v1 API for signed-in users', function (
     expect($document['openapi'])->toStartWith('3.')
         ->and($document['info']['title'])->toBe('Argos API')
         // Endpoints are inferred from routes/api.php (api_path = api/v1).
-        ->and($document['paths'])->toHaveKeys(['/projects', '/tasks'])
+        ->and($document['paths'])->toHaveKeys(['/projects', '/workspaces'])
         // Sanctum bearer auth is documented globally (MiddlewareAuthSecurityStrategy).
         ->and($document['security'])->not->toBeEmpty();
 });

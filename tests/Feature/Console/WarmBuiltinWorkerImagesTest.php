@@ -28,8 +28,8 @@ class WarmBuiltinWorkerImagesTest extends TestCase
         $this->artisan('argos:warm-builtin-images')
             ->assertSuccessful();
 
-        // 2 stacks × 2 registered agents = 4 jobs
-        Queue::assertPushed(BuildWorkerImageJob::class, 4);
+        // 2 stacks × 1 registered agent = 2 jobs
+        Queue::assertPushed(BuildWorkerImageJob::class, 2);
     }
 
     public function test_default_only_narrows_to_configured_default_stack(): void
@@ -43,7 +43,7 @@ class WarmBuiltinWorkerImagesTest extends TestCase
         $this->artisan('argos:warm-builtin-images', ['--default-only' => true])
             ->assertSuccessful();
 
-        Queue::assertPushed(BuildWorkerImageJob::class, 2);
+        Queue::assertPushed(BuildWorkerImageJob::class, 1);
         Queue::assertPushed(BuildWorkerImageJob::class, fn (BuildWorkerImageJob $j) => WorkerStack::find($j->workerStackId)?->name === 'php-8.4');
     }
 
@@ -64,8 +64,8 @@ class WarmBuiltinWorkerImagesTest extends TestCase
         $this->artisan('argos:warm-builtin-images')
             ->assertSuccessful();
 
-        // Only php-8.4 × 2 agents
-        Queue::assertPushed(BuildWorkerImageJob::class, 2);
+        // Only php-8.4 × 1 agent
+        Queue::assertPushed(BuildWorkerImageJob::class, 1);
     }
 
     public function test_warns_when_no_builtin_stacks_present(): void

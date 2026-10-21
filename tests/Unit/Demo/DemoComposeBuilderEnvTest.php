@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Unit\Demo;
 
 use App\Models\RepoProfile;
-use App\Models\Task;
 use App\Models\Workspace;
 use App\Services\Demo\DemoComposeBuilder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -25,12 +24,12 @@ class DemoComposeBuilderEnvTest extends TestCase
                 ['name' => 'APP_URL', 'value' => 'http://evil'], // reserved → dropped
             ])
             ->create();
-        $task = Task::factory()->create(['repo_profile_id' => $profile->id]);
+        $workspace = Workspace::factory()->create(['repo_profile_id' => $profile->id]);
 
         $entry = ['service' => 'app', 'port' => 80, 'workspace_mount' => '/var/www/html'];
 
         $yaml = app(DemoComposeBuilder::class)
-            ->buildOverrideYaml($task, 'demo-x', $entry, 'http://demo-x.test:8080');
+            ->buildOverrideYaml($workspace, 'demo-x', $entry, 'http://demo-x.test:8080');
 
         $env = Yaml::parse($yaml)['services']['app']['environment'];
 
@@ -43,10 +42,9 @@ class DemoComposeBuilderEnvTest extends TestCase
     public function test_workspace_previews_serve_as_the_workspace_user(): void
     {
         $entry = ['service' => 'app', 'port' => 80, 'workspace_mount' => '/var/www/html'];
-        $env = fn ($target): array => Yaml::parse(app(DemoComposeBuilder::class)
-            ->buildOverrideYaml($target, 'demo-x', $entry, 'http://demo-x.test:8080'))['services']['app']['environment'];
+        $env = Yaml::parse(app(DemoComposeBuilder::class)
+            ->buildOverrideYaml(Workspace::factory()->create(), 'demo-x', $entry, 'http://demo-x.test:8080'))['services']['app']['environment'];
 
-        $this->assertSame('argos', $env(Workspace::factory()->create())['ARGOS_FPM_USER']);
-        $this->assertArrayNotHasKey('ARGOS_FPM_USER', $env(Task::factory()->create()));
+        $this->assertSame('argos', $env['ARGOS_FPM_USER']);
     }
 }

@@ -14,13 +14,10 @@ use Illuminate\Support\Carbon;
 /**
  * @property string $id
  * @property string $task_provider_binding_id
- * @property string|null $task_id
- * @property Carbon|null $task_imported_at
  * @property string $external_id
  * @property string $external_url
  * @property Carbon|null $last_synced_at
  * @property string|null $signature
- * @property string|null $concept_comment_id
  * @property string|null $workspace_id
  * @property Carbon|null $launched_at
  * @property string|null $plan_comment_id
@@ -28,7 +25,6 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read TaskProviderBinding $binding
- * @property-read Task|null $task
  */
 class ExternalIssueLink extends Model
 {
@@ -42,13 +38,10 @@ class ExternalIssueLink extends Model
         'launched_at',
         'plan_comment_id',
         'task_provider_binding_id',
-        'task_id',
-        'task_imported_at',
         'external_id',
         'external_url',
         'last_synced_at',
         'signature',
-        'concept_comment_id',
     ];
 
     protected function casts(): array
@@ -56,7 +49,6 @@ class ExternalIssueLink extends Model
         return [
             'launched_at' => 'datetime',
             'last_synced_at' => 'datetime',
-            'task_imported_at' => 'datetime',
         ];
     }
 
@@ -72,13 +64,5 @@ class ExternalIssueLink extends Model
     public function workspace(): BelongsTo
     {
         return $this->belongsTo(Workspace::class);
-    }
-
-    /**
-     * @return BelongsTo<Task, $this>
-     */
-    public function task(): BelongsTo
-    {
-        return $this->belongsTo(Task::class);
     }
 }

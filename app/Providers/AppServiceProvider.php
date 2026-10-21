@@ -4,18 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
-use App\Events\Task\PhaseCompleted;
-use App\Events\Task\TaskCompleted;
-use App\Events\Task\TaskDeleted;
-use App\Jobs\RunPhaseJob;
-use App\Listeners\Task\CloseSourceIssue;
-use App\Listeners\Task\DispatchAutoPush;
-use App\Listeners\Task\NotifyIssueTrackerOfPhase;
-use App\Listeners\Task\PurgeTaskResources;
-use App\Listeners\Task\RemoveTaskVolume;
-use App\Listeners\Task\StopDemoAfterPush;
 use App\Models\User;
-use App\Services\Anthropic\CredentialStore;
 use App\Services\GitProvider\BitbucketGitService;
 use App\Services\GitProvider\GitHubGitService;
 use App\Services\GitProvider\GitLabGitService;
@@ -29,7 +18,6 @@ use App\Services\OAuth\OAuthConfigHydrator;
 use App\Services\Workspace\WorkspaceMemberService;
 use App\Workers\Agents\AgentRegistry;
 use App\Workers\Agents\ClaudeCodeRunner;
-use App\Workers\Agents\CodexRunner;
 use App\Workers\Builtin\BuiltinSync;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Events\MigrationsEnded;
@@ -54,7 +42,6 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->app->singleton(CredentialStore::class);
 
         $this->app->singleton(GitProviderRegistry::class, function (): GitProviderRegistry {
             $registry = new GitProviderRegistry;
@@ -117,13 +104,12 @@ class AppServiceProvider extends ServiceProvider
             // Adding a new agent: write the runner class, add a case to
             // App\Enums\AgentName, register here. No DB seeding required.
             $registry->register(ClaudeCodeRunner::class);
-            $registry->register(CodexRunner::class);
 
             return $registry;
         });
 
         // Browser-E2E test mode: deterministic, offline replacements for the
-        // worker run and external validations (Anthropic, Git providers).
+        // workspace runtime and external validations (Anthropic, Git providers).
         // Double-gated — only when ARGOS_E2E_FAKE is set AND not in production —
         // so the production autoload path is never touched. Registered last so
         // its bindings override the real ones above.
@@ -137,23 +123,7 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(SocialiteWasCalled::class, GitLabExtendSocialite::class.'@handle');
         Event::listen(SocialiteWasCalled::class, BitbucketExtendSocialite::class.'@handle');
 
-        // Task workflow follow-up actions. The kernel services (WorkflowService,
-        // TaskService) just advance state and fire the event; these listeners
-        // carry out the side-effects so the services stay side-effect-free.
-        // Auto-discovery is explicitly disabled in bootstrap/app.php so this
-        // block remains the single source of truth and no listener fires twice.
-        Event::listen(PhaseCompleted::class, DispatchAutoPush::class);
-        Event::listen(PhaseCompleted::class, StopDemoAfterPush::class);
-        Event::listen(PhaseCompleted::class, NotifyIssueTrackerOfPhase::class);
-        Event::listen(TaskCompleted::class, CloseSourceIssue::class);
-        Event::listen(TaskCompleted::class, RemoveTaskVolume::class);
-        Event::listen(TaskDeleted::class, PurgeTaskResources::class);
-
         Queue::failing(function (JobFailed $event): void {
-            if ($event->job->resolveName() === RunPhaseJob::class) {
-                return;
-            }
-
             Log::channel('argos')->error('Job failed', [
                 'job' => $event->job->resolveName(),
                 'error' => $event->exception->getMessage(),

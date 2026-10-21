@@ -26,9 +26,9 @@ class RedirectToOnboardingTest extends TestCase
         $response->assertRedirect(route('filament.admin.pages.onboarding'));
     }
 
-    public function test_tasks_index_redirects_to_onboarding_when_no_profile(): void
+    public function test_projects_index_redirects_to_onboarding_when_no_profile(): void
     {
-        $response = $this->get(route('filament.admin.resources.tasks.index'));
+        $response = $this->get(route('filament.admin.resources.repo-profiles.index'));
 
         $response->assertRedirect(route('filament.admin.pages.onboarding'));
     }
@@ -37,7 +37,7 @@ class RedirectToOnboardingTest extends TestCase
     {
         RepoProfile::factory()->create();
 
-        $response = $this->get(route('filament.admin.resources.tasks.index'));
+        $response = $this->get(route('filament.admin.resources.repo-profiles.index'));
 
         $response->assertOk();
     }

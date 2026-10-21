@@ -14,7 +14,6 @@ use Filament\PanelProvider;
 use Filament\Support\Enums\Width;
 use Filament\Support\Icons\Heroicon;
 use Filament\View\PanelsRenderHook;
-use Illuminate\Support\Facades\Blade;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -65,10 +64,6 @@ class AdminPanelProvider extends PanelProvider
                     ->url(fn (): string => url('docs/api'), shouldOpenInNewTab: true)
                     ->sort(99),
             ])
-            ->renderHook(
-                PanelsRenderHook::SIDEBAR_FOOTER,
-                fn (): string => Blade::render('@livewire(\'anthropic-usage-sidebar\')')
-            )
             ->renderHook(
                 PanelsRenderHook::FOOTER,
                 fn (): string => view('components.argos-source-footer')->render()

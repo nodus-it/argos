@@ -5,10 +5,9 @@ declare(strict_types=1);
 namespace App\Services\Worker;
 
 /**
- * Immutable handle to the ephemeral sidecars started for one worker phase run:
- * the private network, the worker-facing connection env, and the container
- * names to tear down. Empty (network null) when the profile enabled no services
- * or the phase doesn't run tests.
+ * Immutable handle to the sidecars started for a workspace: the private
+ * network, the workspace-facing connection env, and the container names.
+ * Empty (network null) when the profile enabled no services.
  */
 final class WorkerSidecars
 {

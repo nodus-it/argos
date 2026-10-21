@@ -19,7 +19,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
-/** Workspaces and automatic runs (the replacement for tasks). */
+/** Workspaces and automatic runs. */
 class WorkspaceController extends Controller
 {
     use ActsForAutomation;

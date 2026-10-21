@@ -7,10 +7,9 @@ namespace App\Models;
 use App\Enums\AgentName;
 use App\Enums\AuthMethod;
 use App\Enums\BackingService;
-use App\Enums\ClaudeModel;
 use App\Enums\GitProvider;
 use App\Enums\WorkerSource;
-use App\Enums\WorkflowStatus;
+use App\Enums\WorkspaceStatus;
 use App\Services\OAuth\TokenRefresher;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Collection;
@@ -35,21 +34,13 @@ use Laravel\Sanctum\HasApiTokens;
  * @property WorkerSource $worker_source
  * @property string|null $worker_stack_id
  * @property AgentName|null $worker_agent_name
- * @property array<string, mixed>|null $worker_config
  * @property array<int, array{host: string, username?: string|null, token: string}>|null $composer_registries
  * @property array<int, array{name: string, value: string}>|null $worker_env
  * @property array<int, string>|null $worker_services
  * @property array<string, array<string, string>>|null $worker_service_config
- * @property string|null $model_concept
- * @property string|null $model_implement
- * @property int|null $max_turns_concept
- * @property int|null $max_turns_implement
- * @property bool $auto_concept
- * @property bool $auto_pr
  * @property bool $live_demo_enabled
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
- * @property-read Collection<int, Task> $tasks
  * @property-read ConnectedAccount|null $connectedAccount
  * @property-read WorkerStack|null $workerStack
  * @property-read Collection<int, TaskProviderBinding> $taskProviderBindings
@@ -60,7 +51,7 @@ use Laravel\Sanctum\HasApiTokens;
 class RepoProfile extends Model implements HasApiTokensContract
 {
     // Project-bound Sanctum API tokens: one token = one project, fine-scoped
-    // (e.g. CI). $repoProfile->createToken('ci', ['tasks:write']).
+    // (e.g. CI). $repoProfile->createToken('ci', ['workspaces:write']).
     use HasApiTokens;
     use HasFactory;
     use HasUlids;
@@ -78,17 +69,10 @@ class RepoProfile extends Model implements HasApiTokensContract
         'worker_source',
         'worker_stack_id',
         'worker_agent_name',
-        'worker_config',
         'composer_registries',
         'worker_env',
         'worker_services',
         'worker_service_config',
-        'model_concept',
-        'model_implement',
-        'max_turns_concept',
-        'max_turns_implement',
-        'auto_concept',
-        'auto_pr',
         'live_demo_enabled',
     ];
 
@@ -101,15 +85,10 @@ class RepoProfile extends Model implements HasApiTokensContract
             'auth_method' => AuthMethod::class,
             'worker_source' => WorkerSource::class,
             'worker_agent_name' => AgentName::class,
-            'worker_config' => 'array',
             'composer_registries' => 'encrypted:array',
             'worker_env' => 'encrypted:array',
             'worker_services' => 'array',
             'worker_service_config' => 'array',
-            'max_turns_concept' => 'integer',
-            'max_turns_implement' => 'integer',
-            'auto_concept' => 'boolean',
-            'auto_pr' => 'boolean',
             'live_demo_enabled' => 'boolean',
         ];
     }
@@ -120,26 +99,20 @@ class RepoProfile extends Model implements HasApiTokensContract
         return $this->belongsTo(User::class, 'automation_user_id');
     }
 
-    /**
-     * @return HasMany<Task, $this>
-     */
-    public function tasks(): HasMany
+    /** @return HasMany<Workspace, $this> */
+    public function workspaces(): HasMany
     {
-        return $this->hasMany(Task::class);
+        return $this->hasMany(Workspace::class);
     }
 
     /**
-     * Tasks that are not in a terminal workflow state — drives the API's
-     * "open_tasks" count.
+     * Workspaces that are not stopped or failed: the API's "open_workspaces".
      *
-     * @return HasMany<Task, $this>
+     * @return HasMany<Workspace, $this>
      */
-    public function openTasks(): HasMany
+    public function openWorkspaces(): HasMany
     {
-        return $this->tasks()->whereNotIn('workflow_status', [
-            WorkflowStatus::Completed->value,
-            WorkflowStatus::Failed->value,
-        ]);
+        return $this->workspaces()->whereNotIn('status', [WorkspaceStatus::Stopped, WorkspaceStatus::Failed]);
     }
 
     /**
@@ -178,21 +151,6 @@ class RepoProfile extends Model implements HasApiTokensContract
             static fn (string $value): ?BackingService => BackingService::tryFrom($value),
             $this->worker_services ?? [],
         )));
-    }
-
-    /**
-     * Returns the configured model ID string for the given phase,
-     * falling back to the hardcoded default when null.
-     */
-    public function modelForPhase(string $phase): string
-    {
-        $configured = match ($phase) {
-            'concept' => $this->model_concept,
-            'implement' => $this->model_implement,
-            default => null,
-        };
-
-        return $configured ?? ClaudeModel::default($phase)->value;
     }
 
     /**

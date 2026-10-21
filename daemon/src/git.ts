@@ -49,7 +49,7 @@ export const NETWORK_FAILURE = /could not resolve host|connection timed out|conn
 
 export type FetchFailure = 'auth' | 'branch_not_found' | 'network' | 'unknown';
 
-/** Port of `_concept_classify_fetch_err` (worker/phases/concept.sh). */
+/** Classifies git fetch errors (auth vs. network vs. missing ref). */
 export function classifyGitError(stderr: string): FetchFailure {
     const text = stderr.toLowerCase();
     if (/couldn't find remote ref|remote branch .* not found|not a valid ref|unknown revision|did not match any/.test(text)) {

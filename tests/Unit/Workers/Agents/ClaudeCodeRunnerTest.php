@@ -32,12 +32,4 @@ class ClaudeCodeRunnerTest extends TestCase
 
         $this->assertSame('agents/install-claude-code.sh', $spec->installScript);
     }
-
-    public function test_spec_config_schema_lists_optional_config_dir(): void
-    {
-        $spec = ClaudeCodeRunner::spec();
-
-        $this->assertArrayHasKey('fields', $spec->configSchema);
-        $this->assertArrayHasKey('config_dir', $spec->configSchema['fields']);
-    }
 }

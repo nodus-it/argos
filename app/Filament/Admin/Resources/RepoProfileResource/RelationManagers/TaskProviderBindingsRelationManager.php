@@ -22,7 +22,6 @@ use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TagsInput;
-use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Components\Utilities\Get;
@@ -91,11 +90,6 @@ class TaskProviderBindingsRelationManager extends RelationManager
             TagsInput::make('filters.labels')
                 ->label(__('task_providers.form.labels_filter'))
                 ->nullable(),
-
-            Toggle::make('filters.close_on_complete')
-                ->label(__('task_providers.form.close_on_complete'))
-                ->helperText(__('task_providers.form.close_on_complete_help'))
-                ->default(false),
         ]);
     }
 

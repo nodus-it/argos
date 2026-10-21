@@ -1,17 +1,15 @@
 {{-- Projects (RepoProfiles) list page hero. Embedded via ListRepoProfiles::getHeader(). --}}
 @php
-    use App\Enums\WorkflowStatus;
+    use App\Enums\WorkspaceStatus;
     use App\Models\RepoProfile;
-    use App\Models\Task;
+    use App\Models\Workspace;
 
     $totalProjects = RepoProfile::count();
-    $activeTasks = Task::whereNotIn('workflow_status', [
-        WorkflowStatus::Completed,
-    ])->count();
+    $runningWorkspaces = Workspace::where('status', WorkspaceStatus::Running)->count();
 
     $chips = [
         ['label' => __('widgets.hero.chips.projects'), 'value' => $totalProjects, 'type' => 'ok'],
-        ['label' => __('widgets.hero.chips.active_tasks'), 'value' => $activeTasks, 'type' => 'run'],
+        ['label' => __('widgets.hero.chips.running_workspaces'), 'value' => $runningWorkspaces, 'type' => 'run'],
     ];
 @endphp
 

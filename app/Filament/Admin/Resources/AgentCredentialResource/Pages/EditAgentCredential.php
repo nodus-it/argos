@@ -49,28 +49,8 @@ class EditAgentCredential extends EditRecord
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
-    protected function mutateFormDataBeforeFill(array $data): array
-    {
-        // Codex: surface the JSON text in the virtual field. Token-shaped
-        // claude credentials are already mapped via dot-notation.
-        if (($data['agent_name'] ?? null) === AgentName::Codex->value) {
-            $data['credentials_json'] = json_encode(
-                $data['credentials'] ?? [],
-                JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES,
-            );
-        }
-
-        return $data;
-    }
-
-    /**
-     * @param  array<string, mixed>  $data
-     * @return array<string, mixed>
-     */
     protected function mutateFormDataBeforeSave(array $data): array
     {
-        $data = CreateAgentCredential::normaliseCredentials($data);
-
         if (($data['agent_name'] ?? null) === AgentName::ClaudeCode->value) {
             $verification = app(CredentialVerifier::class)
                 ->verifyClaudeToken((string) ($data['credentials']['token'] ?? ''));

@@ -5,9 +5,8 @@ declare(strict_types=1);
 namespace Tests\Unit\Worker;
 
 use App\Models\RepoProfile;
-use App\Models\Task;
+use App\Models\Workspace;
 use App\Services\Worker\WorkerSidecarManager;
-use App\Services\Worker\WorkerSidecars;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Symfony\Component\Process\Process;
 use Tests\TestCase;
@@ -38,70 +37,48 @@ class WorkerSidecarManagerTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function taskWithServices(array $services, string $name = 'my-task'): Task
+    /** @param  list<string>  $services */
+    private function workspaceWithServices(array $services): Workspace
     {
         $profile = RepoProfile::factory()->withBackingServices($services)->create();
 
-        return Task::factory()->create(['repo_profile_id' => $profile->id, 'name' => $name]);
-    }
-
-    public function test_no_sidecars_for_non_test_phase(): void
-    {
-        $manager = new RecordingSidecarManager;
-        $sidecars = $manager->start($this->taskWithServices(['mysql']), 'concept');
-
-        $this->assertTrue($sidecars->isEmpty());
-        $this->assertSame([], $manager->commands);
+        return Workspace::factory()->create(['repo_profile_id' => $profile->id]);
     }
 
     public function test_no_sidecars_when_profile_enables_none(): void
     {
         $manager = new RecordingSidecarManager;
-        $sidecars = $manager->start($this->taskWithServices([]), 'implement');
+        $sidecars = $manager->startForWorkspace($this->workspaceWithServices([]));
 
         $this->assertTrue($sidecars->isEmpty());
         $this->assertSame([], $manager->commands);
     }
 
-    public function test_starts_network_services_and_collects_env(): void
+    public function test_starts_services_with_workspace_label_and_collects_env(): void
     {
+        $workspace = $this->workspaceWithServices(['mysql', 'redis']);
         $manager = new RecordingSidecarManager;
-        $sidecars = $manager->start($this->taskWithServices(['mysql', 'redis']), 'implement');
+        $sidecars = $manager->startForWorkspace($workspace);
 
         $this->assertFalse($sidecars->isEmpty());
-        $this->assertStringStartsWith('argos-run-my-task', (string) $sidecars->network);
+        $this->assertSame('ws_'.$workspace->slug.'_svc', $sidecars->network);
         $this->assertCount(2, $sidecars->containers);
-
-        // Worker-facing connection env for both services.
         $this->assertSame('db', $sidecars->env['DB_HOST']);
         $this->assertSame('redis', $sidecars->env['REDIS_HOST']);
 
         $joined = array_map(static fn (array $c): string => implode(' ', $c), $manager->commands);
 
-        // The run network is created with the run labels so the orphan sweep
-        // and abort can find it again.
-        $this->assertTrue(
-            (bool) array_filter($joined, static fn (string $c): bool => str_starts_with($c, 'docker network create')
-                && str_contains($c, (string) $sidecars->network)
-                && str_contains($c, 'argos.role=network')
-                && str_contains($c, 'argos.task=')),
-            'expected the run network to be created with run labels',
-        );
-        // Sidecar containers carry the run labels too.
+        // Containers carry the workspace label (orphan sweep) and a named data volume.
         $this->assertTrue(
             (bool) array_filter($joined, static fn (string $c): bool => str_contains($c, 'mariadb:11')
-                && str_contains($c, 'argos.role=sidecar')),
-            'expected a mariadb container to be started with run labels',
-        );
-        $this->assertTrue(
-            (bool) array_filter($joined, static fn (string $c): bool => str_contains($c, 'mariadb:11')),
-            'expected a mariadb container to be started',
+                && str_contains($c, WorkerSidecarManager::WORKSPACE_LABEL.'='.$workspace->slug)
+                && str_contains($c, $sidecars->network.'_db:')),
+            'expected a labelled mariadb container with a data volume',
         );
         $this->assertTrue(
             (bool) array_filter($joined, static fn (string $c): bool => str_contains($c, 'redis:7-alpine')),
             'expected a redis container to be started',
         );
-        // Readiness probed via docker exec.
         $this->assertTrue(
             (bool) array_filter($joined, static fn (string $c): bool => str_contains($c, 'docker exec') && str_contains($c, 'healthcheck.sh')),
             'expected a mysql readiness probe',
@@ -114,10 +91,10 @@ class WorkerSidecarManagerTest extends TestCase
             ->withBackingServices(['mysql'])
             ->withServiceConfig(['mysql' => ['database' => 'shop', 'username' => 'sa', 'password' => 'pw']])
             ->create();
-        $task = Task::factory()->create(['repo_profile_id' => $profile->id, 'name' => 'cust']);
+        $workspace = Workspace::factory()->create(['repo_profile_id' => $profile->id]);
 
         $manager = new RecordingSidecarManager;
-        $sidecars = $manager->start($task, 'implement');
+        $sidecars = $manager->startForWorkspace($workspace);
 
         $this->assertSame('shop', $sidecars->env['DB_DATABASE']);
         $this->assertSame('sa', $sidecars->env['DB_USERNAME']);
@@ -129,23 +106,15 @@ class WorkerSidecarManagerTest extends TestCase
         );
     }
 
-    public function test_stop_removes_containers_and_network(): void
+    public function test_purge_removes_containers_volumes_and_network(): void
     {
         $manager = new RecordingSidecarManager;
-        $manager->stop(new WorkerSidecars('argos-run-x', ['DB_HOST' => 'db'], ['argos-run-x-db', 'argos-run-x-redis']));
+        $manager->purgeWorkspace('demo');
 
         $joined = array_map(static fn (array $c): string => implode(' ', $c), $manager->commands);
 
-        $this->assertContains('docker rm -f argos-run-x-db', $joined);
-        $this->assertContains('docker rm -f argos-run-x-redis', $joined);
-        $this->assertContains('docker network rm argos-run-x', $joined);
-    }
-
-    public function test_stop_is_a_noop_for_empty_handle(): void
-    {
-        $manager = new RecordingSidecarManager;
-        $manager->stop(new WorkerSidecars);
-
-        $this->assertSame([], $manager->commands);
+        $this->assertContains('docker rm -f ws_demo_svc-db', $joined);
+        $this->assertContains('docker volume rm -f ws_demo_svc_db', $joined);
+        $this->assertContains('docker network rm ws_demo_svc', $joined);
     }
 }

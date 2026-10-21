@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace Tests\Feature\Docs;
 
 use App\Enums\AgentName;
+use App\Enums\AutoPlanMode;
+use App\Enums\AutoShipMode;
 use App\Enums\BackingService;
-use App\Enums\DemoAccessMode;
 use App\Filament\Admin\RelationManagers\ApiTokensRelationManager;
 use App\Services\Docs\DocManifest;
 use Tests\TestCase;
@@ -17,9 +18,9 @@ use Tests\TestCase;
  * it, or the test fails. This is the reliable layer of the docs-freshness
  * strategy; prose-level accuracy is covered by the periodic drift audit.
  *
- * Enums with deliberately undocumented internal cases (Phase's diff/commit-
- * message, WorkerSource's devcontainer) are covered by the explicit user-facing
- * subset rather than iterating ::cases().
+ * Enums with deliberately undocumented internal cases (WorkerSource's
+ * devcontainer) are covered by the explicit user-facing subset rather than
+ * iterating ::cases().
  */
 class DocCoverageTest extends TestCase
 {
@@ -47,7 +48,6 @@ class DocCoverageTest extends TestCase
     public function test_rest_api_documents_the_versioned_endpoints(): void
     {
         $this->assertDocMentions('REST-API.md', '/api/v1/projects', 'API endpoint');
-        $this->assertDocMentions('REST-API.md', '/api/v1/tasks', 'API endpoint');
         $this->assertDocMentions('REST-API.md', '/api/v1/workspaces', 'API endpoint');
         $this->assertDocMentions('REST-API.md', '/api/v1/threads', 'API endpoint');
     }
@@ -59,10 +59,11 @@ class DocCoverageTest extends TestCase
         }
     }
 
-    public function test_live_demos_doc_documents_every_access_mode(): void
+    public function test_auto_thread_modes_are_documented(): void
     {
-        foreach (DemoAccessMode::cases() as $mode) {
-            $this->assertDocMentions('LIVE-DEMOS.md', $mode->value, 'Demo access mode');
+        foreach ([...AutoPlanMode::cases(), ...AutoShipMode::cases()] as $mode) {
+            $this->assertDocMentions('CONFIGURATION.md', '`'.$mode->value.'`', 'Auto-thread mode');
+            $this->assertDocMentions('REST-API.md', '`'.$mode->value.'`', 'Auto-thread mode');
         }
     }
 
@@ -70,13 +71,6 @@ class DocCoverageTest extends TestCase
     {
         foreach (AgentName::cases() as $agent) {
             $this->assertDocMentions('AGENTS.md', $agent->value, 'Agent');
-        }
-    }
-
-    public function test_user_facing_phases_are_documented_in_tasks(): void
-    {
-        foreach (['concept', 'implement', 'push', 'respond'] as $phase) {
-            $this->assertDocMentions('TASKS.md', $phase, 'Workflow phase');
         }
     }
 

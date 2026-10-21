@@ -22,19 +22,7 @@ class RepoProfileFactory extends Factory
             'auth_method' => 'pat',
             'connected_account_id' => null,
             'default_branch' => 'main',
-            'auto_concept' => false,
-            'auto_pr' => false,
         ];
-    }
-
-    public function withAutoConcept(): static
-    {
-        return $this->state(['auto_concept' => true]);
-    }
-
-    public function withAutoPr(): static
-    {
-        return $this->state(['auto_pr' => true]);
     }
 
     /**

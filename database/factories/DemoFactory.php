@@ -6,7 +6,7 @@ namespace Database\Factories;
 
 use App\Enums\DemoStatus;
 use App\Models\Demo;
-use App\Models\Task;
+use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -17,7 +17,7 @@ class DemoFactory extends Factory
     public function definition(): array
     {
         return [
-            'task_id' => Task::factory(),
+            'workspace_id' => Workspace::factory(),
             'status' => DemoStatus::Building,
             'url' => null,
             'compose_project' => 'demo-'.fake()->lexify('??????????'),

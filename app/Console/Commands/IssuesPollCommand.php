@@ -14,7 +14,7 @@ final class IssuesPollCommand extends Command
 {
     protected $signature = 'argos:poll-issues';
 
-    protected $description = 'Dispatch polling jobs for all active Poll-mode task-provider bindings';
+    protected $description = 'Dispatch polling jobs for all active Poll-mode issue-trigger bindings';
 
     public function handle(): int
     {

@@ -84,7 +84,7 @@ class ApiClientResourceTest extends TestCase
         ])
             ->callAction(TestAction::make('generate')->table(), [
                 'name' => 'ci-token',
-                'abilities' => ['tasks:write'],
+                'abilities' => ['workspaces:write'],
             ])
             ->assertHasNoActionErrors()
             ->assertNotified();
@@ -92,7 +92,7 @@ class ApiClientResourceTest extends TestCase
         $this->assertSame(1, $client->tokens()->count());
         $token = $client->tokens()->first();
         $this->assertSame('ci-token', $token->name);
-        $this->assertContains('tasks:write', $token->abilities);
+        $this->assertContains('workspaces:write', $token->abilities);
 
         Livewire::test(ApiTokensRelationManager::class, [
             'ownerRecord' => $client,

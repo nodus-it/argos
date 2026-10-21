@@ -9,8 +9,8 @@ return [
 
     'blade' => [
         'logs_section' => 'Logs',
-        'logs_description' => 'Manager-Log (PHP-Seite): Phase-Starts, Fehler, Job-Dispatches.',
-        'logs_hint' => 'Worker-Logs pro Phase sind im Task-View unter „Logs" abrufbar.',
+        'logs_description' => 'Manager-Log (PHP-Seite): Workspace-Jobs, Fehler, Job-Dispatches.',
+        'logs_hint' => 'Die Ausgabe des Agenten steht in den Threads der Workspaces.',
         'logs_download' => 'Application Log herunterladen',
     ],
 ];

@@ -128,7 +128,7 @@ class WorkspaceResource extends Resource
                         ->maxLength(255),
                 ]),
 
-            // Optional: start an auto-thread right away (replaces creating a task).
+            // Optional: start an auto-thread right away.
             Section::make(__('workspaces.auto.toggle'))
                 ->description(__('workspaces.auto.toggle_help'))
                 ->icon('heroicon-o-bolt')

@@ -18,13 +18,4 @@ enum ClaudeModel: string
             self::Haiku45 => 'Claude Haiku 4.5',
         };
     }
-
-    public static function default(string $phase): self
-    {
-        return match ($phase) {
-            'concept' => self::Opus47,
-            'implement' => self::Sonnet46,
-            default => self::Haiku45,
-        };
-    }
 }

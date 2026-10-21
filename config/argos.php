@@ -55,7 +55,7 @@ return [
     'dev_login_email' => env('SEED_USER_EMAIL', 'admin@argos.local'),
     /*
      * How often (minutes) the scheduler polls issue providers and checks
-     * concept-comment reactions. Default 5 keeps API usage low at scale; set
+     * plan-comment reactions. Default 5 keeps API usage low at scale; set
      * ARGOS_POLL_INTERVAL_MINUTES=1 locally for fast feedback. Clamped to 1–59.
      */
     'poll_interval_minutes' => max(1, min(59, (int) env('ARGOS_POLL_INTERVAL_MINUTES', 5))),
@@ -76,15 +76,10 @@ return [
         'bitbucket_ref' => env('SEED_BITBUCKET_REF') ?: null,
         'linear_team' => env('SEED_LINEAR_TEAM') ?: null,
     ],
-    'docker' => [
-        'memory_limit' => env('ARGOS_MEM_LIMIT', '4g'),
-        'cpu_limit' => env('ARGOS_CPU_LIMIT', '2'),
-    ],
     /*
-     * Backing services Argos can boot alongside a worker phase run as ephemeral
-     * sidecars (one private network per run, torn down afterwards) so a
-     * project's tests can talk to a real MySQL/Redis. A repo profile opts in per
-     * service; only the test-running phases start them. See
+     * Backing services Argos boots alongside a workspace as sidecars (one
+     * private network per workspace) so a project's tests can talk to a real
+     * MySQL/Redis. A repo profile opts in per service. See
      * App\Enums\BackingService and App\Services\Worker\WorkerSidecarManager.
      */
     'worker' => [
@@ -100,23 +95,22 @@ return [
     ],
     /*
      * Compose-pipeline settings. The WorkerImageResolver consults
-     * `compose.default_stack` when neither the task nor the repo profile
-     * pins a stack; this is the slug of a row in `worker_stacks`, populated
+     * `compose.default_stack` when the repo profile pins no stack; this is the slug of a row in `worker_stacks`, populated
      * from the built-in manifest by BuiltinSync on every `migrate`.
      */
     'compose' => [
         'default_stack' => env('ARGOS_DEFAULT_STACK', 'php-8.4'),
     ],
 
-    // Live-Demo (P6): ephemeral per-task demo deployments, routed by Traefik
-    // under their own subdomain. See docs/backlog/live-demo-concept.md.
+    // Live previews of workspaces, routed by Traefik under their own
+    // subdomain and guarded by the workspace gate. See docs/LIVE-DEMOS.md.
     'preview' => [
         // On by default — a project's own `live_demo_enabled` toggle is the real
         // per-project gate, so this only governs whether the platform *can*
         // deploy demos at all. Operators without preview infra (Traefik +
         // argos_edge + a base domain) can opt out with ARGOS_PREVIEW_ENABLED=false.
         'enabled' => (bool) env('ARGOS_PREVIEW_ENABLED', true),
-        // Demos live at demo-{task}.{base_domain}. Defaults to the APP_URL host
+        // Demos live at demo-ws-{slug}.{base_domain}. Defaults to the APP_URL host
         // (demos as subdomains of the app); locally that host has no wildcard
         // DNS, so fall back to nip.io (*.127.0.0.1.nip.io → 127.0.0.1).
         'base_domain' => env('ARGOS_PREVIEW_BASE_DOMAIN') ?: ($bareHost ? '127.0.0.1.nip.io' : $appHost),
@@ -130,22 +124,6 @@ return [
         'scheme' => env('ARGOS_PREVIEW_SCHEME') ?: $appScheme,
         'port' => (int) $envOr('ARGOS_PREVIEW_PORT', $envOr('ARGOS_PORT', 8080)),
         'ttl_hours' => (int) $envOr('ARGOS_PREVIEW_TTL_HOURS', 24),
-        // Stack-wide default access protection for demos whose task is set to
-        // "inherit" (the default). One of: none | session | basic.
-        //   none    — public, anyone with the URL
-        //   session — Argos login required (Traefik forwardAuth → the gate below)
-        //   basic   — shared HTTP Basic credentials
-        // Per-task overrides (tasks.demo_access_mode) win over this default.
-        'auth' => $envOr('ARGOS_PREVIEW_AUTH', 'none'),
-        // HTTP Basic username for basic-protected demos. The password is either
-        // per-task (generated when a task is switched to basic) or this global
-        // fallback for tasks that merely inherit the basic default.
-        'basic_user' => $envOr('ARGOS_PREVIEW_BASIC_USER', 'demo'),
-        'basic_password' => env('ARGOS_PREVIEW_BASIC_PASSWORD') ?: null,
-        // Internal URL Traefik's forwardAuth middleware calls to validate the
-        // Argos session for session-protected demos. Points at the in-stack
-        // nginx that fronts the app; reachable from Traefik on the default net.
-        'auth_gate_url' => $envOr('ARGOS_PREVIEW_AUTH_GATE_URL', 'http://nginx:80/_argos/demo-gate'),
         // External Docker network shared with Traefik (defined in docker-compose.yml).
         'network' => $envOr('ARGOS_PREVIEW_NETWORK', 'argos_edge'),
         // Shared volume where the manager writes one Traefik file-provider route
@@ -153,7 +131,7 @@ return [
         // docker-compose.yml.
         'traefik_dir' => env('ARGOS_TRAEFIK_DIR', '/data/traefik'),
         // Cap on concurrently running demos. When a new deploy would exceed it,
-        // the oldest running demos of other tasks are evicted (logged) to make
+        // the oldest running demos of other workspaces are evicted (logged) to make
         // room. 0 disables the cap.
         'max_concurrent' => (int) $envOr('ARGOS_PREVIEW_MAX_CONCURRENT', 10),
         // Per-demo resource limits (separate from the worker limits — demos run
@@ -225,12 +203,6 @@ return [
         'enabled' => filter_var($envOr('ARGOS_DEMO', false), FILTER_VALIDATE_BOOLEAN),
     ],
 
-    'concept' => [
-        'max_turns_default' => (int) env('ARGOS_CONCEPT_MAX_TURNS_DEFAULT', 50),
-    ],
-    'implement' => [
-        'max_turns_default' => (int) env('ARGOS_MAX_TURNS_DEFAULT', 200),
-    ],
     'factories' => [
         'github_token' => env('GITHUB_TOKEN', 'test-token'),
     ],

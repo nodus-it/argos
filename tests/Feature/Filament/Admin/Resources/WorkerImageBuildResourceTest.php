@@ -73,7 +73,7 @@ class WorkerImageBuildResourceTest extends TestCase
         $currentHash = substr(hash('sha256', $stack->dockerfile_body), 0, 8);
 
         AgentVersion::factory()->withUpdate()->create([
-            'agent_name' => AgentName::Codex,
+            'agent_name' => AgentName::ClaudeCode,
             'last_checked_at' => now(),
         ]);
 
@@ -88,7 +88,7 @@ class WorkerImageBuildResourceTest extends TestCase
         // (2) agent drift: stack_hash matches, but built before last npm check
         $agentDrift = WorkerImageBuild::factory()->ready()->create([
             'worker_stack_id' => $stack->id,
-            'agent_name' => AgentName::Codex,
+            'agent_name' => AgentName::ClaudeCode,
             'stack_hash' => $currentHash,
             'built_at' => now()->subHour(),
         ]);
@@ -154,10 +154,10 @@ class WorkerImageBuildResourceTest extends TestCase
             'stack_hash' => 'bbbbbbbb',
             'built_at' => now(),
         ]);
-        // Different agent, also stale → second job
+        // Different stack, also stale → second job
         WorkerImageBuild::factory()->ready()->create([
-            'worker_stack_id' => $stack->id,
-            'agent_name' => AgentName::Codex,
+            'worker_stack_id' => WorkerStack::factory()->create()->id,
+            'agent_name' => AgentName::ClaudeCode,
             'stack_hash' => 'cccccccc',
             'built_at' => now(),
         ]);
@@ -166,7 +166,7 @@ class WorkerImageBuildResourceTest extends TestCase
             ->callAction(TestAction::make('rebuildAllOutdated')->table())
             ->assertNotified();
 
-        // 2 unique pairs: (stack, claude-code) and (stack, codex)
+        // 2 unique pairs: (stack, claude-code) and (other stack, claude-code)
         Queue::assertPushed(BuildWorkerImageJob::class, 2);
     }
 

@@ -29,8 +29,6 @@ class ApiTokensRelationManager extends RelationManager
     /** The abilities a token may carry (mirrors the REST route gates). */
     public const ABILITIES = [
         'projects:read' => 'projects:read',
-        'tasks:read' => 'tasks:read',
-        'tasks:write' => 'tasks:write',
         'workspaces:read' => 'workspaces:read',
         'workspaces:write' => 'workspaces:write',
     ];

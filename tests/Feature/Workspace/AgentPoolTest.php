@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Workspace;
 
-use App\Enums\AgentName;
 use App\Models\AgentCredential;
 use App\Models\Thread;
 use App\Models\User;
@@ -34,7 +33,6 @@ class AgentPoolTest extends TestCase
         $shared = AgentCredential::factory()->create(['name' => 'a-shared']);
         AgentCredential::factory()->ownedBy($other)->create();
         AgentCredential::factory()->ownedBy($me)->expired()->create();
-        AgentCredential::factory()->ownedBy($me)->create(['agent_name' => AgentName::Codex, 'credentials' => ['x' => 1]]);
         AgentCredential::factory()->ownedBy($me)->create(['usage_limited_until' => now()->addHour()]);
 
         $ids = $this->pool->usableAgentsFor($me)->pluck('id')->all();

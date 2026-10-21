@@ -8,7 +8,6 @@ use App\Enums\AgentName;
 use App\Models\AgentVersion;
 use App\Workers\Agents\AgentRegistry;
 use App\Workers\Agents\ClaudeCodeRunner;
-use App\Workers\Agents\CodexRunner;
 use App\Workers\Health\AgentVersionCheck;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use RuntimeException;
@@ -23,17 +22,14 @@ class AgentVersionCheckTest extends TestCase
     {
         $registry = new AgentRegistry;
         $registry->register(ClaudeCodeRunner::class);
-        $registry->register(CodexRunner::class);
 
         $check = new FakeAgentVersionCheck($registry, [
             '@anthropic-ai/claude-code' => "1.5.0\n",
-            '@openai/codex' => "0.130.0\n",
         ]);
 
         $report = $check->run();
 
         $this->assertSame('1.5.0', $report['claude-code']['upstream']);
-        $this->assertSame('0.130.0', $report['codex']['upstream']);
 
         $row = AgentVersion::query()->find('claude-code');
         $this->assertSame('1.5.0', $row->upstream_version);

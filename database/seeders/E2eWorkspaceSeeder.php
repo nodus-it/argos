@@ -50,8 +50,6 @@ class E2eWorkspaceSeeder extends Seeder
             'platform' => GitProvider::GitHub,
             'auth_method' => AuthMethod::Pat,
             'default_branch' => 'main',
-            'auto_concept' => false,
-            'auto_pr' => false,
         ]);
 
         $agent = AgentCredential::query()->create([

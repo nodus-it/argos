@@ -12,7 +12,7 @@ use Illuminate\Support\Str;
 
 /**
  * Start an automatic run in a new workspace — the one entry point for the
- * REST API, MCP and issue triggers (the replacement for creating a task).
+ * REST API, MCP and issue triggers.
  */
 class AutoRunService
 {

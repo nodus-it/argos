@@ -113,8 +113,7 @@ class ConfigDerivationTest extends TestCase
     {
         $keys = [
             'ARGOS_PREVIEW_DEFAULT_IMAGE', 'ARGOS_PREVIEW_TTL_HOURS', 'ARGOS_PREVIEW_PORT',
-            'ARGOS_PREVIEW_NETWORK', 'ARGOS_PREVIEW_AUTH', 'ARGOS_PREVIEW_AUTH_GATE_URL',
-            'ARGOS_PREVIEW_BASIC_USER', 'ARGOS_PREVIEW_MAX_CONCURRENT',
+            'ARGOS_PREVIEW_NETWORK', 'ARGOS_PREVIEW_MAX_CONCURRENT',
             'ARGOS_PREVIEW_CPU_LIMIT', 'ARGOS_PREVIEW_MEM_LIMIT', 'ARGOS_PORT',
         ];
         foreach ($keys as $key) {
@@ -133,9 +132,6 @@ class ConfigDerivationTest extends TestCase
         $this->assertSame(24, $cfg['ttl_hours']);
         $this->assertSame(8080, $cfg['port']);
         $this->assertSame('argos_edge', $cfg['network']);
-        $this->assertSame('none', $cfg['auth']);
-        $this->assertSame('http://nginx:80/_argos/demo-gate', $cfg['auth_gate_url']);
-        $this->assertSame('demo', $cfg['basic_user']);
         $this->assertSame(10, $cfg['max_concurrent']);
         $this->assertSame('1.0', $cfg['cpu_limit']);
         $this->assertSame('1g', $cfg['memory_limit']);

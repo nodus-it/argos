@@ -100,7 +100,7 @@ class WorkerStackResourceTest extends TestCase
                 'name' => 'rust-stable',
                 'label' => 'Rust stable',
                 'base_image' => 'rust:1.85-slim',
-                // node => compatible with claude-code AND codex (both registered)
+                // node => compatible with claude-code
                 'capabilities' => ['rust', 'cargo', 'node'],
                 'common_tools' => ['git'],
                 'status' => WorkerImageEntityStatus::Active->value,
@@ -109,7 +109,7 @@ class WorkerStackResourceTest extends TestCase
             ->call('create')
             ->assertHasNoFormErrors();
 
-        Queue::assertPushed(BuildWorkerImageJob::class, 2);
+        Queue::assertPushed(BuildWorkerImageJob::class, 1);
     }
 
     public function test_create_skips_dispatch_for_incompatible_stack(): void

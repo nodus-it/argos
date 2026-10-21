@@ -15,7 +15,7 @@ use Filament\Support\Icons\Heroicon;
 /**
  * The workspace app (/w): full width, navigation in the top bar, so chat,
  * editor and preview get the whole screen. Administration (projects,
- * agents, users, tasks) stays in the admin panel.
+ * agents, users) stays in the admin panel.
  */
 class WorkspacesPanelProvider extends PanelProvider
 {

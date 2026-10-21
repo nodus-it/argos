@@ -17,7 +17,6 @@ use App\Filament\Admin\Resources\RepoProfileResource\Pages\CreateRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\EditRepoProfile;
 use App\Filament\Admin\Resources\RepoProfileResource\Pages\ListRepoProfiles;
 use App\Filament\Admin\Resources\RepoProfileResource\RelationManagers\TaskProviderBindingsRelationManager;
-use App\Filament\Admin\Resources\RepoProfileResource\RelationManagers\TasksRelationManager;
 use App\Models\ConnectedAccount;
 use App\Models\RepoProfile;
 use App\Models\User;
@@ -39,7 +38,6 @@ use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
-use Filament\Infolists\Components\IconEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Callout;
@@ -247,14 +245,6 @@ class RepoProfileResource extends Resource
                                                 ->label(__('projects.fields.project_name'))
                                                 ->required()
                                                 ->maxLength(255),
-
-                                            Toggle::make('auto_concept')
-                                                ->label(__('projects.fields.auto_concept_label'))
-                                                ->helperText(__('projects.fields.auto_concept_helper')),
-
-                                            Toggle::make('auto_pr')
-                                                ->label(__('projects.fields.auto_pr_label'))
-                                                ->helperText(__('projects.fields.auto_pr_helper')),
                                         ]),
 
                                     Section::make(__('projects.sections.repository'))
@@ -444,15 +434,6 @@ class RepoProfileResource extends Resource
                                         ->helperText(__('projects.fields.worker_agent_helper'))
                                         ->options(fn (): array => self::agentOptions())
                                         ->placeholder(__('projects.fields.worker_agent_placeholder', ['agent' => AgentName::ClaudeCode->value]))
-                                        ->live()
-                                        ->afterStateUpdated(function (Set $set): void {
-                                            // Different agent → previously-pinned models belong to
-                                            // the old agent's spec (e.g. claude-haiku is invalid
-                                            // for codex). Clear so the new agent's defaults take
-                                            // over and the placeholder shows the right hint.
-                                            $set('model_concept', null);
-                                            $set('model_implement', null);
-                                        })
                                         ->native(false),
 
                                     CheckboxList::make('worker_services')
@@ -567,61 +548,6 @@ class RepoProfileResource extends Resource
                                         ->itemLabel(fn (array $state): ?string => $state['name'] ?? null)
                                         ->collapsible()
                                         ->defaultItems(0),
-                                ]),
-
-                            // ── Modelle ─────────────────────────────────────────────────────
-                            Section::make(__('projects.sections.models'))
-                                ->description(__('projects.sections.models_description'))
-                                ->icon('heroicon-o-sparkles')
-                                ->aside()
-                                ->visible(fn (Get $get): bool => self::platformChosen($get))
-                                ->schema([
-                                    // The default-model hint lives in helperText (text inside a
-                                    // span) instead of placeholder (an HTML attribute). Livewire
-                                    // diffs reliably update text nodes; placeholder attributes
-                                    // get frozen on first render and won't change when the agent
-                                    // switches even though the server re-evaluates the closure.
-                                    Select::make('model_concept')
-                                        ->label(__('projects.fields.model_concept_label'))
-                                        ->options(fn (Get $get): array => self::modelOptions($get))
-                                        ->placeholder(__('projects.fields.model_placeholder_neutral'))
-                                        ->helperText(fn (Get $get): string => __(
-                                            'projects.fields.model_concept_helper_with_default',
-                                            ['model' => self::defaultModelLabel($get, 'concept')],
-                                        ))
-                                        ->live()
-                                        ->native(false),
-
-                                    Select::make('model_implement')
-                                        ->label(__('projects.fields.model_implement_label'))
-                                        ->options(fn (Get $get): array => self::modelOptions($get))
-                                        ->placeholder(__('projects.fields.model_placeholder_neutral'))
-                                        ->helperText(fn (Get $get): string => __(
-                                            'projects.fields.model_implement_helper_with_default',
-                                            ['model' => self::defaultModelLabel($get, 'implement')],
-                                        ))
-                                        ->live()
-                                        ->native(false),
-
-                                    TextInput::make('max_turns_concept')
-                                        ->label(__('projects.fields.max_turns_concept_label'))
-                                        ->helperText(__('projects.fields.max_turns_concept_helper', [
-                                            'default' => (int) config('argos.concept.max_turns_default', 50),
-                                        ]))
-                                        ->numeric()
-                                        ->minValue(10)
-                                        ->maxValue(1000)
-                                        ->nullable(),
-
-                                    TextInput::make('max_turns_implement')
-                                        ->label(__('projects.fields.max_turns_implement_label'))
-                                        ->helperText(__('projects.fields.max_turns_implement_helper', [
-                                            'default' => (int) config('argos.implement.max_turns_default', 200),
-                                        ]))
-                                        ->numeric()
-                                        ->minValue(10)
-                                        ->maxValue(1000)
-                                        ->nullable(),
                                 ]),
                         ]),  // ↑ end of "Worker" tab
 
@@ -972,49 +898,6 @@ class RepoProfileResource extends Resource
     }
 
     /**
-     * Models offered by the currently-selected agent (or by Claude Code as
-     * fallback when nothing is chosen yet) as a [id => label] map.
-     *
-     * @return array<string, string>
-     */
-    private static function modelOptions(Get $get): array
-    {
-        return self::agentFromState($get)->spec()->availableModels;
-    }
-
-    /**
-     * Default model label for the selected agent + phase, used as Select
-     * placeholder. Returns the model id when no human label is registered.
-     */
-    private static function defaultModelLabel(Get $get, string $phase): string
-    {
-        $spec = self::agentFromState($get)->spec();
-        $modelId = $spec->defaultModel($phase) ?? '';
-
-        return $spec->availableModels[$modelId] ?? $modelId;
-    }
-
-    /**
-     * Resolve the agent currently selected in the form, falling back to
-     * Claude Code when nothing is set yet. Accepts both string state
-     * (Filament Select default) and AgentName enum instances (in case the
-     * model cast leaks through into the form state).
-     */
-    private static function agentFromState(Get $get): AgentName
-    {
-        $value = $get('worker_agent_name');
-
-        if ($value instanceof AgentName) {
-            return $value;
-        }
-        if (is_string($value) && $value !== '') {
-            return AgentName::tryFrom($value) ?? AgentName::ClaudeCode;
-        }
-
-        return AgentName::ClaudeCode;
-    }
-
-    /**
      * Im OAuth-Pfad schreiben die sichtbaren Picker in das gemeinsame Feld
      * `oauth_repo` / `oauth_branch`; die DB-Spalten heißen aber `url` und
      * `default_branch`. Diese Methode mappt die Werte zurück (der URL-Aufbau
@@ -1081,14 +964,6 @@ class RepoProfileResource extends Resource
                         ->color(fn (AuthMethod $state): string => $state->color())
                         ->formatStateUsing(fn (AuthMethod $state): string => $state->label()),
 
-                    IconEntry::make('auto_concept')
-                        ->label(__('projects.infolist.auto_concept'))
-                        ->boolean(),
-
-                    IconEntry::make('auto_pr')
-                        ->label(__('projects.infolist.auto_pr'))
-                        ->boolean(),
-
                     TextEntry::make('workerStack.label')
                         ->label(__('projects.infolist.worker_stack'))
                         ->placeholder(__('projects.infolist.worker_stack_placeholder', ['stack' => (string) config('argos.compose.default_stack', 'php-8.4')])),
@@ -1137,9 +1012,9 @@ class RepoProfileResource extends Resource
                     ->limit(50)
                     ->toggleable(isToggledHiddenByDefault: true),
 
-                TextColumn::make('tasks_count')
-                    ->label(__('projects.columns.tasks'))
-                    ->counts('tasks')
+                TextColumn::make('workspaces_count')
+                    ->label(__('projects.columns.workspaces'))
+                    ->counts('workspaces')
                     ->visibleFrom('md'),
             ])
             ->recordUrl(fn (RepoProfile $record): string => static::getUrl('edit', ['record' => $record]))
@@ -1156,7 +1031,6 @@ class RepoProfileResource extends Resource
     public static function getRelations(): array
     {
         return [
-            TasksRelationManager::class,
             TaskProviderBindingsRelationManager::class,
             ApiTokensRelationManager::class,
         ];

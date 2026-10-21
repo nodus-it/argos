@@ -6,9 +6,9 @@
 #   --shellcheck     nur shellcheck (Severity warning) laufen lassen
 #   (default: shellcheck → bats)
 #
-# Hinweis: --integration ist als Alias für --bats erhalten (CI ruft das so);
-# eine eigenständige Integrations-Suite für die Bash-Schicht existiert nicht
-# mehr, weil PhaseRunner (PHP) die Container-Orchestrierung übernommen hat.
+# Hinweis: --integration ist als Alias für --bats erhalten (CI ruft das so).
+# Die Bash-Schicht besteht nur noch aus den Gate-Helfern (worker/lib) und den
+# Workspace-Skripten.
 
 set -euo pipefail
 IFS=$'\n\t'
@@ -41,8 +41,8 @@ rc=0
 
 if $run_shellcheck; then
     echo "==> shellcheck (severity=warning)"
-    files=(.tools/docker/worker/worker-entrypoint.sh worker/tests/run-tests.sh worker/tests/run-bats.sh)
-    while IFS= read -r f; do files+=("$f"); done < <(find worker/lib worker/phases -type f -name '*.sh')
+    files=(.tools/docker/worker/workspace/run-gates.sh worker/tests/run-tests.sh worker/tests/run-bats.sh)
+    while IFS= read -r f; do files+=("$f"); done < <(find worker/lib -type f -name '*.sh')
     docker run --rm -v "$repo_root:/mnt" -w /mnt koalaman/shellcheck:stable \
         --severity=warning "${files[@]}" || rc=$?
 fi

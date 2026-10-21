@@ -6,17 +6,15 @@ namespace Database\Seeders;
 
 use App\Enums\AuthMethod;
 use App\Enums\GitProvider;
-use App\Enums\WorkflowStatus;
 use App\Models\ConnectedAccount;
 use App\Models\RepoProfile;
-use App\Models\Task;
 use App\Models\User;
 use Database\Seeders\Support\DemoUserBuilder;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Env;
 
 /**
- * Live-Ready profile: real OAuth fully wired so a REAL task can run immediately.
+ * Live-Ready profile: real OAuth fully wired so a REAL workspace can start immediately.
  * LOCAL ONLY — skipped outside the local environment. Secrets are read from the
  * root .env (bind-mounted into the app container); nothing sensitive is
  * committed.
@@ -28,7 +26,7 @@ use Illuminate\Support\Env;
  * Optional env:
  *   SEED_GITHUB_REFRESH_TOKEN — GitHub OAuth refresh token
  *   SEED_GITHUB_USER          — GitHub login (provider_id / name / nickname)
- *   SEED_REPO_BRANCH          — default branch + task base branch (default: main)
+ *   SEED_REPO_BRANCH          — default branch (default: main)
  *   SEED_USER_EMAIL           — admin email (default: admin@argos.local)
  *
  * The ConnectedAccount is seeded with expires_at=null so TokenRefresher never
@@ -54,7 +52,7 @@ final class LiveReadySeeder extends Seeder
         $claude = (new DemoUserBuilder($this->command))->claudeFromEnv('live');
 
         if ($githubToken === null || $repoUrl === null || $claude === null) {
-            $this->command?->warn('LiveReadySeeder: missing SEED_GITHUB_OAUTH_TOKEN / SEED_REPO_URL / SEED_CLAUDE_OAUTH_TOKEN — live task not wired (admin user kept).');
+            $this->command?->warn('LiveReadySeeder: missing SEED_GITHUB_OAUTH_TOKEN / SEED_REPO_URL / SEED_CLAUDE_OAUTH_TOKEN — live project not wired (admin user kept).');
 
             return;
         }
@@ -63,10 +61,9 @@ final class LiveReadySeeder extends Seeder
         $login = $this->env('SEED_GITHUB_USER') ?? 'argos-live';
 
         $account = $this->connectedAccount($user, $githubToken, $login);
-        $profile = $this->liveProfile($account, $repoUrl, $branch);
-        $this->liveTask($user, $profile, $branch);
+        $this->liveProfile($user, $account, $repoUrl, $branch);
 
-        $this->command?->info('Live-Ready profile seeded: GitHub OAuth account + repo + Claude credential + one runnable Draft task.');
+        $this->command?->info('Live-Ready profile seeded: GitHub OAuth account + repo + Claude credential.');
     }
 
     private function connectedAccount(User $user, string $token, string $login): ConnectedAccount
@@ -86,7 +83,7 @@ final class LiveReadySeeder extends Seeder
         );
     }
 
-    private function liveProfile(ConnectedAccount $account, string $repoUrl, string $branch): RepoProfile
+    private function liveProfile(User $user, ConnectedAccount $account, string $repoUrl, string $branch): RepoProfile
     {
         // Named after the repo, so a live profile for another repo is not
         // mistaken for Argos itself.
@@ -100,24 +97,11 @@ final class LiveReadySeeder extends Seeder
                 'auth_method' => AuthMethod::OAuth->value,
                 'connected_account_id' => $account->id,
                 'default_branch' => $branch,
-                'auto_concept' => false,
-                'auto_pr' => false,
+                // Issue triggers and project tokens act for the admin.
+                'automation_user_id' => $user->id,
                 // Live profile is meant to showcase the end-to-end flow incl.
-                // the per-task live demo, so enable it by default.
+                // the workspace preview, so enable it by default.
                 'live_demo_enabled' => true,
-            ],
-        );
-    }
-
-    private function liveTask(User $user, RepoProfile $profile, string $branch): void
-    {
-        Task::firstOrCreate(
-            ['user_id' => $user->id, 'name' => 'Live demo task'],
-            [
-                'repo_profile_id' => $profile->id,
-                'description' => 'Seeded by LiveReadySeeder — ready to run against the real repo.',
-                'base_branch' => $branch,
-                'workflow_status' => WorkflowStatus::Draft->value,
             ],
         );
     }
