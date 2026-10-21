@@ -1,23 +1,38 @@
-{{-- Icon rail of the workspaces panel (replaces the top bar): home,
-     administration, the bell and the user menu. Icon-only, 44px targets. --}}
+{{-- Icon rail of the workspaces panel (replaces the top bar): logo, "My
+     work", the workspaces as abbreviations with waiting badges, the list of
+     all workspaces, administration (Argos admins), the bell and the user
+     menu. Icon-only, 44px targets; a bottom bar on phones. --}}
 @php
+    use App\Filament\Workspaces\Pages\MyWork;
     use App\Filament\Workspaces\Resources\WorkspaceResource;
 
     $user = filament()->auth()->user();
+    $onMyWork = request()->routeIs(MyWork::getRouteName(filament()->getPanel('workspaces')));
+    $onList = request()->routeIs('filament.workspaces.resources.workspaces.index');
+    $record = request()->route('record');
+    $activeId = is_string($record) ? $record : ($record instanceof \App\Models\Workspace ? $record->id : null);
 @endphp
 @if ($user)
 <nav class="wf-rail" aria-label="{{ __('workspaces.panel.navigation') }}">
-    <a href="{{ WorkspaceResource::getUrl('index', panel: 'workspaces') }}" class="wf-rail-logo" aria-label="Argos">
+    <a href="{{ MyWork::getUrl(panel: 'workspaces') }}" class="wf-rail-logo" aria-label="Argos">
         <x-wf.icon name="eye" :size="24" />
     </a>
-    <a href="{{ WorkspaceResource::getUrl('index', panel: 'workspaces') }}" @class(['wf-rail-btn', 'is-active' => request()->routeIs('filament.workspaces.*')])
-       aria-label="{{ __('workspaces.panel.workspaces') }}" title="{{ __('workspaces.panel.workspaces') }}" @if (request()->routeIs('filament.workspaces.*')) aria-current="page" @endif>
-        <x-wf.icon name="layout" :size="20" />
+    <a href="{{ MyWork::getUrl(panel: 'workspaces') }}" @class(['wf-rail-btn', 'wf-rail-home', 'is-active' => $onMyWork])
+       aria-label="{{ __('workspaces.my_work.title') }}" title="{{ __('workspaces.my_work.title') }}" @if ($onMyWork) aria-current="page" @endif>
+        <x-wf.icon name="inbox" :size="20" />
     </a>
-    <a href="{{ url('/admin') }}" class="wf-rail-btn" aria-label="{{ __('workspaces.panel.admin') }}" title="{{ __('workspaces.panel.admin') }}">
-        <x-wf.icon name="settings" :size="20" />
+    <span class="wf-rail-sep" aria-hidden="true"></span>
+    @livewire(\App\Livewire\Workspace\RailWorkspaces::class, ['activeId' => $activeId], key('rail-workspaces'))
+    <a href="{{ WorkspaceResource::getUrl('index', panel: 'workspaces') }}" @class(['wf-rail-btn', 'wf-rail-all', 'is-active' => $onList])
+       aria-label="{{ __('workspaces.rail.all_workspaces') }}" title="{{ __('workspaces.rail.all_workspaces') }}" @if ($onList) aria-current="page" @endif>
+        <x-wf.icon name="grid" :size="20" />
     </a>
     <span class="wf-rail-spacer"></span>
+    @if ($user->isAdmin())
+        <a href="{{ url('/admin') }}" class="wf-rail-btn wf-rail-admin" aria-label="{{ __('workspaces.panel.admin') }}" title="{{ __('workspaces.panel.admin') }}">
+            <x-wf.icon name="settings" :size="20" />
+        </a>
+    @endif
     @livewire(\App\Livewire\Workspace\RailNotifications::class, ['lazy' => true])
     <x-filament::dropdown placement="right-end" class="wf-rail-user">
         <x-slot name="trigger">
@@ -30,9 +45,11 @@
                     {{ __('workspaces.panel.profile') }}
                 </x-filament::dropdown.list.item>
             @endif
-            <x-filament::dropdown.list.item :href="url('/admin')" tag="a" icon="heroicon-o-cog-6-tooth">
-                {{ __('workspaces.panel.admin') }}
-            </x-filament::dropdown.list.item>
+            @if ($user->isAdmin())
+                <x-filament::dropdown.list.item :href="url('/admin')" tag="a" icon="heroicon-o-cog-6-tooth">
+                    {{ __('workspaces.panel.admin') }}
+                </x-filament::dropdown.list.item>
+            @endif
         </x-filament::dropdown.list>
         <x-filament::dropdown.list>
             <x-filament-panels::theme-switcher />

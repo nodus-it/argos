@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Filament\Workspaces\Resources\WorkspaceResource\Pages;
 
-use App\Filament\Admin\Resources\WorkspaceResource as AdminWorkspaceResource;
 use App\Filament\Workspaces\Resources\WorkspaceResource;
 use App\Models\Workspace;
 use App\Support\DocsLinkAction;
@@ -24,7 +23,7 @@ class ListWorkspaces extends ListRecords
                 ->label(__('workspaces.actions.create'))
                 ->icon('heroicon-o-plus')
                 ->visible(fn (): bool => auth()->user()?->can('create', Workspace::class) ?? false)
-                ->url(fn (): string => AdminWorkspaceResource::getUrl('create', panel: 'admin')),
+                ->url(fn (): string => WorkspaceResource::getUrl('create')),
         ];
     }
 }

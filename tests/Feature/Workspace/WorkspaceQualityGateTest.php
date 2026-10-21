@@ -12,6 +12,7 @@ use App\Enums\WorkspaceStatus;
 use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ViewWorkspace;
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
 use App\Livewire\Workspace\ContextPanel;
+use App\Livewire\Workspace\GateDetail;
 use App\Livewire\Workspace\TaskChat;
 use App\Models\AgentCredential;
 use App\Models\Task;
@@ -197,19 +198,22 @@ class WorkspaceQualityGateTest extends TestCase
             ->call('startCreating')->set('newTitle', 'Gates')->call('createTask')->assertHasNoErrors();
         $task = Task::query()->where('title', 'Gates')->sole();
 
-        $panel = Livewire::withoutLazyLoading()->withQueryParams(['task' => $task->id])->actingAs($this->editor)->test(ContextPanel::class, ['workspaceId' => $this->workspace->id])
+        Livewire::withoutLazyLoading()->withQueryParams(['task' => $task->id])->actingAs($this->editor)->test(ContextPanel::class, ['workspaceId' => $this->workspace->id])
             ->assertSee(__('workspaces.focus.gate_state.open'))
             ->call('runGates')
-            ->assertSee(__('workspaces.focus.gate_state.fail'))
+            ->assertSee(__('workspaces.focus.gate_state.fail'));
+
+        $detail = Livewire::actingAs($this->editor)->test(GateDetail::class, ['workspaceId' => $this->workspace->id])
+            ->call('show', $task->id, 'pest')
             ->assertSee(__('workspaces.gates.send_fix'))
             ->assertSee('LoginTest');
 
-        $panel->call('sendGateFix', 'pest')->assertNotified(__('workspaces.gates.fix_sent'));
+        $detail->call('sendGateFix', 'pest')->assertNotified(__('workspaces.gates.fix_sent'));
         $message = TaskEvent::query()->where('task_id', $task->id)->where('type', TaskEventType::UserMessage->value)->sole();
         $this->assertStringContainsString('# Quality-Gate-Fix: pest', $message->payload['text']);
 
         // Only failed gates can be sent.
-        $panel->call('sendGateFix', 'pint')->assertNotified(__('workspaces.gates.no_prompt'));
+        $detail->call('sendGateFix', 'pint')->assertNotified(__('workspaces.gates.no_prompt'));
         $this->assertSame(1, TaskEvent::query()->where('task_id', $task->id)->where('type', TaskEventType::UserMessage->value)->count());
     }
 

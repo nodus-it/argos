@@ -324,7 +324,7 @@ Commits, nicht committete Änderungen und neue Dateien:
 
 - Die **Werkzeugleiste** zeigt die hinzugefügten/entfernten Zeilen, *X / N
   gesehen*, einen Chip pro Gate (ein fehlgeschlagenes Gate mit Befunden springt
-  zum ersten), **Split** oder **Unified** — für dich gespeichert — und
+  zum ersten, die übrigen öffnen die Gate-Details), **Split** oder **Unified** — für dich gespeichert — und
   Maximieren.
 - Der **Dateibaum** gruppiert die Dateien nach Verzeichnis, mit Statusbuchstabe
   und Badges: Befunde der Gates (gelb), *neu* (Claude hat die Datei geändert,
@@ -373,9 +373,16 @@ Sie sind für PHP/Laravel-Projekte gemacht; bei anderen Stacks werden die Gates
   Basis-Branches: Pest und PHPStan zählen dann nur neue Fehler. Solange die
   Baseline noch läuft oder wenn sie fehlgeschlagen ist, zählt jeder Fehler.
 - Ein Lauf gleichzeitig pro Workspace. Die Seitenleiste zeigt den Zustand jedes
-  Gates; ein fehlgeschlagenes Gate klappt das Ende seines Logs und **Claude
-  fixen lassen** auf. Das schickt einen Fix-Prompt mit dem Log in den aktuellen
-  Thread — denselben, den automatische Läufe nutzen.
+  Gates. Ein Klick auf ein Gate — auch ein grünes — öffnet seine
+  **Gate-Details**: Ergebnis, Dauer und Zeitpunkt, den Baseline-Hinweis (*nur
+  neue Fehler zählen* bzw. *alle Fehler zählen*, wenn der Basis-Commit keine
+  Baseline hat), das vollständige Log mit einer Suche, die passende Zeilen
+  filtert und hervorhebt, und die betroffenen Dateien (PHPStan-Fehler pro Datei,
+  von Pint markierte Dateien) — ein Klick öffnet das Review auf dieser Datei. Ein
+  fehlgeschlagenes Gate bietet **Claude fixen lassen**; das schickt einen
+  Fix-Prompt mit dem Log in die aktuelle Aufgabe — dieselbe, die automatische
+  Läufe nutzen. Ist die Arbeitskopie nicht erreichbar, zeigen die Details das
+  gespeicherte Ende des Logs.
 - Im [Review](#das-review) erscheinen PHPStan-Fehler **an ihrer Zeile**, Pint
   markiert die Datei. **Claude fixen lassen** legt den Befund dort (Gate,
   Meldung, Datei und Zeile) zu deinen gesammelten Kommentaren, sodass er mit dem

@@ -9,18 +9,21 @@ use App\Enums\ApprovalStatus;
 use App\Enums\AutoTaskState;
 use App\Enums\SessionStatus;
 use App\Enums\TaskEventType;
+use App\Enums\TaskStatus;
 use App\Models\Task;
 use App\Models\TaskApproval;
 use App\Models\TaskEvent;
+use App\Models\User;
 use App\Models\Workspace;
 use App\Support\TaskEventFormatter;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
 /**
- * The tasks of a workspace for the header's switcher: grouped into
- * "waiting for you", "running" and "done", each with one line of status
- * text (the open approval, the last step, or what the last turn changed).
+ * The tasks of a workspace for the header's switcher, grouped by state —
+ * waiting for you, running, ready, pull request open, done (merged or
+ * cancelled) — each with one line of status text (the open approval, the
+ * last step, the pull request, or what the last turn changed).
  */
 class TaskOverview
 {
@@ -28,24 +31,34 @@ class TaskOverview
 
     public const RUNNING = 'running';
 
+    public const READY = 'ready';
+
+    public const PR_OPEN = 'pr_open';
+
     public const DONE = 'done';
+
+    /** Display order of the groups. */
+    public const GROUPS = [self::WAITING, self::RUNNING, self::READY, self::PR_OPEN, self::DONE];
 
     /** Tools whose input names the file they change. */
     private const EDIT_TOOLS = ['Edit', 'MultiEdit', 'Write', 'NotebookEdit'];
 
     /**
-     * @return array{waiting: list<array{task: Task, text: string}>, running: list<array{task: Task, text: string}>, done: list<array{task: Task, text: string}>, archived: int}
+     * @param  User|null  $mine  only tasks this person owns or was invited to
+     * @return array{waiting: list<array{task: Task, text: string}>, running: list<array{task: Task, text: string}>, ready: list<array{task: Task, text: string}>, pr_open: list<array{task: Task, text: string}>, done: list<array{task: Task, text: string}>, archived: int}
      */
-    public function for(Workspace $workspace): array
+    public function for(Workspace $workspace, ?User $mine = null): array
     {
         $tasks = Task::query()
+            ->with(['owner', 'members'])
             ->where('workspace_id', $workspace->id)
             ->whereNull('archived_at')
+            ->when($mine !== null, fn ($q) => $q->where(fn ($q) => $q->where('owner_user_id', $mine->id)->orWhereHas('members', fn ($m) => $m->where('user_id', $mine->id))))
             ->latest('updated_at')
             ->get();
         $pending = $this->pendingApprovals($tasks);
 
-        $groups = [self::WAITING => [], self::RUNNING => [], self::DONE => []];
+        $groups = array_fill_keys(self::GROUPS, []);
         foreach ($tasks as $task) {
             $approval = $pending->get($task->id);
             $group = $this->group($task, $approval);
@@ -66,14 +79,11 @@ class TaskOverview
 
     public function group(Task $task, ?TaskApproval $approval): string
     {
-        if ($approval !== null || $task->session_status === SessionStatus::WaitingInput || $task->auto_state === AutoTaskState::AwaitingPlanApproval) {
+        if ($approval !== null) {
             return self::WAITING;
         }
-        if (in_array($task->session_status, [SessionStatus::Running, SessionStatus::Starting], true) || ($task->auto_state?->isRunning() ?? false)) {
-            return self::RUNNING;
-        }
 
-        return self::DONE;
+        return $task->state()->group();
     }
 
     private function text(Task $task, string $group, ?TaskApproval $approval): string
@@ -85,9 +95,21 @@ class TaskOverview
             return $task->auto_state === AutoTaskState::AwaitingPlanApproval ? __('workspaces.switcher.text.plan') : __('workspaces.switcher.text.waiting');
         }
         if ($group === self::RUNNING) {
+            if ($task->status === TaskStatus::Preparing) {
+                return __('workspaces.switcher.text.preparing');
+            }
             $step = $this->lastStep($task);
 
             return $step === '' ? __('workspaces.switcher.text.working') : __('workspaces.switcher.text.working_on', ['step' => $step]);
+        }
+        if ($task->queued_at !== null) {
+            return __('workspaces.switcher.text.queued');
+        }
+        if ($group === self::PR_OPEN) {
+            return __('workspaces.switcher.text.pr', ['number' => (string) $task->pr_number, 'state' => __('workspaces.pr_state.'.($task->pr_state ?? 'open'))]);
+        }
+        if ($group === self::DONE) {
+            return $task->state()->label();
         }
         if ($task->session_status === SessionStatus::Error) {
             return __('workspaces.switcher.text.error');

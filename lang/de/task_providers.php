@@ -14,6 +14,8 @@ return [
         'project_placeholder' => 'Erst Provider und Zugang wählen',
         'project_help' => 'Wird automatisch aus dem gewählten Zugang geladen.',
         'labels_filter' => 'Labels-Filter',
+        'close_on_merge' => 'Ticket beim Merge schließen',
+        'close_on_merge_help' => 'GitHub- und GitLab-Issues: Der Pull Request enthält „Closes #…“, der Merge schließt das Ticket. Aus: „Refs #…“ – das Ticket bleibt offen.',
         'groups' => [
             'oauth' => 'OAuth-Accounts',
             'pat' => 'Access-Tokens (PAT)',
@@ -27,6 +29,7 @@ return [
         'project' => 'Projekt',
         'last_poll' => 'Letzter Poll',
         'last_error' => 'Letzter Fehler',
+        'close_on_merge' => 'Schließt beim Merge',
     ],
 
     'actions' => [

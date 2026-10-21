@@ -16,13 +16,16 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
+use Livewire\Attributes\Session;
 use Livewire\Component;
 
 /**
- * Task switcher in the workspace header (replaces the task column):
- * a button with the current task and a popover (⌘J) grouped into
- * "waiting for you", "running" and "done", plus the hint chip when another
- * task waits for a decision. Selecting tells TaskChat via events.
+ * Task switcher in the workspace header: a button with the current task and
+ * a popover (⌘J) grouped into waiting for you, running, ready, PR open and
+ * done; filtered to "mine + invited" or all tasks of the workspace. Each row
+ * shows its owner (when it is someone else), ticket and pull request. The
+ * hint chip points at another task waiting for a decision. Selecting tells
+ * TaskChat via events.
  */
 class TaskSwitcher extends Component
 {
@@ -32,6 +35,10 @@ class TaskSwitcher extends Component
     public ?string $currentId = null;
 
     public bool $showArchived = false;
+
+    /** Only my tasks and the ones I was invited to (remembered per session). */
+    #[Session]
+    public bool $mine = true;
 
     public ?string $renamingId = null;
 
@@ -103,8 +110,8 @@ class TaskSwitcher extends Component
     public function render(): View
     {
         $workspace = $this->workspace();
-        $overview = app(TaskOverview::class)->for($workspace);
-        $all = collect([...$overview['waiting'], ...$overview['running'], ...$overview['done']])->map(fn (array $row): Task => $row['task']);
+        $overview = app(TaskOverview::class)->for($workspace, $this->mine ? $this->user() : null);
+        $all = collect(TaskOverview::GROUPS)->flatMap(fn (string $group): array => $overview[$group])->map(fn (array $row): Task => $row['task']);
         $current = $all->firstWhere('id', $this->currentId) ?? ($this->currentId !== null ? $this->task($this->currentId) : null);
         $waitingElsewhere = array_values(array_filter($overview['waiting'], fn (array $row): bool => $row['task']->id !== $this->currentId));
 
@@ -119,13 +126,15 @@ class TaskSwitcher extends Component
                 ? Task::query()->where('workspace_id', $this->workspaceId)->whereNotNull('archived_at')->latest('archived_at')->get()
                 : collect(),
             'canWrite' => $this->user()->can('create', [Task::class, $workspace]),
+            'user' => $this->user(),
+            'others' => $this->mine ? Task::query()->where('workspace_id', $workspace->id)->whereNull('archived_at')->count() - $all->count() : 0,
         ]);
     }
 
     /** @param  array<string, mixed>  $overview */
     private function groupOf(array $overview, string $id): string
     {
-        foreach ([TaskOverview::WAITING, TaskOverview::RUNNING] as $group) {
+        foreach (TaskOverview::GROUPS as $group) {
             foreach ($overview[$group] as $row) {
                 if ($row['task']->id === $id) {
                     return $group;

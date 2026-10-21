@@ -19,6 +19,34 @@
         </span>
         <span class="wf-head-sep" aria-hidden="true">/</span>
         @livewire('workspace.task-switcher', ['workspaceId' => $workspace->id], key('switcher-'.$workspace->id))
+        @if ($task !== null)
+            {{-- Who the task belongs to, who works on it, what it refers to. --}}
+            <div class="wf-task-meta wf-hide-narrow">
+                @if ($task->owner !== null)
+                    <span class="wf-avatar-xs is-owner" title="{{ __('workspaces.switcher.owner', ['name' => $task->owner->name]) }}" aria-label="{{ __('workspaces.switcher.owner', ['name' => $task->owner->name]) }}">{{ \App\Support\Initials::of($task->owner->name) }}</span>
+                @endif
+                @foreach ($task->collaborators as $collaborator)
+                    <span class="wf-avatar-xs" title="{{ __('workspaces.task_actions.collaborator', ['name' => $collaborator->name]) }}">
+                        {{ \App\Support\Initials::of($collaborator->name) }}
+                    </span>
+                @endforeach
+                @if ($canInvite)
+                    <button type="button" class="wf-icon-btn wf-icon-btn-xs" wire:click="mountAction('invite')" aria-label="{{ __('workspaces.task_actions.invite') }}" title="{{ __('workspaces.task_actions.invite') }}">
+                        <x-wf.icon name="plus" :size="13" :stroke="2" />
+                    </button>
+                @endif
+                @if ($task->external_ref !== null)
+                    <a class="wf-ref-chip" href="{{ $task->external_ref['url'] ?? '#' }}" target="_blank" rel="noopener" title="{{ $task->external_ref['title'] ?? '' }}">
+                        <x-wf.icon name="link" :size="11" :stroke="2" /> {{ \App\Support\TaskRefs::ticketLabel($task) }}
+                    </a>
+                @endif
+                @if ($task->pr_url !== null)
+                    <a class="wf-ref-chip is-pr is-{{ $task->pr_state ?? 'open' }}" href="{{ $task->pr_url }}" target="_blank" rel="noopener">
+                        <x-wf.icon name="git-pr" :size="11" :stroke="2" /> #{{ $task->pr_number }} · {{ __('workspaces.pr_state.'.($task->pr_state ?? 'open')) }}
+                    </a>
+                @endif
+            </div>
+        @endif
         <span class="wf-review-flag" x-show="review" x-cloak>
             <x-wf.icon name="eye" :size="15" :stroke="2" /> {{ __('workspaces.focus.review_mode') }}
         </span>
@@ -26,7 +54,7 @@
         <button type="button" class="wf-btn" x-show="review" x-cloak x-on:click="closeReview()">
             {{ __('workspaces.focus.close_review') }} <kbd class="wf-kbd">esc</kbd>
         </button>
-        @if ($canOperate)
+        @if ($canCreate)
             <button type="button" class="wf-btn wf-hide-narrow" x-show="!review" x-on:click="$dispatch('task-new')">
                 <x-wf.icon name="plus" :size="16" :stroke="2" /> {{ __('workspaces.task.new') }}
             </button>
@@ -34,7 +62,11 @@
         @if ($this->startAction->isVisible()) {{ $this->startAction }} @endif
         @if ($this->shipAction->isVisible()) {{ $this->shipAction }} @endif
         <x-filament-actions::group
-            :actions="[$this->gatesAction, $this->rebaseAction, $this->membersAction, $this->stopAction, $this->deleteAction]"
+            :actions="[
+                \Filament\Actions\ActionGroup::make([$this->inviteAction, $this->transferAction, $this->followUpAction, $this->gatesAction, $this->rebaseAction])->dropdown(false),
+                \Filament\Actions\ActionGroup::make([$this->cancelTaskAction, $this->deleteTaskAction])->dropdown(false),
+                \Filament\Actions\ActionGroup::make([$this->settingsAction, $this->stopAction, $this->deleteAction])->dropdown(false),
+            ]"
             icon="heroicon-o-ellipsis-horizontal"
             :label="__('workspaces.focus.more')"
             color="gray"

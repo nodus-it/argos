@@ -13,7 +13,9 @@ use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Auth;
 use Laravel\Sanctum\Contracts\HasApiTokens;
 
 /**
@@ -36,6 +38,16 @@ class ApiTokensRelationManager extends RelationManager
     public static function getTitle(Model $ownerRecord, string $pageClass): string
     {
         return __('api_tokens.title');
+    }
+
+    /** A workspace's tokens belong to its settings (admins of the workspace). */
+    public static function canViewForRecord(Model $ownerRecord, string $pageClass): bool
+    {
+        if ($ownerRecord instanceof Workspace) {
+            return Auth::user()?->can('update', $ownerRecord) ?? false;
+        }
+
+        return parent::canViewForRecord($ownerRecord, $pageClass);
     }
 
     public function form(Schema $schema): Schema

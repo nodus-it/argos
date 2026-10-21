@@ -8,6 +8,7 @@ use App\Integrations\WorkspaceDaemon\Requests\CreateCheckpoint;
 use App\Integrations\WorkspaceDaemon\Requests\GetCheckpointDiff;
 use App\Integrations\WorkspaceDaemon\Requests\GetFileContent;
 use App\Integrations\WorkspaceDaemon\Requests\GetGateFixPrompt;
+use App\Integrations\WorkspaceDaemon\Requests\GetGateLog;
 use App\Integrations\WorkspaceDaemon\Requests\GitChanges;
 use App\Integrations\WorkspaceDaemon\Requests\GitCommit;
 use App\Integrations\WorkspaceDaemon\Requests\GitDiff;
@@ -40,6 +41,7 @@ class WorktreeRequestsTest extends TestCase
             'file content' => [new GetFileContent('login', 'README.md'), 'GET', '/worktrees/login/files/content'],
             'gates' => [new RunGates('login', []), 'POST', '/worktrees/login/gates/run'],
             'gate fix prompt' => [new GetGateFixPrompt('login', 'pest', 'r1'), 'GET', '/worktrees/login/gates/fix-prompt'],
+            'gate log' => [new GetGateLog('login', 'pest', 'r1'), 'GET', '/worktrees/login/gates/log'],
             'checkpoint' => [new CreateCheckpoint('login', []), 'POST', '/worktrees/login/checkpoints'],
             'checkpoint diff' => [new GetCheckpointDiff('login', 'refs/x'), 'GET', '/worktrees/login/checkpoints/diff'],
             'restore' => [new RestoreCheckpoint('login', []), 'POST', '/worktrees/login/checkpoints/restore'],
@@ -52,5 +54,10 @@ class WorktreeRequestsTest extends TestCase
     {
         $this->assertSame($method, $request->getMethod()->value);
         $this->assertSame($endpoint, $request->resolveEndpoint());
+    }
+
+    public function test_the_gate_log_request_names_gate_and_run(): void
+    {
+        $this->assertSame(['gate' => 'phpstan', 'run_id' => 'r9'], (new GetGateLog('login', 'phpstan', 'r9'))->query()->all());
     }
 }

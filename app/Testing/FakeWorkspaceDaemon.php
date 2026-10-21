@@ -301,6 +301,18 @@ class FakeWorkspaceDaemon extends WorkspaceDaemonClient implements WorkspaceDaem
         return "# Quality-Gate-Fix: {$gate}\n\nTests sind fehlgeschlagen.\n";
     }
 
+    public function gateLog(string $worktree, string $gate, string $runId): array
+    {
+        $log = match ($gate) {
+            'pest' => "   PASS  Tests\\Unit\\ExampleTest\n  ✓ that true is true\n\n   FAIL  Tests\\Feature\\LoginTest\n  ⨯ redirects home\n\n  Failed asserting that 500 is 302.\n  at tests/Feature/LoginTest.php:18\n\n  Tests:    1 failed, 1 passed (2 assertions)\n",
+            'phpstan' => "app/Http/Controllers/LoginController.php:42: Method App\\Http\\Controllers\\LoginController::store() should return Illuminate\\Http\\RedirectResponse but returns null.\napp/Models/User.php:17: Property App\\Models\\User::\$name has no type specified.\n\n [ERROR] Found 2 errors\n",
+            'pint' => "  ⨯ app/Http/Controllers/LoginController.php  unary_operator_spaces\n\n  FAIL  1 file, 1 style issue\n",
+            default => "{$gate}: ok\nfinished\n",
+        };
+
+        return ['log' => "[full log] {$gate} {$runId}\n".$log, 'truncated' => false];
+    }
+
     public function createCheckpoint(string $worktree, string $taskId, string $label): array
     {
         return [...$this->nextCheckpoint($taskId), 'label' => $label];

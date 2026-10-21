@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { copyFile, mkdir, open, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, open, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { strippedEnv } from './claudeEnv.js';
 import { CodedError } from './errors.js';
@@ -32,6 +32,8 @@ export const GATE_NAME_PATTERN = /^[a-z_]{1,32}$/;
 const RUN_TIMEOUT_MS = 30 * 60_000;
 const BASELINE_TIMEOUT_MS = 30 * 60_000;
 const LOG_TAIL_BYTES = 8 * 1024;
+/** Cap of a full gate log served to the UI; longer logs keep their end. */
+export const FULL_LOG_BYTES = 2 * 1024 * 1024;
 const GATE_RESULTS = new Set(['pass', 'fail', 'skip']);
 const BASELINE_FILES = ['pest-baseline.xml', 'phpstan-baseline.json'];
 const COMMIT_PATTERN = /^[0-9a-f]{40}$/;
@@ -146,6 +148,24 @@ export class GateRunner {
         }
 
         return stdout;
+    }
+
+    /**
+     * A gate's full log of a run (at most `maxBytes`, keeping the end).
+     * Empty when the gate wrote no log (skipped, or the run is gone).
+     */
+    async log(gate: string, runId: string, dir: string, maxBytes: number = FULL_LOG_BYTES): Promise<{ log: string; truncated: boolean; size: number }> {
+        const { code, stdout, stderr } = await this.script(['--dir', dir, '--log-path', gate, runId], 10_000);
+        if (code !== 0) {
+            throw new GateScriptError(stderr.trim() || `run-gates.sh exited with ${code}`);
+        }
+        const path = stdout.trim();
+        if (path === '' || !existsSync(path)) {
+            return { log: '', truncated: false, size: 0 };
+        }
+        const size = (await stat(path)).size;
+
+        return { log: await readTail(path, maxBytes), truncated: size > maxBytes, size };
     }
 
     /** Copy the base commit's baseline into the worktree (or clear a stale one). */

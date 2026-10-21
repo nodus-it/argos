@@ -572,7 +572,7 @@ class TaskService
      * Delete a task for good: its session, preview, worktree and database go
      * (the remote branch and pull request stay). Archiving is the normal way.
      */
-    public function delete(Task $task, User $by): void
+    public function discard(Task $task, User $by): void
     {
         Gate::forUser($by)->authorize('delete', $task);
         if ($task->session_open) {

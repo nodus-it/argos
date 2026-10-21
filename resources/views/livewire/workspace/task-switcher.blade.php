@@ -1,13 +1,10 @@
 @php
     use App\Services\Workspace\TaskOverview;
 
-    /** @var array{waiting: list<array{task: \App\Models\Task, text: string}>, running: list<array{task: \App\Models\Task, text: string}>, done: list<array{task: \App\Models\Task, text: string}>, archived: int} $overview */
-    $groups = [
-        TaskOverview::WAITING => __('workspaces.switcher.waiting'),
-        TaskOverview::RUNNING => __('workspaces.switcher.running'),
-        TaskOverview::DONE => __('workspaces.switcher.done'),
-    ];
+    /** @var array<string, mixed> $overview */
+    $groups = collect(TaskOverview::GROUPS)->mapWithKeys(fn (string $g): array => [$g => __('workspaces.switcher.'.$g)])->all();
     $doneLimit = 3;
+    $empty = collect(TaskOverview::GROUPS)->every(fn (string $g): bool => $overview[$g] === []);
 @endphp
 {{-- Task switcher: button + popover (dialog with a listbox), ⌘J/Ctrl+J,
      arrows + Enter, Esc closes and returns focus. Live: re-renders on any
@@ -45,6 +42,11 @@
             <kbd class="wf-kbd-plain mono">esc</kbd>
         </div>
 
+        <div class="wf-pop-filter" role="group" aria-label="{{ __('workspaces.switcher.title') }}">
+            <button type="button" @class(['wf-seg', 'is-on' => $mine]) wire:click="$set('mine', true)" aria-pressed="{{ $mine ? 'true' : 'false' }}">{{ __('workspaces.switcher.filter_mine') }}</button>
+            <button type="button" @class(['wf-seg', 'is-on' => ! $mine]) wire:click="$set('mine', false)" aria-pressed="{{ $mine ? 'false' : 'true' }}">{{ __('workspaces.switcher.filter_all') }}</button>
+        </div>
+
         <div class="wf-pop-list" id="wf-task-list" role="listbox" aria-label="{{ __('workspaces.switcher.title') }}" x-ref="list">
             @foreach ($groups as $group => $label)
                 @php $rows = $overview[$group]; @endphp
@@ -72,7 +74,20 @@
                                 @if ($group !== TaskOverview::DONE || $isCurrent)
                                     <span class="wf-pop-sub">{{ $row['text'] }}</span>
                                 @endif
+                                @if ($t->external_ref !== null || $t->pr_number !== null)
+                                    <span class="wf-pop-refs">
+                                        @if ($t->external_ref !== null)
+                                            <span class="wf-ref-chip" title="{{ $t->external_ref['title'] ?? '' }}"><x-wf.icon name="link" :size="11" :stroke="2" /> {{ \App\Support\TaskRefs::ticketLabel($t) }}</span>
+                                        @endif
+                                        @if ($t->pr_number !== null)
+                                            <span class="wf-ref-chip is-pr is-{{ $t->pr_state ?? 'open' }}"><x-wf.icon name="git-pr" :size="11" :stroke="2" /> #{{ $t->pr_number }}</span>
+                                        @endif
+                                    </span>
+                                @endif
                             </span>
+                        @endif
+                        @if ($t->owner !== null && $t->owner_user_id !== $user->id)
+                            <span class="wf-avatar-xs" title="{{ __('workspaces.switcher.owner', ['name' => $t->owner->name]) }}" aria-label="{{ __('workspaces.switcher.owner', ['name' => $t->owner->name]) }}">{{ \App\Support\Initials::of($t->owner->name) }}</span>
                         @endif
                         @if (($unread[$t->id] ?? 0) > 0 && ! $isCurrent)
                             <span class="wf-unread" title="{{ __('workspaces.switcher.unread') }}">{{ $unread[$t->id] }}</span>
@@ -93,8 +108,13 @@
                 @endif
             @endforeach
 
-            @if ($overview['waiting'] === [] && $overview['running'] === [] && $overview['done'] === [])
-                <p class="wf-pop-empty">{{ __('workspaces.task.none_short') }}</p>
+            @if ($empty)
+                <p class="wf-pop-empty">
+                    {{ __('workspaces.task.none_short') }}
+                    @if ($mine && $others > 0)
+                        <button type="button" class="wf-text-btn" wire:click="$set('mine', false)">{{ trans_choice('workspaces.switcher.show_others', $others, ['count' => $others]) }}</button>
+                    @endif
+                </p>
             @endif
 
             @if ($showArchived)

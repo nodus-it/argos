@@ -171,7 +171,7 @@ class TaskCollaborationTest extends TestCase
     {
         $task = $this->task();
 
-        $this->service()->delete($task, $this->ada);
+        $this->service()->discard($task, $this->ada);
 
         $this->assertNull(Task::query()->find($task->id));
         $this->assertSame([$task->slug], FakeWorkspaceDaemon::$removed);

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Workspace;
 
 use App\Enums\GateRunStatus;
+use App\Enums\WorkspaceStatus;
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
 use App\Models\Task;
 use App\Models\User;
@@ -25,6 +26,9 @@ class WorkspaceGateService
 
     /** Baseline key when the daemon does not name the base commit. */
     public const CURRENT_BASE = 'current';
+
+    /** Size of the log tail stored with a run. */
+    public const TAIL_BYTES = 8192;
 
     /** A run without a result after this long is considered lost. */
     private const STALE_AFTER_MINUTES = 45;
@@ -139,6 +143,39 @@ class WorkspaceGateService
         $this->tasks->send($task, $by, $prompt, automated: $automated);
     }
 
+    /**
+     * A gate's full log of a run, read from the task's worktree through the
+     * daemon. Falls back to the 8 KB tail stored with the run when the
+     * daemon is unreachable or the worktree is gone (`complete` = false).
+     *
+     * @return array{log: string, truncated: bool, complete: bool}
+     */
+    public function log(WorkspaceGateRun $run, Task $task, User $by, string $gate): array
+    {
+        Gate::forUser($by)->authorize('view', $task);
+        if ($task->id !== $run->task_id || ! array_key_exists($gate, $run->gates ?? [])) {
+            throw WorkspaceException::translated('workspaces.gates.no_log');
+        }
+
+        $tail = (string) ($run->logs[$gate] ?? '');
+        $workspace = $run->workspace;
+        if ($task->cleaned_at !== null || $workspace->status !== WorkspaceStatus::Running) {
+            return ['log' => $tail, 'truncated' => strlen($tail) >= self::TAIL_BYTES, 'complete' => false];
+        }
+
+        try {
+            $full = $this->daemon->for($workspace)->gateLog($task->slug, $gate, $run->id);
+        } catch (DaemonTransportException) {
+            return ['log' => $tail, 'truncated' => strlen($tail) >= self::TAIL_BYTES, 'complete' => false];
+        }
+        if ($full['log'] === '' && $tail !== '') {
+            // The log file is gone (e.g. the worktree was rebuilt).
+            return ['log' => $tail, 'truncated' => strlen($tail) >= self::TAIL_BYTES, 'complete' => false];
+        }
+
+        return ['log' => $full['log'], 'truncated' => $full['truncated'], 'complete' => true];
+    }
+
     /** "6/7" — for the ship dialog; null when no completed run exists. */
     public function summary(Task $task): ?string
     {
@@ -174,7 +211,7 @@ class WorkspaceGateService
         $logs = [];
         foreach (is_array($data['logs'] ?? null) ? $data['logs'] : [] as $gate => $log) {
             if (is_string($gate) && isset($gates[$gate]) && is_string($log)) {
-                $logs[$gate] = mb_strcut($log, 0, 8192);
+                $logs[$gate] = mb_strcut($log, 0, self::TAIL_BYTES);
             }
         }
 

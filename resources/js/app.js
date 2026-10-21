@@ -2,6 +2,7 @@ import Echo from 'laravel-echo';
 import Pusher from 'pusher-js';
 import { argosTaskStream } from './workspace/task-stream';
 import { argosReview, argosTaskSwitcher, argosWorkspaceFocus } from './workspace/focus';
+import { argosGateDetail } from './workspace/gate-log';
 import { listenForWorkspaceSignals } from './workspace/notifications';
 
 // Alpine data factory for the workspace chat; available with or without realtime.
@@ -9,6 +10,7 @@ window.argosTaskStream = argosTaskStream;
 window.argosWorkspaceFocus = argosWorkspaceFocus;
 window.argosTaskSwitcher = argosTaskSwitcher;
 window.argosReview = argosReview;
+window.argosGateDetail = argosGateDetail;
 
 /**
  * Realtime (Laravel Reverb). The server renders `window.ArgosRealtime` (see

@@ -23,6 +23,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Support\Htmlable;
 use Livewire\Attributes\On;
 
@@ -139,6 +140,8 @@ class ViewWorkspace extends ViewRecord
             ->label(__('workspaces.ship.action'))
             ->icon('heroicon-o-paper-airplane')
             ->color('primary')
+            // Icon only on phones: the header stays one line.
+            ->labeledFrom('sm')
             ->visible(fn (): bool => $this->workspace()->status === WorkspaceStatus::Running
                 && ($task = $this->task()) !== null
                 && (auth()->user()?->can('ship', $task) ?? false))
@@ -233,40 +236,147 @@ class ViewWorkspace extends ViewRecord
             });
     }
 
-    public function membersAction(): Action
+    /** Workspace settings (repository, environment, resources, integrations, members). */
+    public function settingsAction(): Action
     {
-        return Action::make('members')
-            ->label(__('workspaces.actions.add_member'))
+        return Action::make('settings')
+            ->label(__('workspaces.actions.settings'))
+            ->icon('heroicon-o-cog-6-tooth')
+            ->visible(fn (): bool => auth()->user()?->can('update', $this->workspace()) ?? false)
+            ->url(fn (): string => WorkspaceResource::getUrl('settings', ['record' => $this->workspace()]));
+    }
+
+    /** Invite a workspace member to work on the current task. */
+    public function inviteAction(): Action
+    {
+        return Action::make('invite')
+            ->label(__('workspaces.task_actions.invite'))
             ->icon('heroicon-o-user-plus')
-            ->visible(fn (): bool => auth()->user()?->can('manageMembers', $this->workspace()) ?? false)
-            ->modalDescription(__('workspaces.actions.subscription_hint'))
+            ->visible(fn (): bool => ($task = $this->task()) !== null && (auth()->user()?->can('invite', $task) ?? false))
+            ->modalDescription(__('workspaces.task_actions.invite_hint'))
             ->schema([
                 Select::make('user_id')
                     ->label(__('workspaces.members.user'))
-                    ->options(fn (): array => User::query()
-                        ->whereNotIn('id', $this->workspace()->members()->pluck('user_id'))
+                    ->options(fn (): array => $this->workspace()->users()
+                        ->whereKeyNot($this->task()?->owner_user_id)
+                        ->whereNotIn('users.id', $this->task()?->members()->pluck('user_id') ?? [])
                         ->orderBy('name')
-                        ->pluck('name', 'id')
+                        ->pluck('name', 'users.id')
                         ->all())
                     ->searchable()
                     ->required(),
-                Select::make('role')
-                    ->label(__('workspaces.members.role'))
-                    ->options(collect(WorkspaceRole::cases())->mapWithKeys(fn (WorkspaceRole $r): array => [$r->value => $r->label()])->all())
-                    ->default(WorkspaceRole::Member->value)
+            ])
+            ->action(function (array $data): void {
+                $member = User::query()->findOrFail($data['user_id']);
+                $this->taskAction(fn (Task $task, User $user) => app(TaskService::class)->invite($task, $user, $member), __('workspaces.task_actions.invited', ['name' => $member->name]));
+            });
+    }
+
+    /** Remove a collaborator from the current task. */
+    public function uninviteAction(): Action
+    {
+        return Action::make('uninvite')
+            ->requiresConfirmation()
+            ->visible(fn (): bool => ($task = $this->task()) !== null && (auth()->user()?->can('invite', $task) ?? false))
+            ->action(function (array $arguments): void {
+                $member = User::query()->findOrFail($arguments['user'] ?? 0);
+                $this->taskAction(fn (Task $task, User $user) => app(TaskService::class)->uninvite($task, $user, $member));
+            });
+    }
+
+    /** Hand the current task to another member (it moves to their subscription). */
+    public function transferAction(): Action
+    {
+        return Action::make('transfer')
+            ->label(__('workspaces.task_actions.transfer'))
+            ->icon('heroicon-o-arrows-right-left')
+            ->visible(fn (): bool => ($task = $this->task()) !== null && (auth()->user()?->can('transfer', $task) ?? false))
+            ->modalDescription(__('workspaces.task_actions.transfer_hint'))
+            ->schema([
+                Select::make('user_id')
+                    ->label(__('workspaces.task_actions.new_owner'))
+                    ->options(fn (): array => $this->workspace()->users()
+                        ->wherePivotIn('role', [WorkspaceRole::Admin->value, WorkspaceRole::Member->value])
+                        ->whereKeyNot($this->task()?->owner_user_id)
+                        ->orderBy('name')
+                        ->pluck('name', 'users.id')
+                        ->all())
+                    ->searchable()
                     ->required(),
             ])
             ->action(function (array $data): void {
-                /** @var User $actor */
-                $actor = auth()->user();
-                $member = User::query()->findOrFail($data['user_id']);
-                try {
-                    app(WorkspaceMemberService::class)->add($this->workspace(), $actor, $member, WorkspaceRole::from($data['role']));
-                    Notification::make()->title(__('workspaces.actions.member_added', ['name' => $member->name]))->success()->send();
-                } catch (WorkspaceException $e) {
-                    Notification::make()->title($e->getMessage())->danger()->send();
-                }
+                $newOwner = User::query()->findOrFail($data['user_id']);
+                $this->taskAction(fn (Task $task, User $user) => app(TaskService::class)->transfer($task, $user, $newOwner), __('workspaces.task_actions.transferred', ['name' => $newOwner->name]));
             });
+    }
+
+    /** Continue a finished task in a new one (same ticket, fresh branch). */
+    public function followUpAction(): Action
+    {
+        return Action::make('followUp')
+            ->label(__('workspaces.task_actions.follow_up'))
+            ->icon('heroicon-o-arrow-uturn-right')
+            ->visible(fn (): bool => ($task = $this->task()) !== null && $task->status->isFinished()
+                && (auth()->user()?->can('create', [Task::class, $this->workspace()]) ?? false))
+            ->action(function (): void {
+                $this->dispatch('task-follow-up', id: $this->taskId);
+            });
+    }
+
+    /** Stop working on the current task without merging. */
+    public function cancelTaskAction(): Action
+    {
+        return Action::make('cancelTask')
+            ->label(__('workspaces.task_actions.cancel'))
+            ->icon('heroicon-o-x-circle')
+            ->color('warning')
+            ->visible(fn (): bool => ($task = $this->task()) !== null && ! $task->status->isFinished() && (auth()->user()?->can('archive', $task) ?? false))
+            ->requiresConfirmation()
+            ->modalDescription(__('workspaces.task_actions.cancel_confirm'))
+            ->action(fn () => $this->taskAction(fn (Task $task, User $user) => app(TaskService::class)->cancel($task, $user)));
+    }
+
+    /** Delete the current task with its working copy (archiving is the normal way). */
+    public function deleteTaskAction(): Action
+    {
+        return Action::make('deleteTask')
+            ->label(__('workspaces.task_actions.delete'))
+            ->icon('heroicon-o-trash')
+            ->color('danger')
+            ->visible(fn (): bool => ($task = $this->task()) !== null && (auth()->user()?->can('delete', $task) ?? false))
+            ->requiresConfirmation()
+            ->modalDescription(__('workspaces.task_actions.delete_confirm'))
+            ->action(function (): void {
+                $id = $this->taskId;
+                $this->taskAction(fn (Task $task, User $user) => app(TaskService::class)->discard($task, $user));
+                $this->dispatch('task-archived', id: $id);
+            });
+    }
+
+    /**
+     * Run an action on the current task and report the outcome.
+     *
+     * @param  callable(Task, User): mixed  $action
+     */
+    private function taskAction(callable $action, ?string $success = null): void
+    {
+        /** @var User $user */
+        $user = auth()->user();
+        $task = $this->task();
+        if ($task === null) {
+            return;
+        }
+        try {
+            $action($task, $user);
+            if ($success !== null) {
+                Notification::make()->title($success)->success()->send();
+            }
+        } catch (WorkspaceException $e) {
+            Notification::make()->title($e->getMessage())->danger()->send();
+        } catch (AuthorizationException) {
+            Notification::make()->title(__('workspaces.task.viewer_hint'))->warning()->send();
+        }
+        $this->dispatch('argos-tasks-changed');
     }
 
     public function stopAction(): Action
@@ -311,9 +421,14 @@ class ViewWorkspace extends ViewRecord
     {
         $workspace = $this->workspace();
 
+        $task = $this->task()?->load(['owner', 'collaborators']);
+
         return [
             'workspace' => $workspace,
+            'task' => $task,
+            'canInvite' => $task !== null && (auth()->user()?->can('invite', $task) ?? false),
             'canOperate' => auth()->user()?->can('operate', $workspace) ?? false,
+            'canCreate' => auth()->user()?->can('create', [Task::class, $workspace]) ?? false,
             'running' => $workspace->status === WorkspaceStatus::Running,
             'transitional' => in_array($workspace->status, [WorkspaceStatus::Provisioning, WorkspaceStatus::Starting, WorkspaceStatus::Stopping], true),
         ];

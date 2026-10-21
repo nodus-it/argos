@@ -417,8 +417,9 @@ body,
 .fi-main .fi-sc-tabs-tab.fi-active {
   background: none;
 }
-.fi-main .fi-tabs-item.fi-active::after,
-.fi-main .fi-sc-tabs-tab.fi-active::after {
+/* Only the tab buttons (.fi-tabs-item) get the underline — .fi-sc-tabs-tab is
+   the tab PANEL in Filament 5 and would draw a stray line under its content. */
+.fi-main .fi-tabs-item.fi-active::after {
   content: "";
   position: absolute;
   left: 8px;
@@ -1041,6 +1042,15 @@ body,
 .ws-overview-state{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:var(--t-xs);}
 .ws-overview-time{font-size:11px;}
 .ws-browser-notifications{display:grid;gap:6px;}
+.argos-own-agents{display:grid;gap:12px;}
+.argos-own-agents-empty{margin:0;color:var(--muted);font-size:var(--t-sm, 14px);}
+.argos-own-agents-list{margin:0;padding:0;list-style:none;border:1px solid var(--border);border-radius:var(--radius, 10px);overflow:hidden;}
+.argos-own-agents-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 12px;min-height:48px;padding:8px 14px;}
+.argos-own-agents-row + .argos-own-agents-row{border-top:1px solid var(--border);}
+.argos-own-agents-name{font-weight:500;color:var(--text);text-decoration:none;overflow-wrap:anywhere;}
+.argos-own-agents-name:hover{text-decoration:underline;}
+.argos-own-agents-meta{display:flex;flex-wrap:wrap;gap:6px;}
+.argos-own-agents-actions{display:flex;flex-wrap:wrap;gap:8px;}
 .ws-images{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
 .ws-images img{max-width:160px;max-height:120px;border-radius:var(--radius-sm);border:1px solid var(--border);object-fit:cover;}
 .ws-composer.is-dragging{outline:2px dashed var(--accent);outline-offset:-4px;}

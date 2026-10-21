@@ -108,6 +108,17 @@ class WorkspaceDockerTest extends TestCase
         $this->assertSame('argos-workspace:x', end($cmd));
     }
 
+    public function test_workspace_resource_limits_override_the_installation_default(): void
+    {
+        config(['argos.workspaces.cpus' => '3', 'argos.workspaces.memory' => '6g']);
+        $workspace = $this->workspace();
+        $workspace->forceFill(['cpu_limit' => '1.50', 'memory_limit_mb' => 2048])->save();
+
+        $joined = implode(' ', app(WorkspaceContainerManager::class)->runCommand($workspace->fresh(), 'img', new WorkerSidecars));
+
+        $this->assertStringContainsString('--cpus 1.5 --memory 2048m', $joined);
+    }
+
     public function test_workspace_env_cannot_override_daemon_wiring(): void
     {
         $workspace = $this->workspace([], [['name' => 'ARGOS_DAEMON_TOKEN', 'value' => 'evil'], ['name' => 'MEILI_KEY', 'value' => 'abc']]);

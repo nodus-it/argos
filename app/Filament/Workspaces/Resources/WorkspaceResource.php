@@ -5,11 +5,14 @@ declare(strict_types=1);
 namespace App\Filament\Workspaces\Resources;
 
 use App\Enums\WorkspaceStatus;
+use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\CreateWorkspace;
+use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\EditWorkspaceSettings;
 use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ListWorkspaces;
 use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ViewWorkspace;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Workspace\WorkspaceSummaryService;
+use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
 use Filament\Resources\Resource;
 use Filament\Tables\Columns\TextColumn;
@@ -131,6 +134,13 @@ class WorkspaceResource extends Resource
                     ->visible(fn (): bool => Gate::allows('administer-argos')),
             ])
             ->recordActions([
+                Action::make('settings')
+                    ->label(__('workspaces.settings.title'))
+                    ->icon('heroicon-o-cog-6-tooth')
+                    ->iconButton()
+                    ->tooltip(__('workspaces.settings.title'))
+                    ->visible(fn (Workspace $record): bool => auth()->user()?->can('update', $record) ?? false)
+                    ->url(fn (Workspace $record): string => static::getUrl('settings', ['record' => $record])),
                 ViewAction::make(),
             ])
             ->recordUrl(fn (Workspace $record): string => static::getUrl('view', ['record' => $record]))
@@ -142,7 +152,10 @@ class WorkspaceResource extends Resource
     {
         return [
             'index' => ListWorkspaces::route('/'),
+            // Before '/{record}' so "create" is not read as a record key.
+            'create' => CreateWorkspace::route('/create'),
             'view' => ViewWorkspace::route('/{record}'),
+            'settings' => EditWorkspaceSettings::route('/{record}/settings'),
         ];
     }
 }

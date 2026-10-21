@@ -54,8 +54,9 @@ class WorkspaceContainerManager
             '--network', (string) config('argos.workspaces.network', 'argos_ws'),
             '--restart', 'unless-stopped',
             '--label', $this->label($workspace),
-            '--cpus', (string) config('argos.workspaces.cpus', '2'),
-            '--memory', (string) config('argos.workspaces.memory', '4g'),
+            // The workspace's own limits (settings → Resources) win over the installation default.
+            '--cpus', $workspace->cpu_limit !== null ? (string) (float) $workspace->cpu_limit : (string) config('argos.workspaces.cpus', '2'),
+            '--memory', $workspace->memory_limit_mb !== null ? $workspace->memory_limit_mb.'m' : (string) config('argos.workspaces.memory', '4g'),
             '-v', $workspace->volumeName().':/workspace',
             '-v', $workspace->agentsVolumeName().':/home/agent/.claude-agents',
             '-v', 'composer_cache:/home/agent/.composer/cache',

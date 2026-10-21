@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Pages;
 
+use App\Models\AgentCredential;
 use App\Models\User;
 use Filament\Auth\Pages\EditProfile;
 use Filament\Forms\Components\Select;
@@ -54,6 +55,25 @@ final class Profile extends EditProfile
                             User::NOTIFICATION_KINDS,
                         ),
                         View::make('filament.admin.pages.partials.browser-notifications'),
+                    ]),
+                Section::make(__('common.profile.section_auto'))
+                    ->description(__('common.profile.section_auto_description'))
+                    ->icon('heroicon-o-bolt')
+                    ->aside()
+                    ->components([
+                        Toggle::make('auto_task_consent')
+                            ->label(__('common.profile.auto_task_consent'))
+                            ->helperText(__('common.profile.auto_task_consent_help')),
+                    ]),
+                Section::make(__('common.profile.section_agents'))
+                    ->description(__('common.profile.section_agents_description'))
+                    ->icon('heroicon-o-cpu-chip')
+                    ->aside()
+                    ->components([
+                        View::make('filament.admin.pages.partials.own-agents')
+                            ->viewData(fn (): array => [
+                                'agents' => AgentCredential::query()->where('user_id', auth()->id())->orderBy('name')->get(),
+                            ]),
                     ]),
                 Section::make(__('common.profile.section_password'))
                     ->description(__('common.profile.section_password_description'))

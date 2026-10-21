@@ -14,7 +14,7 @@ use App\Models\WorkspaceGateRun;
 use App\Services\Git\WorkspaceDiffService;
 use App\Services\Workspace\WorkspaceException;
 use App\Services\Workspace\WorkspaceGateService;
-use App\Services\Workspace\WorkspaceIssueService;
+use App\Support\TaskRefs;
 use Filament\Notifications\Notification;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
@@ -60,27 +60,6 @@ class ContextPanel extends Component
     public function taskChanged(?string $id): void
     {
         $this->taskId = $id;
-    }
-
-    /** Hand a failed gate to Claude with the gate's fix prompt. */
-    public function sendGateFix(string $gate): void
-    {
-        $task = $this->task();
-        $run = $task !== null ? app(WorkspaceGateService::class)->latest($task) : null;
-        if ($run === null || $task === null) {
-            Notification::make()->title(__('workspaces.ship.no_task'))->warning()->send();
-
-            return;
-        }
-
-        try {
-            app(WorkspaceGateService::class)->sendFixToAgent($run, $task, $this->user(), $gate);
-            Notification::make()->title(__('workspaces.gates.fix_sent'))->success()->send();
-        } catch (WorkspaceException|DaemonTransportException $e) {
-            Notification::make()->title($e->getMessage())->danger()->send();
-        } catch (AuthorizationException) {
-            Notification::make()->title(__('workspaces.task.viewer_hint'))->warning()->send();
-        }
     }
 
     /** "Alle prüfen", the change tray and `/gates`. */
@@ -135,7 +114,7 @@ class ContextPanel extends Component
             'canOperate' => $task !== null && $this->user()->can('prompt', $task),
             'canEdit' => $this->user()->can('editor', $workspace),
             'running' => $workspace->status === WorkspaceStatus::Running,
-            'issueLabel' => $issue !== null ? ($issue['key'] ?? app(WorkspaceIssueService::class)->label($issue['number'], '')).' '.$issue['title'] : null,
+            'issueLabel' => $task !== null && $issue !== null ? TaskRefs::ticketLabel($task).' · '.$issue['title'] : null,
         ]);
     }
 
@@ -161,7 +140,7 @@ class ContextPanel extends Component
      * Gate rows with a state: open, running, pass, fail or skip. Gates outside
      * the four fixed rows appear once they ran.
      *
-     * @return list<array{key: string, label: string, state: string, failed: list<string>, log: string}>
+     * @return list<array{key: string, label: string, keys: list<string>, state: string, failed: list<string>, log: string}>
      */
     public static function gateRows(?WorkspaceGateRun $run): array
     {
@@ -174,12 +153,12 @@ class ContextPanel extends Component
             $found = array_values(array_filter(array_map(fn (string $k): ?string => $results[$k] ?? null, $row['keys'])));
             $covered = [...$covered, ...$row['keys']];
             $failed = array_values(array_filter($row['keys'], fn (string $k): bool => ($results[$k] ?? null) === 'fail'));
-            $rows[] = ['key' => $key, 'label' => $row['label'], 'state' => self::state($found, $runningNow), 'failed' => $failed, 'log' => self::logOf($run, $failed)];
+            $rows[] = ['key' => $key, 'label' => $row['label'], 'keys' => $row['keys'], 'state' => self::state($found, $runningNow), 'failed' => $failed, 'log' => self::logOf($run, $failed)];
         }
         foreach ($results as $key => $result) {
             if (! in_array($key, $covered, true) && $result !== 'skip') {
                 $failed = $result === 'fail' ? [$key] : [];
-                $rows[] = ['key' => $key, 'label' => ucfirst(str_replace('_', ' ', $key)), 'state' => $result, 'failed' => $failed, 'log' => self::logOf($run, $failed)];
+                $rows[] = ['key' => $key, 'label' => ucfirst(str_replace('_', ' ', $key)), 'keys' => [$key], 'state' => $result, 'failed' => $failed, 'log' => self::logOf($run, $failed)];
             }
         }
 

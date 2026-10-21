@@ -24,19 +24,43 @@ final class GateAnnotations
         }
 
         if (($run->gates['phpstan'] ?? null) === 'fail') {
-            foreach (explode("\n", (string) ($run->logs['phpstan'] ?? '')) as $line) {
-                if (preg_match('/^([^\s:][^:]*):(\d+): (.+)$/', trim($line), $m) === 1) {
-                    $out['phpstan'][$m[1]][] = ['line' => (int) $m[2], 'message' => trim($m[3])];
-                }
-            }
+            $out['phpstan'] = self::phpstanFindings((string) ($run->logs['phpstan'] ?? ''));
         }
 
         if (($run->gates['pint'] ?? null) === 'fail') {
-            preg_match_all('/([\w.\-\/]+\.php)\b/', (string) ($run->logs['pint'] ?? ''), $matches);
-            $out['pint'] = array_values(array_unique(array_map(fn (string $p): string => (string) preg_replace('#^/?workspace/#', '', $p), $matches[1])));
+            $out['pint'] = self::pintFiles((string) ($run->logs['pint'] ?? ''));
         }
 
         return $out;
+    }
+
+    /**
+     * PHPStan errors per file from its log (`path:line: message` lines).
+     *
+     * @return array<string, list<array{line: int, message: string}>>
+     */
+    public static function phpstanFindings(string $log): array
+    {
+        $findings = [];
+        foreach (explode("\n", $log) as $line) {
+            if (preg_match('/^([^\s:][^:]*):(\d+): (.+)$/', trim($line), $m) === 1) {
+                $findings[$m[1]][] = ['line' => (int) $m[2], 'message' => trim($m[3])];
+            }
+        }
+
+        return $findings;
+    }
+
+    /**
+     * Files Pint flagged in its log, relative to the checkout.
+     *
+     * @return list<string>
+     */
+    public static function pintFiles(string $log): array
+    {
+        preg_match_all('/([\w.\-\/]+\.php)\b/', $log, $matches);
+
+        return array_values(array_unique(array_map(fn (string $p): string => (string) preg_replace('#^/?workspace/#', '', $p), $matches[1])));
     }
 
     /**

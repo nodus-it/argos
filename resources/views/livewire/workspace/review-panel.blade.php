@@ -26,10 +26,11 @@
                             ! {{ explode(' ', $gate['label'])[0] }} {{ $count }}
                         </button>
                     @else
-                        <span @class(['wf-gate-chip', 'is-'.$gate['state']])>
+                        <button type="button" @class(['wf-gate-chip', 'is-'.$gate['state']]) aria-haspopup="dialog" title="{{ __('workspaces.gate_detail.title') }}: {{ $gate['label'] }}"
+                                x-on:click="$dispatch('gate-detail-open', { taskId: @js($taskId), gate: @js($gate['key']) })">
                             @if ($gate['state'] === 'pass') ✓ @elseif ($gate['state'] === 'fail') ! @else <span class="wf-spin"></span> @endif
                             {{ explode(' ', $gate['label'])[0] }}
-                        </span>
+                        </button>
                     @endif
                 @endforeach
             </span>

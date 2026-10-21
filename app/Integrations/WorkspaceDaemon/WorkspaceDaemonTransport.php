@@ -96,6 +96,13 @@ interface WorkspaceDaemonTransport
 
     public function gateFixPrompt(string $worktree, string $gate, string $runId): string;
 
+    /**
+     * A gate's full log of a run, at most 2 MB (the end is kept when it is longer).
+     *
+     * @return array{log: string, truncated: bool}
+     */
+    public function gateLog(string $worktree, string $gate, string $runId): array;
+
     /** @return array{ref: string, n: int, sha: string, head: string|null, label: string} */
     public function createCheckpoint(string $worktree, string $taskId, string $label): array;
 

@@ -405,6 +405,13 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
         return { prompt: await gateRunner().fixPrompt(query.gate, query.run_id, dir) };
     });
 
+    app.get('/worktrees/:slug/gates/log', async (request) => {
+        const dir = worktreeOf(request);
+        const query = z.object({ gate: z.string().regex(GATE_NAME_PATTERN), run_id: idSchema }).parse(request.query);
+
+        return gateRunner().log(query.gate, query.run_id, dir);
+    });
+
     // ── Task sessions ────────────────────────────────────────────────────
 
     app.post('/tasks/:id/start', async (request) => {

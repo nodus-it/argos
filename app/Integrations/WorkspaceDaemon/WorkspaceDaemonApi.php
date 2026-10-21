@@ -8,6 +8,7 @@ use App\Integrations\WorkspaceDaemon\Requests\CreateCheckpoint;
 use App\Integrations\WorkspaceDaemon\Requests\GetCheckpointDiff;
 use App\Integrations\WorkspaceDaemon\Requests\GetFileContent;
 use App\Integrations\WorkspaceDaemon\Requests\GetGateFixPrompt;
+use App\Integrations\WorkspaceDaemon\Requests\GetGateLog;
 use App\Integrations\WorkspaceDaemon\Requests\GetHealth;
 use App\Integrations\WorkspaceDaemon\Requests\GitChanges;
 use App\Integrations\WorkspaceDaemon\Requests\GitCommit;
@@ -200,6 +201,13 @@ class WorkspaceDaemonApi implements WorkspaceDaemonTransport
     public function gateFixPrompt(string $worktree, string $gate, string $runId): string
     {
         return (string) ($this->call(new GetGateFixPrompt($worktree, $gate, $runId))['prompt'] ?? '');
+    }
+
+    public function gateLog(string $worktree, string $gate, string $runId): array
+    {
+        $body = $this->call(new GetGateLog($worktree, $gate, $runId));
+
+        return ['log' => (string) ($body['log'] ?? ''), 'truncated' => (bool) ($body['truncated'] ?? false)];
     }
 
     public function createCheckpoint(string $worktree, string $taskId, string $label): array

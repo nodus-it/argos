@@ -22,11 +22,13 @@ use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TagsInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
+use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
@@ -42,6 +44,12 @@ class TaskProviderBindingsRelationManager extends RelationManager
     public static function getTitle(Model $ownerRecord, string $pageClass): string
     {
         return __('task_providers.title');
+    }
+
+    /** Integrations are workspace settings: admins of the workspace (and Argos admins). */
+    public static function canViewForRecord(Model $ownerRecord, string $pageClass): bool
+    {
+        return Auth::user()?->can('update', $ownerRecord) ?? false;
     }
 
     public function form(Schema $schema): Schema
@@ -90,6 +98,11 @@ class TaskProviderBindingsRelationManager extends RelationManager
             TagsInput::make('filters.labels')
                 ->label(__('task_providers.form.labels_filter'))
                 ->nullable(),
+
+            Toggle::make('close_on_merge')
+                ->label(__('task_providers.form.close_on_merge'))
+                ->helperText(__('task_providers.form.close_on_merge_help'))
+                ->default(true),
         ]);
     }
 
@@ -272,6 +285,11 @@ class TaskProviderBindingsRelationManager extends RelationManager
                 TextColumn::make('external_project_ref')
                     ->label(__('task_providers.columns.project'))
                     ->placeholder('—'),
+
+                IconColumn::make('close_on_merge')
+                    ->label(__('task_providers.columns.close_on_merge'))
+                    ->boolean()
+                    ->visibleFrom('md'),
 
                 TextColumn::make('last_polled_at')
                     ->label(__('task_providers.columns.last_poll'))

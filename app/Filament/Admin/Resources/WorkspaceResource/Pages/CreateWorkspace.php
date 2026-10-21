@@ -6,6 +6,7 @@ namespace App\Filament\Admin\Resources\WorkspaceResource\Pages;
 
 use App\Filament\Admin\Resources\WorkspaceResource;
 use App\Filament\Admin\Support\Pages\CreateRecord;
+use App\Filament\Shared\WorkspaceForm;
 use App\Models\User;
 use App\Services\EntityService;
 use App\Services\Workspace\WorkspaceService;
@@ -43,15 +44,13 @@ class CreateWorkspace extends CreateRecord
     }
 
     /**
-     * Im OAuth-Pfad schreibt der sichtbare Picker in `oauth_repo` /
-     * `oauth_branch`; die DB-Spalten sind `repo_url` / `default_branch`. Mappen
-     * und Helper-Keys vor dem Insert entfernen.
+     * OAuth pickers → repo_url / default_branch, auto settings cleaned.
      *
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        return WorkspaceResource::mutateAutoSettings(WorkspaceResource::mutateOauthFields($data));
+        return WorkspaceForm::dehydrate($data);
     }
 }

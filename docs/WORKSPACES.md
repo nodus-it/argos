@@ -301,7 +301,8 @@ The review shows the workspace's changes against its base branch — commits,
 uncommitted edits and new files:
 
 - The **toolbar** shows the added/removed lines, *X / N seen*, a chip per gate
-  (a failed gate with findings jumps to the first one), **Split** or
+  (a failed gate with findings jumps to the first one, the others open the gate
+  details), **Split** or
   **Unified** — remembered for you — and maximise.
 - The **file tree** groups the files by directory with their status letter and
   badges: findings of the gates (yellow), *new* (Claude changed the file while
@@ -344,10 +345,16 @@ stacks the gates are skipped.
 - Right after the workspace is cloned, Argos records a **baseline** of the base
   branch: Pest and PHPStan then only count failures that are new. While the
   baseline is still running or if it failed, every failure counts.
-- One run at a time per workspace. The sidebar shows each gate's state; a
-  failed gate unfolds the end of its log and **Let Claude fix it**, which posts
-  a fix prompt with the log into the current thread — the same one automatic
-  runs use.
+- One run at a time per workspace. The sidebar shows each gate's state. A
+  click on any gate — green ones too — opens its **gate details**: result,
+  duration and when it ran, the baseline hint (*only new errors count* or *all
+  errors count* when the base commit has no baseline), the full log with a
+  search that filters and highlights matching lines, and the affected files
+  (PHPStan errors per file, files Pint flagged) — a click opens the review on
+  that file. A failed gate offers **Let Claude fix it**, which posts a fix
+  prompt with the log into the current task — the same one automatic runs use.
+  When the working copy cannot be reached, the details show the stored end of
+  the log.
 - In the [review](#the-review), PHPStan errors appear **at their line** and
   Pint flags the file. **Let Claude fix it** there adds the finding (gate,
   message, file and line) to your collected comments, so it goes out with the

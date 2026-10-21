@@ -6,7 +6,6 @@ namespace Tests\Feature\Workspace;
 
 use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceStatus;
-use App\Filament\Admin\Resources\WorkspaceResource as AdminWorkspaceResource;
 use App\Filament\Workspaces\Resources\WorkspaceResource;
 use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ListWorkspaces;
 use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ViewWorkspace;
@@ -59,15 +58,13 @@ class WorkspaceResourceTest extends TestCase
 
     public function test_only_argos_admins_get_the_new_workspace_action(): void
     {
-        $this->assertArrayNotHasKey('create', WorkspaceResource::getPages());
-
         $this->actingAs(User::factory()->create());
         Livewire::test(ListWorkspaces::class)->assertActionHidden('create');
 
         $this->actingAs(User::factory()->admin()->create());
         Livewire::test(ListWorkspaces::class)
             ->assertActionVisible('create')
-            ->assertActionHasUrl('create', AdminWorkspaceResource::getUrl('create', panel: 'admin'));
+            ->assertActionHasUrl('create', WorkspaceResource::getUrl('create'));
     }
 
     public function test_the_workspace_page_is_members_only(): void
@@ -100,27 +97,18 @@ class WorkspaceResourceTest extends TestCase
         $this->assertSame(WorkspaceStatus::Stopped, $workspace->fresh()->status);
     }
 
-    public function test_owners_add_members_through_the_page(): void
+    public function test_workspace_admins_reach_the_settings_from_the_page(): void
     {
-        $owner = User::factory()->create();
-        $pair = User::factory()->create(['name' => 'Pair']);
-        $workspace = $this->workspaceFor($owner);
+        $admin = User::factory()->create();
+        $workspace = $this->workspaceFor($admin);
+        $member = User::factory()->create();
+        WorkspaceMember::query()->create(['workspace_id' => $workspace->id, 'user_id' => $member->id, 'role' => WorkspaceRole::Member]);
 
-        Livewire::actingAs($owner)->test(ViewWorkspace::class, ['record' => $workspace->getKey()])
-            ->callAction('members', ['user_id' => $pair->id, 'role' => WorkspaceRole::Member->value])
-            ->assertNotified();
-
-        $this->assertSame(WorkspaceRole::Member, $workspace->roleOf($pair));
-    }
-
-    public function test_member_management_is_hidden_without_collaboration(): void
-    {
-        config(['argos.workspaces.collaboration' => false]);
-        $owner = User::factory()->create();
-        $workspace = $this->workspaceFor($owner);
-
-        Livewire::actingAs($owner)->test(ViewWorkspace::class, ['record' => $workspace->getKey()])
-            ->assertActionHidden('members');
+        Livewire::actingAs($admin)->test(ViewWorkspace::class, ['record' => $workspace->getKey()])
+            ->assertActionVisible('settings')
+            ->assertActionHasUrl('settings', WorkspaceResource::getUrl('settings', ['record' => $workspace]));
+        Livewire::actingAs($member)->test(ViewWorkspace::class, ['record' => $workspace->getKey()])
+            ->assertActionHidden('settings');
     }
 
     public function test_the_editor_opens_in_its_own_reused_tab(): void

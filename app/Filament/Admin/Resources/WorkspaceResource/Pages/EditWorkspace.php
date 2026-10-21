@@ -7,10 +7,13 @@ namespace App\Filament\Admin\Resources\WorkspaceResource\Pages;
 use App\Filament\Admin\Concerns\HasArgosEditHeading;
 use App\Filament\Admin\Resources\WorkspaceResource;
 use App\Filament\Admin\Support\Pages\EditRecord;
+use App\Filament\Shared\WorkspaceForm;
+use App\Models\User;
 use App\Models\Workspace;
 use App\Services\EntityService;
 use App\Services\Workspace\WorkspaceService;
 use Filament\Actions\DeleteAction;
+use Illuminate\Database\Eloquent\Model;
 
 class EditWorkspace extends EditRecord
 {
@@ -45,50 +48,43 @@ class EditWorkspace extends EditRecord
     }
 
     /**
-     * Derive the shared oauth_repo / oauth_branch picker values from the
-     * persisted repo_url + default_branch so the OAuth picker shows the current
-     * values when the form opens. Also ensures auth_method has a default.
+     * Pre-select the OAuth pickers from the persisted repo_url + default
+     * branch and add the hidden repository token.
      *
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
     protected function mutateFormDataBeforeFill(array $data): array
     {
-        if (! isset($data['auth_method']) || $data['auth_method'] === '') {
-            $data['auth_method'] = 'pat';
-        }
-
-        // The token is $hidden on the model (kept out of serialisation), so
-        // the default fill misses it.
         /** @var Workspace $record */
         $record = $this->getRecord();
-        $data['token'] = $record->token;
 
-        $url = $data['repo_url'] ?? null;
-        if (is_string($url) && $url !== '') {
-            $repoPath = WorkspaceResource::repoPathFromUrl($url);
-            if ($repoPath !== null) {
-                $data['oauth_repo'] = $repoPath;
-            }
-        }
-
-        if (isset($data['default_branch']) && is_string($data['default_branch'])) {
-            $data['oauth_branch'] = $data['default_branch'];
-        }
-
-        return $data;
+        return WorkspaceForm::fillFromRecord($record, $data);
     }
 
     /**
-     * Im OAuth-Pfad schreibt der sichtbare Picker in `oauth_repo` /
-     * `oauth_branch`; die DB-Spalten sind `repo_url` / `default_branch`. Mappen
-     * und Helper-Keys vor dem Save entfernen.
+     * OAuth pickers → repo_url / default_branch, auto settings cleaned.
      *
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
     protected function mutateFormDataBeforeSave(array $data): array
     {
-        return WorkspaceResource::mutateAutoSettings(WorkspaceResource::mutateOauthFields($data));
+        return WorkspaceForm::dehydrate($data);
+    }
+
+    /**
+     * Through WorkspaceService::updateSettings (same path as the /w
+     * settings page).
+     *
+     * @param  array<string, mixed>  $data
+     */
+    protected function handleRecordUpdate(Model $record, array $data): Model
+    {
+        /** @var Workspace $record */
+        /** @var User $user */
+        $user = auth()->user();
+
+        return app(WorkspaceService::class)->updateSettings($record, $user, $data);
     }
 }

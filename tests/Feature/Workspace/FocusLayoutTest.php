@@ -10,6 +10,7 @@ use App\Enums\ApprovalStatus;
 use App\Enums\GateRunStatus;
 use App\Enums\SessionStatus;
 use App\Enums\TaskEventType;
+use App\Enums\TaskStatus;
 use App\Enums\WorkspaceRole;
 use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ViewWorkspace;
 use App\Livewire\Workspace\ChangeTray;
@@ -56,7 +57,7 @@ class FocusLayoutTest extends TestCase
 
     private function task(string $title, SessionStatus $status = SessionStatus::Idle): Task
     {
-        return Task::factory()->create(['workspace_id' => $this->workspace->id, 'title' => $title, 'session_status' => $status]);
+        return Task::factory()->ownedBy($this->owner)->create(['workspace_id' => $this->workspace->id, 'title' => $title, 'session_status' => $status]);
     }
 
     public function test_the_page_wires_switcher_chat_and_context(): void
@@ -86,8 +87,39 @@ class FocusLayoutTest extends TestCase
         $this->assertSame(['Navbar'], array_map(fn (array $r): string => $r['task']->title, $overview['waiting']));
         $this->assertSame(__('workspaces.switcher.text.approval', ['what' => 'npm run build']), $overview['waiting'][0]['text']);
         $this->assertSame(__('workspaces.switcher.text.working_on', ['step' => 'pest']), $overview['running'][0]['text']);
-        $this->assertSame(trans_choice('workspaces.switcher.text.done_files', 2, ['count' => 2]), $overview['done'][0]['text']);
+        $this->assertSame(trans_choice('workspaces.switcher.text.done_files', 2, ['count' => 2]), $overview['ready'][0]['text']);
         $this->assertSame(1, $overview['archived']);
+    }
+
+    public function test_pull_requests_and_finished_tasks_have_their_own_groups(): void
+    {
+        $this->task('Open PR')->forceFill(['status' => TaskStatus::PrOpen, 'pr_number' => 12, 'pr_state' => 'draft'])->save();
+        $this->task('Merged')->forceFill(['status' => TaskStatus::Done, 'done_at' => now()])->save();
+        $this->task('Dropped')->forceFill(['status' => TaskStatus::Cancelled, 'done_at' => now()])->save();
+        $this->task('Preparing')->forceFill(['status' => TaskStatus::Preparing])->save();
+
+        $overview = app(TaskOverview::class)->for($this->workspace);
+
+        $this->assertSame(['Open PR'], array_map(fn (array $r): string => $r['task']->title, $overview['pr_open']));
+        $this->assertSame(__('workspaces.switcher.text.pr', ['number' => '12', 'state' => __('workspaces.pr_state.draft')]), $overview['pr_open'][0]['text']);
+        $this->assertEqualsCanonicalizing(['Merged', 'Dropped'], array_map(fn (array $r): string => $r['task']->title, $overview['done']));
+        $this->assertSame(__('workspaces.switcher.text.preparing'), $overview['running'][0]['text']);
+    }
+
+    public function test_the_switcher_shows_mine_and_invited_or_all_tasks(): void
+    {
+        $other = User::factory()->create(['name' => 'Bob']);
+        $this->task('Mine');
+        $invited = Task::factory()->ownedBy($other)->create(['workspace_id' => $this->workspace->id, 'title' => 'Invited', 'external_ref' => ['provider' => 'gitlab', 'key' => 'gitlab-42', 'number' => '42', 'title' => 'Login', 'url' => 'https://gitlab.com/x/-/issues/42']]);
+        $invited->members()->create(['user_id' => $this->owner->id]);
+        Task::factory()->ownedBy($other)->create(['workspace_id' => $this->workspace->id, 'title' => 'Bobs own']);
+
+        $switcher = Livewire::actingAs($this->owner)->test(TaskSwitcher::class, ['workspaceId' => $this->workspace->id])
+            ->assertSee('Mine')->assertSee('Invited')->assertDontSee('Bobs own')
+            ->assertSee('GitLab #42')
+            ->assertSee(__('workspaces.switcher.owner', ['name' => 'Bob']), false);
+
+        $switcher->set('mine', false)->assertSee('Bobs own');
     }
 
     public function test_the_hint_chip_shows_only_other_waiting_tasks_and_selects_them(): void

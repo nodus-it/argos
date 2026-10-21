@@ -95,6 +95,17 @@ class TaskChat extends Component
 
     public string $newMode = 'default';
 
+    /** Ticket of the workspace's tracker the new task works on (its number). */
+    public ?string $newIssue = null;
+
+    public string $newIssueQuery = '';
+
+    public string $newBaseBranch = '';
+
+    /** Set when the new task continues a finished one. */
+    #[Locked]
+    public ?string $newParentId = null;
+
     /** "Reset to here" dialog: the checkpoint and its diff preview. */
     public ?string $restoreId = null;
 
@@ -131,7 +142,44 @@ class TaskChat extends Component
     public function startCreating(): void
     {
         $this->creating = true;
+        $this->newParentId = null;
         $this->newAgentId ??= $this->usableAgents()->first()?->id;
+    }
+
+    /** "Follow-up task" in the header: the form starts from the finished task. */
+    #[On('task-follow-up')]
+    public function startFollowUp(string $id): void
+    {
+        $parent = $this->tasks(withArchived: true)->firstWhere('id', $id);
+        if ($parent === null) {
+            return;
+        }
+        $this->startCreating();
+        $this->newParentId = $parent->id;
+        $this->newTitle = mb_substr(__('workspaces.task.follow_up_title', ['title' => $parent->title]), 0, 120);
+        $this->newBaseBranch = $parent->base_branch;
+        $this->newIssue = $parent->external_ref['number'] ?? null;
+    }
+
+    /** Pick a ticket for the new task; its title becomes the default title. */
+    public function chooseIssue(?string $number): void
+    {
+        $this->newIssue = $number;
+        $this->newIssueQuery = '';
+        if ($number !== null && trim($this->newTitle) === '') {
+            $label = $this->issueOptions($number, 200)[$number] ?? null;
+            $this->newTitle = $label !== null ? mb_substr((string) preg_replace('/^#\S+\s+/', '', $label), 0, 120) : '';
+        }
+    }
+
+    /**
+     * Open issues of the workspace's tracker matching the search.
+     *
+     * @return array<string, string>
+     */
+    private function issueOptions(string $query, int $limit = 8): array
+    {
+        return app(WorkspaceIssueService::class)->search($this->workspace(), $query, $limit);
     }
 
     /** Keep the header's switcher on the task shown here. */
@@ -144,6 +192,8 @@ class TaskChat extends Component
     {
         $this->validate([
             'newTitle' => ['nullable', 'string', 'max:120'],
+            'newIssue' => ['nullable', 'string', 'max:64'],
+            'newBaseBranch' => ['nullable', 'string', 'max:255', 'regex:/^[A-Za-z0-9._\/-]*$/'],
             'newAgentId' => ['required', 'string'],
             'newModel' => ['nullable', 'string', 'max:90'],
             'newMode' => ['required', 'string'],
@@ -160,8 +210,24 @@ class TaskChat extends Component
             return;
         }
 
+        $issue = null;
+        if ($this->newIssue !== null && $this->newIssue !== '') {
+            try {
+                $issue = app(WorkspaceIssueService::class)->load($this->workspace(), $this->newIssue);
+            } catch (WorkspaceException $e) {
+                $this->addError('newIssue', $e->getMessage());
+
+                return;
+            }
+        }
+        $options = array_filter([
+            'base_branch' => trim($this->newBaseBranch) !== '' ? trim($this->newBaseBranch) : null,
+            'external_ref' => $issue,
+            'parent_task_id' => $this->newParentId,
+        ], fn ($value): bool => $value !== null);
+
         if ($this->newAuto) {
-            $this->attempt(function () use ($agent): void {
+            $this->attempt(function () use ($agent, $options): void {
                 $task = app(AutoTaskDriver::class)->start(
                     $this->workspace(),
                     $this->user(),
@@ -170,17 +236,18 @@ class TaskChat extends Component
                     trim($this->newTitle) !== '' ? trim($this->newTitle) : null,
                     $this->newModel,
                     ['plan' => $this->newPlan, 'ship' => $this->newShip, 'max_fix_rounds' => $this->newMaxFixRounds],
+                    $options,
                 );
                 $this->taskId = $task->id;
                 $this->creating = false;
-                $this->reset('newTitle', 'newPrompt', 'newAuto', 'newPlan', 'newShip', 'newMaxFixRounds');
+                $this->reset('newTitle', 'newPrompt', 'newAuto', 'newPlan', 'newShip', 'newMaxFixRounds', 'newIssue', 'newIssueQuery', 'newBaseBranch', 'newParentId');
                 $this->announceTask();
             });
 
             return;
         }
 
-        $this->attempt(function () use ($agent): void {
+        $this->attempt(function () use ($agent, $options): void {
             $task = app(TaskService::class)->create(
                 $this->workspace(),
                 $this->user(),
@@ -188,13 +255,17 @@ class TaskChat extends Component
                 trim($this->newTitle) !== '' ? trim($this->newTitle) : __('workspaces.task.title_default').' '.($this->tasks()->count() + 1),
                 $this->newModel,
                 PermissionMode::from($this->newMode),
+                options: $options,
             );
             $this->taskId = $task->id;
             $this->creating = false;
             $this->newTitle = '';
             $this->announceTask();
-            // Started from an issue: prefill, never send — the person reviews it.
-            $this->draft = app(WorkspaceIssueService::class)->composerDraft($task);
+            // Started from an issue or as a follow-up: prefill, never send — the person reviews it.
+            $this->draft = $task->parent_task_id !== null
+                ? app(TaskService::class)->followUpBrief($task)
+                : app(WorkspaceIssueService::class)->composerDraft($task);
+            $this->reset('newIssue', 'newIssueQuery', 'newBaseBranch', 'newParentId');
         });
     }
 
@@ -565,6 +636,9 @@ class TaskChat extends Component
             'agents' => $this->usableAgents(),
             'models' => app(ModelCatalog::class)->options($task?->agentCredential, $task?->model),
             'newModels' => app(ModelCatalog::class)->options($this->usableAgents()->firstWhere('id', $this->newAgentId)),
+            'issuesEnabled' => $this->creating && app(WorkspaceIssueService::class)->bindingFor($workspace) !== null,
+            'issueResults' => $this->creating && $this->newIssueQuery !== '' ? $this->issueOptions($this->newIssueQuery) : [],
+            'chosenIssue' => $this->creating && $this->newIssue !== null ? ($this->issueOptions($this->newIssue, 200)[$this->newIssue] ?? '#'.$this->newIssue) : null,
             'modes' => PermissionMode::cases(),
             'busy' => $task !== null && $task->session_status->isBusy(),
             'user' => $this->user(),

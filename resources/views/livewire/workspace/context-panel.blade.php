@@ -69,28 +69,21 @@
         </div>
         <ul class="wf-card wf-gates">
             @foreach ($gates as $gate)
-                <li class="wf-gate-item" x-data="{ open: false }">
-                    <button type="button" class="wf-gate" @if ($gate['failed'] !== []) x-on:click="open = !open" :aria-expanded="open" @else disabled @endif>
+                <li class="wf-gate-item">
+                    <button type="button" class="wf-gate" @disabled($task === null) aria-haspopup="dialog"
+                            x-on:click="$dispatch('gate-detail-open', { taskId: @js($task?->id), gate: @js($gate['key']) })">
                         <span @class(['wf-gate-dot', 'is-'.$gate['state']]) aria-hidden="true"></span>
                         <span class="wf-gate-name">{{ $gate['label'] }}</span>
                         <span @class(['wf-gate-state', 'is-'.$gate['state']])>{{ __('workspaces.focus.gate_state.'.$gate['state']) }}</span>
+                        <x-wf.icon name="chevron-right" :size="14" class="wf-gate-chev" />
                     </button>
-                    @if ($gate['failed'] !== [])
-                        <div class="wf-gate-more" x-show="open" x-cloak>
-                            @if ($gate['log'] !== '')<pre class="wf-log mono">{{ $gate['log'] }}</pre>@endif
-                            @if ($canOperate)
-                                @foreach ($gate['failed'] as $failedGate)
-                                    <button type="button" class="wf-btn wf-btn-sm wf-btn-soft" wire:click="sendGateFix('{{ $failedGate }}')">{{ __('workspaces.gates.send_fix') }}@if (count($gate['failed']) > 1) ({{ $failedGate }})@endif</button>
-                                @endforeach
-                            @endif
-                        </div>
-                    @endif
                 </li>
             @endforeach
         </ul>
         @if ($gateRun?->status === \App\Enums\GateRunStatus::Error && $gateRun->message)
             <p class="wf-note is-error">{{ $gateRun->message }}</p>
         @endif
+        @livewire('workspace.gate-detail', ['workspaceId' => $workspace->id], key('gate-detail-'.$workspace->id))
     </section>
 
     <section class="wf-section" x-data="{ q: '', all: false }">

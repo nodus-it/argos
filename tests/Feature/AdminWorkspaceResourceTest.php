@@ -11,6 +11,7 @@ use App\Filament\Admin\Resources\WorkspaceResource\Pages\CreateWorkspace;
 use App\Filament\Admin\Resources\WorkspaceResource\Pages\EditWorkspace;
 use App\Filament\Admin\Resources\WorkspaceResource\Pages\ListWorkspaces;
 use App\Filament\Admin\Resources\WorkspaceResource\RelationManagers\TaskProviderBindingsRelationManager;
+use App\Filament\Shared\WorkspaceForm;
 use App\Models\ConnectedAccount;
 use App\Models\ProviderCredential;
 use App\Models\Task;
@@ -142,7 +143,7 @@ class AdminWorkspaceResourceTest extends TestCase
     #[DataProvider('repoPathProvider')]
     public function test_repo_path_from_url_extracts_owner_repo(string $url, ?string $expected): void
     {
-        $this->assertSame($expected, WorkspaceResource::repoPathFromUrl($url));
+        $this->assertSame($expected, WorkspaceForm::repoPathFromUrl($url));
     }
 
     /**

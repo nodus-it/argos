@@ -100,9 +100,42 @@
                             </label>
                         </div>
                     @endif
+                    @if ($newParentId !== null)
+                        <p class="wf-new-follow"><x-wf.icon name="arrow-right" :size="13" :stroke="2" /> {{ __('workspaces.task.follow_up_hint') }}</p>
+                    @endif
+                    @if ($issuesEnabled)
+                        <div class="ws-field">
+                            <span>{{ __('workspaces.task.ticket') }}</span>
+                            @if ($chosenIssue !== null)
+                                <span class="wf-ref-chip wf-new-ticket">
+                                    <x-wf.icon name="link" :size="11" :stroke="2" /> {{ $chosenIssue }}
+                                    <button type="button" class="wf-text-btn" wire:click="chooseIssue(null)" aria-label="{{ __('workspaces.task.ticket_clear') }}"><x-wf.icon name="x" :size="12" :stroke="2" /></button>
+                                </span>
+                            @else
+                                <input type="search" class="ws-input" wire:model.live.debounce.300ms="newIssueQuery" placeholder="{{ __('workspaces.task.ticket_search') }}" autocomplete="off">
+                                @if ($issueResults !== [])
+                                    <ul class="wf-new-issues" role="listbox">
+                                        @foreach ($issueResults as $number => $label)
+                                            <li><button type="button" role="option" wire:click="chooseIssue(@js((string) $number))">{{ $label }}</button></li>
+                                        @endforeach
+                                    </ul>
+                                @elseif ($newIssueQuery !== '')
+                                    <small class="muted">{{ __('workspaces.task.ticket_none') }}</small>
+                                @endif
+                            @endif
+                            @error('newIssue') <small class="t-err">{{ $message }}</small> @enderror
+                            <small class="muted">{{ __('workspaces.task.ticket_help') }}</small>
+                        </div>
+                    @endif
                     <label class="ws-field">
                         <span>{{ __('workspaces.task.title') }}</span>
                         <input type="text" class="ws-input" wire:model="newTitle" maxlength="120" placeholder="{{ __('workspaces.task.title_default') }}">
+                    </label>
+                    <label class="ws-field">
+                        <span>{{ __('workspaces.task.base_branch') }}</span>
+                        <input type="text" class="ws-input mono" wire:model="newBaseBranch" maxlength="255" placeholder="{{ $workspace->default_branch }}">
+                        @error('newBaseBranch') <small class="t-err">{{ $message }}</small> @enderror
+                        <small class="muted">{{ __('workspaces.task.base_branch_help') }}</small>
                     </label>
                     <label class="ws-field">
                         <span>{{ __('workspaces.task.agent') }}</span>
@@ -133,7 +166,7 @@
                         </select>
                     </label>
                     @error('newAgentId') <p class="t-err">{{ $message }}</p> @enderror
-                    <p class="muted ws-hint">{{ __('workspaces.task.shared_files_hint') }}</p>
+                    <p class="muted ws-hint">{{ __('workspaces.task.own_copy_hint') }}</p>
                     <div class="ws-form-actions">
                         <button type="submit" class="btn btn-primary btn-sm">{{ $newAuto ? __('workspaces.auto.start') : __('workspaces.task.create') }}</button>
                     </div>
@@ -156,10 +189,15 @@
 
             @foreach ($timeline as $block)
                 @if ($block['kind'] === 'user')
-                    @php $event = $block['event']; $p = $event->payload; @endphp
-                    <div class="wf-msg ws-msg" wire:key="ev-{{ $event->id }}">
+                    @php $event = $block['event']; $p = $event->payload; $mine = $event->author_user_id === $user->id; @endphp
+                    <div @class(['wf-msg', 'ws-msg', 'is-other' => ! $mine && empty($p['auto']), 'is-author-'.((int) $event->author_user_id % 4) => ! $mine]) wire:key="ev-{{ $event->id }}">
                         <div class="wf-msg-meta">
-                            <span>{{ $event->author_user_id === $user->id ? __('workspaces.events.you') : ($p['author_name'] ?? '') }} · {{ $event->created_at?->diffForHumans() }}</span>
+                            @if ($mine)
+                                <span>{{ __('workspaces.events.you') }} · {{ $event->created_at?->diffForHumans() }}</span>
+                            @else
+                                <span class="wf-msg-author"><span class="wf-avatar-xs" aria-hidden="true">{{ \App\Support\Initials::of((string) ($p['author_name'] ?? '?')) }}</span>{{ $p['author_name'] ?? '' }}</span>
+                                <span>· {{ $event->created_at?->diffForHumans() }}</span>
+                            @endif
                             @if (! empty($p['auto']))
                                 <span class="wf-pill-tag"><x-wf.icon name="zap" :size="11" :stroke="2" /> {{ __('workspaces.auto.automated') }}</span>
                             @endif

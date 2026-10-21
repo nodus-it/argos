@@ -111,6 +111,22 @@ describe('quality gate runs', () => {
         expect(new GateScriptError('x')).toBeInstanceOf(Error);
     });
 
+    it('serves a gate\'s full log and keeps the end of an oversized one', async () => {
+        writeFileSync(join(dir, '.agent', 'logs', 'pest.r1.log'), 'x'.repeat(10_000) + '\nFAILED LoginTest\n');
+        const gates = runner(fakeScript(calls));
+
+        const full = await gates.log('pest', 'r1', dir);
+        expect(full).toEqual({ log: 'x'.repeat(10_000) + '\nFAILED LoginTest\n', truncated: false, size: 10_018 });
+        expect(calls[0]).toEqual(['--dir', dir, '--log-path', 'pest', 'r1']);
+
+        const capped = await gates.log('pest', 'r1', dir, 100);
+        expect(capped).toEqual({ log: 'FAILED LoginTest\n', truncated: true, size: 10_018 });
+
+        expect(await gates.log('pint', 'r1', dir)).toEqual({ log: '', truncated: false, size: 0 });
+        const broken = runner(fakeScript(calls, { '--log-path': async () => ({ code: 2, stdout: '', stderr: 'invalid gate' }) }));
+        await expect(broken.log('pest', 'r1', dir)).rejects.toMatchObject({ status: 502, code: 'gates_failed' });
+    });
+
     it('reports a failed run with the script error', async () => {
         await runner(fakeScript(calls, { '--run': async () => ({ code: 2, stdout: '', stderr: 'run-gates: invalid run id' }) })).start('r1', dir, null);
 
@@ -277,6 +293,14 @@ describe('quality gates over HTTP', () => {
         expect(prompt.json()).toEqual({ prompt: '# Quality-Gate-Fix: pest\n' });
         expect(calls).toContainEqual(['--dir', worktree.path, '--fix-prompt', 'pest', 'r1']);
         expect((await app.inject({ method: 'GET', url: '/gates', headers: auth })).json()).toEqual({ running: null });
+
+        mkdirSync(join(worktree.path, '.agent', 'logs'), { recursive: true });
+        writeFileSync(join(worktree.path, '.agent', 'logs', 'pest.r1.log'), 'line 1\nFAILED LoginTest\n');
+        const log = await app.inject({ method: 'GET', url: '/worktrees/fix-login/gates/log?gate=pest&run_id=r1', headers: auth });
+        expect(log.json()).toEqual({ log: 'line 1\nFAILED LoginTest\n', truncated: false, size: 24 });
+        expect((await app.inject({ method: 'GET', url: '/worktrees/fix-login/gates/log?gate=../x&run_id=r1', headers: auth })).statusCode).toBe(422);
+        expect((await app.inject({ method: 'GET', url: '/worktrees/fix-login/gates/log?gate=pest&run_id=../x', headers: auth })).statusCode).toBe(422);
+        expect((await app.inject({ method: 'GET', url: '/worktrees/nope/gates/log?gate=pest&run_id=r1', headers: auth })).json().error.code).toBe('unknown_worktree');
         outbox.stop();
     }, 20_000);
 
