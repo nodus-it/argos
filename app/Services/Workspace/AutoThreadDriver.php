@@ -401,7 +401,7 @@ class AutoThreadDriver
     /** The user the automation acts for: the thread's creator. */
     private function actor(Thread $thread): User
     {
-        return $thread->creator ?? throw WorkspaceException::translated('workspaces.auto.no_actor');
+        return $thread->creator ?? throw WorkspaceException::translated('workspaces.auto.creator_gone');
     }
 
     private function pendingPlan(Thread $thread): ?ThreadApproval

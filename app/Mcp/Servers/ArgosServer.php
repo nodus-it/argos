@@ -13,6 +13,14 @@ use App\Mcp\Tools\TaskGet;
 use App\Mcp\Tools\TaskImplement;
 use App\Mcp\Tools\TaskList;
 use App\Mcp\Tools\TaskPr;
+use App\Mcp\Tools\ThreadMessage;
+use App\Mcp\Tools\ThreadPause;
+use App\Mcp\Tools\ThreadPlanDecide;
+use App\Mcp\Tools\ThreadResume;
+use App\Mcp\Tools\WorkspaceCreate;
+use App\Mcp\Tools\WorkspaceGet;
+use App\Mcp\Tools\WorkspaceList;
+use App\Mcp\Tools\WorkspaceShip;
 use Laravel\Mcp\Server;
 use Laravel\Mcp\Server\Attributes\Instructions;
 use Laravel\Mcp\Server\Attributes\Name;
@@ -22,22 +30,26 @@ use Laravel\Mcp\Server\Tool;
 #[Name('Argos')]
 #[Version('0.1.0')]
 #[Instructions(<<<'TXT'
-    Argos is a web-first dev agent that turns a plan into a pull request through
-    three phases: Concept, Implement, Push (PR).
+    Argos runs Claude on a repository in workspaces: one branch, one container,
+    live preview. An automatic run plans (optionally), implements, fixes failing
+    quality gates and opens a pull request — on your own Claude subscription.
 
     Typical flow from a planning session:
-    1. `project_list` / `project_get` — pick the repository profile to work in.
-    2. `task_create` — hand over the plan. It is stored as the task description
-       AND as the concept notes, and the Concept phase starts automatically; the
-       feature branch is created during that phase.
-    3. `task_get` — poll the workflow status. Phases run asynchronously, so write
-       tools return immediately; re-read to follow progress.
-    4. `task_implement`, then `task_pr` — advance once the previous phase is done.
-    5. After `task_pr`, `task_get` exposes the checkout block (repo_url,
-       base_branch, feature_branch) so you can `git checkout` the branch locally.
-    6. `task_feedback` — send review feedback, which runs the Respond phase.
+    1. `project_list` / `project_get` — pick the project.
+    2. `workspace_create` — hand over what to implement (`prompt`). Choose `plan`
+       (off / auto / approve) and `ship` (pr / draft_pr / none), or leave them
+       to the project's defaults. It returns immediately.
+    3. `workspace_get` — poll the run: thread `auto.state` goes queued → planning
+       → implementing → gating/fixing → shipping → done; the pull request appears
+       under `pull_request`.
+    4. With `plan = approve` the run stops at `awaiting_plan_approval`:
+       `thread_plan_decide` approves or rejects (with feedback).
+    5. `thread_message` sends feedback into the thread; set `resume_auto` to let
+       the run continue on its own. `thread_pause` / `thread_resume` control it.
+    6. `workspace_ship` ships the current state on demand.
 
-    A `task` argument accepts either the task ULID or its name.
+    The older task tools (task_*) still work but are being replaced by
+    workspaces.
     TXT)]
 class ArgosServer extends Server
 {
@@ -47,6 +59,14 @@ class ArgosServer extends Server
     protected array $tools = [
         ProjectList::class,
         ProjectGet::class,
+        WorkspaceList::class,
+        WorkspaceGet::class,
+        WorkspaceCreate::class,
+        WorkspaceShip::class,
+        ThreadMessage::class,
+        ThreadPlanDecide::class,
+        ThreadPause::class,
+        ThreadResume::class,
         TaskList::class,
         TaskGet::class,
         TaskCreate::class,

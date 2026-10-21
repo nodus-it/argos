@@ -80,6 +80,20 @@ Der Status springt auf **connected** und die folgenden Tools werden verfügbar.
 Der Server stellt neun Tools bereit. Ein `task`- oder `project`-Argument
 akzeptiert stets entweder die ULID des Datensatzes **oder** seinen exakten Namen.
 
+### Workspaces und automatische Läufe
+
+| Tool | Was es tut |
+| --- | --- |
+| `workspace_create` | Legt einen Workspace an und startet einen automatischen Lauf: planen (je nach `plan`: off / auto / approve), umsetzen, fehlgeschlagene Quality-Gates beheben, Pull Request öffnen. Argumente: `project`, `prompt`, optional `title`, `base_branch`, `plan`, `ship`. Kehrt sofort zurück. |
+| `workspace_list` | Listet deine Workspaces (optional `origin`) mit Läufen, Pull Request und Gate-Ergebnissen. |
+| `workspace_get` | Ein Workspace per ID oder Name — frag ihn ab, um einem Lauf zu folgen (`threads[].auto.state`, `pull_request`). |
+| `thread_plan_decide` | Gibt einen wartenden Plan frei oder lehnt ihn ab (`decision`, optional `feedback`). |
+| `thread_message` | Schreibt in einen Thread (`text`); mit `resume_auto` läuft der Lauf danach selbstständig weiter. |
+| `thread_pause` / `thread_resume` | Automatik pausieren / den Thread an sie zurückgeben. |
+| `workspace_ship` | Committet, pusht und öffnet/aktualisiert jetzt den Pull Request (optional `draft`). |
+
+Läufe handeln für dich: Dein Claude-Agent arbeitet, und dir gehört der Workspace.
+
 ### Projekte (lesen)
 
 | Tool | Was es tut |

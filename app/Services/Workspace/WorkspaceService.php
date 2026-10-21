@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Workspace;
 
+use App\Enums\WorkspaceOrigin;
 use App\Enums\WorkspaceStatus;
 use App\Events\Workspace\WorkspaceCreated;
 use App\Events\Workspace\WorkspaceDeleted;
@@ -39,11 +40,11 @@ class WorkspaceService extends EntityService
     /**
      * @param  array{binding_id: string, provider: string, owner: string, project: string, number: string, title: string, url: string, body: string}|null  $issue  from WorkspaceIssueService::load()
      */
-    public function createWorkspace(User $creator, RepoProfile $profile, string $name, ?string $baseBranch = null, ?array $issue = null): Workspace
+    public function createWorkspace(User $creator, RepoProfile $profile, string $name, ?string $baseBranch = null, ?array $issue = null, WorkspaceOrigin $origin = WorkspaceOrigin::Manual): Workspace
     {
         $this->ensureCapacity();
 
-        $workspace = DB::transaction(function () use ($creator, $profile, $name, $baseBranch, $issue): Workspace {
+        $workspace = DB::transaction(function () use ($creator, $profile, $name, $baseBranch, $issue, $origin): Workspace {
             $slug = Workspace::generateSlug($name);
             $branch = $issue !== null ? $this->issueBranch($issue) : 'ws/'.$slug;
 
@@ -58,6 +59,7 @@ class WorkspaceService extends EntityService
                 'status' => WorkspaceStatus::Provisioning,
                 'daemon_token' => Str::random(64),
                 'external_issue' => $issue,
+                'origin' => $origin,
             ])->save();
 
             $this->members->addOwner($workspace, $creator);

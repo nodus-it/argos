@@ -6,6 +6,9 @@ return [
     'label' => 'Workspace',
     'plural' => 'Workspaces',
     'auto' => [
+        'creator_gone' => 'Die Person, die diesen Lauf gestartet hat, gibt es nicht mehr.',
+        'no_usable_agent' => 'Die Person, für die dieser Lauf handelt, hat keinen nutzbaren Agenten (Claude-Abo).',
+        'no_actor' => 'Dieses Token handelt für niemanden: Lege den Automatik-Nutzer des Projekts oder den „Handelt als“-Nutzer des API-Clients fest.',
         'start_with_workspace' => 'Mit dem Workspace einen automatischen Lauf starten',
         'label' => 'Automatisch',
         'automated' => 'automatisch',
@@ -23,7 +26,6 @@ return [
         'plan_rejected_default' => 'Bitte überdenke den Plan.',
         'workspace_unavailable' => 'Der Workspace ist nicht verfügbar.',
         'queue_timeout' => 'Workspace oder Agent wurden nicht rechtzeitig verfügbar.',
-        'no_actor' => 'Die Person, die diesen Lauf gestartet hat, gibt es nicht mehr.',
         'usage_limit' => 'Der Agent hat sein Nutzungslimit erreicht; der Lauf geht :time weiter.',
         'pr_gates_ok' => 'Quality-Gates: :summary grün.',
         'pr_gates_failed' => 'Quality-Gates: :summary grün — weiterhin rot: :gates.',

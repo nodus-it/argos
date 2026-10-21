@@ -40,6 +40,8 @@ return [
     ],
 
     'fields' => [
+        'automation_user' => 'Automatik-Nutzer',
+        'automation_user_helper' => 'Automatische Läufe über Tokens dieses Projekts und Issue-Trigger handeln für diese Person: Ihr Claude-Agent arbeitet, und sie besitzt den Workspace.',
         'auto_plan' => 'Plan',
         'auto_ship' => 'Wenn fertig',
         'auto_max_fix_rounds' => 'Gate-Fix-Runden',

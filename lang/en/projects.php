@@ -40,6 +40,8 @@ return [
     ],
 
     'fields' => [
+        'automation_user' => 'Automation user',
+        'automation_user_helper' => 'Automatic runs from this project\'s tokens and issue triggers act for this person: their Claude agent does the work and they own the workspace.',
         'auto_plan' => 'Plan',
         'auto_ship' => 'When done',
         'auto_max_fix_rounds' => 'Gate fix rounds',

@@ -22,6 +22,8 @@ return [
     ],
 
     'client' => [
+        'run_as' => 'Runs as',
+        'run_as_help' => 'Automatic runs started with this client\'s tokens act for this person: their Claude agent does the work and they own the workspace. Required for the workspace endpoints.',
         'label' => 'API client',
         'plural' => 'API clients',
         'section' => 'Identity',

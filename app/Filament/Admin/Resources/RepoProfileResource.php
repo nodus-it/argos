@@ -633,6 +633,12 @@ class RepoProfileResource extends Resource
                                 ->icon('heroicon-o-bolt')
                                 ->aside()
                                 ->schema([
+                                    Select::make('automation_user_id')
+                                        ->label(__('projects.fields.automation_user'))
+                                        ->helperText(__('projects.fields.automation_user_helper'))
+                                        ->options(fn (): array => User::query()->orderBy('name')->pluck('name', 'id')->all())
+                                        ->searchable()
+                                        ->nullable(),
                                     Select::make('auto_settings.plan')
                                         ->label(__('projects.fields.auto_plan'))
                                         ->options(collect(AutoPlanMode::cases())->mapWithKeys(fn (AutoPlanMode $m): array => [$m->value => $m->label()])->all())

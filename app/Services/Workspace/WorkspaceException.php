@@ -20,10 +20,16 @@ class WorkspaceException extends RuntimeException
         parent::__construct($message, $code, $previous);
     }
 
+    /** Machine-readable reason (the last segment of the translation key), e.g. for the REST API. */
+    public ?string $reason = null;
+
     /** @param  array<string, mixed>  $replace */
     public static function translated(string $key, array $replace = []): static
     {
-        return new static(__($key, $replace));
+        $e = new static(__($key, $replace));
+        $e->reason = substr((string) strrchr('.'.$key, '.'), 1);
+
+        return $e;
     }
 
     /**

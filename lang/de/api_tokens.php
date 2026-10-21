@@ -22,6 +22,8 @@ return [
     ],
 
     'client' => [
+        'run_as' => 'Handelt als',
+        'run_as_help' => 'Automatische Läufe mit den Tokens dieses Clients handeln für diese Person: Ihr Claude-Agent arbeitet, und sie besitzt den Workspace. Für die Workspace-Endpunkte erforderlich.',
         'label' => 'API-Client',
         'plural' => 'API-Clients',
         'section' => 'Identität',

@@ -48,6 +48,8 @@ class DocCoverageTest extends TestCase
     {
         $this->assertDocMentions('REST-API.md', '/api/v1/projects', 'API endpoint');
         $this->assertDocMentions('REST-API.md', '/api/v1/tasks', 'API endpoint');
+        $this->assertDocMentions('REST-API.md', '/api/v1/workspaces', 'API endpoint');
+        $this->assertDocMentions('REST-API.md', '/api/v1/threads', 'API endpoint');
     }
 
     public function test_projects_doc_documents_every_backing_service(): void

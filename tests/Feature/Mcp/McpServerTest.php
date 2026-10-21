@@ -14,6 +14,14 @@ use App\Mcp\Tools\TaskGet;
 use App\Mcp\Tools\TaskImplement;
 use App\Mcp\Tools\TaskList;
 use App\Mcp\Tools\TaskPr;
+use App\Mcp\Tools\ThreadMessage;
+use App\Mcp\Tools\ThreadPause;
+use App\Mcp\Tools\ThreadPlanDecide;
+use App\Mcp\Tools\ThreadResume;
+use App\Mcp\Tools\WorkspaceCreate;
+use App\Mcp\Tools\WorkspaceGet;
+use App\Mcp\Tools\WorkspaceList;
+use App\Mcp\Tools\WorkspaceShip;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -29,11 +37,19 @@ test('the mcp endpoint rejects unauthenticated requests with a 401 and WWW-Authe
     $response->assertHeader('WWW-Authenticate');
 });
 
-test('the argos server registers the nine task-communication tools', function () {
+test('the argos server registers the workspace and task tools', function () {
     $reflection = new \ReflectionClass(ArgosServer::class);
     $tools = $reflection->getDefaultProperties()['tools'];
 
-    expect($tools)->toHaveCount(9)
+    expect($tools)->toHaveCount(17)
+        ->toContain(WorkspaceList::class)
+        ->toContain(WorkspaceGet::class)
+        ->toContain(WorkspaceCreate::class)
+        ->toContain(WorkspaceShip::class)
+        ->toContain(ThreadMessage::class)
+        ->toContain(ThreadPlanDecide::class)
+        ->toContain(ThreadPause::class)
+        ->toContain(ThreadResume::class)
         ->toContain(ProjectList::class)
         ->toContain(ProjectGet::class)
         ->toContain(TaskList::class)

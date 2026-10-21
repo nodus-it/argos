@@ -31,6 +31,8 @@ class ApiTokensRelationManager extends RelationManager
         'projects:read' => 'projects:read',
         'tasks:read' => 'tasks:read',
         'tasks:write' => 'tasks:write',
+        'workspaces:read' => 'workspaces:read',
+        'workspaces:write' => 'workspaces:write',
     ];
 
     public static function getTitle(Model $ownerRecord, string $pageClass): string

@@ -10,10 +10,12 @@ use App\Filament\Admin\Resources\ApiClientResource\Pages\CreateApiClient;
 use App\Filament\Admin\Resources\ApiClientResource\Pages\EditApiClient;
 use App\Filament\Admin\Resources\ApiClientResource\Pages\ListApiClients;
 use App\Models\ApiClient;
+use App\Models\User;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
@@ -66,6 +68,12 @@ class ApiClientResource extends Resource
                         ->helperText(__('api_tokens.client.name_help'))
                         ->required()
                         ->maxLength(255),
+                    Select::make('run_as_user_id')
+                        ->label(__('api_tokens.client.run_as'))
+                        ->helperText(__('api_tokens.client.run_as_help'))
+                        ->options(fn (): array => User::query()->orderBy('name')->pluck('name', 'id')->all())
+                        ->searchable()
+                        ->nullable(),
                 ]),
         ]);
     }

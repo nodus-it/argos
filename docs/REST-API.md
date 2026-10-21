@@ -77,6 +77,20 @@ rejected.
 | `projects:read` | List and read projects |
 | `tasks:read` | List and read tasks |
 | `tasks:write` | Create tasks and run/advance phases (feedback, concept, implement, pr) |
+| `workspaces:read` | List and read workspaces and their threads |
+| `workspaces:write` | Start automatic runs, write into threads, decide plans, pause/resume, ship |
+
+### Who a workspace request acts for
+
+Workspace endpoints always act for a **person**: that person's Claude agent
+(subscription) does the work and they own the workspaces it creates.
+
+- A **project-scoped token** acts for the project's **automation user**
+  (project → *Automation* tab).
+- An **API client token** acts for the client's **Runs as** user (API client
+  form).
+
+Without that user, workspace requests answer `422` with `"code": "no_actor"`.
 
 ### Using the token
 
@@ -374,6 +388,55 @@ curl -X POST https://your-argos-host/api/v1/tasks/01J.../pr \
 
 Responds `202 Accepted` with the task. Once the Push phase completes, re-read
 the task to find the `pr_url` and the `checkout` block.
+
+### Workspaces and automatic runs
+
+An **automatic run** is a thread that plans (optionally), implements, fixes
+failing quality gates and ships — see [Workspaces → Auto-threads](WORKSPACES.md#auto-threads).
+Runs are asynchronous: write endpoints answer `202` and you poll the workspace.
+
+| Method | Path | Ability | Purpose |
+| --- | --- | --- | --- |
+| GET | `/api/v1/workspaces` | `workspaces:read` | Workspaces of the acting person (filters: `origin`, `status`) |
+| GET | `/api/v1/workspaces/{workspace}` | `workspaces:read` | One workspace with its threads, pull request and latest gate results |
+| GET | `/api/v1/threads/{thread}` | `workspaces:read` | One thread with its automatic-run state |
+| POST | `/api/v1/workspaces` | `workspaces:write` | Create a workspace and start an automatic run |
+| POST | `/api/v1/workspaces/{workspace}/threads` | `workspaces:write` | Start another automatic run in an existing workspace |
+| POST | `/api/v1/workspaces/{workspace}/ship` | `workspaces:write` | Commit, push and open/update the pull request now (`draft`) |
+| POST | `/api/v1/threads/{thread}/messages` | `workspaces:write` | Write into a thread (`text`); pauses a running automatic run unless `resume_auto` is true |
+| POST | `/api/v1/threads/{thread}/plan` | `workspaces:write` | Decide a waiting plan: `decision` = `approve` or `reject`, optional `feedback` |
+| POST | `/api/v1/threads/{thread}/pause` | `workspaces:write` | Pause automation |
+| POST | `/api/v1/threads/{thread}/resume` | `workspaces:write` | Hand the thread back to automation |
+
+**Start a run** — `POST /api/v1/workspaces`:
+
+| Field | Required | Meaning |
+| --- | --- | --- |
+| `project` | yes | Project ULID or exact name |
+| `prompt` | yes | What to implement (Markdown) |
+| `title` | no | Workspace/thread title (defaults to the start of the prompt) |
+| `base_branch` | no | Branch to start from (defaults to the project's default branch) |
+| `issue` | no | Issue number of the project's issue tracker: names the workspace and branch after it, `Closes #…` in the pull request |
+| `agent_id` | no | One of the acting person's usable agents (default: their first) |
+| `model` | no | Model id or alias (`sonnet`, `opus`, …) |
+| `plan` | no | `off`, `auto` or `approve` (default: project setting) |
+| `ship` | no | `pr`, `draft_pr` or `none` (default: project setting) |
+| `max_fix_rounds`, `max_turns`, `max_cost_usd`, `max_minutes` | no | Budgets (default: project setting) |
+
+```bash
+curl -X POST https://your-argos-host/api/v1/workspaces \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE" -H "Accept: application/json" \
+  -d project=widget -d prompt="Add a priority (low/medium/high) to notes" -d plan=approve
+```
+
+The thread's `auto.state` moves `queued → planning → (awaiting_plan_approval) →
+implementing → gating ⇄ fixing → shipping → done`; it can also end `failed` or
+`budget_exceeded`, or be `paused` by a person. The pull request appears under
+`pull_request`.
+
+Domain failures answer `422` with a `code`: `no_actor`, `no_usable_agent`,
+`no_plan_waiting`, `capacity` (too many workspaces running), and others named
+after the failure.
 
 ## Typical flow
 

@@ -6,6 +6,9 @@ return [
     'label' => 'Workspace',
     'plural' => 'Workspaces',
     'auto' => [
+        'creator_gone' => 'The person who started this run no longer exists.',
+        'no_usable_agent' => 'The person this run acts for has no usable agent (Claude subscription).',
+        'no_actor' => 'This token acts for nobody: set the project\'s automation user or the API client\'s “runs as” user.',
         'start_with_workspace' => 'Start an automatic run with the workspace',
         'label' => 'Automatic',
         'automated' => 'automatic',
@@ -23,7 +26,6 @@ return [
         'plan_rejected_default' => 'Please rethink the plan.',
         'workspace_unavailable' => 'The workspace is not available.',
         'queue_timeout' => 'The workspace or an agent did not become available in time.',
-        'no_actor' => 'The user who started this run no longer exists.',
         'usage_limit' => 'The agent hit its usage limit; the run continues :time.',
         'pr_gates_ok' => 'Quality gates: :summary green.',
         'pr_gates_failed' => 'Quality gates: :summary green — still failing: :gates.',

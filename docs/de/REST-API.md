@@ -85,6 +85,20 @@ Ability dem Token fehlt, wird abgewiesen.
 | `projects:read` | Projekte auflisten und lesen |
 | `tasks:read` | Tasks auflisten und lesen |
 | `tasks:write` | Tasks erstellen und Phasen ausführen/fortsetzen (feedback, concept, implement, pr) |
+| `workspaces:read` | Workspaces und ihre Threads auflisten und lesen |
+| `workspaces:write` | Automatische Läufe starten, in Threads schreiben, Pläne entscheiden, pausieren/fortsetzen, ausliefern |
+
+### Für wen eine Workspace-Anfrage handelt
+
+Workspace-Endpunkte handeln immer für eine **Person**: Deren Claude-Agent (Abo)
+arbeitet, und ihr gehören die Workspaces, die dabei entstehen.
+
+- Ein **projektgebundenes Token** handelt für den **Automatik-Nutzer** des
+  Projekts (Projekt → Tab *Automatik*).
+- Ein **API-Client-Token** handelt für den Nutzer unter **Handelt als** im
+  Formular des API-Clients.
+
+Ohne diesen Nutzer antworten Workspace-Anfragen mit `422` und `"code": "no_actor"`.
 
 ### Das Token verwenden
 
@@ -388,6 +402,56 @@ curl -X POST https://your-argos-host/api/v1/tasks/01J.../pr \
 Antwortet mit `202 Accepted` und dem Task. Sobald die Push-Phase abgeschlossen
 ist, lesen Sie den Task erneut, um die `pr_url` und den `checkout`-Block zu
 finden.
+
+### Workspaces und automatische Läufe
+
+Ein **automatischer Lauf** ist ein Thread, der (optional) plant, umsetzt,
+fehlgeschlagene Quality-Gates behebt und ausliefert — siehe
+[Workspaces → Auto-Threads](WORKSPACES.md#auto-threads). Läufe sind asynchron:
+Schreibende Endpunkte antworten mit `202`, den Fortschritt fragst du am Workspace ab.
+
+| Methode | Pfad | Ability | Zweck |
+| --- | --- | --- | --- |
+| GET | `/api/v1/workspaces` | `workspaces:read` | Workspaces der handelnden Person (Filter: `origin`, `status`) |
+| GET | `/api/v1/workspaces/{workspace}` | `workspaces:read` | Ein Workspace mit Threads, Pull Request und letzten Gate-Ergebnissen |
+| GET | `/api/v1/threads/{thread}` | `workspaces:read` | Ein Thread mit dem Zustand seines automatischen Laufs |
+| POST | `/api/v1/workspaces` | `workspaces:write` | Workspace anlegen und einen automatischen Lauf starten |
+| POST | `/api/v1/workspaces/{workspace}/threads` | `workspaces:write` | Einen weiteren automatischen Lauf in einem bestehenden Workspace starten |
+| POST | `/api/v1/workspaces/{workspace}/ship` | `workspaces:write` | Jetzt committen, pushen und den Pull Request öffnen/aktualisieren (`draft`) |
+| POST | `/api/v1/threads/{thread}/messages` | `workspaces:write` | In einen Thread schreiben (`text`); pausiert einen laufenden automatischen Lauf, außer `resume_auto` ist true |
+| POST | `/api/v1/threads/{thread}/plan` | `workspaces:write` | Einen wartenden Plan entscheiden: `decision` = `approve` oder `reject`, optional `feedback` |
+| POST | `/api/v1/threads/{thread}/pause` | `workspaces:write` | Automatik pausieren |
+| POST | `/api/v1/threads/{thread}/resume` | `workspaces:write` | Den Thread an die Automatik zurückgeben |
+
+**Lauf starten** — `POST /api/v1/workspaces`:
+
+| Feld | Pflicht | Bedeutung |
+| --- | --- | --- |
+| `project` | ja | ULID oder exakter Name des Projekts |
+| `prompt` | ja | Was umgesetzt werden soll (Markdown) |
+| `title` | nein | Titel von Workspace/Thread (Standard: Anfang des Prompts) |
+| `base_branch` | nein | Ausgangs-Branch (Standard: Standard-Branch des Projekts) |
+| `issue` | nein | Issue-Nummer im Issue-Tracker des Projekts: benennt Workspace und Branch danach, `Closes #…` im Pull Request |
+| `agent_id` | nein | Einer der nutzbaren Agenten der handelnden Person (Standard: der erste) |
+| `model` | nein | Modell-ID oder Alias (`sonnet`, `opus`, …) |
+| `plan` | nein | `off`, `auto` oder `approve` (Standard: Projekteinstellung) |
+| `ship` | nein | `pr`, `draft_pr` oder `none` (Standard: Projekteinstellung) |
+| `max_fix_rounds`, `max_turns`, `max_cost_usd`, `max_minutes` | nein | Budgets (Standard: Projekteinstellung) |
+
+```bash
+curl -X POST https://your-argos-host/api/v1/workspaces \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE" -H "Accept: application/json" \
+  -d project=widget -d prompt="Notizen bekommen eine Priorität (niedrig/mittel/hoch)" -d plan=approve
+```
+
+`auto.state` des Threads läuft `queued → planning → (awaiting_plan_approval) →
+implementing → gating ⇄ fixing → shipping → done`; er kann auch mit `failed`
+oder `budget_exceeded` enden oder von einer Person `paused` werden. Der Pull
+Request erscheint unter `pull_request`.
+
+Fachliche Fehler antworten mit `422` und einem `code`: `no_actor`,
+`no_usable_agent`, `no_plan_waiting`, `capacity` (zu viele laufende Workspaces)
+und weitere, benannt nach dem Fehler.
 
 ## Typischer Ablauf
 

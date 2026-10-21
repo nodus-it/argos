@@ -54,6 +54,8 @@ use Laravel\Sanctum\HasApiTokens;
  * @property-read WorkerStack|null $workerStack
  * @property-read Collection<int, TaskProviderBinding> $taskProviderBindings
  * @property array<string, mixed>|null $auto_settings
+ * @property int|null $automation_user_id
+ * @property-read User|null $automationUser
  */
 class RepoProfile extends Model implements HasApiTokensContract
 {
@@ -64,6 +66,7 @@ class RepoProfile extends Model implements HasApiTokensContract
     use HasUlids;
 
     protected $fillable = [
+        'automation_user_id',
         'auto_settings',
         'name',
         'url',
@@ -109,6 +112,12 @@ class RepoProfile extends Model implements HasApiTokensContract
             'auto_pr' => 'boolean',
             'live_demo_enabled' => 'boolean',
         ];
+    }
+
+    /** The person auto-threads of project tokens and issue triggers act for. */
+    public function automationUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'automation_user_id');
     }
 
     /**

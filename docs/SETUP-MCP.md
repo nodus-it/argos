@@ -75,6 +75,20 @@ tools below become available.
 The server exposes nine tools. A `task` or `project` argument always accepts
 either the record's ULID **or** its exact name.
 
+### Workspaces and automatic runs
+
+| Tool | What it does |
+| --- | --- |
+| `workspace_create` | Creates a workspace and starts an automatic run: plan (per `plan`: off / auto / approve), implement, fix failing quality gates, open the pull request. Args: `project`, `prompt`, optional `title`, `base_branch`, `plan`, `ship`. Returns immediately. |
+| `workspace_list` | Lists your workspaces (optional `origin`) with their runs, pull request and gate results. |
+| `workspace_get` | One workspace by id or name — poll it to follow a run (`threads[].auto.state`, `pull_request`). |
+| `thread_plan_decide` | Approves or rejects a waiting plan (`decision`, optional `feedback`). |
+| `thread_message` | Writes into a thread (`text`); `resume_auto` lets the run continue on its own afterwards. |
+| `thread_pause` / `thread_resume` | Pause automation / hand the thread back to it. |
+| `workspace_ship` | Commits, pushes and opens/updates the pull request now (optional `draft`). |
+
+Runs act for you: your Claude agent does the work and you own the workspace.
+
 ### Projects (read)
 
 | Tool | What it does |
