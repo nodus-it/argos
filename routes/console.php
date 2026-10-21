@@ -30,6 +30,11 @@ Schedule::command('argos:check-concept-approvals')
     ->cron($pollCron)
     ->withoutOverlapping();
 
+// 👍 on the plan comment of an issue-started automatic run approves the plan.
+Schedule::command('argos:check-plan-approvals')
+    ->cron($pollCron)
+    ->withoutOverlapping();
+
 // Tear down live demos past their TTL (preview.ttl_hours). Dispatches
 // StopDemoJob to the queue (the scheduler has no docker socket).
 // Manual trigger: `php artisan argos:cleanup-demos`.

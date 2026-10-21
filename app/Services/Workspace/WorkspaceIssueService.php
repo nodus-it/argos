@@ -140,14 +140,62 @@ class WorkspaceIssueService
     public function composerDraft(Workspace $workspace): string
     {
         $issue = $workspace->external_issue;
-        if ($issue === null) {
-            return '';
-        }
 
+        return $issue === null ? '' : $this->promptFor($issue);
+    }
+
+    /**
+     * The task text for an issue: the issue wrapped as untrusted input.
+     *
+     * @param  array{number: string, title: string, url: string, body: string}  $issue
+     */
+    public function promptFor(array $issue): string
+    {
         $text = "# {$issue['title']}\n\n".($issue['body'] !== '' ? $issue['body'] : '(no description)')."\n\n".$issue['url'];
 
         return __('workspaces.issue.draft_intro', ['label' => $this->label($issue['number'], '')])."\n\n"
             .$this->untrusted->wrapText($text, true, 'ISSUE');
+    }
+
+    /**
+     * The workspace's issue data from an ingested issue (as load() returns it).
+     *
+     * @return array{binding_id: string, provider: string, owner: string, project: string, number: string, title: string, url: string, body: string}
+     */
+    public function fromExternal(ExternalIssue $issue, TaskProviderBinding $binding): array
+    {
+        [$owner, $project] = $this->parseRef((string) $binding->external_project_ref);
+
+        return [
+            'binding_id' => $binding->id,
+            'provider' => $binding->kind->value,
+            'owner' => $owner,
+            'project' => $project,
+            'number' => $issue->externalId,
+            'title' => $issue->title !== '' ? $issue->title : 'Issue '.$issue->externalId,
+            'url' => $issue->url,
+            'body' => mb_substr($issue->body, 0, self::BODY_LIMIT),
+        ];
+    }
+
+    /** Post a comment on the workspace's issue; returns its id. Failures are only logged. */
+    public function comment(Workspace $workspace, string $body): ?string
+    {
+        $issue = $workspace->external_issue;
+        $binding = $issue !== null ? TaskProviderBinding::query()->find($issue['binding_id']) : null;
+        if ($issue === null || $binding === null || ! $this->registry->has($binding->kind)) {
+            return null;
+        }
+
+        try {
+            $tracker = $this->registry->make($binding->kind, $binding);
+
+            return $tracker->commentId($tracker->createComment($issue['owner'], $issue['project'], $issue['number'], $body));
+        } catch (Throwable $e) {
+            Log::channel('argos')->warning('Workspace issue comment failed', ['workspace' => $workspace->slug, 'error' => $e->getMessage()]);
+
+            return null;
+        }
     }
 
     /** Line for the PR body that links (and on merge closes) the issue. */
@@ -167,22 +215,7 @@ class WorkspaceIssueService
     /** Tell the issue that a pull request exists; failures are only logged. */
     public function announcePullRequest(Workspace $workspace, string $prUrl): void
     {
-        $issue = $workspace->external_issue;
-        if ($issue === null) {
-            return;
-        }
-
-        $binding = TaskProviderBinding::query()->find($issue['binding_id']);
-        if ($binding === null || ! $this->registry->has($binding->kind)) {
-            return;
-        }
-
-        try {
-            $this->registry->make($binding->kind, $binding)
-                ->createComment($issue['owner'], $issue['project'], $issue['number'], __('workspaces.issue.pr_comment', ['url' => $prUrl, 'workspace' => $workspace->name]));
-        } catch (Throwable $e) {
-            Log::channel('argos')->warning('Workspace issue comment failed', ['workspace' => $workspace->slug, 'error' => $e->getMessage()]);
-        }
+        $this->comment($workspace, __('workspaces.issue.pr_comment', ['url' => $prUrl, 'workspace' => $workspace->name]));
     }
 
     /** Linear ids are UUIDs — keep labels and branches short. */

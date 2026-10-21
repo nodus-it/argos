@@ -7,13 +7,15 @@ namespace Tests\Feature\Console;
 use App\Enums\TaskProviderKind;
 use App\Models\ExternalIssueLink;
 use App\Models\RepoProfile;
-use App\Models\Task;
 use App\Models\TaskProviderBinding;
+use App\Models\Workspace;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\LaunchesIssueRuns;
 use Tests\TestCase;
 
 class SimulateIssueWebhookCommandTest extends TestCase
 {
+    use LaunchesIssueRuns;
     use RefreshDatabase;
 
     protected function setUp(): void
@@ -24,12 +26,13 @@ class SimulateIssueWebhookCommandTest extends TestCase
         config(['queue.default' => 'sync']);
     }
 
-    public function test_it_creates_a_task_from_a_simulated_github_issue(): void
+    public function test_it_launches_a_workspace_from_a_simulated_github_issue(): void
     {
         $binding = TaskProviderBinding::factory()->webhook()->create([
             'repo_profile_id' => RepoProfile::factory()->create()->id,
             'kind' => TaskProviderKind::GitHub,
         ]);
+        $this->prepareIssueRuns($binding->repoProfile);
 
         $this->artisan('argos:webhook:simulate', [
             'binding' => $binding->id,
@@ -41,7 +44,7 @@ class SimulateIssueWebhookCommandTest extends TestCase
             'task_provider_binding_id' => $binding->id,
             'external_id' => '4242',
         ]);
-        $this->assertDatabaseHas('tasks', ['name' => 'Hello from simulator']);
+        $this->assertTrue(Workspace::query()->where('name', 'like', '%Hello from simulator')->exists());
     }
 
     public function test_it_rejects_a_binding_without_provider_kind_gracefully(): void
@@ -59,6 +62,7 @@ class SimulateIssueWebhookCommandTest extends TestCase
             'kind' => TaskProviderKind::GitHub,
             'filters' => ['labels' => ['argos', 'ready']],
         ]);
+        $this->prepareIssueRuns($binding->repoProfile);
 
         // One of two configured labels is enough → task created.
         $this->artisan('argos:webhook:simulate', [
@@ -71,7 +75,7 @@ class SimulateIssueWebhookCommandTest extends TestCase
         $oneMatch = ExternalIssueLink::where('task_provider_binding_id', $binding->id)
             ->where('external_id', '555')->first();
         $this->assertNotNull($oneMatch);
-        $this->assertNotNull($oneMatch->task_id, 'OR semantics: one configured label is enough to import');
+        $this->assertNotNull($oneMatch->workspace_id, 'OR semantics: one configured label is enough to import');
 
         // None of the configured labels → filtered, link exists but no task.
         $this->artisan('argos:webhook:simulate', [
@@ -84,9 +88,9 @@ class SimulateIssueWebhookCommandTest extends TestCase
         $noMatch = ExternalIssueLink::where('task_provider_binding_id', $binding->id)
             ->where('external_id', '556')->first();
         $this->assertNotNull($noMatch);
-        $this->assertNull($noMatch->task_id, 'No configured label present → no task');
+        $this->assertNull($noMatch->workspace_id, 'No configured label present → no task');
 
         // Only the matching issue produced a task.
-        $this->assertSame(1, Task::count());
+        $this->assertSame(1, Workspace::count());
     }
 }

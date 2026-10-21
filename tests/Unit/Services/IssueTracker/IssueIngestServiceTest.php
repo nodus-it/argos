@@ -4,21 +4,24 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\IssueTracker;
 
+use App\Enums\AutoThreadState;
 use App\Enums\TaskProviderKind;
 use App\Enums\TaskProviderMode;
 use App\Enums\TaskProviderSyncStatus;
-use App\Events\Integration\NewIssueFoundEvent;
+use App\Enums\WorkspaceOrigin;
 use App\Models\ExternalIssueLink;
-use App\Models\Task;
 use App\Models\TaskProviderBinding;
+use App\Models\Thread;
+use App\Models\Workspace;
 use App\Services\IssueTracker\DTO\ExternalIssue;
 use App\Services\IssueTracker\IssueIngestService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Event;
+use Tests\Support\LaunchesIssueRuns;
 use Tests\TestCase;
 
 class IssueIngestServiceTest extends TestCase
 {
+    use LaunchesIssueRuns;
     use RefreshDatabase;
 
     private IssueIngestService $service;
@@ -31,13 +34,16 @@ class IssueIngestServiceTest extends TestCase
 
     private function makeBinding(array $overrides = []): TaskProviderBinding
     {
-        return TaskProviderBinding::factory()->create(array_merge([
+        $binding = TaskProviderBinding::factory()->create(array_merge([
             'kind' => TaskProviderKind::GitHub,
             'mode' => TaskProviderMode::Poll,
             'sync_status' => TaskProviderSyncStatus::Active,
             'external_project_ref' => 'acme/widget',
             'filters' => null,
         ], $overrides));
+        $this->prepareIssueRuns($binding->repoProfile);
+
+        return $binding;
     }
 
     /** @return array<string, mixed> */
@@ -137,21 +143,38 @@ class IssueIngestServiceTest extends TestCase
         $this->assertNotSame($signatureAfterV1, $link2->signature);
     }
 
-    public function test_ingest_creates_task_for_new_matching_issue(): void
+    public function test_ingest_launches_an_automatic_run_for_a_new_matching_issue(): void
     {
         $binding = $this->makeBinding();
         $issue = $this->sampleIssue(5);
 
         $link = $this->ingest($issue, $binding);
 
-        $this->assertNotNull($link->task_id);
-        $this->assertDatabaseHas('tasks', [
-            'id' => $link->task_id,
-            'name' => 'Issue #5',
-        ]);
+        $this->assertNotNull($link->workspace_id);
+        $this->assertNotNull($link->launched_at);
+        $workspace = Workspace::query()->findOrFail($link->workspace_id);
+        $this->assertSame('#5 Issue #5', $workspace->name);
+        $this->assertSame(WorkspaceOrigin::Issue, $workspace->origin);
+        $this->assertSame('Issue Bot', $workspace->creator->name);
+        $this->assertSame('5', $workspace->external_issue['number']);
+        $thread = Thread::query()->where('workspace_id', $workspace->id)->sole();
+        $this->assertSame(AutoThreadState::Queued, $thread->auto_state);
+        $this->assertStringContainsString('UNTRUSTED ISSUE', $thread->auto_config['prompt']);
     }
 
-    public function test_ingest_does_not_create_second_task_on_reimport(): void
+    public function test_without_an_automation_user_nothing_launches_and_the_binding_says_why(): void
+    {
+        $binding = $this->makeBinding();
+        $binding->repoProfile->forceFill(['automation_user_id' => null])->save();
+
+        $link = $this->ingest($this->sampleIssue(9), $binding->fresh());
+
+        $this->assertNull($link->workspace_id);
+        $this->assertNull($link->launched_at);
+        $this->assertSame(__('workspaces.issue.run.no_automation_user'), $binding->fresh()->last_error);
+    }
+
+    public function test_ingest_does_not_launch_twice_on_reimport(): void
     {
         $binding = $this->makeBinding();
         $issue = $this->sampleIssue(5);
@@ -159,8 +182,8 @@ class IssueIngestServiceTest extends TestCase
         $link1 = $this->ingest($issue, $binding);
         $link2 = $this->ingest($issue, $binding);
 
-        $this->assertSame($link1->task_id, $link2->task_id);
-        $this->assertDatabaseCount('tasks', 1);
+        $this->assertSame($link1->workspace_id, $link2->workspace_id);
+        $this->assertDatabaseCount('workspaces', 1);
     }
 
     public function test_state_filter_blocks_closed_issues(): void
@@ -170,7 +193,7 @@ class IssueIngestServiceTest extends TestCase
 
         $link = $this->ingest($issue, $binding);
 
-        $this->assertNull($link->task_id, 'Closed issue should not create a task when filter=open');
+        $this->assertNull($link->workspace_id, 'Closed issue should not create a task when filter=open');
     }
 
     public function test_label_filter_blocks_issues_without_required_label(): void
@@ -180,7 +203,7 @@ class IssueIngestServiceTest extends TestCase
 
         $link = $this->ingest($issue, $binding);
 
-        $this->assertNull($link->task_id, 'Issue without required label should not create a task');
+        $this->assertNull($link->workspace_id, 'Issue without required label should not create a task');
     }
 
     public function test_label_filter_allows_issues_with_required_label(): void
@@ -190,7 +213,7 @@ class IssueIngestServiceTest extends TestCase
 
         $link = $this->ingest($issue, $binding);
 
-        $this->assertNotNull($link->task_id);
+        $this->assertNotNull($link->workspace_id);
     }
 
     public function test_label_filter_uses_or_semantics_for_multiple_labels(): void
@@ -201,43 +224,38 @@ class IssueIngestServiceTest extends TestCase
 
         $link = $this->ingest($issue, $binding);
 
-        $this->assertNotNull($link->task_id, 'OR semantics: one of the configured labels should be enough');
+        $this->assertNotNull($link->workspace_id, 'OR semantics: one of the configured labels should be enough');
     }
 
-    public function test_creates_task_when_a_previously_filtered_issue_starts_matching(): void
+    public function test_launches_when_a_previously_filtered_issue_starts_matching(): void
     {
         $binding = $this->makeBinding(['filters' => ['labels' => ['argos']]]);
 
         // First seen without the label → filtered: link exists, no task.
         $issue = $this->sampleIssue(7, ['labels' => []]);
         $link = $this->ingest($issue, $binding);
-        $this->assertNull($link->task_id);
+        $this->assertNull($link->workspace_id);
 
         // Label added later → now matches → a task is created on the same link.
         $issue['labels'] = [['name' => 'argos']];
         $link = $this->ingest($issue, $binding);
-        $this->assertNotNull($link->task_id);
-        $this->assertDatabaseCount('tasks', 1);
+        $this->assertNotNull($link->workspace_id);
+        $this->assertDatabaseCount('workspaces', 1);
     }
 
-    public function test_does_not_reimport_after_the_task_is_deleted(): void
+    public function test_does_not_relaunch_after_the_workspace_is_deleted(): void
     {
-        $binding = $this->makeBinding(['filters' => ['labels' => ['argos']]]);
-        $issue = $this->sampleIssue(8, ['labels' => [['name' => 'argos']]]);
+        $binding = $this->makeBinding();
+        $issue = $this->sampleIssue(7);
 
         $link = $this->ingest($issue, $binding);
-        $this->assertNotNull($link->task_id);
+        Workspace::query()->findOrFail($link->workspace_id)->forceDelete();
+        $this->assertNull($link->fresh()->workspace_id);
 
-        // User deletes the Argos task → link.task_id is nulled (nullOnDelete),
-        // but the import marker stays.
-        Task::find($link->task_id)->delete();
-        $this->assertNull($link->fresh()->task_id);
-
-        // Next poll must NOT recreate a task.
         $this->ingest($issue, $binding);
 
-        $this->assertDatabaseCount('tasks', 0);
-        $this->assertNull($link->fresh()->task_id);
+        $this->assertDatabaseCount('workspaces', 0);
+        $this->assertNull($link->fresh()->workspace_id);
     }
 
     public function test_label_filter_blocks_issue_with_none_of_several_labels(): void
@@ -247,45 +265,6 @@ class IssueIngestServiceTest extends TestCase
 
         $link = $this->ingest($issue, $binding);
 
-        $this->assertNull($link->task_id, 'No configured label present → no task');
-    }
-
-    public function test_fires_new_issue_found_event_on_first_import(): void
-    {
-        Event::fake([NewIssueFoundEvent::class]);
-
-        $binding = $this->makeBinding();
-        $link = $this->ingest($this->sampleIssue(5), $binding);
-
-        Event::assertDispatched(
-            NewIssueFoundEvent::class,
-            fn (NewIssueFoundEvent $e): bool => $e->task->id === $link->task_id
-                && $e->binding->id === $binding->id
-                && $e->issue->externalId === '5',
-        );
-    }
-
-    public function test_does_not_fire_event_on_reimport(): void
-    {
-        $binding = $this->makeBinding();
-        $issue = $this->sampleIssue(5);
-        $this->ingest($issue, $binding);
-
-        // Only the second ingest is observed: an already-imported issue must not
-        // re-fire the seam.
-        Event::fake([NewIssueFoundEvent::class]);
-        $this->ingest($issue, $binding);
-
-        Event::assertNotDispatched(NewIssueFoundEvent::class);
-    }
-
-    public function test_does_not_fire_event_for_filtered_issue(): void
-    {
-        Event::fake([NewIssueFoundEvent::class]);
-
-        $binding = $this->makeBinding(['filters' => ['labels' => ['argos']]]);
-        $this->ingest($this->sampleIssue(6, ['labels' => []]), $binding);
-
-        Event::assertNotDispatched(NewIssueFoundEvent::class);
+        $this->assertNull($link->workspace_id, 'No configured label present → no task');
     }
 }

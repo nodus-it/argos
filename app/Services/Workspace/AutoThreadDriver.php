@@ -20,6 +20,7 @@ use App\Models\ThreadApproval;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceGateRun;
+use App\Services\IssueTracker\IssueRunReporter;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -73,6 +74,8 @@ class AutoThreadDriver
             'auto_counters' => ['fix_rounds' => 0, 'turns' => 0, 'started_at' => now()->toIso8601String()],
         ])->save();
 
+        // Before the first step, so the issue hears about the run first.
+        app(IssueRunReporter::class)->started($workspace);
         AdvanceAutoThreadJob::dispatch($thread->id, 'begin');
 
         return $thread;
@@ -328,6 +331,7 @@ class AutoThreadDriver
             if (($thread->auto_config['plan'] ?? '') === AutoPlanMode::Approve->value) {
                 $this->transition($thread, AutoThreadState::AwaitingPlanApproval);
                 $this->notifier->notify($thread->workspace, $thread, 'auto', __('workspaces.auto.notifications.plan'), $thread->title);
+                app(IssueRunReporter::class)->planWaiting($thread, (string) ($data['input']['plan'] ?? ''));
 
                 return;
             }
@@ -474,6 +478,7 @@ class AutoThreadDriver
         }
 
         $this->notifier->notify($workspace, $thread, 'auto', __('workspaces.auto.notifications.'.$state->value), $url ?? $message ?? $thread->title);
+        app(IssueRunReporter::class)->finished($thread, $state, $message);
     }
 
     private function transition(Thread $thread, AutoThreadState $state, ?string $message = null): void
