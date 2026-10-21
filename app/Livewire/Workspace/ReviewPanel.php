@@ -6,12 +6,17 @@ namespace App\Livewire\Workspace;
 
 use App\Enums\WorkspaceStatus;
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
+use App\Models\ReviewComment;
 use App\Models\Thread;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Git\WorkspaceDiffService;
+use App\Services\Workspace\ReviewCommentService;
 use App\Services\Workspace\ReviewService;
 use App\Services\Workspace\WorkspaceDaemonClient;
+use App\Services\Workspace\WorkspaceException;
+use Filament\Notifications\Notification;
+use Illuminate\Auth\Access\AuthorizationException;
 use App\Services\Workspace\WorkspaceGateService;
 use App\Support\ReviewDiff;
 use Illuminate\Contracts\View\View;
@@ -117,6 +122,50 @@ class ReviewPanel extends Component
         $this->expanded[$path.'#'.$index] = ReviewDiff::gapLines($content, $gap);
     }
 
+    /** Collect a line comment (not sent yet — see ReviewCommentService). */
+    public function addComment(string $path, string $side, int $start, int $end, string $body): void
+    {
+        $thread = $this->threadId !== null ? $this->thread($this->threadId) : null;
+        if ($thread === null || trim($body) === '') {
+            return;
+        }
+        $file = collect($this->files())->firstWhere('path', $path);
+        if ($file === null) {
+            return;
+        }
+
+        try {
+            app(ReviewCommentService::class)->add($thread, $this->user(), $path, $side, $start, $end, $body, $this->lineTexts($file, $side));
+        } catch (AuthorizationException) {
+            Notification::make()->title(__('workspaces.thread.viewer_hint'))->warning()->send();
+
+            return;
+        }
+        $this->dispatch('review-comments-changed');
+    }
+
+    public function updateComment(string $id, string $body): void
+    {
+        $comment = $this->comment($id);
+        if ($comment !== null && trim($body) !== '') {
+            app(ReviewCommentService::class)->edit($comment, $this->user(), $body);
+            $this->dispatch('review-comments-changed');
+        }
+    }
+
+    public function discardComment(string $id): void
+    {
+        $comment = $this->comment($id);
+        if ($comment !== null) {
+            app(ReviewCommentService::class)->discard($comment, $this->user());
+            $this->dispatch('review-comments-changed');
+        }
+    }
+
+    /** The composer changed the collection (removed a chip, sent the review). */
+    #[On('review-comments-changed')]
+    public function commentsChanged(): void {}
+
     public function render(): View
     {
         $workspace = $this->workspace();
@@ -141,8 +190,17 @@ class ReviewPanel extends Component
             ? app(ReviewService::class)->seen($thread, $this->user(), array_column($files, 'hash', 'path'))
             : [];
 
+        $comments = $thread !== null ? app(ReviewCommentService::class)->open($thread, $this->user()) : collect();
+        $numbers = $comments->values()->mapWithKeys(fn (ReviewComment $c, int $i): array => [$c->id => $i + 1]);
+        $here = $current !== null ? $comments->where('path', $current['path']) : collect();
+
         return view('livewire.workspace.review-panel', [
             'active' => true,
+            'canWrite' => $workspace->roleOf($this->user())?->canOperate() ?? false,
+            'commentsAt' => $here->groupBy(fn (ReviewComment $c): string => $c->side.':'.$c->line_end),
+            'commented' => $here->flatMap(fn (ReviewComment $c): array => array_map(fn (int $n): string => $c->side.':'.$n, range($c->line_start, $c->line_end)))->unique()->values()->all(),
+            'numbers' => $numbers,
+            'commentCount' => $comments->count(),
             'running' => $workspace->status === WorkspaceStatus::Running,
             'error' => $error,
             'files' => $files,
@@ -159,6 +217,35 @@ class ReviewPanel extends Component
             )),
             'baseBranch' => $workspace->base_branch,
         ]);
+    }
+
+    /**
+     * Text of every line the diff shows for one side (plus expanded gaps).
+     *
+     * @param  array<string, mixed>  $file
+     * @return array<int, string>
+     */
+    private function lineTexts(array $file, string $side): array
+    {
+        $key = $side === 'old' ? 'old_num' : 'new_num';
+        $skip = $side === 'old' ? 'add' : 'del';
+        $lines = [];
+        foreach ($file['hunks'] as $hunk) {
+            foreach ([...($this->expanded[$file['path'].'#'.$hunk['index']] ?? []), ...$hunk['lines']] as $line) {
+                if ($line['type'] !== $skip && $line[$key] !== null) {
+                    $lines[(int) $line[$key]] = (string) $line['text'];
+                }
+            }
+        }
+        ksort($lines);
+
+        return $lines;
+    }
+
+    private function comment(string $id): ?ReviewComment
+    {
+        return ReviewComment::query()->whereKey($id)->where('user_id', $this->user()->id)
+            ->whereHas('thread', fn ($q) => $q->where('workspace_id', $this->workspaceId))->first();
     }
 
     /** @return list<array<string, mixed>> */

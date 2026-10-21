@@ -338,7 +338,7 @@
         @if ($canWrite)
             <div class="wf-bottom">
                 @livewire('workspace.change-tray', ['workspaceId' => $workspace->id], key('tray-'.$workspace->id))
-                <div class="ws-composer wf-composer"
+                <div @class(['ws-composer', 'wf-composer', 'has-review' => $reviewComments->isNotEmpty()])
                      x-on:dragover.prevent="dragging = true"
                      x-on:dragleave.prevent="dragging = false"
                      x-on:drop.prevent="dragging = false; attach($event.dataTransfer.files)"
@@ -362,6 +362,23 @@
                     @endif
                     @error('uploads.*') <p class="wf-note is-error">{{ $message }}</p> @enderror
                     @error('uploads') <p class="wf-note is-error">{{ $message }}</p> @enderror
+
+                    @php
+                        $activeComments = $reviewComments->filter(fn ($c) => $c->status === \App\Enums\ReviewCommentStatus::Draft || in_array($c->id, $includeStale, true));
+                        $staleComments = $reviewComments->filter(fn ($c) => $c->status === \App\Enums\ReviewCommentStatus::Stale && ! in_array($c->id, $includeStale, true));
+                    @endphp
+                    @if ($reviewComments->isNotEmpty())
+                        <div class="wf-chips">
+                            @foreach ($reviewComments as $comment)
+                                @php $isStale = $staleComments->contains('id', $comment->id); @endphp
+                                <span @class(['wf-chip-ref', 'mono', 'is-stale' => $isStale]) wire:key="chip-{{ $comment->id }}" title="{{ $comment->body }}">
+                                    {{ basename($comment->path) }}:{{ $comment->line_start }}{{ $comment->line_end > $comment->line_start ? '-'.$comment->line_end : '' }}
+                                    <button type="button" wire:click="removeComment(@js($comment->id))" aria-label="{{ __('workspaces.review.remove_ref') }}">×</button>
+                                </span>
+                                @if ($isStale)<span class="wf-tag is-warn">{{ __('workspaces.review.outdated') }}</span>@endif
+                            @endforeach
+                        </div>
+                    @endif
 
                     <div class="ws-suggest-wrap">
                         <ul class="ws-suggest" x-show="suggestions.length > 0" x-cloak role="listbox">
@@ -405,14 +422,26 @@
                         @if ($thread->permission_mode === PermissionMode::BypassPermissions)
                             <span class="wf-pill-tag is-danger" title="{{ __('workspaces.thread.bypass_warning') }}"><x-wf.icon name="alert" :size="12" :stroke="2" /> {{ PermissionMode::BypassPermissions->label() }}</span>
                         @endif
+                        @if ($reviewComments->isNotEmpty())
+                            <span class="wf-composer-note">
+                                {{ $staleComments->isNotEmpty()
+                                    ? __('workspaces.review.collected_stale', ['active' => $activeComments->count(), 'stale' => $staleComments->count()])
+                                    : trans_choice('workspaces.review.collected', $activeComments->count(), ['count' => $activeComments->count()]) }}<span x-show="status === 'running' || status === 'waiting_input'"> · {{ __('workspaces.review.queued_hint') }}</span>
+                            </span>
+                        @endif
                         <span class="wf-spacer"></span>
                         @if ((float) $thread->cost_usd > 0)
                             <span class="wf-cost" title="{{ __('workspaces.thread.cost') }}">{{ \App\Support\CostFormatter::usd((float) $thread->cost_usd) }}</span>
                         @endif
+                        @if ($activeComments->isNotEmpty())
+                            <button type="button" class="wf-btn wf-btn-primary wf-send-review" wire:click="send" wire:loading.attr="disabled" wire:target="send">
+                                {{ __('workspaces.review.send_review') }} <span class="wf-count">{{ $activeComments->count() }}</span>
+                            </button>
+                        @endif
                         <button type="button" class="wf-btn wf-btn-soft wf-stop" wire:click="interrupt" x-show="status === 'running' || status === 'waiting_input'" x-cloak>
                             <x-wf.icon name="stop" :size="13" :stroke="2.6" /> {{ __('workspaces.thread.stop') }}
                         </button>
-                        <button type="button" class="wf-send" wire:click="send" wire:loading.attr="disabled" wire:target="send" x-show="status !== 'running' && status !== 'waiting_input'" aria-label="{{ __('workspaces.chat.send') }}" title="{{ __('workspaces.chat.send') }}">
+                        <button type="button" class="wf-send" wire:click="send" wire:loading.attr="disabled" wire:target="send" x-show="status !== 'running' && status !== 'waiting_input'" @if ($activeComments->isNotEmpty()) hidden @endif aria-label="{{ __('workspaces.chat.send') }}" title="{{ __('workspaces.chat.send') }}">
                             <x-wf.icon name="arrow-up" :size="18" :stroke="2.2" />
                         </button>
                     </div>

@@ -22,6 +22,7 @@ use App\Services\Workspace\AgentPool;
 use App\Services\Workspace\AutoSettings;
 use App\Services\Workspace\AutoThreadDriver;
 use App\Services\Workspace\ModelCatalog;
+use App\Services\Workspace\ReviewCommentService;
 use App\Services\Workspace\ThreadAttachmentService;
 use App\Services\Workspace\ThreadCheckpointService;
 use App\Services\Workspace\ThreadReadService;
@@ -202,11 +203,31 @@ class ThreadChat extends Component
         });
     }
 
+    /** Stale review comments the person chose to send anyway (ids). */
+    public array $includeStale = [];
+
     public function send(): void
     {
         $text = trim($this->draft);
         $thread = $this->activeThread();
-        if (($text === '' && $this->uploads === []) || $thread === null) {
+        if ($thread === null) {
+            return;
+        }
+
+        // Collected review comments go out with the text as one message.
+        if ($this->collectedCount($thread) > 0) {
+            $this->attempt(function () use ($thread, $text): void {
+                $sent = app(ReviewCommentService::class)->send($thread, $this->user(), $text, $this->includeStale);
+                $this->draft = '';
+                $this->includeStale = [];
+                $this->dispatch('review-comments-changed');
+                Notification::make()->title(trans_choice('workspaces.review.sent_count', $sent, ['count' => $sent]))->success()->send();
+            });
+
+            return;
+        }
+
+        if ($text === '' && $this->uploads === []) {
             return;
         }
 
@@ -227,6 +248,29 @@ class ThreadChat extends Component
             $this->draft = '';
             $this->uploads = [];
         });
+    }
+
+    /** The × on a comment chip: drop it from the collection. */
+    public function removeComment(string $id): void
+    {
+        $thread = $this->activeThread();
+        $comment = $thread !== null ? app(ReviewCommentService::class)->open($thread, $this->user())->firstWhere('id', $id) : null;
+        if ($comment !== null) {
+            app(ReviewCommentService::class)->discard($comment, $this->user());
+            $this->includeStale = array_values(array_diff($this->includeStale, [$id]));
+            $this->dispatch('review-comments-changed');
+        }
+    }
+
+    /** The review panel changed the collection. */
+    #[On('review-comments-changed')]
+    public function commentsChanged(): void {}
+
+    private function collectedCount(Thread $thread): int
+    {
+        return app(ReviewCommentService::class)->open($thread, $this->user())
+            ->filter(fn ($c): bool => $c->status === \App\Enums\ReviewCommentStatus::Draft || in_array($c->id, $this->includeStale, true))
+            ->count();
     }
 
     public function removeUpload(int $index): void
@@ -518,6 +562,7 @@ class ThreadChat extends Component
             'user' => $this->user(),
             'commands' => $thread !== null ? $this->commandList() : [],
             'autoDefaults' => AutoSettings::resolve($workspace->repoProfile),
+            'reviewComments' => $thread !== null && ($role?->canOperate() ?? false) ? app(ReviewCommentService::class)->open($thread, $this->user()) : collect(),
             // user message id => checkpoint taken right before it
             'checkpoints' => $thread !== null
                 ? ThreadCheckpoint::query()->where('thread_id', $thread->id)->whereIn('thread_event_id', $events->pluck('id'))->orderBy('n')->get()->unique('thread_event_id')->pluck('id', 'thread_event_id')

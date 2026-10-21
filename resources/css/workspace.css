@@ -381,6 +381,41 @@ button.wf-gate-chip { cursor: pointer; }
 .wf-chat-strip { grid-area: chat; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 14px 0; border-right: 1px solid var(--wf-border); background: var(--wf-bg); }
 .wf-strip-text { writing-mode: vertical-rl; transform: rotate(180deg); margin-top: auto; font-size: 12px; color: var(--wf-muted); white-space: nowrap; }
 
+/* ---- Review comments ---- */
+.wf-dcell, .wf-urow { position: relative; }
+.wf-urow { display: flex; }
+.wf-urow > .wf-dcell { flex: 1; }
+.wf-dcell.is-commented .wf-dnum { box-shadow: inset 3px 0 0 var(--wf-info); }
+.wf-dcell.is-drafting { background: var(--wf-info-soft) !important; color: var(--wf-info) !important; }
+.wf-dplus { position: absolute; right: 6px; top: 3px; width: 18px; height: 18px; display: none; place-items: center; border: 0; border-radius: 4px; background: var(--wf-info); color: #fff; font: 600 13px/1 var(--font-sans); cursor: pointer; }
+.wf-dcell:hover .wf-dplus, .wf-dplus:focus-visible { display: grid; }
+.wf-dbadge { position: absolute; right: 6px; top: 3px; min-width: 18px; height: 18px; padding: 0 4px; box-sizing: border-box; display: grid; place-items: center; border-radius: 4px; background: var(--wf-info); color: #fff; font: 600 11px/1 var(--font-sans); }
+.wf-dbadge.is-static { position: static; }
+.wf-dnote-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); padding: 8px 12px; font-family: var(--font-sans); line-height: 1.5; }
+.wf-dnote-row.is-left > .wf-dnote { grid-column: 1; }
+.wf-dnote-row.is-right > .wf-dnote { grid-column: 2; }
+.wf-dnote-row.is-unified { grid-template-columns: minmax(0, 1fr); padding-left: 100px; }
+.wf-dnote { display: flex; flex-direction: column; gap: 6px; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--wf-border); background: var(--wf-surface); box-shadow: 0 2px 8px rgba(0,0,0,.05); font-size: 13.5px; }
+.wf-dnote.is-draft { border-color: var(--wf-info); }
+.wf-dnote.is-stale { border-style: dashed; background: var(--wf-raised); color: var(--wf-muted); }
+.wf-dnote-head { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.wf-dnote-body { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.wf-dnote-ta { height: auto; min-height: 56px; padding: 8px; resize: vertical; font: 13.5px/1.5 var(--font-sans); }
+.wf-dnote-actions { gap: 14px; }
+.wf-avatar-xs { width: 20px; height: 20px; border-radius: 50%; display: inline-grid; place-items: center; background: var(--wf-ink); color: var(--wf-on-ink); font-size: 9px; font-weight: 600; }
+.wf-tag { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 6px; font-size: 11.5px; font-weight: 500; font-family: var(--font-sans); }
+.wf-tag.is-warn { background: var(--wf-warn-soft); color: var(--wf-warn); }
+.wf-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 12px 12px 0; }
+.wf-chip-ref { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; border-radius: 6px; background: var(--wf-info-soft); color: var(--wf-info); font-size: 11.5px; }
+.wf-chip-ref button { border: 0; padding: 0; background: transparent; color: inherit; font-size: 14px; line-height: 1; cursor: pointer; }
+.wf-chip-ref.is-stale { background: transparent; border: 1px dashed var(--wf-muted); color: var(--wf-muted); text-decoration: line-through; }
+.wf-composer.has-review { border-color: var(--wf-accent); box-shadow: 0 0 0 3px var(--wf-accent-soft); }
+.wf-composer-note { font-size: 12px; color: var(--wf-muted); }
+.wf-send-review { height: 36px; border-radius: 10px; }
+.wf-count { padding: 0 6px; border-radius: 999px; background: rgba(255,255,255,.22); font-size: 11.5px; }
+.wf-strip-comments { position: relative; background: var(--wf-raised); }
+.wf-strip-badge { position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; padding: 0 4px; box-sizing: border-box; border-radius: 999px; background: var(--wf-info); color: #fff; font-size: 11px; font-weight: 600; display: grid; place-items: center; }
+
 /* ---- Narrow: context becomes a drawer; phones: rail at the bottom ---- */
 .wf-drawer-toggle { display: none; }
 @media (max-width: 1100px) {

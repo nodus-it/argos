@@ -50,6 +50,10 @@
         <button type="button" class="wf-icon-btn" x-on:click="maximized = false" aria-label="{{ __('workspaces.review.chat_strip') }}" title="{{ __('workspaces.review.chat_strip') }}">
             <x-wf.icon name="chevron-right" :size="16" :stroke="2" />
         </button>
+        <button type="button" class="wf-icon-btn wf-strip-comments" x-on:click="maximized = false" x-show="commentCount > 0" aria-label="{{ __('workspaces.review.send_review') }}">
+            <x-wf.icon name="message" :size="17" />
+            <span class="wf-strip-badge" x-text="commentCount"></span>
+        </button>
         <span class="wf-strip-text">{{ __('workspaces.review.chat_strip') }}</span>
     </div>
 

@@ -85,7 +85,7 @@ class ReviewPanelTest extends TestCase
             ->assertSee('Hello Argos')
             ->assertSeeHtml('class="wf-drow"');
 
-        $review->call('setView', 'unified')->assertSeeHtml('wf-uline');
+        $review->call('setView', 'unified')->assertSeeHtml('wf-urow');
         $this->assertSame('unified', $this->editor->fresh()->ui_prefs['diff_view']);
     }
 

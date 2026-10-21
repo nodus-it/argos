@@ -131,4 +131,10 @@ return [
         'answered' => 'Answered',
         'cancelled' => 'Cancelled',
     ],
+    'review_comment_status' => [
+        'draft' => 'Collected',
+        'stale' => 'Outdated',
+        'sent' => 'Sent',
+        'discarded' => 'Discarded',
+    ],
 ];

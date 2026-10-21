@@ -8,6 +8,7 @@ export function argosWorkspaceFocus() {
         review: false,
         maximized: false,
         drawer: false,
+        commentCount: 0,
 
         init() {
             const params = new URLSearchParams(window.location.search);
@@ -16,6 +17,7 @@ export function argosWorkspaceFocus() {
             }
             window.addEventListener('review-open', (event) => this.openReview(event.detail?.file ?? null));
             window.addEventListener('review-maximize', () => { this.maximized = !this.maximized; });
+            window.addEventListener('argos-review-count', (event) => { this.commentCount = Number(event.detail) || 0; });
             // `/review`, `/gates`, `/preview` and the gates action (Livewire `workspace-focus`).
             window.addEventListener('workspace-focus', (event) => {
                 if (event.detail?.target === 'review') {
@@ -151,6 +153,42 @@ export function argosThreadSwitcher() {
         choose(id) {
             this.$wire.select(id);
             this.close();
+        },
+    };
+}
+
+/** Review diff: picking lines (Shift-click extends) and the inline comment editor. */
+export function argosReview(labelTemplate) {
+    return {
+        draft: null,
+
+        pick(side, line, event) {
+            if (event.shiftKey && this.draft && this.draft.side === side) {
+                this.draft.end = Math.max(line, this.draft.anchor);
+                this.draft.start = Math.min(line, this.draft.anchor);
+                return;
+            }
+            this.draft = { side, start: line, end: line, anchor: line, body: this.draft?.body ?? '' };
+        },
+
+        inDraft(side, line) {
+            return this.draft !== null && this.draft.side === side && line >= this.draft.start && line <= this.draft.end;
+        },
+
+        draftLabel() {
+            if (!this.draft) {
+                return '';
+            }
+            const range = this.draft.start === this.draft.end ? `${this.draft.start}` : `${this.draft.start}–${this.draft.end}`;
+            return labelTemplate.replace('__L__', range);
+        },
+
+        save(path) {
+            if (!this.draft || this.draft.body.trim() === '') {
+                return;
+            }
+            const { side, start, end, body } = this.draft;
+            this.$wire.addComment(path, side, start, end, body).then(() => { this.draft = null; });
         },
     };
 }

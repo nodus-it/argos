@@ -1,6 +1,6 @@
 {{-- Review mode: toolbar, file tree and the diff of one file. Opens and
      closes with the page's review state (resources/js/workspace/focus.js). --}}
-<div class="wf-review"
+<div class="wf-review" x-data="argosReview(@js(__('workspaces.review.comment_on', ['line' => '__L__'])))"
      x-on:argos-review-opened.window="$wire.open($event.detail.file)"
      x-on:argos-review-closed.window="$wire.close()"
      x-on:argos-turn-completed.window="if ($wire.active) $wire.$refresh()"
@@ -10,6 +10,7 @@
         /** @var list<array<string, mixed>> $files */
         $seenCount = count($seen);
     @endphp
+    <span class="hidden" wire:key="cc-{{ $commentCount }}" x-init="window.dispatchEvent(new CustomEvent('argos-review-count', { detail: {{ $commentCount }} }))"></span>
     <div class="wf-review-bar">
         <span class="wf-review-title">{{ __('workspaces.review.changes') }}</span>
         <span class="mono wf-review-stat"><span class="wf-add">+{{ $additions }}</span> <span class="wf-del">−{{ $deletions }}</span></span>
@@ -50,7 +51,7 @@
                     <div class="wf-tree-dir mono">{{ $dir === '' ? '/' : $dir }}</div>
                     @foreach ($dirFiles as $f)
                         <button type="button" @class(['wf-tree-file', 'is-current' => $current['path'] === $f['path']])
-                                wire:click="selectFile(@js($f['path']))" @if ($current['path'] === $f['path']) aria-current="true" @endif title="{{ $f['path'] }}">
+                                wire:click="selectFile(@js($f['path']))" x-on:click="draft = null" @if ($current['path'] === $f['path']) aria-current="true" @endif title="{{ $f['path'] }}">
                             <span @class(['wf-file-status', 'mono', 'is-'.strtolower($f['status'])])>{{ $f['status'] }}</span>
                             <span class="wf-tree-name mono">{{ $f['name'] }}</span>
                             @if (in_array($f['path'], $seen, true))
