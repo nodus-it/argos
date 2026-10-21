@@ -6,6 +6,7 @@
      Re-renders when Claude finishes a turn or the gates change. --}}
 <div class="wf-context-inner"
      x-on:argos-turn-completed.window="$wire.$refresh()"
+     x-on:argos-workspace-changed.window="$wire.$refresh()"
      x-on:argos-gates-updated.window="$wire.$refresh()"
      @if ($gateRun?->status === \App\Enums\GateRunStatus::Running) wire:poll.10s @endif>
 
@@ -87,25 +88,43 @@
         @endif
     </section>
 
-    <section class="wf-section">
-        <h2 class="wf-section-title">{{ __('workspaces.focus.changed_files') }}</h2>
+    <section class="wf-section" x-data="{ q: '', all: false }">
+        <div class="wf-section-head">
+            <h2 class="wf-section-title">{{ __('workspaces.focus.changed_files') }}@if ($files !== []) · {{ count($files) + count($generated) }}@endif</h2>
+            @if (count($files) > 1)
+                <button type="button" class="wf-text-btn" x-on:click="window.dispatchEvent(new CustomEvent('review-open', { detail: { file: null } }))">{{ __('workspaces.tray.review') }}</button>
+            @endif
+        </div>
         @if (! $running)
             <p class="wf-muted wf-note">{{ __('workspaces.focus.unavailable') }}</p>
-        @elseif ($files === [])
+        @elseif ($files === [] && $generated === [])
             <p class="wf-muted wf-note">{{ __('workspaces.focus.no_changes') }}</p>
         @else
+            @if (count($files) > 10)
+                <input type="search" class="wf-input wf-file-filter" x-model="q" placeholder="{{ __('workspaces.focus.filter_files') }}" aria-label="{{ __('workspaces.focus.filter_files') }}">
+            @endif
             <ul class="wf-files mono">
-                @foreach ($files as $file)
-                    <li>
+                @foreach ($files as $i => $file)
+                    <li wire:key="cf-{{ md5($file['path']) }}" data-path="{{ mb_strtolower($file['path']) }}"
+                        x-show="q !== '' ? $el.dataset.path.includes(q.toLowerCase()) : (all || {{ $i }} < 10)">
                         <button type="button" class="wf-file" title="{{ $file['path'] }}" x-on:click="$dispatch('review-open', { file: @js($file['path']) })">
                             <span @class(['wf-file-status', 'is-'.strtolower($file['status'])])>{{ $file['status'] }}</span>
-                            <span class="wf-file-name">{{ $file['name'] }}</span>
+                            <span class="wf-file-name">{{ $file['name'] }}@if ($file['dir'] !== '')<span class="wf-file-dir"> {{ $file['dir'] }}</span>@endif</span>
                             @if ($file['additions'] > 0)<span class="wf-add">+{{ $file['additions'] }}</span>@endif
                             @if ($file['deletions'] > 0)<span class="wf-del">−{{ $file['deletions'] }}</span>@endif
                         </button>
                     </li>
                 @endforeach
             </ul>
+            @if (count($files) > 10)
+                <button type="button" class="wf-text-btn wf-muted" x-show="q === ''" x-on:click="all = !all"
+                        x-text="all ? @js(__('workspaces.focus.show_less')) : @js(__('workspaces.focus.show_all', ['count' => count($files)]))"></button>
+            @endif
+            @if ($generated !== [])
+                <p class="wf-muted wf-note wf-generated" title="{{ implode(', ', array_column($generated, 'path')) }}">
+                    {{ trans_choice('workspaces.focus.generated', count($generated), ['count' => count($generated), 'files' => implode(', ', array_map('basename', array_slice(array_column($generated, 'path'), 0, 3)))]) }}
+                </p>
+            @endif
         @endif
     </section>
 </div>

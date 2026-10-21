@@ -9,7 +9,7 @@ use App\Enums\ThreadEventType;
 use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceStatus;
 use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ViewWorkspace;
-use App\Integrations\WorkspaceDaemon\Requests\GitDiff;
+use App\Integrations\WorkspaceDaemon\Requests\GitChanges;
 use App\Integrations\WorkspaceDaemon\Requests\GitFetch;
 use App\Integrations\WorkspaceDaemon\Requests\GitStatus;
 use App\Livewire\Workspace\ContextPanel;
@@ -25,6 +25,7 @@ use App\Services\Workspace\WorkspaceDaemonClient;
 use App\Testing\FakeWorkspaceDaemon;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
 use Livewire\Livewire;
 use Saloon\Http\Faking\MockResponse;
@@ -101,6 +102,7 @@ class ReviewPanelTest extends TestCase
             ->assertSee(__('workspaces.review.seen_progress', ['seen' => 1, 'total' => 1]));
 
         FakeWorkspaceDaemon::$diff = "diff --git a/README.md b/README.md\n--- a/README.md\n+++ b/README.md\n@@ -1 +1 @@\n-Hello\n+Hello again\n";
+        Cache::forget('ws-changes:'.$this->workspace->id);
         $review->call('$refresh')->assertSee(__('workspaces.review.seen_progress', ['seen' => 0, 'total' => 1]));
     }
 
@@ -141,7 +143,7 @@ class ReviewPanelTest extends TestCase
             ->assertSee(__('workspaces.tabs.not_running'));
     }
 
-    public function test_workspace_diffs_fetch_at_most_once_a_minute(): void
+    public function test_the_change_list_is_cheap_and_fetches_at_most_once_a_minute(): void
     {
         $fetches = 0;
         Saloon::fake([
@@ -151,15 +153,37 @@ class ReviewPanelTest extends TestCase
                 return MockResponse::make([], 202);
             },
             GitStatus::class => MockResponse::make(['branch' => 'ws/x', 'upstream' => null, 'ahead' => 2, 'behind' => 0, 'dirty' => true, 'files' => [['path' => 'a', 'status' => 'M']]]),
-            GitDiff::class => MockResponse::make(['diff' => "diff --git a/a b/a\n--- a/a\n+++ b/a\n@@ -1 +1 @@\n-x\n+y\n", 'truncated' => false]),
+            GitChanges::class => MockResponse::make(['files' => [['path' => 'a', 'from_path' => null, 'status' => 'M', 'additions' => 1, 'deletions' => 1, 'binary' => false, 'generated' => false, 'hash' => str_repeat('a', 40)]]]),
         ]);
 
-        $first = app(WorkspaceDiffService::class)->forWorkspace($this->workspace);
-        app(WorkspaceDiffService::class)->forWorkspace($this->workspace);
+        $first = app(WorkspaceDiffService::class)->summary($this->workspace);
+        Cache::forget('ws-changes:'.$this->workspace->id);
+        app(WorkspaceDiffService::class)->summary($this->workspace);
 
         $this->assertSame(1, $fetches);
         $this->assertSame(2, $first['ahead']);
         $this->assertSame(1, $first['uncommitted']);
-        $this->assertSame('a', $first['files'][0]['to_path']);
+        $this->assertSame('a', $first['files'][0]['path']);
+    }
+
+    public function test_generated_files_and_big_diffs_load_on_request(): void
+    {
+        $this->app->singleton(WorkspaceDaemonClient::class, FakeWorkspaceDaemon::class);
+        $lines = implode('', array_map(fn (int $n): string => "+line {$n}\n", range(1, 900)));
+        FakeWorkspaceDaemon::$diff = "diff --git a/composer.lock b/composer.lock\n--- a/composer.lock\n+++ b/composer.lock\n@@ -1 +1 @@\n-{}\n+{ }\n"
+            ."diff --git a/big.php b/big.php\nnew file mode 100644\n--- /dev/null\n+++ b/big.php\n@@ -0,0 +1,900 @@\n".$lines;
+
+        Livewire::withQueryParams(['review' => '1'])->actingAs($this->editor)
+            ->test(ReviewPanel::class, ['workspaceId' => $this->workspace->id])
+            ->assertSee('big.php')
+            ->assertSee('line 400')
+            ->assertDontSee('line 401')
+            ->assertSeeHtml('wf-diff-more')
+            ->call('showMoreLines', 'big.php')
+            ->assertSee('line 900')
+            ->call('selectFile', 'composer.lock')
+            ->assertSee(__('workspaces.review.generated_hidden'))
+            ->call('loadGeneratedDiff', 'composer.lock')
+            ->assertDontSee(__('workspaces.review.generated_hidden'));
     }
 }

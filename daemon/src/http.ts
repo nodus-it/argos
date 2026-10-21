@@ -71,6 +71,9 @@ const initSchema = z.object({
     git_user_email: z.string().min(1),
 });
 
+/** A repo-relative path for git pathspecs (no options, no traversal). */
+const pathSchema = z.string().min(1).max(1000).refine((p) => !p.startsWith('-') && !p.startsWith('/') && !p.split('/').includes('..'), 'invalid path');
+
 const refSchema = z.string().min(1).max(255).regex(/^[A-Za-z0-9._\/-]+$/).refine((ref) => !ref.startsWith('-') && !ref.includes('..'), 'invalid ref');
 
 const commitSchema = z.object({
@@ -266,9 +269,17 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
     app.get('/git/status', async () => gitOps.status(dir));
 
     app.get('/git/diff', async (request) => {
+        const query = request.query as { base?: string; path?: string };
+        const base = refSchema.parse(query.base);
+        const path = query.path === undefined ? null : pathSchema.parse(query.path);
+
+        return gitOps.diffAgainst(dir, base, 512 * 1024, path);
+    });
+
+    app.get('/git/changes', async (request) => {
         const base = refSchema.parse((request.query as { base?: string }).base);
 
-        return gitOps.diffAgainst(dir, base);
+        return gitOps.changedFiles(dir, base);
     });
 
     app.post('/git/fetch', async (_request, reply) => {

@@ -72,6 +72,18 @@
                         </button>
                     @endforeach
                 @endforeach
+                @if ($generatedFiles !== [])
+                    <details class="wf-tree-generated" @if ($current['generated'] ?? false) open @endif>
+                        <summary class="wf-tree-dir">{{ trans_choice('workspaces.review.generated_group', count($generatedFiles), ['count' => count($generatedFiles)]) }}</summary>
+                        @foreach ($generatedFiles as $f)
+                            <button type="button" @class(['wf-tree-file', 'is-current' => $current['path'] === $f['path']]) wire:click="selectFile(@js($f['path']))" x-on:click="draft = null" title="{{ $f['path'] }}">
+                                <span @class(['wf-file-status', 'mono', 'is-'.strtolower($f['status'])])>{{ $f['status'] }}</span>
+                                <span class="wf-tree-name mono">{{ $f['name'] }}</span>
+                                <span class="wf-muted mono wf-tree-count">+{{ $f['additions'] }}</span>
+                            </button>
+                        @endforeach
+                    </details>
+                @endif
             </nav>
 
             <section class="wf-diff" aria-label="{{ $current['path'] }}">
@@ -118,6 +130,14 @@
                 @endif
 
                 <div @class(['wf-diff-body', 'mono', 'is-split' => $view === 'split', 'is-unified' => $view === 'unified']) wire:key="diff-{{ md5($current['path']) }}-{{ $view }}">
+                    @if ($current['skipped'] === 'generated')
+                        <div class="wf-diff-skipped">
+                            <p>{{ __('workspaces.review.generated_hidden') }}</p>
+                            <button type="button" class="wf-btn wf-btn-sm" wire:click="loadGeneratedDiff(@js($current['path']))">{{ __('workspaces.review.load_anyway') }}</button>
+                        </div>
+                    @elseif ($current['skipped'] === 'binary')
+                        <div class="wf-diff-skipped"><p>{{ __('workspaces.review.binary') }}</p></div>
+                    @endif
                     @foreach ($current['hunks'] as $hunk)
                         @php $gapKey = $current['path'].'#'.$hunk['index']; @endphp
                         @if ($hunk['gap'] !== null)
@@ -142,6 +162,11 @@
                             @endforeach
                         @endif
                     @endforeach
+                    @if ($current['hidden'] > 0)
+                        <button type="button" class="wf-diff-gap wf-diff-more" wire:click="showMoreLines(@js($current['path']))">
+                            {{ trans_choice('workspaces.review.more_lines', $current['hidden'], ['count' => $current['hidden']]) }}
+                        </button>
+                    @endif
                 </div>
 
                 <div class="wf-diff-foot">

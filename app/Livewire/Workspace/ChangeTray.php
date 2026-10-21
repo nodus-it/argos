@@ -46,7 +46,7 @@ class ChangeTray extends Component
         $diff = null;
         if ($workspace->status === WorkspaceStatus::Running) {
             try {
-                $diff = app(WorkspaceDiffService::class)->forWorkspace($workspace);
+                $diff = app(WorkspaceDiffService::class)->summary($workspace);
             } catch (DaemonTransportException) {
                 $diff = null;
             }

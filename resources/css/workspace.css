@@ -216,6 +216,9 @@ button.wf-gate:not([disabled]):hover { background: var(--wf-raised); }
 .wf-file-status.is-d { color: var(--wf-danger); }
 .wf-file-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wf-add { color: var(--wf-add-text); }
+.wf-file-dir { color: var(--wf-muted); font-size: 11px; }
+.wf-file-filter { height: 30px; font-size: 12.5px; }
+.wf-generated { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wf-del { color: var(--wf-del-text); }
 
 /* ---- Chat column ---- */
@@ -359,6 +362,14 @@ button.wf-gate-chip { cursor: pointer; }
 .wf-diff-stat { font-size: 12px; white-space: nowrap; }
 .wf-seen-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--wf-muted); cursor: pointer; white-space: nowrap; }
 .wf-diff-body { flex: 1; min-height: 0; overflow: auto; font-size: 12px; line-height: 24px; }
+.wf-diff-skipped { padding: 24px 16px; font-family: var(--font-sans); font-size: 13px; color: var(--wf-muted); display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.wf-diff-skipped p { margin: 0; }
+.wf-diff-more { text-align: center; padding: 6px 16px; }
+.wf-tree-generated > summary { cursor: pointer; list-style: none; }
+.wf-tree-generated > summary::-webkit-details-marker { display: none; }
+.wf-tree-generated > summary::before { content: '▸ '; }
+.wf-tree-generated[open] > summary::before { content: '▾ '; }
+.wf-tree-count { font-size: 11px; }
 .wf-diff-hunk { padding: 0 16px; background: var(--wf-raised); color: var(--wf-muted); white-space: pre; overflow: hidden; text-overflow: ellipsis; }
 .wf-diff-gap { display: block; width: 100%; padding: 0 16px; border: 0; background: var(--wf-raised); color: var(--wf-accent-ink); font: inherit; text-align: left; cursor: pointer; }
 .wf-diff-gap:hover { text-decoration: underline; text-underline-offset: 3px; }

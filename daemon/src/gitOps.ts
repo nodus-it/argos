@@ -54,12 +54,18 @@ export async function status(dir: string): Promise<GitStatus> {
  * uncommitted changes since the merge base, plus untracked (not ignored)
  * files — what a pull request would contain once committed.
  */
-export async function diffAgainst(dir: string, base: string, maxBytes = 512 * 1024): Promise<{ diff: string; truncated: boolean }> {
-    let mergeBase = base;
-    try {
-        mergeBase = (await git(['merge-base', base, 'HEAD'], dir)).stdout.trim() || base;
-    } catch {
-        // No common history (or unknown base): diff against the ref itself.
+export async function diffAgainst(dir: string, base: string, maxBytes = 512 * 1024, path: string | null = null): Promise<{ diff: string; truncated: boolean }> {
+    const mergeBase = await mergeBaseOf(dir, base);
+
+    if (path !== null) {
+        // One file (the review loads files one at a time): tracked, renamed or untracked.
+        const untracked = (await git(['ls-files', '--others', '--exclude-standard', '-z', '--', path], dir)).stdout.split('\0').filter((p) => p !== '');
+        const diff = untracked.length > 0
+            ? await untrackedDiff(dir, path)
+            : (await git(['diff', '--no-color', '--find-renames', mergeBase, '--', path, ...(await renameSources(dir, mergeBase, path))], dir)).stdout;
+        const bounded = truncateUtf8(diff, maxBytes);
+
+        return { diff: bounded.text, truncated: bounded.truncated };
     }
 
     let diff = (await git(['diff', '--no-color', '--find-renames', mergeBase], dir)).stdout;
@@ -75,6 +81,145 @@ export async function diffAgainst(dir: string, base: string, maxBytes = 512 * 10
     const bounded = truncateUtf8(diff, maxBytes);
 
     return { diff: bounded.text, truncated: bounded.truncated };
+}
+
+async function mergeBaseOf(dir: string, base: string): Promise<string> {
+    try {
+        return (await git(['merge-base', base, 'HEAD'], dir)).stdout.trim() || base;
+    } catch {
+        // No common history (or unknown base): diff against the ref itself.
+        return base;
+    }
+}
+
+/** The old path of `path` when it was renamed since the merge base, so its diff pairs up. */
+async function renameSources(dir: string, mergeBase: string, path: string): Promise<string[]> {
+    const out = (await git(['diff', '--name-status', '-z', '--find-renames', mergeBase], dir)).stdout.split('\0');
+    for (let i = 0; i < out.length; i++) {
+        if ((out[i] ?? '').startsWith('R') && out[i + 2] === path && out[i + 1] !== undefined) {
+            return [out[i + 1] as string];
+        }
+    }
+
+    return [];
+}
+
+export interface ChangedFile {
+    path: string;
+    from_path: string | null;
+    status: 'A' | 'M' | 'D' | 'R';
+    additions: number;
+    deletions: number;
+    binary: boolean;
+    generated: boolean;
+    /** Blob hash of the working-tree content (empty for deleted files): changes when the file does. */
+    hash: string;
+}
+
+/** Lock files and build output whose diff nobody reviews line by line. */
+const GENERATED = [/(^|\/)(composer|package-lock|yarn|pnpm-lock|Cargo|Gemfile|poetry|bun)\.lock(b)?$/, /(^|\/)package-lock\.json$/, /(^|\/)pnpm-lock\.yaml$/, /\.min\.(js|css)$/, /\.map$/, /(^|\/)public\/(build|hot)\//, /(^|\/)dist\//];
+
+/**
+ * Files changed against `base` (committed, uncommitted and untracked) with
+ * line counts — cheap enough to render a list of hundreds; the diff itself
+ * is fetched per file.
+ */
+export async function changedFiles(dir: string, base: string): Promise<{ files: ChangedFile[] }> {
+    const mergeBase = await mergeBaseOf(dir, base);
+    const files = new Map<string, ChangedFile>();
+
+    const nameStatus = (await git(['diff', '--name-status', '-z', '--find-renames', mergeBase], dir)).stdout.split('\0');
+    for (let i = 0; i < nameStatus.length - 1;) {
+        const code = nameStatus[i] ?? '';
+        if (code === '') {
+            i++;
+            continue;
+        }
+        if (code.startsWith('R') || code.startsWith('C')) {
+            const from = nameStatus[i + 1] ?? '';
+            const to = nameStatus[i + 2] ?? '';
+            files.set(to, { path: to, from_path: from, status: 'R', additions: 0, deletions: 0, binary: false, generated: false, hash: '' });
+            i += 3;
+        } else {
+            const path = nameStatus[i + 1] ?? '';
+            const status = code.startsWith('A') ? 'A' : code.startsWith('D') ? 'D' : 'M';
+            files.set(path, { path, from_path: null, status, additions: 0, deletions: 0, binary: false, generated: false, hash: '' });
+            i += 2;
+        }
+    }
+
+    // --numstat -z: "add\tdel\tpath\0" or for renames "add\tdel\t\0from\0to\0".
+    const numstat = (await git(['diff', '--numstat', '-z', '--find-renames', mergeBase], dir)).stdout.split('\0');
+    for (let i = 0; i < numstat.length;) {
+        const entry = numstat[i] ?? '';
+        if (entry === '') {
+            i++;
+            continue;
+        }
+        const [add = '0', del = '0', rest = ''] = entry.split('\t');
+        let path = rest;
+        if (rest === '') {
+            path = numstat[i + 2] ?? '';
+            i += 3;
+        } else {
+            i += 1;
+        }
+        const file = files.get(path);
+        if (file !== undefined) {
+            file.binary = add === '-';
+            file.additions = file.binary ? 0 : Number(add);
+            file.deletions = file.binary ? 0 : Number(del);
+        }
+    }
+
+    const untracked = (await git(['ls-files', '--others', '--exclude-standard', '-z'], dir)).stdout.split('\0').filter((p) => p !== '');
+    for (const path of untracked) {
+        const stats = await untrackedLines(dir, path);
+        files.set(path, { path, from_path: null, status: 'A', additions: stats.lines, deletions: 0, binary: stats.binary, generated: false, hash: '' });
+    }
+
+    const paths = [...files.keys()];
+    const existing = paths.filter((p) => files.get(p)?.status !== 'D');
+    for (const chunk of chunks(existing, 200)) {
+        const hashes = (await gitUnchecked(['hash-object', '--', ...chunk], dir)).stdout.trim().split('\n');
+        chunk.forEach((p, n) => {
+            const file = files.get(p);
+            if (file !== undefined) {
+                file.hash = hashes[n] ?? '';
+            }
+        });
+    }
+    for (const chunk of chunks(paths, 200)) {
+        // -z output: path\0attr\0value\0 …
+        const attrs = (await gitUnchecked(['check-attr', '-z', 'linguist-generated', '--', ...chunk], dir)).stdout.split('\0');
+        for (let i = 0; i + 2 < attrs.length; i += 3) {
+            const file = files.get(attrs[i] ?? '');
+            if (file !== undefined && ['set', 'true'].includes(attrs[i + 2] ?? '')) {
+                file.generated = true;
+            }
+        }
+    }
+    for (const file of files.values()) {
+        file.generated ||= GENERATED.some((pattern) => pattern.test(file.path));
+    }
+
+    return { files: [...files.values()].sort((a, b) => a.path.localeCompare(b.path)) };
+}
+
+function chunks<T>(items: T[], size: number): T[][] {
+    const out: T[][] = [];
+    for (let i = 0; i < items.length; i += size) {
+        out.push(items.slice(i, i + size));
+    }
+
+    return out;
+}
+
+async function untrackedLines(dir: string, path: string): Promise<{ lines: number; binary: boolean }> {
+    const numstat = (await gitUnchecked(['diff', '--no-index', '--numstat', '--', '/dev/null', path], dir)).stdout.trim();
+    const [add = '0'] = numstat.split('\t');
+
+    return add === '-' ? { lines: 0, binary: true } : { lines: Number(add) || 0, binary: false };
 }
 
 /** Diff of one untracked file against /dev/null (`--no-index` exits 1 on differences). */

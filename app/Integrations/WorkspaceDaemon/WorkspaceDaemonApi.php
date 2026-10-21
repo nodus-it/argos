@@ -10,6 +10,7 @@ use App\Integrations\WorkspaceDaemon\Requests\GetFileContent;
 use App\Integrations\WorkspaceDaemon\Requests\GetGateFixPrompt;
 use App\Integrations\WorkspaceDaemon\Requests\GetHealth;
 use App\Integrations\WorkspaceDaemon\Requests\GitCommit;
+use App\Integrations\WorkspaceDaemon\Requests\GitChanges;
 use App\Integrations\WorkspaceDaemon\Requests\GitDiff;
 use App\Integrations\WorkspaceDaemon\Requests\GitFetch;
 use App\Integrations\WorkspaceDaemon\Requests\GitPush;
@@ -111,9 +112,9 @@ class WorkspaceDaemonApi implements WorkspaceDaemonTransport
         return $this->call(new GitStatus) + ['branch' => null, 'upstream' => null, 'ahead' => 0, 'behind' => 0, 'dirty' => false, 'files' => []];
     }
 
-    public function gitDiff(string $base): array
+    public function gitDiff(string $base, ?string $path = null): array
     {
-        $result = $this->call(new GitDiff($base));
+        $result = $this->call(new GitDiff($base, $path));
 
         return ['diff' => (string) ($result['diff'] ?? ''), 'truncated' => (bool) ($result['truncated'] ?? false)];
     }
@@ -154,6 +155,22 @@ class WorkspaceDaemonApi implements WorkspaceDaemonTransport
         $files = $this->call(new ListFiles($query, $limit))['files'] ?? [];
 
         return array_values(array_filter(is_array($files) ? $files : [], 'is_string'));
+    }
+
+    public function gitChanges(string $base): array
+    {
+        $files = $this->call(new GitChanges($base))['files'] ?? [];
+
+        return array_values(array_map(fn (array $f): array => [
+            'path' => (string) ($f['path'] ?? ''),
+            'from_path' => isset($f['from_path']) ? (string) $f['from_path'] : null,
+            'status' => (string) ($f['status'] ?? 'M'),
+            'additions' => (int) ($f['additions'] ?? 0),
+            'deletions' => (int) ($f['deletions'] ?? 0),
+            'binary' => (bool) ($f['binary'] ?? false),
+            'generated' => (bool) ($f['generated'] ?? false),
+            'hash' => (string) ($f['hash'] ?? ''),
+        ], array_filter(is_array($files) ? $files : [], 'is_array')));
     }
 
     public function fileContent(string $path): array

@@ -107,7 +107,7 @@ class ContextPanel extends Component
         $diff = null;
         if ($workspace->status === WorkspaceStatus::Running) {
             try {
-                $diff = app(WorkspaceDiffService::class)->forWorkspace($workspace);
+                $diff = app(WorkspaceDiffService::class)->summary($workspace);
             } catch (DaemonTransportException) {
                 $diff = null;
             }
@@ -118,7 +118,8 @@ class ContextPanel extends Component
         return view('livewire.workspace.context-panel', [
             'workspace' => $workspace,
             'diff' => $diff,
-            'files' => self::changedFiles($diff['files'] ?? []),
+            'files' => self::changedFiles(array_values(array_filter($diff['files'] ?? [], fn (array $f): bool => ! $f['generated']))),
+            'generated' => array_values(array_filter($diff['files'] ?? [], fn (array $f): bool => $f['generated'])),
             'gateRun' => $gateRun,
             'gates' => self::gateRows($gateRun),
             'canOperate' => $this->user()->can('operate', $workspace),
@@ -130,30 +131,19 @@ class ContextPanel extends Component
     /**
      * Changed files as sidebar rows: status letter, path, line counts.
      *
-     * @param  array<int, array<string, mixed>>  $files
-     * @return list<array{status: string, path: string, name: string, additions: int, deletions: int}>
+     * @param  array<int, array<string, mixed>>  $files  summary rows (WorkspaceDiffService::summary)
+     * @return list<array{status: string, path: string, name: string, dir: string, additions: int, deletions: int}>
      */
     public static function changedFiles(array $files): array
     {
-        $rows = [];
-        foreach ($files as $file) {
-            $path = (string) (($file['to_path'] ?? '') !== '' ? $file['to_path'] : ($file['from_path'] ?? ''));
-            $status = match (true) {
-                (bool) ($file['is_new'] ?? false) => 'A',
-                (bool) ($file['is_deleted'] ?? false) => 'D',
-                ($file['from_path'] ?? $path) !== $path => 'R',
-                default => 'M',
-            };
-            $rows[] = [
-                'status' => $status,
-                'path' => $path,
-                'name' => basename($path),
-                'additions' => (int) ($file['additions'] ?? 0),
-                'deletions' => (int) ($file['deletions'] ?? 0),
-            ];
-        }
-
-        return $rows;
+        return array_map(fn (array $file): array => [
+            'status' => (string) ($file['status'] ?? 'M'),
+            'path' => (string) $file['path'],
+            'name' => basename((string) $file['path']),
+            'dir' => str_contains((string) $file['path'], '/') ? dirname((string) $file['path']) : '',
+            'additions' => (int) ($file['additions'] ?? 0),
+            'deletions' => (int) ($file['deletions'] ?? 0),
+        ], $files);
     }
 
     /**

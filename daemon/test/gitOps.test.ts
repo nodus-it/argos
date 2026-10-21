@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { classifyPushError, commit, diffAgainst, fetch, parseStatus, push, PushError, status } from '../src/gitOps.js';
+import { changedFiles, classifyPushError, commit, diffAgainst, fetch, parseStatus, push, PushError, status } from '../src/gitOps.js';
 
 const env = { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', LC_ALL: 'C' };
 const run = (args: string[], cwd: string) => execFileSync('git', args, { cwd, encoding: 'utf8', env, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -58,6 +58,37 @@ describe('git operations', () => {
         expect(diff).toContain('+edited');
         expect(diff).toContain('untracked.txt');
         expect(diff).toContain('+u');
+    });
+
+    it('lists changed files with counts, generated flags and content hashes', async () => {
+        writeFileSync(join(work, 'README.md'), 'hello\nworld\n');
+        writeFileSync(join(work, 'composer.lock'), '{}\n');
+        writeFileSync(join(work, 'new.txt'), 'a\nb\nc\n');
+        run([...id, 'add', 'composer.lock'], work);
+        run([...id, 'commit', '-m', 'lock'], work);
+
+        const { files } = await changedFiles(work, 'origin/main');
+
+        expect(files.map((f) => [f.path, f.status, f.additions, f.deletions, f.generated])).toEqual([
+            ['composer.lock', 'A', 1, 0, true],
+            ['new.txt', 'A', 3, 0, false],
+            ['README.md', 'M', 1, 0, false],
+        ].sort((a, b) => String(a[0]).localeCompare(String(b[0]))));
+        const readme = files.find((f) => f.path === 'README.md');
+        expect(readme?.hash).toMatch(/^[0-9a-f]{40}$/);
+
+        writeFileSync(join(work, 'README.md'), 'hello\nagain\n');
+        const after = (await changedFiles(work, 'origin/main')).files.find((f) => f.path === 'README.md');
+        expect(after?.hash).not.toBe(readme?.hash);
+    });
+
+    it('diffs a single file', async () => {
+        writeFileSync(join(work, 'README.md'), 'changed\n');
+        writeFileSync(join(work, 'new.txt'), 'new\n');
+
+        expect((await diffAgainst(work, 'origin/main', 512 * 1024, 'README.md')).diff).toContain('+changed');
+        expect((await diffAgainst(work, 'origin/main', 512 * 1024, 'README.md')).diff).not.toContain('new.txt');
+        expect((await diffAgainst(work, 'origin/main', 512 * 1024, 'new.txt')).diff).toContain('+new');
     });
 
     it('commits everything with the given author, and reports nothing to commit', async () => {

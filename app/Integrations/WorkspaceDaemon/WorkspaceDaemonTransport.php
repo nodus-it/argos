@@ -48,7 +48,10 @@ interface WorkspaceDaemonTransport
     public function gitStatus(): array;
 
     /** @return array{diff: string, truncated: bool} */
-    public function gitDiff(string $base): array;
+    public function gitDiff(string $base, ?string $path = null): array;
+
+    /** @return list<array{path: string, from_path: string|null, status: string, additions: int, deletions: int, binary: bool, generated: bool, hash: string}> */
+    public function gitChanges(string $base): array;
 
     public function gitFetch(): void;
 

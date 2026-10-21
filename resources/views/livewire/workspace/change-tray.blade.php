@@ -1,5 +1,5 @@
 {{-- Change tray above the composer (only with uncommitted changes). --}}
-<div x-on:argos-turn-completed.window="$wire.$refresh()" x-on:argos-gates-updated.window="$wire.$refresh()">
+<div x-on:argos-turn-completed.window="$wire.$refresh()" x-on:argos-workspace-changed.window="$wire.$refresh()" x-on:argos-gates-updated.window="$wire.$refresh()">
     @if ($show)
         <div class="wf-tray" role="status">
             <x-wf.icon name="file" :size="16" class="wf-muted" />

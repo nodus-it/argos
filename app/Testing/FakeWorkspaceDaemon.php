@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Testing;
 
+use App\Services\Git\DiffParser;
 use App\Enums\ApprovalKind;
 use App\Enums\PermissionMode;
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
@@ -179,9 +180,36 @@ class FakeWorkspaceDaemon extends WorkspaceDaemonClient implements WorkspaceDaem
     /** The working tree's diff against the base branch (tests replace it). */
     public static ?string $diff = null;
 
-    public function gitDiff(string $base): array
+    public function gitDiff(string $base, ?string $path = null): array
     {
-        return ['diff' => self::$diff ?? "diff --git a/README.md b/README.md\n--- a/README.md\n+++ b/README.md\n@@ -1 +1 @@\n-Hello\n+Hello Argos\n", 'truncated' => false];
+        $diff = self::$diff ?? "diff --git a/README.md b/README.md\n--- a/README.md\n+++ b/README.md\n@@ -1 +1 @@\n-Hello\n+Hello Argos\n";
+        if ($path !== null) {
+            // The section of that one file.
+            $parts = preg_split('/(?=^diff --git )/m', $diff) ?: [];
+            $diff = implode('', array_filter($parts, fn (string $p): bool => str_contains(strtok($p, "\n") ?: '', ' b/'.$path)));
+        }
+
+        return ['diff' => $diff, 'truncated' => false];
+    }
+
+    public function gitChanges(string $base): array
+    {
+        $files = (new DiffParser)->parse($this->gitDiff($base)['diff']);
+
+        return array_map(function (array $f): array {
+            $path = $f['to_path'] !== '' ? $f['to_path'] : $f['from_path'];
+
+            return [
+                'path' => $path,
+                'from_path' => $f['from_path'] !== $path ? $f['from_path'] : null,
+                'status' => $f['is_new'] ? 'A' : ($f['is_deleted'] ? 'D' : 'M'),
+                'additions' => $f['additions'],
+                'deletions' => $f['deletions'],
+                'binary' => false,
+                'generated' => str_ends_with($path, '.lock'),
+                'hash' => sha1(serialize($f['hunks'])),
+            ];
+        }, $files);
     }
 
     public function gitFetch(): void {}

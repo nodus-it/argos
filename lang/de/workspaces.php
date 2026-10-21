@@ -52,6 +52,10 @@ return [
         'alias' => ':family (neuestes)',
     ],
     'focus' => [
+        'filter_files' => 'Dateien filtern',
+        'show_all' => 'Alle :count Dateien anzeigen',
+        'show_less' => 'Weniger anzeigen',
+        'generated' => '{1} + :count generierte Datei (:files)|[0,*] + :count generierte Dateien (:files)',
         'review_mode' => 'Review-Modus',
         'close_review' => 'Review schließen',
         'more' => 'Weitere Aktionen',
@@ -270,6 +274,11 @@ return [
         'closed' => 'geschlossen',
     ],
     'review' => [
+        'generated_group' => '{1} Generiert · :count|[0,*] Generiert · :count',
+        'generated_hidden' => 'Generierte Datei (Lockfile, Build-Ausgabe) — der Diff ist ausgeblendet, damit der Review schnell bleibt.',
+        'load_anyway' => 'Diff trotzdem laden',
+        'binary' => 'Binärdatei — kein Text-Diff.',
+        'more_lines' => '{1} :count weitere Zeile anzeigen|[0,*] :count weitere Zeilen anzeigen',
         'fix_body' => ':gate meldet: :message — bitte beheben.',
         'stale_hint' => 'Claude hat diese Zeile nach deinem Kommentar geändert.',
         'send_anyway' => 'Trotzdem senden',

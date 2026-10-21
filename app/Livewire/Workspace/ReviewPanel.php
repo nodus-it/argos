@@ -14,12 +14,11 @@ use App\Services\Git\WorkspaceDiffService;
 use App\Services\Workspace\ReviewCommentService;
 use App\Services\Workspace\ReviewService;
 use App\Services\Workspace\WorkspaceDaemonClient;
-use App\Services\Workspace\WorkspaceException;
-use Filament\Notifications\Notification;
-use Illuminate\Auth\Access\AuthorizationException;
 use App\Services\Workspace\WorkspaceGateService;
 use App\Support\GateAnnotations;
 use App\Support\ReviewDiff;
+use Filament\Notifications\Notification;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
@@ -49,6 +48,15 @@ class ReviewPanel extends Component
 
     /** @var array<string, list<array{type: string, old_num: int, new_num: int, text: string}>> "path#hunk" => unchanged lines shown */
     public array $expanded = [];
+
+    /** @var list<string> generated files whose diff was asked for anyway */
+    public array $loadGenerated = [];
+
+    /** @var array<string, int> path => diff lines shown (big diffs load in steps) */
+    public array $lineLimit = [];
+
+    /** Diff lines a file shows before "show more". */
+    public const LINE_STEP = 400;
 
     public function mount(string $workspaceId): void
     {
@@ -106,10 +114,20 @@ class ReviewPanel extends Component
             : app(ReviewService::class)->unmarkSeen($thread, $this->user(), $path);
     }
 
+    public function loadGeneratedDiff(string $path): void
+    {
+        $this->loadGenerated = array_values(array_unique([...$this->loadGenerated, $path]));
+    }
+
+    public function showMoreLines(string $path): void
+    {
+        $this->lineLimit[$path] = ($this->lineLimit[$path] ?? self::LINE_STEP) + self::LINE_STEP * 3;
+    }
+
     /** Show the unchanged lines before hunk $index of $path. */
     public function expand(string $path, int $index): void
     {
-        $file = collect($this->files())->firstWhere('path', $path);
+        $file = $this->detail($path);
         $gap = $file['hunks'][$index]['gap'] ?? null;
         if ($gap === null) {
             return;
@@ -130,7 +148,7 @@ class ReviewPanel extends Component
         if ($thread === null || trim($body) === '') {
             return;
         }
-        $file = collect($this->files())->firstWhere('path', $path);
+        $file = $this->detail($path);
         if ($file === null) {
             return;
         }
@@ -216,7 +234,17 @@ class ReviewPanel extends Component
             }
         }
 
-        $current = collect($files)->firstWhere('path', $this->file) ?? ($files[0] ?? null);
+        $row = collect($files)->firstWhere('path', $this->file)
+            ?? collect($files)->firstWhere('generated', false)
+            ?? ($files[0] ?? null);
+        $current = null;
+        if ($row !== null) {
+            try {
+                $current = $this->detail($row['path'], $files) ?? [...$row, 'hunks' => [], 'skipped' => null, 'hidden' => 0];
+            } catch (DaemonTransportException $e) {
+                $error = $e->getMessage();
+            }
+        }
         $thread = $this->threadId !== null ? $this->thread($this->threadId) : null;
         if ($current !== null && $thread !== null) {
             $this->reanchor($thread, $current['path']);
@@ -244,7 +272,8 @@ class ReviewPanel extends Component
             'running' => $workspace->status === WorkspaceStatus::Running,
             'error' => $error,
             'files' => $files,
-            'tree' => ReviewDiff::tree($files),
+            'tree' => ReviewDiff::tree(array_values(array_filter($files, fn (array $f): bool => ! $f['generated']))),
+            'generatedFiles' => array_values(array_filter($files, fn (array $f): bool => $f['generated'])),
             'current' => $current,
             'previous' => $index !== false && $index > 0 ? $files[$index - 1]['path'] : null,
             'next' => $index !== false && $index < count($files) - 1 ? $files[$index + 1]['path'] : null,
@@ -316,10 +345,70 @@ class ReviewPanel extends Component
             ->whereHas('thread', fn ($q) => $q->where('workspace_id', $this->workspaceId))->first();
     }
 
-    /** @return list<array<string, mixed>> */
+    /**
+     * The changed files (no diff text): path, status, counts, content hash.
+     *
+     * @return list<array{path: string, dir: string, name: string, status: string, additions: int, deletions: int, hash: string, generated: bool, binary: bool}>
+     */
     private function files(): array
     {
-        return ReviewDiff::files(app(WorkspaceDiffService::class)->forWorkspace($this->workspace())['files']);
+        return array_map(fn (array $f): array => [
+            'path' => $f['path'],
+            'dir' => str_contains($f['path'], '/') ? dirname($f['path']) : '',
+            'name' => basename($f['path']),
+            'status' => $f['status'],
+            'additions' => $f['additions'],
+            'deletions' => $f['deletions'],
+            'hash' => $f['hash'],
+            'generated' => $f['generated'],
+            'binary' => $f['binary'],
+        ], app(WorkspaceDiffService::class)->summary($this->workspace())['files']);
+    }
+
+    /**
+     * One file with its hunks (fetched and cached per content hash), cut to
+     * the shown line budget. Generated files only after "load anyway".
+     *
+     * @param  list<array<string, mixed>>|null  $files
+     * @return array<string, mixed>|null
+     */
+    private function detail(string $path, ?array $files = null): ?array
+    {
+        $row = collect($files ?? $this->files())->firstWhere('path', $path);
+        if ($row === null) {
+            return null;
+        }
+        if ($row['binary']) {
+            return [...$row, 'hunks' => [], 'skipped' => 'binary', 'hidden' => 0];
+        }
+        if ($row['generated'] && ! in_array($path, $this->loadGenerated, true)) {
+            return [...$row, 'hunks' => [], 'skipped' => 'generated', 'hidden' => 0];
+        }
+
+        $parsed = app(WorkspaceDiffService::class)->fileDiff($this->workspace(), $path, $row['hash']);
+        $hunks = $parsed !== null ? ReviewDiff::files([$parsed])[0]['hunks'] : [];
+
+        // Big diffs: render up to the budget, the rest on request.
+        $budget = $this->lineLimit[$path] ?? self::LINE_STEP;
+        $kept = [];
+        $hidden = 0;
+        foreach ($hunks as $hunk) {
+            $count = count($hunk['lines']);
+            if ($budget <= 0) {
+                $hidden += $count;
+
+                continue;
+            }
+            if ($count > $budget) {
+                $hidden += $count - $budget;
+                $hunk['lines'] = array_slice($hunk['lines'], 0, $budget);
+                $hunk['split'] = ReviewDiff::split($hunk['lines']);
+            }
+            $budget -= count($hunk['lines']);
+            $kept[] = $hunk;
+        }
+
+        return [...$row, 'hunks' => $kept, 'skipped' => null, 'hidden' => $hidden];
     }
 
     private function thread(string $id): ?Thread

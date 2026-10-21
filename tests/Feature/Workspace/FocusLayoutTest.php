@@ -144,10 +144,11 @@ class FocusLayoutTest extends TestCase
         $this->assertSame('open', ContextPanel::gateRows(null)[0]['state']);
 
         $files = ContextPanel::changedFiles([
-            ['from_path' => 'a.php', 'to_path' => 'a.php', 'is_new' => false, 'is_deleted' => false, 'additions' => 2, 'deletions' => 1],
-            ['from_path' => '', 'to_path' => 'b.php', 'is_new' => true, 'is_deleted' => false, 'additions' => 5, 'deletions' => 0],
-            ['from_path' => 'c.php', 'to_path' => '', 'is_new' => false, 'is_deleted' => true, 'additions' => 0, 'deletions' => 3],
+            ['path' => 'app/a.php', 'status' => 'M', 'additions' => 2, 'deletions' => 1],
+            ['path' => 'b.php', 'status' => 'A', 'additions' => 5, 'deletions' => 0],
+            ['path' => 'c.php', 'status' => 'D', 'additions' => 0, 'deletions' => 3],
         ]);
+        $this->assertSame('app', $files[0]['dir']);
         $this->assertSame(['M', 'A', 'D'], array_column($files, 'status'));
 
         Livewire::withoutLazyLoading()->actingAs($this->owner)

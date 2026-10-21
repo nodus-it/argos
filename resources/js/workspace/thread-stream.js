@@ -16,6 +16,7 @@ export function argosThreadStream(config) {
         refreshTimer: null,
         threadsTimer: null,
         pendingEdits: {},
+        changeTimer: null,
         lastWhisper: 0,
         dragging: false,
         commands: [],
@@ -57,6 +58,7 @@ export function argosThreadStream(config) {
                     this.trackEdit(event.data);
                 } else if (event.type === 'tool.result') {
                     this.announceEdit(event.data);
+                    this.announceWorkspaceChange();
                 }
             }
             if (payload.thread_id === '_workspace') {
@@ -134,6 +136,12 @@ export function argosThreadStream(config) {
             if (!data.is_error) {
                 window.dispatchEvent(new CustomEvent('argos-file-changed', { detail: edit }));
             }
+        },
+
+        /** Any tool may have touched files (Bash, composer …): sidebar and tray refresh. */
+        announceWorkspaceChange() {
+            clearTimeout(this.changeTimer);
+            this.changeTimer = setTimeout(() => window.dispatchEvent(new CustomEvent('argos-workspace-changed')), 2500);
         },
 
         announceThreads() {

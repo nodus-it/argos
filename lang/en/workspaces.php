@@ -52,6 +52,10 @@ return [
         'alias' => ':family (newest)',
     ],
     'focus' => [
+        'filter_files' => 'Filter files',
+        'show_all' => 'Show all :count files',
+        'show_less' => 'Show fewer',
+        'generated' => '{1} + :count generated file (:files)|[0,*] + :count generated files (:files)',
         'review_mode' => 'Review mode',
         'close_review' => 'Close review',
         'more' => 'More actions',
@@ -270,6 +274,11 @@ return [
         'closed' => 'closed',
     ],
     'review' => [
+        'generated_group' => '{1} Generated · :count|[0,*] Generated · :count',
+        'generated_hidden' => 'Generated file (lock file, build output) — its diff is hidden to keep the review fast.',
+        'load_anyway' => 'Load the diff anyway',
+        'binary' => 'Binary file — no text diff.',
+        'more_lines' => '{1} Show :count more line|[0,*] Show :count more lines',
         'fix_body' => ':gate reports: :message — please fix it.',
         'stale_hint' => 'Claude changed this line after your comment.',
         'send_anyway' => 'Send anyway',
