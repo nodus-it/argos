@@ -105,7 +105,7 @@ class WorkspaceGateService
     }
 
     /** Ask the agent to fix a failed gate, with the worker's fix prompt. */
-    public function sendFixToAgent(WorkspaceGateRun $run, Thread $thread, User $by, string $gate): void
+    public function sendFixToAgent(WorkspaceGateRun $run, Thread $thread, User $by, string $gate, bool $automated = false): void
     {
         Gate::forUser($by)->authorize('prompt', $thread);
         if ($thread->workspace_id !== $run->workspace_id || ! in_array($gate, $run->failedGates(), true)) {
@@ -121,7 +121,7 @@ class WorkspaceGateService
             throw WorkspaceException::translated('workspaces.gates.no_prompt');
         }
 
-        $this->threads->send($thread, $by, $prompt);
+        $this->threads->send($thread, $by, $prompt, automated: $automated);
     }
 
     /** "6/7" — for the ship dialog; null when no completed run exists. */

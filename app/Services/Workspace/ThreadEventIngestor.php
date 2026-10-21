@@ -97,6 +97,9 @@ class ThreadEventIngestor
         if ($changed) {
             $this->gates->announce($workspace);
         }
+        if (array_intersect(array_column($events, 'type'), ['gates.completed', 'gates.failed']) !== []) {
+            app(AutoThreadDriver::class)->onGatesFinished($workspace);
+        }
     }
 
     /**
@@ -139,6 +142,11 @@ class ThreadEventIngestor
         if ($outgoing !== []) {
             $this->publisher->publish($workspace->id, $threadId, $outgoing);
             $this->notify($workspace, $threadId, $outgoing);
+            // Resolved lazily: the driver depends on services that depend on this ingestor's peers.
+            $thread = Thread::query()->find($threadId);
+            if ($thread?->auto_state !== null) {
+                app(AutoThreadDriver::class)->onThreadEvents($thread, $outgoing);
+            }
         }
 
         return $ack;

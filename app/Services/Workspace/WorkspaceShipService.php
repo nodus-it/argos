@@ -85,7 +85,10 @@ class WorkspaceShipService
     /**
      * Commit, push and open/update the pull request. Returns the PR URL.
      */
-    public function ship(Workspace $workspace, User $by, string $subject, string $body, bool $draft = false): string
+    /**
+     * @param  bool  $pullRequest  false: commit and push only (auto-threads with ship mode `none`)
+     */
+    public function ship(Workspace $workspace, User $by, string $subject, string $body, bool $draft = false, bool $pullRequest = true): string
     {
         Gate::forUser($by)->authorize('ship', $workspace);
         $subject = trim($subject);
@@ -105,6 +108,12 @@ class WorkspaceShipService
                 'rejected_non_fast_forward' => 'workspaces.ship.rejected',
                 'auth' => 'workspaces.ship.auth',
             ]);
+        }
+
+        if (! $pullRequest) {
+            $workspace->forceFill(['shipped_at' => now()])->save();
+
+            return (string) $workspace->pr_url;
         }
 
         $profile = $workspace->repoProfile;

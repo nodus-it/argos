@@ -7,6 +7,7 @@ namespace App\Services\Workspace;
 use App\Enums\AgentName;
 use App\Enums\ApprovalKind;
 use App\Enums\ApprovalStatus;
+use App\Enums\AutoThreadState;
 use App\Enums\PermissionMode;
 use App\Enums\ThreadEventType;
 use App\Enums\ThreadStatus;
@@ -35,14 +36,21 @@ class ThreadService
         private readonly ThreadStreamPublisher $publisher,
     ) {}
 
-    public function create(Workspace $workspace, User $by, AgentCredential $agent, string $title, ?string $model = null, PermissionMode $mode = PermissionMode::Default): Thread
+    /**
+     * @param  bool  $automated  an auto-thread (AutoThreadDriver): it may run
+     *                           in bypass mode — it is isolated in the container
+     *                           and nobody is there to answer approvals
+     */
+    public function create(Workspace $workspace, User $by, AgentCredential $agent, string $title, ?string $model = null, PermissionMode $mode = PermissionMode::Default, bool $automated = false): Thread
     {
         Gate::forUser($by)->authorize('create', [Thread::class, $workspace]);
         Gate::forUser($by)->authorize('use', $agent);
         if ($agent->agent_name !== AgentName::ClaudeCode) {
             throw WorkspaceException::translated('workspaces.errors.agent_unavailable');
         }
-        $this->assertModeAllowed($workspace, $by, $mode);
+        if (! $automated) {
+            $this->assertModeAllowed($workspace, $by, $mode);
+        }
 
         $thread = new Thread;
         $thread->forceFill([
@@ -105,9 +113,14 @@ class ThreadService
      *
      * @param  list<array{media_type: string, data: string, path?: string}>  $images
      */
-    public function send(Thread $thread, User $author, string $text, array $images = []): ThreadEvent
+    public function send(Thread $thread, User $author, string $text, array $images = [], bool $automated = false): ThreadEvent
     {
         Gate::forUser($author)->authorize('prompt', $thread);
+
+        // A human writing into a running auto-thread takes over: automation pauses.
+        if (! $automated && $thread->auto_state?->isRunning() === true) {
+            $thread->forceFill(['auto_state' => AutoThreadState::Paused, 'auto_message' => __('workspaces.auto.paused_by', ['name' => $author->name])])->save();
+        }
 
         if (! $thread->session_open) {
             $this->open($thread);
@@ -121,7 +134,7 @@ class ThreadService
                 'text' => $text,
                 'author_name' => $author->name,
                 'images' => array_map(fn (array $image): array => ['media_type' => $image['media_type'], 'path' => $image['path'] ?? null], $images),
-            ],
+            ] + ($automated ? ['auto' => true] : []),
         ]);
 
         $payload = [
@@ -177,6 +190,18 @@ class ThreadService
             $this->callDaemon(fn () => $this->daemon->for($thread->workspace)->setPermissionMode($thread->id, $mode->value));
         }
         $this->notice($thread, 'permission_mode', $by, ['mode' => $mode->value]);
+    }
+
+    /**
+     * Switch the mode for an auto-thread (AutoThreadDriver) — no policy or
+     * owner check: the driver acts for the thread's creator.
+     */
+    public function applyAutomatedMode(Thread $thread, PermissionMode $mode): void
+    {
+        $thread->forceFill(['permission_mode' => $mode])->save();
+        if ($thread->session_open) {
+            $this->callDaemon(fn () => $this->daemon->for($thread->workspace)->setPermissionMode($thread->id, $mode->value));
+        }
     }
 
     public function setModel(Thread $thread, User $by, string $model): void

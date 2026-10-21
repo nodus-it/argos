@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Testing;
 
+use App\Enums\ApprovalKind;
+use App\Enums\PermissionMode;
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
 use App\Integrations\WorkspaceDaemon\WorkspaceDaemonTransport;
 use App\Models\Thread;
+use App\Models\ThreadApproval;
 use App\Models\ThreadCheckpoint;
 use App\Models\Workspace;
 use App\Services\Workspace\ThreadEventIngestor;
@@ -67,7 +70,14 @@ class FakeWorkspaceDaemon extends WorkspaceDaemonClient implements WorkspaceDaem
             ['status', ['state' => 'running']],
         ];
 
-        if (str_contains(Str::lower($text), 'edit')) {
+        // value() returns the cast enum, not the raw string.
+        $mode = Thread::query()->whereKey($threadId)->value('permission_mode');
+        if ($mode === PermissionMode::Plan || $mode === 'plan') {
+            // Plan mode: Claude presents a plan for approval (ExitPlanMode).
+            $events[] = ['assistant.message', ['message_id' => 'm-'.Str::random(6), 'text' => 'I looked at the code and have a plan.']];
+            $events[] = ['approval.requested', $this->planApproval()];
+            $events[] = ['status', ['state' => 'waiting_input']];
+        } elseif (str_contains(Str::lower($text), 'edit')) {
             $events[] = ['assistant.message', ['message_id' => 'm-'.Str::random(6), 'text' => "I'll change README.md for {$author}."]];
             $events[] = ['approval.requested', [
                 'approval_id' => (string) Str::ulid(),
@@ -102,6 +112,34 @@ class FakeWorkspaceDaemon extends WorkspaceDaemonClient implements WorkspaceDaem
     public function resolveApproval(string $threadId, string $approvalId, array $payload): void
     {
         $allowed = ($payload['decision'] ?? '') === 'allow';
+        $kind = ThreadApproval::query()->whereKey($approvalId)->value('kind');
+        $kind = $kind instanceof ApprovalKind ? $kind->value : $kind;
+        if ($kind === 'plan') {
+            // Accepted: the plan gets implemented. Rejected: a revised plan.
+            $this->emit($threadId, $allowed ? [
+                ['status', ['state' => 'running']],
+                ['assistant.message', ['message_id' => 'm-'.Str::random(6), 'text' => 'Implemented the plan; tests pass.']],
+                ['turn.completed', ['session_cost_usd' => 0.03, 'duration_ms' => 1500, 'num_turns' => 2]],
+                ['status', ['state' => 'idle']],
+            ] : [
+                ['status', ['state' => 'running']],
+                ['assistant.message', ['message_id' => 'm-'.Str::random(6), 'text' => 'Revised the plan: '.($payload['message'] ?? '')]],
+                ['approval.requested', $this->planApproval()],
+                ['status', ['state' => 'waiting_input']],
+            ]);
+
+            return;
+        }
+        if ($kind === 'question') {
+            $this->emit($threadId, [
+                ['status', ['state' => 'running']],
+                ['assistant.message', ['message_id' => 'm-'.Str::random(6), 'text' => 'I will assume the default and continue.']],
+                ['turn.completed', ['session_cost_usd' => 0.01, 'duration_ms' => 800, 'num_turns' => 1]],
+                ['status', ['state' => 'idle']],
+            ]);
+
+            return;
+        }
         $this->emit($threadId, [
             ['status', ['state' => 'running']],
             ['tool.started', ['tool_use_id' => 'toolu_fake', 'name' => 'Edit', 'input' => ['file_path' => '/workspace/README.md']]],
@@ -113,6 +151,18 @@ class FakeWorkspaceDaemon extends WorkspaceDaemonClient implements WorkspaceDaem
     }
 
     public function setPermissionMode(string $threadId, string $mode): void {}
+
+    /** @return array<string, mixed> */
+    private function planApproval(): array
+    {
+        return [
+            'approval_id' => (string) Str::ulid(),
+            'tool_use_id' => 'toolu_plan',
+            'kind' => 'plan',
+            'tool_name' => 'ExitPlanMode',
+            'input' => ['plan' => "1. Add the field\n2. Cover it with a test"],
+        ];
+    }
 
     public function setModel(string $threadId, string $model): void {}
 
@@ -140,7 +190,10 @@ class FakeWorkspaceDaemon extends WorkspaceDaemonClient implements WorkspaceDaem
         return array_values(array_slice(array_filter($all, fn (string $f): bool => $query === '' || str_contains(strtolower($f), strtolower($query))), 0, $limit));
     }
 
-    /** Gates: pint passes, pest fails with one test — enough to drive the fix flow. */
+    /** What the next gate runs report: `fail` (pest red) or `pass`. */
+    public static string $gateOutcome = 'fail';
+
+    /** Gates: pint passes, pest fails with one test (or passes) — enough to drive the fix flow. */
     public function runGates(string $runId): void
     {
         if ($this->workspace === null) {
@@ -152,7 +205,7 @@ class FakeWorkspaceDaemon extends WorkspaceDaemonClient implements WorkspaceDaem
             ['thread_id' => null, 'seq' => 2, 'type' => 'gates.completed', 'data' => [
                 'run_id' => $runId,
                 'baseline' => 'ready',
-                'gates' => ['artisan' => 'pass', 'pint' => 'pass', 'pest' => 'fail', 'phpstan' => 'skip'],
+                'gates' => ['artisan' => 'pass', 'pint' => 'pass', 'pest' => self::$gateOutcome === 'pass' ? 'pass' : 'fail', 'phpstan' => 'skip'],
                 'logs' => ['artisan' => '', 'pint' => "PASS\n", 'pest' => "FAILED  Tests\\Feature\\LoginTest > redirects home\n"],
             ]],
         ]);

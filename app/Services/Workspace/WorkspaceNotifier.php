@@ -26,7 +26,7 @@ use Throwable;
 class WorkspaceNotifier
 {
     /** Kinds that also persist in the bell. */
-    private const BELL_KINDS = ['approval', 'limit', 'error', 'ship'];
+    private const BELL_KINDS = ['approval', 'limit', 'error', 'ship', 'auto'];
 
     public function notify(Workspace $workspace, ?Thread $thread, string $kind, string $title, string $body = '', ?int $exceptUserId = null): void
     {

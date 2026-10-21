@@ -5,6 +5,35 @@ declare(strict_types=1);
 return [
     'label' => 'Workspace',
     'plural' => 'Workspaces',
+    'auto' => [
+        'paused_by' => ':name took over — automation is paused.',
+        'no_plan_waiting' => 'No plan is waiting for approval.',
+        'plan_rejected_default' => 'Please rethink the plan.',
+        'workspace_unavailable' => 'The workspace is not available.',
+        'queue_timeout' => 'The workspace or an agent did not become available in time.',
+        'no_actor' => 'The user who started this run no longer exists.',
+        'usage_limit' => 'The agent hit its usage limit; the run continues :time.',
+        'pr_gates_ok' => 'Quality gates: :summary green.',
+        'pr_gates_failed' => 'Quality gates: :summary green — still failing: :gates.',
+        'prompts' => [
+            'plan_first' => "You work autonomously in this workspace — nobody watches live and nobody answers questions. First explore the code and present a plan (ExitPlanMode). Once it is accepted, implement it completely and run the tests. Do not push; Argos commits and opens the pull request when you are done.\n\nTask:\n:prompt",
+            'implement' => "You work autonomously in this workspace — nobody watches live and nobody answers questions. Implement the task completely and run the tests. Do not push; Argos commits and opens the pull request when you are done.\n\nTask:\n:prompt",
+            'continue' => 'The usage limit is lifted. Please continue where you stopped.',
+            'decide_yourself' => 'This run is automatic — nobody will answer. Decide yourself, state your assumption in one sentence, and continue.',
+        ],
+        'budget' => [
+            'turns' => 'Turn budget used up (:max turns).',
+            'cost' => 'Cost budget used up (:max USD).',
+            'time' => 'Time budget used up (:max minutes).',
+        ],
+        'notifications' => [
+            'plan' => 'A plan waits for your approval',
+            'limit' => 'An automatic run waits for the usage limit',
+            'done' => 'An automatic run is done',
+            'failed' => 'An automatic run failed',
+            'budget_exceeded' => 'An automatic run hit its budget',
+        ],
+    ],
     'models' => [
         'alias' => ':family (newest)',
     ],
@@ -169,6 +198,7 @@ return [
         'kind_turn' => 'Claude finished a longer turn',
         'kind_limit' => 'A subscription hit its usage limit',
         'kind_error' => 'Errors',
+        'kind_auto' => 'Automatic runs: plan waits, done, failed',
         'kind_ship' => 'Someone shipped a workspace',
         'browser' => 'Browser notifications',
         'browser_enable' => 'Allow browser notifications',

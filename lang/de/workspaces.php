@@ -5,6 +5,35 @@ declare(strict_types=1);
 return [
     'label' => 'Workspace',
     'plural' => 'Workspaces',
+    'auto' => [
+        'paused_by' => ':name hat übernommen — die Automatik ist pausiert.',
+        'no_plan_waiting' => 'Es wartet kein Plan auf Freigabe.',
+        'plan_rejected_default' => 'Bitte überdenke den Plan.',
+        'workspace_unavailable' => 'Der Workspace ist nicht verfügbar.',
+        'queue_timeout' => 'Workspace oder Agent wurden nicht rechtzeitig verfügbar.',
+        'no_actor' => 'Die Person, die diesen Lauf gestartet hat, gibt es nicht mehr.',
+        'usage_limit' => 'Der Agent hat sein Nutzungslimit erreicht; der Lauf geht :time weiter.',
+        'pr_gates_ok' => 'Quality-Gates: :summary grün.',
+        'pr_gates_failed' => 'Quality-Gates: :summary grün — weiterhin rot: :gates.',
+        'prompts' => [
+            'plan_first' => "Du arbeitest selbstständig in diesem Workspace — niemand schaut live zu und niemand beantwortet Fragen. Sieh dir zuerst den Code an und lege einen Plan vor (ExitPlanMode). Sobald er angenommen ist, setze ihn vollständig um und führe die Tests aus. Pushe nicht; Argos committet und öffnet den Pull Request, wenn du fertig bist.\n\nAufgabe:\n:prompt",
+            'implement' => "Du arbeitest selbstständig in diesem Workspace — niemand schaut live zu und niemand beantwortet Fragen. Setze die Aufgabe vollständig um und führe die Tests aus. Pushe nicht; Argos committet und öffnet den Pull Request, wenn du fertig bist.\n\nAufgabe:\n:prompt",
+            'continue' => 'Das Nutzungslimit ist aufgehoben. Bitte mach dort weiter, wo du aufgehört hast.',
+            'decide_yourself' => 'Dieser Lauf ist automatisch — niemand wird antworten. Entscheide selbst, nenne deine Annahme in einem Satz und mach weiter.',
+        ],
+        'budget' => [
+            'turns' => 'Turn-Budget aufgebraucht (:max Turns).',
+            'cost' => 'Kosten-Budget aufgebraucht (:max USD).',
+            'time' => 'Zeit-Budget aufgebraucht (:max Minuten).',
+        ],
+        'notifications' => [
+            'plan' => 'Ein Plan wartet auf deine Freigabe',
+            'limit' => 'Ein automatischer Lauf wartet auf das Nutzungslimit',
+            'done' => 'Ein automatischer Lauf ist fertig',
+            'failed' => 'Ein automatischer Lauf ist fehlgeschlagen',
+            'budget_exceeded' => 'Ein automatischer Lauf hat sein Budget erreicht',
+        ],
+    ],
     'models' => [
         'alias' => ':family (neuestes)',
     ],
@@ -169,6 +198,7 @@ return [
         'kind_turn' => 'Claude hat einen längeren Turn beendet',
         'kind_limit' => 'Ein Abo hat sein Nutzungslimit erreicht',
         'kind_error' => 'Fehler',
+        'kind_auto' => 'Automatische Läufe: Plan wartet, fertig, fehlgeschlagen',
         'kind_ship' => 'Jemand hat einen Workspace ausgeliefert',
         'browser' => 'Browser-Benachrichtigungen',
         'browser_enable' => 'Browser-Benachrichtigungen erlauben',
