@@ -25,7 +25,7 @@
                     @endif
                 </span>
                 @if ($canEdit && $running)
-                    <a class="wf-btn wf-btn-sm wf-btn-soft" href="{{ route('workspaces.open', ['workspace' => $workspace, 'target' => 'code']) }}" target="argos-code-{{ $workspace->slug }}">{{ __('workspaces.tabs.open') }}</a>
+                    <a class="wf-btn wf-btn-sm wf-btn-soft" href="{{ route('workspaces.open', ['workspace' => $workspace, 'target' => 'code'] + ($task !== null ? ['task' => $task->id] : [])) }}" target="argos-code-{{ $workspace->slug }}">{{ __('workspaces.tabs.open') }}</a>
                 @endif
             </div>
         </div>

@@ -29,6 +29,7 @@ use App\Services\Workspace\TaskAccess;
 use App\Services\Workspace\TaskAttachmentService;
 use App\Services\Workspace\TaskCheckpointService;
 use App\Services\Workspace\TaskReadService;
+use App\Services\Workspace\TaskPreparer;
 use App\Services\Workspace\TaskService;
 use App\Services\Workspace\WorkspaceDaemonClient;
 use App\Services\Workspace\WorkspaceException;
@@ -197,6 +198,15 @@ class TaskChat extends Component
         });
     }
 
+    /** "Try again" on a failed preparation. */
+    public function retryPreparation(): void
+    {
+        $task = $this->activeTask();
+        if ($task !== null) {
+            $this->attempt(fn () => app(TaskPreparer::class)->retry($task, $this->user()));
+        }
+    }
+
     public function send(): void
     {
         $text = trim($this->draft);
@@ -275,8 +285,12 @@ class TaskChat extends Component
      */
     public function searchFiles(string $query): array
     {
+        $task = $this->activeTask();
+        if ($task === null) {
+            return [];
+        }
         try {
-            return app(WorkspaceDaemonClient::class)->for($this->workspace(), 5)->files(mb_substr($query, 0, 200), 15);
+            return app(WorkspaceDaemonClient::class)->for($this->workspace(), 5)->files($task->slug, mb_substr($query, 0, 200), 15);
         } catch (DaemonTransportException) {
             return [];
         }

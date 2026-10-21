@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -8,6 +8,8 @@ import { TaskSession, type TaskStartParams } from '../src/taskSession.js';
 import { assistantText, fakeFactory, streamDelta, textOfUserMessage, waitFor, type Script } from './fakeQuery.js';
 
 const params: TaskStartParams = {
+    cwd: '/workspace/tasks/fix-login',
+    guard: 'ask',
     agentId: 'agent_1',
     oauthToken: 'sk-ant-oat-secret',
     model: 'claude-sonnet-5-5',
@@ -33,7 +35,7 @@ describe('TaskSession', () => {
     const make = (script: Script, overrides: Partial<TaskStartParams> = {}, configure?: Parameters<typeof fakeFactory>[1]) => {
         const { factory, queries } = fakeFactory(script, configure);
         const approvals = new ApprovalRegistry();
-        const session = new TaskSession('task_1', { ...params, ...overrides }, (e) => events.push(e), approvals, factory, {
+        const session = new TaskSession('task_1', { ...params, cwd: join(dir, 'tasks', 'fix-login'), ...overrides }, (e) => events.push(e), approvals, factory, {
             workspaceDir: dir,
             agentsDir: join(dir, 'agents'),
             baseEnv: { PATH: '/usr/bin', ARGOS_DAEMON_TOKEN: 'daemon-secret', ANTHROPIC_API_KEY: 'sk-api', HOME: '/home/agent' },
@@ -60,6 +62,7 @@ describe('TaskSession', () => {
         expect(options.settingSources).toEqual(['project', 'local']);
         expect(options.systemPrompt).toEqual({ type: 'preset', preset: 'claude_code', append: 'Several humans may write in this task.' });
         expect(options.resume).toBeUndefined();
+        expect(options.cwd).toBe(join(dir, 'tasks', 'fix-login'));
 
         expect(ofType('session.started')[0]!.data).toMatchObject({
             claude_session_id: 'session-1',
@@ -347,5 +350,49 @@ describe('TaskSession', () => {
         expect(types().at(-1)).toBe('status');
         expect(session.currentState).toBe('closed');
         expect(ofType('error')).toHaveLength(0);
+    });
+    it('guards file tools outside the worktree with a PreToolUse hook', async () => {
+        const preToolUse = async (overrides: Partial<TaskStartParams>, toolName: string, toolInput: Record<string, unknown>) => {
+            // Not under /tmp: that is always allowed.
+            const { session, queries } = make(echo, { cwd: '/workspace/tasks/fix-login', ...overrides });
+            session.start();
+            await waitFor(() => ofType('session.started').length >= 1);
+            const matchers = queries.at(-1)!.options.hooks?.PreToolUse;
+            expect(matchers).toHaveLength(1);
+            const hook = matchers![0]!.hooks[0]!;
+            const output = await hook(
+                { hook_event_name: 'PreToolUse', tool_name: toolName, tool_input: toolInput, tool_use_id: 'toolu_1', session_id: 's', transcript_path: '/t', cwd: '/' } as never,
+                'toolu_1',
+                { signal: new AbortController().signal },
+            );
+            await session.stop();
+
+            return output as { hookSpecificOutput?: { hookEventName: string; permissionDecision: string; permissionDecisionReason: string } };
+        };
+        expect(await preToolUse({}, 'Edit', { file_path: '/workspace/tasks/fix-login/app/User.php' })).toEqual({});
+        expect(await preToolUse({}, 'Bash', { command: 'cat /etc/passwd' })).toEqual({});
+
+        const asked = await preToolUse({}, 'Write', { file_path: '/workspace/tasks/other/x.php' });
+        expect(asked.hookSpecificOutput).toMatchObject({ hookEventName: 'PreToolUse', permissionDecision: 'ask' });
+        expect(asked.hookSpecificOutput!.permissionDecisionReason).toContain('/workspace/tasks/other/x.php');
+
+        const denied = await preToolUse({ guard: 'deny' }, 'Read', { file_path: '../other/.env' });
+        expect(denied.hookSpecificOutput).toMatchObject({ permissionDecision: 'deny' });
+    });
+    it('lets the task env override the container env for Claude', async () => {
+        const cwd = join(dir, 'tasks', 'fix-login');
+        mkdirSync(join(cwd, '.agent'), { recursive: true });
+        writeFileSync(join(cwd, '.agent', 'task-env.json'), JSON.stringify({ DB_DATABASE: 'task_fix_login', HOME: '/home/task', APP_ENV: 'task' }));
+        const { session, queries } = make(echo);
+        session.start();
+        await waitFor(() => ofType('session.started').length === 1);
+
+        const env = queries[0]!.options.env!;
+        expect(env.DB_DATABASE).toBe('task_fix_login');
+        expect(env.APP_ENV).toBe('task');
+        // Process basics stay the container's.
+        expect(env.HOME).toBe('/home/agent');
+        expect(env.CLAUDE_CODE_OAUTH_TOKEN).toBe('sk-ant-oat-secret');
+        await session.stop();
     });
 });

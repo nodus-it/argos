@@ -18,6 +18,8 @@ use App\Integrations\WorkspaceDaemon\Requests\GitStatus;
 use App\Integrations\WorkspaceDaemon\Requests\InitWorkspace;
 use App\Integrations\WorkspaceDaemon\Requests\InterruptTask;
 use App\Integrations\WorkspaceDaemon\Requests\ListFiles;
+use App\Integrations\WorkspaceDaemon\Requests\PrepareWorktree;
+use App\Integrations\WorkspaceDaemon\Requests\RemoveWorktree;
 use App\Integrations\WorkspaceDaemon\Requests\ResolveApproval;
 use App\Integrations\WorkspaceDaemon\Requests\RestoreCheckpoint;
 use App\Integrations\WorkspaceDaemon\Requests\RunGates;
@@ -106,15 +108,25 @@ class WorkspaceDaemonApi implements WorkspaceDaemonTransport
         $this->call(new StopTask($taskId));
     }
 
-    public function gitStatus(): array
+    public function prepareWorktree(string $worktree, array $payload): void
     {
-        /** @var array{branch: string|null, upstream: string|null, ahead: int, behind: int, dirty: bool, files: list<array{path: string, status: string}>} */
-        return $this->call(new GitStatus) + ['branch' => null, 'upstream' => null, 'ahead' => 0, 'behind' => 0, 'dirty' => false, 'files' => []];
+        $this->call(new PrepareWorktree($worktree, $payload));
     }
 
-    public function gitDiff(string $base, ?string $path = null): array
+    public function removeWorktree(string $worktree): void
     {
-        $result = $this->call(new GitDiff($base, $path));
+        $this->call(new RemoveWorktree($worktree));
+    }
+
+    public function gitStatus(string $worktree): array
+    {
+        /** @var array{branch: string|null, upstream: string|null, ahead: int, behind: int, dirty: bool, files: list<array{path: string, status: string}>} */
+        return $this->call(new GitStatus($worktree)) + ['branch' => null, 'upstream' => null, 'ahead' => 0, 'behind' => 0, 'dirty' => false, 'files' => []];
+    }
+
+    public function gitDiff(string $worktree, string $base, ?string $path = null): array
+    {
+        $result = $this->call(new GitDiff($worktree, $base, $path));
 
         return ['diff' => (string) ($result['diff'] ?? ''), 'truncated' => (bool) ($result['truncated'] ?? false)];
     }
@@ -124,10 +136,10 @@ class WorkspaceDaemonApi implements WorkspaceDaemonTransport
         $this->call(new GitFetch);
     }
 
-    public function gitCommit(string $subject, string $body, array $author): ?array
+    public function gitCommit(string $worktree, string $subject, string $body, array $author): ?array
     {
         try {
-            $result = $this->call(new GitCommit(['subject' => $subject, 'body' => $body, 'author' => $author]));
+            $result = $this->call(new GitCommit($worktree, ['subject' => $subject, 'body' => $body, 'author' => $author]));
         } catch (DaemonTransportException $e) {
             if ($e->errorCode === 'no_changes') {
                 return null;
@@ -138,9 +150,9 @@ class WorkspaceDaemonApi implements WorkspaceDaemonTransport
         return ['sha' => (string) ($result['sha'] ?? '')];
     }
 
-    public function gitPush(string $branch): void
+    public function gitPush(string $worktree, string $branch): void
     {
-        $this->call(new GitPush(['branch' => $branch]));
+        $this->call(new GitPush($worktree, ['branch' => $branch]));
     }
 
     public function oneshot(array $payload): array
@@ -150,16 +162,16 @@ class WorkspaceDaemonApi implements WorkspaceDaemonTransport
         return ['text' => (string) ($result['text'] ?? ''), 'structured' => $result['structured'] ?? null, 'cost_usd' => $result['cost_usd'] ?? 0];
     }
 
-    public function files(string $query, int $limit = 20): array
+    public function files(string $worktree, string $query, int $limit = 20): array
     {
-        $files = $this->call(new ListFiles($query, $limit))['files'] ?? [];
+        $files = $this->call(new ListFiles($worktree, $query, $limit))['files'] ?? [];
 
         return array_values(array_filter(is_array($files) ? $files : [], 'is_string'));
     }
 
-    public function gitChanges(string $base): array
+    public function gitChanges(string $worktree, string $base): array
     {
-        $files = $this->call(new GitChanges($base))['files'] ?? [];
+        $files = $this->call(new GitChanges($worktree, $base))['files'] ?? [];
 
         return array_values(array_map(fn (array $f): array => [
             'path' => (string) ($f['path'] ?? ''),
@@ -173,38 +185,38 @@ class WorkspaceDaemonApi implements WorkspaceDaemonTransport
         ], array_filter(is_array($files) ? $files : [], 'is_array')));
     }
 
-    public function fileContent(string $path): array
+    public function fileContent(string $worktree, string $path): array
     {
-        $data = $this->call(new GetFileContent($path));
+        $data = $this->call(new GetFileContent($worktree, $path));
 
         return ['content' => (string) ($data['content'] ?? ''), 'truncated' => (bool) ($data['truncated'] ?? false)];
     }
 
-    public function runGates(string $runId): void
+    public function runGates(string $worktree, string $runId, ?string $baseCommit): void
     {
-        $this->call(new RunGates(['run_id' => $runId]));
+        $this->call(new RunGates($worktree, ['run_id' => $runId, 'base_commit' => $baseCommit]));
     }
 
-    public function gateFixPrompt(string $gate, string $runId): string
+    public function gateFixPrompt(string $worktree, string $gate, string $runId): string
     {
-        return (string) ($this->call(new GetGateFixPrompt($gate, $runId))['prompt'] ?? '');
+        return (string) ($this->call(new GetGateFixPrompt($worktree, $gate, $runId))['prompt'] ?? '');
     }
 
-    public function createCheckpoint(string $taskId, string $label): array
+    public function createCheckpoint(string $worktree, string $taskId, string $label): array
     {
-        return self::checkpoint($this->call(new CreateCheckpoint(['task_id' => $taskId, 'label' => $label])));
+        return self::checkpoint($this->call(new CreateCheckpoint($worktree, ['task_id' => $taskId, 'label' => $label])));
     }
 
-    public function checkpointDiff(string $ref): array
+    public function checkpointDiff(string $worktree, string $ref): array
     {
-        $result = $this->call(new GetCheckpointDiff($ref));
+        $result = $this->call(new GetCheckpointDiff($worktree, $ref));
 
         return ['diff' => (string) ($result['diff'] ?? ''), 'truncated' => (bool) ($result['truncated'] ?? false), 'head' => is_string($result['head'] ?? null) ? $result['head'] : null];
     }
 
-    public function restoreCheckpoint(string $ref): array
+    public function restoreCheckpoint(string $worktree, string $ref): array
     {
-        $result = $this->call(new RestoreCheckpoint(['ref' => $ref]));
+        $result = $this->call(new RestoreCheckpoint($worktree, ['ref' => $ref]));
         $removed = is_array($result['removed'] ?? null) ? $result['removed'] : [];
 
         return [

@@ -173,7 +173,7 @@ class AutoTaskDriverTest extends TestCase
     {
         Queue::fake();
         $task = $this->start(['plan' => 'off']);
-        $task->forceFill(['auto_state' => AutoTaskState::Implementing])->save();
+        $task->forceFill(['status' => TaskStatus::Active, 'auto_state' => AutoTaskState::Implementing])->save();
         app(TaskService::class)->open($task);
 
         app(TaskService::class)->send($task, $this->owner, 'Also add a test for the default');
@@ -202,7 +202,7 @@ class AutoTaskDriverTest extends TestCase
         $this->workspace->forceFill(['status' => WorkspaceStatus::Starting])->save();
         $task = $this->start(['plan' => 'off']);
         $this->workspace->forceFill(['status' => WorkspaceStatus::Running])->save();
-        $task->forceFill(['auto_state' => AutoTaskState::Implementing])->save();
+        $task->forceFill(['status' => TaskStatus::Active, 'auto_state' => AutoTaskState::Implementing])->save();
         app(TaskService::class)->open($task);
 
         app(TaskEventIngestor::class)->ingest($this->workspace, [[

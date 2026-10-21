@@ -35,21 +35,23 @@ describe('initWorkspace', () => {
     });
     afterEach(() => rmSync(root, { recursive: true, force: true }));
 
-    const params = (branch: string) => ({ repoUrl: remote, baseBranch: 'main', branch, gitUserName: 'Ada', gitUserEmail: 'ada@example.com' });
+    const params = (baseBranch = 'main') => ({ repoUrl: remote, baseBranch, gitUserName: 'Ada', gitUserEmail: 'ada@example.com' });
 
-    it('clones, creates the branch from base and configures identity and helper', async () => {
+    it('clones, checks out the base branch detached and configures identity and helper', async () => {
         const dir = join(root, 'ws');
         mkdirSync(dir);
-        expect(await initWorkspace(dir, params('ws/new'), helper)).toBe('ready');
-        expect(run(['rev-parse', '--abbrev-ref', 'HEAD'], dir).trim()).toBe('ws/new');
+        expect(await initWorkspace(dir, params(), helper)).toBe('ready');
+        expect(run(['rev-parse', '--abbrev-ref', 'HEAD'], dir).trim()).toBe('HEAD');
+        expect(run(['rev-parse', 'HEAD'], dir).trim()).toBe(run(['rev-parse', 'origin/main'], dir).trim());
         expect(existsSync(join(dir, 'README.md'))).toBe(true);
+        expect(existsSync(join(dir, 'feature.txt'))).toBe(false);
         expect(run(['config', 'user.email'], dir).trim()).toBe('ada@example.com');
         expect(run(['config', '--get-all', 'credential.helper'], dir).trim()).toBe(helper);
         expect(readFileSync(join(dir, '.git', 'info', 'exclude'), 'utf8')).toContain('.agent/\n');
-        expect(await initWorkspace(dir, params('ws/new'), helper)).toBe('already_initialized');
+        expect(await initWorkspace(dir, params(), helper)).toBe('already_initialized');
     });
 
-    it('checks out an existing remote branch', async () => {
+    it('can use another branch as the base', async () => {
         const dir = join(root, 'ws2');
         await initWorkspace(dir, params('ws/existing'), helper);
         expect(existsSync(join(dir, 'feature.txt'))).toBe(true);
@@ -57,14 +59,14 @@ describe('initWorkspace', () => {
 
     it('classifies a missing base branch', async () => {
         const dir = join(root, 'ws3');
-        await expect(initWorkspace(dir, { ...params('ws/x'), baseBranch: 'nope' }, helper)).rejects.toMatchObject({ code: 'branch_not_found' });
+        await expect(initWorkspace(dir, params('nope'), helper)).rejects.toMatchObject({ code: 'branch_not_found' });
     });
 
     it('refuses a non-empty directory that is not a checkout', async () => {
         const dir = join(root, 'ws4');
         mkdirSync(dir);
         writeFileSync(join(dir, 'stray'), '');
-        await expect(initWorkspace(dir, params('ws/x'), helper)).rejects.toBeInstanceOf(WorkspaceInitError);
+        await expect(initWorkspace(dir, params(), helper)).rejects.toBeInstanceOf(WorkspaceInitError);
     });
 
     it('adds exclude patterns only once', () => {
@@ -85,5 +87,21 @@ describe('classifyGitError', () => {
         ['fatal: unable to access: Could not resolve host: github.com', 'network'],
     ])('%s → %s', (stderr, expected) => {
         expect(classifyGitError(stderr)).toBe(expected);
+    });
+});
+
+describe('initWorkspace with a missing base branch', () => {
+    it('leaves no half-initialised clone behind', async () => {
+        const { mkdtempSync, rmSync, existsSync } = await import('node:fs');
+        const { tmpdir } = await import('node:os');
+        const { join } = await import('node:path');
+        const { execFileSync } = await import('node:child_process');
+        const root = mkdtempSync(join(tmpdir(), 'argos-init-missing-'));
+        const remote = join(root, 'remote.git');
+        execFileSync('git', ['init', '--bare', '-b', 'main', remote], { env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null' } });
+        const dir = join(root, 'repo');
+        await expect(initWorkspace(dir, { repoUrl: remote, baseBranch: 'develop', gitUserName: 'A', gitUserEmail: 'a@a' }, '/bin/true')).rejects.toMatchObject({ code: 'branch_not_found' });
+        expect(existsSync(join(dir, '.git'))).toBe(false);
+        rmSync(root, { recursive: true, force: true });
     });
 });

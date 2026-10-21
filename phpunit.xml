@@ -29,6 +29,7 @@
         <env name="APP_KEY" value="base64:zTobRxr7TepBXVjM/E3kjKGAwnxWQ7QWMMXaInQYKKg=" force="true"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file" force="true"/>
         <env name="BCRYPT_ROUNDS" value="4" force="true"/>
+        <env name="QUEUE_CONNECTION" value="sync" force="true"/>
         <!--
             DB connection is not forced so CI can override it via process env
             (DB_CONNECTION=mariadb + ARGOS_DB_* against a service container).

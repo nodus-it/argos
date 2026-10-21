@@ -27,18 +27,15 @@ class WorkspaceOpenController extends Controller
         // The editor is a shell into the container: readers get the preview only.
         abort_if($target === 'code' && ! $user->can('editor', $workspace), 403);
 
+        $task = $request->filled('task') ? Task::query()->where('workspace_id', $workspace->id)->find((string) $request->query('task')) : null;
         if ($target === 'code') {
+            // The editor opens the task's own folder (or the main clone).
             $host = TraefikRouter::codeKey($workspace->slug);
+            $folder = $task !== null ? '/workspace/tasks/'.$task->slug : '/workspace/repo';
+            $url = $router->urlForSlug($host).'/?folder='.rawurlencode($folder).'&';
         } else {
-            $task = Task::query()->where('workspace_id', $workspace->id)->find((string) $request->query('task'));
             abort_if($task === null, 404);
-            $host = $task->demoSlug();
-        }
-        $url = $router->urlForSlug($host).'/';
-        if ($target === 'code') {
-            $url .= '?folder=/workspace&';
-        } else {
-            $url .= '?';
+            $url = $router->urlForSlug($task->demoSlug()).'/?';
         }
 
         return redirect()->away($url.WorkspaceAccessTokens::TICKET_PARAM.'='.urlencode($tokens->ticket($workspace, $user)));

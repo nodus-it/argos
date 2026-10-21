@@ -7,16 +7,16 @@ namespace App\Integrations\WorkspaceDaemon\Requests;
 use Saloon\Enums\Method;
 use Saloon\Http\Request;
 
-/** GET /files/content?path= — a working-tree file for the review (expanding unchanged lines). */
+/** GET /worktrees/{slug}/files/content?path= — a working-tree file for the review (expanding unchanged lines). */
 class GetFileContent extends Request
 {
     protected Method $method = Method::GET;
 
-    public function __construct(private readonly string $path) {}
+    public function __construct(private readonly string $worktree, private readonly string $path) {}
 
     public function resolveEndpoint(): string
     {
-        return '/files/content';
+        return '/worktrees/'.rawurlencode($this->worktree).'/files/content';
     }
 
     /**

@@ -35,7 +35,7 @@ class ReanchorReviewCommentsJob implements ShouldQueue
         $contents = [];
         foreach ($comments->anchoredPaths($task) as $path) {
             try {
-                $contents[$path] = $api->fileContent($path)['content'];
+                $contents[$path] = $api->fileContent($task->slug, $path)['content'];
             } catch (DaemonTransportException $e) {
                 if ($e->errorCode === 'not_found') {
                     // The file is gone: its comments can no longer match.

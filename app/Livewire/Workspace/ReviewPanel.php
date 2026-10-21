@@ -133,8 +133,12 @@ class ReviewPanel extends Component
             return;
         }
 
+        $task = $this->currentTask();
+        if ($task === null) {
+            return;
+        }
         try {
-            $content = app(WorkspaceDaemonClient::class)->for($this->workspace(), 15)->fileContent($path)['content'];
+            $content = app(WorkspaceDaemonClient::class)->for($this->workspace(), 15)->fileContent($task->slug, $path)['content'];
         } catch (DaemonTransportException) {
             return;
         }
@@ -199,7 +203,7 @@ class ReviewPanel extends Component
             return;
         }
         try {
-            $content = app(WorkspaceDaemonClient::class)->for($this->workspace(), 15)->fileContent($comment->path)['content'];
+            $content = app(WorkspaceDaemonClient::class)->for($this->workspace(), 15)->fileContent($comment->task->slug, $comment->path)['content'];
         } catch (DaemonTransportException) {
             return;
         }
@@ -332,7 +336,7 @@ class ReviewPanel extends Component
             return;
         }
         try {
-            $content = app(WorkspaceDaemonClient::class)->for($this->workspace(), 15)->fileContent($path)['content'];
+            $content = app(WorkspaceDaemonClient::class)->for($this->workspace(), 15)->fileContent($task->slug, $path)['content'];
         } catch (DaemonTransportException) {
             return;
         }

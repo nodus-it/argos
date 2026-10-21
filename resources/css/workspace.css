@@ -252,6 +252,9 @@ button.wf-gate:not([disabled]):hover { background: var(--wf-raised); }
 .wf-think-toggle .is-open { transform: rotate(90deg); }
 .wf-think-text { margin-top: 4px; padding-left: 16px; border-left: 2px solid var(--wf-border); color: var(--wf-muted); font-size: 13px; white-space: pre-wrap; }
 .wf-notice { font-size: 12.5px; color: var(--wf-muted); }
+.wf-notice-log { margin-top: 6px; text-align: left; }
+.wf-notice-log summary { cursor: pointer; }
+.wf-notice-log .wf-log { max-height: 240px; overflow: auto; margin-top: 6px; }
 .wf-note-row { display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px; border-radius: 10px; font-size: 13px; }
 .wf-note-row svg { width: 15px; height: 15px; flex: none; margin-top: 2px; }
 .wf-note-row.is-error { background: var(--wf-danger-soft); color: var(--wf-danger); }

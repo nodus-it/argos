@@ -7,6 +7,7 @@ namespace Tests\Feature\Workspace;
 use App\Broadcasting\TaskStream;
 use App\Enums\AutoTaskState;
 use App\Enums\GitProvider;
+use App\Enums\TaskStatus;
 use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceStatus;
 use App\Jobs\Workspace\AdvanceAutoTaskJob;
@@ -108,7 +109,7 @@ class AutoTaskUiTest extends TestCase
         $this->chat()->set('newAuto', true)->set('newPrompt', 'Do it')->call('createTask');
         $task = Task::query()->sole();
         $this->workspace->forceFill(['status' => WorkspaceStatus::Running])->save();
-        $task->forceFill(['auto_state' => AutoTaskState::Implementing])->save();
+        $task->forceFill(['auto_state' => AutoTaskState::Implementing, 'status' => TaskStatus::Active])->save();
 
         $chat = $this->chat()->set('taskId', $task->id)->assertSee(__('workspaces.auto.pause'));
         $chat->set('draft', 'Let me help')->call('send');

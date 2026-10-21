@@ -4,20 +4,47 @@ declare(strict_types=1);
 
 namespace App\Services\Workspace;
 
+use App\Enums\WorkspaceStatus;
+use App\Integrations\WorkspaceDaemon\DaemonTransportException;
 use App\Models\Task;
+use App\Services\Worker\WorkerSidecarManager;
+use Illuminate\Support\Facades\Log;
 
 /**
- * Frees what a finished task holds in its workspace — the preview (and,
- * with per-task working copies, its worktree and database). The
- * conversation, the remote branch and the pull request stay.
+ * Frees what a finished task holds in its workspace: the preview, the
+ * worktree with its local branch, and its database. The conversation, the
+ * remote branch and the pull request stay. Needs the workspace container
+ * running; a stopped workspace is cleaned up on a later pass.
  */
 class TaskCleanup
 {
-    public function __construct(private readonly WorkspacePreviewService $previews) {}
+    public function __construct(
+        private readonly WorkspacePreviewService $previews,
+        private readonly WorkspaceDaemonClient $daemon,
+        private readonly WorkerSidecarManager $sidecars,
+    ) {}
 
-    public function cleanup(Task $task): void
+    /** False when the workspace is not running (nothing was removed). */
+    public function cleanup(Task $task): bool
     {
+        $workspace = $task->workspace;
+        if ($workspace->status !== WorkspaceStatus::Running) {
+            return false;
+        }
+
         $this->previews->stop($task);
+        try {
+            $this->daemon->for($workspace, 60)->removeWorktree($task->slug);
+        } catch (DaemonTransportException $e) {
+            Log::channel('argos')->info('Task worktree removal failed', ['task' => $task->id, 'error' => $e->getMessage()]);
+
+            return false;
+        }
+        if ($task->db_name !== null) {
+            $this->sidecars->dropTaskDatabase($workspace, $task->db_name);
+        }
         $task->forceFill(['cleaned_at' => now()])->save();
+
+        return true;
     }
 }

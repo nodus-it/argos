@@ -76,7 +76,7 @@ class TaskCheckpointService
     public function preview(TaskCheckpoint $checkpoint, User $by): array
     {
         Gate::forUser($by)->authorize('update', $checkpoint->task);
-        $result = $this->call(fn () => $this->daemon->for($checkpoint->task->workspace)->checkpointDiff($checkpoint->ref));
+        $result = $this->call(fn () => $this->daemon->for($checkpoint->task->workspace)->checkpointDiff($checkpoint->task->slug, $checkpoint->ref));
 
         return [
             'diff' => $result['diff'],
@@ -93,7 +93,7 @@ class TaskCheckpointService
             throw WorkspaceException::translated('workspaces.checkpoints.busy');
         }
 
-        $result = $this->call(fn () => $this->daemon->for($task->workspace)->restoreCheckpoint($checkpoint->ref));
+        $result = $this->call(fn () => $this->daemon->for($task->workspace)->restoreCheckpoint($task->slug, $checkpoint->ref));
         $before = $this->record($task, $result['before']);
 
         $message = $checkpoint->taskEvent;
@@ -111,7 +111,7 @@ class TaskCheckpointService
     {
         Gate::forUser($by)->authorize('update', $task);
         $label = mb_substr(trim($label), 0, 120);
-        $raw = $this->call(fn () => $this->daemon->for($task->workspace)->createCheckpoint($task->id, $label));
+        $raw = $this->call(fn () => $this->daemon->for($task->workspace)->createCheckpoint($task->slug, $task->id, $label));
         $checkpoint = $this->record($task, $raw) ?? throw WorkspaceException::translated('workspaces.checkpoints.failed');
 
         $this->tasks->notice($task, 'checkpoint', $by, ['label' => $label, 'checkpoint_id' => $checkpoint->id]);

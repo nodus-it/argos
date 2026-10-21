@@ -109,6 +109,38 @@ class WorkerSidecarManager
         $this->runQuietly(['docker', 'network', 'rm', $network], 30);
     }
 
+    /**
+     * Give a task its own database on the workspace's MySQL sidecar
+     * (idempotent). A workspace without MySQL has nothing to do.
+     */
+    public function createTaskDatabase(Workspace $workspace, string $database): void
+    {
+        $this->taskDatabaseStatement($workspace, $database, 'CREATE DATABASE IF NOT EXISTS `%1$s`; GRANT ALL PRIVILEGES ON `%1$s`.* TO \'%2$s\'@\'%%\'; FLUSH PRIVILEGES;');
+    }
+
+    /** Drop a finished task's database (best-effort). */
+    public function dropTaskDatabase(Workspace $workspace, string $database): void
+    {
+        $this->taskDatabaseStatement($workspace, $database, 'DROP DATABASE IF EXISTS `%1$s`;', quiet: true);
+    }
+
+    private function taskDatabaseStatement(Workspace $workspace, string $database, string $sql, bool $quiet = false): void
+    {
+        if (! in_array(BackingService::Mysql, $workspace->backingServices(), true)) {
+            return;
+        }
+        if (preg_match('/^[A-Za-z0-9_]{1,64}$/', $database) !== 1) {
+            throw new RuntimeException("Invalid task database name: {$database}");
+        }
+
+        $coords = app(BackingServiceResolver::class)->coordinates($workspace)[BackingService::Mysql->value];
+        $container = $this->workspaceNetworkName($workspace).'-'.$coords['host'];
+        // The password goes in via the environment, not the command line of the client.
+        $cmd = ['docker', 'exec', '-e', 'MYSQL_PWD='.$coords['password'], $container, 'mariadb', '-uroot', '-e', sprintf($sql, $database, $coords['username'])];
+
+        $quiet ? $this->runQuietly($cmd, 60) : $this->mustRun($cmd, 60);
+    }
+
     public function workspaceNetworkName(Workspace $workspace): string
     {
         return 'ws_'.$workspace->slug.'_svc';

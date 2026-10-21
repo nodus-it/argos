@@ -296,6 +296,12 @@ class Task extends Model implements DemoTarget
         return $this->workspace->volumeName();
     }
 
+    /** The task's worktree on the workspace volume. */
+    public function workspaceSubpath(): ?string
+    {
+        return 'tasks/'.$this->slug;
+    }
+
     public function demoWorkspace(): Workspace
     {
         return $this->workspace;

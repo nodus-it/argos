@@ -408,9 +408,18 @@ return [
         'bypass_warning' => 'Claude will run every tool without asking. Use with care.',
     ],
     'events' => [
+        'prepare_step' => [
+            'worktree' => 'Preparing: creating the working copy on its branch …',
+            'setup' => 'Preparing: running the setup commands …',
+        ],
+        'prepared' => 'Working copy ready — Claude can start.',
+        'prepared_setup_failed' => 'Working copy ready, but the setup commands failed. Claude can look into it.',
+        'prepared_log' => 'Setup log',
+        'prepare_failed' => 'Preparing the task failed: :message',
+        'prepare_retry' => 'Try again',
         'restored' => ':name reset the working tree to before “:excerpt”.',
         'checkpoint' => ':name set a checkpoint: :label',
-        'shipped' => ':name shipped the workspace:',
+        'shipped' => ':name shipped the task:',
         'you' => 'You',
         'claude' => 'Claude',
         'thinking' => 'Thinking',
@@ -443,6 +452,7 @@ return [
     ],
     'errors' => [
         'not_running' => 'The workspace is not running. Start it first.',
+        'preparing' => 'This task is still being prepared (working copy, database, setup). Try again in a moment.',
         'daemon_unreachable' => 'The workspace did not respond: :message',
         'bypass_owner_only' => 'Only workspace owners may bypass permissions.',
         'capacity' => 'Already :max workspaces are running. Stop one before starting another.',

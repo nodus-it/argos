@@ -258,8 +258,20 @@
                                                 'shipped' => __('workspaces.events.shipped', ['name' => $p['author_name'] ?? '']),
                                                 'restored' => __('workspaces.events.restored', ['name' => $p['author_name'] ?? '', 'excerpt' => $p['excerpt'] ?? '']),
                                                 'checkpoint' => __('workspaces.events.checkpoint', ['name' => $p['author_name'] ?? '', 'label' => ($p['label'] ?? '') !== '' ? $p['label'] : '—']),
+                                                'prepare_step' => in_array($p['step'] ?? '', ['worktree', 'setup'], true) ? __('workspaces.events.prepare_step.'.$p['step']) : '',
+                                                'prepared' => ($p['setup'] ?? '') === 'failed' ? __('workspaces.events.prepared_setup_failed') : __('workspaces.events.prepared'),
+                                                'prepare_failed' => __('workspaces.events.prepare_failed', ['message' => $p['message'] ?? '']),
                                                 default => '',
                                             } }}
+                                            @if (($p['kind'] ?? '') === 'prepare_failed' && $canWrite && $task->status === \App\Enums\TaskStatus::Preparing)
+                                                <button type="button" class="wf-link" wire:click="retryPreparation">{{ __('workspaces.events.prepare_retry') }}</button>
+                                            @endif
+                                            @if (($p['kind'] ?? '') === 'prepared' && ($p['log'] ?? '') !== '')
+                                                <details class="wf-notice-log">
+                                                    <summary>{{ __('workspaces.events.prepared_log') }}</summary>
+                                                    <pre class="wf-log mono">{{ $p['log'] }}</pre>
+                                                </details>
+                                            @endif
                                             @if (in_array($p['kind'] ?? '', ['restored', 'checkpoint'], true) && $canWrite && ! empty($p['checkpoint_id']))
                                                 <button type="button" class="wf-link" wire:click="previewRestore('{{ $p['checkpoint_id'] }}')">
                                                     {{ ($p['kind'] ?? '') === 'restored' ? __('workspaces.checkpoints.undo_restore') : __('workspaces.checkpoints.reset_here') }}

@@ -145,6 +145,9 @@ class TaskEventIngestor
             $this->notify($workspace, $taskId, $outgoing);
             // Resolved lazily: the driver depends on services that depend on this ingestor's peers.
             $task = Task::query()->find($taskId);
+            if ($task !== null && in_array('prepare.completed', array_column($events, 'type'), true)) {
+                app(TaskPreparer::class)->afterPrepared($task);
+            }
             if ($task?->auto_state !== null) {
                 app(AutoTaskDriver::class)->onTaskEvents($task, $outgoing);
             }
@@ -291,6 +294,13 @@ class TaskEventIngestor
 
             case 'error':
                 return $this->persist($task, TaskEventType::Error, $data, $seq, $broadcast);
+
+            case 'prepare.step':
+            case 'prepare.completed':
+            case 'prepare.failed':
+                $notice = app(TaskPreparer::class)->onEvent($task, $type, $data);
+
+                return $notice === null ? null : $this->persist($task, TaskEventType::Notice, $notice, $seq, ['type' => 'notice', 'seq' => $seq, 'data' => $notice]);
 
             default:
                 return null;

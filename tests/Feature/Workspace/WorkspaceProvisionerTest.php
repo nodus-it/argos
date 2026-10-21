@@ -6,10 +6,12 @@ namespace Tests\Feature\Workspace;
 
 use App\Enums\DemoStatus;
 use App\Enums\SessionStatus;
+use App\Enums\TaskStatus;
 use App\Enums\WorkspaceStatus;
 use App\Events\Workspace\WorkspaceStarted;
 use App\Integrations\WorkspaceDaemon\Requests\InitWorkspace;
 use App\Integrations\WorkspaceDaemon\Requests\StopTask;
+use App\Jobs\Workspace\PrepareTaskJob;
 use App\Models\Demo;
 use App\Models\Task;
 use App\Models\User;
@@ -26,6 +28,7 @@ use App\Workers\Compose\ResolvedWorkerImage;
 use App\Workers\Compose\WorkerImageResolver;
 use App\Workers\Compose\WorkspaceImageBuilder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Event;
 use RuntimeException;
 use Saloon\Http\Faking\MockResponse;
@@ -90,13 +93,30 @@ class WorkspaceProvisionerTest extends TestCase
         $this->assertSame(WorkspaceStatus::Running, $workspace->status);
         $this->assertSame($workspace->containerName(), $workspace->container_name);
         // The main clone checks out the default branch; tasks get worktrees later.
-        $this->assertSame('develop', $sent['branch']);
+        $this->assertArrayNotHasKey('branch', $sent);
         $this->assertSame('develop', $sent['base_branch']);
         $this->assertSame('ada@example.com', $sent['git_user_email']);
         $this->assertSame($workspace->repo_url, $sent['repo_url']);
         $this->assertArrayNotHasKey('repo_token', $sent);
         Event::assertDispatched(WorkspaceStarted::class);
         $this->assertFileExists($this->traefikDir.'/code-'.$workspace->slug.'.yml');
+    }
+
+    public function test_boot_carries_on_with_tasks_still_preparing(): void
+    {
+        Event::fake([WorkspaceStarted::class]);
+        Bus::fake([PrepareTaskJob::class]);
+        $this->bindDocker();
+        Saloon::fake([InitWorkspace::class => MockResponse::make(['status' => 'ready'])]);
+        $workspace = Workspace::factory()->create(['status' => WorkspaceStatus::Provisioning]);
+        $waiting = Task::factory()->create(['workspace_id' => $workspace->id, 'status' => TaskStatus::Preparing]);
+        Task::factory()->create(['workspace_id' => $workspace->id, 'status' => TaskStatus::Active]);
+        Task::factory()->create(['status' => TaskStatus::Preparing]);
+
+        app(WorkspaceProvisioner::class)->boot($workspace);
+
+        Bus::assertDispatchedTimes(PrepareTaskJob::class, 1);
+        Bus::assertDispatched(PrepareTaskJob::class, fn (PrepareTaskJob $job): bool => $job->taskId === $waiting->id);
     }
 
     public function test_init_failures_mark_the_workspace_failed_with_a_readable_message(): void

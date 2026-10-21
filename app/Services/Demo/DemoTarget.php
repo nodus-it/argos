@@ -19,6 +19,9 @@ interface DemoTarget
     /** Docker volume holding the checkout the demo mounts. */
     public function workspaceVolumeName(): string;
 
+    /** Folder inside that volume to mount (null: the whole volume). */
+    public function workspaceSubpath(): ?string;
+
     /** The workspace whose environment (contract, services, secrets) the demo uses. */
     public function demoWorkspace(): Workspace;
 

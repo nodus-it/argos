@@ -52,7 +52,7 @@ class WorkspaceShipService
         $empty = ['subject' => '', 'body' => '', 'changed_files' => 0, 'ahead' => 0];
 
         try {
-            $status = $api->gitStatus();
+            $status = $api->gitStatus($task->slug);
             $empty = [...$empty, 'changed_files' => count($status['files']), 'ahead' => (int) $status['ahead']];
 
             $agent = $this->pool->usableAgentsFor($by)->first();
@@ -60,7 +60,7 @@ class WorkspaceShipService
                 return $empty;
             }
 
-            $diff = $api->gitDiff('origin/'.$task->base_branch)['diff'];
+            $diff = $api->gitDiff($task->slug, 'origin/'.$task->base_branch)['diff'];
             $result = $api->oneshot([
                 'agent_id' => $agent->id,
                 'oauth_token' => (string) ($agent->credentials['token'] ?? ''),
@@ -101,11 +101,11 @@ class WorkspaceShipService
 
         $api = $this->daemon->for($workspace, 300);
         try {
-            $commit = $api->gitCommit($subject, $body, ['name' => $by->name, 'email' => $by->email]);
-            if ($commit === null && (int) $api->gitStatus()['ahead'] === 0 && $this->nothingToShip($task, $api)) {
+            $commit = $api->gitCommit($task->slug, $subject, $body, ['name' => $by->name, 'email' => $by->email]);
+            if ($commit === null && (int) $api->gitStatus($task->slug)['ahead'] === 0 && $this->nothingToShip($task, $api)) {
                 throw WorkspaceException::translated('workspaces.ship.nothing');
             }
-            $api->gitPush((string) $task->branch);
+            $api->gitPush($task->slug, (string) $task->branch);
         } catch (DaemonTransportException $e) {
             throw WorkspaceException::fromDaemon($e, [
                 'rejected_non_fast_forward' => 'workspaces.ship.rejected',
@@ -198,7 +198,7 @@ class WorkspaceShipService
             return true;
         }
 
-        return trim($api->gitDiff('origin/'.$task->base_branch)['diff']) === '';
+        return trim($api->gitDiff($task->slug, 'origin/'.$task->base_branch)['diff']) === '';
     }
 
     private function prompt(Task $task, string $diff): string

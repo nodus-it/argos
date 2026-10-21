@@ -1,12 +1,12 @@
-import { appendFileSync, existsSync, readFileSync, readdirSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { CodedError } from './errors.js';
 import { classifyGitError, git, GitError } from './git.js';
 
 export interface WorkspaceInitParams {
     repoUrl: string;
+    /** The workspace's default branch; the main clone stays on it, detached. */
     baseBranch: string;
-    branch: string;
     gitUserName: string;
     gitUserEmail: string;
 }
@@ -18,8 +18,10 @@ export class WorkspaceInitError extends CodedError {
 }
 
 /**
- * Clone the project into the (empty) workspace volume and check out the
- * workspace branch. Idempotent: an existing checkout is left alone.
+ * Clone the project into the main clone folder and check out the default
+ * branch, detached: the main clone is only the base tasks branch off in
+ * their worktrees, nobody works in it. Idempotent: an existing clone is left
+ * alone.
  *
  * The repository token never touches disk: git asks the Argos credential
  * helper, which fetches it from the manager on demand.
@@ -28,28 +30,26 @@ export async function initWorkspace(dir: string, params: WorkspaceInitParams, cr
     if (existsSync(join(dir, '.git'))) {
         return 'already_initialized';
     }
-    if (existsSync(dir) && readdirSync(dir).length > 0) {
+    mkdirSync(dir, { recursive: true });
+    if (readdirSync(dir).length > 0) {
         throw new WorkspaceInitError('workspace_not_empty', `${dir} is not empty and not a git checkout`);
     }
 
     const helperArgs = ['-c', 'credential.helper=', '-c', `credential.helper=${credentialHelper}`];
 
     try {
+        // Check the base branch before cloning: a failed check must not leave
+        // a half-initialised clone that later counts as "already initialized".
+        const baseBranch = await git([...helperArgs, 'ls-remote', '--heads', params.repoUrl, params.baseBranch], '/');
+        if (baseBranch.stdout.trim() === '') {
+            throw new WorkspaceInitError('branch_not_found', `Base branch ${params.baseBranch} does not exist on the remote`);
+        }
+
         await git([...helperArgs, 'clone', '--no-checkout', params.repoUrl, dir], '/');
         await git(['config', 'credential.helper', credentialHelper], dir);
         await git(['config', 'user.name', params.gitUserName], dir);
         await git(['config', 'user.email', params.gitUserEmail], dir);
-
-        const remoteBranch = await git(['ls-remote', '--heads', 'origin', params.branch], dir);
-        const baseBranch = await git(['ls-remote', '--heads', 'origin', params.baseBranch], dir);
-        if (remoteBranch.stdout.trim() === '' && baseBranch.stdout.trim() === '') {
-            throw new WorkspaceInitError('branch_not_found', `Base branch ${params.baseBranch} does not exist on the remote`);
-        }
-        if (remoteBranch.stdout.trim() !== '') {
-            await git(['checkout', '-B', params.branch, `origin/${params.branch}`], dir);
-        } else {
-            await git(['checkout', '-b', params.branch, `origin/${params.baseBranch}`], dir);
-        }
+        await git(['checkout', '--detach', `origin/${params.baseBranch}`], dir);
     } catch (error) {
         if (error instanceof GitError) {
             throw new WorkspaceInitError(classifyGitError(error.stderr), error.stderr.trim().slice(0, 2000));

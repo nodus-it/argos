@@ -12,6 +12,7 @@ use App\Enums\AutoTaskState;
 use App\Enums\GateRunStatus;
 use App\Enums\PermissionMode;
 use App\Enums\TaskOrigin;
+use App\Enums\TaskStatus;
 use App\Enums\WorkspaceStatus;
 use App\Jobs\Workspace\AdvanceAutoTaskJob;
 use App\Models\AgentCredential;
@@ -220,6 +221,10 @@ class AutoTaskDriver
             if ($workspace->status === WorkspaceStatus::Stopped) {
                 $this->workspaces->start($workspace);
             }
+            $this->retryUnlessExpired($task);
+        }
+        if ($task->status === TaskStatus::Preparing) {
+            // TaskPreparer starts this step again once the working copy is ready.
             $this->retryUnlessExpired($task);
         }
 

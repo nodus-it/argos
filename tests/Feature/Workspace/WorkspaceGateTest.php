@@ -149,7 +149,15 @@ class WorkspaceGateTest extends TestCase
     {
         $this->actingAs($this->member)
             ->get(route('workspaces.open', ['workspace' => $this->workspace, 'target' => 'code']))
-            ->assertRedirectContains('https://code-login.argos.test/?folder=/workspace&argos_ticket=');
+            ->assertRedirectContains('https://code-login.argos.test/?folder=%2Fworkspace%2Frepo&argos_ticket=');
+
+        // With a task the editor opens that task's worktree; a foreign task falls back to the main clone.
+        $this->actingAs($this->member)
+            ->get(route('workspaces.open', ['workspace' => $this->workspace, 'target' => 'code', 'task' => $this->task->id]))
+            ->assertRedirectContains('https://code-login.argos.test/?folder=%2Fworkspace%2Ftasks%2Ffeature&argos_ticket=');
+        $this->actingAs($this->member)
+            ->get(route('workspaces.open', ['workspace' => $this->workspace, 'target' => 'code', 'task' => Task::factory()->create()->id]))
+            ->assertRedirectContains('?folder=%2Fworkspace%2Frepo&argos_ticket=');
 
         $this->actingAs($this->member)
             ->get(route('workspaces.open', ['workspace' => $this->workspace, 'target' => 'preview', 'task' => $this->task->id]))

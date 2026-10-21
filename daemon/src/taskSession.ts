@@ -3,7 +3,9 @@ import type { Options, PermissionMode, PermissionResult, PermissionUpdate, SDKUs
 import { ApprovalRegistry } from './approvals.js';
 import { applyClaudeBin, claudeChildEnv, type SessionEnvironment } from './claudeEnv.js';
 import type { EventSink, PendingEvent, TaskState } from './events.js';
+import { guardDecision, type GuardMode } from './guard.js';
 import { InputQueue } from './inputQueue.js';
+import { taskEnv } from './layout.js';
 import { mapCommands, mapModels, Normalizer, type SdkMessageLike } from './normalize.js';
 import { extractResetAt, isUsageLimitMessage } from './usageLimit.js';
 
@@ -24,6 +26,10 @@ export const USER_PERMISSION_MODES = ['default', 'acceptEdits', 'plan', 'bypassP
 export type UserPermissionMode = (typeof USER_PERMISSION_MODES)[number];
 
 export interface TaskStartParams {
+    /** The task's worktree; the session's working directory. */
+    cwd: string;
+    /** What happens to file tools outside `cwd` (see guard.ts). */
+    guard: GuardMode;
     agentId: string;
     oauthToken: string;
     model: string;
@@ -96,6 +102,11 @@ export class TaskSession {
         return this.claudeSessionId;
     }
 
+    /** The task's worktree. */
+    get cwd(): string {
+        return this.params.cwd;
+    }
+
     /** Launch the SDK query; call once per session. */
     start(): void {
         this.setState('starting');
@@ -166,7 +177,7 @@ export class TaskSession {
     }
 
     private launch(): void {
-        const env = claudeChildEnv(this.environment, this.params.agentId, this.params.oauthToken);
+        const env = { ...claudeChildEnv(this.environment, this.params.agentId, this.params.oauthToken), ...taskEnv(this.params.cwd) };
         // Only this query's stderr belongs in its failure report.
         this.stderrTail = [];
 
@@ -182,8 +193,10 @@ export class TaskSession {
             },
         };
 
+        const root = this.params.cwd;
+        const guard = this.params.guard;
         const options: Options = {
-            cwd: this.environment.workspaceDir,
+            cwd: root,
             includePartialMessages: true,
             permissionMode: this.params.permissionMode,
             allowDangerouslySkipPermissions: true,
@@ -191,6 +204,22 @@ export class TaskSession {
             settingSources: ['project', 'local'],
             systemPrompt: { type: 'preset', preset: 'claude_code', append: this.params.appendSystemPrompt ?? '' },
             canUseTool: (toolName, input, options) => this.canUseTool(toolName, input, options),
+            hooks: {
+                PreToolUse: [
+                    {
+                        hooks: [
+                            async (input) => {
+                                const pre = input as { tool_name?: string; tool_input?: unknown };
+                                const verdict = guardDecision(pre.tool_name ?? '', pre.tool_input, root, guard);
+
+                                return verdict === null
+                                    ? {}
+                                    : { hookSpecificOutput: { hookEventName: 'PreToolUse' as const, permissionDecision: verdict.decision, permissionDecisionReason: verdict.reason } };
+                            },
+                        ],
+                    },
+                ],
+            },
             env,
             stderr: (data: string) => this.captureStderr(data),
         };

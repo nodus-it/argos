@@ -72,3 +72,9 @@ teardown() {
     run quality_gate_log_converged artisan 1 1
     [ "$status" -eq 0 ]
 }
+
+@test "quality_gate_log_path follows QUALITY_DIR when no log dir is set" {
+    local p
+    p="$(unset QUALITY_LOG_DIR; QUALITY_DIR=/workspace/tasks/fix-login quality_gate_log_path pest 7)"
+    [ "$p" = "/workspace/tasks/fix-login/.agent/logs/pest.7.log" ]
+}

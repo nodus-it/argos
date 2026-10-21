@@ -190,6 +190,8 @@ class WorkspaceQualityGateTest extends TestCase
 
     public function test_the_review_tab_shows_results_and_sends_fixes_to_the_agent(): void
     {
+        // The fake daemon prepares the new task inline.
+        config(['queue.default' => 'sync']);
         AgentCredential::factory()->ownedBy($this->editor)->create();
         Livewire::actingAs($this->editor)->test(TaskChat::class, ['workspaceId' => $this->workspace->id])
             ->call('startCreating')->set('newTitle', 'Gates')->call('createTask')->assertHasNoErrors();

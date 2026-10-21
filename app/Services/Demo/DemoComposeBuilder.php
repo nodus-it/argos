@@ -78,7 +78,13 @@ class DemoComposeBuilder
                         'ARGOS_FPM_USER' => 'argos',
                     ] : []),
                     'volumes' => [
-                        $target->workspaceVolumeName().':'.$entry['workspace_mount'],
+                        // Long syntax: a task's preview mounts only its own worktree.
+                        array_filter([
+                            'type' => 'volume',
+                            'source' => $target->workspaceVolumeName(),
+                            'target' => $entry['workspace_mount'],
+                            'volume' => $target->workspaceSubpath() !== null ? ['subpath' => $target->workspaceSubpath()] : null,
+                        ]),
                     ],
                     'networks' => [
                         $network => [

@@ -39,6 +39,8 @@ class TaskComposerTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // New tasks are prepared inline by the fake daemon (worktree, setup).
+        config(['queue.default' => 'sync']);
         Storage::fake('local');
         Event::fake([TaskStream::class]);
         $this->app->singleton(WorkspaceDaemonClient::class, FakeWorkspaceDaemon::class);

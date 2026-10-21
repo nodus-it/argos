@@ -26,7 +26,10 @@ export type DaemonEventType =
     | 'gates.completed'
     | 'gates.failed'
     | 'gates.baseline'
-    | 'checkpoint.created';
+    | 'checkpoint.created'
+    | 'prepare.step'
+    | 'prepare.completed'
+    | 'prepare.failed';
 
 export type TaskState = 'starting' | 'idle' | 'running' | 'waiting_input' | 'closed';
 

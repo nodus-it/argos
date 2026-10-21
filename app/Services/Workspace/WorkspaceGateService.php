@@ -55,7 +55,7 @@ class WorkspaceGateService
         ]);
 
         try {
-            $this->daemon->for($workspace)->runGates($run->id);
+            $this->daemon->for($workspace)->runGates($task->slug, $run->id, $task->base_commit);
         } catch (DaemonTransportException $e) {
             $run->forceFill(['status' => GateRunStatus::Error, 'message' => $e->getMessage(), 'finished_at' => now()])->save();
 
@@ -128,7 +128,7 @@ class WorkspaceGateService
         }
 
         try {
-            $prompt = $this->daemon->for($run->workspace)->gateFixPrompt($gate, $run->id);
+            $prompt = $this->daemon->for($run->workspace)->gateFixPrompt($task->slug, $gate, $run->id);
         } catch (DaemonTransportException $e) {
             throw WorkspaceException::fromDaemon($e);
         }

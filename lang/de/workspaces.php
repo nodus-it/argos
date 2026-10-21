@@ -408,9 +408,18 @@ return [
         'bypass_warning' => 'Claude führt jedes Tool ohne Rückfrage aus. Mit Vorsicht verwenden.',
     ],
     'events' => [
+        'prepare_step' => [
+            'worktree' => 'Vorbereitung: Arbeitskopie auf eigenem Branch wird angelegt …',
+            'setup' => 'Vorbereitung: Setup-Befehle laufen …',
+        ],
+        'prepared' => 'Arbeitskopie bereit — Claude kann loslegen.',
+        'prepared_setup_failed' => 'Arbeitskopie bereit, aber die Setup-Befehle sind fehlgeschlagen. Claude kann sich darum kümmern.',
+        'prepared_log' => 'Setup-Log',
+        'prepare_failed' => 'Die Vorbereitung der Aufgabe ist fehlgeschlagen: :message',
+        'prepare_retry' => 'Erneut versuchen',
         'restored' => ':name hat den Arbeitsstand auf vor „:excerpt“ zurückgesetzt.',
         'checkpoint' => ':name hat einen Checkpoint gesetzt: :label',
-        'shipped' => ':name hat den Workspace ausgeliefert:',
+        'shipped' => ':name hat die Aufgabe ausgeliefert:',
         'you' => 'Du',
         'claude' => 'Claude',
         'thinking' => 'Denkt nach',
@@ -443,6 +452,7 @@ return [
     ],
     'errors' => [
         'not_running' => 'Der Workspace läuft nicht. Starte ihn zuerst.',
+        'preparing' => 'Diese Aufgabe wird noch vorbereitet (Arbeitskopie, Datenbank, Setup). Versuch es gleich noch einmal.',
         'daemon_unreachable' => 'Der Workspace hat nicht geantwortet: :message',
         'bypass_owner_only' => 'Nur Besitzer des Workspaces dürfen Freigaben umgehen.',
         'capacity' => 'Es laufen bereits :max Workspaces. Stoppe einen, bevor du einen weiteren startest.',

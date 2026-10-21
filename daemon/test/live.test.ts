@@ -36,7 +36,7 @@ describe.skipIf(!enabled)('live: Claude subscription in SDK streaming mode', () 
     afterAll(() => rmSync(agentsDir, { recursive: true, force: true }));
 
     const make = (events: PendingEvent[], permissionMode: 'default' | 'acceptEdits', resumeSessionId?: string) =>
-        new TaskSession('live', { agentId: 'live', oauthToken: token!, model, permissionMode, resumeSessionId: resumeSessionId ?? null }, (e) => events.push(e), approvals, factory, {
+        new TaskSession('live', { cwd: repoDir!, guard: 'ask', agentId: 'live', oauthToken: token!, model, permissionMode, resumeSessionId: resumeSessionId ?? null }, (e) => events.push(e), approvals, factory, {
             workspaceDir: repoDir!,
             agentsDir,
             claudeBin: process.env.ARGOS_CLAUDE_BIN,

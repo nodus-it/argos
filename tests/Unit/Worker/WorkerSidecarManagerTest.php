@@ -113,4 +113,30 @@ class WorkerSidecarManagerTest extends TestCase
         $this->assertContains('docker volume rm -f ws_demo_svc_db', $joined);
         $this->assertContains('docker network rm ws_demo_svc', $joined);
     }
+
+    public function test_a_task_database_is_created_and_granted_on_the_mysql_sidecar(): void
+    {
+        $workspace = Workspace::factory()->withBackingServices(['mysql'])->withServiceConfig(['mysql' => ['username' => 'app', 'password' => 's3cret']])->create(['slug' => 'shop']);
+        $manager = new RecordingSidecarManager;
+
+        $manager->createTaskDatabase($workspace, 'task_fix_login');
+        $manager->dropTaskDatabase($workspace, 'task_fix_login');
+
+        [$create, $drop] = $manager->commands;
+        // The root password travels in the environment of the client, not as an argument.
+        $this->assertSame(['docker', 'exec', '-e', 'MYSQL_PWD=s3cret', 'ws_shop_svc-db', 'mariadb', '-uroot', '-e'], array_slice($create, 0, 8));
+        $this->assertStringContainsString('CREATE DATABASE IF NOT EXISTS `task_fix_login`', $create[8]);
+        $this->assertStringContainsString("GRANT ALL PRIVILEGES ON `task_fix_login`.* TO 'app'@'%'", $create[8]);
+        $this->assertSame('DROP DATABASE IF EXISTS `task_fix_login`;', $drop[8]);
+    }
+
+    public function test_task_databases_need_mysql_and_a_safe_name(): void
+    {
+        $manager = new RecordingSidecarManager;
+        $manager->createTaskDatabase($this->workspaceWithServices(['redis']), 'task_x');
+        $this->assertSame([], $manager->commands);
+
+        $this->expectException(\RuntimeException::class);
+        $manager->createTaskDatabase($this->workspaceWithServices(['mysql']), 'task_x`; DROP DATABASE argos; --');
+    }
 }

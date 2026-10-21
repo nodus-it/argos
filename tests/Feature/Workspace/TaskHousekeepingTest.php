@@ -6,11 +6,15 @@ namespace Tests\Feature\Workspace;
 
 use App\Enums\DemoStatus;
 use App\Enums\TaskStatus;
+use App\Enums\WorkspaceStatus;
 use App\Models\Demo;
 use App\Models\Task;
 use App\Models\Workspace;
 use App\Services\Demo\DemoDeployer;
+use App\Services\Worker\WorkerSidecarManager;
+use App\Services\Workspace\WorkspaceDaemonClient;
 use App\Services\Workspace\WorkspaceShipService;
+use App\Testing\FakeWorkspaceDaemon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery\MockInterface;
 use Tests\TestCase;
@@ -25,9 +29,17 @@ class TaskHousekeepingTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->workspace = Workspace::factory()->create(['cleanup_after_days' => 14]);
+        $this->workspace = Workspace::factory()->create(['cleanup_after_days' => 14, 'status' => WorkspaceStatus::Running]);
         $this->mock(DemoDeployer::class)->shouldReceive('teardown');
+        $this->app->singleton(WorkspaceDaemonClient::class, FakeWorkspaceDaemon::class);
+        $this->dropped = [];
+        $this->mock(WorkerSidecarManager::class)->shouldReceive('dropTaskDatabase')->andReturnUsing(function (Workspace $workspace, string $database): void {
+            $this->dropped[] = $database;
+        });
     }
+
+    /** @var list<string> task databases dropped */
+    private array $dropped = [];
 
     /** @param  array<string, mixed>  $attributes */
     private function task(string $title, array $attributes = []): Task
@@ -42,7 +54,7 @@ class TaskHousekeepingTest extends TestCase
 
     public function test_cleanup_frees_tasks_finished_longer_ago_than_the_workspace_keeps_them(): void
     {
-        $old = $this->finished('old-done', 20);
+        $old = $this->finished('old-done', 20, ['db_name' => 'task_old_done']);
         $cancelled = $this->finished('old-cancelled', 15, ['status' => TaskStatus::Cancelled]);
         $recent = $this->finished('recent-done', 3);
         $active = $this->task('active');
@@ -52,9 +64,16 @@ class TaskHousekeepingTest extends TestCase
 
         // Another workspace keeps finished tasks for longer.
         $patient = Task::factory()->create([
-            'workspace_id' => Workspace::factory()->create(['cleanup_after_days' => 60])->id,
+            'workspace_id' => Workspace::factory()->create(['cleanup_after_days' => 60, 'status' => WorkspaceStatus::Running])->id,
             'status' => TaskStatus::Done,
             'done_at' => now()->subDays(20),
+        ]);
+        // A stopped workspace has no container to remove worktrees in: a later pass does it.
+        $stopped = Task::factory()->create([
+            'workspace_id' => Workspace::factory()->create(['cleanup_after_days' => 14, 'status' => WorkspaceStatus::Stopped])->id,
+            'status' => TaskStatus::Done,
+            'done_at' => now()->subDays(20),
+            'db_name' => 'task_stopped',
         ]);
 
         $this->artisan('argos:tasks:cleanup')->expectsOutputToContain('2 finished task(s) cleaned up.')->assertSuccessful();
@@ -62,7 +81,10 @@ class TaskHousekeepingTest extends TestCase
         $this->assertNotNull($old->fresh()->cleaned_at);
         $this->assertNotNull($cancelled->fresh()->cleaned_at);
         $this->assertSame(DemoStatus::Stopped, $preview->fresh()->status);
-        foreach ([$recent, $active, $busy, $patient] as $spared) {
+        // Worktree and database go with it.
+        $this->assertEqualsCanonicalizing([$old->slug, $cancelled->slug], FakeWorkspaceDaemon::$removed);
+        $this->assertSame(['task_old_done'], $this->dropped);
+        foreach ([$recent, $active, $busy, $patient, $stopped] as $spared) {
             $this->assertNull($spared->fresh()->cleaned_at, $spared->title);
         }
         $this->assertTrue($alreadyCleaned->fresh()->cleaned_at->lt(now()->subDays(9)));

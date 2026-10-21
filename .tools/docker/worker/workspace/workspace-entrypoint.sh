@@ -16,7 +16,7 @@ daemon_pid=$!
     --host 0.0.0.0 \
     --port "${ARGOS_EDITOR_PORT:-3000}" \
     --without-connection-token \
-    --default-folder /workspace \
+    --default-folder /workspace/repo \
     --telemetry-level off &
 editor_pid=$!
 

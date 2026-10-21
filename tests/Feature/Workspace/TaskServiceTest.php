@@ -20,6 +20,7 @@ use App\Integrations\WorkspaceDaemon\Requests\SendMessage;
 use App\Integrations\WorkspaceDaemon\Requests\SetPermissionMode;
 use App\Integrations\WorkspaceDaemon\Requests\StartTask;
 use App\Integrations\WorkspaceDaemon\Requests\StopTask;
+use App\Jobs\Workspace\PrepareTaskJob;
 use App\Models\AgentCredential;
 use App\Models\Task;
 use App\Models\TaskApproval;
@@ -31,6 +32,7 @@ use App\Services\Workspace\TaskService;
 use App\Services\Workspace\WorkspaceException;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Event;
 use Saloon\Http\Faking\MockResponse;
 use Saloon\Http\PendingRequest;
@@ -56,6 +58,8 @@ class TaskServiceTest extends TestCase
     {
         parent::setUp();
         Event::fake([TaskStream::class]);
+        // Preparation is covered by TaskPreparationTest; here tasks are made ready by hand.
+        Bus::fake([PrepareTaskJob::class]);
         $this->workspace = Workspace::factory()->create(['status' => WorkspaceStatus::Running]);
         $this->owner = $this->member(WorkspaceRole::Admin, 'Ada');
         $this->editor = $this->member(WorkspaceRole::Member, 'Bob');
@@ -101,10 +105,11 @@ class TaskServiceTest extends TestCase
         return app(TaskService::class);
     }
 
-    /** Ada's task; Bob is invited as a collaborator. */
+    /** Ada's prepared task; Bob is invited as a collaborator. */
     private function task(): Task
     {
         $task = $this->service()->create($this->workspace, $this->owner, $this->agent, 'Login');
+        $task->forceFill(['status' => TaskStatus::Active, 'worktree_path' => '/workspace/tasks/login'])->save();
         $task->members()->create(['user_id' => $this->editor->id, 'invited_by' => $this->owner->id]);
 
         return $task;
@@ -130,7 +135,8 @@ class TaskServiceTest extends TestCase
 
         $this->assertTrue($task->isOwnedBy($this->owner));
         $this->assertSame($this->owner->id, $task->created_by);
-        $this->assertSame(TaskStatus::Active, $task->status);
+        $this->assertSame(TaskStatus::Preparing, $task->status);
+        Bus::assertDispatched(PrepareTaskJob::class, fn (PrepareTaskJob $job): bool => $job->taskId === $task->id);
         $this->assertSame(TaskOrigin::Manual, $task->origin);
         $this->assertSame('login-seite', $task->slug);
         $this->assertSame('argos/login-seite', $task->branch);

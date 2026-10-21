@@ -6,6 +6,8 @@ import { query } from '@anthropic-ai/claude-agent-sdk';
 import { managerCredentialFetcher, RepoCredentialCache, startCredentialServer } from './credentials.js';
 import { scriptRunner } from './gates.js';
 import { buildApp } from './http.js';
+import { cacheEnv, layoutFor } from './layout.js';
+import { setupRunner } from './worktrees.js';
 import { Outbox, type Acks } from './outbox.js';
 import type { SdkMessageLike } from './normalize.js';
 import type { QueryFactory, QueryLike } from './taskSession.js';
@@ -79,7 +81,8 @@ async function main(): Promise<void> {
         },
         credentialHelper: process.env.ARGOS_CREDENTIAL_HELPER ?? '/opt/argos/bin/git-credential-argos',
         oneshotRunner: (params) => query(params) as unknown as AsyncIterable<SdkMessageLike>,
-        gateScript: scriptRunner(process.env.ARGOS_GATES_SCRIPT ?? '/opt/argos/bin/run-gates.sh', workspaceDir),
+        gateScript: scriptRunner(process.env.ARGOS_GATES_SCRIPT ?? '/opt/argos/bin/run-gates.sh', workspaceDir, cacheEnv(layoutFor(workspaceDir))),
+        setupScript: setupRunner(process.env.ARGOS_SETUP_SCRIPT ?? '/opt/argos/bin/task-setup.sh', layoutFor(workspaceDir)),
         versions: { sdk: sdkVersion(), claude: claudeVersion(claudeBin) },
     });
 

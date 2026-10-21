@@ -5,13 +5,14 @@
 # every workspace judges code the same way.
 #
 # Usage:
-#   run-gates.sh --run <run-id>                 gates JSON on stdout
-#   run-gates.sh --baseline                     composer install + pest/phpstan baselines
-#   run-gates.sh --fix-prompt <gate> <run-id>   fix prompt on stdout
-#   run-gates.sh --log-path <gate> <run-id>     path of a gate's log
+#   run-gates.sh [--dir <path>] --run <run-id>                gates JSON on stdout
+#   run-gates.sh [--dir <path>] --baseline                    composer install + pest/phpstan baselines
+#   run-gates.sh [--dir <path>] --fix-prompt <gate> <run-id>  fix prompt on stdout
+#   run-gates.sh [--dir <path>] --log-path <gate> <run-id>    path of a gate's log
 #
-# The gates read and write /workspace (hard-wired in quality.sh). Unlike the
-# implement phase this script does not seed .env or public/hot: the workspace
+# The gates read and write the checkout in --dir (a task's worktree or the
+# main clone; default /workspace), see QUALITY_DIR in quality.sh. Unlike the
+# implement phase this script does not seed .env or public/hot: the checkout
 # is the person's working tree and its preview must keep working.
 set -euo pipefail
 IFS=$'\n\t'
@@ -23,24 +24,27 @@ source "${lib_dir}/logging.sh"
 # shellcheck source=../../../../worker/lib/quality.sh
 source "${lib_dir}/quality.sh"
 
-# gates_prepare: create the log directory and keep it out of git.
+# gates_prepare: create the log directory and keep it out of git. Worktrees
+# share the main clone's info/exclude (git's common dir).
 gates_prepare() {
-    mkdir -p /workspace/.agent/logs
-    if [[ -d /workspace/.git/info ]] || mkdir -p /workspace/.git/info 2>/dev/null; then
-        grep -qxF '.agent/' /workspace/.git/info/exclude 2>/dev/null \
-            || echo '.agent/' >> /workspace/.git/info/exclude
-    fi
+    local common
+    mkdir -p "${QUALITY_DIR}/.agent/logs"
+    common="$(git -C "$QUALITY_DIR" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
+    [[ -n "$common" ]] || return 0
+    mkdir -p "${common}/info"
+    grep -qxF '.agent/' "${common}/info/exclude" 2>/dev/null \
+        || echo '.agent/' >> "${common}/info/exclude"
 }
 
 # gates_install_deps: install composer dependencies of a fresh clone, so the
 # baseline (and Claude) can run tests. Best-effort; skipped when vendor/
 # exists or the project has no composer.json.
 gates_install_deps() {
-    [[ -f /workspace/composer.json && ! -f /workspace/vendor/autoload.php ]] || return 0
+    [[ -f "${QUALITY_DIR}/composer.json" && ! -f "${QUALITY_DIR}/vendor/autoload.php" ]] || return 0
     command -v composer >/dev/null || return 0
     log_info "workspace: composer install"
-    (cd /workspace && composer install --no-interaction --no-progress --prefer-dist) \
-        &> /workspace/.agent/logs/composer-install.log || log_warn "workspace: composer install failed (see .agent/logs/composer-install.log)"
+    (cd "$QUALITY_DIR" && composer install --no-interaction --no-progress --prefer-dist) \
+        &> "${QUALITY_DIR}/.agent/logs/composer-install.log" || log_warn "workspace: composer install failed (see .agent/logs/composer-install.log)"
     return 0
 }
 
@@ -61,6 +65,17 @@ gates_safe_gate() {
         *) echo "run-gates: unknown gate" >&2; exit 2 ;;
     esac
 }
+
+QUALITY_DIR=/workspace
+if [[ "${1:-}" == "--dir" ]]; then
+    QUALITY_DIR="${2:-}"
+    if [[ ( "$QUALITY_DIR" != /workspace && "$QUALITY_DIR" != /workspace/* ) || "$QUALITY_DIR" == *..* || ! -d "$QUALITY_DIR" ]]; then
+        echo "run-gates: invalid checkout dir" >&2
+        exit 2
+    fi
+    shift 2
+fi
+export QUALITY_DIR
 
 mode="${1:-}"
 case "$mode" in
@@ -86,7 +101,7 @@ case "$mode" in
         quality_gate_log_path "$gate" "$run_id"
         ;;
     *)
-        echo "usage: run-gates.sh --run <id> | --baseline | --fix-prompt <gate> <id> | --log-path <gate> <id>" >&2
+        echo "usage: run-gates.sh [--dir <path>] --run <id> | --baseline | --fix-prompt <gate> <id> | --log-path <gate> <id>" >&2
         exit 2
         ;;
 esac

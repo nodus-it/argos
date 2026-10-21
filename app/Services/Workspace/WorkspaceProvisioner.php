@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Services\Workspace;
 
 use App\Enums\WorkspaceStatus;
+use App\Enums\TaskStatus;
 use App\Events\Workspace\WorkspaceStarted;
 use App\Events\Workspace\WorkspaceStopped;
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
+use App\Jobs\Workspace\PrepareTaskJob;
 use App\Models\Task;
 use App\Models\Workspace;
 use App\Services\Demo\TraefikRouter;
@@ -35,9 +37,10 @@ class WorkspaceProvisioner
     ) {}
 
     /**
-     * Image → volumes → sidecars → container → daemon health → clone.
+     * Image → volumes → sidecars → container → daemon health → main clone.
      * Idempotent: a restart re-runs every step; the clone is skipped when
-     * the volume already holds a checkout.
+     * the volume already holds one. Tasks still preparing (waiting for the
+     * container) carry on afterwards.
      */
     public function boot(Workspace $workspace): void
     {
@@ -56,7 +59,6 @@ class WorkspaceProvisioner
                 'repo_url' => $workspace->repo_url,
                 // The main clone; tasks branch off it in their own worktrees.
                 'base_branch' => $workspace->default_branch,
-                'branch' => $workspace->default_branch,
                 'git_user_name' => $creator !== null ? $creator->name : 'Argos',
                 'git_user_email' => $creator !== null ? $creator->email : 'argos@localhost',
             ]);
@@ -74,6 +76,9 @@ class WorkspaceProvisioner
         ])->save();
 
         event(new WorkspaceStarted($workspace));
+
+        Task::query()->where('workspace_id', $workspace->id)->where('status', TaskStatus::Preparing->value)->pluck('id')
+            ->each(fn (string $id) => PrepareTaskJob::dispatch($id));
     }
 
     /**

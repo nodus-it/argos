@@ -44,6 +44,8 @@ class TaskCheckpointTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // New tasks are prepared inline by the fake daemon (worktree, setup).
+        config(['queue.default' => 'sync']);
         Event::fake([TaskStream::class]);
         $this->app->singleton(WorkspaceDaemonClient::class, FakeWorkspaceDaemon::class);
         $this->workspace = Workspace::factory()->create(['status' => WorkspaceStatus::Running]);

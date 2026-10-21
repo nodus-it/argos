@@ -13,6 +13,10 @@ import { FileIndex, readWorkspaceFile } from './files.js';
 import { runOneshot, type OneshotRunner } from './oneshot.js';
 import { GATE_NAME_PATTERN, GateRunner, type GateScript } from './gates.js';
 import { CheckpointStore, parseRef, type Checkpoint } from './checkpoints.js';
+import { layoutFor, saveTaskEnv, SLUG_PATTERN, worktreeDir, type Layout } from './layout.js';
+import { prepareWorktree, removeWorktree, SETUP_TIMEOUT_MS, writeEnv, type SetupScript } from './worktrees.js';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 
 /** The daemon's version, from package.json (one directory above src/ and dist/). */
 export const DAEMON_VERSION = (JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string }).version;
@@ -25,6 +29,7 @@ export interface AppDependencies {
     credentialHelper: string;
     oneshotRunner?: OneshotRunner;
     gateScript?: GateScript;
+    setupScript?: SetupScript;
     versions?: { sdk?: string; claude?: string };
 }
 
@@ -36,7 +41,12 @@ const idSchema = z.string().regex(ID_PATTERN);
 /** Checkpoint refs; the shape is checked by `parseRef`. */
 const checkpointRefSchema = z.string().max(200);
 
+/** Task slugs (worktree folder names). */
+const slugSchema = z.string().regex(SLUG_PATTERN);
+
 const startSchema = z.object({
+    worktree: slugSchema,
+    guard: z.enum(['ask', 'deny']).default('ask'),
     agent_id: idSchema,
     oauth_token: z.string().min(1),
     model: z.string().min(1),
@@ -66,7 +76,6 @@ const approvalSchema = z.object({
 const initSchema = z.object({
     repo_url: z.string().min(1),
     base_branch: z.string().min(1),
-    branch: z.string().min(1),
     git_user_name: z.string().min(1),
     git_user_email: z.string().min(1),
 });
@@ -75,6 +84,14 @@ const initSchema = z.object({
 const pathSchema = z.string().min(1).max(1000).refine((p) => !p.startsWith('-') && !p.startsWith('/') && !p.split('/').includes('..'), 'invalid path');
 
 const refSchema = z.string().min(1).max(255).regex(/^[A-Za-z0-9._\/-]+$/).refine((ref) => !ref.startsWith('-') && !ref.includes('..'), 'invalid ref');
+
+const prepareSchema = z.object({
+    task_id: idSchema,
+    branch: z.string().min(1).max(255).regex(/^[A-Za-z0-9._\/-]+$/).refine((ref) => !ref.startsWith('-') && !ref.includes('..'), 'invalid branch'),
+    base_branch: z.string().min(1).max(255).regex(/^[A-Za-z0-9._\/-]+$/).refine((ref) => !ref.startsWith('-') && !ref.includes('..'), 'invalid branch'),
+    env: z.record(z.string().regex(/^[A-Z][A-Z0-9_]*$/), z.string().max(4000)).default({}),
+    seq_offset: z.number().int().min(0).default(0),
+});
 
 const commitSchema = z.object({
     subject: z.string().min(1).max(200),
@@ -100,8 +117,30 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
     const app = Fastify({ logger: false, bodyLimit: 40 * 1024 * 1024 });
     const sessions = new Map<string, TaskSession>();
     const approvals = new ApprovalRegistry();
-    const gates = deps.gateScript === undefined ? null : new GateRunner(deps.gateScript, (event) => deps.outbox.push(null, event), deps.environment.workspaceDir);
-    const checkpoints = new CheckpointStore(deps.environment.workspaceDir);
+    const layout: Layout = layoutFor(deps.environment.workspaceDir);
+    const gates = deps.gateScript === undefined ? null : new GateRunner(deps.gateScript, (event) => deps.outbox.push(null, event), layout);
+    const checkpointStores = new Map<string, CheckpointStore>();
+    const fileIndexes = new Map<string, FileIndex>();
+    const preparing = new Set<string>();
+
+    const checkpointsFor = (dir: string): CheckpointStore => {
+        let store = checkpointStores.get(dir);
+        if (store === undefined) {
+            store = new CheckpointStore(dir);
+            checkpointStores.set(dir, store);
+        }
+
+        return store;
+    };
+    const filesFor = (dir: string): FileIndex => {
+        let index = fileIndexes.get(dir);
+        if (index === undefined) {
+            index = new FileIndex(dir);
+            fileIndexes.set(dir, index);
+        }
+
+        return index;
+    };
     const announceCheckpoint = (taskId: string, checkpoint: Checkpoint, clientMsgId: string | null): void => {
         deps.outbox.push(taskId, {
             type: 'checkpoint.created',
@@ -114,6 +153,15 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
         }
 
         return gates;
+    };
+    /** The worktree of the route's `:slug`; 404 until the task is prepared. */
+    const worktreeOf = (request: FastifyRequest): string => {
+        const dir = worktreeDir(layout, slugSchema.parse((request.params as { slug?: string }).slug));
+        if (!existsSync(join(dir, '.git'))) {
+            throw new CodedError(404, 'unknown_worktree', 'This task has no working copy yet');
+        }
+
+        return dir;
     };
     const expected = Buffer.from(`Bearer ${deps.daemonToken}`);
 
@@ -146,6 +194,8 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
         return session;
     };
 
+    // ── Workspace ────────────────────────────────────────────────────────
+
     app.get('/health', async () => ({
         version: DAEMON_VERSION,
         sdk_version: deps.versions?.sdk ?? null,
@@ -156,18 +206,206 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
     app.post('/workspace/init', async (request) => {
         const body = initSchema.parse(request.body);
         const status = await initWorkspace(
-            deps.environment.workspaceDir,
-            { repoUrl: body.repo_url, baseBranch: body.base_branch, branch: body.branch, gitUserName: body.git_user_name, gitUserEmail: body.git_user_email },
+            layout.mainDir,
+            { repoUrl: body.repo_url, baseBranch: body.base_branch, gitUserName: body.git_user_name, gitUserEmail: body.git_user_email },
             deps.credentialHelper,
         );
-        // Fresh base checkout: record pre-existing test/type failures so the
-        // gates only report new ones. Runs in the background.
-        if (status === 'ready' && gates !== null) {
-            void gates.startBaseline();
+        // Record pre-existing test/type failures of the base so the gates
+        // only report new ones. Runs in the background.
+        if (gates !== null) {
+            const head = (await gitOps.headCommit(layout.mainDir)) ?? '';
+            void gates.ensureBaseline(head);
         }
 
         return { status };
     });
+
+    app.post('/git/fetch', async (_request, reply) => {
+        await gitOps.fetch(layout.mainDir);
+
+        return reply.code(202).send({});
+    });
+
+    app.get('/gates', async () => ({ running: gateRunner().running }));
+
+    app.post('/oneshot', async (request) => {
+        const body = oneshotSchema.parse(request.body);
+        if (deps.oneshotRunner === undefined) {
+            throw new CodedError(501, 'oneshot_unavailable', 'One-shot prompts are not configured');
+        }
+
+        return runOneshot(
+            deps.oneshotRunner,
+            { agentId: body.agent_id, oauthToken: body.oauth_token, model: body.model, systemPrompt: body.system_prompt, userPrompt: body.user_prompt, jsonSchema: body.json_schema },
+            deps.environment,
+        );
+    });
+
+    // ── Worktrees (one per task) ─────────────────────────────────────────
+
+    /**
+     * Prepare a task's working copy in the background: worktree on its
+     * branch, `.env` with the task's values, then the setup commands.
+     * Progress travels as task events (prepare.step / prepare.completed /
+     * prepare.failed).
+     */
+    app.post('/worktrees/:slug/prepare', async (request, reply) => {
+        const slug = slugSchema.parse((request.params as { slug?: string }).slug);
+        const body = prepareSchema.parse(request.body);
+        if (preparing.has(slug)) {
+            return reply.code(202).send({ status: 'preparing' });
+        }
+        preparing.add(slug);
+        deps.outbox.setSeqOffset(body.task_id, body.seq_offset);
+        const emit = (type: 'prepare.step' | 'prepare.completed' | 'prepare.failed', data: Record<string, unknown>): void => {
+            deps.outbox.push(body.task_id, { type, data });
+        };
+
+        void (async () => {
+            try {
+                emit('prepare.step', { step: 'worktree' });
+                const worktree = await prepareWorktree(layout, { slug, branch: body.branch, baseBranch: body.base_branch, env: body.env });
+                writeEnv(worktree.path, body.env);
+                saveTaskEnv(worktree.path, body.env);
+
+                let setup: 'ok' | 'failed' | 'skipped' = 'skipped';
+                let log = '';
+                if (worktree.created && deps.setupScript !== undefined) {
+                    emit('prepare.step', { step: 'setup' });
+                    const result = await deps.setupScript(worktree.path, body.env, SETUP_TIMEOUT_MS);
+                    setup = result.code === 0 ? 'ok' : 'failed';
+                    log = result.output.length > 8192 ? result.output.slice(-8192) : result.output;
+                }
+                emit('prepare.completed', { path: worktree.path, base_commit: worktree.baseCommit, created: worktree.created, setup, log });
+                if (gates !== null) {
+                    void gates.ensureBaseline(worktree.baseCommit);
+                }
+            } catch (error) {
+                emit('prepare.failed', {
+                    code: error instanceof CodedError ? error.code : 'internal_error',
+                    message: (error instanceof Error ? error.message : String(error)).slice(0, 4000),
+                });
+            } finally {
+                preparing.delete(slug);
+            }
+        })();
+
+        return reply.code(202).send({ status: 'preparing' });
+    });
+
+    app.delete('/worktrees/:slug', async (request, reply) => {
+        const slug = slugSchema.parse((request.params as { slug?: string }).slug);
+        const dir = worktreeDir(layout, slug);
+        if ([...sessions.values()].some((s) => s.cwd === dir && s.currentState !== 'closed')) {
+            throw new CodedError(409, 'task_running', 'A session still works in this task');
+        }
+        await removeWorktree(layout, slug);
+        checkpointStores.delete(dir);
+        fileIndexes.delete(dir);
+
+        return reply.code(202).send({});
+    });
+
+    app.get('/worktrees/:slug/files', async (request) => {
+        const dir = worktreeOf(request);
+        const query = z.object({ q: z.string().max(200).default(''), limit: z.coerce.number().int().min(1).max(50).default(20) }).parse(request.query);
+
+        return { files: await filesFor(dir).search(query.q, query.limit) };
+    });
+
+    app.get('/worktrees/:slug/files/content', async (request) => {
+        const dir = worktreeOf(request);
+        const query = z.object({ path: z.string().min(1).max(1000) }).parse(request.query);
+
+        return readWorkspaceFile(dir, query.path);
+    });
+
+    app.get('/worktrees/:slug/git/status', async (request) => gitOps.status(worktreeOf(request)));
+
+    app.get('/worktrees/:slug/git/diff', async (request) => {
+        const dir = worktreeOf(request);
+        const query = request.query as { base?: string; path?: string };
+        const base = refSchema.parse(query.base);
+        const path = query.path === undefined ? null : pathSchema.parse(query.path);
+
+        return gitOps.diffAgainst(dir, base, 512 * 1024, path);
+    });
+
+    app.get('/worktrees/:slug/git/changes', async (request) => {
+        const dir = worktreeOf(request);
+        const base = refSchema.parse((request.query as { base?: string }).base);
+
+        return gitOps.changedFiles(dir, base);
+    });
+
+    app.post('/worktrees/:slug/git/commit', async (request, reply) => {
+        const dir = worktreeOf(request);
+        const body = commitSchema.parse(request.body);
+        const result = await gitOps.commit(dir, body.subject, body.body, body.author);
+        if (result === null) {
+            throw new CodedError(409, 'no_changes', 'Nothing to commit');
+        }
+
+        return reply.code(201).send(result);
+    });
+
+    app.post('/worktrees/:slug/git/push', async (request, reply) => {
+        const dir = worktreeOf(request);
+        const { branch } = z.object({ branch: refSchema }).parse(request.body);
+        await gitOps.push(dir, branch);
+
+        return reply.code(202).send({});
+    });
+
+    app.post('/worktrees/:slug/checkpoints', async (request, reply) => {
+        const dir = worktreeOf(request);
+        const body = z.object({ task_id: idSchema, label: z.string().max(120).default('') }).parse(request.body);
+        const checkpoint = await checkpointsFor(dir).create(body.task_id, body.label);
+        announceCheckpoint(body.task_id, checkpoint, null);
+
+        return reply.code(201).send(checkpoint);
+    });
+
+    app.get('/worktrees/:slug/checkpoints/diff', async (request) => {
+        const dir = worktreeOf(request);
+        const { ref } = z.object({ ref: checkpointRefSchema }).parse(request.query);
+
+        return checkpointsFor(dir).diff(ref);
+    });
+
+    app.post('/worktrees/:slug/checkpoints/restore', async (request) => {
+        const dir = worktreeOf(request);
+        const { ref } = z.object({ ref: checkpointRefSchema }).parse(request.body);
+        const { taskId } = parseRef(ref);
+        // A restore rewrites this task's working tree: its session must be quiet.
+        const busy = [...sessions.values()].find(
+            (s) => s.cwd === dir && (s.currentState === 'running' || s.currentState === 'starting' || s.currentState === 'waiting_input'),
+        );
+        if (busy !== undefined) {
+            throw new CodedError(409, 'task_running', 'Claude is working in this task; interrupt it first');
+        }
+        const result = await checkpointsFor(dir).restore(ref);
+        announceCheckpoint(taskId, result.before, null);
+
+        return result;
+    });
+
+    app.post('/worktrees/:slug/gates/run', async (request, reply) => {
+        const dir = worktreeOf(request);
+        const body = z.object({ run_id: idSchema, base_commit: z.string().regex(/^[0-9a-f]{40}$/).nullish() }).parse(request.body);
+        void gateRunner().start(body.run_id, dir, body.base_commit ?? null);
+
+        return reply.code(202).send({ run_id: body.run_id });
+    });
+
+    app.get('/worktrees/:slug/gates/fix-prompt', async (request) => {
+        const dir = worktreeOf(request);
+        const query = z.object({ gate: z.string().regex(GATE_NAME_PATTERN), run_id: idSchema }).parse(request.query);
+
+        return { prompt: await gateRunner().fixPrompt(query.gate, query.run_id, dir) };
+    });
+
+    // ── Task sessions ────────────────────────────────────────────────────
 
     app.post('/tasks/:id/start', async (request) => {
         const id = idSchema.parse((request.params as { id?: string }).id);
@@ -177,11 +415,17 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
         if (existing !== undefined && existing.currentState !== 'closed') {
             return { state: existing.currentState };
         }
+        const cwd = worktreeDir(layout, body.worktree);
+        if (!existsSync(join(cwd, '.git'))) {
+            throw new CodedError(409, 'worktree_missing', 'This task has no working copy yet');
+        }
 
         deps.outbox.setSeqOffset(id, body.seq_offset);
         const session = new TaskSession(
             id,
             {
+                cwd,
+                guard: body.guard,
                 agentId: body.agent_id,
                 oauthToken: body.oauth_token,
                 model: body.model,
@@ -193,7 +437,7 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
             approvals,
             deps.queryFactory,
             deps.environment,
-            async (clientMsgId) => announceCheckpoint(id, await checkpoints.create(id, ''), clientMsgId),
+            async (clientMsgId) => announceCheckpoint(id, await checkpointsFor(cwd).create(id, ''), clientMsgId),
         );
         sessions.set(id, session);
         session.start();
@@ -249,116 +493,6 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
         sessions.delete(session.taskId);
 
         return reply.code(202).send({});
-    });
-
-    const dir = deps.environment.workspaceDir;
-    const fileIndex = new FileIndex(dir);
-
-    app.get('/files', async (request) => {
-        const query = z.object({ q: z.string().max(200).default(''), limit: z.coerce.number().int().min(1).max(50).default(20) }).parse(request.query);
-
-        return { files: await fileIndex.search(query.q, query.limit) };
-    });
-
-    app.get('/files/content', async (request) => {
-        const query = z.object({ path: z.string().min(1).max(1000) }).parse(request.query);
-
-        return readWorkspaceFile(dir, query.path);
-    });
-
-    app.get('/git/status', async () => gitOps.status(dir));
-
-    app.get('/git/diff', async (request) => {
-        const query = request.query as { base?: string; path?: string };
-        const base = refSchema.parse(query.base);
-        const path = query.path === undefined ? null : pathSchema.parse(query.path);
-
-        return gitOps.diffAgainst(dir, base, 512 * 1024, path);
-    });
-
-    app.get('/git/changes', async (request) => {
-        const base = refSchema.parse((request.query as { base?: string }).base);
-
-        return gitOps.changedFiles(dir, base);
-    });
-
-    app.post('/git/fetch', async (_request, reply) => {
-        await gitOps.fetch(dir);
-
-        return reply.code(202).send({});
-    });
-
-    app.post('/git/commit', async (request, reply) => {
-        const body = commitSchema.parse(request.body);
-        const result = await gitOps.commit(dir, body.subject, body.body, body.author);
-        if (result === null) {
-            throw new CodedError(409, 'no_changes', 'Nothing to commit');
-        }
-
-        return reply.code(201).send(result);
-    });
-
-    app.post('/git/push', async (request, reply) => {
-        const { branch } = z.object({ branch: refSchema }).parse(request.body);
-        await gitOps.push(dir, branch);
-
-        return reply.code(202).send({});
-    });
-
-    app.post('/checkpoints', async (request, reply) => {
-        const body = z.object({ task_id: idSchema, label: z.string().max(120).default('') }).parse(request.body);
-        const checkpoint = await checkpoints.create(body.task_id, body.label);
-        announceCheckpoint(body.task_id, checkpoint, null);
-
-        return reply.code(201).send(checkpoint);
-    });
-
-    app.get('/checkpoints/diff', async (request) => {
-        const { ref } = z.object({ ref: checkpointRefSchema }).parse(request.query);
-
-        return checkpoints.diff(ref);
-    });
-
-    app.post('/checkpoints/restore', async (request) => {
-        const { ref } = z.object({ ref: checkpointRefSchema }).parse(request.body);
-        const { taskId } = parseRef(ref);
-        // A restore rewrites the whole working tree, so no task may be working.
-        const busy = [...sessions.values()].find((s) => s.currentState === 'running' || s.currentState === 'starting' || s.currentState === 'waiting_input');
-        if (busy !== undefined) {
-            throw new CodedError(409, 'task_running', busy.taskId === taskId ? 'Claude is working in this task; interrupt it first' : `Claude is working in task ${busy.taskId}; interrupt it first`);
-        }
-        const result = await checkpoints.restore(ref);
-        announceCheckpoint(taskId, result.before, null);
-
-        return result;
-    });
-
-    app.get('/gates', async () => ({ running: gateRunner().running, baseline: gateRunner().baseline }));
-
-    app.post('/gates/run', async (request, reply) => {
-        const { run_id: runId } = z.object({ run_id: idSchema }).parse(request.body);
-        void gateRunner().start(runId);
-
-        return reply.code(202).send({ run_id: runId });
-    });
-
-    app.get('/gates/fix-prompt', async (request) => {
-        const query = z.object({ gate: z.string().regex(GATE_NAME_PATTERN), run_id: idSchema }).parse(request.query);
-
-        return { prompt: await gateRunner().fixPrompt(query.gate, query.run_id) };
-    });
-
-    app.post('/oneshot', async (request) => {
-        const body = oneshotSchema.parse(request.body);
-        if (deps.oneshotRunner === undefined) {
-            throw new CodedError(501, 'oneshot_unavailable', 'One-shot prompts are not configured');
-        }
-
-        return runOneshot(
-            deps.oneshotRunner,
-            { agentId: body.agent_id, oauthToken: body.oauth_token, model: body.model, systemPrompt: body.system_prompt, userPrompt: body.user_prompt, jsonSchema: body.json_schema },
-            deps.environment,
-        );
     });
 
     return { app, sessions };

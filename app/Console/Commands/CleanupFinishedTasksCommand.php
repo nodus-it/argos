@@ -12,6 +12,7 @@ use Illuminate\Console\Command;
  * Cleans up finished tasks (done or cancelled) once their workspace's
  * `cleanup_after_days` have passed: preview, worktree and database go, the
  * conversation stays readable. Remote branches and pull requests are kept.
+ * Tasks of a stopped workspace wait for a pass while it runs.
  */
 class CleanupFinishedTasksCommand extends Command
 {
@@ -32,11 +33,16 @@ class CleanupFinishedTasksCommand extends Command
                 if ($task->done_at === null || $task->done_at->gt(now()->subDays($task->workspace->cleanup_after_days))) {
                     return;
                 }
-                $this->line(($this->option('dry-run') ? '[dry-run] ' : '').'Cleaning up '.$task->workspace->slug.'/'.$task->slug);
-                if (! $this->option('dry-run')) {
-                    $cleanup->cleanup($task);
+                if ($this->option('dry-run')) {
+                    $this->line('[dry-run] Cleaning up '.$task->workspace->slug.'/'.$task->slug);
+                    $cleaned++;
+
+                    return;
                 }
-                $cleaned++;
+                if ($cleanup->cleanup($task)) {
+                    $this->line('Cleaned up '.$task->workspace->slug.'/'.$task->slug);
+                    $cleaned++;
+                }
             });
 
         $this->info("{$cleaned} finished task(s) cleaned up.");

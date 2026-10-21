@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Testing;
 
 use App\Enums\ApprovalKind;
+use App\Enums\SessionStatus;
 use App\Enums\PermissionMode;
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
 use App\Integrations\WorkspaceDaemon\WorkspaceDaemonTransport;
@@ -85,7 +86,7 @@ class FakeWorkspaceDaemon extends WorkspaceDaemonClient implements WorkspaceDaem
                 'tool_use_id' => 'toolu_fake',
                 'kind' => 'tool',
                 'tool_name' => 'Edit',
-                'input' => ['file_path' => '/workspace/README.md', 'old_string' => 'Hello', 'new_string' => 'Hello Argos'],
+                'input' => ['file_path' => '/workspace/tasks/'.(string) Task::query()->whereKey($taskId)->value('slug').'/README.md', 'old_string' => 'Hello', 'new_string' => 'Hello Argos'],
             ]];
             $events[] = ['status', ['state' => 'waiting_input']];
         } else {
@@ -172,7 +173,52 @@ class FakeWorkspaceDaemon extends WorkspaceDaemonClient implements WorkspaceDaem
         $this->emit($taskId, [['status', ['state' => 'closed']]]);
     }
 
-    public function gitStatus(): array
+    /** Back to the defaults (between tests). */
+    public static function reset(): void
+    {
+        self::$prepareOutcome = 'ok';
+        self::$prepared = [];
+        self::$removed = [];
+        self::$diff = null;
+        self::$fileContents = [];
+        self::$gateOutcome = 'fail';
+    }
+
+    /** What the next preparations report: `ok`, `setup_failed` or `failed`. */
+    public static string $prepareOutcome = 'ok';
+
+    /** Worktrees prepared / removed (slug => payload), for assertions. */
+    public static array $prepared = [];
+
+    /** @var list<string> */
+    public static array $removed = [];
+
+    /** Prepares synchronously: the worktree is "there" right away. */
+    public function prepareWorktree(string $worktree, array $payload): void
+    {
+        self::$prepared[$worktree] = $payload;
+        $events = [['prepare.step', ['step' => 'worktree']]];
+        if (self::$prepareOutcome === 'failed') {
+            $events[] = ['prepare.failed', ['code' => 'branch_not_found', 'message' => 'Base branch does not exist on the remote']];
+        } else {
+            $events[] = ['prepare.step', ['step' => 'setup']];
+            $events[] = ['prepare.completed', [
+                'path' => '/workspace/tasks/'.$worktree,
+                'base_commit' => str_repeat('b', 40),
+                'created' => true,
+                'setup' => self::$prepareOutcome === 'setup_failed' ? 'failed' : 'ok',
+                'log' => "[setup] composer install\n[setup] done\n",
+            ]];
+        }
+        $this->emit((string) $payload['task_id'], $events);
+    }
+
+    public function removeWorktree(string $worktree): void
+    {
+        self::$removed[] = $worktree;
+    }
+
+    public function gitStatus(string $worktree): array
     {
         return ['branch' => $this->workspace?->default_branch, 'upstream' => null, 'ahead' => 1, 'behind' => 0, 'dirty' => true, 'files' => [['path' => 'README.md', 'status' => 'M']]];
     }
@@ -180,7 +226,7 @@ class FakeWorkspaceDaemon extends WorkspaceDaemonClient implements WorkspaceDaem
     /** The working tree's diff against the base branch (tests replace it). */
     public static ?string $diff = null;
 
-    public function gitDiff(string $base, ?string $path = null): array
+    public function gitDiff(string $worktree, string $base, ?string $path = null): array
     {
         $diff = self::$diff ?? "diff --git a/README.md b/README.md\n--- a/README.md\n+++ b/README.md\n@@ -1 +1 @@\n-Hello\n+Hello Argos\n";
         if ($path !== null) {
@@ -192,9 +238,9 @@ class FakeWorkspaceDaemon extends WorkspaceDaemonClient implements WorkspaceDaem
         return ['diff' => $diff, 'truncated' => false];
     }
 
-    public function gitChanges(string $base): array
+    public function gitChanges(string $worktree, string $base): array
     {
-        $files = (new DiffParser)->parse($this->gitDiff($base)['diff']);
+        $files = (new DiffParser)->parse($this->gitDiff($worktree, $base)['diff']);
 
         return array_map(function (array $f): array {
             $path = $f['to_path'] !== '' ? $f['to_path'] : $f['from_path'];
@@ -214,7 +260,7 @@ class FakeWorkspaceDaemon extends WorkspaceDaemonClient implements WorkspaceDaem
 
     public function gitFetch(): void {}
 
-    public function files(string $query, int $limit = 20): array
+    public function files(string $worktree, string $query, int $limit = 20): array
     {
         $all = ['README.md', 'app/Http/Controllers/LoginController.php', 'app/Models/User.php', 'routes/web.php'];
 
@@ -224,7 +270,7 @@ class FakeWorkspaceDaemon extends WorkspaceDaemonClient implements WorkspaceDaem
     /** Files the fake working tree serves to the review (path => content). */
     public static array $fileContents = [];
 
-    public function fileContent(string $path): array
+    public function fileContent(string $worktree, string $path): array
     {
         return ['content' => self::$fileContents[$path] ?? implode("\n", array_map(fn (int $n): string => 'line '.$n, range(1, 60)))."\n", 'truncated' => false];
     }
@@ -233,7 +279,7 @@ class FakeWorkspaceDaemon extends WorkspaceDaemonClient implements WorkspaceDaem
     public static string $gateOutcome = 'fail';
 
     /** Gates: pint passes, pest fails with one test (or passes) — enough to drive the fix flow. */
-    public function runGates(string $runId): void
+    public function runGates(string $worktree, string $runId, ?string $baseCommit): void
     {
         if ($this->workspace === null) {
             throw new \LogicException('FakeWorkspaceDaemon used without a workspace');
@@ -250,25 +296,27 @@ class FakeWorkspaceDaemon extends WorkspaceDaemonClient implements WorkspaceDaem
         ]);
     }
 
-    public function gateFixPrompt(string $gate, string $runId): string
+    public function gateFixPrompt(string $worktree, string $gate, string $runId): string
     {
         return "# Quality-Gate-Fix: {$gate}\n\nTests sind fehlgeschlagen.\n";
     }
 
-    public function createCheckpoint(string $taskId, string $label): array
+    public function createCheckpoint(string $worktree, string $taskId, string $label): array
     {
         return [...$this->nextCheckpoint($taskId), 'label' => $label];
     }
 
-    public function checkpointDiff(string $ref): array
+    public function checkpointDiff(string $worktree, string $ref): array
     {
         return ['diff' => "diff --git a/README.md b/README.md\n--- a/README.md\n+++ b/README.md\n@@ -1 +1 @@\n-Hello\n+Hello Argos\n", 'truncated' => false, 'head' => str_repeat('0', 40)];
     }
 
-    public function restoreCheckpoint(string $ref): array
+    public function restoreCheckpoint(string $worktree, string $ref): array
     {
         $taskId = explode('/', $ref)[3] ?? '';
-        if (in_array(Task::query()->whereKey($taskId)->value('status'), ['running', 'waiting_input'], true)) {
+        $state = Task::query()->whereKey($taskId)->value('session_status');
+        $state = $state instanceof SessionStatus ? $state->value : $state;
+        if (in_array($state, ['running', 'waiting_input'], true)) {
             throw new DaemonTransportException('Claude is working in this task; interrupt it first', 409, 'task_running');
         }
 
@@ -283,12 +331,12 @@ class FakeWorkspaceDaemon extends WorkspaceDaemonClient implements WorkspaceDaem
         return ['ref' => "refs/argos/checkpoints/{$taskId}/{$n}", 'n' => $n, 'sha' => str_pad(dechex($n), 40, 'c', STR_PAD_LEFT), 'head' => str_repeat('0', 40)];
     }
 
-    public function gitCommit(string $subject, string $body, array $author): ?array
+    public function gitCommit(string $worktree, string $subject, string $body, array $author): ?array
     {
         return ['sha' => str_repeat('a', 40)];
     }
 
-    public function gitPush(string $branch): void {}
+    public function gitPush(string $worktree, string $branch): void {}
 
     public function oneshot(array $payload): array
     {

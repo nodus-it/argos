@@ -17,6 +17,7 @@ use App\Enums\TaskStatus;
 use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceStatus;
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
+use App\Jobs\Workspace\PrepareTaskJob;
 use App\Models\AgentCredential;
 use App\Models\Task;
 use App\Models\TaskApproval;
@@ -73,7 +74,7 @@ class TaskService
             'created_by' => $by->id,
             'parent_task_id' => $options['parent_task_id'] ?? null,
             'title' => $title,
-            'status' => TaskStatus::Active,
+            'status' => TaskStatus::Preparing,
             'session_status' => SessionStatus::Closed,
             'branch' => $this->namer->branch($workspace, $title, isset($ref['key']) ? (string) $ref['key'] : null),
             'base_branch' => $baseBranch !== null && $baseBranch !== '' ? $baseBranch : $workspace->default_branch,
@@ -84,6 +85,9 @@ class TaskService
             'cost_usd' => 0,
             'session_open' => false,
         ])->save();
+
+        // Worktree, database and setup commands; Claude starts after that.
+        PrepareTaskJob::dispatch($task->id)->afterCommit();
 
         return $task;
     }
@@ -97,6 +101,9 @@ class TaskService
         if ($workspace->status !== WorkspaceStatus::Running) {
             throw WorkspaceException::translated('workspaces.errors.not_running');
         }
+        if ($task->status === TaskStatus::Preparing) {
+            throw WorkspaceException::translated('workspaces.errors.preparing');
+        }
 
         $this->pool->acquire($task);
         $agent = $task->agentCredential;
@@ -107,6 +114,9 @@ class TaskService
 
         try {
             $this->daemon->for($workspace)->startTask($task->id, [
+                'worktree' => $task->slug,
+                // Nobody answers in an automatic run: file tools outside the task's folder are refused.
+                'guard' => $task->auto_state?->isRunning() === true ? 'deny' : 'ask',
                 'agent_id' => $agent->id,
                 'oauth_token' => (string) ($agent->credentials['token'] ?? ''),
                 'model' => $task->model,
@@ -350,6 +360,7 @@ class TaskService
             'You are working inside an Argos workspace (an interactive, browser-based Claude Code session).',
             "Project: {$workspace->name}. Task: {$task->title}. Branch: {$task->branch} (based on {$task->base_branch}).",
             'Several humans may write in this task; every user message starts with the author in brackets, e.g. "[Ada]: …". Address people by name when it helps.',
+            "Work only in this task's own folder ({$task->worktree_path}): it has its own branch, database and preview. Other tasks of the workspace have their own folders — leave them alone.",
             'Humans may edit files in the editor while you work — re-read a file before changing it if it might have moved on.',
             'Do not push and do not open pull requests: the humans ship through Argos. Commit only when someone asks you to.',
         ]);

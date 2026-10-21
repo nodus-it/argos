@@ -227,6 +227,13 @@ async function untrackedDiff(dir: string, path: string): Promise<string> {
     return (await gitUnchecked(['diff', '--no-color', '--no-index', '--', '/dev/null', path], dir)).stdout;
 }
 
+/** HEAD's commit, or null in a repository without commits. */
+export async function headCommit(dir: string): Promise<string | null> {
+    const result = await gitUnchecked(['rev-parse', '--verify', '--quiet', 'HEAD^{commit}'], dir);
+
+    return result.exitCode === 0 ? result.stdout.trim() : null;
+}
+
 export async function fetch(dir: string): Promise<void> {
     await git(['fetch', '--prune', 'origin'], dir);
 }

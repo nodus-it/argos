@@ -7,6 +7,9 @@
 #   quality_gate_verdict  GATES_JSON print failing gate name, exit 4 if any fails
 
 # shellcheck shell=bash
+#
+# All gates work on the checkout in QUALITY_DIR (default /workspace) — a
+# workspace task's worktree sets it to its own folder.
 
 # quality_ensure_workspace_dotenv: make sure /workspace/.env exists so
 # Laravel's Foundation\Bootstrap\LoadEnvironmentVariables (via vlucas/
@@ -21,16 +24,16 @@
 # entries, so the seeded `.env` only needs to exist; contents don't
 # matter. Idempotent.
 quality_ensure_workspace_dotenv() {
-    if [[ -f /workspace/.env ]]; then
+    if [[ -f "${QUALITY_DIR:-/workspace}/.env" ]]; then
         return 0
     fi
-    if [[ -f /workspace/.env.example ]]; then
-        cp /workspace/.env.example /workspace/.env
+    if [[ -f "${QUALITY_DIR:-/workspace}/.env.example" ]]; then
+        cp "${QUALITY_DIR:-/workspace}/.env.example" "${QUALITY_DIR:-/workspace}/.env"
         log_info "workspace: seeded .env from .env.example"
         return 0
     fi
     # No example to copy — drop a minimal stub so the file at least exists.
-    : > /workspace/.env
+    : > "${QUALITY_DIR:-/workspace}/.env"
     log_info "workspace: created empty .env (no .env.example present)"
     return 0
 }
@@ -47,11 +50,11 @@ quality_ensure_workspace_dotenv() {
 # we drop a placeholder one. The worker never serves the frontend, so the dummy
 # URL is inert. Idempotent.
 quality_ensure_vite_hot() {
-    if [[ -f /workspace/public/hot ]]; then
+    if [[ -f "${QUALITY_DIR:-/workspace}/public/hot" ]]; then
         return 0
     fi
-    mkdir -p /workspace/public
-    printf '%s' 'http://localhost:5173' > /workspace/public/hot
+    mkdir -p "${QUALITY_DIR:-/workspace}/public"
+    printf '%s' 'http://localhost:5173' > "${QUALITY_DIR:-/workspace}/public/hot"
     log_info "workspace: seeded public/hot (Vite stub) so artisan can boot without built assets"
     return 0
 }
@@ -59,7 +62,7 @@ quality_ensure_vite_hot() {
 # quality_changed_php_files: list PHP files modified or added in /workspace.
 # Output: NUL-separated file paths relative to /workspace root.
 quality_changed_php_files() {
-    (cd /workspace && {
+    (cd "${QUALITY_DIR:-/workspace}" && {
         git diff -z --name-only --diff-filter=ACMR HEAD -- '*.php'
         git ls-files -z --others --exclude-standard -- '*.php'
     } | sort -uz)
@@ -73,15 +76,15 @@ quality_changed_php_files() {
 # anything; idempotent so re-runs on later iterations reuse the first capture.
 # Best-effort — a missing/failed baseline falls back to strict gating.
 quality_pest_baseline_capture() {
-    [[ -f /workspace/.agent/pest-baseline.xml ]] && return 0
-    if [[ -x /workspace/vendor/bin/pest ]]; then
+    [[ -f "${QUALITY_DIR:-/workspace}/.agent/pest-baseline.xml" ]] && return 0
+    if [[ -x "${QUALITY_DIR:-/workspace}/vendor/bin/pest" ]]; then
         log_info "quality: capturing pest baseline (pre-existing failures) on the clean checkout"
-        (cd /workspace && vendor/bin/pest --no-coverage --log-junit /workspace/.agent/pest-baseline.xml) \
-            &> /workspace/.agent/logs/pest-baseline.log || true
-    elif [[ -x /workspace/vendor/bin/phpunit ]]; then
+        (cd "${QUALITY_DIR:-/workspace}" && vendor/bin/pest --no-coverage --log-junit "${QUALITY_DIR:-/workspace}/.agent/pest-baseline.xml") \
+            &> "${QUALITY_DIR:-/workspace}/.agent/logs/pest-baseline.log" || true
+    elif [[ -x "${QUALITY_DIR:-/workspace}/vendor/bin/phpunit" ]]; then
         log_info "quality: capturing phpunit baseline (pre-existing failures) on the clean checkout"
-        (cd /workspace && vendor/bin/phpunit --log-junit /workspace/.agent/pest-baseline.xml) \
-            &> /workspace/.agent/logs/pest-baseline.log || true
+        (cd "${QUALITY_DIR:-/workspace}" && vendor/bin/phpunit --log-junit "${QUALITY_DIR:-/workspace}/.agent/pest-baseline.xml") \
+            &> "${QUALITY_DIR:-/workspace}/.agent/logs/pest-baseline.log" || true
     fi
     return 0
 }
@@ -95,12 +98,12 @@ quality_pest_baseline_capture() {
 # baseline falls back to strict gating. PHPStan exits non-zero when it finds
 # errors, so the `|| true` keeps the JSON report (written to stdout) intact.
 quality_phpstan_baseline_capture() {
-    [[ -f /workspace/.agent/phpstan-baseline.json ]] && return 0
-    if { [[ -f /workspace/phpstan.neon ]] || [[ -f /workspace/phpstan.neon.dist ]]; } \
-            && [[ -x /workspace/vendor/bin/phpstan ]]; then
+    [[ -f "${QUALITY_DIR:-/workspace}/.agent/phpstan-baseline.json" ]] && return 0
+    if { [[ -f "${QUALITY_DIR:-/workspace}/phpstan.neon" ]] || [[ -f "${QUALITY_DIR:-/workspace}/phpstan.neon.dist" ]]; } \
+            && [[ -x "${QUALITY_DIR:-/workspace}/vendor/bin/phpstan" ]]; then
         log_info "quality: capturing phpstan baseline (pre-existing errors) on the clean checkout"
-        (cd /workspace && vendor/bin/phpstan analyse --no-progress --error-format=json \
-            > /workspace/.agent/phpstan-baseline.json 2> /workspace/.agent/logs/phpstan-baseline.log) || true
+        (cd "${QUALITY_DIR:-/workspace}" && vendor/bin/phpstan analyse --no-progress --error-format=json \
+            > "${QUALITY_DIR:-/workspace}/.agent/phpstan-baseline.json" 2> "${QUALITY_DIR:-/workspace}/.agent/logs/phpstan-baseline.log") || true
     fi
     return 0
 }
@@ -172,7 +175,10 @@ function errors(string $f): array {
             if ($msg === '') {
                 continue;
             }
-            $out[] = ['path' => (string) $path, 'line' => (int) ($m['line'] ?? 0), 'msg' => $msg];
+            // Relative to the checkout: the baseline may come from another
+            // checkout of the same commit (main clone vs. task worktree).
+            $rel = (string) preg_replace('#^/workspace/(?:repo/|tasks/[^/]+/)?#', '', (string) $path);
+            $out[] = ['path' => $rel, 'line' => (int) ($m['line'] ?? 0), 'msg' => $msg];
         }
     }
     return $out;
@@ -188,7 +194,7 @@ foreach (errors($argv[2] ?? '') as $e) {
         $baseCounts[$k]--;
         continue;
     }
-    $rel = preg_replace('#^/workspace/#', '', $e['path']);
+    $rel = $e['path'];
     echo $rel.':'.$e['line'].': '.$e['msg']."\n";
 }
 PHP
@@ -232,9 +238,9 @@ quality_gates_run() {
     # ── 1. php artisan smoke test ─────────────────────────────────────────
     # Verifies the app bootstraps: service providers, autoload, config.
     # A fatal error here makes test results meaningless.
-    if [[ -f /workspace/artisan ]]; then
-        if (cd /workspace && php artisan list --no-ansi) \
-                &> "/workspace/.agent/logs/artisan-smoke.${iteration}.log"; then
+    if [[ -f "${QUALITY_DIR:-/workspace}/artisan" ]]; then
+        if (cd "${QUALITY_DIR:-/workspace}" && php artisan list --no-ansi) \
+                &> "${QUALITY_DIR:-/workspace}/.agent/logs/artisan-smoke.${iteration}.log"; then
             gates="$(printf '%s' "$gates" | jq '.artisan = "pass"')"
         else
             gates="$(printf '%s' "$gates" | jq '.artisan = "fail"')"
@@ -244,15 +250,15 @@ quality_gates_run() {
     # ── 2. Pint (code style) ─────────────────────────────────────────────
     # Only lint files Claude actually touched — pre-existing debt is not
     # Claude's to fix and would otherwise block every implement run.
-    if [[ -x /workspace/vendor/bin/pint ]]; then
+    if [[ -x "${QUALITY_DIR:-/workspace}/vendor/bin/pint" ]]; then
         local -a changed_files=()
         mapfile -d '' -t changed_files < <(quality_changed_php_files)
 
         if [[ ${#changed_files[@]} -eq 0 ]]; then
             gates="$(printf '%s' "$gates" | jq '.pint = "skip"')"
         else
-            if (cd /workspace && vendor/bin/pint --test "${changed_files[@]}") \
-                    &> "/workspace/.agent/logs/pint.${iteration}.log"; then
+            if (cd "${QUALITY_DIR:-/workspace}" && vendor/bin/pint --test "${changed_files[@]}") \
+                    &> "${QUALITY_DIR:-/workspace}/.agent/logs/pint.${iteration}.log"; then
                 gates="$(printf '%s' "$gates" | jq '.pint = "pass"')"
             else
                 gates="$(printf '%s' "$gates" | jq '.pint = "fail"')"
@@ -267,9 +273,9 @@ quality_gates_run() {
     # never block (otherwise every implement → PR is unwinnable on a repo that
     # is not 100% green). No baseline → every failure counts (strict).
     local new_failures
-    if [[ -x /workspace/vendor/bin/pest ]]; then
-        local pest_log="/workspace/.agent/logs/pest.${iteration}.log" pest_exit=0
-        (cd /workspace && vendor/bin/pest --no-coverage --log-junit "/workspace/.agent/logs/pest.${iteration}.xml") \
+    if [[ -x "${QUALITY_DIR:-/workspace}/vendor/bin/pest" ]]; then
+        local pest_log="${QUALITY_DIR:-/workspace}/.agent/logs/pest.${iteration}.log" pest_exit=0
+        (cd "${QUALITY_DIR:-/workspace}" && vendor/bin/pest --no-coverage --log-junit "${QUALITY_DIR:-/workspace}/.agent/logs/pest.${iteration}.xml") \
             &> "$pest_log" || pest_exit=$?
         if [[ "$pest_exit" -eq 0 ]]; then
             gates="$(printf '%s' "$gates" | jq '.pest = "pass"')"
@@ -278,7 +284,7 @@ quality_gates_run() {
             printf '\n── Pest crashed on infrastructure (OOM/config/binary), not a real finding — gate skipped, NOT sent to remediation ──\n' \
                 >> "$pest_log"
         else
-            new_failures="$(quality_pest_new_failures /workspace/.agent/pest-baseline.xml "/workspace/.agent/logs/pest.${iteration}.xml")"
+            new_failures="$(quality_pest_new_failures "${QUALITY_DIR:-/workspace}/.agent/pest-baseline.xml" "${QUALITY_DIR:-/workspace}/.agent/logs/pest.${iteration}.xml")"
             if [[ -n "$new_failures" ]]; then
                 gates="$(printf '%s' "$gates" | jq '.pest = "fail"')"
                 { printf '\n── New failures vs. baseline (these block the gate) ──\n'; printf '%s\n' "$new_failures"; } \
@@ -289,9 +295,9 @@ quality_gates_run() {
                     >> "$pest_log"
             fi
         fi
-    elif [[ -x /workspace/vendor/bin/phpunit ]]; then
-        local phpunit_log="/workspace/.agent/logs/phpunit.${iteration}.log" phpunit_exit=0
-        (cd /workspace && vendor/bin/phpunit --log-junit "/workspace/.agent/logs/phpunit.${iteration}.xml") \
+    elif [[ -x "${QUALITY_DIR:-/workspace}/vendor/bin/phpunit" ]]; then
+        local phpunit_log="${QUALITY_DIR:-/workspace}/.agent/logs/phpunit.${iteration}.log" phpunit_exit=0
+        (cd "${QUALITY_DIR:-/workspace}" && vendor/bin/phpunit --log-junit "${QUALITY_DIR:-/workspace}/.agent/logs/phpunit.${iteration}.xml") \
             &> "$phpunit_log" || phpunit_exit=$?
         if [[ "$phpunit_exit" -eq 0 ]]; then
             gates="$(printf '%s' "$gates" | jq '.phpunit = "pass"')"
@@ -300,7 +306,7 @@ quality_gates_run() {
             printf '\n── PHPUnit crashed on infrastructure (OOM/config/binary), not a real finding — gate skipped, NOT sent to remediation ──\n' \
                 >> "$phpunit_log"
         else
-            new_failures="$(quality_pest_new_failures /workspace/.agent/pest-baseline.xml "/workspace/.agent/logs/phpunit.${iteration}.xml")"
+            new_failures="$(quality_pest_new_failures "${QUALITY_DIR:-/workspace}/.agent/pest-baseline.xml" "${QUALITY_DIR:-/workspace}/.agent/logs/phpunit.${iteration}.xml")"
             if [[ -n "$new_failures" ]]; then
                 gates="$(printf '%s' "$gates" | jq '.phpunit = "fail"')"
                 { printf '\n── New failures vs. baseline (these block the gate) ──\n'; printf '%s\n' "$new_failures"; } \
@@ -320,11 +326,11 @@ quality_gates_run() {
     # every error counts → strict gating. The stderr stream is kept separately so
     # the infra-crash heuristic can inspect it (OOM/broken config go there, not
     # into the json report).
-    if [[ -f /workspace/phpstan.neon || -f /workspace/phpstan.neon.dist ]] \
-            && [[ -x /workspace/vendor/bin/phpstan ]]; then
-        local phpstan_log="/workspace/.agent/logs/phpstan.${iteration}.log" phpstan_exit=0
-        local phpstan_json="/workspace/.agent/logs/phpstan.${iteration}.json"
-        (cd /workspace && vendor/bin/phpstan analyse --no-progress --error-format=json \
+    if [[ -f "${QUALITY_DIR:-/workspace}/phpstan.neon" || -f "${QUALITY_DIR:-/workspace}/phpstan.neon.dist" ]] \
+            && [[ -x "${QUALITY_DIR:-/workspace}/vendor/bin/phpstan" ]]; then
+        local phpstan_log="${QUALITY_DIR:-/workspace}/.agent/logs/phpstan.${iteration}.log" phpstan_exit=0
+        local phpstan_json="${QUALITY_DIR:-/workspace}/.agent/logs/phpstan.${iteration}.json"
+        (cd "${QUALITY_DIR:-/workspace}" && vendor/bin/phpstan analyse --no-progress --error-format=json \
             > "$phpstan_json" 2> "$phpstan_log") || phpstan_exit=$?
         if [[ "$phpstan_exit" -eq 0 ]]; then
             gates="$(printf '%s' "$gates" | jq '.phpstan = "pass"')"
@@ -338,7 +344,7 @@ quality_gates_run() {
             gates="$(printf '%s' "$gates" | jq '.phpstan = "fail"')"
         else
             local new_errors
-            new_errors="$(quality_phpstan_new_errors /workspace/.agent/phpstan-baseline.json "$phpstan_json")"
+            new_errors="$(quality_phpstan_new_errors "${QUALITY_DIR:-/workspace}/.agent/phpstan-baseline.json" "$phpstan_json")"
             if [[ -n "$new_errors" ]]; then
                 gates="$(printf '%s' "$gates" | jq '.phpstan = "fail"')"
                 { printf 'PHPStan — new errors vs. baseline (these block the gate):\n\n'; printf '%s\n' "$new_errors"; } \
@@ -356,15 +362,15 @@ quality_gates_run() {
     # Only checks files Claude added in this session.
     local -a new_migrations=()
     mapfile -d '' -t new_migrations < <(
-        cd /workspace && git diff -z --name-only --diff-filter=A HEAD \
+        cd "${QUALITY_DIR:-/workspace}" && git diff -z --name-only --diff-filter=A HEAD \
             -- 'database/migrations/*.php' 2>/dev/null
     )
     if [[ ${#new_migrations[@]} -gt 0 ]]; then
         local migrations_ok=true
-        : > "/workspace/.agent/logs/migrations.${iteration}.log"
+        : > "${QUALITY_DIR:-/workspace}/.agent/logs/migrations.${iteration}.log"
         for mf in "${new_migrations[@]}"; do
-            if ! php -l "/workspace/$mf" \
-                    >> "/workspace/.agent/logs/migrations.${iteration}.log" 2>&1; then
+            if ! php -l "${QUALITY_DIR:-/workspace}/$mf" \
+                    >> "${QUALITY_DIR:-/workspace}/.agent/logs/migrations.${iteration}.log" 2>&1; then
                 migrations_ok=false
             fi
         done
@@ -383,13 +389,13 @@ quality_gates_run() {
     local -a nontestphp=()
     for f in "${all_changed[@]}"; do
         if [[ "$f" != tests/* && "$f" != test/* ]]; then
-            nontestphp+=("/workspace/$f")
+            nontestphp+=("${QUALITY_DIR:-/workspace}/$f")
         fi
     done
     if [[ ${#nontestphp[@]} -gt 0 ]]; then
         if grep -lE '\bdd\(|\bdump\(|\bray\(|\bvar_dump\(|\bddd\(' \
                 "${nontestphp[@]}" \
-                > "/workspace/.agent/logs/debug-code.${iteration}.log" 2>/dev/null; then
+                > "${QUALITY_DIR:-/workspace}/.agent/logs/debug-code.${iteration}.log" 2>/dev/null; then
             gates="$(printf '%s' "$gates" | jq '.debug_code = "fail"')"
         else
             gates="$(printf '%s' "$gates" | jq '.debug_code = "pass"')"
@@ -401,7 +407,7 @@ quality_gates_run() {
     # "warn" is logged but never blocks the push.
     local -a new_app_files=()
     mapfile -d '' -t new_app_files < <(
-        cd /workspace && git diff -z --name-only --diff-filter=A HEAD \
+        cd "${QUALITY_DIR:-/workspace}" && git diff -z --name-only --diff-filter=A HEAD \
             -- 'app/*.php' 'app/**/*.php' 2>/dev/null
     )
     if [[ ${#new_app_files[@]} -gt 0 ]]; then
@@ -409,20 +415,20 @@ quality_gates_run() {
         for f in "${new_app_files[@]}"; do
             local base
             base="$(basename "$f" .php)"
-            if ! find /workspace/tests -name "${base}Test.php" 2>/dev/null | grep -q .; then
+            if ! find "${QUALITY_DIR:-/workspace}/tests" -name "${base}Test.php" 2>/dev/null | grep -q .; then
                 untested+=("$f")
             fi
         done
         if [[ ${#untested[@]} -gt 0 ]]; then
             printf '%s\n' "${untested[@]}" \
-                > "/workspace/.agent/logs/untested.${iteration}.log"
+                > "${QUALITY_DIR:-/workspace}/.agent/logs/untested.${iteration}.log"
             gates="$(printf '%s' "$gates" | jq '.test_presence = "warn"')"
         else
             gates="$(printf '%s' "$gates" | jq '.test_presence = "pass"')"
         fi
     fi
 
-    printf '%s' "$gates" > "/workspace/.agent/quality-gates.${iteration}.json"
+    printf '%s' "$gates" > "${QUALITY_DIR:-/workspace}/.agent/quality-gates.${iteration}.json"
     printf '%s' "$gates"
 }
 
@@ -439,7 +445,7 @@ quality_gate_log_path() {
         debug_code) base="debug-code" ;;
         *)          base="$gate" ;;
     esac
-    printf '%s/%s.%s.log' "${QUALITY_LOG_DIR:-/workspace/.agent/logs}" "$base" "$suffix"
+    printf '%s/%s.%s.log' "${QUALITY_LOG_DIR:-${QUALITY_DIR:-/workspace}/.agent/logs}" "$base" "$suffix"
 }
 
 # quality_gate_log_converged: 0 if the latest gate log is byte-identical to the
@@ -512,7 +518,7 @@ quality_gate_fix_prompt() {
     local tail_lines="${QUALITY_GATE_LOG_TAIL_LINES:-200}"
 
     printf '# Quality-Gate-Fix: %s\n\n' "$gate"
-    printf 'Du befindest dich im Workspace `/workspace`. Nach deiner Implementierung ist das\n'
+    printf 'Du befindest dich im Workspace `%s`. Nach deiner Implementierung ist das\n' "${QUALITY_DIR:-/workspace}"
     printf 'Quality-Gate `%s` fehlgeschlagen.\n\n' "$gate"
 
     if [[ -n "$log_file" && -f "$log_file" && -s "$log_file" ]]; then

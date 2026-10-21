@@ -103,7 +103,13 @@ class DemoDeployerTest extends TestCase
             'workspace_mount' => '/var/www/html',
         ], 'http://demo-feat1.127.0.0.1.nip.io:8080');
 
-        $this->assertStringContainsString($workspace->volumeName().':/var/www/html', $yaml);
+        // Long syntax: the preview mounts only the task's worktree of the workspace volume.
+        $this->assertSame([[
+            'type' => 'volume',
+            'source' => $workspace->volumeName(),
+            'target' => '/var/www/html',
+            'volume' => ['subpath' => 'tasks/'.$task->slug],
+        ]], Yaml::parse($yaml)['services']['app']['volumes']);
         $this->assertStringContainsString('argos_edge', $yaml);
         $this->assertStringContainsString('demo-feat1', $yaml);
         // No Traefik labels — routing is file-provider, not docker-provider.
@@ -394,13 +400,16 @@ class DemoDeployerTest extends TestCase
 
     public function test_workspace_override_mounts_the_workspace_volume(): void
     {
-        $task = Task::factory()->create(['workspace_id' => Workspace::factory()->create(['slug' => 'login'])->id]);
+        $task = Task::factory()->create(['workspace_id' => Workspace::factory()->create(['slug' => 'login'])->id, 'slug' => 'fix-login']);
 
         $yaml = app(DemoComposeBuilder::class)->buildOverrideYaml($task, 'demo-login-x', [
             'service' => 'app', 'port' => 8000, 'workspace_mount' => '/var/www/html',
         ], 'http://demo-ws-login.127.0.0.1.nip.io:8080');
 
-        $this->assertStringContainsString('ws_login:/var/www/html', $yaml);
+        $volume = Yaml::parse($yaml)['services']['app']['volumes'][0];
+        $this->assertSame('ws_login', $volume['source']);
+        $this->assertSame('/var/www/html', $volume['target']);
+        $this->assertSame(['subpath' => 'tasks/fix-login'], $volume['volume']);
         // Contract commands run as the agent user, so the demo serves as it too.
         $this->assertSame('argos', Yaml::parse($yaml)['services']['app']['environment']['ARGOS_FPM_USER']);
     }

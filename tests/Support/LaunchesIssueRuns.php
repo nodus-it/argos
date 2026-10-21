@@ -6,6 +6,7 @@ namespace Tests\Support;
 
 use App\Enums\WorkspaceRole;
 use App\Jobs\Workspace\AdvanceAutoTaskJob;
+use App\Jobs\Workspace\PrepareTaskJob;
 use App\Jobs\Workspace\ProvisionWorkspaceJob;
 use App\Models\AgentCredential;
 use App\Models\User;
@@ -23,7 +24,7 @@ trait LaunchesIssueRuns
 {
     protected function prepareIssueRuns(Workspace $workspace): User
     {
-        Bus::fake([ProvisionWorkspaceJob::class, AdvanceAutoTaskJob::class]);
+        Bus::fake([ProvisionWorkspaceJob::class, AdvanceAutoTaskJob::class, PrepareTaskJob::class]);
 
         $user = User::factory()->create(['name' => 'Issue Bot']);
         AgentCredential::factory()->ownedBy($user)->create();
