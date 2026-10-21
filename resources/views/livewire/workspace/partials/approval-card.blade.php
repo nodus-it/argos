@@ -63,8 +63,13 @@
             @else
                 <div class="wf-approval-cmd mono">@if (! in_array($tool, ['Edit', 'MultiEdit', 'Write', 'NotebookEdit'], true)){{ $tool }} · @endif{{ Fmt::toolSummary($tool, $input) }}</div>
             @endif
-            @if (($p['description'] ?? '') !== '' || ($p['decision_reason'] ?? '') !== '')
-                <p class="muted">{{ $p['description'] ?? $p['decision_reason'] }}</p>
+            @php
+                $note = (string) (($p['description'] ?? '') !== '' ? $p['description'] : ($p['decision_reason'] ?? ''));
+                $shown = Fmt::toolSummary($tool, $input);
+            @endphp
+            {{-- Claude Code's description often just repeats the path or command. --}}
+            @if ($note !== '' && trim(str_replace('/workspace/', '', $note)) !== $shown && $note !== ($input['command'] ?? null))
+                <p class="muted">{{ $note }}</p>
             @endif
             @if (isset($input['old_string']) || isset($input['new_string']) || isset($input['content']))
                 <pre class="ws-diff mono">@if (isset($input['old_string']))<span class="del">{{ \Illuminate\Support\Str::limit((string) $input['old_string'], 1500) }}</span>
