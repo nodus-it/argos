@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { Options, PermissionMode, PermissionResult, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
+import type { Options, PermissionMode, PermissionResult, PermissionUpdate, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 import { ApprovalRegistry } from './approvals.js';
 import { applyClaudeBin, claudeChildEnv, type SessionEnvironment } from './claudeEnv.js';
 import type { EventSink, PendingEvent, ThreadState } from './events.js';
@@ -312,7 +312,14 @@ export class ThreadSession {
         }
 
         if (result.decision === 'allow') {
-            return { behavior: 'allow', updatedInput: result.updatedInput ?? input, toolUseID: options.toolUseID };
+            // "Always allow" hands Claude Code's own suggestions back (session rules).
+            const remember = result.remember === true && Array.isArray(options.suggestions) && options.suggestions.length > 0;
+            return {
+                behavior: 'allow',
+                updatedInput: result.updatedInput ?? input,
+                toolUseID: options.toolUseID,
+                ...(remember ? { updatedPermissions: options.suggestions as PermissionUpdate[] } : {}),
+            };
         }
 
         return { behavior: 'deny', message: result.message ?? 'Denied by user', interrupt: result.interrupt ?? false, toolUseID: options.toolUseID };

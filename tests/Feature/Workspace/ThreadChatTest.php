@@ -87,7 +87,7 @@ class ThreadChatTest extends TestCase
             ->assertSet('draft', '')
             ->assertSee('Hi Claude')
             ->assertSee('Echo: [Ada]: Hi Claude', false)
-            ->assertSee(__('workspaces.events.turn_done'));
+            ->assertSeeHtml('class="wf-claude-badge"');
 
         $this->assertTrue($thread->fresh()->session_open);
     }

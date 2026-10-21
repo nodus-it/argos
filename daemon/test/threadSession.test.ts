@@ -143,6 +143,22 @@ describe('ThreadSession', () => {
         await session.stop();
     });
 
+    it('applies the permission suggestions when "always allow" was chosen', async () => {
+        const suggestion = { type: 'addRules', rules: [{ toolName: 'Bash', ruleContent: 'npm run build' }], behavior: 'allow', destination: 'session' };
+        const script: Script = async function* (_message, ctx) {
+            const decision = await ctx.askPermission('Bash', { command: 'npm run build' }, 'toolu_b', [suggestion]);
+            yield assistantText('msg_4', JSON.stringify(decision));
+        };
+        const { session, approvals } = make(script);
+        session.start();
+        session.send({ clientMsgId: 'm1', author: { id: 1, name: 'A' }, text: 'build' });
+        await waitFor(() => ofType('approval.requested').length === 1);
+        approvals.resolve('thread_1', ofType('approval.requested')[0]!.data.approval_id as string, { decision: 'allow', remember: true });
+        await waitFor(() => ofType('turn.completed').length === 1);
+        expect(JSON.parse(ofType('assistant.message')[0]!.data.text as string)).toMatchObject({ behavior: 'allow', updatedPermissions: [suggestion] });
+        await session.stop();
+    });
+
     it('classifies plan and question approvals and passes updated input through', async () => {
         const script: Script = async function* (_message, ctx) {
             const answer = await ctx.askPermission('AskUserQuestion', { questions: [{ question: 'Which?' }] }, 'toolu_q');

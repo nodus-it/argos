@@ -60,6 +60,7 @@ const approvalSchema = z.object({
     decision: z.enum(['allow', 'deny']),
     updated_input: z.record(z.string(), z.unknown()).optional(),
     message: z.string().max(10_000).optional(),
+    remember: z.boolean().optional(),
 });
 
 const initSchema = z.object({
@@ -218,7 +219,7 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
         const session = sessionFor(request);
         const approvalId = z.string().min(1).parse((request.params as { approvalId?: string }).approvalId);
         const body = approvalSchema.parse(request.body);
-        approvals.resolve(session.threadId, approvalId, { decision: body.decision, updatedInput: body.updated_input, message: body.message });
+        approvals.resolve(session.threadId, approvalId, { decision: body.decision, updatedInput: body.updated_input, message: body.message, remember: body.remember });
 
         return reply.code(202).send({});
     });

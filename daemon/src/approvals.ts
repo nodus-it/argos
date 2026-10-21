@@ -8,6 +8,8 @@ export interface ApprovalDecision {
     updatedInput?: Record<string, unknown>;
     message?: string;
     interrupt?: boolean;
+    /** "Always allow": apply Claude Code's permission suggestions for the rest of the session. */
+    remember?: boolean;
 }
 
 interface PendingApproval {

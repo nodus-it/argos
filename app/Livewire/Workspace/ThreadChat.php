@@ -29,6 +29,7 @@ use App\Services\Workspace\ThreadService;
 use App\Services\Workspace\WorkspaceDaemonClient;
 use App\Services\Workspace\WorkspaceException;
 use App\Services\Workspace\WorkspaceIssueService;
+use App\Support\ThreadTimeline;
 use Filament\Notifications\Notification;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
@@ -399,9 +400,11 @@ class ThreadChat extends Component
     public function resolveApproval(string $approvalId, string $decision, ?string $message = null, ?array $answers = null, ?string $nextMode = null): void
     {
         $approval = ThreadApproval::query()->with('thread.workspace')->find($approvalId);
-        if ($approval === null || $approval->thread->workspace_id !== $this->workspaceId || ! in_array($decision, ['allow', 'deny'], true)) {
+        if ($approval === null || $approval->thread->workspace_id !== $this->workspaceId || ! in_array($decision, ['allow', 'always', 'deny'], true)) {
             return;
         }
+        $remember = $decision === 'always';
+        $decision = $remember ? 'allow' : $decision;
 
         $updatedInput = null;
         if ($answers !== null && $decision === 'allow') {
@@ -415,8 +418,8 @@ class ThreadChat extends Component
             return;
         }
 
-        $this->attempt(function () use ($approval, $decision, $message, $updatedInput, $nextMode): void {
-            $won = app(ThreadService::class)->resolveApproval($approval, $this->user(), $decision, $updatedInput, $message !== '' ? $message : null);
+        $this->attempt(function () use ($approval, $decision, $message, $updatedInput, $nextMode, $remember): void {
+            $won = app(ThreadService::class)->resolveApproval($approval, $this->user(), $decision, $updatedInput, $message !== '' ? $message : null, $remember);
             if (! $won) {
                 Notification::make()->title(__('workspaces.approval.taken'))->warning()->send();
 
@@ -495,13 +498,16 @@ class ThreadChat extends Component
         if ($thread !== null) {
             app(ThreadReadService::class)->markRead($thread, $this->user());
         }
+        $toolResults = $events->where('type', ThreadEventType::ToolResult)->keyBy(fn (ThreadEvent $e) => (string) ($e->payload['tool_use_id'] ?? ''));
+        $approvals = $thread !== null ? ThreadApproval::query()->with('resolver')->where('thread_id', $thread->id)->get()->keyBy('id') : collect();
+
         return view('livewire.workspace.thread-chat', [
             'workspace' => $workspace,
             'thread' => $thread,
             'events' => $events,
+            'timeline' => ThreadTimeline::build($events, $toolResults, $approvals, $thread !== null && $thread->status->isBusy()),
             'hasOlder' => $hasOlder,
-            'toolResults' => $events->where('type', ThreadEventType::ToolResult)->keyBy(fn (ThreadEvent $e) => (string) ($e->payload['tool_use_id'] ?? '')),
-            'approvals' => $thread !== null ? ThreadApproval::query()->with('resolver')->where('thread_id', $thread->id)->get()->keyBy('id') : collect(),
+            'approvals' => $approvals,
             'canWrite' => $role?->canOperate() ?? false,
             'isOwner' => $role === WorkspaceRole::Owner,
             'agents' => $this->usableAgents(),

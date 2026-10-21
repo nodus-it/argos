@@ -5,7 +5,7 @@ import type { QueryFactory, QueryLike } from '../src/threadSession.js';
 export interface ScriptContext {
     readonly options: Options;
     readonly interrupted: boolean;
-    askPermission(toolName: string, input: Record<string, unknown>, toolUseID?: string): Promise<PermissionResult>;
+    askPermission(toolName: string, input: Record<string, unknown>, toolUseID?: string, suggestions?: unknown[]): Promise<PermissionResult>;
 }
 
 /** Produces the SDK messages answering one user message. */
@@ -84,13 +84,13 @@ export class FakeQuery implements QueryLike {
             const ctx: ScriptContext = {
                 options: this.options,
                 interrupted: false,
-                askPermission: (toolName, input, toolUseID = 'toolu_1') => {
+                askPermission: (toolName, input, toolUseID = 'toolu_1', suggestions = undefined) => {
                     const canUseTool = this.options.canUseTool;
                     if (canUseTool === undefined) {
                         return Promise.resolve({ behavior: 'allow', updatedInput: input });
                     }
 
-                    return canUseTool(toolName, input, { signal: this.abort.signal, toolUseID, requestId: `req_${toolUseID}` }) as Promise<PermissionResult>;
+                    return canUseTool(toolName, input, { signal: this.abort.signal, toolUseID, requestId: `req_${toolUseID}`, ...(suggestions ? { suggestions: suggestions as never } : {}) }) as Promise<PermissionResult>;
                 },
             };
             Object.defineProperty(ctx, 'interrupted', { get: () => this.interrupted });

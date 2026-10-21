@@ -6,11 +6,13 @@ namespace Tests\Feature\Workspace;
 
 use App\Broadcasting\ThreadStream;
 use App\Broadcasting\UserWorkspaceSignal;
+use App\Enums\ApprovalStatus;
 use App\Enums\GateRunStatus;
 use App\Enums\ThreadEventType;
 use App\Enums\ThreadStatus;
 use App\Enums\WorkspaceRole;
 use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ViewWorkspace;
+use App\Livewire\Workspace\ChangeTray;
 use App\Livewire\Workspace\ContextPanel;
 use App\Livewire\Workspace\ThreadChat;
 use App\Livewire\Workspace\ThreadSwitcher;
@@ -24,6 +26,7 @@ use App\Models\WorkspaceGateRun;
 use App\Models\WorkspaceMember;
 use App\Services\Workspace\ThreadOverview;
 use App\Services\Workspace\WorkspaceDaemonClient;
+use App\Support\ThreadTimeline;
 use App\Testing\FakeWorkspaceDaemon;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -152,5 +155,55 @@ class FocusLayoutTest extends TestCase
             ->assertSee('Pest / PHPUnit')
             ->assertSee(__('workspaces.focus.gate_state.fail'))
             ->assertSee($this->workspace->branch);
+    }
+
+    public function test_the_timeline_groups_a_turn_with_steps_and_hides_allowed_tool_approvals(): void
+    {
+        $thread = $this->thread('Login');
+        $make = fn (ThreadEventType $type, array $payload): ThreadEvent => ThreadEvent::query()->create(['thread_id' => $thread->id, 'type' => $type, 'payload' => $payload]);
+        $make(ThreadEventType::UserMessage, ['text' => 'Build a login page']);
+        $approval = ThreadApproval::factory()->create(['thread_id' => $thread->id, 'status' => ApprovalStatus::Allowed]);
+        $make(ThreadEventType::ApprovalRequested, ['approval_id' => $approval->id, 'kind' => 'tool', 'tool_name' => 'Edit']);
+        $make(ThreadEventType::ToolCall, ['tool_use_id' => 't1', 'name' => 'Edit', 'input' => ['file_path' => '/workspace/routes/web.php', 'old_string' => 'a', 'new_string' => "a\nb"]]);
+        $make(ThreadEventType::ToolResult, ['tool_use_id' => 't1', 'output' => 'ok']);
+        $make(ThreadEventType::ToolCall, ['tool_use_id' => 't2', 'name' => 'Bash', 'input' => ['command' => 'php artisan route:list']]);
+        $make(ThreadEventType::ToolResult, ['tool_use_id' => 't2', 'output' => "2 routes\nmore"]);
+        $make(ThreadEventType::AssistantMessage, ['text' => 'Done.']);
+        $make(ThreadEventType::TurnCompleted, ['session_cost_usd' => 0.42, 'duration_ms' => 163000]);
+
+        $events = ThreadEvent::query()->where('thread_id', $thread->id)->orderBy('id')->get();
+        $results = $events->where('type', ThreadEventType::ToolResult)->keyBy(fn ($e) => $e->payload['tool_use_id']);
+        $blocks = ThreadTimeline::build($events, $results, collect([$approval->id => $approval]), false);
+
+        $this->assertSame(['user', 'claude'], array_column($blocks, 'kind'));
+        $turn = $blocks[1];
+        $this->assertSame(163000, $turn['duration_ms']);
+        $this->assertEqualsWithDelta(0.42, $turn['cost'], 0.0001);
+        $this->assertSame(['steps', 'event'], array_column($turn['items'], 'kind'));
+        [$edit, $bash] = $turn['items'][0]['rows'];
+        $this->assertSame([__('workspaces.steps.edited'), 'routes/web.php', 2, 1], [$edit['verb'], $edit['target'], $edit['add'], $edit['del']]);
+        $this->assertSame([__('workspaces.steps.ran'), '2 routes', 'ok'], [$bash['verb'], $bash['detail'], $bash['state']]);
+    }
+
+    public function test_always_allow_asks_the_daemon_to_remember(): void
+    {
+        $thread = Thread::factory()->open()->create(['workspace_id' => $this->workspace->id, 'status' => ThreadStatus::WaitingInput]);
+        $approval = ThreadApproval::factory()->create(['thread_id' => $thread->id, 'tool_name' => 'Bash', 'request' => ['input' => ['command' => 'npm run build']]]);
+
+        Livewire::withQueryParams(['thread' => $thread->id])->actingAs($this->owner)
+            ->test(ThreadChat::class, ['workspaceId' => $this->workspace->id])
+            ->call('resolveApproval', $approval->id, 'always');
+
+        $this->assertSame(ApprovalStatus::Allowed, $approval->fresh()->status);
+        $this->assertTrue($approval->fresh()->response['remember'] ?? false);
+    }
+
+    public function test_the_change_tray_summarises_the_gates(): void
+    {
+        $this->assertSame(__('workspaces.tray.gates_none'), ChangeTray::gateSummary(null));
+        $run = WorkspaceGateRun::factory()->create(['workspace_id' => $this->workspace->id, 'status' => GateRunStatus::Failed, 'gates' => ['phpstan' => 'fail', 'pint' => 'pass']]);
+        $this->assertSame(__('workspaces.tray.gates_failed', ['gates' => 'PHPStan']), ChangeTray::gateSummary($run));
+        $run->update(['status' => GateRunStatus::Passed, 'gates' => ['phpstan' => 'pass']]);
+        $this->assertSame(__('workspaces.tray.gates_green'), ChangeTray::gateSummary($run->fresh()));
     }
 }

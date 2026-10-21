@@ -221,7 +221,7 @@ class ThreadService
      *
      * @param  array<string, mixed>|null  $updatedInput
      */
-    public function resolveApproval(ThreadApproval $approval, User $by, string $decision, ?array $updatedInput = null, ?string $message = null): bool
+    public function resolveApproval(ThreadApproval $approval, User $by, string $decision, ?array $updatedInput = null, ?string $message = null, bool $remember = false): bool
     {
         $thread = $approval->thread;
         Gate::forUser($by)->authorize('resolveApproval', $thread);
@@ -231,7 +231,8 @@ class ThreadService
             $approval->kind === ApprovalKind::Question => ApprovalStatus::Answered,
             default => ApprovalStatus::Allowed,
         };
-        $response = array_filter(['decision' => $decision, 'updated_input' => $updatedInput, 'message' => $message], fn ($v): bool => $v !== null);
+        // remember = 'always allow': Claude Code applies its own rule suggestions for the session.
+        $response = array_filter(['decision' => $decision, 'updated_input' => $updatedInput, 'message' => $message, 'remember' => $remember && $decision === 'allow' ? true : null], fn ($v): bool => $v !== null);
 
         $won = ThreadApproval::query()
             ->whereKey($approval->getKey())

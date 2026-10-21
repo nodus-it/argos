@@ -147,170 +147,144 @@
             <div class="ws-empty muted">{{ __('workspaces.thread.none') }}</div>
         @endunless
     @else
-        {{-- History --}}
-        <div class="ws-feed" x-ref="feed">
+        {{-- History: a person's messages; per Claude turn a head (duration,
+             cost), compact step rows and the text/approvals in between. --}}
+        <div class="ws-feed wf-feed" x-ref="feed">
             @if ($hasOlder)
-                <button type="button" class="btn btn-ghost btn-sm ws-older" wire:click="loadOlder">{{ __('workspaces.thread.load_older') }}</button>
+                <button type="button" class="wf-btn wf-btn-sm ws-older" wire:click="loadOlder">{{ __('workspaces.thread.load_older') }}</button>
             @endif
 
-            @foreach ($events as $event)
-                @php $p = $event->payload; @endphp
-                @switch ($event->type)
-                    @case (ThreadEventType::UserMessage)
-                        <div class="ws-msg ws-msg-user" wire:key="ev-{{ $event->id }}">
-                            <span class="ws-avatar" title="{{ $p['author_name'] ?? '' }}" aria-hidden="true">{{ \App\Support\Initials::of($p['author_name'] ?? null) }}</span>
-                            <div class="ws-bubble">
-                                <div class="ws-who">
-                                    {{ $event->author_user_id === $user->id ? __('workspaces.events.you') : ($p['author_name'] ?? '') }}
-                                    @if (! empty($p['auto']))
-                                        <span class="ws-chip">@svg('heroicon-s-bolt') {{ __('workspaces.auto.automated') }}</span>
-                                    @endif
-                                    @if (! isset($p['accepted_at']) && $busy)
-                                        <span class="badge badge-draft">{{ __('workspaces.thread.queued') }}</span>
-                                    @endif
-                                    @if ($canWrite && isset($checkpoints[$event->id]))
-                                        <button type="button" class="ws-reset-btn" wire:click="previewRestore('{{ $checkpoints[$event->id] }}')" title="{{ __('workspaces.checkpoints.reset_here_hint') }}">
-                                            @svg('heroicon-o-arrow-uturn-left') <span>{{ __('workspaces.checkpoints.reset_here') }}</span>
-                                        </button>
-                                    @endif
-                                </div>
-                                <div class="ws-text">{{ $p['text'] ?? '' }}</div>
-                                @if (! empty($p['images']))
-                                    <div class="ws-images">
-                                        @foreach ($p['images'] as $image)
-                                            @if (! empty($image['path']))
-                                                @php $imageUrl = route('threads.attachments', ['thread' => $thread, 'file' => basename($image['path'])]); @endphp
-                                                <a href="{{ $imageUrl }}" target="_blank" rel="noopener"><img src="{{ $imageUrl }}" alt="{{ __('workspaces.thread.image') }}" loading="lazy"></a>
-                                            @endif
-                                        @endforeach
-                                    </div>
-                                @endif
-                            </div>
-                        </div>
-                        @break
-
-                    @case (ThreadEventType::AssistantMessage)
-                        <div class="ws-msg ws-msg-claude" wire:key="ev-{{ $event->id }}">
-                            <span class="ws-avatar ws-avatar-claude">C</span>
-                            <div class="ws-bubble">
-                                <div class="ws-who">{{ __('workspaces.events.claude') }}</div>
-                                <div class="ws-md prose prose-sm">{{ Fmt::markdown((string) ($p['text'] ?? '')) }}</div>
-                            </div>
-                        </div>
-                        @break
-
-                    @case (ThreadEventType::Thinking)
-                        <div class="ws-line ws-think" wire:key="ev-{{ $event->id }}" x-data="{ open: false }">
-                            <span class="as-ico">✳</span>
-                            <span class="ws-line-main">
-                                <span class="as-tag">{{ __('workspaces.events.thinking') }}</span>
-                                <button type="button" class="as-toggle" x-on:click="open = !open" :aria-expanded="open">{{ __('workspaces.events.show_more') }}</button>
-                                <div class="as-more" x-show="open" x-cloak>{{ $p['text'] ?? '' }}</div>
-                            </span>
-                        </div>
-                        @break
-
-                    @case (ThreadEventType::ToolCall)
-                        @php
-                            $result = $toolResults->get((string) ($p['tool_use_id'] ?? ''));
-                            $summary = Fmt::toolSummary((string) ($p['name'] ?? ''), $p['input'] ?? null);
-                        @endphp
-                        <div class="ws-line ws-tool" wire:key="ev-{{ $event->id }}" x-data="{ open: false }">
-                            <span class="as-ico">◆</span>
-                            <span class="ws-line-main">
-                                <span class="name">{{ $p['name'] ?? __('workspaces.events.tool') }}</span>
-                                <span class="summary mono">{{ $summary }}</span>
-                                <button type="button" class="as-toggle" x-on:click="open = !open" :aria-expanded="open">{{ __('workspaces.events.show_more') }}</button>
-                                <div class="as-more mono" x-show="open" x-cloak>{{ Fmt::json($p['input'] ?? null) }}@if ($result)
-
-────
-{{ $result->payload['output'] ?? '' }}@endif</div>
-                                @if ($result && ($result->payload['is_error'] ?? false))
-                                    <span class="badge badge-failed">{{ __('workspaces.events.error') }}</span>
-                                @endif
-                            </span>
-                        </div>
-                        @break
-
-                    @case (ThreadEventType::ApprovalRequested)
-                        @php
-                            $approval = $approvals->get((string) ($p['approval_id'] ?? ''));
-                            $kind = ApprovalKind::tryFrom((string) ($p['kind'] ?? 'tool')) ?? ApprovalKind::Tool;
-                            $input = is_array($p['input'] ?? null) ? $p['input'] : [];
-                        @endphp
-                        @if ($approval)
-                            @include('livewire.workspace.partials.approval-card', ['approval' => $approval, 'kind' => $kind, 'input' => $input, 'p' => $p, 'canWrite' => $canWrite, 'event' => $event])
-                        @endif
-                        @break
-
-                    @case (ThreadEventType::TurnCompleted)
-                        <div class="ws-divider" wire:key="ev-{{ $event->id }}">
-                            <span>{{ __('workspaces.events.turn_done') }}</span>
-                            @if (($p['duration_ms'] ?? null) !== null)
-                                <span class="mono">{{ number_format(((int) $p['duration_ms']) / 1000, 1) }}s</span>
+            @foreach ($timeline as $block)
+                @if ($block['kind'] === 'user')
+                    @php $event = $block['event']; $p = $event->payload; @endphp
+                    <div class="wf-msg ws-msg" wire:key="ev-{{ $event->id }}">
+                        <div class="wf-msg-meta">
+                            <span>{{ $event->author_user_id === $user->id ? __('workspaces.events.you') : ($p['author_name'] ?? '') }} · {{ $event->created_at?->diffForHumans() }}</span>
+                            @if (! empty($p['auto']))
+                                <span class="wf-pill-tag"><x-wf.icon name="zap" :size="11" :stroke="2" /> {{ __('workspaces.auto.automated') }}</span>
                             @endif
-                        </div>
-                        @break
-
-                    @case (ThreadEventType::Error)
-                        <div class="ws-alert ws-alert-error" wire:key="ev-{{ $event->id }}">
-                            @svg('heroicon-o-exclamation-triangle')
-                            <span>{{ $p['message'] ?? __('workspaces.events.error') }}</span>
-                        </div>
-                        @break
-
-                    @case (ThreadEventType::UsageLimit)
-                        <div class="ws-alert ws-alert-warn" wire:key="ev-{{ $event->id }}">
-                            @svg('heroicon-o-clock')
-                            <span>{{ __('workspaces.thread.usage_limit', ['agent' => $thread->agentCredential?->name ?? '', 'time' => isset($p['resets_at']) ? \Illuminate\Support\Carbon::parse($p['resets_at'])->diffForHumans() : __('workspaces.thread.usage_limit_unknown')]) }}</span>
-                        </div>
-                        @break
-
-                    @case (ThreadEventType::Notice)
-                        <div class="ws-notice muted" wire:key="ev-{{ $event->id }}">
-                            {{ match ($p['kind'] ?? '') {
-                                'interrupted' => __('workspaces.events.interrupted', ['name' => $p['author_name'] ?? '']),
-                                'permission_mode' => __('workspaces.events.permission_mode', ['name' => $p['author_name'] ?? '', 'mode' => PermissionMode::tryFrom((string) ($p['mode'] ?? ''))?->label() ?? '']),
-                                'model' => __('workspaces.events.model', ['name' => $p['author_name'] ?? '', 'model' => $p['model'] ?? '']),
-                                'shipped' => __('workspaces.events.shipped', ['name' => $p['author_name'] ?? '']),
-                                'restored' => __('workspaces.events.restored', ['name' => $p['author_name'] ?? '', 'excerpt' => $p['excerpt'] ?? '']),
-                                'checkpoint' => __('workspaces.events.checkpoint', ['name' => $p['author_name'] ?? '', 'label' => ($p['label'] ?? '') !== '' ? $p['label'] : '—']),
-                                default => '',
-                            } }}
-                            @if (in_array($p['kind'] ?? '', ['restored', 'checkpoint'], true) && $canWrite && ! empty($p['checkpoint_id']))
-                                <button type="button" class="link" wire:click="previewRestore('{{ $p['checkpoint_id'] }}')">
-                                    {{ ($p['kind'] ?? '') === 'restored' ? __('workspaces.checkpoints.undo_restore') : __('workspaces.checkpoints.reset_here') }}
+                            @if (! isset($p['accepted_at']) && $busy)
+                                <span class="wf-pill-tag">{{ __('workspaces.thread.queued') }}</span>
+                            @endif
+                            @if ($canWrite && isset($checkpoints[$event->id]))
+                                <button type="button" class="ws-reset-btn" wire:click="previewRestore('{{ $checkpoints[$event->id] }}')" title="{{ __('workspaces.checkpoints.reset_here_hint') }}">
+                                    <x-wf.icon name="undo" :size="13" :stroke="2" /> <span>{{ __('workspaces.checkpoints.reset_here') }}</span>
                                 </button>
                             @endif
-                            @if (($p['kind'] ?? '') === 'shipped' && ($p['url'] ?? '') !== '')
-                                <a class="link" href="{{ $p['url'] }}" target="_blank" rel="noopener">{{ $p['url'] }}</a>
-                            @endif
                         </div>
-                        @break
-
-                    @case (ThreadEventType::ApprovalResolved)
-                        @if (($p['status'] ?? '') === ApprovalStatus::Cancelled->value)
-                            <div class="ws-notice muted" wire:key="ev-{{ $event->id }}">{{ __('workspaces.approval.cancelled') }}</div>
+                        <div class="wf-msg-text">{{ $p['text'] ?? '' }}</div>
+                        @if (! empty($p['images']))
+                            <div class="ws-images">
+                                @foreach ($p['images'] as $image)
+                                    @if (! empty($image['path']))
+                                        @php $imageUrl = route('threads.attachments', ['thread' => $thread, 'file' => basename($image['path'])]); @endphp
+                                        <a href="{{ $imageUrl }}" target="_blank" rel="noopener"><img src="{{ $imageUrl }}" alt="{{ __('workspaces.thread.image') }}" loading="lazy"></a>
+                                    @endif
+                                @endforeach
+                            </div>
                         @endif
-                        @break
-                @endswitch
+                    </div>
+                @else
+                    @php $firstId = $block['items'][0]['event']->id ?? ($block['items'][0]['rows'][0]['id'] ?? $loop->index); @endphp
+                    <div class="wf-turn" wire:key="turn-{{ $firstId }}">
+                        <div class="wf-msg-meta">
+                            <span class="wf-claude-badge" aria-hidden="true">C</span>
+                            <span>{{ __('workspaces.events.claude') }}
+                                @if ($block['running'])
+                                    · <span x-data="{ s: {{ \App\Support\ThreadTimeline::elapsed($block['started_at']) }} }" x-init="setInterval(() => s++, 1000)" x-text="@js(__('workspaces.chat.working_for', ['seconds' => '__S__'])).replace('__S__', s)">{{ __('workspaces.chat.working_for', ['seconds' => \App\Support\ThreadTimeline::elapsed($block['started_at'])]) }}</span>
+                                @elseif ($block['duration_ms'] !== null)
+                                    · {{ $block['cost'] ? __('workspaces.chat.meta', ['duration' => number_format($block['duration_ms'] / 1000, 0, ',', '.'), 'cost' => \App\Support\CostFormatter::usd((float) $block['cost'])]) : __('workspaces.chat.meta_duration', ['duration' => number_format($block['duration_ms'] / 1000, 0, ',', '.')]) }}
+                                @endif
+                            </span>
+                        </div>
+                        @foreach ($block['items'] as $item)
+                            @if ($item['kind'] === 'steps')
+                                @include('livewire.workspace.partials.steps', ['rows' => $item['rows'], 'running' => $block['running'] && $loop->last])
+                            @else
+                                @php $event = $item['event']; $p = $event->payload; @endphp
+                                @switch ($event->type)
+                                    @case (ThreadEventType::AssistantMessage)
+                                        <div class="wf-md ws-md prose" wire:key="ev-{{ $event->id }}">{{ Fmt::markdown((string) ($p['text'] ?? '')) }}</div>
+                                        @break
+
+                                    @case (ThreadEventType::Thinking)
+                                        <div class="wf-think" wire:key="ev-{{ $event->id }}" x-data="{ open: false }">
+                                            <button type="button" class="wf-think-toggle" x-on:click="open = !open" :aria-expanded="open">
+                                                <x-wf.icon name="chevron-right" :size="13" :stroke="2" x-bind:class="{ 'is-open': open }" /> {{ __('workspaces.chat.thinking') }}
+                                            </button>
+                                            <div class="wf-think-text" x-show="open" x-cloak>{{ $p['text'] ?? '' }}</div>
+                                        </div>
+                                        @break
+
+                                    @case (ThreadEventType::ApprovalRequested)
+                                        @php
+                                            $approval = $approvals->get((string) ($p['approval_id'] ?? ''));
+                                            $kind = ApprovalKind::tryFrom((string) ($p['kind'] ?? 'tool')) ?? ApprovalKind::Tool;
+                                            $input = is_array($p['input'] ?? null) ? $p['input'] : [];
+                                        @endphp
+                                        @if ($approval)
+                                            @include('livewire.workspace.partials.approval-card', ['approval' => $approval, 'kind' => $kind, 'input' => $input, 'p' => $p, 'canWrite' => $canWrite, 'event' => $event])
+                                        @endif
+                                        @break
+
+                                    @case (ThreadEventType::Error)
+                                        <div class="wf-note-row is-error" wire:key="ev-{{ $event->id }}">
+                                            <x-wf.icon name="alert" :size="15" :stroke="2" />
+                                            <span>{{ $p['message'] ?? __('workspaces.events.error') }}</span>
+                                        </div>
+                                        @break
+
+                                    @case (ThreadEventType::UsageLimit)
+                                        <div class="wf-note-row is-warn" wire:key="ev-{{ $event->id }}">
+                                            @svg('heroicon-o-clock')
+                                            <span>{{ __('workspaces.thread.usage_limit', ['agent' => $thread->agentCredential?->name ?? '', 'time' => isset($p['resets_at']) ? \Illuminate\Support\Carbon::parse($p['resets_at'])->diffForHumans() : __('workspaces.thread.usage_limit_unknown')]) }}</span>
+                                        </div>
+                                        @break
+
+                                    @case (ThreadEventType::Notice)
+                                        <div class="ws-notice wf-notice" wire:key="ev-{{ $event->id }}">
+                                            {{ match ($p['kind'] ?? '') {
+                                                'interrupted' => __('workspaces.events.interrupted', ['name' => $p['author_name'] ?? '']),
+                                                'permission_mode' => __('workspaces.events.permission_mode', ['name' => $p['author_name'] ?? '', 'mode' => PermissionMode::tryFrom((string) ($p['mode'] ?? ''))?->label() ?? '']),
+                                                'model' => __('workspaces.events.model', ['name' => $p['author_name'] ?? '', 'model' => $p['model'] ?? '']),
+                                                'shipped' => __('workspaces.events.shipped', ['name' => $p['author_name'] ?? '']),
+                                                'restored' => __('workspaces.events.restored', ['name' => $p['author_name'] ?? '', 'excerpt' => $p['excerpt'] ?? '']),
+                                                'checkpoint' => __('workspaces.events.checkpoint', ['name' => $p['author_name'] ?? '', 'label' => ($p['label'] ?? '') !== '' ? $p['label'] : '—']),
+                                                default => '',
+                                            } }}
+                                            @if (in_array($p['kind'] ?? '', ['restored', 'checkpoint'], true) && $canWrite && ! empty($p['checkpoint_id']))
+                                                <button type="button" class="wf-link" wire:click="previewRestore('{{ $p['checkpoint_id'] }}')">
+                                                    {{ ($p['kind'] ?? '') === 'restored' ? __('workspaces.checkpoints.undo_restore') : __('workspaces.checkpoints.reset_here') }}
+                                                </button>
+                                            @endif
+                                            @if (($p['kind'] ?? '') === 'shipped' && ($p['url'] ?? '') !== '')
+                                                <a class="wf-link" href="{{ $p['url'] }}" target="_blank" rel="noopener">{{ $p['url'] }}</a>
+                                            @endif
+                                        </div>
+                                        @break
+
+                                    @case (ThreadEventType::ApprovalResolved)
+                                        <div class="ws-notice wf-notice" wire:key="ev-{{ $event->id }}">{{ __('workspaces.approval.cancelled') }}</div>
+                                        @break
+                                @endswitch
+                            @endif
+                        @endforeach
+                    </div>
+                @endif
             @endforeach
 
-            {{-- Live (not yet persisted) output, fed by the websocket --}}
-            <div class="ws-msg ws-msg-claude ws-live" x-show="live || thinking" x-cloak>
-                <span class="ws-avatar ws-avatar-claude">C</span>
-                <div class="ws-bubble">
-                    <div class="ws-who">{{ __('workspaces.events.claude') }}</div>
-                    <div class="ws-think-live muted" x-show="thinking && !live" x-text="thinking.slice(-400)"></div>
-                    <div class="ws-text" x-text="live"></div>
-                </div>
+            {{-- Live (not yet persisted) output, fed by the websocket. Before the
+                 first event of a new turn arrives, it carries the turn head. --}}
+            <div class="wf-turn wf-live" x-show="live || thinking || (status === 'running' && @js(($timeline[array_key_last($timeline) ?? 0]['kind'] ?? 'user') === 'user'))" x-cloak>
+                @if (($timeline[array_key_last($timeline) ?? 0]['kind'] ?? 'user') === 'user')
+                    <div class="wf-msg-meta"><span class="wf-claude-badge" aria-hidden="true">C</span> <span>{{ __('workspaces.events.claude') }} · {{ __('workspaces.thread.working') }}</span></div>
+                @endif
+                <div class="wf-think-text" x-show="thinking && !live" x-text="thinking.slice(-400)"></div>
+                <div class="wf-msg-text" x-text="live"></div>
             </div>
 
-            <div class="ws-working" x-show="status === 'running'" x-cloak>
-                <span class="ws-dot"></span> {{ __('workspaces.thread.working') }}
-            </div>
-            <div class="ws-working ws-working-wait" x-show="status === 'waiting_input'" x-cloak>
-                @svg('heroicon-o-hand-raised') {{ __('workspaces.thread.waiting') }}
+            <div class="wf-working is-wait" x-show="status === 'waiting_input'" x-cloak>
+                <span class="wf-dot is-waiting" aria-hidden="true"></span> {{ __('workspaces.thread.waiting') }}
             </div>
         </div>
 
@@ -352,86 +326,92 @@
             </div>
         @endif
 
-        {{-- Composer --}}
+        {{-- Change tray + composer --}}
         @if ($canWrite)
-            <div class="ws-composer"
-                 x-on:dragover.prevent="dragging = true"
-                 x-on:dragleave.prevent="dragging = false"
-                 x-on:drop.prevent="dragging = false; attach($event.dataTransfer.files)"
-                 :class="{ 'is-dragging': dragging }"
-                 x-init="commands = @js($commands)">
-                <div class="ws-typing muted" x-show="typingText()" x-text="typingText()" x-cloak></div>
+            <div class="wf-bottom">
+                @livewire('workspace.change-tray', ['workspaceId' => $workspace->id], key('tray-'.$workspace->id))
+                <div class="ws-composer wf-composer"
+                     x-on:dragover.prevent="dragging = true"
+                     x-on:dragleave.prevent="dragging = false"
+                     x-on:drop.prevent="dragging = false; attach($event.dataTransfer.files)"
+                     :class="{ 'is-dragging': dragging }"
+                     x-init="commands = @js($commands)">
+                    <div class="ws-typing wf-muted" x-show="typingText()" x-text="typingText()" x-cloak></div>
 
-                @if ($uploads !== [])
-                    <div class="ws-upload-previews">
-                        @foreach ($uploads as $i => $upload)
-                            <span class="ws-upload" wire:key="upload-{{ $i }}">
-                                @if ($upload->isPreviewable())
-                                    <img src="{{ $upload->temporaryUrl() }}" alt="">
-                                @else
-                                    <span class="ws-upload-name mono">{{ $upload->getClientOriginalName() }}</span>
-                                @endif
-                                <button type="button" wire:click="removeUpload({{ $i }})" aria-label="{{ __('workspaces.thread.remove_image') }}" title="{{ __('workspaces.thread.remove_image') }}">@svg('heroicon-o-x-mark')</button>
-                            </span>
-                        @endforeach
+                    @if ($uploads !== [])
+                        <div class="ws-upload-previews">
+                            @foreach ($uploads as $i => $upload)
+                                <span class="ws-upload" wire:key="upload-{{ $i }}">
+                                    @if ($upload->isPreviewable())
+                                        <img src="{{ $upload->temporaryUrl() }}" alt="">
+                                    @else
+                                        <span class="ws-upload-name mono">{{ $upload->getClientOriginalName() }}</span>
+                                    @endif
+                                    <button type="button" wire:click="removeUpload({{ $i }})" aria-label="{{ __('workspaces.thread.remove_image') }}" title="{{ __('workspaces.thread.remove_image') }}"><x-wf.icon name="x" :size="12" :stroke="2" /></button>
+                                </span>
+                            @endforeach
+                        </div>
+                    @endif
+                    @error('uploads.*') <p class="wf-note is-error">{{ $message }}</p> @enderror
+                    @error('uploads') <p class="wf-note is-error">{{ $message }}</p> @enderror
+
+                    <div class="ws-suggest-wrap">
+                        <ul class="ws-suggest" x-show="suggestions.length > 0" x-cloak role="listbox">
+                            <template x-for="(item, i) in suggestions" :key="item.value">
+                                <li :class="{ 'on': i === suggestIndex }" x-on:mousedown.prevent="choose(i)" role="option">
+                                    <span class="mono" x-text="item.label"></span>
+                                    <span class="muted" x-text="item.hint"></span>
+                                </li>
+                            </template>
+                        </ul>
+                        <label class="sr-only" for="wf-composer-{{ $thread->id }}">{{ __('workspaces.chat.placeholder') }}</label>
+                        <textarea
+                            id="wf-composer-{{ $thread->id }}"
+                            class="wf-ta"
+                            rows="2"
+                            x-ref="composer"
+                            wire:model="draft"
+                            placeholder="{{ __('workspaces.chat.placeholder') }}"
+                            :placeholder="status === 'running' ? @js(__('workspaces.chat.queued_placeholder')) : @js(__('workspaces.chat.placeholder'))"
+                            x-on:keydown="onComposerKeydown($event)"
+                            x-on:input="typed(); suggest()"
+                            x-on:paste="pasted($event)"
+                            x-on:blur="setTimeout(() => suggestions = [], 150)"
+                        ></textarea>
                     </div>
-                @endif
-                @error('uploads.*') <p class="t-err">{{ $message }}</p> @enderror
-                @error('uploads') <p class="t-err">{{ $message }}</p> @enderror
-
-                <div class="ws-suggest-wrap">
-                    <ul class="ws-suggest" x-show="suggestions.length > 0" x-cloak role="listbox">
-                        <template x-for="(item, i) in suggestions" :key="item.value">
-                            <li :class="{ 'on': i === suggestIndex }" x-on:mousedown.prevent="choose(i)" role="option">
-                                <span class="mono" x-text="item.label"></span>
-                                <span class="muted" x-text="item.hint"></span>
-                            </li>
-                        </template>
-                    </ul>
-                    <textarea
-                        class="respond-ta ws-ta"
-                        rows="3"
-                        x-ref="composer"
-                        wire:model="draft"
-                        placeholder="{{ __('workspaces.thread.placeholder') }}"
-                        x-on:keydown="onComposerKeydown($event)"
-                        x-on:input="typed(); suggest()"
-                        x-on:paste="pasted($event)"
-                        x-on:blur="setTimeout(() => suggestions = [], 150)"
-                    ></textarea>
-                </div>
-                <div class="ws-composer-bar">
-                    <button type="button" class="btn btn-ghost btn-sm" x-on:click="$refs.file.click()" title="{{ __('workspaces.thread.attach') }}" aria-label="{{ __('workspaces.thread.attach') }}">@svg('heroicon-o-photo')</button>
-                    <input type="file" class="sr-only" tabindex="-1" aria-hidden="true" x-ref="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple x-on:change="attach($event.target.files); $event.target.value = ''">
-                    <select class="ws-select ws-select-sm" wire:change="setMode($event.target.value)" aria-label="{{ __('workspaces.thread.mode') }}">
-                        @foreach ($modes as $mode)
-                            @if ($mode !== PermissionMode::BypassPermissions || $isOwner)
-                                <option value="{{ $mode->value }}" @selected($thread->permission_mode === $mode)>{{ $mode->label() }}</option>
-                            @endif
-                        @endforeach
-                    </select>
-                    <select class="ws-select ws-select-sm" wire:change="setModel($event.target.value)" aria-label="{{ __('workspaces.thread.model') }}">
-                        @foreach ($models as $model)
-                            <option value="{{ $model['value'] }}" title="{{ $model['description'] }}" @selected($thread->model === $model['value'])>{{ $model['label'] }}</option>
-                        @endforeach
-                    </select>
-                    @if ($thread->permission_mode === PermissionMode::BypassPermissions)
-                        <span class="badge badge-failed" title="{{ __('workspaces.thread.bypass_warning') }}">@svg('heroicon-o-exclamation-triangle') {{ PermissionMode::BypassPermissions->label() }}</span>
-                    @endif
-                    <span class="ws-spacer"></span>
-                    @if ((float) $thread->cost_usd > 0)
-                        <span class="muted mono ws-cost" title="{{ __('workspaces.thread.cost') }}">{{ \App\Support\CostFormatter::usd((float) $thread->cost_usd) }}</span>
-                    @endif
-                    <button type="button" class="btn btn-danger btn-sm" wire:click="interrupt" x-show="status === 'running' || status === 'waiting_input'" x-cloak>
-                        @svg('heroicon-o-stop') {{ __('workspaces.thread.stop') }}
-                    </button>
-                    <button type="button" class="btn btn-primary btn-sm" wire:click="send" wire:loading.attr="disabled" wire:target="send">
-                        @svg('heroicon-o-paper-airplane') {{ __('workspaces.thread.send') }}
-                    </button>
+                    <div class="wf-composer-bar">
+                        <button type="button" class="wf-icon-btn wf-icon-btn-sm" x-on:click="$refs.file.click()" title="{{ __('workspaces.thread.attach') }}" aria-label="{{ __('workspaces.thread.attach') }}"><x-wf.icon name="paperclip" :size="17" /></button>
+                        <input type="file" class="sr-only" tabindex="-1" aria-hidden="true" x-ref="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple x-on:change="attach($event.target.files); $event.target.value = ''">
+                        <select class="wf-pill" wire:change="setMode($event.target.value)" aria-label="{{ __('workspaces.chat.mode') }}">
+                            @foreach ($modes as $mode)
+                                @if ($mode !== PermissionMode::BypassPermissions || $isOwner)
+                                    <option value="{{ $mode->value }}" @selected($thread->permission_mode === $mode)>{{ $mode->label() }}</option>
+                                @endif
+                            @endforeach
+                        </select>
+                        <select class="wf-pill mono" wire:change="setModel($event.target.value)" aria-label="{{ __('workspaces.chat.model') }}">
+                            @foreach ($models as $model)
+                                <option value="{{ $model['value'] }}" title="{{ $model['description'] }}" @selected($thread->model === $model['value'])>{{ $model['label'] }}</option>
+                            @endforeach
+                        </select>
+                        @if ($thread->permission_mode === PermissionMode::BypassPermissions)
+                            <span class="wf-pill-tag is-danger" title="{{ __('workspaces.thread.bypass_warning') }}"><x-wf.icon name="alert" :size="12" :stroke="2" /> {{ PermissionMode::BypassPermissions->label() }}</span>
+                        @endif
+                        <span class="wf-spacer"></span>
+                        @if ((float) $thread->cost_usd > 0)
+                            <span class="wf-cost" title="{{ __('workspaces.thread.cost') }}">{{ \App\Support\CostFormatter::usd((float) $thread->cost_usd) }}</span>
+                        @endif
+                        <button type="button" class="wf-btn wf-btn-soft wf-stop" wire:click="interrupt" x-show="status === 'running' || status === 'waiting_input'" x-cloak>
+                            <x-wf.icon name="stop" :size="13" :stroke="2.6" /> {{ __('workspaces.thread.stop') }}
+                        </button>
+                        <button type="button" class="wf-send" wire:click="send" wire:loading.attr="disabled" wire:target="send" x-show="status !== 'running' && status !== 'waiting_input'" aria-label="{{ __('workspaces.chat.send') }}" title="{{ __('workspaces.chat.send') }}">
+                            <x-wf.icon name="arrow-up" :size="18" :stroke="2.2" />
+                        </button>
+                    </div>
                 </div>
             </div>
         @else
-            <div class="ws-viewer muted">{{ __('workspaces.thread.viewer_hint') }}</div>
+            <div class="ws-viewer wf-muted wf-viewer">{{ __('workspaces.thread.viewer_hint') }}</div>
         @endif
     @endif
     </div>{{-- .wf-chat-main --}}
