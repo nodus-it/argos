@@ -63,7 +63,7 @@
         @if ($this->shipAction->isVisible()) {{ $this->shipAction }} @endif
         <x-filament-actions::group
             :actions="[
-                \Filament\Actions\ActionGroup::make([$this->inviteAction, $this->transferAction, $this->followUpAction, $this->gatesAction, $this->rebaseAction])->dropdown(false),
+                \Filament\Actions\ActionGroup::make([$this->inviteAction, $this->transferAction, $this->linkTicketAction, $this->createTicketAction, $this->followUpAction, $this->gatesAction, $this->rebaseAction])->dropdown(false),
                 \Filament\Actions\ActionGroup::make([$this->cancelTaskAction, $this->deleteTaskAction])->dropdown(false),
                 \Filament\Actions\ActionGroup::make([$this->settingsAction, $this->stopAction, $this->deleteAction])->dropdown(false),
             ]"

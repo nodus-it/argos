@@ -21,6 +21,7 @@ use Illuminate\Support\Carbon;
  * @property string $id
  * @property string $workspace_id
  * @property bool $close_on_merge
+ * @property string|null $callback_url
  * @property TaskProviderKind $kind
  * @property TaskProviderMode $mode
  * @property AuthMethod $auth_method
@@ -50,6 +51,7 @@ class TaskProviderBinding extends Model
     protected $fillable = [
         'workspace_id',
         'close_on_merge',
+        'callback_url',
         'kind',
         'mode',
         'auth_method',

@@ -6,7 +6,9 @@ namespace App\Services\IssueTracker\Providers;
 
 use App\Integrations\GitLab\GitLabConnector;
 use App\Integrations\GitLab\Requests\CloseIssue;
+use App\Integrations\GitLab\Requests\CreateIssue;
 use App\Integrations\GitLab\Requests\CreateIssueNote;
+use App\Integrations\GitLab\Requests\FindUserByUsername;
 use App\Integrations\GitLab\Requests\GetIssue;
 use App\Integrations\GitLab\Requests\GetIssueAwardEmoji;
 use App\Integrations\GitLab\Requests\GetIssueNotes;
@@ -16,7 +18,9 @@ use App\Integrations\GitLab\Requests\ListIssues;
 use App\Integrations\GitLab\Requests\ListProjects;
 use App\Integrations\GitLab\Requests\RegisterWebhook;
 use App\Integrations\GitLab\Requests\UnregisterWebhook;
+use App\Integrations\GitLab\Requests\UpdateIssueAssignees;
 use App\Services\IssueTracker\Contracts\IssueTrackerContract;
+use Illuminate\Support\Facades\Log;
 
 class GitLabIssueTracker implements IssueTrackerContract
 {
@@ -94,6 +98,73 @@ class GitLabIssueTracker implements IssueTrackerContract
             ->send(new CreateIssueNote($owner, $project, $issueNumber, $body))
             ->throw()
             ->json();
+    }
+
+    public function createIssue(string $owner, string $project, string $title, string $body): array
+    {
+        return $this->connector
+            ->send(new CreateIssue($owner, $project, $title, $body))
+            ->throw()
+            ->json();
+    }
+
+    public function listComments(string $owner, string $project, int|string $issueNumber): array
+    {
+        $notes = $this->connector
+            ->send(new GetIssueNotes($owner, $project, $issueNumber))
+            ->throw()
+            ->json();
+
+        $out = [];
+        foreach (is_array($notes) ? $notes : [] as $note) {
+            // System notes ("changed the description", "assigned to …") are
+            // activity, not comments.
+            if (! is_array($note) || ($note['system'] ?? false) === true) {
+                continue;
+            }
+            $out[] = [
+                'id' => (string) ($note['id'] ?? ''),
+                'author' => (string) ($note['author']['username'] ?? ''),
+                'body' => (string) ($note['body'] ?? ''),
+                'created_at' => isset($note['created_at']) ? (string) $note['created_at'] : null,
+                // The notes API carries no web URL for a note.
+                'url' => null,
+            ];
+        }
+
+        // GitLab returns notes newest first by default.
+        usort($out, fn (array $a, array $b): int => strcmp((string) $a['created_at'], (string) $b['created_at']));
+
+        return $out;
+    }
+
+    public function assignIssue(string $owner, string $project, int|string $issueNumber, string $assignee): bool
+    {
+        $context = ['provider' => 'gitlab', 'project' => "{$owner}/{$project}", 'issue' => (string) $issueNumber, 'assignee' => $assignee];
+
+        try {
+            $users = $this->connector->send(new FindUserByUsername($assignee))->throw()->json();
+            $userId = is_array($users) && is_array($users[0] ?? null) ? ($users[0]['id'] ?? null) : null;
+
+            if (! is_int($userId) && ! (is_string($userId) && ctype_digit($userId))) {
+                Log::channel('argos')->info('Issue assignee not found', $context);
+
+                return false;
+            }
+
+            $response = $this->connector->send(new UpdateIssueAssignees($owner, $project, $issueNumber, [(int) $userId]));
+            if ($response->failed()) {
+                Log::channel('argos')->info('Issue assignment refused', [...$context, 'status' => $response->status()]);
+
+                return false;
+            }
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::channel('argos')->info('Issue assignment failed', [...$context, 'error' => $e->getMessage()]);
+
+            return false;
+        }
     }
 
     public function closeIssue(string $owner, string $project, int|string $issueNumber): void

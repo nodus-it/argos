@@ -22,7 +22,13 @@ class StartAutoRunRequest extends FormRequest
         return [
             'prompt' => ['required', 'string', 'max:20000'],
             'base_branch' => ['nullable', 'string', 'max:255'],
-            'issue' => ['nullable', 'string', 'max:64'],
+            'issue' => ['nullable', 'string', 'max:64', 'prohibits:ticket'],
+            // A ticket of an own system (custom integration of the workspace).
+            'ticket' => ['nullable', 'array'],
+            'ticket.key' => ['required_with:ticket', 'string', 'max:64'],
+            'ticket.title' => ['required_with:ticket', 'string', 'max:300'],
+            'ticket.url' => ['nullable', 'url', 'max:2000'],
+            'ticket.body' => ['nullable', 'string', 'max:20000'],
             'title' => ['nullable', 'string', 'max:120'],
             'agent_id' => ['nullable', 'string'],
             'model' => ['nullable', 'string', 'max:90'],

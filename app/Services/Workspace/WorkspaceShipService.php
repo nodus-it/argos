@@ -13,6 +13,7 @@ use App\Models\TaskEvent;
 use App\Models\User;
 use App\Services\GitProvider\GitServiceFactory;
 use App\Services\GitProvider\PullRequestInfo;
+use App\Services\IssueTracker\IssueRunReporter;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -136,7 +137,7 @@ class WorkspaceShipService
                     'status' => TaskStatus::PrOpen,
                 ]);
                 // Never throws: tracker failures are only logged.
-                $this->issues->announcePullRequest($task, (string) $info->url);
+                app(IssueRunReporter::class)->pullRequest($task, (string) $info->url);
             } else {
                 $service->commentOnPullRequest($owner, $repo, $task->pr_number, __('workspaces.ship.pr_comment', ['subject' => $subject, 'name' => $by->name]));
             }
@@ -179,13 +180,17 @@ class WorkspaceShipService
             'pr_url' => $info->url ?? $task->pr_url,
             'pr_synced_at' => now(),
         ]);
-        if (! $task->status->isFinished() && in_array($state, ['merged', 'closed'], true)) {
+        $finished = ! $task->status->isFinished() && in_array($state, ['merged', 'closed'], true);
+        if ($finished) {
             $task->forceFill([
                 'status' => $state === 'merged' ? TaskStatus::Done : TaskStatus::Cancelled,
                 'done_at' => now(),
             ]);
         }
         $task->save();
+        if ($finished) {
+            app(IssueRunReporter::class)->closed($task);
+        }
     }
 
     /**

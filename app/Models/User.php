@@ -60,7 +60,7 @@ class User extends Authenticatable implements FilamentUser, OAuthenticatable
     }
 
     /** Workspace notification kinds a user can switch off. */
-    public const NOTIFICATION_KINDS = ['approval', 'turn', 'limit', 'error', 'ship', 'auto', 'invite'];
+    public const NOTIFICATION_KINDS = ['approval', 'turn', 'limit', 'error', 'ship', 'auto', 'invite', 'ticket'];
 
     /** Whether the user wants workspace notifications of this kind (default: yes). */
     public function wantsNotification(string $kind): bool

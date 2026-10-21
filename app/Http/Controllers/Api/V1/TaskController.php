@@ -51,7 +51,11 @@ class TaskController extends Controller
         $actor = $this->actor($request);
 
         return $this->domain(function () use ($request, $workspace, $actor, $runs, $issues): JsonResponse {
-            $issue = $request->filled('issue') ? $issues->load($workspace, (string) $request->input('issue')) : null;
+            $issue = match (true) {
+                $request->filled('issue') => $issues->load($workspace, (string) $request->input('issue')),
+                is_array($request->input('ticket')) => $issues->customTicket($workspace, (array) $request->input('ticket')),
+                default => null,
+            };
             $task = $runs->launch($actor, $workspace, (string) $request->input('prompt'), [
                 'title' => $request->input('title'),
                 'base_branch' => $request->input('base_branch'),
@@ -69,6 +73,23 @@ class TaskController extends Controller
         $this->assertWorkspaceVisible($request, $task->workspace);
 
         return new TaskResource($task);
+    }
+
+    /** A comment on the task's ticket in an own system: shown as a hint in the task. */
+    public function ticketComment(Request $request, Task $task, TaskService $tasks): JsonResponse
+    {
+        $this->assertWorkspaceVisible($request, $task->workspace);
+        $actor = $this->actor($request);
+        $request->validate(['author' => ['required', 'string', 'max:120'], 'body' => ['required', 'string', 'max:20000'], 'url' => ['nullable', 'url', 'max:2000']]);
+
+        return $this->domain(function () use ($request, $task, $actor, $tasks): JsonResponse {
+            if (! $actor->can('view', $task)) {
+                abort(404);
+            }
+            $tasks->ticketComment($task, (string) $request->input('author'), (string) $request->input('body'), $request->input('url'));
+
+            return new JsonResponse([], 202);
+        });
     }
 
     /** Commit, push and open/update the task's pull request now. */

@@ -76,8 +76,6 @@ class AutoTaskDriver
             'auto_counters' => ['fix_rounds' => 0, 'turns' => 0, 'started_at' => now()->toIso8601String()],
         ])->save();
 
-        // Before the first step, so the issue hears about the run first.
-        app(IssueRunReporter::class)->started($task);
         AdvanceAutoTaskJob::dispatch($task->id, 'begin');
 
         return $task;

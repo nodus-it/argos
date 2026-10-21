@@ -305,10 +305,19 @@
                                                 'uninvited' => __('workspaces.events.uninvited', ['name' => $p['author_name'] ?? '', 'member' => $p['member_name'] ?? '']),
                                                 'transferred' => __('workspaces.events.transferred', ['name' => $p['author_name'] ?? '', 'owner' => $p['owner_name'] ?? '']),
                                                 'cancelled' => __('workspaces.events.cancelled', ['name' => $p['author_name'] ?? '']),
+                                                'ticket_linked' => __('workspaces.events.ticket_linked', ['name' => $p['author_name'] ?? '', 'ticket' => $p['ticket'] ?? '']),
+                                                'ticket_created' => __('workspaces.events.ticket_created', ['name' => $p['author_name'] ?? '', 'ticket' => $p['ticket'] ?? '']),
+                                                'ticket_comment' => __('workspaces.events.ticket_comment', ['name' => $p['author_name'] ?? '']),
                                                 default => '',
                                             } }}
                                             @if (($p['kind'] ?? '') === 'prepare_failed' && $canWrite && $task->status === \App\Enums\TaskStatus::Preparing)
                                                 <button type="button" class="wf-link" wire:click="retryPreparation">{{ __('workspaces.events.prepare_retry') }}</button>
+                                            @endif
+                                            @if (($p['kind'] ?? '') === 'ticket_comment')
+                                                <blockquote class="wf-ticket-comment">{{ $p['body'] ?? '' }}@if (! empty($p['url'])) <a class="wf-link" href="{{ $p['url'] }}" target="_blank" rel="noopener">↗</a>@endif</blockquote>
+                                            @endif
+                                            @if (($p['kind'] ?? '') === 'ticket_created' && ! empty($p['url']))
+                                                <a class="wf-link" href="{{ $p['url'] }}" target="_blank" rel="noopener">{{ $p['url'] }}</a>
                                             @endif
                                             @if (($p['kind'] ?? '') === 'prepared' && ($p['log'] ?? '') !== '')
                                                 <details class="wf-notice-log">

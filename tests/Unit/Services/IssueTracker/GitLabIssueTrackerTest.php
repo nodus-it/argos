@@ -4,11 +4,17 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\IssueTracker;
 
+use App\Enums\TaskProviderKind;
 use App\Integrations\GitLab\Requests\CloseIssue;
+use App\Integrations\GitLab\Requests\CreateIssue;
+use App\Integrations\GitLab\Requests\FindUserByUsername;
+use App\Integrations\GitLab\Requests\GetIssueNotes;
 use App\Integrations\GitLab\Requests\ListIssues;
 use App\Integrations\GitLab\Requests\ListProjects;
 use App\Integrations\GitLab\Requests\RegisterWebhook;
 use App\Integrations\GitLab\Requests\UnregisterWebhook;
+use App\Integrations\GitLab\Requests\UpdateIssueAssignees;
+use App\Services\IssueTracker\DTO\ExternalIssue;
 use App\Services\IssueTracker\Providers\GitLabIssueTracker;
 use Saloon\Http\Faking\MockResponse;
 use Saloon\Http\Request;
@@ -355,5 +361,92 @@ class GitLabIssueTrackerTest extends TestCase
         $result = (new GitLabIssueTracker('tok'))->normalizeWebhookPayload($envelope, null);
 
         $this->assertSame([], $result);
+    }
+
+    // ── createIssue / listComments / assignIssue ─────────────────────────────
+
+    public function test_create_issue_posts_title_and_description_and_returns_raw_issue(): void
+    {
+        Saloon::fake([
+            CreateIssue::class => MockResponse::make([
+                'id' => 9001,
+                'iid' => 12,
+                'title' => 'New bug',
+                'description' => 'Steps…',
+                'web_url' => 'https://gitlab.com/acme/widget/-/issues/12',
+                'state' => 'opened',
+                'labels' => [],
+            ], 201),
+        ]);
+
+        $raw = (new GitLabIssueTracker('glpat-tok'))->createIssue('acme', 'widget', 'New bug', 'Steps…');
+
+        $issue = ExternalIssue::fromProvider($raw, TaskProviderKind::GitLab);
+        $this->assertSame('12', $issue->externalId);
+        $this->assertSame('https://gitlab.com/acme/widget/-/issues/12', $issue->url);
+
+        Saloon::assertSent(function (Request $r, $response): bool {
+            return $r instanceof CreateIssue
+                && $response->getPendingRequest()->getMethod()->value === 'POST'
+                && $r->resolveEndpoint() === '/projects/acme%2Fwidget/issues'
+                && $r->body()->all() === ['title' => 'New bug', 'description' => 'Steps…'];
+        });
+    }
+
+    public function test_list_comments_skips_system_notes_and_orders_oldest_first(): void
+    {
+        Saloon::fake([
+            GetIssueNotes::class => MockResponse::make([
+                ['id' => 3, 'author' => ['username' => 'bob'], 'body' => 'second', 'created_at' => '2026-01-03T00:00:00Z', 'system' => false],
+                ['id' => 2, 'author' => ['username' => 'bot'], 'body' => 'changed the description', 'created_at' => '2026-01-02T00:00:00Z', 'system' => true],
+                ['id' => 1, 'author' => ['username' => 'alice'], 'body' => 'first', 'created_at' => '2026-01-01T00:00:00Z', 'system' => false],
+            ]),
+        ]);
+
+        $comments = (new GitLabIssueTracker('glpat-tok'))->listComments('acme', 'widget', 12);
+
+        $this->assertSame([
+            ['id' => '1', 'author' => 'alice', 'body' => 'first', 'created_at' => '2026-01-01T00:00:00Z', 'url' => null],
+            ['id' => '3', 'author' => 'bob', 'body' => 'second', 'created_at' => '2026-01-03T00:00:00Z', 'url' => null],
+        ], $comments);
+    }
+
+    public function test_assign_issue_resolves_user_id_by_username(): void
+    {
+        Saloon::fake([
+            FindUserByUsername::class => MockResponse::make([['id' => 42, 'username' => 'alice']]),
+            UpdateIssueAssignees::class => MockResponse::make(['iid' => 12, 'assignee' => ['username' => 'alice']]),
+        ]);
+
+        $this->assertTrue((new GitLabIssueTracker('glpat-tok'))->assignIssue('acme', 'widget', 12, 'alice'));
+
+        Saloon::assertSent(fn (Request $r): bool => $r instanceof FindUserByUsername
+            && $r->query()->all() === ['username' => 'alice']);
+        Saloon::assertSent(fn (Request $r, $response): bool => $r instanceof UpdateIssueAssignees
+            && $response->getPendingRequest()->getMethod()->value === 'PUT'
+            && $r->resolveEndpoint() === '/projects/acme%2Fwidget/issues/12'
+            && $r->body()->all() === ['assignee_ids' => [42]]);
+    }
+
+    public function test_assign_issue_returns_false_when_user_not_found(): void
+    {
+        Saloon::fake([
+            FindUserByUsername::class => MockResponse::make([]),
+            UpdateIssueAssignees::class => MockResponse::make([]),
+        ]);
+
+        $this->assertFalse((new GitLabIssueTracker('glpat-tok'))->assignIssue('acme', 'widget', 12, 'ghost'));
+
+        Saloon::assertNotSent(UpdateIssueAssignees::class);
+    }
+
+    public function test_assign_issue_returns_false_when_gitlab_refuses(): void
+    {
+        Saloon::fake([
+            FindUserByUsername::class => MockResponse::make([['id' => 42]]),
+            UpdateIssueAssignees::class => MockResponse::make(['message' => '403 Forbidden'], 403),
+        ]);
+
+        $this->assertFalse((new GitLabIssueTracker('glpat-tok'))->assignIssue('acme', 'widget', 12, 'alice'));
     }
 }

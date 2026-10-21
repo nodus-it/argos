@@ -13,6 +13,7 @@ use App\Models\Workspace;
 use App\Services\Workspace\TaskService;
 use App\Services\Workspace\WorkspaceException;
 use App\Services\Workspace\WorkspaceGateService;
+use App\Services\Workspace\WorkspaceIssueService;
 use App\Services\Workspace\WorkspaceMemberService;
 use App\Services\Workspace\WorkspaceService;
 use App\Services\Workspace\WorkspaceShipService;
@@ -308,6 +309,49 @@ class ViewWorkspace extends ViewRecord
                 $newOwner = User::query()->findOrFail($data['user_id']);
                 $this->taskAction(fn (Task $task, User $user) => app(TaskService::class)->transfer($task, $user, $newOwner), __('workspaces.task_actions.transferred', ['name' => $newOwner->name]));
             });
+    }
+
+    /** Link the current task (without a ticket) to an issue of the workspace's tracker. */
+    public function linkTicketAction(): Action
+    {
+        return Action::make('linkTicket')
+            ->label(__('workspaces.task_actions.link_ticket'))
+            ->icon('heroicon-o-link')
+            ->visible(fn (): bool => $this->canChangeTicket())
+            ->schema([
+                Select::make('number')
+                    ->label(__('workspaces.task.ticket'))
+                    ->searchable()
+                    ->getSearchResultsUsing(fn (string $search): array => app(WorkspaceIssueService::class)->search($this->workspace(), $search))
+                    ->getOptionLabelUsing(fn (?string $value): ?string => $value === null ? null : (app(WorkspaceIssueService::class)->search($this->workspace(), $value, 200)[$value] ?? '#'.$value))
+                    ->required(),
+            ])
+            ->action(fn (array $data) => $this->taskAction(fn (Task $task, User $user) => app(TaskService::class)->linkTicket($task, $user, (string) $data['number']), __('workspaces.task_actions.ticket_linked')));
+    }
+
+    /** Open an issue in the workspace's tracker for the current task. */
+    public function createTicketAction(): Action
+    {
+        return Action::make('createTicket')
+            ->label(__('workspaces.task_actions.create_ticket'))
+            ->icon('heroicon-o-document-plus')
+            ->visible(fn (): bool => $this->canChangeTicket())
+            ->fillForm(fn (): array => ['title' => $this->task()?->title])
+            ->schema([
+                TextInput::make('title')->label(__('workspaces.task_actions.ticket_title'))->required()->maxLength(255),
+                Textarea::make('body')->label(__('workspaces.task_actions.ticket_body'))->rows(6),
+            ])
+            ->action(fn (array $data) => $this->taskAction(fn (Task $task, User $user) => app(TaskService::class)->createTicket($task, $user, (string) $data['title'], (string) ($data['body'] ?? '')), __('workspaces.task_actions.ticket_created')));
+    }
+
+    /** A task without a ticket, a tracker to put one in, and the right to change the task. */
+    private function canChangeTicket(): bool
+    {
+        $task = $this->task();
+
+        return $task !== null && $task->external_ref === null
+            && (auth()->user()?->can('update', $task) ?? false)
+            && app(WorkspaceIssueService::class)->bindingFor($this->workspace()) !== null;
     }
 
     /** Continue a finished task in a new one (same ticket, fresh branch). */

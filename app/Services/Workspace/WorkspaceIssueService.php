@@ -124,6 +124,52 @@ class WorkspaceIssueService
         ];
     }
 
+    /**
+     * Open a ticket in the workspace's tracker; returns it as stored on the
+     * task (`external_ref`).
+     *
+     * @return array{binding_id: string, provider: string, key: string, owner: string, project: string, number: string, title: string, url: string, body: string}
+     */
+    public function create(Workspace $workspace, string $title, string $body): array
+    {
+        $binding = $this->bindingFor($workspace) ?? throw WorkspaceException::translated('workspaces.issue.no_binding');
+        [$owner, $project] = $this->parseRef((string) $binding->external_project_ref);
+
+        try {
+            $issue = ExternalIssue::fromProvider($this->registry->make($binding->kind, $binding)->createIssue($owner, $project, $title, $body), $binding->kind);
+        } catch (Throwable $e) {
+            throw WorkspaceException::translated('workspaces.issue.create_failed', ['message' => $e->getMessage()]);
+        }
+
+        return $this->fromExternal($issue, $binding);
+    }
+
+    /**
+     * A ticket of the workspace's own system (custom integration), as stored
+     * on the task.
+     *
+     * @param  array<string, mixed>  $ticket  key, title, url, body
+     * @return array{binding_id: string, provider: string, key: string, owner: string, project: string, number: string, title: string, url: string, body: string}
+     */
+    public function customTicket(Workspace $workspace, array $ticket): array
+    {
+        $binding = $workspace->taskProviderBindings()->where('kind', TaskProviderKind::Custom->value)->first()
+            ?? throw WorkspaceException::translated('workspaces.issue.no_custom_binding');
+        $key = mb_substr(trim((string) ($ticket['key'] ?? '')), 0, 64);
+
+        return [
+            'binding_id' => $binding->id,
+            'provider' => TaskProviderKind::Custom->value,
+            'key' => $key,
+            'owner' => '',
+            'project' => (string) $binding->external_project_ref,
+            'number' => $key,
+            'title' => mb_substr(trim((string) ($ticket['title'] ?? '')), 0, 300),
+            'url' => (string) ($ticket['url'] ?? ''),
+            'body' => mb_substr((string) ($ticket['body'] ?? ''), 0, self::BODY_LIMIT),
+        ];
+    }
+
     public function label(string $number, string $title): string
     {
         return '#'.$this->shortNumber($number).' '.$title;

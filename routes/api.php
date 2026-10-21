@@ -30,5 +30,6 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function (): void {
         Route::post('tasks/{task}/pause', [TaskController::class, 'pause']);
         Route::post('tasks/{task}/resume', [TaskController::class, 'resume']);
         Route::post('tasks/{task}/ship', [TaskController::class, 'ship']);
+        Route::post('tasks/{task}/ticket-comments', [TaskController::class, 'ticketComment']);
     });
 });

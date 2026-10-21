@@ -41,6 +41,11 @@ Schedule::command('argos:workspaces:reap-orphans')
     ->everyFifteenMinutes()
     ->withoutOverlapping();
 
+// New comments on the tickets of open tasks become hints in the chat.
+Schedule::command('argos:tasks:sync-ticket-comments')
+    ->cron('*/'.max(1, (int) config('argos.poll_interval_minutes', 5)).' * * * *')
+    ->withoutOverlapping();
+
 Schedule::command('argos:tasks:sync-prs')
     ->cron('*/'.max(1, (int) config('argos.workspaces.pr_sync_minutes', 15)).' * * * *')
     ->withoutOverlapping();

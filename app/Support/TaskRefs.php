@@ -24,6 +24,7 @@ final class TaskRefs
         $key = (string) ($ref['key'] ?? '');
 
         return match (true) {
+            $kind === TaskProviderKind::Custom => $key !== '' ? $key : '#'.$ref['number'],
             $kind === TaskProviderKind::Linear && $key !== '' && ! str_starts_with($key, 'linear-') => $key,
             $kind !== null => $kind->label().' #'.$ref['number'],
             default => $key !== '' ? $key : '#'.$ref['number'],

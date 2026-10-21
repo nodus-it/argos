@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Tests\Feature\Workspace;
 
 use App\Enums\IntegrationProvider;
+use App\Enums\TaskProviderSyncStatus;
+use App\Enums\TaskProviderKind;
 use App\Enums\WorkspaceRole;
 use App\Filament\Admin\RelationManagers\ApiTokensRelationManager;
 use App\Filament\Admin\Resources\WorkspaceResource\RelationManagers\TaskProviderBindingsRelationManager;
@@ -235,6 +237,26 @@ class WorkspaceSettingsTest extends TestCase
 
         $binding = TaskProviderBinding::query()->where('workspace_id', $workspace->id)->sole();
         $this->assertFalse($binding->close_on_merge);
+    }
+
+    public function test_a_workspace_admin_connects_an_own_ticket_system(): void
+    {
+        $admin = User::factory()->create();
+        $workspace = $this->workspaceFor($admin);
+
+        Livewire::actingAs($admin)->test(TaskProviderBindingsRelationManager::class, ['ownerRecord' => $workspace, 'pageClass' => EditWorkspaceSettings::class])
+            ->callAction(TestAction::make(CreateAction::class)->table(), [
+                'kind' => 'custom',
+                'external_project_ref' => 'Support desk',
+                'callback_url' => 'https://desk.example.com/argos',
+            ])
+            ->assertHasNoActionErrors();
+
+        $binding = TaskProviderBinding::query()->where('workspace_id', $workspace->id)->sole();
+        $this->assertSame(TaskProviderKind::Custom, $binding->kind);
+        $this->assertSame('https://desk.example.com/argos', $binding->callback_url);
+        $this->assertSame(48, strlen((string) $binding->webhook_secret));
+        $this->assertSame(TaskProviderSyncStatus::Active, $binding->sync_status);
     }
 
     public function test_integration_managers_are_for_workspace_admins_only(): void

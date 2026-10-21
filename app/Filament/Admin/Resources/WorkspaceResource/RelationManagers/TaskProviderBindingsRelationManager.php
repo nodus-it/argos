@@ -22,6 +22,7 @@ use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TagsInput;
+use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -52,6 +53,33 @@ class TaskProviderBindingsRelationManager extends RelationManager
         return Auth::user()?->can('update', $ownerRecord) ?? false;
     }
 
+    private static function isCustom(Get $get): bool
+    {
+        return $get('kind') === TaskProviderKind::Custom->value;
+    }
+
+    /**
+     * Own systems need no credentials, mode or filters; they get a signing
+     * secret for the webhook instead.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    protected function applyCustom(array $data): array
+    {
+        if (($data['kind'] ?? null) !== TaskProviderKind::Custom->value) {
+            return $data;
+        }
+
+        return [
+            ...$data,
+            'mode' => TaskProviderMode::Webhook->value,
+            'auth_method' => AuthMethod::Pat->value,
+            'webhook_secret' => $data['webhook_secret'] ?? bin2hex(random_bytes(24)),
+            'sync_status' => TaskProviderSyncStatus::Active->value,
+        ];
+    }
+
     public function form(Schema $schema): Schema
     {
         return $schema->components([
@@ -66,6 +94,7 @@ class TaskProviderBindingsRelationManager extends RelationManager
                 ->native(false),
 
             Select::make('mode')
+                ->visible(fn (Get $get): bool => ! self::isCustom($get))
                 ->label(__('task_providers.form.mode'))
                 ->options(collect(TaskProviderMode::cases())
                     ->mapWithKeys(fn (TaskProviderMode $m): array => [$m->value => $m->label()])
@@ -78,6 +107,7 @@ class TaskProviderBindingsRelationManager extends RelationManager
             // option encodes both the auth method and the source id (see
             // applyCredentialRef / mutateRecordDataUsing).
             Select::make('credential_ref')
+                ->visible(fn (Get $get): bool => ! self::isCustom($get))
                 ->label(__('task_providers.form.credential'))
                 ->options(fn (Get $get): array => $this->credentialRefOptions($get))
                 ->required()
@@ -87,6 +117,7 @@ class TaskProviderBindingsRelationManager extends RelationManager
                 ->helperText(__('task_providers.form.credential_help')),
 
             Select::make('external_project_ref')
+                ->visible(fn (Get $get): bool => ! self::isCustom($get))
                 ->label(__('task_providers.form.project'))
                 ->options(fn (Get $get): array => $this->loadProjectRefOptions($get))
                 ->searchable()
@@ -96,8 +127,30 @@ class TaskProviderBindingsRelationManager extends RelationManager
                 ->nullable(),
 
             TagsInput::make('filters.labels')
+                ->visible(fn (Get $get): bool => ! self::isCustom($get))
                 ->label(__('task_providers.form.labels_filter'))
                 ->nullable(),
+
+            // Own systems: they create tasks over the REST API and hear back here.
+            TextInput::make('external_project_ref')
+                ->visible(fn (Get $get): bool => self::isCustom($get))
+                ->label(__('task_providers.custom.name'))
+                ->helperText(__('task_providers.custom.name_help'))
+                ->required()
+                ->maxLength(120),
+            TextInput::make('callback_url')
+                ->visible(fn (Get $get): bool => self::isCustom($get))
+                ->label(__('task_providers.custom.callback_url'))
+                ->helperText(__('task_providers.custom.callback_url_help'))
+                ->url()
+                ->maxLength(2000)
+                ->nullable(),
+            TextInput::make('webhook_secret')
+                ->visible(fn (Get $get, ?TaskProviderBinding $record): bool => self::isCustom($get) && $record !== null)
+                ->label(__('task_providers.custom.secret'))
+                ->helperText(__('task_providers.custom.secret_help'))
+                ->readOnly()
+                ->dehydrated(false),
 
             Toggle::make('close_on_merge')
                 ->label(__('task_providers.form.close_on_merge'))
@@ -304,14 +357,15 @@ class TaskProviderBindingsRelationManager extends RelationManager
             ])
             ->headerActions([
                 CreateAction::make()
-                    ->mutateDataUsing(fn (array $data): array => $this->applyCredentialRef($data)),
+                    ->mutateDataUsing(fn (array $data): array => $this->applyCustom($this->applyCredentialRef($data))),
             ])
             ->actions([
                 EditAction::make()
                     ->mutateRecordDataUsing(fn (array $data): array => $this->hydrateCredentialRef($data))
-                    ->mutateDataUsing(fn (array $data): array => $this->applyCredentialRef($data)),
+                    ->mutateDataUsing(fn (array $data): array => $this->applyCustom($this->applyCredentialRef($data))),
 
                 Action::make('setup')
+                    ->visible(fn (TaskProviderBinding $record): bool => ! $record->kind->isCustom())
                     ->label(__('task_providers.actions.setup'))
                     ->icon('heroicon-o-arrow-path')
                     ->action(function (TaskProviderBinding $record): void {

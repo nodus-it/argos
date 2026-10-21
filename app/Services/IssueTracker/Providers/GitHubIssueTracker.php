@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace App\Services\IssueTracker\Providers;
 
 use App\Integrations\GitHub\GitHubConnector;
+use App\Integrations\GitHub\Requests\AddIssueAssignees;
+use App\Integrations\GitHub\Requests\CheckAssignee;
 use App\Integrations\GitHub\Requests\CloseIssue;
+use App\Integrations\GitHub\Requests\CreateIssue;
 use App\Integrations\GitHub\Requests\CreateIssueComment;
 use App\Integrations\GitHub\Requests\GetCollaboratorPermission;
 use App\Integrations\GitHub\Requests\GetCommentReactions;
@@ -17,6 +20,7 @@ use App\Integrations\GitHub\Requests\ListRepositories;
 use App\Integrations\GitHub\Requests\RegisterWebhook;
 use App\Integrations\GitHub\Requests\UnregisterWebhook;
 use App\Services\IssueTracker\Contracts\IssueTrackerContract;
+use Illuminate\Support\Facades\Log;
 
 class GitHubIssueTracker implements IssueTrackerContract
 {
@@ -98,6 +102,81 @@ class GitHubIssueTracker implements IssueTrackerContract
             ->send(new CreateIssueComment($owner, $project, $issueNumber, $body))
             ->throw()
             ->json();
+    }
+
+    public function createIssue(string $owner, string $project, string $title, string $body): array
+    {
+        return $this->connector
+            ->send(new CreateIssue($owner, $project, $title, $body))
+            ->throw()
+            ->json();
+    }
+
+    public function listComments(string $owner, string $project, int|string $issueNumber): array
+    {
+        $comments = $this->connector
+            ->send(new GetIssueComments($owner, $project, $issueNumber))
+            ->throw()
+            ->json();
+
+        $out = [];
+        foreach (is_array($comments) ? $comments : [] as $comment) {
+            if (! is_array($comment)) {
+                continue;
+            }
+            $out[] = [
+                'id' => (string) ($comment['id'] ?? ''),
+                'author' => (string) ($comment['user']['login'] ?? ''),
+                'body' => (string) ($comment['body'] ?? ''),
+                'created_at' => isset($comment['created_at']) ? (string) $comment['created_at'] : null,
+                'url' => isset($comment['html_url']) ? (string) $comment['html_url'] : null,
+            ];
+        }
+
+        // GitHub already returns ascending; sort defensively (stable on ties).
+        usort($out, fn (array $a, array $b): int => strcmp((string) $a['created_at'], (string) $b['created_at']));
+
+        return $out;
+    }
+
+    public function assignIssue(string $owner, string $project, int|string $issueNumber, string $assignee): bool
+    {
+        $context = ['provider' => 'github', 'repo' => "{$owner}/{$project}", 'issue' => (string) $issueNumber, 'assignee' => $assignee];
+
+        try {
+            // GitHub silently ignores unassignable logins on the add call, so
+            // check assignability first (204 = assignable, 404 = not).
+            $check = $this->connector->send(new CheckAssignee($owner, $project, $assignee));
+            if ($check->status() !== 204) {
+                Log::channel('argos')->info('Issue assignee not assignable', [...$context, 'status' => $check->status()]);
+
+                return false;
+            }
+
+            $response = $this->connector->send(new AddIssueAssignees($owner, $project, $issueNumber, [$assignee]));
+            if ($response->failed()) {
+                Log::channel('argos')->info('Issue assignment refused', [...$context, 'status' => $response->status()]);
+
+                return false;
+            }
+
+            $logins = array_map(
+                fn (mixed $a): string => is_array($a) ? strtolower((string) ($a['login'] ?? '')) : '',
+                (array) ($response->json('assignees') ?? []),
+            );
+
+            if (! in_array(strtolower($assignee), $logins, true)) {
+                Log::channel('argos')->info('Issue assignment not applied', $context);
+
+                return false;
+            }
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::channel('argos')->info('Issue assignment failed', [...$context, 'error' => $e->getMessage()]);
+
+            return false;
+        }
     }
 
     public function closeIssue(string $owner, string $project, int|string $issueNumber): void

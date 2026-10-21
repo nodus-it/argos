@@ -42,4 +42,13 @@ return [
         'setup_ok' => 'Provider eingerichtet',
         'setup_failed' => 'Einrichtung fehlgeschlagen',
     ],
+    'custom' => [
+        'label' => 'Eigenes System',
+        'name' => 'Name des Systems',
+        'name_help' => 'So heißt das System in Argos, z. B. „Support-Desk“.',
+        'callback_url' => 'Webhook-URL',
+        'callback_url_help' => 'Argos meldet hierhin, was mit den Aufgaben passiert (gestartet, Plan wartet, Pull Request, fertig, abgebrochen), signiert mit dem Geheimnis unten (X-Argos-Signature: sha256=…). Aufgaben kommen über die REST-API herein (POST /api/v1/workspaces/{workspace}/tasks mit „ticket“).',
+        'secret' => 'Signatur-Geheimnis',
+        'secret_help' => 'Prüfe den Header X-Argos-Signature gegen den HMAC-SHA256 des Request-Bodys mit diesem Geheimnis.',
+    ],
 ];

@@ -103,7 +103,7 @@ class IssueTriggerTest extends TestCase
 
         $task = Task::query()->sole();
         $this->assertSame(AutoTaskState::AwaitingPlanApproval, $task->auto_state);
-        $this->assertStringContainsString('started working on this issue', $this->comments[0]);
+        $this->assertStringContainsString('is working on this issue', $this->comments[0]);
         $this->assertStringContainsString('React with 👍', $this->comments[1]);
         $this->assertStringContainsString('Add the field', $this->comments[1]);
         $this->assertSame('2', $link->fresh()->plan_comment_id);

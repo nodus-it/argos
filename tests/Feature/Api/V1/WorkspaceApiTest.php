@@ -7,13 +7,16 @@ namespace Tests\Feature\Api\V1;
 use App\Broadcasting\TaskStream;
 use App\Enums\AutoTaskState;
 use App\Enums\TaskOrigin;
+use App\Enums\TaskProviderKind;
 use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceStatus;
+use App\Jobs\SendTicketWebhookJob;
 use App\Jobs\Workspace\AdvanceAutoTaskJob;
 use App\Jobs\Workspace\ProvisionWorkspaceJob;
 use App\Models\AgentCredential;
 use App\Models\ApiClient;
 use App\Models\Task;
+use App\Models\TaskProviderBinding;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceMember;
@@ -93,6 +96,31 @@ class WorkspaceApiTest extends TestCase
         $this->assertSame('draft_pr', $task->auto_config['ship']);
         $this->assertSame(20, $task->auto_config['max_turns']);
         Bus::assertDispatched(AdvanceAutoTaskJob::class, fn ($job): bool => $job->step === 'begin');
+    }
+
+    public function test_an_own_system_starts_tasks_with_its_ticket_and_reports_comments(): void
+    {
+        TaskProviderBinding::factory()->create(['workspace_id' => $this->workspace->id, 'kind' => TaskProviderKind::Custom, 'external_project_ref' => 'Support desk', 'callback_url' => 'https://desk.example.com/argos', 'webhook_secret' => 's']);
+        Bus::fake([SendTicketWebhookJob::class]);
+
+        $this->withToken($this->clientToken())->postJson("/api/v1/workspaces/{$this->workspace->id}/tasks", [
+            'prompt' => 'Fix the printer', 'ticket' => ['key' => 'SUP-5', 'title' => 'Printer offline', 'url' => 'https://desk.example.com/5', 'body' => 'It is offline.'],
+        ])->assertStatus(202)
+            ->assertJsonPath('data.ticket.key', 'SUP-5')
+            ->assertJsonPath('data.branch', 'sup-5-printer-offline');
+        Bus::assertDispatched(SendTicketWebhookJob::class, fn (SendTicketWebhookJob $job): bool => $job->payload['event'] === 'started');
+
+        $task = Task::query()->sole();
+        $this->withToken($this->clientToken())->postJson("/api/v1/tasks/{$task->id}/ticket-comments", ['author' => 'Carol', 'body' => 'Also the scanner.'])
+            ->assertStatus(202);
+        $this->assertTrue($task->events()->get()->contains(fn ($e): bool => ($e->payload['kind'] ?? null) === 'ticket_comment' && $e->payload['body'] === 'Also the scanner.'));
+    }
+
+    public function test_a_ticket_needs_an_own_system_integration(): void
+    {
+        $this->withToken($this->clientToken())->postJson("/api/v1/workspaces/{$this->workspace->id}/tasks", [
+            'prompt' => 'x', 'ticket' => ['key' => 'SUP-1', 'title' => 'T'],
+        ])->assertStatus(422)->assertJsonPath('code', 'no_custom_binding');
     }
 
     public function test_a_viewer_cannot_start_tasks(): void

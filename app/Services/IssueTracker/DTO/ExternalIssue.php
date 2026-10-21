@@ -31,6 +31,8 @@ final readonly class ExternalIssue extends Dto
         public array $labels,
         // Human-readable key where the tracker has one (Linear: "ENG-118").
         public string $key = '',
+        // Provider login/username of the assignee (Linear: e-mail address).
+        public ?string $assignee = null,
     ) {}
 
     /**
@@ -54,7 +56,46 @@ final readonly class ExternalIssue extends Dto
             state: (string) ($payload['state'] ?? $payload['status'] ?? ''),
             labels: self::normalizeLabels($payload['labels'] ?? []),
             key: (string) ($payload['identifier'] ?? ''),
+            assignee: self::normalizeAssignee($payload, $kind),
         );
+    }
+
+    /**
+     * GitHub `assignee.login`, GitLab `assignee.username` (each falling back
+     * to the first of `assignees`), Linear `assignee.email`, Bitbucket
+     * `assignee.nickname`/`username`.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    private static function normalizeAssignee(array $payload, TaskProviderKind $kind): ?string
+    {
+        $keys = match ($kind) {
+            TaskProviderKind::GitHub => ['login'],
+            TaskProviderKind::GitLab => ['username'],
+            // Linear (email) and Bitbucket (nickname/username), which has no
+            // TaskProviderKind case of its own.
+            default => ['email', 'nickname', 'username', 'login'],
+        };
+
+        $candidates = [$payload['assignee'] ?? null];
+        $assignees = $payload['assignees'] ?? null;
+        if (is_array($assignees) && array_is_list($assignees)) {
+            $candidates[] = $assignees[0] ?? null;
+        }
+
+        foreach ($candidates as $candidate) {
+            if (! is_array($candidate)) {
+                continue;
+            }
+            foreach ($keys as $key) {
+                $value = $candidate[$key] ?? null;
+                if (is_string($value) && $value !== '') {
+                    return $value;
+                }
+            }
+        }
+
+        return null;
     }
 
     /**

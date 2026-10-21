@@ -4,11 +4,17 @@ declare(strict_types=1);
 
 namespace Tests\Feature\IssueTracker;
 
+use App\Enums\TaskProviderKind;
+use App\Integrations\GitHub\Requests\AddIssueAssignees;
+use App\Integrations\GitHub\Requests\CheckAssignee;
 use App\Integrations\GitHub\Requests\CloseIssue;
+use App\Integrations\GitHub\Requests\CreateIssue;
+use App\Integrations\GitHub\Requests\GetIssueComments;
 use App\Integrations\GitHub\Requests\ListIssues;
 use App\Integrations\GitHub\Requests\ListRepositories;
 use App\Integrations\GitHub\Requests\RegisterWebhook;
 use App\Integrations\GitHub\Requests\UnregisterWebhook;
+use App\Services\IssueTracker\DTO\ExternalIssue;
 use App\Services\IssueTracker\Providers\GitHubIssueTracker;
 use Saloon\Http\Faking\MockResponse;
 use Saloon\Http\Request;
@@ -353,5 +359,101 @@ class GitHubIssueTrackerTest extends TestCase
     {
         $this->assertSame('12345', $this->tracker->commentId(['id' => 12345]));
         $this->assertNull($this->tracker->commentId([]));
+    }
+
+    // ── createIssue / listComments / assignIssue ─────────────────────────────
+
+    public function test_create_issue_posts_title_and_body_and_returns_raw_issue(): void
+    {
+        Saloon::fake([
+            CreateIssue::class => MockResponse::make([
+                'number' => 77,
+                'title' => 'New bug',
+                'body' => 'Steps…',
+                'html_url' => 'https://github.com/acme/widget/issues/77',
+                'state' => 'open',
+                'labels' => [],
+            ], 201),
+        ]);
+
+        $raw = $this->tracker->createIssue('acme', 'widget', 'New bug', 'Steps…');
+
+        $issue = ExternalIssue::fromProvider($raw, TaskProviderKind::GitHub);
+        $this->assertSame('77', $issue->externalId);
+        $this->assertSame('https://github.com/acme/widget/issues/77', $issue->url);
+
+        Saloon::assertSent(function (Request $request, $response): bool {
+            $body = $request instanceof CreateIssue ? $request->body()->all() : [];
+
+            return $request instanceof CreateIssue
+                && $response->getPendingRequest()->getMethod()->value === 'POST'
+                && $request->resolveEndpoint() === '/repos/acme/widget/issues'
+                && $body === ['title' => 'New bug', 'body' => 'Steps…'];
+        });
+    }
+
+    public function test_list_comments_normalizes_oldest_first(): void
+    {
+        Saloon::fake([
+            GetIssueComments::class => MockResponse::make([
+                ['id' => 2, 'user' => ['login' => 'bob'], 'body' => 'second', 'created_at' => '2026-01-02T00:00:00Z', 'html_url' => 'https://github.com/c/2'],
+                ['id' => 1, 'user' => ['login' => 'alice'], 'body' => 'first', 'created_at' => '2026-01-01T00:00:00Z', 'html_url' => 'https://github.com/c/1'],
+            ]),
+        ]);
+
+        $comments = $this->tracker->listComments('acme', 'widget', 5);
+
+        $this->assertSame([
+            ['id' => '1', 'author' => 'alice', 'body' => 'first', 'created_at' => '2026-01-01T00:00:00Z', 'url' => 'https://github.com/c/1'],
+            ['id' => '2', 'author' => 'bob', 'body' => 'second', 'created_at' => '2026-01-02T00:00:00Z', 'url' => 'https://github.com/c/2'],
+        ], $comments);
+    }
+
+    public function test_assign_issue_checks_assignability_then_adds_assignee(): void
+    {
+        Saloon::fake([
+            CheckAssignee::class => MockResponse::make('', 204),
+            AddIssueAssignees::class => MockResponse::make(['number' => 5, 'assignees' => [['login' => 'Octocat']]], 201),
+        ]);
+
+        $this->assertTrue($this->tracker->assignIssue('acme', 'widget', 5, 'octocat'));
+
+        Saloon::assertSent(fn (Request $r): bool => $r instanceof CheckAssignee
+            && $r->resolveEndpoint() === '/repos/acme/widget/assignees/octocat');
+        Saloon::assertSent(fn (Request $r): bool => $r instanceof AddIssueAssignees
+            && $r->resolveEndpoint() === '/repos/acme/widget/issues/5/assignees'
+            && $r->body()->all() === ['assignees' => ['octocat']]);
+    }
+
+    public function test_assign_issue_returns_false_when_user_is_not_assignable(): void
+    {
+        Saloon::fake([
+            CheckAssignee::class => MockResponse::make(['message' => 'Not Found'], 404),
+            AddIssueAssignees::class => MockResponse::make([], 201),
+        ]);
+
+        $this->assertFalse($this->tracker->assignIssue('acme', 'widget', 5, 'ghost'));
+
+        Saloon::assertNotSent(AddIssueAssignees::class);
+    }
+
+    public function test_assign_issue_returns_false_when_github_drops_the_assignee(): void
+    {
+        Saloon::fake([
+            CheckAssignee::class => MockResponse::make('', 204),
+            AddIssueAssignees::class => MockResponse::make(['number' => 5, 'assignees' => []], 201),
+        ]);
+
+        $this->assertFalse($this->tracker->assignIssue('acme', 'widget', 5, 'octocat'));
+    }
+
+    public function test_assign_issue_returns_false_instead_of_throwing_on_server_error(): void
+    {
+        Saloon::fake([
+            CheckAssignee::class => MockResponse::make('', 204),
+            AddIssueAssignees::class => MockResponse::make(['message' => 'boom'], 500),
+        ]);
+
+        $this->assertFalse($this->tracker->assignIssue('acme', 'widget', 5, 'octocat'));
     }
 }

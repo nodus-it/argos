@@ -27,6 +27,8 @@ use App\Models\TaskEvent;
 use App\Models\TaskMember;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Services\IssueTracker\IssueRunReporter;
+use App\Support\TaskRefs;
 use Illuminate\Support\Facades\Gate;
 
 /**
@@ -91,6 +93,9 @@ class TaskService
 
         // Worktree, database and setup commands; Claude starts after that.
         PrepareTaskJob::dispatch($task->id)->afterCommit();
+        if ($task->external_ref !== null) {
+            app(IssueRunReporter::class)->started($task);
+        }
 
         return $task;
     }
@@ -546,6 +551,7 @@ class TaskService
         $task->unsetRelation('members');
 
         $this->notice($task, 'transferred', $by, ['owner_name' => $newOwner->name]);
+        app(IssueRunReporter::class)->ownerChanged($task, $newOwner);
         app(WorkspaceNotifier::class)->notify($task->workspace, $task, 'invite', __('workspaces.notifications.transferred', ['name' => $by->name]), $task->title, $by->id);
     }
 
@@ -566,6 +572,7 @@ class TaskService
             'auto_state' => $task->auto_state?->isRunning() === true ? AutoTaskState::Paused : $task->auto_state,
         ])->save();
         $this->notice($task, 'cancelled', $by);
+        app(IssueRunReporter::class)->closed($task);
     }
 
     /**
@@ -614,6 +621,51 @@ class TaskService
             $parent->pr_url !== null ? __('workspaces.task.follow_up_pr', ['url' => $parent->pr_url, 'state' => (string) $parent->pr_state]) : null,
             is_array($last) && trim((string) ($last['text'] ?? '')) !== '' ? __('workspaces.task.follow_up_last')."\n> ".str_replace("\n", "\n> ", mb_strimwidth(trim((string) $last['text']), 0, 1500, '…')) : null,
         ])));
+    }
+
+    /** Link a task to a ticket of the workspace's tracker after the fact. */
+    public function linkTicket(Task $task, User $by, string $number): void
+    {
+        Gate::forUser($by)->authorize('update', $task);
+        if ($task->external_ref !== null) {
+            throw WorkspaceException::translated('workspaces.errors.ticket_linked');
+        }
+        $ref = app(WorkspaceIssueService::class)->load($task->workspace, $number);
+        $task->forceFill(['external_ref' => $ref])->save();
+        $this->notice($task, 'ticket_linked', $by, ['ticket' => (string) TaskRefs::ticketLabel($task)]);
+        app(WorkspaceIssueService::class)->comment($task, __('workspaces.issue.run.linked', ['url' => $task->url()]));
+    }
+
+    /** Open a ticket in the workspace's tracker for a task that has none. */
+    public function createTicket(Task $task, User $by, string $title, string $body): void
+    {
+        Gate::forUser($by)->authorize('update', $task);
+        if ($task->external_ref !== null) {
+            throw WorkspaceException::translated('workspaces.errors.ticket_linked');
+        }
+        $ref = app(WorkspaceIssueService::class)->create($task->workspace, $title, trim($body)."\n\n".__('workspaces.issue.created_footer', ['url' => $task->url()]));
+        $task->forceFill(['external_ref' => $ref])->save();
+        $this->notice($task, 'ticket_created', $by, ['ticket' => (string) TaskRefs::ticketLabel($task), 'url' => $ref['url']]);
+    }
+
+    /**
+     * A new comment on the task's ticket: a hint in the chat (never sent to
+     * Claude by itself) and a notification for the task's people.
+     */
+    public function ticketComment(Task $task, string $author, string $body, ?string $url = null): void
+    {
+        $text = mb_strimwidth(trim($body), 0, 2000, '…');
+        $event = TaskEvent::query()->create([
+            'task_id' => $task->id,
+            'type' => TaskEventType::Notice,
+            'payload' => ['kind' => 'ticket_comment', 'author_name' => $author, 'body' => $text, 'url' => $url],
+        ]);
+        $this->publisher->publish($task->workspace_id, $task->id, [[
+            'type' => 'notice',
+            'event_id' => $event->id,
+            'data' => ['kind' => 'ticket_comment'],
+        ]]);
+        app(WorkspaceNotifier::class)->notify($task->workspace, $task, 'ticket', __('workspaces.notifications.ticket_comment', ['name' => $author]), mb_strimwidth($text, 0, 200, '…'));
     }
 
     public function rename(Task $task, User $by, string $title): void
