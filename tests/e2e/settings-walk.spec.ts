@@ -8,11 +8,9 @@ import { login } from './helpers/auth';
  */
 const PAGES: Array<{ label: string; path: string; expect?: RegExp }> = [
   { label: 'Dashboard', path: '/admin' },
-  { label: 'Projects', path: '/admin/repo-profiles' },
+  { label: 'Workspaces (admin)', path: '/admin/workspaces' },
   { label: 'API clients', path: '/admin/api-clients' },
   { label: 'Agent credentials', path: '/admin/agent-credentials' },
-  { label: 'Worker stacks', path: '/admin/worker-stacks' },
-  { label: 'Worker image builds', path: '/admin/worker-image-builds' },
   { label: 'Connected accounts', path: '/admin/connected-accounts' },
   { label: 'Settings', path: '/admin/settings' },
 ];

@@ -25,18 +25,16 @@ import {
 // desktop settings-walk plus the in-app docs viewer (concept overlap D).
 const MASKS: { label: string; path: string }[] = [
   { label: 'Dashboard', path: '/admin' },
-  { label: 'Projects', path: '/admin/repo-profiles' },
+  { label: 'Workspaces (admin)', path: '/admin/workspaces' },
   { label: 'API clients', path: '/admin/api-clients' },
   { label: 'Agent credentials', path: '/admin/agent-credentials' },
-  { label: 'Worker stacks', path: '/admin/worker-stacks' },
-  { label: 'Worker image builds', path: '/admin/worker-image-builds' },
   { label: 'Connected accounts', path: '/admin/connected-accounts' },
   { label: 'Settings', path: '/admin/settings' },
   { label: 'Documentation', path: '/admin/docs' },
   { label: 'Workspaces', path: '/w/workspaces' },
+  { label: 'My work', path: '/w/my-work' },
   { label: 'Users', path: '/admin/users' },
   // Forms must not break on mobile (Filament stacks grids to 1 column below lg).
-  { label: 'Create project', path: '/admin/repo-profiles/create' },
   { label: 'Create workspace', path: '/w/workspaces/create' },
 ];
 
@@ -64,7 +62,15 @@ test.describe('mobile gate @375px', () => {
     await expect(page.locator('.ws-chat')).toBeVisible();
 
     await assertNoHorizontalOverflow(page, 'Workspace · chat');
+
     await assertTapTarget(page.locator('.ws-composer-bar .btn-primary').first(), 'Workspace · Send');
+
+    // The workspace settings (every tab) must fit the phone as well.
+    const settings = page.url().replace(/\?.*$/, '') + '/settings';
+    for (const tab of ['general', 'environment', 'resources', 'integrations', 'automation', 'members']) {
+      await gotoStable(page, `${settings}?tab=${tab}`);
+      await assertNoHorizontalOverflow(page, `Workspace settings · ${tab}`);
+    }
   });
 
   test('the new-task form with the auto toggle fits the phone', async ({ page }) => {
