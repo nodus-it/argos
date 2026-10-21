@@ -110,7 +110,12 @@ final class WorkspaceForm
                     ])
                     ->required()
                     ->live()
-                    ->native(false),
+                    ->native(false)
+                    // The repository is fixed once the workspace exists (worktrees,
+                    // branches, PRs hang on it); still sent so the access fields map
+                    // (WorkspaceService ignores the value).
+                    ->disabledOn('edit')
+                    ->dehydrated(),
 
                 Callout::make(fn (Get $get): string => __('projects.platform_hints.'.($get('platform') ?: 'github').'.heading'))
                     ->visible(fn (Get $get): bool => self::platformChosen($get))
@@ -308,7 +313,8 @@ final class WorkspaceForm
                         }
                     })
                     ->visible(fn (Get $get): bool => self::isConnectedPath($get))
-                    ->dehydrated(fn (Get $get): bool => self::isConnectedPath($get)),
+                    ->disabledOn('edit')
+                    ->dehydrated(fn (Get $get, string $operation): bool => self::isConnectedPath($get) && $operation !== 'edit'),
 
                 Select::make('oauth_branch')
                     ->label(__('projects.fields.default_branch_label'))
@@ -327,7 +333,8 @@ final class WorkspaceForm
                     ->maxLength(500)
                     ->live(onBlur: true)
                     ->visible(fn (Get $get): bool => ! self::isConnectedPath($get))
-                    ->dehydrated(),
+                    ->disabledOn('edit')
+                    ->dehydrated(fn (string $operation): bool => $operation !== 'edit'),
 
                 TextInput::make('token')
                     ->label(__('projects.fields.token_label'))

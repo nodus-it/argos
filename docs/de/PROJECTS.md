@@ -30,12 +30,11 @@ Formular). Neue Workspaces legen nur Argos-Admins an — siehe
 
 ## Anlegen: Plattform, Zugang, Repository
 
-Diese Felder werden beim Anlegen des Workspaces gesetzt. Auf der
-Einstellungsseite in `/w` steht das Repository danach fest (es zu ändern würde
-jeden Aufgaben-Branch verwaisen lassen); das Bearbeitungsformular im
-Admin-Panel zeigt Plattform, Zugang und Repository weiterhin — nutze es, um
-einen abgelaufenen Token zu ersetzen, nicht um den Workspace auf ein anderes
-Repository zu richten.
+Diese Felder werden beim Anlegen des Workspaces gesetzt. Plattform und
+Repository stehen danach fest (sie zu ändern würde jeden Aufgaben-Branch und
+Pull Request verwaisen lassen) — auf der Einstellungsseite in `/w` und im
+Bearbeitungsformular im Admin-Panel. Dort lässt sich der Zugang weiterhin
+erneuern, z. B. ein abgelaufener Token ersetzen.
 
 - **Plattform** — GitHub, GitLab (einschließlich selbst gehosteter Instanzen)
   oder Bitbucket. Bis du eine auswählst, bleibt der Rest des Formulars

@@ -29,11 +29,11 @@ below the form). New workspaces are created by Argos administrators only — see
 
 ## Creating: platform, access, repository
 
-These fields are set when the workspace is created. On the `/w` settings
-page the repository is fixed afterwards (changing it would orphan every task
-branch); the admin panel's edit form still shows platform, access and
-repository — use it to replace an expired token, not to point the workspace at
-another repository.
+These fields are set when the workspace is created. Platform and repository
+are fixed afterwards (changing them would orphan every task branch and pull
+request) — on the `/w` settings page and in the admin panel's edit form. The
+admin panel's edit form can still renew the access, e.g. replace an expired
+token.
 
 - **Platform** — GitHub, GitLab (including self-hosted) or Bitbucket. Until you
   pick one, the rest of the form stays locked. A hint links the platform guide

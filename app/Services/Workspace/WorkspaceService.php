@@ -85,14 +85,16 @@ class WorkspaceService extends EntityService
     }
 
     /**
-     * Change settings (admins of the workspace).
+     * Change settings (admins of the workspace). The repository and its
+     * platform are fixed once the workspace exists; its access (token,
+     * account) may be renewed.
      *
      * @param  array<string, mixed>  $attributes
      */
     public function updateSettings(Workspace $workspace, User $by, array $attributes): Workspace
     {
         Gate::forUser($by)->authorize('update', $workspace);
-        $workspace->fill(Arr::except($attributes, ['slug', 'status', 'daemon_token', 'container_name', 'created_by']))->save();
+        $workspace->fill(Arr::except($attributes, ['slug', 'status', 'daemon_token', 'container_name', 'created_by', 'repo_url', 'platform']))->save();
 
         return $workspace;
     }

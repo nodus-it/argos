@@ -178,6 +178,32 @@ class AdminWorkspaceResourceTest extends TestCase
         $this->assertDatabaseHas(Workspace::class, ['id' => $workspace->id, 'name' => 'Umbenannt']);
     }
 
+    public function test_the_repository_stays_fixed_when_editing(): void
+    {
+        Saloon::fake([
+            'api.github.com/repos/test-org/test-repo/branches*' => MockResponse::make([['name' => 'main']]),
+        ]);
+        $workspace = Workspace::factory()->create();
+        $repo = $workspace->repo_url;
+
+        Livewire::test(EditWorkspace::class, ['record' => $workspace->getKey()])
+            ->assertFormFieldIsDisabled('platform')
+            ->assertFormFieldIsDisabled('repo_url')
+            ->fillForm(['name' => 'Shop'])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $this->assertSame($repo, $workspace->fresh()->repo_url);
+        $this->assertSame('github', $workspace->fresh()->platform->value);
+
+        // The service ignores them, whoever calls it.
+        $admin = \App\Models\User::factory()->create(['is_admin' => true]);
+        app(\App\Services\Workspace\WorkspaceService::class)->updateSettings($workspace, $admin, ['repo_url' => 'https://github.com/evil/other', 'platform' => 'gitlab', 'name' => 'Renamed']);
+        $this->assertSame($repo, $workspace->fresh()->repo_url);
+        $this->assertSame('github', $workspace->fresh()->platform->value);
+        $this->assertSame('Renamed', $workspace->fresh()->name);
+    }
+
     public function test_can_delete_workspace(): void
     {
         $workspace = Workspace::factory()->create();
