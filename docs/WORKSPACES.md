@@ -32,6 +32,7 @@ projects, worker stacks and agents.
 - [Quality gates](#quality-gates)
 - [Checkpoints and reset](#checkpoints-and-reset)
 - [Shipping: commit and pull request](#shipping-commit-and-pull-request)
+- [Auto-threads](#auto-threads)
 - [Lifecycle](#lifecycle)
 - [Security](#security)
 - [Configuration](#configuration)
@@ -313,7 +314,66 @@ branch.
 
 ## Auto-threads
 
-An **auto-thread** works without a human: it plans (optional), implements, checks the [quality gates](#quality-gates), fixes failures and ships a pull request. Each project sets the defaults under **Administration → Projects → Automation** (plan: off / automatic / wait for approval; what to do when done; fix rounds; turn, cost and time budgets). All settings are listed in [Configuration](CONFIGURATION.md#auto-threads).
+An **auto-thread** works without a human: it plans (optionally), implements,
+checks the [quality gates](#quality-gates), fixes failures and ships a pull
+request. You can watch it live and take over at any time — it is an ordinary
+thread otherwise.
+
+**Starting one**
+
+- In a workspace: **New thread → Run automatically**, then describe the task.
+- With a new workspace: **Start an automatic run with the workspace** in the
+  form — the run waits until the workspace is up.
+- From outside: the [REST API](REST-API.md#workspaces-and-automatic-runs)
+  (`POST /api/v1/workspaces`), [MCP](SETUP-MCP.md) (`workspace_create`), or an
+  issue of a connected tracker ([issue triggers](SETUP-TASK-PROVIDERS.md#issue-to-automatic-run)).
+
+**How it runs**
+
+1. **Plan** (per the *Plan* setting): *off* implements right away; *automatic*
+   plans first and continues on its own; *wait for approval* stops at the plan
+   until someone approves it — on the plan card in the thread, via the API or
+   MCP, or with 👍 on the issue comment. Rejecting with feedback makes Claude
+   revise the plan.
+2. **Implement** in *Bypass permissions* mode — the run is isolated in the
+   workspace container and nobody is there to answer approvals. If Claude asks
+   a question, it is told to decide itself and state its assumption.
+3. **Gates** after each turn. Failing gates go back to Claude with the same fix
+   prompt the review offers, up to *Gate fix rounds* times; then it ships
+   anyway and the pull request says which gates still fail.
+4. **Ship** per *When done*: pull request, draft pull request, or commit and
+   push only. Then the session ends and an automatic workspace (started by the
+   API, MCP or an issue) stops.
+
+The thread header shows the state (e.g. *Fixing gate failures · round 2/3*);
+automatic messages are marked *automatic*.
+
+**Taking over.** Writing into a running auto-thread pauses the automation — it
+becomes a normal thread. **Continue automatically** (play button in the header)
+hands it back: it checks the gates and ships. **Pause** stops it without
+writing.
+
+**Budgets.** *Max. turns*, *max. cost* and *max. runtime* stop a run
+(*Budget exceeded*); the work so far stays in the workspace. When the agent
+hits its usage limit, the run continues once the limit is lifted.
+
+**Who it runs as.** A run acts for a person: whoever started it in the UI, the
+signed-in MCP user, the project's **automation user** (project tokens, issue
+triggers) or the API client's **Runs as** user. Their Claude agent does the
+work and they own the workspace.
+
+**Cleanup.** Automatic workspaces are deleted once their pull request is
+merged or closed, or `ARGOS_AUTO_CLEANUP_DAYS` after their run ended without
+anyone working in them. Workspaces created by hand are never deleted
+automatically.
+
+**Notifications** of kind *Automatic runs* tell you when a plan waits, a run is
+done, failed or hit its budget.
+
+Each project sets the defaults under **Administration → Projects →
+Automation**; all settings are listed in [Configuration](CONFIGURATION.md#auto-threads).
+Gates are made for PHP/Laravel projects; on other stacks the fix rounds are
+skipped.
 
 ## Lifecycle
 

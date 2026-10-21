@@ -63,3 +63,9 @@ Schedule::command('argos:workspaces:reap-orphans')
 Schedule::command('argos:workspaces:sync-prs')
     ->cron('*/'.max(1, (int) config('argos.workspaces.pr_sync_minutes', 15)).' * * * *')
     ->withoutOverlapping();
+
+// Delete automatic workspaces (API/MCP/issue) once their pull request is
+// merged/closed or their run ended ARGOS_AUTO_CLEANUP_DAYS ago.
+Schedule::command('argos:workspaces:cleanup-auto')
+    ->dailyAt('03:30')
+    ->withoutOverlapping();

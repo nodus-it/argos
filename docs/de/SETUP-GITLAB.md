@@ -118,9 +118,9 @@ gehosteter Instanz.
 
 ## Option 3: Issue-Provider (Pull + Webhook)
 
-Argos kann GitLab-Issues als Tasks importieren und automatisch einen Kommentar am
-Issue hinterlassen, wenn eine Phase abgeschlossen ist. Jedes Repository benötigt
-ein **TaskProviderBinding**, das über die Filament-Admin-Oberfläche erstellt wird.
+Argos kann automatische Läufe aus GitLab-Issues starten und kommentiert im
+Verlauf des Laufs am Issue. Jedes Repository benötigt ein
+**TaskProviderBinding**, das über die Filament-Admin-Oberfläche erstellt wird.
 
 ### Schritt 1: Erforderliche Token-Scopes
 
@@ -182,7 +182,7 @@ in der Spalte **Last Error**. Behebe das Problem und klicke erneut auf
   `X-Gitlab-Event-UUID` erkannt und verworfen.
 - **Note- und MR-Hooks**: GitLab sendet unter Umständen auch `note`- und
   `merge_request`-Events an dieselbe Webhook-URL. Diese werden erkannt
-  (`object_kind ≠ issue`) und ohne Erstellung eines Tasks verworfen.
+  (`object_kind ≠ issue`) und verworfen, ohne einen Lauf zu starten.
 - **Vertrauliche Issues**: Der Webhook wird mit
   `confidential_issues_events: true` registriert, sodass auch vertrauliche Issues
   verarbeitet werden.
@@ -218,8 +218,8 @@ mehrzeilige Beschreibung trägt.
   **nicht** verwendet — GitLab akzeptiert Bearer für beide Token-Typen.
 - Für gitlab.com wird die `instance_url` in `connected_accounts` leer gespeichert
   (Standardwert `https://gitlab.com`).
-- MR-URLs selbst gehosteter Instanzen werden aus der Ausgabe des Git-Push
-  extrahiert und am Task-Datensatz gespeichert.
+- Merge Requests werden über die GitLab-API geöffnet; ihre URL wird am
+  Workspace gespeichert.
 
 ---
 

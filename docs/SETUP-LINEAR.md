@@ -1,12 +1,11 @@
 # Linear Setup Guide
 
 This guide is for **Argos operators** who want to connect **Linear** as a
-task/issue provider: import Linear issues as Argos tasks, post phase results
-back onto the issue, gate the implement phase on a 👍 reaction, and optionally
-close the issue when the task is done.
+issue tracker: matching Linear issues start automatic runs, Argos comments on
+the issue as the run progresses, and a 👍 reaction approves the plan.
 
 It covers the Linear-specific parts only. The shared mechanics — how a binding
-is created, how webhook vs. poll mode work, the approve gate, status sync — are
+is created, how webhook vs. poll mode work, plan approval — are
 described once in [SETUP-TASK-PROVIDERS.md](SETUP-TASK-PROVIDERS.md) and only
 summarized here. Read that page alongside this one.
 
@@ -18,9 +17,8 @@ summarized here. Read that page alongside this one.
 - [Creating the binding](#creating-the-binding)
 - [Webhook mode](#webhook-mode)
 - [Poll mode](#poll-mode)
-- [Issue to task](#issue-to-task)
-- [Concept write-back and the approve gate](#concept-write-back-and-the-approve-gate)
-- [Status sync on completion](#status-sync-on-completion)
+- [Issue to automatic run](#issue-to-automatic-run)
+- [Plan approval](#plan-approval)
 - [Issue identifiers](#issue-identifiers)
 - [Troubleshooting](#troubleshooting)
 
@@ -119,7 +117,7 @@ The Linear-specific field values:
 | **Zugang** (Credential) | The Linear OAuth account **or** the Linear API key (PAT) |
 | **Projekt / Team** | A Linear **team**, picked from a list loaded from the credential (the team key + name, e.g. `ENG — Engineering`). The team key is stored, not an `owner/repo` path |
 | **Labels-Filter** | Optional: import only issues carrying at least one of these labels |
-| **Issue schließen bei Task-Abschluss** | Optional: close the source issue when the Argos task completes ([status sync](#status-sync-on-completion)) |
+| **Issue schließen bei Task-Abschluss** | No longer used — merging the pull request closes the issue. |
 
 The **Projekt / Team** list is populated by querying Linear's `teams` API with
 the chosen credential, so pick the **Provider** and **Zugang** first. You can
@@ -174,26 +172,24 @@ publicly reachable. **Einrichten** marks the binding Active immediately.
 The poll runs via the scheduled `argos:poll-issues` command. The interval is
 configurable through `ARGOS_POLL_INTERVAL_MINUTES` (default **5**, clamped to
 **1–59**); set it to `1` locally for faster feedback. The same interval also
-drives the approve-gate check (`argos:check-concept-approvals`). The scheduler
+drives the plan-approval check (`argos:check-plan-approvals`). The scheduler
 (`php artisan schedule:work`, or a system cron running `schedule:run`) must be
-active for poll mode *and* for the approve gate — see
+active for poll mode *and* for plan approval — see
 [SETUP-TASK-PROVIDERS.md#poll-mode](SETUP-TASK-PROVIDERS.md#poll-mode).
 
-## Issue to task
+## Issue to automatic run
 
-When a matching Linear issue is seen for the first time, Argos creates a task
-on the binding's project: the task name is the issue title and the description
-is the issue body. If the project has auto-concept enabled, the concept phase
-starts automatically. Import is once-ever per issue. See
-[SETUP-TASK-PROVIDERS.md#issue-to-task](SETUP-TASK-PROVIDERS.md#issue-to-task)
+When a matching Linear issue is seen for the first time, Argos starts an
+automatic run in a new workspace on the binding's project, for the project's
+automation user. Launching is once-ever per issue. See
+[SETUP-TASK-PROVIDERS.md#issue-to-automatic-run](SETUP-TASK-PROVIDERS.md#issue-to-automatic-run)
 for the full behavior.
 
-## Concept write-back and the approve gate
+## Plan approval
 
-After the concept phase, Argos posts a comment on the Linear issue with the
-concept text. While the task is in Concept Review, the approve-gate check polls
-that comment's reactions. A 👍 reaction from an **authorized** user starts the
-implement phase.
+With the project's plan setting *wait for approval*, Argos posts the plan as a
+comment on the Linear issue. A 👍 reaction from an **authorized** user approves
+it and the run continues.
 
 For Linear, "authorized to approve" means an **active, non-guest organisation
 member**: the reacting user must have `active = true` and `guest != true` in
@@ -201,21 +197,12 @@ Linear. (Linear has no per-repo permissions, so this org-member check stands in
 for the write/admin access used on GitHub/GitLab. Admins are a non-guest
 superset and qualify.)
 
-Reactions are never pushed by Linear, so the gate relies on the scheduled
-`argos:check-concept-approvals` run even in webhook mode. Full mechanics:
-[SETUP-TASK-PROVIDERS.md#concept-write-back-and-the-approve-gate](SETUP-TASK-PROVIDERS.md#concept-write-back-and-the-approve-gate).
+Reactions are never pushed by Linear, so approval relies on the scheduled
+`argos:check-plan-approvals` run even in webhook mode. Full mechanics:
+[SETUP-TASK-PROVIDERS.md#comments-and-plan-approval](SETUP-TASK-PROVIDERS.md#comments-and-plan-approval).
 
-## Status sync on completion
-
-Status sync is opt-in per binding via the **Issue schließen bei
-Task-Abschluss** toggle (`close_on_complete`). When enabled and the Argos task
-completes, Argos closes the Linear issue.
-
-Linear has no generic "closed" flag, so Argos moves the issue to the **first
-workflow state of type `completed`** on the issue's team. If the team has no
-completed-type state, the close step fails (logged, best-effort — it never
-blocks completing the task in Argos). See
-[SETUP-TASK-PROVIDERS.md#status-sync-on-completion](SETUP-TASK-PROVIDERS.md#status-sync-on-completion).
+The pull request links the Linear issue; merging it moves the issue on per your
+Linear–Git integration — Argos does not close it.
 
 ## Issue identifiers
 

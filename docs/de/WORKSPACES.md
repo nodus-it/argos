@@ -34,6 +34,7 @@ ist der interaktive. Beide nutzen dieselben Projekte, Worker-Stacks und Agenten.
 - [Quality-Gates](#quality-gates)
 - [Checkpoints und Zurücksetzen](#checkpoints-und-zurucksetzen)
 - [Ausliefern: Commit und Pull Request](#ausliefern-commit-und-pull-request)
+- [Auto-Threads](#auto-threads)
 - [Lebenszyklus](#lebenszyklus)
 - [Sicherheit](#sicherheit)
 - [Konfiguration](#konfiguration)
@@ -338,7 +339,70 @@ Basis-Branch.
 
 ## Auto-Threads
 
-Ein **Auto-Thread** arbeitet ohne Menschen: Er plant (optional), setzt um, prüft die [Quality-Gates](#quality-gates), behebt Fehler und liefert einen Pull Request aus. Jedes Projekt legt die Standards unter **Verwaltung → Projekte → Automatik** fest (Plan: aus / automatisch / auf Freigabe warten; was nach dem Ende passiert; Fix-Runden; Budgets für Turns, Kosten und Zeit). Alle Einstellungen stehen unter [Konfiguration](CONFIGURATION.md#auto-threads).
+Ein **Auto-Thread** arbeitet ohne Menschen: Er plant (optional), setzt um,
+prüft die [Quality-Gates](#quality-gates), behebt Fehler und liefert einen Pull
+Request aus. Du kannst live zusehen und jederzeit übernehmen — ansonsten ist er
+ein ganz normaler Thread.
+
+**Einen starten**
+
+- In einem Workspace: **Neuer Thread → Automatisch umsetzen**, dann die Aufgabe
+  beschreiben.
+- Mit einem neuen Workspace: **Mit dem Workspace einen automatischen Lauf
+  starten** im Formular — der Lauf wartet, bis der Workspace bereit ist.
+- Von außen: die [REST-API](REST-API.md#workspaces-und-automatische-laufe)
+  (`POST /api/v1/workspaces`), [MCP](SETUP-MCP.md) (`workspace_create`) oder ein
+  Issue eines verbundenen Trackers ([Issue-Trigger](SETUP-TASK-PROVIDERS.md#issue-zu-automatischem-lauf)).
+
+**Wie er läuft**
+
+1. **Plan** (je nach Einstellung *Plan*): *aus* setzt sofort um; *automatisch*
+   plant zuerst und macht dann selbst weiter; *auf Freigabe warten* hält beim
+   Plan an, bis jemand ihn freigibt — auf der Plan-Karte im Thread, per API oder
+   MCP oder mit 👍 auf dem Issue-Kommentar. Lehnst du mit Feedback ab, überarbeitet
+   Claude den Plan.
+2. **Umsetzen** im Modus *Freigaben umgehen* — der Lauf ist im
+   Workspace-Container isoliert, und niemand ist da, um Freigaben zu beantworten.
+   Stellt Claude eine Frage, wird es angewiesen, selbst zu entscheiden und seine
+   Annahme zu nennen.
+3. **Gates** nach jedem Turn. Fehlgeschlagene Gates gehen mit demselben
+   Fix-Prompt, den das Review anbietet, zurück an Claude, bis zu *Gate-Fix-Runden*
+   Mal; danach wird trotzdem ausgeliefert, und der Pull Request nennt die Gates,
+   die weiterhin fehlschlagen.
+4. **Ausliefern** je nach *Wenn fertig*: Pull Request, Entwurfs-Pull-Request
+   oder nur committen und pushen. Danach endet die Session, und ein automatischer
+   Workspace (gestartet per API, MCP oder aus einem Issue) wird gestoppt.
+
+Der Thread-Kopf zeigt den Zustand (z. B. *Behebt Gate-Fehler · Runde 2/3*);
+automatische Nachrichten sind als *automatisch* markiert.
+
+**Übernehmen.** Schreibst du in einen laufenden Auto-Thread, pausiert die
+Automatik — er wird zu einem normalen Thread. **Automatisch fortsetzen**
+(Play-Button im Kopf) gibt ihn zurück: Er prüft die Gates und liefert aus.
+**Automatik pausieren** hält ihn an, ohne etwas zu schreiben.
+
+**Budgets.** *Max. Turns*, *Max. Kosten* und *Max. Laufzeit* stoppen einen Lauf
+(*Budget überschritten*); die bisherige Arbeit bleibt im Workspace. Erreicht der
+Agent sein Nutzungslimit, geht der Lauf weiter, sobald das Limit aufgehoben ist.
+
+**Für wen er läuft.** Ein Lauf handelt für eine Person: wer ihn in der UI
+gestartet hat, der angemeldete MCP-Nutzer, der **Automatik-Nutzer** des Projekts
+(Projekt-Tokens, Issue-Trigger) oder der **Handelt als**-Nutzer des API-Clients.
+Ihr Claude-Agent erledigt die Arbeit, und sie besitzt den Workspace.
+
+**Aufräumen.** Automatische Workspaces werden gelöscht, sobald ihr Pull Request
+gemergt oder geschlossen ist, oder `ARGOS_AUTO_CLEANUP_DAYS` nach dem Ende ihres
+Laufs, wenn niemand darin gearbeitet hat. Von Hand angelegte Workspaces werden
+nie automatisch gelöscht.
+
+**Benachrichtigungen** der Art *Automatische Läufe* sagen dir, wenn ein Plan
+wartet oder ein Lauf fertig ist, fehlgeschlagen ist oder sein Budget erreicht
+hat.
+
+Jedes Projekt legt die Standards unter **Verwaltung → Projekte → Automatik**
+fest; alle Einstellungen stehen unter [Konfiguration](CONFIGURATION.md#auto-threads).
+Die Gates sind für PHP/Laravel-Projekte gemacht; auf anderen Stacks werden die
+Fix-Runden übersprungen.
 
 ## Lebenszyklus
 

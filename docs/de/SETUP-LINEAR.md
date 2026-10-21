@@ -1,14 +1,13 @@
 # Linear Setup-Anleitung
 
 Diese Anleitung richtet sich an **Argos-Betreiber**, die **Linear** als
-Task-/Issue-Provider anbinden möchten: Linear-Issues als Argos-Tasks
-importieren, Phasenergebnisse zurück auf das Issue posten, die Implement-Phase
-durch eine 👍-Reaktion freigeben und optional das Issue schließen, wenn der Task
-fertig ist.
+Issue-Tracker anbinden möchten: Passende Linear-Issues starten automatische
+Läufe, Argos kommentiert den Fortschritt am Issue, und eine 👍-Reaktion gibt den
+Plan frei.
 
 Sie behandelt ausschließlich die Linear-spezifischen Teile. Die gemeinsamen
 Mechanismen — wie eine Bindung erstellt wird, wie Webhook- und Poll-Modus
-funktionieren, das Approve-Gate, die Status-Synchronisation — sind einmalig in
+funktionieren, die Plan-Freigabe — sind einmalig in
 [SETUP-TASK-PROVIDERS.md](SETUP-TASK-PROVIDERS.md) beschrieben und hier nur
 zusammengefasst. Lies diese Seite zusammen mit der vorliegenden.
 
@@ -20,9 +19,8 @@ zusammengefasst. Lies diese Seite zusammen mit der vorliegenden.
 - [Bindung erstellen](#bindung-erstellen)
 - [Webhook-Modus](#webhook-modus)
 - [Poll-Modus](#poll-modus)
-- [Issue zu Task](#issue-zu-task)
-- [Konzept-Rückschrieb und das Approve-Gate](#konzept-rückschrieb-und-das-approve-gate)
-- [Status-Synchronisation beim Abschluss](#status-synchronisation-beim-abschluss)
+- [Issue zu automatischem Lauf](#issue-zu-automatischem-lauf)
+- [Plan-Freigabe](#plan-freigabe)
 - [Issue-Identifikatoren](#issue-identifikatoren)
 - [Fehlerbehebung](#fehlerbehebung)
 
@@ -125,7 +123,7 @@ Die Linear-spezifischen Feldwerte:
 | **Zugang** (Credential) | Das Linear-OAuth-Konto **oder** der Linear-API-Key (PAT) |
 | **Projekt / Team** | Ein Linear-**Team**, ausgewählt aus einer Liste, die anhand der Zugangsdaten geladen wird (der Team-Key + Name, z. B. `ENG — Engineering`). Gespeichert wird der Team-Key, kein `owner/repo`-Pfad |
 | **Labels-Filter** | Optional: nur Issues importieren, die mindestens eines dieser Labels tragen |
-| **Issue schließen bei Task-Abschluss** | Optional: das Quell-Issue schließen, wenn der Argos-Task abgeschlossen ist ([Status-Synchronisation](#status-synchronisation-beim-abschluss)) |
+| **Issue schließen bei Task-Abschluss** | Wird nicht mehr verwendet — der Merge des Pull Requests schließt das Issue. |
 
 Die **Projekt / Team**-Liste wird gefüllt, indem Linears `teams`-API mit den
 gewählten Zugangsdaten abgefragt wird — wähle also zuerst **Provider** und
@@ -183,27 +181,25 @@ Active.
 Der Poll läuft über den geplanten Befehl `argos:poll-issues`. Das Intervall ist
 über `ARGOS_POLL_INTERVAL_MINUTES` konfigurierbar (Standard **5**, begrenzt auf
 **1–59**); setze es lokal auf `1` für schnelleres Feedback. Dasselbe Intervall
-steuert auch die Approve-Gate-Prüfung (`argos:check-concept-approvals`). Der
+steuert auch die Plan-Freigabe-Prüfung (`argos:check-plan-approvals`). Der
 Scheduler (`php artisan schedule:work` oder ein System-Cron, der
-`schedule:run` ausführt) muss für den Poll-Modus *und* für das Approve-Gate
+`schedule:run` ausführt) muss für den Poll-Modus *und* für die Plan-Freigabe
 aktiv sein — siehe
 [SETUP-TASK-PROVIDERS.md#poll-mode](SETUP-TASK-PROVIDERS.md#poll-mode).
 
-## Issue zu Task
+## Issue zu automatischem Lauf
 
-Wenn ein passendes Linear-Issue zum ersten Mal gesehen wird, erstellt Argos
-einen Task im Projekt der Bindung: der Task-Name ist der Issue-Titel und die
-Beschreibung ist der Issue-Body. Ist im Projekt Auto-Konzept aktiviert, startet
-die Konzept-Phase automatisch. Der Import erfolgt einmalig pro Issue. Siehe
-[SETUP-TASK-PROVIDERS.md#issue-to-task](SETUP-TASK-PROVIDERS.md#issue-to-task)
+Wenn ein passendes Linear-Issue zum ersten Mal gesehen wird, startet Argos einen
+automatischen Lauf in einem neuen Workspace im Projekt der Bindung, für den
+Automatik-Nutzer des Projekts. Der Start erfolgt einmalig pro Issue. Siehe
+[SETUP-TASK-PROVIDERS.md#issue-zu-automatischem-lauf](SETUP-TASK-PROVIDERS.md#issue-zu-automatischem-lauf)
 für das vollständige Verhalten.
 
-## Konzept-Rückschrieb und das Approve-Gate
+## Plan-Freigabe
 
-Nach der Konzept-Phase postet Argos einen Kommentar mit dem Konzept-Text auf
-das Linear-Issue. Solange der Task im Concept Review ist, fragt die
-Approve-Gate-Prüfung die Reaktionen dieses Kommentars ab. Eine 👍-Reaktion von
-einem **autorisierten** Nutzer startet die Implement-Phase.
+Mit der Plan-Einstellung *auf Freigabe warten* des Projekts postet Argos den Plan
+als Kommentar auf das Linear-Issue. Eine 👍-Reaktion von einem **autorisierten**
+Nutzer gibt ihn frei, und der Lauf fährt fort.
 
 Für Linear bedeutet „berechtigt zu freizugeben" ein **aktives,
 nicht-Gast-Organisationsmitglied**: der reagierende Nutzer muss in Linear
@@ -212,24 +208,13 @@ Per-Repo-Berechtigungen, daher steht diese Org-Mitglied-Prüfung stellvertretend
 für den write-/admin-Zugriff, der bei GitHub/GitLab verwendet wird. Admins sind
 eine nicht-Gast-Obermenge und qualifizieren sich.)
 
-Reaktionen werden von Linear nie gepusht, daher verlässt sich das Gate selbst
-im Webhook-Modus auf den geplanten `argos:check-concept-approvals`-Lauf.
+Reaktionen werden von Linear nie gepusht, daher verlässt sich die Freigabe selbst
+im Webhook-Modus auf den geplanten `argos:check-plan-approvals`-Lauf.
 Vollständige Mechanik:
-[SETUP-TASK-PROVIDERS.md#concept-write-back-and-the-approve-gate](SETUP-TASK-PROVIDERS.md#concept-write-back-and-the-approve-gate).
+[SETUP-TASK-PROVIDERS.md#kommentare-und-plan-freigabe](SETUP-TASK-PROVIDERS.md#kommentare-und-plan-freigabe).
 
-## Status-Synchronisation beim Abschluss
-
-Die Status-Synchronisation ist pro Bindung über den Schalter **Issue schließen
-bei Task-Abschluss** (`close_on_complete`) optional aktivierbar. Ist sie
-aktiviert und der Argos-Task wird abgeschlossen, schließt Argos das
-Linear-Issue.
-
-Linear hat kein generisches „closed"-Flag, daher verschiebt Argos das Issue in
-den **ersten Workflow-Status vom Typ `completed`** auf dem Team des Issues. Hat
-das Team keinen Status vom Typ completed, schlägt der Schließvorgang fehl
-(geloggt, Best-Effort — er blockiert nie den Abschluss des Tasks in Argos).
-Siehe
-[SETUP-TASK-PROVIDERS.md#status-sync-on-completion](SETUP-TASK-PROVIDERS.md#status-sync-on-completion).
+Der Pull Request verknüpft das Linear-Issue; sein Merge bewegt das Issue je nach
+deiner Linear–Git-Integration weiter — Argos schließt es nicht.
 
 ## Issue-Identifikatoren
 

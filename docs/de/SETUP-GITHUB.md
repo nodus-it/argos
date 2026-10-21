@@ -108,8 +108,8 @@ klassischer PAT mit `repo` bietet.
 
 ## Option 3: Issue-Provider (Pull + Webhook)
 
-Argos kann GitHub Issues als Tasks importieren und sie per Polling oder Webhooks
-synchron halten. Jedes Repository benötigt ein **TaskProviderBinding** (eines pro
+Argos kann automatische Läufe aus GitHub Issues starten, per Polling oder
+Webhooks. Jedes Repository benötigt ein **TaskProviderBinding** (eines pro
 GitHub-Repo), das über die Filament-Administrationsoberfläche konfiguriert wird.
 
 ### Schritt 1: Erforderliche Token-Scopes
@@ -134,7 +134,7 @@ GitHub-Repo), das über die Filament-Administrationsoberfläche konfiguriert wir
    - **Webhook** — in Echtzeit; erfordert, dass `APP_URL` öffentlich erreichbar ist.
    - **Poll** — periodisches Polling; funktioniert hinter Firewalls oder in der lokalen Entwicklung.
 5. Setze optional **Filters** (z. B. `state=open`, Label-Filter), sodass nur
-   relevante Issues zu Tasks werden.
+   relevante Issues automatische Läufe starten.
 6. Klicke auf **Save**. Das Binding startet im Zustand `Pending`.
 
 ### Schritt 3: Aktivierung mit "Einrichten"
@@ -167,12 +167,11 @@ Spalte **Last Error** angezeigt. Behebe das Problem und klicke erneut auf
 
 ### Verhaltenshinweise
 
-- **issue_comment**-Events werden vom Webhook-Endpunkt akzeptiert, aber derzeit
-  nicht als Tasks aufgenommen. Nur `issues`-Events (opened, edited usw.)
-  erstellen oder aktualisieren Tasks.
-- **Issue-Zustand und Task-Zustand sind unabhängig voneinander.** Das Schließen
-  eines GitHub-Issues schließt nicht den zugehörigen Task in Argos; Tasks werden
-  separat verwaltet.
+- **issue_comment**-Events werden vom Webhook-Endpunkt akzeptiert, aber
+  ignoriert. Nur `issues`-Events (opened, edited usw.) können einen Lauf starten.
+- **Issue-Zustand und Workspace sind unabhängig voneinander.** Das Schließen
+  eines GitHub-Issues stoppt oder löscht seinen Workspace nicht; das Mergen des
+  Pull Requests schließt das Issue (`Closes #…`).
 - **Duplikatsicher**: Der Webhook-Endpunkt ignoriert erneute Zustellungen
   (identifiziert über den Header `X-GitHub-Delivery`). Pull Requests, die in der
   Issues-Liste auftauchen, werden automatisch herausgefiltert.

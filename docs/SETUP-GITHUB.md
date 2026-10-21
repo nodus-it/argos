@@ -106,8 +106,7 @@ provides.
 
 ## Option 3: Issue-Provider (Pull + Webhook)
 
-Argos can import GitHub Issues as Tasks and keep them in sync via polling or
-webhooks. Each repository needs a **TaskProviderBinding** (one per GitHub repo)
+Argos can start automatic runs from GitHub Issues, via polling or webhooks. Each repository needs a **TaskProviderBinding** (one per GitHub repo)
 configured through the Filament admin interface.
 
 ### Step 1: Required token scopes
@@ -132,7 +131,7 @@ configured through the Filament admin interface.
    - **Webhook** — real-time; requires `APP_URL` to be publicly reachable.
    - **Poll** — periodic polling; works behind firewalls or in local development.
 5. Optionally set **Filters** (e.g. `state=open`, label filters) so only
-   relevant issues become tasks.
+   relevant issues start automatic runs.
 6. Click **Save**. The binding starts in `Pending` state.
 
 ### Step 3: Activate with "Einrichten"
@@ -164,11 +163,11 @@ column. Fix the issue and click **Einrichten** again.
 
 ### Behaviour notes
 
-- **issue_comment** events are accepted by the webhook endpoint but not
-  currently ingested as tasks. Only `issues` events (opened, edited, etc.)
-  create or update Tasks.
-- **Issue state and Task state are independent.** Closing a GitHub issue does
-  not close the corresponding Task in Argos; Tasks are managed separately.
+- **issue_comment** events are accepted by the webhook endpoint but ignored.
+  Only `issues` events (opened, edited, etc.) can start a run.
+- **Issue state and the workspace are independent.** Closing a GitHub issue
+  does not stop or delete its workspace; merging the pull request closes the
+  issue (`Closes #…`).
 - **Duplicate-safe**: the webhook endpoint ignores re-deliveries (identified by
   the `X-GitHub-Delivery` header). Pull requests appearing in the issues list
   are filtered out automatically.
