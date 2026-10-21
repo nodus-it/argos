@@ -173,6 +173,20 @@ Live-Demos).
 | `ARGOS_WORKSPACE_EDITOR_COOKIE_HOURS` | `12` | Lebensdauer des Zugangs-Cookies auf Workspace-Hosts. |
 | `ARGOS_WORKSPACE_PR_SYNC_MINUTES` | `15` | Wie oft der Zustand (offen/gemergt/geschlossen) offener Workspace-Pull-Requests beim Provider neu gelesen wird. Das Öffnen eines Workspaces aktualisiert ihn ebenfalls. |
 | `ARGOS_WORKSPACE_UPLOAD_MAX_MB` | `5` | Größenlimit pro Bild, das an eine Thread-Nachricht angehängt wird (bis zu 5 Bilder pro Nachricht). |
+
+### Auto-Threads
+
+Standards der Installation für [Auto-Threads](WORKSPACES.md#auto-threads); ein Projekt überschreibt sie unter *Automatik*, ein einzelner Lauf überschreibt das Projekt.
+
+| Variable | Standard | Zweck |
+|---|---|---|
+| `ARGOS_AUTO_PLAN` | `auto` | `off` (direkt umsetzen), `auto` (planen, dann weiter) oder `approve` (planen, dann auf Freigabe warten). |
+| `ARGOS_AUTO_SHIP` | `pr` | `pr`, `draft_pr` oder `none` (nur committen und pushen). |
+| `ARGOS_AUTO_MAX_FIX_ROUNDS` | `3` | Runden, in denen Claude fehlgeschlagene Quality-Gates beheben darf, bevor trotzdem ausgeliefert wird. |
+| `ARGOS_AUTO_MAX_TURNS` | `60` | Turn-Budget pro Lauf. |
+| `ARGOS_AUTO_MAX_COST_USD` | `0` | Kosten-Budget pro Lauf; `0` = keins (Abos sind pauschal). |
+| `ARGOS_AUTO_MAX_MINUTES` | `120` | Laufzeit-Budget pro Lauf. |
+| `ARGOS_AUTO_CLEANUP_DAYS` | `14` | Tage, bis ein fertiger oder fehlgeschlagener Auto-Workspace gelöscht wird. |
 | `ARGOS_OPENVSCODE_VERSION` | `1.109.5` | Release von OpenVSCode Server, das ins Workspace-Image eingebaut wird. |
 
 ## Echtzeit (Reverb)

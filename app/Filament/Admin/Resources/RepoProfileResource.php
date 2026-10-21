@@ -6,6 +6,8 @@ namespace App\Filament\Admin\Resources;
 
 use App\Enums\AgentName;
 use App\Enums\AuthMethod;
+use App\Enums\AutoPlanMode;
+use App\Enums\AutoShipMode;
 use App\Enums\BackingService;
 use App\Enums\GitProvider;
 use App\Enums\WorkerImageEntityStatus;
@@ -24,6 +26,7 @@ use App\Services\Git\RepositoryFetcher;
 use App\Services\GitProvider\GitServiceFactory;
 use App\Services\OAuth\ConnectedAccountService;
 use App\Services\OAuth\TokenRefresher;
+use App\Services\Workspace\AutoSettings;
 use App\Support\DocLink;
 use App\Support\DocsLinkAction;
 use App\Support\RepoUrlBuilder;
@@ -621,8 +624,64 @@ class RepoProfileResource extends Resource
                                         ->nullable(),
                                 ]),
                         ]),  // ↑ end of "Worker" tab
+
+                    Tab::make(__('projects.tabs.automation'))
+                        ->icon('heroicon-o-bolt')
+                        ->schema([
+                            Section::make(__('projects.sections.automation'))
+                                ->description(__('projects.sections.automation_description'))
+                                ->icon('heroicon-o-bolt')
+                                ->aside()
+                                ->schema([
+                                    Select::make('auto_settings.plan')
+                                        ->label(__('projects.fields.auto_plan'))
+                                        ->options(collect(AutoPlanMode::cases())->mapWithKeys(fn (AutoPlanMode $m): array => [$m->value => $m->label()])->all())
+                                        ->placeholder(fn (): string => __('projects.fields.auto_default', ['value' => AutoPlanMode::from((string) config('argos.workspaces.auto.plan'))->label()]))
+                                        ->native(false),
+                                    Select::make('auto_settings.ship')
+                                        ->label(__('projects.fields.auto_ship'))
+                                        ->options(collect(AutoShipMode::cases())->mapWithKeys(fn (AutoShipMode $m): array => [$m->value => $m->label()])->all())
+                                        ->placeholder(fn (): string => __('projects.fields.auto_default', ['value' => AutoShipMode::from((string) config('argos.workspaces.auto.ship'))->label()]))
+                                        ->native(false),
+                                    TextInput::make('auto_settings.max_fix_rounds')
+                                        ->label(__('projects.fields.auto_max_fix_rounds'))
+                                        ->helperText(__('projects.fields.auto_max_fix_rounds_helper'))
+                                        ->placeholder((string) config('argos.workspaces.auto.max_fix_rounds'))
+                                        ->numeric()->minValue(0)->maxValue(20)->nullable(),
+                                    TextInput::make('auto_settings.max_turns')
+                                        ->label(__('projects.fields.auto_max_turns'))
+                                        ->placeholder((string) config('argos.workspaces.auto.max_turns'))
+                                        ->numeric()->minValue(1)->maxValue(1000)->nullable(),
+                                    TextInput::make('auto_settings.max_cost_usd')
+                                        ->label(__('projects.fields.auto_max_cost_usd'))
+                                        ->helperText(__('projects.fields.auto_max_cost_usd_helper'))
+                                        ->placeholder((string) config('argos.workspaces.auto.max_cost_usd'))
+                                        ->numeric()->minValue(0)->nullable(),
+                                    TextInput::make('auto_settings.max_minutes')
+                                        ->label(__('projects.fields.auto_max_minutes'))
+                                        ->placeholder((string) config('argos.workspaces.auto.max_minutes'))
+                                        ->numeric()->minValue(1)->maxValue(1440)->nullable(),
+                                ]),
+                        ]),
                 ]),  // ↑ end of Tabs::make()
         ]);
+    }
+
+    /**
+     * Keep only valid auto-thread settings; an all-empty section stores null
+     * (inherit the installation defaults).
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    public static function mutateAutoSettings(array $data): array
+    {
+        if (array_key_exists('auto_settings', $data)) {
+            $clean = AutoSettings::clean(is_array($data['auto_settings']) ? $data['auto_settings'] : []);
+            $data['auto_settings'] = $clean !== [] ? $clean : null;
+        }
+
+        return $data;
     }
 
     /**

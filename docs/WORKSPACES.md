@@ -311,6 +311,10 @@ branch.
 - Every open thread gets a notice with the link; the other members are
   notified.
 
+## Auto-threads
+
+An **auto-thread** works without a human: it plans (optional), implements, checks the [quality gates](#quality-gates), fixes failures and ships a pull request. Each project sets the defaults under **Administration → Projects → Automation** (plan: off / automatic / wait for approval; what to do when done; fix rounds; turn, cost and time budgets). All settings are listed in [Configuration](CONFIGURATION.md#auto-threads).
+
 ## Lifecycle
 
 | State | Meaning |

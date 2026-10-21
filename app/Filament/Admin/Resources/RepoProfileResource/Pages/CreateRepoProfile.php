@@ -36,6 +36,6 @@ class CreateRepoProfile extends CreateRecord
      */
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        return RepoProfileResource::mutateOauthFields($data);
+        return RepoProfileResource::mutateAutoSettings(RepoProfileResource::mutateOauthFields($data));
     }
 }

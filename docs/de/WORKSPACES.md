@@ -336,6 +336,10 @@ Basis-Branch.
 - Jeder offene Thread bekommt einen Hinweis mit dem Link; die anderen
   Mitglieder werden benachrichtigt.
 
+## Auto-Threads
+
+Ein **Auto-Thread** arbeitet ohne Menschen: Er plant (optional), setzt um, prüft die [Quality-Gates](#quality-gates), behebt Fehler und liefert einen Pull Request aus. Jedes Projekt legt die Standards unter **Verwaltung → Projekte → Automatik** fest (Plan: aus / automatisch / auf Freigabe warten; was nach dem Ende passiert; Fix-Runden; Budgets für Turns, Kosten und Zeit). Alle Einstellungen stehen unter [Konfiguration](CONFIGURATION.md#auto-threads).
+
 ## Lebenszyklus
 
 | Zustand | Bedeutung |

@@ -13,12 +13,15 @@ return [
     ],
 
     'tabs' => [
+        'automation' => 'Automation',
         'basics' => 'General',
         'worker' => 'Worker & models',
         'repository' => 'Repository',
     ],
 
     'sections' => [
+        'automation' => 'Automation',
+        'automation_description' => 'Defaults for auto-threads in this project: started from the UI, the API, MCP or an issue, they plan, implement, check the quality gates and ship without a human. Each run can override them. Empty fields use the installation defaults.',
         'platform' => 'Platform',
         'platform_description' => 'Choose a platform — the remaining fields will be unlocked afterwards.',
         'general' => 'General',
@@ -37,6 +40,15 @@ return [
     ],
 
     'fields' => [
+        'auto_plan' => 'Plan',
+        'auto_ship' => 'When done',
+        'auto_max_fix_rounds' => 'Gate fix rounds',
+        'auto_max_fix_rounds_helper' => 'How often Claude may try to fix failing quality gates before shipping anyway.',
+        'auto_max_turns' => 'Max. turns',
+        'auto_max_cost_usd' => 'Max. cost (USD)',
+        'auto_max_cost_usd_helper' => '0 = no limit (subscriptions are flat; the usage limit of the agent applies).',
+        'auto_max_minutes' => 'Max. runtime (minutes)',
+        'auto_default' => 'Default: :value',
         'platform' => 'Platform',
         'platform_github' => 'GitHub',
         'platform_gitlab' => 'GitLab',

@@ -170,6 +170,20 @@ the internal `argos_ws` network. The editor is served at
 | `ARGOS_WORKSPACE_EDITOR_COOKIE_HOURS` | `12` | Lifetime of the access cookie on workspace hosts. |
 | `ARGOS_WORKSPACE_PR_SYNC_MINUTES` | `15` | How often the state (open/merged/closed) of open workspace pull requests is re-read from the provider. Opening a workspace also refreshes it. |
 | `ARGOS_WORKSPACE_UPLOAD_MAX_MB` | `5` | Size limit per image attached to a thread message (up to 5 images per message). |
+
+### Auto-threads
+
+Installation defaults for [auto-threads](WORKSPACES.md#auto-threads); a project overrides them under *Automation*, a single run overrides the project.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `ARGOS_AUTO_PLAN` | `auto` | `off` (implement right away), `auto` (plan, then continue) or `approve` (plan, then wait for approval). |
+| `ARGOS_AUTO_SHIP` | `pr` | `pr`, `draft_pr` or `none` (commit and push only). |
+| `ARGOS_AUTO_MAX_FIX_ROUNDS` | `3` | Rounds Claude may fix failing quality gates before shipping anyway. |
+| `ARGOS_AUTO_MAX_TURNS` | `60` | Turn budget per run. |
+| `ARGOS_AUTO_MAX_COST_USD` | `0` | Cost budget per run; `0` = none (subscriptions are flat). |
+| `ARGOS_AUTO_MAX_MINUTES` | `120` | Runtime budget per run. |
+| `ARGOS_AUTO_CLEANUP_DAYS` | `14` | Days before a finished or failed auto-workspace is deleted. |
 | `ARGOS_OPENVSCODE_VERSION` | `1.109.5` | OpenVSCode Server release baked into the workspace image. |
 
 ## Realtime (Reverb)

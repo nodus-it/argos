@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\AutoThreadState;
 use App\Enums\PermissionMode;
 use App\Enums\ThreadStatus;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
@@ -32,6 +33,10 @@ use Illuminate\Support\Carbon;
  * @property bool $session_open
  * @property Carbon|null $archived_at
  * @property string|null $restore_note
+ * @property AutoThreadState|null $auto_state
+ * @property array{plan: string, ship: string, max_fix_rounds: int, max_turns: int, max_cost_usd: float, max_minutes: int}|null $auto_config
+ * @property array{fix_rounds?: int, turns?: int, started_at?: string}|null $auto_counters
+ * @property string|null $auto_message
  * @property Carbon $created_at
  * @property Carbon $updated_at
  * @property-read Workspace $workspace
@@ -61,6 +66,9 @@ class Thread extends Model
     protected function casts(): array
     {
         return [
+            'auto_state' => AutoThreadState::class,
+            'auto_config' => 'array',
+            'auto_counters' => 'array',
             'status' => ThreadStatus::class,
             'permission_mode' => PermissionMode::class,
             'commands' => 'array',

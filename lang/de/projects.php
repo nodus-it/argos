@@ -13,12 +13,15 @@ return [
     ],
 
     'tabs' => [
+        'automation' => 'Automatik',
         'basics' => 'Allgemein',
         'worker' => 'Worker & Modelle',
         'repository' => 'Repository',
     ],
 
     'sections' => [
+        'automation' => 'Automatik',
+        'automation_description' => 'Standards für Auto-Threads in diesem Projekt: Aus der UI, per API, MCP oder aus einem Issue gestartet, planen sie, setzen um, prüfen die Quality-Gates und liefern aus — ohne Menschen. Jeder Lauf kann sie überschreiben. Leere Felder nehmen die Standards der Installation.',
         'platform' => 'Plattform',
         'platform_description' => 'Wähle die Plattform — danach werden die weiteren Felder freigeschaltet.',
         'general' => 'Allgemein',
@@ -37,6 +40,15 @@ return [
     ],
 
     'fields' => [
+        'auto_plan' => 'Plan',
+        'auto_ship' => 'Wenn fertig',
+        'auto_max_fix_rounds' => 'Gate-Fix-Runden',
+        'auto_max_fix_rounds_helper' => 'Wie oft Claude fehlgeschlagene Quality-Gates beheben darf, bevor trotzdem ausgeliefert wird.',
+        'auto_max_turns' => 'Max. Turns',
+        'auto_max_cost_usd' => 'Max. Kosten (USD)',
+        'auto_max_cost_usd_helper' => '0 = kein Limit (Abos sind pauschal; das Nutzungslimit des Agenten greift).',
+        'auto_max_minutes' => 'Max. Laufzeit (Minuten)',
+        'auto_default' => 'Standard: :value',
         'platform' => 'Plattform',
         'platform_github' => 'GitHub',
         'platform_gitlab' => 'GitLab',

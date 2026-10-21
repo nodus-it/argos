@@ -53,6 +53,7 @@ use Laravel\Sanctum\HasApiTokens;
  * @property-read ConnectedAccount|null $connectedAccount
  * @property-read WorkerStack|null $workerStack
  * @property-read Collection<int, TaskProviderBinding> $taskProviderBindings
+ * @property array<string, mixed>|null $auto_settings
  */
 class RepoProfile extends Model implements HasApiTokensContract
 {
@@ -63,6 +64,7 @@ class RepoProfile extends Model implements HasApiTokensContract
     use HasUlids;
 
     protected $fillable = [
+        'auto_settings',
         'name',
         'url',
         'token',
@@ -90,6 +92,7 @@ class RepoProfile extends Model implements HasApiTokensContract
     protected function casts(): array
     {
         return [
+            'auto_settings' => 'array',
             'token' => 'encrypted',
             'platform' => GitProvider::class,
             'auth_method' => AuthMethod::class,

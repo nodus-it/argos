@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\DemoAccessMode;
+use App\Enums\WorkspaceOrigin;
 use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceStatus;
 use App\Services\Demo\DemoTarget;
@@ -26,6 +27,7 @@ use Illuminate\Support\Str;
  * @property string $slug
  * @property string $repo_profile_id
  * @property int|null $created_by
+ * @property WorkspaceOrigin $origin
  * @property string $name
  * @property string $base_branch
  * @property string $branch
@@ -60,6 +62,7 @@ class Workspace extends Model implements DemoTarget
         'slug',
         'repo_profile_id',
         'created_by',
+        'origin',
         'name',
         'base_branch',
         'branch',
@@ -77,12 +80,15 @@ class Workspace extends Model implements DemoTarget
         'gate_baseline',
     ];
 
+    protected $attributes = ['origin' => 'manual'];
+
     protected $hidden = ['daemon_token'];
 
     protected function casts(): array
     {
         return [
             'status' => WorkspaceStatus::class,
+            'origin' => WorkspaceOrigin::class,
             'daemon_token' => 'encrypted',
             'last_activity_at' => 'datetime',
             'pr_number' => 'integer',

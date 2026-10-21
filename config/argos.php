@@ -197,6 +197,19 @@ return [
         'pr_sync_minutes' => (int) $envOr('ARGOS_WORKSPACE_PR_SYNC_MINUTES', 15),
         // Upload limit per image attached to a thread message (MB).
         'upload_max_mb' => (int) $envOr('ARGOS_WORKSPACE_UPLOAD_MAX_MB', 5),
+        // Defaults for auto-threads; a project overrides them in its settings,
+        // a single run (UI/API/MCP) overrides the project.
+        'auto' => [
+            'plan' => (string) $envOr('ARGOS_AUTO_PLAN', 'auto'),
+            'ship' => (string) $envOr('ARGOS_AUTO_SHIP', 'pr'),
+            'max_fix_rounds' => (int) $envOr('ARGOS_AUTO_MAX_FIX_ROUNDS', 3),
+            'max_turns' => (int) $envOr('ARGOS_AUTO_MAX_TURNS', 60),
+            // 0 = no cost limit (subscriptions are flat; the agent's usage limit applies).
+            'max_cost_usd' => (float) $envOr('ARGOS_AUTO_MAX_COST_USD', 0),
+            'max_minutes' => (int) $envOr('ARGOS_AUTO_MAX_MINUTES', 120),
+            // Days before a finished or failed auto-workspace is deleted.
+            'cleanup_days' => (int) $envOr('ARGOS_AUTO_CLEANUP_DAYS', 14),
+        ],
         'daemon_port' => 7777,
         'editor_port' => 3000,
         'openvscode_version' => $envOr('ARGOS_OPENVSCODE_VERSION', '1.109.5'),
