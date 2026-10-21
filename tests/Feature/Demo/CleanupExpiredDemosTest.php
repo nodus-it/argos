@@ -28,9 +28,9 @@ class CleanupExpiredDemosTest extends TestCase
 
         $this->artisan('argos:cleanup-demos')->assertSuccessful();
 
-        Bus::assertDispatched(StopWorkspaceDemoJob::class, fn (StopWorkspaceDemoJob $j): bool => $j->workspaceId === $expired->workspace_id);
-        Bus::assertNotDispatched(StopWorkspaceDemoJob::class, fn (StopWorkspaceDemoJob $j): bool => $j->workspaceId === $fresh->workspace_id);
-        Bus::assertNotDispatched(StopWorkspaceDemoJob::class, fn (StopWorkspaceDemoJob $j): bool => $j->workspaceId === $expiredButStopped->workspace_id);
+        Bus::assertDispatched(StopWorkspaceDemoJob::class, fn (StopWorkspaceDemoJob $j): bool => $j->taskId === $expired->task_id);
+        Bus::assertNotDispatched(StopWorkspaceDemoJob::class, fn (StopWorkspaceDemoJob $j): bool => $j->taskId === $fresh->task_id);
+        Bus::assertNotDispatched(StopWorkspaceDemoJob::class, fn (StopWorkspaceDemoJob $j): bool => $j->taskId === $expiredButStopped->task_id);
     }
 
     public function test_succeeds_with_no_expired_demos(): void

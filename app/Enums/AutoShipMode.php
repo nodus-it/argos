@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
-/** What an auto-thread does when the work is done. */
+/** What an auto-task does when the work is done. */
 enum AutoShipMode: string
 {
     case PullRequest = 'pr';

@@ -6,7 +6,7 @@ namespace App\Jobs\Workspace;
 
 use App\Enums\WorkspaceStatus;
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
-use App\Models\Thread;
+use App\Models\Task;
 use App\Services\Workspace\ReviewCommentService;
 use App\Services\Workspace\WorkspaceDaemonClient;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -22,18 +22,18 @@ class ReanchorReviewCommentsJob implements ShouldQueue
 
     public int $tries = 1;
 
-    public function __construct(public readonly string $threadId) {}
+    public function __construct(public readonly string $taskId) {}
 
     public function handle(ReviewCommentService $comments, WorkspaceDaemonClient $daemon): void
     {
-        $thread = Thread::query()->with('workspace')->find($this->threadId);
-        if ($thread === null || $thread->workspace->status !== WorkspaceStatus::Running) {
+        $task = Task::query()->with('workspace')->find($this->taskId);
+        if ($task === null || $task->workspace->status !== WorkspaceStatus::Running) {
             return;
         }
 
-        $api = $daemon->for($thread->workspace, 15);
+        $api = $daemon->for($task->workspace, 15);
         $contents = [];
-        foreach ($comments->anchoredPaths($thread) as $path) {
+        foreach ($comments->anchoredPaths($task) as $path) {
             try {
                 $contents[$path] = $api->fileContent($path)['content'];
             } catch (DaemonTransportException $e) {
@@ -44,6 +44,6 @@ class ReanchorReviewCommentsJob implements ShouldQueue
             }
         }
 
-        $comments->reanchor($thread, $contents);
+        $comments->reanchor($task, $contents);
     }
 }

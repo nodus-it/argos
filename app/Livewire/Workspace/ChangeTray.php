@@ -7,8 +7,8 @@ namespace App\Livewire\Workspace;
 use App\Enums\GateRunStatus;
 use App\Enums\WorkspaceStatus;
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
+use App\Models\Task;
 use App\Models\User;
-use App\Models\Workspace;
 use App\Models\WorkspaceGateRun;
 use App\Services\Git\WorkspaceDiffService;
 use App\Services\Workspace\WorkspaceGateService;
@@ -19,7 +19,7 @@ use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 /**
- * The change tray above the composer: "N files changed +X −Y · gate state"
+ * The change tray above the composer of a task: "N files changed +X −Y · gate state"
  * with "Check gates" and "Review". Only shown while there are uncommitted
  * changes; re-renders after a turn or a gate run.
  */
@@ -29,10 +29,14 @@ class ChangeTray extends Component
     #[Locked]
     public string $workspaceId;
 
-    public function mount(string $workspaceId): void
+    #[Locked]
+    public string $taskId;
+
+    public function mount(string $workspaceId, string $taskId): void
     {
         $this->workspaceId = $workspaceId;
-        abort_unless($this->user()->can('view', $this->workspace()), 403);
+        $this->taskId = $taskId;
+        abort_unless($this->user()->can('view', $this->task()), 403);
     }
 
     public function placeholder(): string
@@ -42,11 +46,11 @@ class ChangeTray extends Component
 
     public function render(): View
     {
-        $workspace = $this->workspace();
+        $task = $this->task();
         $diff = null;
-        if ($workspace->status === WorkspaceStatus::Running) {
+        if ($task->workspace->status === WorkspaceStatus::Running) {
             try {
-                $diff = app(WorkspaceDiffService::class)->summary($workspace);
+                $diff = app(WorkspaceDiffService::class)->summary($task);
             } catch (DaemonTransportException) {
                 $diff = null;
             }
@@ -58,8 +62,8 @@ class ChangeTray extends Component
             'count' => count($files),
             'additions' => array_sum(array_column($files, 'additions')),
             'deletions' => array_sum(array_column($files, 'deletions')),
-            'gates' => self::gateSummary(app(WorkspaceGateService::class)->latest($workspace)),
-            'canOperate' => $this->user()->can('operate', $workspace),
+            'gates' => self::gateSummary(app(WorkspaceGateService::class)->latest($task)),
+            'canOperate' => $this->user()->can('prompt', $task),
         ]);
     }
 
@@ -85,9 +89,9 @@ class ChangeTray extends Component
         return __('workspaces.tray.gates_failed', ['gates' => implode(', ', $labels)]);
     }
 
-    private function workspace(): Workspace
+    private function task(): Task
     {
-        return Workspace::query()->findOrFail($this->workspaceId);
+        return Task::query()->with('workspace')->where('workspace_id', $this->workspaceId)->findOrFail($this->taskId);
     }
 
     private function user(): User

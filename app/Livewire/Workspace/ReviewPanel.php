@@ -7,7 +7,7 @@ namespace App\Livewire\Workspace;
 use App\Enums\WorkspaceStatus;
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
 use App\Models\ReviewComment;
-use App\Models\Thread;
+use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Git\WorkspaceDiffService;
@@ -26,7 +26,7 @@ use Livewire\Attributes\Url;
 use Livewire\Component;
 
 /**
- * Review mode: the workspace's changes against its base branch in the
+ * Review mode: the task's changes against its base branch in the
  * widened sidebar — toolbar (stats, seen progress, gate chips, split or
  * unified, maximise), file tree and the diff of one file with "seen",
  * expandable unchanged lines and previous/next file. Reads the diff only
@@ -37,7 +37,7 @@ class ReviewPanel extends Component
     #[Locked]
     public string $workspaceId;
 
-    public ?string $threadId = null;
+    public ?string $taskId = null;
 
     public bool $active = false;
 
@@ -63,18 +63,18 @@ class ReviewPanel extends Component
         $this->workspaceId = $workspaceId;
         abort_unless($this->user()->can('view', $this->workspace()), 403);
 
-        $requested = request()->query('thread');
-        $this->threadId = is_string($requested) && $this->thread($requested) !== null
+        $requested = request()->query('task');
+        $this->taskId = is_string($requested) && $this->task($requested) !== null
             ? $requested
-            : Thread::query()->where('workspace_id', $workspaceId)->whereNull('archived_at')->latest('updated_at')->value('id');
+            : Task::query()->where('workspace_id', $workspaceId)->whereNull('archived_at')->latest('updated_at')->value('id');
         $this->view = app(ReviewService::class)->diffView($this->user());
         $this->active = request()->query('review') === '1';
     }
 
-    #[On('thread-changed')]
-    public function threadChanged(?string $id): void
+    #[On('task-changed')]
+    public function taskChanged(?string $id): void
     {
-        $this->threadId = $id;
+        $this->taskId = $id;
     }
 
     public function open(?string $file = null): void
@@ -105,13 +105,13 @@ class ReviewPanel extends Component
 
     public function toggleSeen(string $path, string $hash, bool $seen): void
     {
-        $thread = $this->threadId !== null ? $this->thread($this->threadId) : null;
-        if ($thread === null) {
+        $task = $this->taskId !== null ? $this->task($this->taskId) : null;
+        if ($task === null) {
             return;
         }
         $seen
-            ? app(ReviewService::class)->markSeen($thread, $this->user(), $path, $hash)
-            : app(ReviewService::class)->unmarkSeen($thread, $this->user(), $path);
+            ? app(ReviewService::class)->markSeen($task, $this->user(), $path, $hash)
+            : app(ReviewService::class)->unmarkSeen($task, $this->user(), $path);
     }
 
     public function loadGeneratedDiff(string $path): void
@@ -144,8 +144,8 @@ class ReviewPanel extends Component
     /** Collect a line comment (not sent yet — see ReviewCommentService). */
     public function addComment(string $path, string $side, int $start, int $end, string $body): void
     {
-        $thread = $this->threadId !== null ? $this->thread($this->threadId) : null;
-        if ($thread === null || trim($body) === '') {
+        $task = $this->taskId !== null ? $this->task($this->taskId) : null;
+        if ($task === null || trim($body) === '') {
             return;
         }
         $file = $this->detail($path);
@@ -154,9 +154,9 @@ class ReviewPanel extends Component
         }
 
         try {
-            app(ReviewCommentService::class)->add($thread, $this->user(), $path, $side, $start, $end, $body, $this->lineTexts($file, $side));
+            app(ReviewCommentService::class)->add($task, $this->user(), $path, $side, $start, $end, $body, $this->lineTexts($file, $side));
         } catch (AuthorizationException) {
-            Notification::make()->title(__('workspaces.thread.viewer_hint'))->warning()->send();
+            Notification::make()->title(__('workspaces.task.viewer_hint'))->warning()->send();
 
             return;
         }
@@ -245,26 +245,26 @@ class ReviewPanel extends Component
                 $error = $e->getMessage();
             }
         }
-        $thread = $this->threadId !== null ? $this->thread($this->threadId) : null;
-        if ($current !== null && $thread !== null) {
-            $this->reanchor($thread, $current['path']);
+        $task = $this->taskId !== null ? $this->task($this->taskId) : null;
+        if ($current !== null && $task !== null) {
+            $this->reanchor($task, $current['path']);
         }
-        $gateRun = app(WorkspaceGateService::class)->latest($workspace);
+        $gateRun = $task !== null ? app(WorkspaceGateService::class)->latest($task) : null;
         $annotations = GateAnnotations::fromRun($gateRun);
         $phpstanHere = $current !== null ? collect($annotations['phpstan'][$current['path']] ?? []) : collect();
         $shown = $current !== null ? $this->shownLines($current) : [];
         $index = $current !== null ? array_search($current['path'], array_column($files, 'path'), true) : false;
-        $seen = $thread !== null
-            ? app(ReviewService::class)->seen($thread, $this->user(), array_column($files, 'hash', 'path'))
+        $seen = $task !== null
+            ? app(ReviewService::class)->seen($task, $this->user(), array_column($files, 'hash', 'path'))
             : [];
 
-        $comments = $thread !== null ? app(ReviewCommentService::class)->open($thread, $this->user()) : collect();
+        $comments = $task !== null ? app(ReviewCommentService::class)->open($task, $this->user()) : collect();
         $numbers = $comments->values()->mapWithKeys(fn (ReviewComment $c, int $i): array => [$c->id => $i + 1]);
         $here = $current !== null ? $comments->where('path', $current['path']) : collect();
 
         return view('livewire.workspace.review-panel', [
             'active' => true,
-            'canWrite' => $workspace->roleOf($this->user())?->canOperate() ?? false,
+            'canWrite' => $task !== null && $this->user()->can('review', $task),
             'commentsAt' => $here->groupBy(fn (ReviewComment $c): string => $c->side.':'.$c->line_end),
             'commented' => $here->flatMap(fn (ReviewComment $c): array => array_map(fn (int $n): string => $c->side.':'.$n, range($c->line_start, $c->line_end)))->unique()->values()->all(),
             'numbers' => $numbers,
@@ -291,7 +291,7 @@ class ReviewPanel extends Component
             'outsideFindings' => $phpstanHere->reject(fn (array $a): bool => in_array($a['line'], $shown, true))->values(),
             'pintFlagged' => $current !== null && in_array($current['path'], $annotations['pint'], true),
             'firstChangedLine' => $current !== null ? (min($shown ?: [1])) : 1,
-            'baseBranch' => $workspace->base_branch,
+            'baseBranch' => $task !== null ? $task->base_branch : $workspace->default_branch,
         ]);
     }
 
@@ -325,10 +325,10 @@ class ReviewPanel extends Component
     }
 
     /** Let the current file's comments follow Claude's edits (one daemon read). */
-    private function reanchor(Thread $thread, string $path): void
+    private function reanchor(Task $task, string $path): void
     {
         $service = app(ReviewCommentService::class);
-        if (! in_array($path, $service->anchoredPaths($thread), true)) {
+        if (! in_array($path, $service->anchoredPaths($task), true)) {
             return;
         }
         try {
@@ -336,13 +336,13 @@ class ReviewPanel extends Component
         } catch (DaemonTransportException) {
             return;
         }
-        $service->reanchor($thread, [$path => $content]);
+        $service->reanchor($task, [$path => $content]);
     }
 
     private function comment(string $id): ?ReviewComment
     {
         return ReviewComment::query()->whereKey($id)->where('user_id', $this->user()->id)
-            ->whereHas('thread', fn ($q) => $q->where('workspace_id', $this->workspaceId))->first();
+            ->whereHas('task', fn ($q) => $q->where('workspace_id', $this->workspaceId))->first();
     }
 
     /**
@@ -362,7 +362,7 @@ class ReviewPanel extends Component
             'hash' => $f['hash'],
             'generated' => $f['generated'],
             'binary' => $f['binary'],
-        ], app(WorkspaceDiffService::class)->summary($this->workspace())['files']);
+        ], ($task = $this->currentTask()) !== null ? app(WorkspaceDiffService::class)->summary($task)['files'] : []);
     }
 
     /**
@@ -385,7 +385,8 @@ class ReviewPanel extends Component
             return [...$row, 'hunks' => [], 'skipped' => 'generated', 'hidden' => 0];
         }
 
-        $parsed = app(WorkspaceDiffService::class)->fileDiff($this->workspace(), $path, $row['hash']);
+        $task = $this->currentTask();
+        $parsed = $task !== null ? app(WorkspaceDiffService::class)->fileDiff($task, $path, $row['hash']) : null;
         $hunks = $parsed !== null ? ReviewDiff::files([$parsed])[0]['hunks'] : [];
 
         // Big diffs: render up to the budget, the rest on request.
@@ -411,9 +412,14 @@ class ReviewPanel extends Component
         return [...$row, 'hunks' => $kept, 'skipped' => null, 'hidden' => $hidden];
     }
 
-    private function thread(string $id): ?Thread
+    private function currentTask(): ?Task
     {
-        return Thread::query()->where('workspace_id', $this->workspaceId)->find($id);
+        return $this->taskId !== null ? $this->task($this->taskId) : null;
+    }
+
+    private function task(string $id): ?Task
+    {
+        return Task::query()->where('workspace_id', $this->workspaceId)->find($id);
     }
 
     private function workspace(): Workspace

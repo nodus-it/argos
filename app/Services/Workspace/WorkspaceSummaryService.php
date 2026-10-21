@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace App\Services\Workspace;
 
 use App\Enums\ApprovalStatus;
-use App\Enums\ThreadStatus;
-use App\Models\Thread;
-use App\Models\ThreadApproval;
+use App\Enums\DemoStatus;
+use App\Enums\SessionStatus;
+use App\Enums\TaskStatus;
+use App\Models\Demo;
+use App\Models\Task;
+use App\Models\TaskApproval;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Support\Collection;
@@ -16,22 +19,23 @@ use Illuminate\Support\Collection;
 class WorkspaceSummaryService
 {
     /**
-     * @return array{working: int, waiting: int, threads: int, waiting_for_me: bool, pr_state: string|null, preview: string|null}
+     * @return array{working: int, waiting: int, tasks: int, waiting_for_me: bool, pr_open: int, previews: int}
      */
     public function for(Workspace $workspace, User $user): array
     {
-        $threads = Thread::query()->where('workspace_id', $workspace->id)->whereNull('archived_at')->get(['id', 'status']);
-        $waiting = $threads->where('status', ThreadStatus::WaitingInput)->count();
-        $pending = ThreadApproval::query()->whereIn('thread_id', $threads->pluck('id'))->where('status', ApprovalStatus::Pending->value)->exists();
+        $tasks = Task::query()->where('workspace_id', $workspace->id)->whereNull('archived_at')->get(['id', 'status', 'session_status', 'owner_user_id']);
+        $waiting = $tasks->where('session_status', SessionStatus::WaitingInput)->count();
+        // Only the people of a task decide — "waiting for me" means my tasks or ones I was invited to.
+        $mine = $tasks->filter(fn (Task $task): bool => $task->involves($user))->pluck('id');
+        $pending = TaskApproval::query()->whereIn('task_id', $mine)->where('status', ApprovalStatus::Pending->value)->exists();
 
         return [
-            'working' => $threads->where('status', ThreadStatus::Running)->count(),
+            'working' => $tasks->where('session_status', SessionStatus::Running)->count(),
             'waiting' => $waiting,
-            'threads' => $threads->count(),
-            // Only operators can decide — viewers are never "waited for".
-            'waiting_for_me' => $pending && ($workspace->roleOf($user)?->canOperate() ?? false),
-            'pr_state' => $workspace->pr_state,
-            'preview' => $workspace->currentDemo()?->status->value,
+            'tasks' => $tasks->count(),
+            'waiting_for_me' => $pending,
+            'pr_open' => $tasks->where('status', TaskStatus::PrOpen)->count(),
+            'previews' => Demo::query()->where('workspace_id', $workspace->id)->where('status', DemoStatus::Live->value)->count(),
         ];
     }
 
@@ -43,7 +47,7 @@ class WorkspaceSummaryService
      */
     public function overviewFor(User $user, int $limit = 12): Collection
     {
-        return $user->workspaces()->with('repoProfile')->latest('last_activity_at')->limit(50)->get()
+        return $user->workspaces()->latest('last_activity_at')->limit(50)->get()
             ->map(fn (Workspace $workspace): array => ['workspace' => $workspace, 'summary' => $this->for($workspace, $user)])
             ->sortBy(fn (array $row): array => [
                 $row['summary']['waiting_for_me'] ? 0 : 1,

@@ -6,7 +6,8 @@ namespace Tests\Feature\Workspace;
 
 use App\Enums\WorkspaceRole;
 use App\Models\AgentCredential;
-use App\Models\Thread;
+use App\Models\Task;
+use App\Models\TaskMember;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceMember;
@@ -35,22 +36,25 @@ class WorkspaceAuthorizationTest extends TestCase
 
     public function test_workspace_abilities_by_role(): void
     {
-        $owner = $this->member(WorkspaceRole::Owner);
-        $editor = $this->member(WorkspaceRole::Editor);
+        $wsAdmin = $this->member(WorkspaceRole::Admin);
+        $member = $this->member(WorkspaceRole::Member);
         $viewer = $this->member(WorkspaceRole::Viewer);
         $stranger = User::factory()->create();
         $admin = User::factory()->admin()->create();
 
         $matrix = [
-            'view' => [$owner, $editor, $viewer, $admin],
-            'operate' => [$owner, $editor, $admin],
-            'update' => [$owner, $admin],
-            'delete' => [$owner, $admin],
-            'manageMembers' => [$owner, $admin],
+            'view' => [$wsAdmin, $member, $viewer, $admin],
+            'operate' => [$wsAdmin, $member, $admin],
+            'editor' => [$wsAdmin, $member, $admin],
+            'update' => [$wsAdmin, $admin],
+            'setup' => [$wsAdmin, $admin],
+            'manageMembers' => [$wsAdmin, $admin],
+            // Deleting a workspace (and creating one) is for Argos admins only.
+            'delete' => [$admin],
         ];
 
         foreach ($matrix as $ability => $allowed) {
-            foreach ([$owner, $editor, $viewer, $stranger, $admin] as $user) {
+            foreach ([$wsAdmin, $member, $viewer, $stranger, $admin] as $user) {
                 $this->assertSame(
                     in_array($user, $allowed, true),
                     $user->can($ability, $this->workspace),
@@ -58,46 +62,70 @@ class WorkspaceAuthorizationTest extends TestCase
                 );
             }
         }
+
+        foreach ([$wsAdmin, $member, $viewer, $stranger] as $user) {
+            $this->assertFalse($user->can('create', Workspace::class));
+        }
+        $this->assertTrue($admin->can('create', Workspace::class));
     }
 
     public function test_collaboration_gate_closes_member_management(): void
     {
-        $owner = $this->member(WorkspaceRole::Owner);
+        $wsAdmin = $this->member(WorkspaceRole::Admin);
         config(['argos.workspaces.collaboration' => false]);
 
-        $this->assertFalse($owner->can('manageMembers', $this->workspace));
-        $this->assertTrue($owner->can('update', $this->workspace));
+        $this->assertFalse($wsAdmin->can('manageMembers', $this->workspace));
+        $this->assertTrue($wsAdmin->can('update', $this->workspace));
     }
 
-    public function test_thread_abilities_require_an_operating_role(): void
+    public function test_task_abilities_belong_to_the_people_of_the_task(): void
     {
-        $thread = Thread::factory()->create(['workspace_id' => $this->workspace->id]);
-        $editor = $this->member(WorkspaceRole::Editor);
+        $owner = $this->member(WorkspaceRole::Member);
+        $task = Task::factory()->ownedBy($owner)->create(['workspace_id' => $this->workspace->id]);
+        $collaborator = $this->member(WorkspaceRole::Member);
+        TaskMember::query()->create(['task_id' => $task->id, 'user_id' => $collaborator->id, 'invited_by' => $owner->id]);
+        $otherMember = $this->member(WorkspaceRole::Member);
         $viewer = $this->member(WorkspaceRole::Viewer);
+        $wsAdmin = $this->member(WorkspaceRole::Admin);
         $admin = User::factory()->admin()->create();
+        $stranger = User::factory()->create();
+        $everyone = [$owner, $collaborator, $otherMember, $viewer, $wsAdmin, $admin, $stranger];
 
-        foreach (['prompt', 'interrupt', 'resolveApproval', 'changeMode'] as $ability) {
-            $this->assertTrue($editor->can($ability, $thread), $ability);
-            $this->assertFalse($viewer->can($ability, $thread), $ability);
-            // Admins read everything but act only as members.
-            $this->assertFalse($admin->can($ability, $thread), $ability);
+        $collaborative = [$owner, $collaborator, $wsAdmin, $admin];
+        $ownerOnly = [$owner, $wsAdmin, $admin];
+        $matrix = [
+            'view' => [$owner, $collaborator, $otherMember, $viewer, $wsAdmin, $admin],
+            'prompt' => $collaborative,
+            'interrupt' => $collaborative,
+            'resolveApproval' => $collaborative,
+            'changeMode' => $collaborative,
+            'update' => $collaborative,
+            'ship' => $collaborative,
+            'review' => $collaborative,
+            'invite' => $ownerOnly,
+            'transfer' => $ownerOnly,
+            'archive' => $ownerOnly,
+            'delete' => $ownerOnly,
+        ];
+
+        foreach ($matrix as $ability => $allowed) {
+            foreach ($everyone as $i => $user) {
+                $this->assertSame(in_array($user, $allowed, true), $user->can($ability, $task), "{$ability} for user #{$i}");
+            }
         }
-        $this->assertTrue($viewer->can('view', $thread));
-        $this->assertTrue($admin->can('view', $thread));
-        $this->assertFalse(User::factory()->create()->can('view', $thread));
     }
 
-    public function test_creating_a_thread_needs_a_usable_agent(): void
+    public function test_creating_a_task_needs_a_usable_agent(): void
     {
-        $editor = $this->member(WorkspaceRole::Editor);
-        $this->assertFalse($editor->can('create', [Thread::class, $this->workspace]));
+        $editor = $this->member(WorkspaceRole::Member);
+        $this->assertFalse($editor->can('create', [Task::class, $this->workspace]));
 
         AgentCredential::factory()->ownedBy($editor)->create();
-        $this->assertTrue($editor->can('create', [Thread::class, $this->workspace]));
+        $this->assertTrue($editor->can('create', [Task::class, $this->workspace]));
 
         $viewer = $this->member(WorkspaceRole::Viewer);
         AgentCredential::factory()->ownedBy($viewer)->create();
-        $this->assertFalse($viewer->can('create', [Thread::class, $this->workspace]));
+        $this->assertFalse($viewer->can('create', [Task::class, $this->workspace]));
     }
 
     public function test_agent_policy_separates_own_shared_and_foreign_agents(): void

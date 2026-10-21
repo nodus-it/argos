@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Unit\Workspace;
 
 use App\Integrations\WorkspaceDaemon\Requests\GetHealth;
-use App\Models\RepoProfile;
 use App\Models\Workspace;
 use App\Services\Worker\WorkerSidecarManager;
 use App\Services\Worker\WorkerSidecars;
@@ -64,12 +63,11 @@ class WorkspaceDockerTest extends TestCase
 
     private function workspace(array $services = [], array $env = []): Workspace
     {
-        $profile = RepoProfile::factory()->withBackingServices($services)->create();
-        if ($env !== []) {
-            $profile->forceFill(['worker_env' => $env])->save();
-        }
-
-        return Workspace::factory()->create(['slug' => 'login', 'repo_profile_id' => $profile->id, 'daemon_token' => 'daemon-secret']);
+        return Workspace::factory()->withBackingServices($services)->create([
+            'slug' => 'login',
+            'daemon_token' => 'daemon-secret',
+            'worker_env' => $env === [] ? null : $env,
+        ]);
     }
 
     /** @param list<string> $cmd */
@@ -110,7 +108,7 @@ class WorkspaceDockerTest extends TestCase
         $this->assertSame('argos-workspace:x', end($cmd));
     }
 
-    public function test_project_env_cannot_override_daemon_wiring(): void
+    public function test_workspace_env_cannot_override_daemon_wiring(): void
     {
         $workspace = $this->workspace([], [['name' => 'ARGOS_DAEMON_TOKEN', 'value' => 'evil'], ['name' => 'MEILI_KEY', 'value' => 'abc']]);
 
@@ -145,7 +143,7 @@ class WorkspaceDockerTest extends TestCase
     {
         Saloon::fake([
             MockResponse::make(['error' => ['code' => 'starting']], 503),
-            MockResponse::make(['version' => '0.1.0', 'threads' => []], 200),
+            MockResponse::make(['version' => '0.1.0', 'tasks' => []], 200),
         ]);
         $manager = new RecordingContainerManager(app(WorkspaceDaemonClient::class));
 

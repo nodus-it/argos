@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1\Concerns;
 
-use App\Models\RepoProfile;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Workspace\AutomationActor;
@@ -16,8 +15,9 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
- * Workspace endpoints act for a person (see AutomationActor) and answer
- * domain failures uniformly: 422 with a machine-readable `code`.
+ * API endpoints act for a person (see AutomationActor), confine a
+ * workspace-bound token to its workspace and answer domain failures
+ * uniformly: 422 with a machine-readable `code`.
  */
 trait ActsForAutomation
 {
@@ -28,11 +28,19 @@ trait ActsForAutomation
             ?? throw new HttpResponseException(new JsonResponse(['message' => __('workspaces.auto.no_actor'), 'code' => 'no_actor'], 422));
     }
 
-    /** 404 for workspaces the token's project scope or the actor may not see. */
-    protected function assertWorkspaceVisible(Request $request, Workspace $workspace): void
+    /** The workspace a workspace-bound token is restricted to, or null. */
+    protected function scopedWorkspaceId(Request $request): ?string
     {
         $tokenable = $request->user();
-        if ($tokenable instanceof RepoProfile && $tokenable->id !== $workspace->repo_profile_id) {
+
+        return $tokenable instanceof Workspace ? $tokenable->id : null;
+    }
+
+    /** 404 for workspaces outside the token's scope or the actor's view. */
+    protected function assertWorkspaceVisible(Request $request, Workspace $workspace): void
+    {
+        $scoped = $this->scopedWorkspaceId($request);
+        if ($scoped !== null && $scoped !== $workspace->id) {
             abort(404);
         }
         if (! $this->actor($request)->can('view', $workspace)) {

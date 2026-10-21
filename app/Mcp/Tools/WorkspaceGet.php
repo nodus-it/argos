@@ -18,7 +18,7 @@ class WorkspaceGet extends Tool
 
     protected string $name = 'workspace_get';
 
-    protected string $description = 'Returns one workspace (by id or name): status, branch, pull request, latest gate results and its threads with their automatic-run state. Poll it to follow a run.';
+    protected string $description = 'Returns one workspace (by id or name) with its open tasks: owner, status, branch, pull request, gates, ticket and automatic-run state.';
 
     public function schema(JsonSchema $schema): array
     {

@@ -6,7 +6,7 @@ namespace App\Http\Requests\Api\V1;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-/** Settings shared by every endpoint that starts an automatic run. */
+/** POST /workspaces/{workspace}/tasks: an automatic task with its run settings. */
 class StartAutoRunRequest extends FormRequest
 {
     public function authorize(): bool
@@ -21,6 +21,8 @@ class StartAutoRunRequest extends FormRequest
     {
         return [
             'prompt' => ['required', 'string', 'max:20000'],
+            'base_branch' => ['nullable', 'string', 'max:255'],
+            'issue' => ['nullable', 'string', 'max:64'],
             'title' => ['nullable', 'string', 'max:120'],
             'agent_id' => ['nullable', 'string'],
             'model' => ['nullable', 'string', 'max:90'],

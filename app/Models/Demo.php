@@ -13,11 +13,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 
 /**
- * An ephemeral live-demo (preview) deployment of a workspace — one current
- * demo per workspace, replaced on the next build.
+ * An ephemeral live-demo (preview) deployment of a task — one current demo
+ * per task, replaced on the next build.
  *
  * @property string $id
  * @property string $workspace_id
+ * @property string $task_id
  * @property DemoStatus $status
  * @property string|null $url
  * @property string|null $compose_project
@@ -27,6 +28,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read Workspace|null $workspace
+ * @property-read Task|null $task
  */
 class Demo extends Model
 {
@@ -37,6 +39,7 @@ class Demo extends Model
 
     protected $fillable = [
         'workspace_id',
+        'task_id',
         'status',
         'url',
         'compose_project',
@@ -62,9 +65,17 @@ class Demo extends Model
         return $this->belongsTo(Workspace::class);
     }
 
-    /** What the demo was built for, if still present. */
-    public function target(): ?Workspace
+    /**
+     * @return BelongsTo<Task, $this>
+     */
+    public function task(): BelongsTo
     {
-        return $this->workspace;
+        return $this->belongsTo(Task::class);
+    }
+
+    /** What the demo was built for, if still present. */
+    public function target(): ?Task
+    {
+        return $this->task;
     }
 }

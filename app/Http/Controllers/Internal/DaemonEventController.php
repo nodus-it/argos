@@ -7,7 +7,7 @@ namespace App\Http\Controllers\Internal;
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\AuthenticateWorkspaceDaemon;
 use App\Models\Workspace;
-use App\Services\Workspace\ThreadEventIngestor;
+use App\Services\Workspace\TaskEventIngestor;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -17,7 +17,7 @@ use Illuminate\Http\Request;
  */
 class DaemonEventController extends Controller
 {
-    public function __invoke(Request $request, ThreadEventIngestor $ingestor): JsonResponse
+    public function __invoke(Request $request, TaskEventIngestor $ingestor): JsonResponse
     {
         /** @var Workspace $workspace */
         $workspace = $request->attributes->get(AuthenticateWorkspaceDaemon::ATTRIBUTE);
@@ -25,7 +25,7 @@ class DaemonEventController extends Controller
         $validated = $request->validate([
             'batch_id' => ['required', 'string', 'max:64'],
             'events' => ['present', 'array', 'max:500'],
-            'events.*.thread_id' => ['nullable', 'string', 'max:64'],
+            'events.*.task_id' => ['nullable', 'string', 'max:64'],
             'events.*.seq' => ['required', 'integer', 'min:1'],
             'events.*.type' => ['required', 'string', 'max:64'],
             'events.*.data' => ['nullable', 'array'],

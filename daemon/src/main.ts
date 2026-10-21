@@ -8,7 +8,7 @@ import { scriptRunner } from './gates.js';
 import { buildApp } from './http.js';
 import { Outbox, type Acks } from './outbox.js';
 import type { SdkMessageLike } from './normalize.js';
-import type { QueryFactory, QueryLike } from './threadSession.js';
+import type { QueryFactory, QueryLike } from './taskSession.js';
 
 function required(name: string): string {
     const value = process.env[name];

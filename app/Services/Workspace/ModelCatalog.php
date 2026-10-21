@@ -8,7 +8,7 @@ use App\Models\AgentCredential;
 use Illuminate\Support\Facades\Cache;
 
 /**
- * Which Claude models a thread can pick. Claude Code reports the models a
+ * Which Claude models a task can pick. Claude Code reports the models a
  * subscription may use when a session starts (aliases like `sonnet` always
  * resolve to the newest model); Argos remembers that list per agent. Before
  * an agent's first session the aliases are offered — never fixed model ids

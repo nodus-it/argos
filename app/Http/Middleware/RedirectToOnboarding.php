@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
-use App\Models\RepoProfile;
+use App\Models\Workspace;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -17,14 +17,14 @@ class RedirectToOnboarding
         if ($request->routeIs(
             'filament.admin.pages.onboarding',
             // The in-app docs (setup/operations) must be reachable before the
-            // first RepoProfile exists, so onboarding can link into them.
+            // first workspace exists, so onboarding can link into them.
             'filament.admin.pages.docs',
-            'filament.admin.resources.repo-profiles.create',
-            // Agents are set up before the first RepoProfile exists — both
+            'filament.admin.resources.workspaces.create',
+            // Agents are set up before the first workspace exists — both
             // create and the post-save edit route must be reachable.
             'filament.admin.resources.agent-credentials.*',
             // OAuth apps and Personal Access Tokens are set up before the first
-            // RepoProfile exists, so the onboarding flow can reach them too.
+            // workspace exists, so the onboarding flow can reach them too.
             'filament.admin.resources.provider-oauth-configs.*',
             'filament.admin.resources.provider-credentials.*',
             'filament.admin.auth.logout',
@@ -33,7 +33,7 @@ class RedirectToOnboarding
             return $next($request);
         }
 
-        if (RepoProfile::query()->exists()) {
+        if (Workspace::query()->exists()) {
             return $next($request);
         }
 

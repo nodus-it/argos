@@ -4,23 +4,23 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Workspace;
 
-use App\Broadcasting\ThreadStream;
+use App\Broadcasting\TaskStream;
 use App\Enums\GateRunStatus;
-use App\Enums\ThreadEventType;
+use App\Enums\TaskEventType;
 use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceStatus;
 use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ViewWorkspace;
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
 use App\Livewire\Workspace\ContextPanel;
-use App\Livewire\Workspace\ThreadChat;
+use App\Livewire\Workspace\TaskChat;
 use App\Models\AgentCredential;
-use App\Models\Thread;
-use App\Models\ThreadEvent;
+use App\Models\Task;
+use App\Models\TaskEvent;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceGateRun;
 use App\Models\WorkspaceMember;
-use App\Services\Workspace\ThreadEventIngestor;
+use App\Services\Workspace\TaskEventIngestor;
 use App\Services\Workspace\WorkspaceDaemonClient;
 use App\Services\Workspace\WorkspaceException;
 use App\Services\Workspace\WorkspaceGateService;
@@ -40,15 +40,18 @@ class WorkspaceQualityGateTest extends TestCase
 
     private User $editor;
 
+    private Task $task;
+
     protected function setUp(): void
     {
         parent::setUp();
         // Workspace pages live in the workspaces panel (/w).
         Filament::setCurrentPanel('workspaces');
-        Event::fake([ThreadStream::class]);
+        Event::fake([TaskStream::class]);
         $this->app->singleton(WorkspaceDaemonClient::class, FakeWorkspaceDaemon::class);
         $this->workspace = Workspace::factory()->create(['status' => WorkspaceStatus::Running]);
-        $this->editor = $this->member(WorkspaceRole::Editor, 'Ada');
+        $this->editor = $this->member(WorkspaceRole::Member, 'Ada');
+        $this->task = Task::factory()->ownedBy($this->editor)->create(['workspace_id' => $this->workspace->id, 'base_commit' => str_repeat('c', 40)]);
     }
 
     private function member(WorkspaceRole $role, string $name): User
@@ -68,46 +71,68 @@ class WorkspaceQualityGateTest extends TestCase
     private function ingest(array $events): void
     {
         $seq = 0;
-        app(ThreadEventIngestor::class)->ingest($this->workspace, array_map(
-            fn (array $e): array => ['thread_id' => null, 'seq' => ++$seq, 'type' => $e[0], 'data' => $e[1]],
+        app(TaskEventIngestor::class)->ingest($this->workspace, array_map(
+            fn (array $e): array => ['task_id' => null, 'seq' => ++$seq, 'type' => $e[0], 'data' => $e[1]],
             $events,
         ));
     }
 
     public function test_a_run_records_the_reported_gates_and_logs(): void
     {
-        $run = $this->service()->run($this->workspace, $this->editor);
+        $run = $this->service()->run($this->task, $this->editor);
 
+        $this->assertSame($this->task->id, $run->task_id);
+        $this->assertSame($this->workspace->id, $run->workspace_id);
+        $this->assertSame(str_repeat('c', 40), $run->base_commit);
         $this->assertSame(GateRunStatus::Failed, $run->status);
         $this->assertSame(['artisan' => 'pass', 'pint' => 'pass', 'pest' => 'fail', 'phpstan' => 'skip'], $run->gates);
         $this->assertStringContainsString('LoginTest', $run->logs['pest']);
         $this->assertSame(['pest'], $run->failedGates());
-        $this->assertSame('2/3', $this->service()->summary($this->workspace));
+        $this->assertSame('2/3', $this->service()->summary($this->task));
+        $this->assertSame($run->id, $this->service()->latest($this->task)?->id);
         $this->assertSame($this->editor->id, $run->triggered_by);
-        Event::assertDispatched(ThreadStream::class, fn (ThreadStream $e): bool => $e->threadId === ThreadEventIngestor::WORKSPACE_KEY);
+        Event::assertDispatched(TaskStream::class, fn (TaskStream $e): bool => $e->taskId === TaskEventIngestor::WORKSPACE_KEY);
     }
 
     public function test_viewers_cannot_run_gates(): void
     {
         $this->expectException(AuthorizationException::class);
 
-        $this->service()->run($this->workspace, $this->member(WorkspaceRole::Viewer, 'Vi'));
+        $this->service()->run($this->task, $this->member(WorkspaceRole::Viewer, 'Vi'));
+    }
+
+    public function test_members_cannot_run_gates_in_someone_elses_task(): void
+    {
+        $this->expectException(AuthorizationException::class);
+
+        $this->service()->run($this->task, $this->member(WorkspaceRole::Member, 'Bo'));
+    }
+
+    public function test_runs_and_summaries_belong_to_their_task(): void
+    {
+        $other = Task::factory()->create(['workspace_id' => $this->workspace->id]);
+        WorkspaceGateRun::factory()->create(['task_id' => $other->id, 'status' => GateRunStatus::Failed, 'gates' => ['pest' => 'fail', 'pint' => 'pass']]);
+
+        $this->assertNull($this->service()->latest($this->task));
+        $this->assertNull($this->service()->summary($this->task));
+        $this->assertSame('1/2', $this->service()->summary($other));
     }
 
     public function test_only_one_run_at_a_time(): void
     {
-        WorkspaceGateRun::factory()->create(['workspace_id' => $this->workspace->id, 'status' => GateRunStatus::Running, 'gates' => null]);
+        // One container: a run of another task blocks too.
+        WorkspaceGateRun::factory()->create(['task_id' => Task::factory()->create(['workspace_id' => $this->workspace->id])->id, 'status' => GateRunStatus::Running, 'gates' => null]);
 
         $this->expectException(WorkspaceException::class);
-        $this->service()->run($this->workspace, $this->editor);
+        $this->service()->run($this->task, $this->editor);
     }
 
     public function test_a_lost_run_no_longer_blocks(): void
     {
-        $lost = WorkspaceGateRun::factory()->create(['workspace_id' => $this->workspace->id, 'status' => GateRunStatus::Running, 'gates' => null]);
+        $lost = WorkspaceGateRun::factory()->create(['task_id' => $this->task->id, 'status' => GateRunStatus::Running, 'gates' => null]);
         $lost->forceFill(['created_at' => now()->subHour()])->save();
 
-        $this->service()->run($this->workspace, $this->editor);
+        $this->service()->run($this->task, $this->editor);
 
         $this->assertSame(GateRunStatus::Error, $lost->fresh()->status);
     }
@@ -118,7 +143,7 @@ class WorkspaceQualityGateTest extends TestCase
         $daemon->shouldReceive('for->runGates')->andThrow(new DaemonTransportException('busy', 409, 'gates_running'));
 
         try {
-            $this->service()->run($this->workspace, $this->editor);
+            $this->service()->run($this->task, $this->editor);
             $this->fail('expected an exception');
         } catch (WorkspaceException $e) {
             $this->assertSame(__('workspaces.gates.already_running'), $e->getMessage());
@@ -128,7 +153,7 @@ class WorkspaceQualityGateTest extends TestCase
 
     public function test_events_are_applied_once_per_run(): void
     {
-        $run = WorkspaceGateRun::factory()->create(['workspace_id' => $this->workspace->id, 'status' => GateRunStatus::Running, 'gates' => null]);
+        $run = WorkspaceGateRun::factory()->create(['task_id' => $this->task->id, 'status' => GateRunStatus::Running, 'gates' => null]);
         $completed = ['gates.completed', ['run_id' => $run->id, 'gates' => ['pint' => 'pass', 'evil' => 'maybe'], 'logs' => ['pint' => 'ok', 'other' => 'x']]];
 
         $this->ingest([$completed]);
@@ -150,23 +175,27 @@ class WorkspaceQualityGateTest extends TestCase
         $this->assertSame(GateRunStatus::Running, $foreign->fresh()->status);
     }
 
-    public function test_the_baseline_state_is_tracked(): void
+    public function test_the_baseline_state_is_tracked_per_base_commit(): void
     {
-        $this->ingest([['gates.baseline', ['state' => 'running']], ['gates.baseline', ['state' => 'ready']]]);
-        $this->assertSame('ready', $this->workspace->fresh()->gate_baseline);
+        $base = str_repeat('c', 40);
+        $this->ingest([['gates.baseline', ['state' => 'running', 'commit' => $base]], ['gates.baseline', ['state' => 'ready', 'commit' => $base]], ['gates.baseline', ['state' => 'failed']]]);
+        $this->assertSame([$base => 'ready', WorkspaceGateService::CURRENT_BASE => 'failed'], $this->workspace->fresh()->gate_baselines);
 
-        $this->ingest([['gates.baseline', ['state' => 'bogus']]]);
-        $this->assertSame('ready', $this->workspace->fresh()->gate_baseline);
+        $this->ingest([['gates.baseline', ['state' => 'bogus', 'commit' => $base]]]);
+        $this->assertSame('ready', $this->service()->baselineFor($this->workspace->fresh(), $base));
+
+        // A run remembers the baseline of its task's base commit.
+        $this->assertSame('ready', $this->service()->run($this->task->fresh(), $this->editor)->baseline);
     }
 
     public function test_the_review_tab_shows_results_and_sends_fixes_to_the_agent(): void
     {
         AgentCredential::factory()->ownedBy($this->editor)->create();
-        Livewire::actingAs($this->editor)->test(ThreadChat::class, ['workspaceId' => $this->workspace->id])
-            ->set('newTitle', 'Gates')->call('createThread')->assertHasNoErrors();
-        $thread = Thread::query()->sole();
+        Livewire::actingAs($this->editor)->test(TaskChat::class, ['workspaceId' => $this->workspace->id])
+            ->call('startCreating')->set('newTitle', 'Gates')->call('createTask')->assertHasNoErrors();
+        $task = Task::query()->where('title', 'Gates')->sole();
 
-        $panel = Livewire::withoutLazyLoading()->withQueryParams(['thread' => $thread->id])->actingAs($this->editor)->test(ContextPanel::class, ['workspaceId' => $this->workspace->id])
+        $panel = Livewire::withoutLazyLoading()->withQueryParams(['task' => $task->id])->actingAs($this->editor)->test(ContextPanel::class, ['workspaceId' => $this->workspace->id])
             ->assertSee(__('workspaces.focus.gate_state.open'))
             ->call('runGates')
             ->assertSee(__('workspaces.focus.gate_state.fail'))
@@ -174,17 +203,17 @@ class WorkspaceQualityGateTest extends TestCase
             ->assertSee('LoginTest');
 
         $panel->call('sendGateFix', 'pest')->assertNotified(__('workspaces.gates.fix_sent'));
-        $message = ThreadEvent::query()->where('thread_id', $thread->id)->where('type', ThreadEventType::UserMessage->value)->sole();
+        $message = TaskEvent::query()->where('task_id', $task->id)->where('type', TaskEventType::UserMessage->value)->sole();
         $this->assertStringContainsString('# Quality-Gate-Fix: pest', $message->payload['text']);
 
         // Only failed gates can be sent.
         $panel->call('sendGateFix', 'pint')->assertNotified(__('workspaces.gates.no_prompt'));
-        $this->assertSame(1, ThreadEvent::query()->where('thread_id', $thread->id)->where('type', ThreadEventType::UserMessage->value)->count());
+        $this->assertSame(1, TaskEvent::query()->where('task_id', $task->id)->where('type', TaskEventType::UserMessage->value)->count());
     }
 
     public function test_viewers_see_results_without_actions(): void
     {
-        WorkspaceGateRun::factory()->create(['workspace_id' => $this->workspace->id, 'status' => GateRunStatus::Failed, 'gates' => ['pest' => 'fail']]);
+        WorkspaceGateRun::factory()->create(['task_id' => $this->task->id, 'status' => GateRunStatus::Failed, 'gates' => ['pest' => 'fail']]);
 
         Livewire::withoutLazyLoading()->actingAs($this->member(WorkspaceRole::Viewer, 'Vi'))->test(ContextPanel::class, ['workspaceId' => $this->workspace->id])
             ->assertSee('Pest / PHPUnit')
@@ -200,7 +229,9 @@ class WorkspaceQualityGateTest extends TestCase
             ->assertNotified(__('workspaces.gates.started'))
             ->assertDispatched('workspace-focus', target: 'gates');
 
-        $this->assertSame(GateRunStatus::Failed, WorkspaceGateRun::query()->sole()->status);
-        $this->assertSame('2/3', $this->service()->summary($this->workspace));
+        $run = WorkspaceGateRun::query()->sole();
+        $this->assertSame(GateRunStatus::Failed, $run->status);
+        $this->assertSame($this->task->id, $run->task_id);
+        $this->assertSame('2/3', $this->service()->summary($this->task));
     }
 }

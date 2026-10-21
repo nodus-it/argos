@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Mcp\Tools\Concerns;
 
-use App\Http\Resources\Api\V1\ThreadResource;
+use App\Http\Resources\Api\V1\TaskResource;
 use App\Http\Resources\Api\V1\WorkspaceResource;
-use App\Models\Thread;
+use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Workspace\WorkspaceException;
@@ -36,23 +36,23 @@ trait InteractsWithWorkspaces
         return $workspace !== null && $this->user()->can('view', $workspace) ? $workspace : null;
     }
 
-    protected function findThread(string $id): ?Thread
+    protected function findTask(string $id): ?Task
     {
-        $thread = Thread::query()->with('workspace')->find($id);
+        $task = Task::query()->with('workspace')->find($id);
 
-        return $thread !== null && $this->user()->can('view', $thread->workspace) ? $thread : null;
+        return $task !== null && $this->user()->can('view', $task->workspace) ? $task : null;
     }
 
     protected function workspaceJson(Workspace $workspace): Response
     {
-        $data = (new WorkspaceResource($workspace->load(['repoProfile', 'threads'])))->resolve();
+        $data = (new WorkspaceResource($workspace->load(['tasks' => fn ($q) => $q->whereNull('archived_at')->with(['workspace', 'owner'])])))->resolve();
 
         return Response::text((string) json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT));
     }
 
-    protected function threadJson(Thread $thread): Response
+    protected function taskJson(Task $task): Response
     {
-        $data = (new ThreadResource($thread->load('workspace')))->resolve();
+        $data = (new TaskResource($task->load(['workspace', 'owner'])))->resolve();
 
         return Response::text((string) json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT));
     }

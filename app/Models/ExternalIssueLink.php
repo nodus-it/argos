@@ -18,10 +18,10 @@ use Illuminate\Support\Carbon;
  * @property string $external_url
  * @property Carbon|null $last_synced_at
  * @property string|null $signature
- * @property string|null $workspace_id
+ * @property string|null $task_id
  * @property Carbon|null $launched_at
  * @property string|null $plan_comment_id
- * @property-read Workspace|null $workspace
+ * @property-read Task|null $task
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read TaskProviderBinding $binding
@@ -34,7 +34,7 @@ class ExternalIssueLink extends Model
     use HasUlids;
 
     protected $fillable = [
-        'workspace_id',
+        'task_id',
         'launched_at',
         'plan_comment_id',
         'task_provider_binding_id',
@@ -60,9 +60,9 @@ class ExternalIssueLink extends Model
         return $this->belongsTo(TaskProviderBinding::class, 'task_provider_binding_id');
     }
 
-    /** @return BelongsTo<Workspace, $this> */
-    public function workspace(): BelongsTo
+    /** @return BelongsTo<Task, $this> */
+    public function task(): BelongsTo
     {
-        return $this->belongsTo(Workspace::class);
+        return $this->belongsTo(Task::class);
     }
 }

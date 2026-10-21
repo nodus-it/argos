@@ -8,13 +8,13 @@ use App\Services\GitProvider\Contracts\GitProviderContract;
 
 /**
  * Browser-E2E fake git provider: serves canonical repo/branch data so the
- * RepoProfile form's dropdowns fill in without any external API call, and
+ * workspace form's dropdowns fill in without any external API call, and
  * returns plausible PR payloads. Bound per platform by E2eFakeServiceProvider
  * (env-gated, never in production).
  *
  * The data is intentionally platform-agnostic — the suite only needs the
  * dropdowns populated and a stable default branch; which platform/agent/auth a
- * run exercises is decided by the seeded RepoProfile, not by this service.
+ * run exercises is decided by the seeded Workspace, not by this service.
  */
 class FakeGitService implements GitProviderContract
 {

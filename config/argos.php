@@ -159,7 +159,7 @@ return [
         // is refused — running workspaces are never evicted.
         'max_active' => (int) $envOr('ARGOS_WORKSPACE_MAX_ACTIVE', 5),
         // Stop idle workspaces (container only; volumes stay) after this many
-        // minutes without activity and without a busy thread.
+        // minutes without activity and without a busy task.
         'idle_minutes' => (int) $envOr('ARGOS_WORKSPACE_IDLE_MINUTES', 60),
         'cpus' => (string) $envOr('ARGOS_WORKSPACE_CPUS', '2'),
         'memory' => (string) $envOr('ARGOS_WORKSPACE_MEMORY', '4g'),
@@ -173,9 +173,9 @@ return [
         'editor_cookie_hours' => (int) $envOr('ARGOS_WORKSPACE_EDITOR_COOKIE_HOURS', 12),
         // How often open pull requests of workspaces are re-read (minutes).
         'pr_sync_minutes' => (int) $envOr('ARGOS_WORKSPACE_PR_SYNC_MINUTES', 15),
-        // Upload limit per image attached to a thread message (MB).
+        // Upload limit per image attached to a task message (MB).
         'upload_max_mb' => (int) $envOr('ARGOS_WORKSPACE_UPLOAD_MAX_MB', 5),
-        // Defaults for auto-threads; a project overrides them in its settings,
+        // Defaults for auto-tasks; a project overrides them in its settings,
         // a single run (UI/API/MCP) overrides the project.
         'auto' => [
             'plan' => (string) $envOr('ARGOS_AUTO_PLAN', 'auto'),
@@ -185,8 +185,6 @@ return [
             // 0 = no cost limit (subscriptions are flat; the agent's usage limit applies).
             'max_cost_usd' => (float) $envOr('ARGOS_AUTO_MAX_COST_USD', 0),
             'max_minutes' => (int) $envOr('ARGOS_AUTO_MAX_MINUTES', 120),
-            // Days before a finished or failed auto-workspace is deleted.
-            'cleanup_days' => (int) $envOr('ARGOS_AUTO_CLEANUP_DAYS', 14),
         ],
         'daemon_port' => 7777,
         'editor_port' => 3000,

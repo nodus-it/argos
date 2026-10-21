@@ -5,10 +5,9 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Enums\AgentName;
-use App\Enums\AutoThreadState;
+use App\Enums\AutoTaskState;
 use App\Filament\Admin\Widgets\StatsOverviewWidget;
-use App\Models\AgentVersion;
-use App\Models\Thread;
+use App\Models\Task;
 use App\Models\User;
 use App\Models\WorkerImageBuild;
 use App\Models\WorkerStack;
@@ -54,17 +53,12 @@ class StatsOverviewWidgetTest extends TestCase
             'built_at' => now(),
         ]);
 
-        // Plus one agent-drift build on a different stack
+        // Plus one stale build on a different stack
         $other = WorkerStack::factory()->create();
-        $otherHash = substr(hash('sha256', $other->dockerfile_body), 0, 8);
-        AgentVersion::factory()->withUpdate()->create([
-            'agent_name' => AgentName::ClaudeCode,
-            'last_checked_at' => now(),
-        ]);
         WorkerImageBuild::factory()->ready()->create([
             'worker_stack_id' => $other->id,
             'agent_name' => AgentName::ClaudeCode,
-            'stack_hash' => $otherHash,
+            'stack_hash' => 'cccccccc',
             'built_at' => now()->subHour(),
         ]);
 
@@ -92,13 +86,13 @@ class StatsOverviewWidgetTest extends TestCase
             ->assertSee('Containers up');
     }
 
-    public function test_in_progress_counts_running_auto_threads(): void
+    public function test_in_progress_counts_running_auto_tasks(): void
     {
-        Thread::factory()->create(['auto_state' => AutoThreadState::Implementing]);
-        Thread::factory()->create(['auto_state' => AutoThreadState::Gating]);
-        Thread::factory()->create(['auto_state' => AutoThreadState::Done]);
-        Thread::factory()->create(['auto_state' => AutoThreadState::Paused]);
-        Thread::factory()->create(); // manual thread
+        Task::factory()->create(['auto_state' => AutoTaskState::Implementing]);
+        Task::factory()->create(['auto_state' => AutoTaskState::Gating]);
+        Task::factory()->create(['auto_state' => AutoTaskState::Done]);
+        Task::factory()->create(['auto_state' => AutoTaskState::Paused]);
+        Task::factory()->create(); // manual task
 
         Livewire::test(StatsOverviewWidget::class)
             ->assertSee('Automatic Runs')
@@ -107,9 +101,9 @@ class StatsOverviewWidgetTest extends TestCase
 
     public function test_waiting_for_input_counts_plan_approvals_and_paused_runs(): void
     {
-        Thread::factory()->create(['auto_state' => AutoThreadState::AwaitingPlanApproval]);
-        Thread::factory()->create(['auto_state' => AutoThreadState::Paused]);
-        Thread::factory()->create(['auto_state' => AutoThreadState::Failed]); // final, not counted
+        Task::factory()->create(['auto_state' => AutoTaskState::AwaitingPlanApproval]);
+        Task::factory()->create(['auto_state' => AutoTaskState::Paused]);
+        Task::factory()->create(['auto_state' => AutoTaskState::Failed]); // final, not counted
 
         $stats = (fn () => $this->getStats())->call(new StatsOverviewWidget);
 

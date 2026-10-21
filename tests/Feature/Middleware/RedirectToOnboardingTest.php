@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Middleware;
 
-use App\Models\RepoProfile;
 use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -19,25 +19,25 @@ class RedirectToOnboardingTest extends TestCase
         $this->actingAs(User::factory()->admin()->create());
     }
 
-    public function test_dashboard_redirects_to_onboarding_when_no_profile(): void
+    public function test_dashboard_redirects_to_onboarding_when_no_workspace(): void
     {
         $response = $this->get('/admin');
 
         $response->assertRedirect(route('filament.admin.pages.onboarding'));
     }
 
-    public function test_projects_index_redirects_to_onboarding_when_no_profile(): void
+    public function test_workspaces_index_redirects_to_onboarding_when_no_workspace(): void
     {
-        $response = $this->get(route('filament.admin.resources.repo-profiles.index'));
+        $response = $this->get(route('filament.admin.resources.workspaces.index'));
 
         $response->assertRedirect(route('filament.admin.pages.onboarding'));
     }
 
-    public function test_no_redirect_when_profile_exists(): void
+    public function test_no_redirect_when_workspace_exists(): void
     {
-        RepoProfile::factory()->create();
+        Workspace::factory()->create();
 
-        $response = $this->get(route('filament.admin.resources.repo-profiles.index'));
+        $response = $this->get(route('filament.admin.resources.workspaces.index'));
 
         $response->assertOk();
     }
@@ -49,9 +49,9 @@ class RedirectToOnboardingTest extends TestCase
         $response->assertOk();
     }
 
-    public function test_repo_profile_create_page_is_not_redirected(): void
+    public function test_workspace_create_page_is_not_redirected(): void
     {
-        $response = $this->get(route('filament.admin.resources.repo-profiles.create'));
+        $response = $this->get(route('filament.admin.resources.workspaces.create'));
 
         $response->assertOk();
     }
@@ -59,7 +59,7 @@ class RedirectToOnboardingTest extends TestCase
     public function test_agent_credential_create_page_is_not_redirected(): void
     {
         // Onboarding's Codex setup links to this route — the middleware must
-        // let it through even though no RepoProfile exists yet.
+        // let it through even though no workspace exists yet.
         $response = $this->get(route('filament.admin.resources.agent-credentials.create'));
 
         $response->assertOk();

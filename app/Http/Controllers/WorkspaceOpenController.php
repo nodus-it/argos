@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Demo\TraefikRouter;
@@ -24,9 +25,15 @@ class WorkspaceOpenController extends Controller
         $user = $request->user();
         abort_unless($user->can('view', $workspace), 404);
         // The editor is a shell into the container: readers get the preview only.
-        abort_if($target === 'code' && ! $user->can('operate', $workspace), 403);
+        abort_if($target === 'code' && ! $user->can('editor', $workspace), 403);
 
-        $host = $target === 'code' ? TraefikRouter::codeKey($workspace->slug) : $workspace->demoSlug();
+        if ($target === 'code') {
+            $host = TraefikRouter::codeKey($workspace->slug);
+        } else {
+            $task = Task::query()->where('workspace_id', $workspace->id)->find((string) $request->query('task'));
+            abort_if($task === null, 404);
+            $host = $task->demoSlug();
+        }
         $url = $router->urlForSlug($host).'/';
         if ($target === 'code') {
             $url .= '?folder=/workspace&';

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Demo;
 
-use App\Models\RepoProfile;
+use App\Models\Workspace;
 use App\Services\GitProvider\GitServiceFactory;
 
 /**
@@ -21,10 +21,10 @@ final class DemoConfigLocator
     public function __construct(private readonly GitServiceFactory $factory) {}
 
     /** Whether both demo files exist at the profile's default branch. */
-    public function hasConfig(RepoProfile $profile): bool
+    public function hasConfig(Workspace $profile): bool
     {
         try {
-            $service = $this->factory->fromRepoProfile($profile);
+            $service = $this->factory->forWorkspace($profile);
             $ownerRepo = $profile->getOwnerRepo();
             $ref = $profile->default_branch;
 

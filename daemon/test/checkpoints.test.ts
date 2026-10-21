@@ -107,7 +107,7 @@ describe('checkpoints', () => {
         expect(head).toBe(run(['rev-parse', 'HEAD'], dir).trim());
     });
 
-    it(`keeps at most ${MAX_CHECKPOINTS} checkpoints per thread`, async () => {
+    it(`keeps at most ${MAX_CHECKPOINTS} checkpoints per task`, async () => {
         const sha = run(['rev-parse', 'HEAD'], dir).trim();
         // Seed refs directly; creating 200 snapshots would only slow the test.
         const lines = Array.from({ length: MAX_CHECKPOINTS }, (_, i) => `create refs/argos/checkpoints/t1/${i + 1} ${sha}`).join('\n');

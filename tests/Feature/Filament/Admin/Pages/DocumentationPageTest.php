@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Tests\Feature\Filament\Admin\Pages;
 
 use App\Filament\Admin\Pages\Documentation;
-use App\Models\RepoProfile;
 use App\Models\User;
+use App\Models\Workspace;
 use App\Services\Docs\DocManifest;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -22,7 +22,7 @@ class DocumentationPageTest extends TestCase
         $this->actingAs(User::factory()->admin()->create());
         // A project exists so the onboarding redirect is out of the way for the
         // default-access tests (the pre-onboarding case has its own test).
-        RepoProfile::factory()->create();
+        Workspace::factory()->create();
     }
 
     public function test_default_route_renders_the_first_manifest_page(): void
@@ -69,7 +69,7 @@ class DocumentationPageTest extends TestCase
     {
         // No project yet: docs must still load (whitelisted in RedirectToOnboarding)
         // rather than bouncing to the onboarding page (which would be a 302).
-        RepoProfile::query()->delete();
+        Workspace::query()->delete();
 
         $this->get(route('filament.admin.pages.docs', ['slug' => 'setup']))
             ->assertSuccessful()

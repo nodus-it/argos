@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
-/** Claude Code permission modes a thread can run in. Values match the SDK. */
+/** Claude Code permission modes a task can run in. Values match the SDK. */
 enum PermissionMode: string
 {
     case Default = 'default';

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Project;
 
-use App\Models\RepoProfile;
+use App\Models\Workspace;
 
 /**
  * Resolves the project-level environment Argos injects into BOTH the worker
@@ -42,7 +42,7 @@ class ProjectEnvironmentResolver
     /**
      * @return array<string, string>
      */
-    public function resolve(RepoProfile $profile): array
+    public function resolve(Workspace $profile): array
     {
         $env = [];
 

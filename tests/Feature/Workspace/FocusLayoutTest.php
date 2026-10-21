@@ -4,29 +4,28 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Workspace;
 
-use App\Broadcasting\ThreadStream;
+use App\Broadcasting\TaskStream;
 use App\Broadcasting\UserWorkspaceSignal;
 use App\Enums\ApprovalStatus;
 use App\Enums\GateRunStatus;
-use App\Enums\ThreadEventType;
-use App\Enums\ThreadStatus;
+use App\Enums\SessionStatus;
+use App\Enums\TaskEventType;
 use App\Enums\WorkspaceRole;
 use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ViewWorkspace;
 use App\Livewire\Workspace\ChangeTray;
 use App\Livewire\Workspace\ContextPanel;
-use App\Livewire\Workspace\ThreadChat;
-use App\Livewire\Workspace\ThreadSwitcher;
-use App\Models\RepoProfile;
-use App\Models\Thread;
-use App\Models\ThreadApproval;
-use App\Models\ThreadEvent;
+use App\Livewire\Workspace\TaskChat;
+use App\Livewire\Workspace\TaskSwitcher;
+use App\Models\Task;
+use App\Models\TaskApproval;
+use App\Models\TaskEvent;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceGateRun;
 use App\Models\WorkspaceMember;
-use App\Services\Workspace\ThreadOverview;
+use App\Services\Workspace\TaskOverview;
 use App\Services\Workspace\WorkspaceDaemonClient;
-use App\Support\ThreadTimeline;
+use App\Support\TaskTimeline;
 use App\Testing\FakeWorkspaceDaemon;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -47,94 +46,95 @@ class FocusLayoutTest extends TestCase
     {
         parent::setUp();
         Filament::setCurrentPanel('workspaces');
-        Event::fake([ThreadStream::class, UserWorkspaceSignal::class]);
+        Event::fake([TaskStream::class, UserWorkspaceSignal::class]);
         $this->app->singleton(WorkspaceDaemonClient::class, FakeWorkspaceDaemon::class);
-        RepoProfile::factory()->create();
+        Workspace::factory()->create();
         $this->workspace = Workspace::factory()->create();
         $this->owner = User::factory()->create();
-        WorkspaceMember::query()->create(['workspace_id' => $this->workspace->id, 'user_id' => $this->owner->id, 'role' => WorkspaceRole::Owner]);
+        WorkspaceMember::query()->create(['workspace_id' => $this->workspace->id, 'user_id' => $this->owner->id, 'role' => WorkspaceRole::Admin]);
     }
 
-    private function thread(string $title, ThreadStatus $status = ThreadStatus::Idle): Thread
+    private function task(string $title, SessionStatus $status = SessionStatus::Idle): Task
     {
-        return Thread::factory()->create(['workspace_id' => $this->workspace->id, 'title' => $title, 'status' => $status]);
+        return Task::factory()->create(['workspace_id' => $this->workspace->id, 'title' => $title, 'session_status' => $status]);
     }
 
     public function test_the_page_wires_switcher_chat_and_context(): void
     {
         Livewire::actingAs($this->owner)
             ->test(ViewWorkspace::class, ['record' => $this->workspace->getKey()])
-            ->assertSeeLivewire(ThreadSwitcher::class)
-            ->assertSeeLivewire(ThreadChat::class)
+            ->assertSeeLivewire(TaskSwitcher::class)
+            ->assertSeeLivewire(TaskChat::class)
             ->assertSeeLivewire(ContextPanel::class);
     }
 
-    public function test_threads_are_grouped_with_a_status_line(): void
+    public function test_tasks_are_grouped_with_a_status_line(): void
     {
-        $waiting = $this->thread('Navbar', ThreadStatus::WaitingInput);
-        ThreadApproval::factory()->create(['thread_id' => $waiting->id, 'tool_name' => 'Bash', 'request' => ['input' => ['command' => 'npm run build']]]);
-        $running = $this->thread('API docs', ThreadStatus::Running);
-        ThreadEvent::query()->create(['thread_id' => $running->id, 'type' => ThreadEventType::ToolCall, 'payload' => ['name' => 'Bash', 'input' => ['command' => 'vendor/bin/pest']]]);
-        $done = $this->thread('Login');
-        ThreadEvent::query()->create(['thread_id' => $done->id, 'type' => ThreadEventType::UserMessage, 'payload' => ['text' => 'go']]);
+        $waiting = $this->task('Navbar', SessionStatus::WaitingInput);
+        TaskApproval::factory()->create(['task_id' => $waiting->id, 'tool_name' => 'Bash', 'request' => ['input' => ['command' => 'npm run build']]]);
+        $running = $this->task('API docs', SessionStatus::Running);
+        TaskEvent::query()->create(['task_id' => $running->id, 'type' => TaskEventType::ToolCall, 'payload' => ['name' => 'Bash', 'input' => ['command' => 'vendor/bin/pest']]]);
+        $done = $this->task('Login');
+        TaskEvent::query()->create(['task_id' => $done->id, 'type' => TaskEventType::UserMessage, 'payload' => ['text' => 'go']]);
         foreach (['resources/views/login.blade.php', 'routes/web.php', 'routes/web.php'] as $path) {
-            ThreadEvent::query()->create(['thread_id' => $done->id, 'type' => ThreadEventType::ToolCall, 'payload' => ['name' => 'Edit', 'input' => ['file_path' => '/workspace/'.$path]]]);
+            TaskEvent::query()->create(['task_id' => $done->id, 'type' => TaskEventType::ToolCall, 'payload' => ['name' => 'Edit', 'input' => ['file_path' => '/workspace/'.$path]]]);
         }
-        $this->thread('Old')->forceFill(['archived_at' => now()])->save();
+        $this->task('Old')->forceFill(['archived_at' => now()])->save();
 
-        $overview = app(ThreadOverview::class)->for($this->workspace);
+        $overview = app(TaskOverview::class)->for($this->workspace);
 
-        $this->assertSame(['Navbar'], array_map(fn (array $r): string => $r['thread']->title, $overview['waiting']));
+        $this->assertSame(['Navbar'], array_map(fn (array $r): string => $r['task']->title, $overview['waiting']));
         $this->assertSame(__('workspaces.switcher.text.approval', ['what' => 'npm run build']), $overview['waiting'][0]['text']);
         $this->assertSame(__('workspaces.switcher.text.working_on', ['step' => 'pest']), $overview['running'][0]['text']);
         $this->assertSame(trans_choice('workspaces.switcher.text.done_files', 2, ['count' => 2]), $overview['done'][0]['text']);
         $this->assertSame(1, $overview['archived']);
     }
 
-    public function test_the_hint_chip_shows_only_other_waiting_threads_and_selects_them(): void
+    public function test_the_hint_chip_shows_only_other_waiting_tasks_and_selects_them(): void
     {
-        $current = $this->thread('Login');
-        $waiting = $this->thread('Navbar', ThreadStatus::WaitingInput);
-        ThreadApproval::factory()->create(['thread_id' => $waiting->id]);
+        $current = $this->task('Login');
+        $waiting = $this->task('Navbar', SessionStatus::WaitingInput);
+        TaskApproval::factory()->create(['task_id' => $waiting->id]);
 
-        Livewire::withQueryParams(['thread' => $current->id])->actingAs($this->owner)
-            ->test(ThreadSwitcher::class, ['workspaceId' => $this->workspace->id])
+        Livewire::withQueryParams(['task' => $current->id])->actingAs($this->owner)
+            ->test(TaskSwitcher::class, ['workspaceId' => $this->workspace->id])
             ->assertSee(trans_choice('workspaces.switcher.waiting_chip', 1, ['count' => 1]))
             ->call('select', $waiting->id)
-            ->assertDispatched('thread-select', id: $waiting->id)
+            ->assertDispatched('task-select', id: $waiting->id)
             ->assertDontSee(trans_choice('workspaces.switcher.waiting_chip', 1, ['count' => 1]));
     }
 
     public function test_the_chat_follows_the_switcher(): void
     {
-        $first = $this->thread('First');
-        $second = $this->thread('Second');
+        $first = $this->task('First');
+        $second = $this->task('Second');
 
-        Livewire::withQueryParams(['thread' => $first->id])->actingAs($this->owner)
-            ->test(ThreadChat::class, ['workspaceId' => $this->workspace->id])
-            ->dispatch('thread-select', id: $second->id)
-            ->assertSet('threadId', $second->id)
-            ->assertDispatched('thread-changed', id: $second->id)
-            ->dispatch('thread-new')
+        Livewire::withQueryParams(['task' => $first->id])->actingAs($this->owner)
+            ->test(TaskChat::class, ['workspaceId' => $this->workspace->id])
+            ->dispatch('task-select', id: $second->id)
+            ->assertSet('taskId', $second->id)
+            ->assertDispatched('task-changed', id: $second->id)
+            ->dispatch('task-new')
             ->assertSet('creating', true);
     }
 
-    public function test_archiving_the_shown_thread_moves_the_chat_on(): void
+    public function test_archiving_the_shown_task_moves_the_chat_on(): void
     {
-        $shown = $this->thread('Shown');
-        $this->thread('Next');
+        $shown = $this->task('Shown');
+        $this->task('Next');
 
-        Livewire::withQueryParams(['thread' => $shown->id])->actingAs($this->owner)
-            ->test(ThreadSwitcher::class, ['workspaceId' => $this->workspace->id])
+        Livewire::withQueryParams(['task' => $shown->id])->actingAs($this->owner)
+            ->test(TaskSwitcher::class, ['workspaceId' => $this->workspace->id])
             ->call('archive', $shown->id)
-            ->assertDispatched('thread-archived', id: $shown->id);
+            ->assertDispatched('task-archived', id: $shown->id);
         $this->assertNotNull($shown->fresh()->archived_at);
     }
 
     public function test_the_context_lists_gates_and_changed_files(): void
     {
+        $task = Task::factory()->create(['workspace_id' => $this->workspace->id, 'branch' => 'argos/login-page', 'base_branch' => 'develop']);
         WorkspaceGateRun::factory()->create([
-            'workspace_id' => $this->workspace->id,
+            'task_id' => $task->id,
             'status' => GateRunStatus::Failed,
             'gates' => ['pint' => 'pass', 'phpunit' => 'fail', 'phpstan' => 'skip', 'artisan' => 'pass', 'migrations' => 'pass'],
         ]);
@@ -155,26 +155,27 @@ class FocusLayoutTest extends TestCase
             ->test(ContextPanel::class, ['workspaceId' => $this->workspace->id])
             ->assertSee('Pest / PHPUnit')
             ->assertSee(__('workspaces.focus.gate_state.fail'))
-            ->assertSee($this->workspace->branch);
+            ->assertSee('argos/login-page')
+            ->assertSee('→ develop');
     }
 
     public function test_the_timeline_groups_a_turn_with_steps_and_hides_allowed_tool_approvals(): void
     {
-        $thread = $this->thread('Login');
-        $make = fn (ThreadEventType $type, array $payload): ThreadEvent => ThreadEvent::query()->create(['thread_id' => $thread->id, 'type' => $type, 'payload' => $payload]);
-        $make(ThreadEventType::UserMessage, ['text' => 'Build a login page']);
-        $approval = ThreadApproval::factory()->create(['thread_id' => $thread->id, 'status' => ApprovalStatus::Allowed]);
-        $make(ThreadEventType::ApprovalRequested, ['approval_id' => $approval->id, 'kind' => 'tool', 'tool_name' => 'Edit']);
-        $make(ThreadEventType::ToolCall, ['tool_use_id' => 't1', 'name' => 'Edit', 'input' => ['file_path' => '/workspace/routes/web.php', 'old_string' => 'a', 'new_string' => "a\nb"]]);
-        $make(ThreadEventType::ToolResult, ['tool_use_id' => 't1', 'output' => 'ok']);
-        $make(ThreadEventType::ToolCall, ['tool_use_id' => 't2', 'name' => 'Bash', 'input' => ['command' => 'php artisan route:list']]);
-        $make(ThreadEventType::ToolResult, ['tool_use_id' => 't2', 'output' => "2 routes\nmore"]);
-        $make(ThreadEventType::AssistantMessage, ['text' => 'Done.']);
-        $make(ThreadEventType::TurnCompleted, ['session_cost_usd' => 0.42, 'duration_ms' => 163000]);
+        $task = $this->task('Login');
+        $make = fn (TaskEventType $type, array $payload): TaskEvent => TaskEvent::query()->create(['task_id' => $task->id, 'type' => $type, 'payload' => $payload]);
+        $make(TaskEventType::UserMessage, ['text' => 'Build a login page']);
+        $approval = TaskApproval::factory()->create(['task_id' => $task->id, 'status' => ApprovalStatus::Allowed]);
+        $make(TaskEventType::ApprovalRequested, ['approval_id' => $approval->id, 'kind' => 'tool', 'tool_name' => 'Edit']);
+        $make(TaskEventType::ToolCall, ['tool_use_id' => 't1', 'name' => 'Edit', 'input' => ['file_path' => '/workspace/routes/web.php', 'old_string' => 'a', 'new_string' => "a\nb"]]);
+        $make(TaskEventType::ToolResult, ['tool_use_id' => 't1', 'output' => 'ok']);
+        $make(TaskEventType::ToolCall, ['tool_use_id' => 't2', 'name' => 'Bash', 'input' => ['command' => 'php artisan route:list']]);
+        $make(TaskEventType::ToolResult, ['tool_use_id' => 't2', 'output' => "2 routes\nmore"]);
+        $make(TaskEventType::AssistantMessage, ['text' => 'Done.']);
+        $make(TaskEventType::TurnCompleted, ['session_cost_usd' => 0.42, 'duration_ms' => 163000]);
 
-        $events = ThreadEvent::query()->where('thread_id', $thread->id)->orderBy('id')->get();
-        $results = $events->where('type', ThreadEventType::ToolResult)->keyBy(fn ($e) => $e->payload['tool_use_id']);
-        $blocks = ThreadTimeline::build($events, $results, collect([$approval->id => $approval]), false);
+        $events = TaskEvent::query()->where('task_id', $task->id)->orderBy('id')->get();
+        $results = $events->where('type', TaskEventType::ToolResult)->keyBy(fn ($e) => $e->payload['tool_use_id']);
+        $blocks = TaskTimeline::build($events, $results, collect([$approval->id => $approval]), false);
 
         $this->assertSame(['user', 'claude'], array_column($blocks, 'kind'));
         $turn = $blocks[1];
@@ -188,11 +189,11 @@ class FocusLayoutTest extends TestCase
 
     public function test_always_allow_asks_the_daemon_to_remember(): void
     {
-        $thread = Thread::factory()->open()->create(['workspace_id' => $this->workspace->id, 'status' => ThreadStatus::WaitingInput]);
-        $approval = ThreadApproval::factory()->create(['thread_id' => $thread->id, 'tool_name' => 'Bash', 'request' => ['input' => ['command' => 'npm run build']]]);
+        $task = Task::factory()->open()->create(['workspace_id' => $this->workspace->id, 'session_status' => SessionStatus::WaitingInput]);
+        $approval = TaskApproval::factory()->create(['task_id' => $task->id, 'tool_name' => 'Bash', 'request' => ['input' => ['command' => 'npm run build']]]);
 
-        Livewire::withQueryParams(['thread' => $thread->id])->actingAs($this->owner)
-            ->test(ThreadChat::class, ['workspaceId' => $this->workspace->id])
+        Livewire::withQueryParams(['task' => $task->id])->actingAs($this->owner)
+            ->test(TaskChat::class, ['workspaceId' => $this->workspace->id])
             ->call('resolveApproval', $approval->id, 'always');
 
         $this->assertSame(ApprovalStatus::Allowed, $approval->fresh()->status);

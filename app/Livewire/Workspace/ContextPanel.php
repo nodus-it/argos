@@ -7,7 +7,7 @@ namespace App\Livewire\Workspace;
 use App\Enums\GateRunStatus;
 use App\Enums\WorkspaceStatus;
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
-use App\Models\Thread;
+use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceGateRun;
@@ -24,9 +24,10 @@ use Livewire\Attributes\On;
 use Livewire\Component;
 
 /**
- * Context sidebar of a workspace: environment (VS Code, preview), branch,
- * quality gates and the changed files. Reads the diff through the daemon,
- * so it renders lazily and refreshes when Claude finishes a turn.
+ * Context sidebar of the task shown in the chat: environment (VS Code,
+ * preview), branch, quality gates and the changed files. Reads the diff
+ * through the daemon, so it renders lazily and refreshes when Claude
+ * finishes a turn.
  */
 #[Lazy]
 class ContextPanel extends Component
@@ -42,43 +43,43 @@ class ContextPanel extends Component
     #[Locked]
     public string $workspaceId;
 
-    /** Thread that "send to Claude" goes to (the one shown in the chat). */
-    public ?string $threadId = null;
+    /** The task shown in the chat. */
+    public ?string $taskId = null;
 
     public function mount(string $workspaceId): void
     {
         $this->workspaceId = $workspaceId;
         abort_unless($this->user()->can('view', $this->workspace()), 403);
-        $requested = request()->query('thread');
-        $this->threadId = is_string($requested) && Thread::query()->where('workspace_id', $workspaceId)->whereKey($requested)->exists()
+        $requested = request()->query('task');
+        $this->taskId = is_string($requested) && Task::query()->where('workspace_id', $workspaceId)->whereKey($requested)->exists()
             ? $requested
-            : Thread::query()->where('workspace_id', $workspaceId)->whereNull('archived_at')->latest('updated_at')->value('id');
+            : Task::query()->where('workspace_id', $workspaceId)->whereNull('archived_at')->latest('updated_at')->value('id');
     }
 
-    #[On('thread-changed')]
-    public function threadChanged(?string $id): void
+    #[On('task-changed')]
+    public function taskChanged(?string $id): void
     {
-        $this->threadId = $id;
+        $this->taskId = $id;
     }
 
     /** Hand a failed gate to Claude with the gate's fix prompt. */
     public function sendGateFix(string $gate): void
     {
-        $run = app(WorkspaceGateService::class)->latest($this->workspace());
-        $thread = $this->threadId !== null ? Thread::query()->where('workspace_id', $this->workspaceId)->find($this->threadId) : null;
-        if ($run === null || $thread === null) {
-            Notification::make()->title(__('workspaces.ship.no_thread'))->warning()->send();
+        $task = $this->task();
+        $run = $task !== null ? app(WorkspaceGateService::class)->latest($task) : null;
+        if ($run === null || $task === null) {
+            Notification::make()->title(__('workspaces.ship.no_task'))->warning()->send();
 
             return;
         }
 
         try {
-            app(WorkspaceGateService::class)->sendFixToAgent($run, $thread, $this->user(), $gate);
+            app(WorkspaceGateService::class)->sendFixToAgent($run, $task, $this->user(), $gate);
             Notification::make()->title(__('workspaces.gates.fix_sent'))->success()->send();
         } catch (WorkspaceException|DaemonTransportException $e) {
             Notification::make()->title($e->getMessage())->danger()->send();
         } catch (AuthorizationException) {
-            Notification::make()->title(__('workspaces.thread.viewer_hint'))->warning()->send();
+            Notification::make()->title(__('workspaces.task.viewer_hint'))->warning()->send();
         }
     }
 
@@ -86,13 +87,20 @@ class ContextPanel extends Component
     #[On('workspace-run-gates')]
     public function runGates(): void
     {
+        $task = $this->task();
+        if ($task === null) {
+            Notification::make()->title(__('workspaces.ship.no_task'))->warning()->send();
+
+            return;
+        }
+
         try {
-            app(WorkspaceGateService::class)->run($this->workspace(), $this->user());
+            app(WorkspaceGateService::class)->run($task, $this->user());
             Notification::make()->title(__('workspaces.gates.started'))->success()->send();
         } catch (WorkspaceException $e) {
             Notification::make()->title($e->getMessage())->warning()->send();
         } catch (AuthorizationException) {
-            Notification::make()->title(__('workspaces.thread.viewer_hint'))->warning()->send();
+            Notification::make()->title(__('workspaces.task.viewer_hint'))->warning()->send();
         }
     }
 
@@ -104,27 +112,30 @@ class ContextPanel extends Component
     public function render(): View
     {
         $workspace = $this->workspace();
+        $task = $this->task();
         $diff = null;
-        if ($workspace->status === WorkspaceStatus::Running) {
+        if ($task !== null && $workspace->status === WorkspaceStatus::Running) {
             try {
-                $diff = app(WorkspaceDiffService::class)->summary($workspace);
+                $diff = app(WorkspaceDiffService::class)->summary($task);
             } catch (DaemonTransportException) {
                 $diff = null;
             }
         }
-        $gateRun = app(WorkspaceGateService::class)->latest($workspace);
-        $issue = $workspace->external_issue;
+        $gateRun = $task !== null ? app(WorkspaceGateService::class)->latest($task) : null;
+        $issue = $task?->external_ref;
 
         return view('livewire.workspace.context-panel', [
             'workspace' => $workspace,
+            'task' => $task,
             'diff' => $diff,
             'files' => self::changedFiles(array_values(array_filter($diff['files'] ?? [], fn (array $f): bool => ! $f['generated']))),
             'generated' => array_values(array_filter($diff['files'] ?? [], fn (array $f): bool => $f['generated'])),
             'gateRun' => $gateRun,
             'gates' => self::gateRows($gateRun),
-            'canOperate' => $this->user()->can('operate', $workspace),
+            'canOperate' => $task !== null && $this->user()->can('prompt', $task),
+            'canEdit' => $this->user()->can('editor', $workspace),
             'running' => $workspace->status === WorkspaceStatus::Running,
-            'issueLabel' => $issue !== null ? app(WorkspaceIssueService::class)->label($issue['number'], $issue['title']) : null,
+            'issueLabel' => $issue !== null ? ($issue['key'] ?? app(WorkspaceIssueService::class)->label($issue['number'], '')).' '.$issue['title'] : null,
         ]);
     }
 
@@ -193,9 +204,14 @@ class ContextPanel extends Component
         };
     }
 
+    private function task(): ?Task
+    {
+        return $this->taskId !== null ? Task::query()->where('workspace_id', $this->workspaceId)->find($this->taskId) : null;
+    }
+
     private function workspace(): Workspace
     {
-        return Workspace::query()->with('repoProfile')->findOrFail($this->workspaceId);
+        return Workspace::query()->findOrFail($this->workspaceId);
     }
 
     private function user(): User

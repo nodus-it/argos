@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Livewire\Workspace;
 
 use App\Enums\DemoStatus;
+use App\Models\Task;
 use App\Models\User;
-use App\Models\Workspace;
 use App\Services\Workspace\WorkspaceException;
 use App\Services\Workspace\WorkspacePreviewService;
 use Filament\Notifications\Notification;
@@ -17,27 +17,32 @@ use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 /**
- * Preview tool of the workbench: start/rebuild/stop the live demo, re-run the
- * setup commands and show the build log; the preview opens in its own tab.
+ * Preview of the task shown in the chat: start/rebuild/stop its live demo,
+ * re-run the setup commands and show the build log; the preview opens in
+ * its own tab.
  */
 class PreviewPanel extends Component
 {
     #[Locked]
     public string $workspaceId;
 
+    #[Locked]
+    public string $taskId;
+
     /** When a deploy was queued and its demo row does not exist yet. */
     public ?string $queuedAt = null;
 
-    public function mount(string $workspaceId): void
+    public function mount(string $workspaceId, string $taskId): void
     {
         $this->workspaceId = $workspaceId;
-        abort_unless($this->user()->can('view', $this->workspace()), 403);
+        $this->taskId = $taskId;
+        abort_unless($this->user()->can('view', $this->task()), 403);
     }
 
     public function start(): void
     {
         $this->attempt(function (): void {
-            app(WorkspacePreviewService::class)->start($this->workspace(), $this->user());
+            app(WorkspacePreviewService::class)->start($this->task(), $this->user());
             $this->queuedAt = now()->toIso8601String();
         });
     }
@@ -45,21 +50,22 @@ class PreviewPanel extends Component
     public function rerun(): void
     {
         $this->attempt(function (): void {
-            app(WorkspacePreviewService::class)->rerunCommands($this->workspace(), $this->user());
+            app(WorkspacePreviewService::class)->rerunCommands($this->task(), $this->user());
             Notification::make()->title(__('workspaces.preview.rerun_queued'))->success()->send();
         });
     }
 
     public function stop(): void
     {
-        $this->attempt(fn () => app(WorkspacePreviewService::class)->stop($this->workspace(), $this->user()));
+        $this->attempt(fn () => app(WorkspacePreviewService::class)->stop($this->task(), $this->user()));
         $this->queuedAt = null;
     }
 
     public function render(): View
     {
-        $workspace = $this->workspace();
-        $demo = $workspace->currentDemo();
+        $task = $this->task();
+        $workspace = $task->workspace;
+        $demo = $task->currentDemo();
         if ($this->queuedAt !== null) {
             $queuedAt = Carbon::parse($this->queuedAt);
             // The job created its demo row, or never ran (queue down): stop waiting.
@@ -70,17 +76,18 @@ class PreviewPanel extends Component
 
         return view('livewire.workspace.preview-panel', [
             'workspace' => $workspace,
+            'task' => $task,
             'demo' => $demo,
-            'reason' => app(WorkspacePreviewService::class)->unavailableReason($workspace),
-            'canOperate' => $this->user()->can('operate', $workspace),
+            'reason' => app(WorkspacePreviewService::class)->unavailableReason($task),
+            'canOperate' => $this->user()->can('prompt', $task),
             'building' => $this->queuedAt !== null || $demo?->status === DemoStatus::Building,
             'queued' => $this->queuedAt !== null,
         ]);
     }
 
-    private function workspace(): Workspace
+    private function task(): Task
     {
-        return Workspace::query()->with('repoProfile')->findOrFail($this->workspaceId);
+        return Task::query()->with('workspace')->where('workspace_id', $this->workspaceId)->findOrFail($this->taskId);
     }
 
     private function user(): User
@@ -98,7 +105,7 @@ class PreviewPanel extends Component
         } catch (WorkspaceException $e) {
             Notification::make()->title($e->getMessage())->danger()->send();
         } catch (AuthorizationException) {
-            Notification::make()->title(__('workspaces.thread.viewer_hint'))->warning()->send();
+            Notification::make()->title(__('workspaces.task.viewer_hint'))->warning()->send();
         }
     }
 }

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Tests\Feature\Workspace;
 
 use App\Enums\WorkspaceRole;
+use App\Models\Demo;
+use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceMember;
@@ -23,13 +25,18 @@ class WorkspaceGateTest extends TestCase
 
     private User $member;
 
+    private Task $task;
+
     protected function setUp(): void
     {
         parent::setUp();
         config(['argos.preview.base_domain' => 'argos.test', 'argos.preview.port' => 80, 'argos.preview.scheme' => 'https']);
         $this->workspace = Workspace::factory()->create(['slug' => 'login']);
         $this->member = User::factory()->create();
-        WorkspaceMember::query()->create(['workspace_id' => $this->workspace->id, 'user_id' => $this->member->id, 'role' => WorkspaceRole::Editor]);
+        WorkspaceMember::query()->create(['workspace_id' => $this->workspace->id, 'user_id' => $this->member->id, 'role' => WorkspaceRole::Member]);
+        // Previews are per task: demo-<workspace>-<task>.
+        $this->task = Task::factory()->create(['workspace_id' => $this->workspace->id, 'slug' => 'feature']);
+        Demo::factory()->create(['task_id' => $this->task->id, 'compose_project' => 'demo-login-feature']);
     }
 
     private function gate(string $host = 'code-login.argos.test', array $headers = [], array $cookies = [])
@@ -51,7 +58,7 @@ class WorkspaceGateTest extends TestCase
     {
         $cookie = $this->tokens()->cookie($this->workspace, $this->member);
         $this->gate(cookies: ['argos_ws_login' => $cookie])->assertNoContent();
-        $this->gate('demo-ws-login.argos.test', cookies: ['argos_ws_login' => $cookie])->assertNoContent();
+        $this->gate('demo-login-feature.argos.test', cookies: ['argos_ws_login' => $cookie])->assertNoContent();
 
         $stranger = $this->tokens()->cookie($this->workspace, User::factory()->create());
         $this->gate(headers: ['Accept' => 'application/json'], cookies: ['argos_ws_login' => $stranger])->assertUnauthorized();
@@ -70,14 +77,14 @@ class WorkspaceGateTest extends TestCase
         WorkspaceMember::query()->create(['workspace_id' => $this->workspace->id, 'user_id' => $viewer->id, 'role' => WorkspaceRole::Viewer]);
         $cookie = $this->tokens()->cookie($this->workspace, $viewer);
 
-        $this->gate('demo-ws-login.argos.test', cookies: ['argos_ws_login' => $cookie])->assertNoContent();
+        $this->gate('demo-login-feature.argos.test', cookies: ['argos_ws_login' => $cookie])->assertNoContent();
         $this->gate(headers: ['Accept' => 'application/json'], cookies: ['argos_ws_login' => $cookie])->assertUnauthorized();
 
         $this->actingAs($viewer)
             ->get(route('workspaces.open', ['workspace' => $this->workspace, 'target' => 'code']))
             ->assertForbidden();
         $this->actingAs($viewer)
-            ->get(route('workspaces.open', ['workspace' => $this->workspace, 'target' => 'preview']))
+            ->get(route('workspaces.open', ['workspace' => $this->workspace, 'target' => 'preview', 'task' => $this->task->id]))
             ->assertRedirect();
     }
 
@@ -86,6 +93,8 @@ class WorkspaceGateTest extends TestCase
         $this->gate('code-nope.argos.test')->assertNotFound();
         $this->gate('code-login.evil.test')->assertNotFound();
         $this->gate('demo-login.argos.test')->assertNotFound();
+        // A task without a preview has no host.
+        $this->gate('demo-login-other.argos.test')->assertNotFound();
     }
 
     public function test_a_ticket_is_traded_for_a_host_cookie_and_removed_from_the_url(): void
@@ -143,8 +152,13 @@ class WorkspaceGateTest extends TestCase
             ->assertRedirectContains('https://code-login.argos.test/?folder=/workspace&argos_ticket=');
 
         $this->actingAs($this->member)
+            ->get(route('workspaces.open', ['workspace' => $this->workspace, 'target' => 'preview', 'task' => $this->task->id]))
+            ->assertRedirectContains('https://demo-login-feature.argos.test/?argos_ticket=');
+
+        // A preview needs a task of this workspace.
+        $this->actingAs($this->member)
             ->get(route('workspaces.open', ['workspace' => $this->workspace, 'target' => 'preview']))
-            ->assertRedirectContains('https://demo-ws-login.argos.test/?argos_ticket=');
+            ->assertNotFound();
 
         $this->actingAs(User::factory()->create())
             ->get(route('workspaces.open', ['workspace' => $this->workspace, 'target' => 'code']))

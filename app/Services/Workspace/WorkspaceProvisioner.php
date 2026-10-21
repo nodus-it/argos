@@ -8,7 +8,7 @@ use App\Enums\WorkspaceStatus;
 use App\Events\Workspace\WorkspaceStarted;
 use App\Events\Workspace\WorkspaceStopped;
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
-use App\Models\Thread;
+use App\Models\Task;
 use App\Models\Workspace;
 use App\Services\Demo\TraefikRouter;
 use App\Services\Worker\WorkerSidecarManager;
@@ -30,7 +30,7 @@ class WorkspaceProvisioner
         private readonly WorkspaceContainerManager $containers,
         private readonly WorkerSidecarManager $sidecars,
         private readonly WorkspaceDaemonClient $daemon,
-        private readonly ThreadService $threads,
+        private readonly TaskService $tasks,
         private readonly TraefikRouter $router,
     ) {}
 
@@ -42,7 +42,7 @@ class WorkspaceProvisioner
     public function boot(Workspace $workspace): void
     {
         try {
-            $resolved = $this->images->resolveForRepoProfile($workspace->repoProfile, $workspace->base_branch);
+            $resolved = $this->images->resolveForWorkspace($workspace, $workspace->default_branch);
             $image = $this->imageBuilder->ensure($resolved)['tag'];
 
             $this->containers->prepareVolumes($workspace);
@@ -53,9 +53,10 @@ class WorkspaceProvisioner
 
             $creator = $workspace->creator;
             $this->daemon->for($workspace, 600)->initWorkspace([
-                'repo_url' => $workspace->repoProfile->url,
-                'base_branch' => $workspace->base_branch,
-                'branch' => $workspace->branch,
+                'repo_url' => $workspace->repo_url,
+                // The main clone; tasks branch off it in their own worktrees.
+                'base_branch' => $workspace->default_branch,
+                'branch' => $workspace->default_branch,
                 'git_user_name' => $creator !== null ? $creator->name : 'Argos',
                 'git_user_email' => $creator !== null ? $creator->email : 'argos@localhost',
             ]);
@@ -82,10 +83,10 @@ class WorkspaceProvisioner
     public function shutdown(Workspace $workspace): void
     {
         try {
-            Thread::query()->where('workspace_id', $workspace->id)->where('session_open', true)->get()
-                ->each(fn (Thread $thread) => $this->threads->close($thread));
+            Task::query()->where('workspace_id', $workspace->id)->where('session_open', true)->get()
+                ->each(fn (Task $task) => $this->tasks->close($task));
 
-            app(WorkspacePreviewService::class)->stop($workspace);
+            app(WorkspacePreviewService::class)->stopAll($workspace->id);
             $this->router->removeCodeRoute($workspace->slug);
             $this->containers->stop($workspace);
             $this->sidecars->stopWorkspaceContainers($workspace);

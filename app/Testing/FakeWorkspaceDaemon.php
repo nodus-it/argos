@@ -4,23 +4,23 @@ declare(strict_types=1);
 
 namespace App\Testing;
 
-use App\Services\Git\DiffParser;
 use App\Enums\ApprovalKind;
 use App\Enums\PermissionMode;
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
 use App\Integrations\WorkspaceDaemon\WorkspaceDaemonTransport;
-use App\Models\Thread;
-use App\Models\ThreadApproval;
-use App\Models\ThreadCheckpoint;
+use App\Models\Task;
+use App\Models\TaskApproval;
+use App\Models\TaskCheckpoint;
 use App\Models\Workspace;
-use App\Services\Workspace\ThreadEventIngestor;
+use App\Services\Git\DiffParser;
+use App\Services\Workspace\TaskEventIngestor;
 use App\Services\Workspace\WorkspaceDaemonClient;
 use Illuminate\Support\Str;
 
 /**
  * Deterministic stand-in for a workspace daemon (E2E fake mode). Answers
  * commands by feeding a scripted conversation straight into the
- * ThreadEventIngestor — the same path real daemon events take:
+ * TaskEventIngestor — the same path real daemon events take:
  *
  * - a message containing "edit" asks for an Edit approval; deciding it
  *   finishes the turn
@@ -41,7 +41,7 @@ class FakeWorkspaceDaemon extends WorkspaceDaemonClient implements WorkspaceDaem
 
     public function health(): array
     {
-        return ['version' => 'fake', 'threads' => []];
+        return ['version' => 'fake', 'tasks' => []];
     }
 
     public function initWorkspace(array $payload): array
@@ -49,30 +49,30 @@ class FakeWorkspaceDaemon extends WorkspaceDaemonClient implements WorkspaceDaem
         return ['status' => 'ready'];
     }
 
-    public function startThread(string $threadId, array $payload): array
+    public function startTask(string $taskId, array $payload): array
     {
-        $this->emit($threadId, [
-            ['session.started', ['claude_session_id' => 'fake-'.$threadId, 'model' => $payload['model'] ?? null, 'commands' => [['name' => 'review', 'description' => 'Review the diff', 'argument_hint' => '']]]],
+        $this->emit($taskId, [
+            ['session.started', ['claude_session_id' => 'fake-'.$taskId, 'model' => $payload['model'] ?? null, 'commands' => [['name' => 'review', 'description' => 'Review the diff', 'argument_hint' => '']]]],
             ['status', ['state' => 'idle']],
         ]);
 
         return ['state' => 'idle'];
     }
 
-    public function sendMessage(string $threadId, array $payload): array
+    public function sendMessage(string $taskId, array $payload): array
     {
-        $this->assertOpen($threadId);
+        $this->assertOpen($taskId);
         $text = (string) ($payload['text'] ?? '');
         $author = (string) ($payload['author']['name'] ?? '');
 
         $events = [
-            ['checkpoint.created', ['client_msg_id' => $payload['client_msg_id'] ?? null, 'label' => '', ...$this->nextCheckpoint($threadId)]],
+            ['checkpoint.created', ['client_msg_id' => $payload['client_msg_id'] ?? null, 'label' => '', ...$this->nextCheckpoint($taskId)]],
             ['user.accepted', ['client_msg_id' => $payload['client_msg_id'] ?? '']],
             ['status', ['state' => 'running']],
         ];
 
         // value() returns the cast enum, not the raw string.
-        $mode = Thread::query()->whereKey($threadId)->value('permission_mode');
+        $mode = Task::query()->whereKey($taskId)->value('permission_mode');
         if ($mode === PermissionMode::Plan || $mode === 'plan') {
             // Plan mode: Claude presents a plan for approval (ExitPlanMode).
             $events[] = ['assistant.message', ['message_id' => 'm-'.Str::random(6), 'text' => 'I looked at the code and have a plan.']];
@@ -100,24 +100,24 @@ class FakeWorkspaceDaemon extends WorkspaceDaemonClient implements WorkspaceDaem
             $events[] = ['status', ['state' => 'idle']];
         }
 
-        $this->emit($threadId, $events);
+        $this->emit($taskId, $events);
 
         return ['queued' => true];
     }
 
-    public function interrupt(string $threadId): void
+    public function interrupt(string $taskId): void
     {
-        $this->emit($threadId, [['status', ['state' => 'idle']]]);
+        $this->emit($taskId, [['status', ['state' => 'idle']]]);
     }
 
-    public function resolveApproval(string $threadId, string $approvalId, array $payload): void
+    public function resolveApproval(string $taskId, string $approvalId, array $payload): void
     {
         $allowed = ($payload['decision'] ?? '') === 'allow';
-        $kind = ThreadApproval::query()->whereKey($approvalId)->value('kind');
+        $kind = TaskApproval::query()->whereKey($approvalId)->value('kind');
         $kind = $kind instanceof ApprovalKind ? $kind->value : $kind;
         if ($kind === 'plan') {
             // Accepted: the plan gets implemented. Rejected: a revised plan.
-            $this->emit($threadId, $allowed ? [
+            $this->emit($taskId, $allowed ? [
                 ['status', ['state' => 'running']],
                 ['assistant.message', ['message_id' => 'm-'.Str::random(6), 'text' => 'Implemented the plan; tests pass.']],
                 ['turn.completed', ['session_cost_usd' => 0.03, 'duration_ms' => 1500, 'num_turns' => 2]],
@@ -132,7 +132,7 @@ class FakeWorkspaceDaemon extends WorkspaceDaemonClient implements WorkspaceDaem
             return;
         }
         if ($kind === 'question') {
-            $this->emit($threadId, [
+            $this->emit($taskId, [
                 ['status', ['state' => 'running']],
                 ['assistant.message', ['message_id' => 'm-'.Str::random(6), 'text' => 'I will assume the default and continue.']],
                 ['turn.completed', ['session_cost_usd' => 0.01, 'duration_ms' => 800, 'num_turns' => 1]],
@@ -141,7 +141,7 @@ class FakeWorkspaceDaemon extends WorkspaceDaemonClient implements WorkspaceDaem
 
             return;
         }
-        $this->emit($threadId, [
+        $this->emit($taskId, [
             ['status', ['state' => 'running']],
             ['tool.started', ['tool_use_id' => 'toolu_fake', 'name' => 'Edit', 'input' => ['file_path' => '/workspace/README.md']]],
             ['tool.result', ['tool_use_id' => 'toolu_fake', 'is_error' => ! $allowed, 'output' => $allowed ? 'File updated' : 'Denied by user']],
@@ -151,7 +151,7 @@ class FakeWorkspaceDaemon extends WorkspaceDaemonClient implements WorkspaceDaem
         ]);
     }
 
-    public function setPermissionMode(string $threadId, string $mode): void {}
+    public function setPermissionMode(string $taskId, string $mode): void {}
 
     /** @return array<string, mixed> */
     private function planApproval(): array
@@ -165,16 +165,16 @@ class FakeWorkspaceDaemon extends WorkspaceDaemonClient implements WorkspaceDaem
         ];
     }
 
-    public function setModel(string $threadId, string $model): void {}
+    public function setModel(string $taskId, string $model): void {}
 
-    public function stopThread(string $threadId): void
+    public function stopTask(string $taskId): void
     {
-        $this->emit($threadId, [['status', ['state' => 'closed']]]);
+        $this->emit($taskId, [['status', ['state' => 'closed']]]);
     }
 
     public function gitStatus(): array
     {
-        return ['branch' => $this->workspace?->branch, 'upstream' => null, 'ahead' => 1, 'behind' => 0, 'dirty' => true, 'files' => [['path' => 'README.md', 'status' => 'M']]];
+        return ['branch' => $this->workspace?->default_branch, 'upstream' => null, 'ahead' => 1, 'behind' => 0, 'dirty' => true, 'files' => [['path' => 'README.md', 'status' => 'M']]];
     }
 
     /** The working tree's diff against the base branch (tests replace it). */
@@ -239,9 +239,9 @@ class FakeWorkspaceDaemon extends WorkspaceDaemonClient implements WorkspaceDaem
             throw new \LogicException('FakeWorkspaceDaemon used without a workspace');
         }
 
-        app(ThreadEventIngestor::class)->ingest($this->workspace, [
-            ['thread_id' => null, 'seq' => 1, 'type' => 'gates.started', 'data' => ['run_id' => $runId, 'baseline' => 'ready']],
-            ['thread_id' => null, 'seq' => 2, 'type' => 'gates.completed', 'data' => [
+        app(TaskEventIngestor::class)->ingest($this->workspace, [
+            ['task_id' => null, 'seq' => 1, 'type' => 'gates.started', 'data' => ['run_id' => $runId, 'baseline' => 'ready']],
+            ['task_id' => null, 'seq' => 2, 'type' => 'gates.completed', 'data' => [
                 'run_id' => $runId,
                 'baseline' => 'ready',
                 'gates' => ['artisan' => 'pass', 'pint' => 'pass', 'pest' => self::$gateOutcome === 'pass' ? 'pass' : 'fail', 'phpstan' => 'skip'],
@@ -255,9 +255,9 @@ class FakeWorkspaceDaemon extends WorkspaceDaemonClient implements WorkspaceDaem
         return "# Quality-Gate-Fix: {$gate}\n\nTests sind fehlgeschlagen.\n";
     }
 
-    public function createCheckpoint(string $threadId, string $label): array
+    public function createCheckpoint(string $taskId, string $label): array
     {
-        return [...$this->nextCheckpoint($threadId), 'label' => $label];
+        return [...$this->nextCheckpoint($taskId), 'label' => $label];
     }
 
     public function checkpointDiff(string $ref): array
@@ -267,20 +267,20 @@ class FakeWorkspaceDaemon extends WorkspaceDaemonClient implements WorkspaceDaem
 
     public function restoreCheckpoint(string $ref): array
     {
-        $threadId = explode('/', $ref)[3] ?? '';
-        if (in_array(Thread::query()->whereKey($threadId)->value('status'), ['running', 'waiting_input'], true)) {
-            throw new DaemonTransportException('Claude is working in this thread; interrupt it first', 409, 'thread_running');
+        $taskId = explode('/', $ref)[3] ?? '';
+        if (in_array(Task::query()->whereKey($taskId)->value('status'), ['running', 'waiting_input'], true)) {
+            throw new DaemonTransportException('Claude is working in this task; interrupt it first', 409, 'task_running');
         }
 
-        return ['before' => [...$this->nextCheckpoint($threadId), 'label' => 'before restore'], 'removed' => []];
+        return ['before' => [...$this->nextCheckpoint($taskId), 'label' => 'before restore'], 'removed' => []];
     }
 
     /** @return array{ref: string, n: int, sha: string, head: string} */
-    private function nextCheckpoint(string $threadId): array
+    private function nextCheckpoint(string $taskId): array
     {
-        $n = (int) ThreadCheckpoint::query()->where('thread_id', $threadId)->max('n') + 1;
+        $n = (int) TaskCheckpoint::query()->where('task_id', $taskId)->max('n') + 1;
 
-        return ['ref' => "refs/argos/checkpoints/{$threadId}/{$n}", 'n' => $n, 'sha' => str_pad(dechex($n), 40, 'c', STR_PAD_LEFT), 'head' => str_repeat('0', 40)];
+        return ['ref' => "refs/argos/checkpoints/{$taskId}/{$n}", 'n' => $n, 'sha' => str_pad(dechex($n), 40, 'c', STR_PAD_LEFT), 'head' => str_repeat('0', 40)];
     }
 
     public function gitCommit(string $subject, string $body, array $author): ?array
@@ -295,29 +295,29 @@ class FakeWorkspaceDaemon extends WorkspaceDaemonClient implements WorkspaceDaem
         return ['text' => '', 'structured' => ['subject' => 'docs: greet Argos in the README', 'body' => 'Updates the README greeting.'], 'cost_usd' => 0.001];
     }
 
-    private function assertOpen(string $threadId): void
+    private function assertOpen(string $taskId): void
     {
         // A real daemon forgets sessions on restart; here the slot is the truth.
-        if (! (bool) Thread::query()->whereKey($threadId)->value('session_open')) {
-            throw new DaemonTransportException('Thread is not running', 404, 'unknown_thread');
+        if (! (bool) Task::query()->whereKey($taskId)->value('session_open')) {
+            throw new DaemonTransportException('Task is not running', 404, 'unknown_task');
         }
     }
 
     /**
      * @param  list<array{0: string, 1: array<string, mixed>}>  $events
      */
-    private function emit(string $threadId, array $events): void
+    private function emit(string $taskId, array $events): void
     {
-        $seq = (int) Thread::query()->whereKey($threadId)->value('last_seq');
+        $seq = (int) Task::query()->whereKey($taskId)->value('last_seq');
         $batch = [];
         foreach ($events as [$type, $data]) {
-            $batch[] = ['thread_id' => $threadId, 'seq' => ++$seq, 'type' => $type, 'data' => $data];
+            $batch[] = ['task_id' => $taskId, 'seq' => ++$seq, 'type' => $type, 'data' => $data];
         }
 
         if ($this->workspace === null) {
             throw new \LogicException('FakeWorkspaceDaemon used without a workspace');
         }
 
-        app(ThreadEventIngestor::class)->ingest($this->workspace, $batch);
+        app(TaskEventIngestor::class)->ingest($this->workspace, $batch);
     }
 }

@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Workspace;
 
-use App\Broadcasting\ThreadStream;
-use App\Enums\ThreadEventType;
+use App\Broadcasting\TaskStream;
 use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceStatus;
 use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ViewWorkspace;
@@ -14,14 +13,13 @@ use App\Integrations\WorkspaceDaemon\Requests\GitFetch;
 use App\Integrations\WorkspaceDaemon\Requests\GitStatus;
 use App\Livewire\Workspace\ContextPanel;
 use App\Livewire\Workspace\ReviewPanel;
-use App\Models\AgentCredential;
-use App\Models\Thread;
-use App\Models\ThreadEvent;
+use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceMember;
 use App\Services\Git\WorkspaceDiffService;
 use App\Services\Workspace\WorkspaceDaemonClient;
+use App\Support\ReviewDiff;
 use App\Testing\FakeWorkspaceDaemon;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -40,14 +38,17 @@ class ReviewPanelTest extends TestCase
 
     private User $editor;
 
+    private Task $task;
+
     protected function setUp(): void
     {
         parent::setUp();
         // Workspace pages live in the workspaces panel (/w).
         Filament::setCurrentPanel('workspaces');
-        Event::fake([ThreadStream::class]);
+        Event::fake([TaskStream::class]);
         $this->workspace = Workspace::factory()->create(['status' => WorkspaceStatus::Running]);
-        $this->editor = $this->member(WorkspaceRole::Editor, 'Ada');
+        $this->editor = $this->member(WorkspaceRole::Member, 'Ada');
+        $this->task = Task::factory()->ownedBy($this->editor)->create(['workspace_id' => $this->workspace->id]);
     }
 
     private function member(WorkspaceRole $role, string $name): User
@@ -93,16 +94,14 @@ class ReviewPanelTest extends TestCase
     public function test_seen_resets_when_the_file_changes_again(): void
     {
         $this->app->singleton(WorkspaceDaemonClient::class, FakeWorkspaceDaemon::class);
-        $thread = Thread::factory()->create(['workspace_id' => $this->workspace->id]);
-
-        $review = Livewire::withQueryParams(['thread' => $thread->id, 'review' => '1'])->actingAs($this->editor)
+        $review = Livewire::withQueryParams(['task' => $this->task->id, 'review' => '1'])->actingAs($this->editor)
             ->test(ReviewPanel::class, ['workspaceId' => $this->workspace->id]);
         $hash = $review->viewData('current')['hash'];
         $review->call('toggleSeen', 'README.md', $hash, true)
             ->assertSee(__('workspaces.review.seen_progress', ['seen' => 1, 'total' => 1]));
 
         FakeWorkspaceDaemon::$diff = "diff --git a/README.md b/README.md\n--- a/README.md\n+++ b/README.md\n@@ -1 +1 @@\n-Hello\n+Hello again\n";
-        Cache::forget('ws-changes:'.$this->workspace->id);
+        Cache::forget('ws-changes:'.$this->task->id);
         $review->call('$refresh')->assertSee(__('workspaces.review.seen_progress', ['seen' => 0, 'total' => 1]));
     }
 
@@ -121,7 +120,7 @@ class ReviewPanelTest extends TestCase
 
     public function test_split_rows_pair_removed_and_added_lines(): void
     {
-        $rows = \App\Support\ReviewDiff::split([
+        $rows = ReviewDiff::split([
             ['type' => 'context', 'old_num' => 1, 'new_num' => 1, 'text' => 'a'],
             ['type' => 'del', 'old_num' => 2, 'new_num' => null, 'text' => 'b'],
             ['type' => 'del', 'old_num' => 3, 'new_num' => null, 'text' => 'c'],
@@ -156,9 +155,11 @@ class ReviewPanelTest extends TestCase
             GitChanges::class => MockResponse::make(['files' => [['path' => 'a', 'from_path' => null, 'status' => 'M', 'additions' => 1, 'deletions' => 1, 'binary' => false, 'generated' => false, 'hash' => str_repeat('a', 40)]]]),
         ]);
 
-        $first = app(WorkspaceDiffService::class)->summary($this->workspace);
-        Cache::forget('ws-changes:'.$this->workspace->id);
-        app(WorkspaceDiffService::class)->summary($this->workspace);
+        $first = app(WorkspaceDiffService::class)->summary($this->task);
+        Cache::forget('ws-changes:'.$this->task->id);
+        app(WorkspaceDiffService::class)->summary($this->task);
+        // The fetch throttle is per workspace: another task reuses it.
+        app(WorkspaceDiffService::class)->summary(Task::factory()->create(['workspace_id' => $this->workspace->id]));
 
         $this->assertSame(1, $fetches);
         $this->assertSame(2, $first['ahead']);

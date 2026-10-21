@@ -9,14 +9,14 @@ use App\Integrations\WorkspaceDaemon\Requests\GetCheckpointDiff;
 use App\Integrations\WorkspaceDaemon\Requests\GetFileContent;
 use App\Integrations\WorkspaceDaemon\Requests\GetGateFixPrompt;
 use App\Integrations\WorkspaceDaemon\Requests\GetHealth;
-use App\Integrations\WorkspaceDaemon\Requests\GitCommit;
 use App\Integrations\WorkspaceDaemon\Requests\GitChanges;
+use App\Integrations\WorkspaceDaemon\Requests\GitCommit;
 use App\Integrations\WorkspaceDaemon\Requests\GitDiff;
 use App\Integrations\WorkspaceDaemon\Requests\GitFetch;
 use App\Integrations\WorkspaceDaemon\Requests\GitPush;
 use App\Integrations\WorkspaceDaemon\Requests\GitStatus;
 use App\Integrations\WorkspaceDaemon\Requests\InitWorkspace;
-use App\Integrations\WorkspaceDaemon\Requests\InterruptThread;
+use App\Integrations\WorkspaceDaemon\Requests\InterruptTask;
 use App\Integrations\WorkspaceDaemon\Requests\ListFiles;
 use App\Integrations\WorkspaceDaemon\Requests\ResolveApproval;
 use App\Integrations\WorkspaceDaemon\Requests\RestoreCheckpoint;
@@ -25,8 +25,8 @@ use App\Integrations\WorkspaceDaemon\Requests\RunOneshot;
 use App\Integrations\WorkspaceDaemon\Requests\SendMessage;
 use App\Integrations\WorkspaceDaemon\Requests\SetModel;
 use App\Integrations\WorkspaceDaemon\Requests\SetPermissionMode;
-use App\Integrations\WorkspaceDaemon\Requests\StartThread;
-use App\Integrations\WorkspaceDaemon\Requests\StopThread;
+use App\Integrations\WorkspaceDaemon\Requests\StartTask;
+use App\Integrations\WorkspaceDaemon\Requests\StopTask;
 use Saloon\Exceptions\Request\FatalRequestException;
 use Saloon\Exceptions\Request\RequestException;
 use Saloon\Http\Request;
@@ -64,46 +64,46 @@ class WorkspaceDaemonApi implements WorkspaceDaemonTransport
      * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
      */
-    public function startThread(string $threadId, array $payload): array
+    public function startTask(string $taskId, array $payload): array
     {
-        return $this->call(new StartThread($threadId, $payload));
+        return $this->call(new StartTask($taskId, $payload));
     }
 
     /**
      * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
      */
-    public function sendMessage(string $threadId, array $payload): array
+    public function sendMessage(string $taskId, array $payload): array
     {
-        return $this->call(new SendMessage($threadId, $payload));
+        return $this->call(new SendMessage($taskId, $payload));
     }
 
-    public function interrupt(string $threadId): void
+    public function interrupt(string $taskId): void
     {
-        $this->call(new InterruptThread($threadId));
+        $this->call(new InterruptTask($taskId));
     }
 
     /**
      * @param  array<string, mixed>  $payload
      */
-    public function resolveApproval(string $threadId, string $approvalId, array $payload): void
+    public function resolveApproval(string $taskId, string $approvalId, array $payload): void
     {
-        $this->call(new ResolveApproval($threadId, $approvalId, $payload));
+        $this->call(new ResolveApproval($taskId, $approvalId, $payload));
     }
 
-    public function setPermissionMode(string $threadId, string $mode): void
+    public function setPermissionMode(string $taskId, string $mode): void
     {
-        $this->call(new SetPermissionMode($threadId, ['mode' => $mode]));
+        $this->call(new SetPermissionMode($taskId, ['mode' => $mode]));
     }
 
-    public function setModel(string $threadId, string $model): void
+    public function setModel(string $taskId, string $model): void
     {
-        $this->call(new SetModel($threadId, ['model' => $model]));
+        $this->call(new SetModel($taskId, ['model' => $model]));
     }
 
-    public function stopThread(string $threadId): void
+    public function stopTask(string $taskId): void
     {
-        $this->call(new StopThread($threadId));
+        $this->call(new StopTask($taskId));
     }
 
     public function gitStatus(): array
@@ -190,9 +190,9 @@ class WorkspaceDaemonApi implements WorkspaceDaemonTransport
         return (string) ($this->call(new GetGateFixPrompt($gate, $runId))['prompt'] ?? '');
     }
 
-    public function createCheckpoint(string $threadId, string $label): array
+    public function createCheckpoint(string $taskId, string $label): array
     {
-        return self::checkpoint($this->call(new CreateCheckpoint(['thread_id' => $threadId, 'label' => $label])));
+        return self::checkpoint($this->call(new CreateCheckpoint(['task_id' => $taskId, 'label' => $label])));
     }
 
     public function checkpointDiff(string $ref): array

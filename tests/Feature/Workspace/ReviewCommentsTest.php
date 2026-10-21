@@ -4,26 +4,26 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Workspace;
 
-use App\Broadcasting\ThreadStream;
+use App\Broadcasting\TaskStream;
 use App\Broadcasting\UserWorkspaceSignal;
 use App\Enums\GateRunStatus;
 use App\Enums\ReviewCommentStatus;
-use App\Enums\ThreadEventType;
+use App\Enums\TaskEventType;
 use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceStatus;
 use App\Livewire\Workspace\ChangeTray;
 use App\Livewire\Workspace\ReviewPanel;
-use App\Livewire\Workspace\ThreadChat;
+use App\Livewire\Workspace\TaskChat;
 use App\Models\AgentCredential;
 use App\Models\ReviewComment;
-use App\Models\Thread;
-use App\Models\ThreadEvent;
+use App\Models\Task;
+use App\Models\TaskEvent;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceGateRun;
 use App\Models\WorkspaceMember;
 use App\Services\Workspace\ReviewCommentService;
-use App\Services\Workspace\ThreadEventIngestor;
+use App\Services\Workspace\TaskEventIngestor;
 use App\Services\Workspace\WorkspaceDaemonClient;
 use App\Support\GateAnnotations;
 use App\Testing\FakeWorkspaceDaemon;
@@ -45,21 +45,21 @@ class ReviewCommentsTest extends TestCase
 
     private User $editor;
 
-    private Thread $thread;
+    private Task $task;
 
     protected function setUp(): void
     {
         parent::setUp();
         Filament::setCurrentPanel('workspaces');
-        Event::fake([ThreadStream::class, UserWorkspaceSignal::class]);
+        Event::fake([TaskStream::class, UserWorkspaceSignal::class]);
         $this->app->singleton(WorkspaceDaemonClient::class, FakeWorkspaceDaemon::class);
         FakeWorkspaceDaemon::$diff = self::DIFF;
         FakeWorkspaceDaemon::$fileContents = ['resources/views/welcome.blade.php' => "<body>\n  <a href=\"{{ route('login') }}\" class=\"btn\">Login</a>\n  <nav></nav>\n</body>\n"];
         $this->workspace = Workspace::factory()->create(['status' => WorkspaceStatus::Running]);
         $this->editor = User::factory()->create(['name' => 'Ada']);
-        WorkspaceMember::query()->create(['workspace_id' => $this->workspace->id, 'user_id' => $this->editor->id, 'role' => WorkspaceRole::Editor]);
+        WorkspaceMember::query()->create(['workspace_id' => $this->workspace->id, 'user_id' => $this->editor->id, 'role' => WorkspaceRole::Member]);
         AgentCredential::factory()->ownedBy($this->editor)->create();
-        $this->thread = Thread::factory()->open()->create(['workspace_id' => $this->workspace->id, 'agent_credential_id' => AgentCredential::query()->first()->id]);
+        $this->task = Task::factory()->open()->ownedBy($this->editor)->create(['workspace_id' => $this->workspace->id, 'agent_credential_id' => AgentCredential::query()->first()->id]);
     }
 
     protected function tearDown(): void
@@ -71,7 +71,7 @@ class ReviewCommentsTest extends TestCase
 
     private function review(?User $user = null): Testable
     {
-        return Livewire::withQueryParams(['thread' => $this->thread->id, 'review' => '1'])
+        return Livewire::withQueryParams(['task' => $this->task->id, 'review' => '1'])
             ->actingAs($user ?? $this->editor)
             ->test(ReviewPanel::class, ['workspaceId' => $this->workspace->id]);
     }
@@ -88,7 +88,7 @@ class ReviewCommentsTest extends TestCase
         $this->assertSame(ReviewCommentStatus::Draft, $comment->status);
         $this->assertStringContainsString('route(\'login\')', $comment->snippet);
         $this->assertStringContainsString('<body>', $comment->snippet);
-        $this->assertSame(0, ThreadEvent::query()->where('type', ThreadEventType::UserMessage->value)->count());
+        $this->assertSame(0, TaskEvent::query()->where('type', TaskEventType::UserMessage->value)->count());
     }
 
     public function test_send_review_sends_one_structured_message_with_the_free_text(): void
@@ -97,15 +97,15 @@ class ReviewCommentsTest extends TestCase
             ->call('addComment', 'resources/views/welcome.blade.php', 'new', 2, 2, 'Reuse the nav partial')
             ->call('addComment', 'resources/views/welcome.blade.php', 'old', 2, 2, 'Keep the dashboard link');
 
-        Livewire::withQueryParams(['thread' => $this->thread->id])->actingAs($this->editor)
-            ->test(ThreadChat::class, ['workspaceId' => $this->workspace->id])
+        Livewire::withQueryParams(['task' => $this->task->id])->actingAs($this->editor)
+            ->test(TaskChat::class, ['workspaceId' => $this->workspace->id])
             ->assertSee(__('workspaces.review.send_review'))
             ->assertSee('welcome.blade.php:2')
             ->set('draft', 'Also make the button smaller.')
             ->call('send')
             ->assertDispatched('review-comments-changed');
 
-        $message = ThreadEvent::query()->where('thread_id', $this->thread->id)->where('type', ThreadEventType::UserMessage->value)->sole()->payload['text'];
+        $message = TaskEvent::query()->where('task_id', $this->task->id)->where('type', TaskEventType::UserMessage->value)->sole()->payload['text'];
         $this->assertStringStartsWith(__('workspaces.review.message_heading')."\n1. resources/views/welcome.blade.php:2", $message);
         $this->assertStringContainsString("```blade\n", $message);
         $this->assertStringContainsString('→ Reuse the nav partial', $message);
@@ -120,8 +120,8 @@ class ReviewCommentsTest extends TestCase
         $id = ReviewComment::query()->sole()->id;
 
         // A fresh component (reload) still has the draft.
-        Livewire::withQueryParams(['thread' => $this->thread->id])->actingAs($this->editor)
-            ->test(ThreadChat::class, ['workspaceId' => $this->workspace->id])
+        Livewire::withQueryParams(['task' => $this->task->id])->actingAs($this->editor)
+            ->test(TaskChat::class, ['workspaceId' => $this->workspace->id])
             ->assertSee('welcome.blade.php:1-2')
             ->call('removeComment', $id)
             ->assertDontSee('welcome.blade.php:1-2');
@@ -140,9 +140,22 @@ class ReviewCommentsTest extends TestCase
         $this->assertSame(0, ReviewComment::query()->count());
     }
 
+    public function test_only_people_on_the_task_comment_collaborators_too(): void
+    {
+        $member = User::factory()->create();
+        WorkspaceMember::query()->create(['workspace_id' => $this->workspace->id, 'user_id' => $member->id, 'role' => WorkspaceRole::Member]);
+
+        $this->review($member)->call('addComment', 'resources/views/welcome.blade.php', 'new', 2, 2, 'x');
+        $this->assertSame(0, ReviewComment::query()->count());
+
+        $this->task->members()->create(['user_id' => $member->id, 'invited_by' => $this->editor->id]);
+        $this->review($member)->call('addComment', 'resources/views/welcome.blade.php', 'new', 2, 2, 'From a collaborator');
+        $this->assertSame($member->id, ReviewComment::query()->sole()->user_id);
+    }
+
     public function test_the_message_marks_stale_comments_as_the_previous_version(): void
     {
-        $stale = ReviewComment::factory()->create(['thread_id' => $this->thread->id, 'user_id' => $this->editor->id, 'status' => ReviewCommentStatus::Stale, 'path' => 'app/Foo.php', 'line_start' => 4, 'line_end' => 5, 'body' => 'Rename']);
+        $stale = ReviewComment::factory()->create(['task_id' => $this->task->id, 'user_id' => $this->editor->id, 'status' => ReviewCommentStatus::Stale, 'path' => 'app/Foo.php', 'line_start' => 4, 'line_end' => 5, 'body' => 'Rename']);
 
         $message = ReviewCommentService::message(collect([$stale]), '');
 
@@ -154,12 +167,12 @@ class ReviewCommentsTest extends TestCase
     {
         $content = "<?php\nRoute::view('/', 'welcome');\nRoute::view('/login', 'login');\n";
         $lines = ReviewCommentService::numbered($content);
-        $moved = app(ReviewCommentService::class)->add($this->thread, $this->editor, 'routes/web.php', 'new', 3, 3, 'Name it', $lines);
-        $changed = app(ReviewCommentService::class)->add($this->thread, $this->editor, 'routes/web.php', 'new', 2, 2, 'Keep it', $lines);
+        $moved = app(ReviewCommentService::class)->add($this->task, $this->editor, 'routes/web.php', 'new', 3, 3, 'Name it', $lines);
+        $changed = app(ReviewCommentService::class)->add($this->task, $this->editor, 'routes/web.php', 'new', 2, 2, 'Keep it', $lines);
 
         // Claude inserted a line on top and rewrote the welcome route.
         $now = "<?php\nuse Illuminate\\Support\\Facades\\Route;\nRoute::view('/', 'home');\nRoute::view('/login', 'login');\n";
-        $this->assertSame(2, app(ReviewCommentService::class)->reanchor($this->thread, ['routes/web.php' => $now]));
+        $this->assertSame(2, app(ReviewCommentService::class)->reanchor($this->task, ['routes/web.php' => $now]));
 
         $this->assertSame([4, 4, ReviewCommentStatus::Draft], [$moved->fresh()->line_start, $moved->fresh()->line_end, $moved->fresh()->status]);
         $this->assertSame(ReviewCommentStatus::Stale, $changed->fresh()->status);
@@ -169,11 +182,11 @@ class ReviewCommentsTest extends TestCase
     {
         config(['queue.default' => 'sync']);
         $lines = ReviewCommentService::numbered("a\nb\nc\n");
-        $comment = app(ReviewCommentService::class)->add($this->thread, $this->editor, 'notes.txt', 'new', 2, 2, 'B?', $lines);
+        $comment = app(ReviewCommentService::class)->add($this->task, $this->editor, 'notes.txt', 'new', 2, 2, 'B?', $lines);
         FakeWorkspaceDaemon::$fileContents = ['notes.txt' => "a\nB changed\nc\n"];
 
-        app(ThreadEventIngestor::class)->ingest($this->workspace, [
-            ['thread_id' => $this->thread->id, 'seq' => $this->thread->last_seq + 1, 'type' => 'turn.completed', 'data' => ['session_cost_usd' => 0.01, 'duration_ms' => 1000]],
+        app(TaskEventIngestor::class)->ingest($this->workspace, [
+            ['task_id' => $this->task->id, 'seq' => $this->task->last_seq + 1, 'type' => 'turn.completed', 'data' => ['session_cost_usd' => 0.01, 'duration_ms' => 1000]],
         ]);
 
         $this->assertSame(ReviewCommentStatus::Stale, $comment->fresh()->status);
@@ -182,8 +195,8 @@ class ReviewCommentsTest extends TestCase
 
     public function test_outdated_comments_send_anyway_or_move_to_the_new_line(): void
     {
-        $stale = ReviewComment::factory()->create(['thread_id' => $this->thread->id, 'user_id' => $this->editor->id, 'path' => 'resources/views/welcome.blade.php', 'line_start' => 2, 'line_end' => 2, 'status' => ReviewCommentStatus::Stale, 'body' => 'Old remark']);
-        $other = ReviewComment::factory()->create(['thread_id' => $this->thread->id, 'user_id' => $this->editor->id, 'path' => 'resources/views/welcome.blade.php', 'line_start' => 3, 'line_end' => 3, 'status' => ReviewCommentStatus::Stale]);
+        $stale = ReviewComment::factory()->create(['task_id' => $this->task->id, 'user_id' => $this->editor->id, 'path' => 'resources/views/welcome.blade.php', 'line_start' => 2, 'line_end' => 2, 'status' => ReviewCommentStatus::Stale, 'body' => 'Old remark']);
+        $other = ReviewComment::factory()->create(['task_id' => $this->task->id, 'user_id' => $this->editor->id, 'path' => 'resources/views/welcome.blade.php', 'line_start' => 3, 'line_end' => 3, 'status' => ReviewCommentStatus::Stale]);
         FakeWorkspaceDaemon::$fileContents = ['resources/views/welcome.blade.php' => "<body>\n  <a class=\"btn\">Login</a>\n  <nav></nav>\n</body>\n"];
 
         $this->review()
@@ -195,8 +208,8 @@ class ReviewCommentsTest extends TestCase
         $this->assertSame([ReviewCommentStatus::Draft, false], [$other->fresh()->status, $other->fresh()->outdated]);
         $this->assertStringContainsString('<nav></nav>', $other->fresh()->snippet);
 
-        app(ReviewCommentService::class)->send($this->thread, $this->editor, '');
-        $message = ThreadEvent::query()->where('type', ThreadEventType::UserMessage->value)->sole()->payload['text'];
+        app(ReviewCommentService::class)->send($this->task, $this->editor, '');
+        $message = TaskEvent::query()->where('type', TaskEventType::UserMessage->value)->sole()->payload['text'];
         $this->assertStringContainsString(':2 '.__('workspaces.review.previous_version'), $message);
         FakeWorkspaceDaemon::$fileContents = [];
     }
@@ -204,7 +217,7 @@ class ReviewCommentsTest extends TestCase
     public function test_phpstan_findings_annotate_the_diff_and_go_into_the_collection(): void
     {
         WorkspaceGateRun::factory()->create([
-            'workspace_id' => $this->workspace->id,
+            'task_id' => $this->task->id,
             'status' => GateRunStatus::Failed,
             'gates' => ['phpstan' => 'fail', 'pint' => 'pass'],
             'logs' => ['phpstan' => "PHPStan — new errors vs. baseline (these block the gate):\n\nresources/views/welcome.blade.php:2: Undefined variable: \$features\n"],

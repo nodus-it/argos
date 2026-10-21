@@ -4,10 +4,15 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Enums\WorkspaceOrigin;
+use App\Enums\AuthMethod;
+use App\Enums\BackingService;
+use App\Enums\GitProvider;
+use App\Enums\WorkerSource;
 use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceStatus;
-use App\Services\Demo\DemoTarget;
+use App\Services\OAuth\TokenRefresher;
+use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -17,39 +22,62 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
+use Laravel\Sanctum\Contracts\HasApiTokens as HasApiTokensContract;
+use Laravel\Sanctum\HasApiTokens;
 
 /**
- * A long-lived, interactive place to work on one branch of a project: one
- * container (daemon + editor), its volumes and threads.
+ * A project: one repository with its environment (stack, services, secrets,
+ * preview), its people and settings, and one long-lived container (daemon +
+ * editor + sidecars) in which all of its tasks work.
  *
  * @property string $id
  * @property string $slug
- * @property string $repo_profile_id
- * @property int|null $created_by
- * @property WorkspaceOrigin $origin
  * @property string $name
- * @property string $base_branch
- * @property string $branch
+ * @property int|null $created_by
+ * @property string $repo_url
+ * @property GitProvider $platform
+ * @property AuthMethod $auth_method
+ * @property string|null $token
+ * @property int|null $connected_account_id
+ * @property string $default_branch
+ * @property string|null $branch_pattern
+ * @property WorkerSource $worker_source
+ * @property string|null $worker_stack_id
+ * @property array<int, array{host: string, username?: string|null, token: string}>|null $composer_registries
+ * @property array<int, array{name: string, value: string}>|null $worker_env
+ * @property array<int, string>|null $worker_services
+ * @property array<string, array<string, string>>|null $worker_service_config
+ * @property bool $live_demo_enabled
+ * @property string|null $setup_status
+ * @property int $max_sessions
+ * @property int $max_previews
+ * @property string|null $cpu_limit
+ * @property int|null $memory_limit_mb
+ * @property int $cleanup_after_days
+ * @property array<string, mixed>|null $auto_settings
+ * @property int|null $automation_user_id
  * @property WorkspaceStatus $status
  * @property string|null $status_message
  * @property string|null $container_name
  * @property string $daemon_token
  * @property Carbon|null $last_activity_at
- * @property string|null $pr_url
- * @property int|null $pr_number
- * @property string|null $pr_state
- * @property Carbon|null $pr_synced_at
- * @property Carbon|null $shipped_at
- * @property array{binding_id: string, provider: string, owner: string, project: string, number: string, title: string, url: string, body: string}|null $external_issue
- * @property string|null $gate_baseline
+ * @property array<string, string>|null $gate_baselines
  * @property Carbon|null $deleted_at
  * @property Carbon $created_at
  * @property Carbon $updated_at
- * @property-read RepoProfile $repoProfile
  * @property-read User|null $creator
+ * @property-read User|null $automationUser
+ * @property-read ConnectedAccount|null $connectedAccount
+ * @property-read WorkerStack|null $workerStack
+ * @property-read Collection<int, WorkspaceMember> $members
+ * @property-read Collection<int, Task> $tasks
+ * @property-read Collection<int, TaskProviderBinding> $taskProviderBindings
  */
-class Workspace extends Model implements DemoTarget
+class Workspace extends Model implements HasApiTokensContract
 {
+    // Workspace-bound Sanctum API tokens: one token = one workspace, fine-scoped
+    // (e.g. CI). $workspace->createToken('ci', ['tasks:write']).
+    use HasApiTokens;
     use HasFactory;
     use HasUlids;
     use SoftDeletes;
@@ -59,60 +87,97 @@ class Workspace extends Model implements DemoTarget
 
     protected $fillable = [
         'slug',
-        'repo_profile_id',
-        'created_by',
-        'origin',
         'name',
-        'base_branch',
-        'branch',
+        'created_by',
+        'repo_url',
+        'platform',
+        'auth_method',
+        'token',
+        'connected_account_id',
+        'default_branch',
+        'branch_pattern',
+        'worker_source',
+        'worker_stack_id',
+        'composer_registries',
+        'worker_env',
+        'worker_services',
+        'worker_service_config',
+        'live_demo_enabled',
+        'setup_status',
+        'max_sessions',
+        'max_previews',
+        'cpu_limit',
+        'memory_limit_mb',
+        'cleanup_after_days',
+        'auto_settings',
+        'automation_user_id',
         'status',
         'status_message',
         'container_name',
         'daemon_token',
         'last_activity_at',
-        'pr_url',
-        'pr_number',
-        'pr_state',
-        'pr_synced_at',
-        'shipped_at',
-        'external_issue',
-        'gate_baseline',
+        'gate_baselines',
     ];
 
-    protected $attributes = ['origin' => 'manual'];
-
-    protected $hidden = ['daemon_token'];
+    protected $hidden = ['daemon_token', 'token'];
 
     protected function casts(): array
     {
         return [
+            'platform' => GitProvider::class,
+            'auth_method' => AuthMethod::class,
+            'token' => 'encrypted',
+            'worker_source' => WorkerSource::class,
+            'composer_registries' => 'encrypted:array',
+            'worker_env' => 'encrypted:array',
+            'worker_services' => 'array',
+            'worker_service_config' => 'array',
+            'live_demo_enabled' => 'boolean',
+            'max_sessions' => 'integer',
+            'max_previews' => 'integer',
+            'memory_limit_mb' => 'integer',
+            'cleanup_after_days' => 'integer',
+            'auto_settings' => 'array',
             'status' => WorkspaceStatus::class,
-            'origin' => WorkspaceOrigin::class,
             'daemon_token' => 'encrypted',
             'last_activity_at' => 'datetime',
-            'pr_number' => 'integer',
-            'pr_synced_at' => 'datetime',
-            'shipped_at' => 'datetime',
-            'external_issue' => 'array',
+            'gate_baselines' => 'array',
         ];
     }
 
-    /** Link to the workspace page, optionally opened on a thread. */
-    public function url(?Thread $thread = null): string
+    /** Link to the workspace page, optionally opened on a task. */
+    public function url(?Task $task = null): string
     {
-        return route('filament.workspaces.resources.workspaces.view', ['record' => $this->id] + ($thread !== null ? ['thread' => $thread->id] : []));
-    }
-
-    /** @return BelongsTo<RepoProfile, $this> */
-    public function repoProfile(): BelongsTo
-    {
-        return $this->belongsTo(RepoProfile::class);
+        return route('filament.workspaces.resources.workspaces.view', ['record' => $this->id] + ($task !== null ? ['task' => $task->id] : []));
     }
 
     /** @return BelongsTo<User, $this> */
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /**
+     * The person auto-tasks of workspace tokens and issue triggers act for
+     * when the assignee has not agreed to run them.
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function automationUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'automation_user_id');
+    }
+
+    /** @return BelongsTo<ConnectedAccount, $this> */
+    public function connectedAccount(): BelongsTo
+    {
+        return $this->belongsTo(ConnectedAccount::class);
+    }
+
+    /** @return BelongsTo<WorkerStack, $this> */
+    public function workerStack(): BelongsTo
+    {
+        return $this->belongsTo(WorkerStack::class);
     }
 
     /** @return HasMany<WorkspaceMember, $this> */
@@ -127,10 +192,22 @@ class Workspace extends Model implements DemoTarget
         return $this->belongsToMany(User::class, 'workspace_members')->withPivot('role')->withTimestamps();
     }
 
-    /** @return HasMany<Thread, $this> */
-    public function threads(): HasMany
+    /** @return HasMany<Task, $this> */
+    public function tasks(): HasMany
     {
-        return $this->hasMany(Thread::class);
+        return $this->hasMany(Task::class);
+    }
+
+    /** @return HasMany<TaskProviderBinding, $this> */
+    public function taskProviderBindings(): HasMany
+    {
+        return $this->hasMany(TaskProviderBinding::class);
+    }
+
+    /** @return HasMany<Demo, $this> */
+    public function demos(): HasMany
+    {
+        return $this->hasMany(Demo::class);
     }
 
     public function roleOf(User $user): ?WorkspaceRole
@@ -142,7 +219,7 @@ class Workspace extends Model implements DemoTarget
         return $member?->role;
     }
 
-    /** Docker volume holding the repository checkout. */
+    /** Docker volume holding the main clone and the task worktrees. */
     public function volumeName(): string
     {
         return 'ws_'.$this->slug;
@@ -160,62 +237,90 @@ class Workspace extends Model implements DemoTarget
     }
 
     /**
-     * Key for the workspace's live demo (compose project, route, subdomain).
+     * The backing services this workspace opts into, as resolved enum cases
+     * (unknown stored values are dropped).
+     *
+     * @return list<BackingService>
      */
-    public function demoKey(): string
+    public function backingServices(): array
     {
-        return 'ws-'.$this->slug;
-    }
-
-    public function demoSlug(): string
-    {
-        return self::demoSlugFor($this->slug);
-    }
-
-    /** Demo slug (= preview host label) for a workspace slug; works for orphans. */
-    public static function demoSlugFor(string $slug): string
-    {
-        return 'demo-ws-'.$slug;
-    }
-
-    public function workspaceVolumeName(): string
-    {
-        return $this->volumeName();
-    }
-
-    public function demoRepoProfile(): ?RepoProfile
-    {
-        return $this->repoProfile;
-    }
-
-    /** The agent user of the worker image. */
-    public function demoExecUser(): ?string
-    {
-        return '1000:1000';
-    }
-
-    /** @return HasMany<Demo, $this> */
-    public function demos(): HasMany
-    {
-        return $this->hasMany(Demo::class);
-    }
-
-    public function currentDemo(): ?Demo
-    {
-        return $this->demos()->latest()->first();
-    }
-
-    /** DNS-/docker-safe slug: lowercase [a-z0-9-], no leading/trailing dash. */
-    public static function slugify(string $value): string
-    {
-        $slug = Str::of(Str::ascii($value, 'de'))->lower()->replaceMatches('/[^a-z0-9]+/', '-')->trim('-')->toString();
-
-        return rtrim(substr($slug, 0, self::SLUG_MAX - 6), '-');
+        return array_values(array_filter(array_map(
+            static fn (string $value): ?BackingService => BackingService::tryFrom($value),
+            $this->worker_services ?? [],
+        )));
     }
 
     /**
-     * Unique slug for a new workspace (soft-deleted ones included).
+     * The repository token: the PAT, or the OAuth token of the linked
+     * account (refreshed when it would expire soon).
+     *
+     * @throws \RuntimeException when no token is configured or the refresh fails
      */
+    public function resolveToken(): string
+    {
+        if ($this->auth_method !== AuthMethod::OAuth) {
+            if ($this->token !== null && $this->token !== '') {
+                return $this->token;
+            }
+
+            throw new \RuntimeException('No access token configured. Add a token to the workspace or connect an account.');
+        }
+
+        $account = $this->connectedAccount;
+        if ($account === null) {
+            throw new \RuntimeException('No OAuth account linked. Connect an account first.');
+        }
+
+        return app(TokenRefresher::class)->refreshIfNeeded($account)->token;
+    }
+
+    /**
+     * The `owner/repo` path of the repository URL (GitLab owners keep their
+     * subgroups), without scheme, host and `.git`.
+     */
+    public function getOwnerRepo(): string
+    {
+        $path = rtrim(parse_url($this->repo_url, PHP_URL_PATH) ?? '', '/');
+        if (str_ends_with($path, '.git')) {
+            $path = substr($path, 0, -4);
+        }
+
+        return ltrim($path, '/');
+    }
+
+    /**
+     * `getOwnerRepo()` split into owner and repository name.
+     *
+     * @return array{0: string, 1: string}
+     */
+    public function ownerAndRepo(): array
+    {
+        $parts = explode('/', $this->getOwnerRepo());
+        $repo = (string) array_pop($parts);
+
+        return [implode('/', $parts), $repo];
+    }
+
+    /**
+     * Trim whitespace and trailing slashes: a trailing "/" would leak into
+     * provider API paths (`/repos/<owner>/<repo>//pulls` → 404).
+     */
+    protected function repoUrl(): Attribute
+    {
+        return Attribute::make(
+            set: fn (?string $value): ?string => $value === null ? null : rtrim(trim($value), '/'),
+        );
+    }
+
+    /** DNS-/docker-safe slug: lowercase [a-z0-9-], no leading/trailing dash. */
+    public static function slugify(string $value, int $max = self::SLUG_MAX - 6): string
+    {
+        $slug = Str::of(Str::ascii($value, 'de'))->lower()->replaceMatches('/[^a-z0-9]+/', '-')->trim('-')->toString();
+
+        return rtrim(substr($slug, 0, $max), '-');
+    }
+
+    /** Unique slug for a new workspace (soft-deleted ones included). */
     public static function generateSlug(string $name): string
     {
         $base = self::slugify($name);

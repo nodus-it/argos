@@ -6,7 +6,7 @@ namespace Tests\Feature\Demo;
 
 use App\Enums\DemoStatus;
 use App\Models\Demo;
-use App\Models\RepoProfile;
+use App\Models\Task;
 use App\Models\Workspace;
 use App\Services\Demo\DemoComposeBuilder;
 use App\Services\Demo\DemoDeployer;
@@ -48,15 +48,22 @@ class DemoDeployerTest extends TestCase
         parent::tearDown();
     }
 
-    private function profile(): RepoProfile
+    private function workspace(): Workspace
     {
-        return RepoProfile::factory()->create([
+        return Workspace::query()->where('slug', 'ws')->first() ?? Workspace::factory()->create([
+            'slug' => 'ws',
             'platform' => 'github',
-            'url' => 'https://github.com/acme/widget',
+            'repo_url' => 'https://github.com/acme/widget',
             'token' => 'ghp-test',
             'default_branch' => 'main',
             'live_demo_enabled' => true,
         ]);
+    }
+
+    /** A task of the `ws` workspace; its preview slug is `demo-ws-<slug>`. */
+    private function task(string $slug): Task
+    {
+        return Task::factory()->create(['workspace_id' => $this->workspace()->id, 'slug' => $slug]);
     }
 
     private function fakeContract(): void
@@ -87,9 +94,10 @@ class DemoDeployerTest extends TestCase
 
     public function test_override_mounts_volume_and_joins_edge_network(): void
     {
-        $workspace = Workspace::factory()->create(['slug' => 'feat1']);
+        $task = Task::factory()->create(['workspace_id' => Workspace::factory()->create(['slug' => 'feat1'])->id]);
+        $workspace = $task->workspace;
 
-        $yaml = app(DemoComposeBuilder::class)->buildOverrideYaml($workspace, 'demo-feat1', [
+        $yaml = app(DemoComposeBuilder::class)->buildOverrideYaml($task, 'demo-feat1', [
             'service' => 'app',
             'port' => 8000,
             'workspace_mount' => '/var/www/html',
@@ -173,8 +181,7 @@ class DemoDeployerTest extends TestCase
     public function test_deploy_happy_path_marks_live_and_writes_route(): void
     {
         $this->fakeContract();
-        $profile = $this->profile();
-        $workspace = Workspace::factory()->create(['slug' => 'feat1', 'repo_profile_id' => $profile->id]);
+        $task = $this->task('feat1');
 
         $deployer = new FakeDemoDeployer(app(GitServiceFactory::class), new FakeDemoImageBuilder, [
             ['cmd' => 'docker compose -p demo-ws-feat1 down', 'exit' => 0],   // initial teardown
@@ -183,7 +190,7 @@ class DemoDeployerTest extends TestCase
             ['cmd' => 'exec -T app', 'exit' => 0],   // health probe
         ]);
 
-        $demo = $deployer->deploy($workspace);
+        $demo = $deployer->deploy($task);
 
         $this->assertSame(DemoStatus::Live, $demo->status);
         $this->assertSame('http://demo-ws-feat1.127.0.0.1.nip.io:8080', $demo->url);
@@ -196,8 +203,7 @@ class DemoDeployerTest extends TestCase
     public function test_deploy_marks_failed_when_a_command_fails(): void
     {
         $this->fakeContract();
-        $profile = $this->profile();
-        $workspace = Workspace::factory()->create(['slug' => 'feat2', 'repo_profile_id' => $profile->id]);
+        $task = $this->task('feat2');
 
         $deployer = new FakeDemoDeployer(app(GitServiceFactory::class), new FakeDemoImageBuilder, [
             ['cmd' => 'down', 'exit' => 0],   // initial teardown
@@ -206,7 +212,7 @@ class DemoDeployerTest extends TestCase
             ['cmd' => 'down', 'exit' => 0],   // cleanup teardown
         ]);
 
-        $demo = $deployer->deploy($workspace);
+        $demo = $deployer->deploy($task);
 
         $this->assertSame(DemoStatus::Failed, $demo->status);
         $this->assertNull($demo->url);
@@ -219,8 +225,7 @@ class DemoDeployerTest extends TestCase
     {
         config(['argos.preview.max_concurrent' => 1]);
         $this->fakeContract();
-        $profile = $this->profile();
-        $workspace = Workspace::factory()->create(['slug' => 'feat4', 'repo_profile_id' => $profile->id]);
+        $task = $this->task('feat4');
 
         // A running demo of another workspace already occupies the only slot.
         $old = Demo::factory()->live()->create();
@@ -233,11 +238,39 @@ class DemoDeployerTest extends TestCase
             ['cmd' => 'exec -T app', 'exit' => 0],   // health
         ]);
 
-        $demo = $deployer->deploy($workspace);
+        $demo = $deployer->deploy($task);
 
         $this->assertSame(DemoStatus::Live, $demo->status);
         $this->assertSame(DemoStatus::Stopped, $old->fresh()->status);
         $this->assertNull($old->fresh()->url);
+    }
+
+    public function test_deploy_evicts_the_oldest_preview_of_the_workspace_over_its_limit(): void
+    {
+        $this->fakeContract();
+        $this->workspace()->forceFill(['max_previews' => 2])->save();
+
+        $oldest = Demo::factory()->live()->create(['task_id' => $this->task('one')->id, 'created_at' => now()->subHours(2)]);
+        $newer = Demo::factory()->live()->create(['task_id' => $this->task('two')->id, 'created_at' => now()->subHour()]);
+        // Previews of other workspaces don't count against this workspace's limit.
+        $foreign = Demo::factory()->live()->create();
+
+        $deployer = new FakeDemoDeployer(app(GitServiceFactory::class), new FakeDemoImageBuilder, [
+            ['cmd' => 'down', 'exit' => 0],   // teardown current (none yet)
+            ['cmd' => 'down', 'exit' => 0],   // evict the oldest preview of the workspace
+            ['cmd' => 'up', 'exit' => 0],
+            ['cmd' => 'exec -T app', 'exit' => 0],   // command
+            ['cmd' => 'exec -T app', 'exit' => 0],   // health
+        ]);
+
+        $demo = $deployer->deploy($this->task('three'));
+
+        $this->assertSame(DemoStatus::Live, $demo->status);
+        $this->assertSame(DemoStatus::Stopped, $oldest->fresh()->status);
+        $this->assertSame(DemoStatus::Live, $newer->fresh()->status);
+        $this->assertSame(DemoStatus::Live, $foreign->fresh()->status);
+        $this->assertStringContainsString('[cap] evicted demo '.$oldest->id, (string) $demo->build_log);
+        $this->assertSame(['docker', 'compose', '-p', 'demo-ws-one'], array_slice($deployer->invokedCommands[1], 0, 4));
     }
 
     public function test_deploy_uses_default_contract_when_repo_has_none(): void
@@ -246,14 +279,13 @@ class DemoDeployerTest extends TestCase
         Saloon::fake([
             'api.github.com/repos/*' => MockResponse::make('', 404),
         ]);
-        $profile = $this->profile();
-        $workspace = Workspace::factory()->create(['slug' => 'feat-default', 'repo_profile_id' => $profile->id]);
+        $task = $this->task('feat-default');
 
         // down + up + 7 default commands + health = 10; pad to be safe.
         $script = array_fill(0, 12, ['cmd' => '', 'exit' => 0]);
         $deployer = new FakeDemoDeployer(app(GitServiceFactory::class), new FakeDemoImageBuilder, $script);
 
-        $demo = $deployer->deploy($workspace);
+        $demo = $deployer->deploy($task);
 
         $this->assertSame(DemoStatus::Live, $demo->status);
         $this->assertSame('http://demo-ws-feat-default.127.0.0.1.nip.io:8080', $demo->url);
@@ -293,13 +325,12 @@ class DemoDeployerTest extends TestCase
             ]),
         ]);
 
-        $profile = $this->profile();
-        $workspace = Workspace::factory()->create(['slug' => 'feat-byo-contract', 'repo_profile_id' => $profile->id]);
+        $task = $this->task('feat-byo-contract');
 
         $script = array_fill(0, 6, ['cmd' => '', 'exit' => 0]);
         $deployer = new FakeDemoDeployer(app(GitServiceFactory::class), new FakeDemoImageBuilder, $script);
 
-        $demo = $deployer->deploy($workspace);
+        $demo = $deployer->deploy($task);
 
         $this->assertSame(DemoStatus::Live, $demo->status);
 
@@ -319,15 +350,14 @@ class DemoDeployerTest extends TestCase
             ]),
             'api.github.com/repos/acme/widget/contents/.argos/demo.yml*' => MockResponse::make('', 404),
         ]);
-        $profile = $this->profile();
-        $workspace = Workspace::factory()->create(['slug' => 'feat-half', 'repo_profile_id' => $profile->id]);
+        $task = $this->task('feat-half');
 
         $deployer = new FakeDemoDeployer(app(GitServiceFactory::class), new FakeDemoImageBuilder, [
             ['cmd' => 'down', 'exit' => 0],   // initial teardown
             ['cmd' => 'down', 'exit' => 0],   // cleanup teardown
         ]);
 
-        $demo = $deployer->deploy($workspace);
+        $demo = $deployer->deploy($task);
 
         $this->assertSame(DemoStatus::Failed, $demo->status);
         $this->assertStringContainsString('contract incomplete', strtolower($demo->build_log));
@@ -336,7 +366,7 @@ class DemoDeployerTest extends TestCase
     public function test_workspace_demos_mount_the_workspace_volume_and_are_members_only(): void
     {
         $this->fakeContract();
-        $workspace = Workspace::factory()->create(['slug' => 'login', 'repo_profile_id' => $this->profile()->id]);
+        $task = $this->task('login');
 
         $deployer = new FakeDemoDeployer(app(GitServiceFactory::class), new FakeDemoImageBuilder, [
             ['cmd' => 'down', 'exit' => 0],
@@ -345,12 +375,13 @@ class DemoDeployerTest extends TestCase
             ['cmd' => 'exec', 'exit' => 0],
         ]);
 
-        $demo = $deployer->deploy($workspace);
+        $demo = $deployer->deploy($task);
 
         $this->assertSame(DemoStatus::Live, $demo->status);
-        $this->assertSame($workspace->id, $demo->workspace_id);
+        $this->assertSame($task->workspace_id, $demo->workspace_id);
+        $this->assertSame($task->id, $demo->task_id);
         $this->assertSame('http://demo-ws-login.127.0.0.1.nip.io:8080', $demo->url);
-        $this->assertSame($demo->id, $workspace->currentDemo()?->id);
+        $this->assertSame($demo->id, $task->currentDemo()?->id);
 
         // Contract commands run as the agent user so the volume stays editable.
         $exec = collect($deployer->invokedCommands)->first(fn (array $c): bool => in_array('composer install --no-interaction', $c, true));
@@ -363,25 +394,27 @@ class DemoDeployerTest extends TestCase
 
     public function test_workspace_override_mounts_the_workspace_volume(): void
     {
-        $workspace = Workspace::factory()->create(['slug' => 'login']);
+        $task = Task::factory()->create(['workspace_id' => Workspace::factory()->create(['slug' => 'login'])->id]);
 
-        $yaml = app(DemoComposeBuilder::class)->buildOverrideYaml($workspace, 'demo-ws-login', [
+        $yaml = app(DemoComposeBuilder::class)->buildOverrideYaml($task, 'demo-login-x', [
             'service' => 'app', 'port' => 8000, 'workspace_mount' => '/var/www/html',
         ], 'http://demo-ws-login.127.0.0.1.nip.io:8080');
 
         $this->assertStringContainsString('ws_login:/var/www/html', $yaml);
+        // Contract commands run as the agent user, so the demo serves as it too.
+        $this->assertSame('argos', Yaml::parse($yaml)['services']['app']['environment']['ARGOS_FPM_USER']);
     }
 
     public function test_rerun_commands_appends_to_the_live_demo_log(): void
     {
         $this->fakeContract();
-        $workspace = Workspace::factory()->create(['slug' => 'login', 'repo_profile_id' => $this->profile()->id]);
-        Demo::factory()->create(['workspace_id' => $workspace->id, 'status' => DemoStatus::Live, 'build_log' => 'first build']);
+        $task = $this->task('login');
+        Demo::factory()->create(['task_id' => $task->id, 'status' => DemoStatus::Live, 'build_log' => 'first build']);
 
         $deployer = new FakeDemoDeployer(app(GitServiceFactory::class), new FakeDemoImageBuilder, [
             ['cmd' => 'exec', 'exit' => 0, 'stdout' => "migrated\n"],
         ]);
-        $demo = $deployer->rerunCommands($workspace);
+        $demo = $deployer->rerunCommands($task);
 
         $this->assertStringStartsWith('first build', $demo->build_log);
         $this->assertStringContainsString('migrated', $demo->build_log);
@@ -390,10 +423,10 @@ class DemoDeployerTest extends TestCase
 
     public function test_rerun_requires_a_live_demo(): void
     {
-        $workspace = Workspace::factory()->create();
+        $task = Task::factory()->create();
 
         $this->expectException(RuntimeException::class);
-        app(DemoDeployer::class)->rerunCommands($workspace);
+        app(DemoDeployer::class)->rerunCommands($task);
     }
 }
 

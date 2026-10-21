@@ -1,7 +1,7 @@
 @php
     use App\Enums\DemoStatus;
     /** @var \App\Models\Demo|null $demo */
-    $openUrl = route('workspaces.open', ['workspace' => $workspace, 'target' => 'preview']);
+    $openUrl = route('workspaces.open', ['workspace' => $workspace, 'target' => 'preview', 'task' => $task->id]);
     $live = $demo?->status === DemoStatus::Live;
     [$state, $stateClass] = match (true) {
         $reason !== null => [__('workspaces.preview.off_short'), ''],

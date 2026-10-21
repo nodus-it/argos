@@ -6,7 +6,7 @@ namespace App\Services\Workspace;
 
 use App\Broadcasting\UserWorkspaceSignal;
 use App\Enums\WorkspaceRole;
-use App\Models\Thread;
+use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
 use Filament\Actions\Action;
@@ -15,29 +15,30 @@ use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
- * Tells workspace members that something needs them: an approval, a
+ * Tells the people of a task that something needs them: an approval, a
  * finished long turn, a usage limit, an error, a shipment.
  *
- * Every operating member (except the person who caused it) gets a realtime
- * signal; the browser decides whether to show it (only when that
- * workspace is not in view). Kinds that need action also land in the
- * notification bell. Users can switch kinds off in their profile.
+ * The task's owner and collaborators (except the person who caused it) get a
+ * realtime signal; the browser decides whether to show it (only when that
+ * task is not in view). Without a task, the workspace's admins and members
+ * are told. Kinds that need action also land in the notification bell.
+ * Users can switch kinds off in their profile.
  */
 class WorkspaceNotifier
 {
     /** Kinds that also persist in the bell. */
     private const BELL_KINDS = ['approval', 'limit', 'error', 'ship', 'auto'];
 
-    public function notify(Workspace $workspace, ?Thread $thread, string $kind, string $title, string $body = '', ?int $exceptUserId = null): void
+    public function notify(Workspace $workspace, ?Task $task, string $kind, string $title, string $body = '', ?int $exceptUserId = null): void
     {
-        $url = $workspace->url($thread);
+        $url = $workspace->url($task);
 
-        foreach ($this->operators($workspace) as $user) {
+        foreach ($this->recipients($workspace, $task) as $user) {
             if ($user->id === $exceptUserId || ! $user->wantsNotification($kind)) {
                 continue;
             }
 
-            $this->signal($user, $workspace, $thread, $kind, $title, $body, $url);
+            $this->signal($user, $workspace, $task, $kind, $title, $body, $url);
 
             if (in_array($kind, self::BELL_KINDS, true)) {
                 Notification::make()
@@ -50,29 +51,33 @@ class WorkspaceNotifier
         }
     }
 
-    /** Quiet refresh signal for overviews (thread status changed). */
-    public function summaryChanged(Workspace $workspace, ?Thread $thread): void
+    /** Quiet refresh signal for overviews (task status changed). */
+    public function summaryChanged(Workspace $workspace, ?Task $task): void
     {
         foreach ($workspace->users()->get() as $user) {
-            $this->signal($user, $workspace, $thread, 'summary', '', '', $workspace->url());
+            $this->signal($user, $workspace, $task, 'summary', '', '', $workspace->url());
         }
     }
 
     /** @return iterable<User> */
-    private function operators(Workspace $workspace): iterable
+    private function recipients(Workspace $workspace, ?Task $task): iterable
     {
+        if ($task !== null) {
+            return collect([$task->owner])->filter()->merge($task->collaborators()->get())->unique('id');
+        }
+
         return $workspace->users()
-            ->wherePivotIn('role', [WorkspaceRole::Owner->value, WorkspaceRole::Editor->value])
+            ->wherePivotIn('role', [WorkspaceRole::Admin->value, WorkspaceRole::Member->value])
             ->get();
     }
 
-    private function signal(User $user, Workspace $workspace, ?Thread $thread, string $kind, string $title, string $body, string $url): void
+    private function signal(User $user, Workspace $workspace, ?Task $task, string $kind, string $title, string $body, string $url): void
     {
         try {
             broadcast(new UserWorkspaceSignal($user->id, [
                 'workspace_id' => $workspace->id,
                 'workspace_name' => $workspace->name,
-                'thread_id' => $thread?->id,
+                'task_id' => $task?->id,
                 'kind' => $kind,
                 'title' => $title,
                 'body' => $body,

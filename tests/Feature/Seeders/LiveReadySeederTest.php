@@ -5,8 +5,8 @@ declare(strict_types=1);
 use App\Enums\AuthMethod;
 use App\Models\AgentCredential;
 use App\Models\ConnectedAccount;
-use App\Models\RepoProfile;
 use App\Models\User;
+use App\Models\Workspace;
 use Database\Seeders\LiveReadySeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -45,7 +45,7 @@ it('skips entirely when not local', function () {
 
     expect(User::count())->toBe(0);
     expect(ConnectedAccount::count())->toBe(0);
-    expect(RepoProfile::count())->toBe(0);
+    expect(Workspace::count())->toBe(0);
 });
 
 it('skips wiring cleanly when required env is unset but keeps the admin user', function () {
@@ -54,7 +54,7 @@ it('skips wiring cleanly when required env is unset but keeps the admin user', f
     $this->seed(LiveReadySeeder::class);
 
     expect(User::where('email', 'admin@argos.local')->exists())->toBeTrue();
-    expect(RepoProfile::where('name', 'argos (live)')->exists())->toBeFalse();
+    expect(Workspace::where('name', 'argos (live)')->exists())->toBeFalse();
     expect(ConnectedAccount::count())->toBe(0);
 });
 
@@ -75,15 +75,15 @@ it('wires a runnable github-oauth project when env is set', function () {
     expect($account->instance_url)->toBe('');
     expect($account->token)->toBe('gho_live_token');
 
-    $profile = RepoProfile::where('name', 'argos (live)')->first();
-    expect($profile)->not->toBeNull();
-    expect($profile->auth_method)->toBe(AuthMethod::OAuth);
-    expect($profile->connected_account_id)->toBe($account->id);
-    expect($profile->live_demo_enabled)->toBeTrue();
+    $workspace = Workspace::where('name', 'argos (live)')->first();
+    expect($workspace)->not->toBeNull();
+    expect($workspace->auth_method)->toBe(AuthMethod::OAuth);
+    expect($workspace->connected_account_id)->toBe($account->id);
+    expect($workspace->live_demo_enabled)->toBeTrue();
 
     expect(AgentCredential::where('name', 'live')->where('status', 'active')->exists())->toBeTrue();
-    expect($profile->automation_user_id)->toBe(User::where('email', 'admin@argos.local')->value('id'));
+    expect($workspace->automation_user_id)->toBe(User::where('email', 'admin@argos.local')->value('id'));
 
     // expires_at=null ⇒ no refresh round-trip ⇒ the seeded token is returned offline.
-    expect($profile->resolveToken())->toBe('gho_live_token');
+    expect($workspace->resolveToken())->toBe('gho_live_token');
 });

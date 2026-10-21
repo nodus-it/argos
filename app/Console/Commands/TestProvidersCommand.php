@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\ConnectedAccount;
-use App\Models\RepoProfile;
 use App\Models\User;
+use App\Models\Workspace;
 use Dotenv\Dotenv;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
@@ -17,7 +17,7 @@ use Symfony\Component\Process\Process;
     {--reset : Delete all [contract-test] profiles and connected accounts and exit}
     {--seed-only : Only seed profiles, do not run the test suite}
     {--user-email= : Email of the user to attach connected accounts to (default: first user)}')]
-#[Description('Interactive helper that seeds three RepoProfiles per provider (PAT + OAuth) and runs the external contract suite against both auth modes')]
+#[Description('Interactive helper that seeds three workspaces per provider (PAT + OAuth) and runs the external contract suite against both auth modes')]
 class TestProvidersCommand extends Command
 {
     private const PROFILE_PREFIX = '[contract-test]';
@@ -99,7 +99,7 @@ class TestProvidersCommand extends Command
 
     private function reset(): int
     {
-        $profiles = RepoProfile::where('name', 'like', self::PROFILE_PREFIX.'%')->get();
+        $profiles = Workspace::where('name', 'like', self::PROFILE_PREFIX.'%')->get();
         $accountIds = $profiles->pluck('connected_account_id')->filter()->unique()->all();
 
         $deletedProfiles = $profiles->count();
@@ -207,10 +207,10 @@ class TestProvidersCommand extends Command
                 continue;
             }
 
-            RepoProfile::updateOrCreate(
+            Workspace::updateOrCreate(
                 ['name' => $name],
                 [
-                    'url' => $coords['repoCloneUrl'] ?? '',
+                    'repo_url' => $coords['repoCloneUrl'] ?? '',
                     'default_branch' => $coords['defaultBranch'] ?? 'main',
                     'platform' => $provider['platform'],
                     'auth_method' => 'pat',
@@ -286,10 +286,10 @@ class TestProvidersCommand extends Command
             }
 
             $name = self::PROFILE_PREFIX.' '.$provider['platform'].'-oauth';
-            RepoProfile::updateOrCreate(
+            Workspace::updateOrCreate(
                 ['name' => $name],
                 [
-                    'url' => $coords['repoCloneUrl'] ?? '',
+                    'repo_url' => $coords['repoCloneUrl'] ?? '',
                     'default_branch' => $coords['defaultBranch'] ?? 'main',
                     'platform' => $provider['platform'],
                     'auth_method' => 'oauth',

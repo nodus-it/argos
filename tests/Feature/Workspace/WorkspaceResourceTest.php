@@ -6,20 +6,20 @@ namespace Tests\Feature\Workspace;
 
 use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceStatus;
-use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\CreateWorkspace;
+use App\Filament\Admin\Resources\WorkspaceResource as AdminWorkspaceResource;
+use App\Filament\Workspaces\Resources\WorkspaceResource;
 use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ListWorkspaces;
 use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ViewWorkspace;
 use App\Jobs\Workspace\ProvisionWorkspaceJob;
 use App\Livewire\Workspace\ContextPanel;
-use App\Models\RepoProfile;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceMember;
+use App\Services\Workspace\WorkspaceDaemonClient;
+use App\Testing\FakeWorkspaceDaemon;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
-use App\Services\Workspace\WorkspaceDaemonClient;
-use App\Testing\FakeWorkspaceDaemon;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -33,10 +33,10 @@ class WorkspaceResourceTest extends TestCase
         // Workspace pages live in the workspaces panel (/w).
         Filament::setCurrentPanel('workspaces');
         Queue::fake();
-        RepoProfile::factory()->create();
+        Workspace::factory()->create();
     }
 
-    private function workspaceFor(User $user, WorkspaceRole $role = WorkspaceRole::Owner, array $attributes = []): Workspace
+    private function workspaceFor(User $user, WorkspaceRole $role = WorkspaceRole::Admin, array $attributes = []): Workspace
     {
         $workspace = Workspace::factory()->create($attributes);
         WorkspaceMember::query()->create(['workspace_id' => $workspace->id, 'user_id' => $user->id, 'role' => $role]);
@@ -57,36 +57,17 @@ class WorkspaceResourceTest extends TestCase
         Livewire::test(ListWorkspaces::class)->assertCanSeeTableRecords([$mine, $other]);
     }
 
-    public function test_creating_a_workspace_queues_provisioning_and_opens_it(): void
+    public function test_only_argos_admins_get_the_new_workspace_action(): void
     {
-        $user = User::factory()->create();
-        $profile = RepoProfile::factory()->create(['default_branch' => 'main']);
-        $this->actingAs($user);
+        $this->assertArrayNotHasKey('create', WorkspaceResource::getPages());
 
-        Livewire::test(CreateWorkspace::class)
-            ->fillForm(['repo_profile_id' => $profile->id, 'name' => 'Checkout flow'])
-            ->call('create')
-            ->assertHasNoFormErrors()
-            ->assertRedirect();
-
-        $workspace = Workspace::query()->where('slug', 'checkout-flow')->firstOrFail();
-        $this->assertSame(WorkspaceRole::Owner, $workspace->roleOf($user));
-        $this->assertSame('main', $workspace->base_branch);
-        Queue::assertPushed(ProvisionWorkspaceJob::class);
-    }
-
-    public function test_capacity_errors_are_shown_instead_of_creating(): void
-    {
-        config(['argos.workspaces.max_active' => 1]);
-        Workspace::factory()->create();
         $this->actingAs(User::factory()->create());
+        Livewire::test(ListWorkspaces::class)->assertActionHidden('create');
 
-        Livewire::test(CreateWorkspace::class)
-            ->fillForm(['repo_profile_id' => RepoProfile::query()->first()->id, 'name' => 'Too many'])
-            ->call('create')
-            ->assertNotified();
-
-        $this->assertSame(1, Workspace::query()->count());
+        $this->actingAs(User::factory()->admin()->create());
+        Livewire::test(ListWorkspaces::class)
+            ->assertActionVisible('create')
+            ->assertActionHasUrl('create', AdminWorkspaceResource::getUrl('create', panel: 'admin'));
     }
 
     public function test_the_workspace_page_is_members_only(): void
@@ -94,14 +75,14 @@ class WorkspaceResourceTest extends TestCase
         $me = User::factory()->create();
         $workspace = $this->workspaceFor($me);
 
-        $this->actingAs($me)->get(ViewWorkspace::getUrl(['record' => $workspace]))->assertOk()->assertSeeLivewire('workspace.thread-chat');
+        $this->actingAs($me)->get(ViewWorkspace::getUrl(['record' => $workspace]))->assertOk()->assertSeeLivewire('workspace.task-chat');
         $this->actingAs(User::factory()->create())->get(ViewWorkspace::getUrl(['record' => $workspace]))->assertNotFound();
     }
 
     public function test_opening_a_stopped_workspace_starts_it_for_operators(): void
     {
         $me = User::factory()->create();
-        $workspace = $this->workspaceFor($me, WorkspaceRole::Editor, ['status' => WorkspaceStatus::Stopped]);
+        $workspace = $this->workspaceFor($me, WorkspaceRole::Member, ['status' => WorkspaceStatus::Stopped]);
 
         Livewire::actingAs($me)->test(ViewWorkspace::class, ['record' => $workspace->getKey()]);
 
@@ -126,10 +107,10 @@ class WorkspaceResourceTest extends TestCase
         $workspace = $this->workspaceFor($owner);
 
         Livewire::actingAs($owner)->test(ViewWorkspace::class, ['record' => $workspace->getKey()])
-            ->callAction('members', ['user_id' => $pair->id, 'role' => WorkspaceRole::Editor->value])
+            ->callAction('members', ['user_id' => $pair->id, 'role' => WorkspaceRole::Member->value])
             ->assertNotified();
 
-        $this->assertSame(WorkspaceRole::Editor, $workspace->roleOf($pair));
+        $this->assertSame(WorkspaceRole::Member, $workspace->roleOf($pair));
     }
 
     public function test_member_management_is_hidden_without_collaboration(): void
@@ -158,7 +139,7 @@ class WorkspaceResourceTest extends TestCase
     public function test_code_tab_explains_a_stopped_workspace(): void
     {
         $me = User::factory()->create();
-        $workspace = $this->workspaceFor($me, WorkspaceRole::Editor, ['status' => WorkspaceStatus::Failed]);
+        $workspace = $this->workspaceFor($me, WorkspaceRole::Member, ['status' => WorkspaceStatus::Failed]);
 
         $this->actingAs($me)->get(ViewWorkspace::getUrl(['record' => $workspace]))
             ->assertSee(__('workspaces.states.failed'));

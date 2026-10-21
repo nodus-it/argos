@@ -12,15 +12,15 @@ use App\Models\AgentCredential;
 use App\Models\ConnectedAccount;
 use App\Models\ProviderCredential;
 use App\Models\ProviderOAuthConfig;
-use App\Models\RepoProfile;
 use App\Models\User;
+use App\Models\Workspace;
 use App\Services\Account\AccountPasswordService;
 use App\Services\Anthropic\AnthropicTokenValidator;
 use App\Services\Credentials\AgentCredentialService;
 use App\Services\Git\RepositoryFetcher;
 use App\Services\OAuth\ConnectedAccountService;
 use App\Services\OAuth\TokenRefresher;
-use App\Services\Project\RepoProfileService;
+use App\Services\Workspace\WorkspaceService;
 use App\Support\DocsLinkAction;
 use App\Support\RepoUrlBuilder;
 use Filament\Actions\Action;
@@ -40,7 +40,7 @@ use Illuminate\Validation\Rules\Password;
  * The first step (security) is optional and skippable — it exists so the first
  * user, who logs in with the seeded default password, can change it right where
  * the onboarding redirect strands them (the profile page is not on the
- * RedirectToOnboarding whitelist while no RepoProfile exists).
+ * RedirectToOnboarding whitelist while no workspace exists).
  */
 class Onboarding extends Page
 {
@@ -129,7 +129,7 @@ class Onboarding extends Page
 
     public static function shouldRegisterNavigation(): bool
     {
-        return ! RepoProfile::exists();
+        return ! Workspace::exists();
     }
 
     public function getTitle(): string
@@ -708,7 +708,7 @@ class Onboarding extends Page
             return;
         }
 
-        if (RepoProfile::query()->where('name', $name)->exists()) {
+        if (Workspace::query()->where('name', $name)->exists()) {
             Notification::make()
                 ->title(__('onboarding.notifications.name_taken_title'))
                 ->body(__('onboarding.notifications.name_taken_body'))
@@ -718,31 +718,21 @@ class Onboarding extends Page
             return;
         }
 
-        /** @var RepoProfile $profile */
-        $profile = app(RepoProfileService::class)->create([
+        /** @var User $user */
+        $user = auth()->user();
+        $profile = app(WorkspaceService::class)->createWorkspace($user, [
             'name' => $name,
-            'url' => RepoUrlBuilder::build($source['platform'], $this->selectedRepo, $source['instance_url']),
+            'repo_url' => RepoUrlBuilder::build($source['platform'], $this->selectedRepo, $source['instance_url']),
             'platform' => $source['platform'],
             'default_branch' => $branch,
             'auth_method' => $source['auth_method'],
             'connected_account_id' => $source['account_id'],
             'token' => $source['credential_id'] !== null ? $source['token'] : null,
-            'worker_agent_name' => $this->preferredAgentName(),
         ]);
 
         $this->createdProfileId = $profile->id;
         $this->currentStep = 4;
 
         Notification::make()->title(__('onboarding.notifications.project_created'))->success()->send();
-    }
-
-    /** The agent the user configured during onboarding, to pre-set on the profile. */
-    private function preferredAgentName(): ?string
-    {
-        if ($this->tokenSource !== 'none') {
-            return AgentName::ClaudeCode->value;
-        }
-
-        return null;
     }
 }

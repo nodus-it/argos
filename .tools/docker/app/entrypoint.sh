@@ -96,7 +96,7 @@ http:
       priority: 1
       entryPoints: ["web"]
       service: argos
-    # Browser websockets for Laravel Reverb (live workspace threads). Only the
+    # Browser websockets for Laravel Reverb (live workspace tasks). Only the
     # client path is public; the publish API (/apps) stays internal.
     argos-realtime:
       rule: "PathPrefix(`/app/`)"

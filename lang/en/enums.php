@@ -6,7 +6,6 @@ return [
     'worker_source' => [
         'standard' => 'Standard',
         'byoi' => 'Bring Your Own Image (BYOI)',
-        'devcontainer' => 'Devcontainer',
     ],
 
     'worker_image_entity_status' => [
@@ -62,8 +61,8 @@ return [
     ],
 
     'workspace_role' => [
-        'owner' => 'Owner',
-        'editor' => 'Editor',
+        'admin' => 'Admin',
+        'member' => 'Member',
         'viewer' => 'Viewer',
     ],
 
@@ -73,7 +72,7 @@ return [
         'failed' => 'Failed',
         'error' => 'Error',
     ],
-    'auto_thread_state' => [
+    'auto_task_state' => [
         'queued' => 'Queued',
         'planning' => 'Planning',
         'awaiting_plan_approval' => 'Plan waits for approval',
@@ -96,19 +95,41 @@ return [
         'draft_pr' => 'Draft pull request',
         'none' => 'Commit and push only',
     ],
-    'workspace_origin' => [
+    'task_origin' => [
         'manual' => 'Manual',
         'api' => 'API',
         'mcp' => 'MCP',
         'issue' => 'Issue',
     ],
-    'thread_status' => [
+    'session_status' => [
         'closed' => 'Closed',
         'starting' => 'Starting',
         'idle' => 'Idle',
         'running' => 'Working',
         'waiting_input' => 'Waiting for input',
         'error' => 'Error',
+    ],
+
+    'task_status' => [
+        'preparing' => 'Preparing',
+        'active' => 'Active',
+        'pr_open' => 'PR open',
+        'done' => 'Done',
+        'cancelled' => 'Cancelled',
+    ],
+    'task_state' => [
+        'preparing' => 'Preparing',
+        'running' => 'Running',
+        'waiting' => 'Waiting for you',
+        'ready' => 'Ready',
+        'pr_open' => 'PR open',
+        'done' => 'Done',
+        'cancelled' => 'Cancelled',
+        'archived' => 'Archived',
+    ],
+    'task_kind' => [
+        'task' => 'Task',
+        'setup' => 'Setup',
     ],
 
     'permission_mode' => [

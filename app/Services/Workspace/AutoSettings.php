@@ -6,10 +6,10 @@ namespace App\Services\Workspace;
 
 use App\Enums\AutoPlanMode;
 use App\Enums\AutoShipMode;
-use App\Models\RepoProfile;
+use App\Models\Workspace;
 
 /**
- * The effective settings of one auto-thread run: config defaults, then the
+ * The effective settings of one auto-task run: config defaults, then the
  * project's `auto_settings`, then per-run overrides (UI/API/MCP). Unknown
  * keys and invalid values are dropped, so the stored config is always valid.
  */
@@ -21,7 +21,7 @@ final class AutoSettings
      * @param  array<string, mixed>  $overrides
      * @return array{plan: string, ship: string, max_fix_rounds: int, max_turns: int, max_cost_usd: float, max_minutes: int}
      */
-    public static function resolve(?RepoProfile $project, array $overrides = []): array
+    public static function resolve(?Workspace $project, array $overrides = []): array
     {
         $settings = self::clean((array) config('argos.workspaces.auto', []));
         $settings = [...$settings, ...self::clean($project?->auto_settings ?? [])];

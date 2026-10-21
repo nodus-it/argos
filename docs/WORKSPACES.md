@@ -205,14 +205,19 @@ Every workspace has **members**:
 
 | Role | Can |
 |---|---|
-| Owner | everything an editor can, plus manage members, delete the workspace and use *Bypass permissions* |
-| Editor | write in threads, stop Claude, decide approvals, change mode/model, use the editor, start/stop the workspace and its preview |
-| Viewer | read threads and open the preview |
+| Admin (`admin`) | everything: settings, integrations, members, and every task |
+| Member (`member`) | start tasks, use the editor, start/stop the workspace and its preview |
+| Viewer (`viewer`) | read all tasks and open the preview |
 
-Owners add members with **⋯ → Add member**. The workspace header shows who is
+Everybody in a workspace sees all of its tasks. Writing into a task, stopping
+Claude, deciding approvals, review comments and shipping belong to the task's
+**owner** and the **collaborators** they invite (and workspace admins); only
+the owner may invite, hand the task over or archive it.
+
+Workspace admins add members with **⋯ → Add member**. The workspace header shows who is
 online; the chat shows who is typing. Every message carries its author, and
-Claude sees it as `[Name]: …`. Administrators see all workspaces but join as a
-member to write.
+Claude sees it as `[Name]: …`. Argos administrators may do everything in every
+workspace.
 
 Administrators manage the people of an installation under **Users**.
 
@@ -401,10 +406,8 @@ thread otherwise.
 **Starting one**
 
 - In a workspace: **New thread → Run automatically**, then describe the work.
-- With a new workspace: **Start an automatic run with the workspace** in the
-  form — the run waits until the workspace is up.
-- From outside: the [REST API](REST-API.md#workspaces-and-automatic-runs)
-  (`POST /api/v1/workspaces`), [MCP](SETUP-MCP.md) (`workspace_create`), or an
+- From outside: the [REST API](REST-API.md#tasks)
+  (`POST /api/v1/workspaces/{workspace}/tasks`), [MCP](SETUP-MCP.md) (`task_create`), or an
   issue of a connected tracker ([issue triggers](SETUP-TASK-PROVIDERS.md#issue-to-automatic-run)).
 
 **How it runs**

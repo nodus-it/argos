@@ -9,7 +9,7 @@ use Symfony\Component\Process\Process;
 /**
  * Probes a remote git repository with `git ls-remote` to verify that a given
  * branch exists, before the worker tries to clone it. Used as a guard in the
- * RepoProfile form so users can't save a default_branch that the worker would
+ * workspace form so users can't save a default_branch that the worker would
  * later fail to fetch.
  */
 class RemoteBranchValidator

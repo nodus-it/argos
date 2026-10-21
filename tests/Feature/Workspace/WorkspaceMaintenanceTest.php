@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Workspace;
 
-use App\Enums\ThreadStatus;
+use App\Enums\SessionStatus;
 use App\Enums\WorkspaceStatus;
 use App\Jobs\Workspace\ReapOrphanedWorkspacesJob;
 use App\Jobs\Workspace\StopWorkspaceJob;
-use App\Models\Thread;
+use App\Models\Task;
 use App\Models\Workspace;
 use App\Services\Workspace\WorkspaceContainerManager;
 use App\Services\Workspace\WorkspaceTeardown;
@@ -20,14 +20,14 @@ class WorkspaceMaintenanceTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_idle_workspaces_stop_unless_a_thread_is_busy(): void
+    public function test_idle_workspaces_stop_unless_a_task_is_busy(): void
     {
         Queue::fake();
         config(['argos.workspaces.idle_minutes' => 60]);
         $idle = Workspace::factory()->create(['last_activity_at' => now()->subHours(2)]);
         $active = Workspace::factory()->create(['last_activity_at' => now()->subMinutes(5)]);
         $busy = Workspace::factory()->create(['last_activity_at' => now()->subHours(2)]);
-        Thread::factory()->create(['workspace_id' => $busy->id, 'status' => ThreadStatus::WaitingInput]);
+        Task::factory()->create(['workspace_id' => $busy->id, 'session_status' => SessionStatus::WaitingInput]);
         $stopped = Workspace::factory()->stopped()->create(['last_activity_at' => now()->subDay()]);
 
         $this->artisan('argos:workspaces:idle-stop')->assertSuccessful();

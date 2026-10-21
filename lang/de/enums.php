@@ -6,7 +6,6 @@ return [
     'worker_source' => [
         'standard' => 'Standard',
         'byoi' => 'Eigenes Image (BYOI)',
-        'devcontainer' => 'Devcontainer',
     ],
 
     'worker_image_entity_status' => [
@@ -62,8 +61,8 @@ return [
     ],
 
     'workspace_role' => [
-        'owner' => 'Besitzer',
-        'editor' => 'Bearbeiter',
+        'admin' => 'Admin',
+        'member' => 'Mitglied',
         'viewer' => 'Leser',
     ],
 
@@ -73,7 +72,7 @@ return [
         'failed' => 'Fehlgeschlagen',
         'error' => 'Fehler',
     ],
-    'auto_thread_state' => [
+    'auto_task_state' => [
         'queued' => 'Wartet',
         'planning' => 'Plant',
         'awaiting_plan_approval' => 'Plan wartet auf Freigabe',
@@ -96,19 +95,41 @@ return [
         'draft_pr' => 'Entwurfs-Pull-Request',
         'none' => 'Nur committen und pushen',
     ],
-    'workspace_origin' => [
+    'task_origin' => [
         'manual' => 'Manuell',
         'api' => 'API',
         'mcp' => 'MCP',
         'issue' => 'Issue',
     ],
-    'thread_status' => [
+    'session_status' => [
         'closed' => 'Geschlossen',
         'starting' => 'Startet',
         'idle' => 'Bereit',
         'running' => 'Arbeitet',
         'waiting_input' => 'Wartet auf Eingabe',
         'error' => 'Fehler',
+    ],
+
+    'task_status' => [
+        'preparing' => 'Vorbereitung',
+        'active' => 'Aktiv',
+        'pr_open' => 'PR offen',
+        'done' => 'Fertig',
+        'cancelled' => 'Abgebrochen',
+    ],
+    'task_state' => [
+        'preparing' => 'Vorbereitung',
+        'running' => 'Läuft',
+        'waiting' => 'Wartet auf dich',
+        'ready' => 'Bereit',
+        'pr_open' => 'PR offen',
+        'done' => 'Fertig',
+        'cancelled' => 'Abgebrochen',
+        'archived' => 'Archiviert',
+    ],
+    'task_kind' => [
+        'task' => 'Aufgabe',
+        'setup' => 'Einrichtung',
     ],
 
     'permission_mode' => [

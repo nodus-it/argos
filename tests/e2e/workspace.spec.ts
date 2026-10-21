@@ -3,7 +3,7 @@ import { resetDatabase } from './helpers/reset';
 import { login } from './helpers/auth';
 
 /**
- * Pair programming in a workspace (fake mode): two browsers share one thread.
+ * Pair programming in a workspace (fake mode): two browsers share one task.
  * Requires the compose stack in E2E mode (ARGOS_E2E_FAKE=1) including the
  * `reverb` service — live updates travel over the workspace presence channel.
  */
@@ -29,7 +29,7 @@ test.describe('workspace pair programming', () => {
     resetDatabase('E2eWorkspaceSeeder');
   });
 
-  test('both members follow one thread live and either can decide an approval', async ({ browser }) => {
+  test('both members follow one task live and either can decide an approval', async ({ browser }) => {
     const ada = await openWorkspace(browser, 'admin@argos.local');
     const pair = await openWorkspace(browser, 'pair@argos.local');
 
@@ -54,20 +54,20 @@ test.describe('workspace pair programming', () => {
     await expect(ada.locator('.ws-approval.is-pending')).toHaveCount(0);
   });
 
-  test('the thread sidebar shows another thread waiting for a decision', async ({ browser }) => {
+  test('the task sidebar shows another task waiting for a decision', async ({ browser }) => {
     const ada = await openWorkspace(browser, 'admin@argos.local');
     const pair = await openWorkspace(browser, 'pair@argos.local');
 
-    // Pair switches to the side thread and asks for an edit there.
-    await pair.locator('.ws-thread-link', { hasText: 'Side quest' }).click();
-    await expect(pair.locator('.ws-thread-title')).toHaveText('Side quest');
+    // Pair switches to the side task and asks for an edit there.
+    await pair.locator('.ws-task-link', { hasText: 'Side quest' }).click();
+    await expect(pair.locator('.ws-task-title')).toHaveText('Side quest');
     await send(pair, 'please edit the readme');
 
-    // Ada stays in "Pairing" and sees the side thread waiting, with unread entries.
-    const side = ada.locator('.ws-thread-item', { hasText: 'Side quest' });
+    // Ada stays in "Pairing" and sees the side task waiting, with unread entries.
+    const side = ada.locator('.ws-task-item', { hasText: 'Side quest' });
     await expect(side.locator('.ws-status-waiting_input')).toBeVisible({ timeout: 15_000 });
     await expect(side.locator('.ws-unread')).toBeVisible({ timeout: 15_000 });
-    await expect(ada.locator('.ws-thread-title')).toHaveText('Pairing');
+    await expect(ada.locator('.ws-task-title')).toHaveText('Pairing');
   });
 
   test('the composer suggests commands and files', async ({ browser }) => {

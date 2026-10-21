@@ -2,9 +2,9 @@
 
 Argos bringt einen eingebauten [MCP](https://modelcontextprotocol.io)-Server
 mit, sodass ein externer MCP-Client — insbesondere **Claude Code** — Argos
-direkt steuern kann: Projekte auflisten, das, was umgesetzt werden soll, als
-**automatischen Lauf** in einem neuen Workspace übergeben, ihn verfolgen, seinen
-Plan freigeben, ihn mit Feedback lenken und den Pull Request abholen.
+direkt steuern kann: Workspaces auflisten, das, was umgesetzt werden soll, als
+**automatischen Task** in einem Workspace übergeben, ihn verfolgen, seinen Plan
+freigeben, ihn mit Feedback lenken und den Pull Request abholen.
 
 Das verwandelt die übliche Schleife („in Claude Code planen → in die Argos-UI
 kopieren → den Browser beobachten → den Pull-Request-Link kopieren") in einen
@@ -77,48 +77,51 @@ Der Status springt auf **connected** und die folgenden Tools werden verfügbar.
 
 ## Verfügbare Tools
 
-Der Server stellt zehn Tools bereit. Ein `project`- oder `workspace`-Argument
-akzeptiert stets entweder die ULID des Datensatzes **oder** seinen exakten Namen.
+Der Server stellt neun Tools bereit. Ein `workspace`-Argument akzeptiert
+entweder die ULID des Workspaces **oder** seinen exakten Namen; ein
+`task`-Argument nimmt die ULID des Tasks.
 
-### Workspaces und automatische Läufe
+### Workspaces (lesen)
 
 | Tool | Was es tut |
 | --- | --- |
-| `workspace_create` | Legt einen Workspace an und startet einen automatischen Lauf: planen (je nach `plan`: off / auto / approve), umsetzen, fehlgeschlagene Quality-Gates beheben, Pull Request öffnen. Argumente: `project`, `prompt`, optional `title`, `base_branch`, `plan`, `ship`. Kehrt sofort zurück. |
-| `workspace_list` | Listet deine Workspaces (optional `origin`) mit Läufen, Pull Request und Gate-Ergebnissen. |
-| `workspace_get` | Ein Workspace per ID oder Name — frag ihn ab, um einem Lauf zu folgen (`threads[].auto.state`, `pull_request`). |
-| `thread_plan_decide` | Gibt einen wartenden Plan frei oder lehnt ihn ab (`decision`, optional `feedback`). |
-| `thread_message` | Schreibt in einen Thread (`text`); mit `resume_auto` läuft der Lauf danach selbstständig weiter. |
-| `thread_pause` / `thread_resume` | Automatik pausieren / den Thread an sie zurückgeben. |
-| `workspace_ship` | Committet, pusht und öffnet/aktualisiert jetzt den Pull Request (optional `draft`). |
+| `workspace_list` | Listet die Workspaces, die du sehen darfst: Repository, Standard-Branch und Container-Status. |
+| `workspace_get` | Ein Workspace per ID oder Name, mit seinen offenen Tasks (Besitzerin, Status, Branch, Pull Request, Gates, Ticket, `auto.state`). |
 
-Läufe handeln für dich: Dein Claude-Agent arbeitet, und dir gehört der Workspace.
-
-### Projekte (lesen)
+### Tasks und automatische Läufe
 
 | Tool | Was es tut |
-|---|---|
-| `project_list` | Listet die konfigurierten Repository-Profile (Projekte), an denen Argos arbeitet, mit ihren Automatisierungs-Vorgaben (`auto_settings`) und der Zahl offener Workspaces. |
-| `project_get` | Liefert ein Projekt (per id oder Name) mit seinen Automatisierungs-Vorgaben und einer Übersicht seiner Workspaces (Status, Herkunft, Branch, Pull Request). |
+| --- | --- |
+| `task_create` | Startet einen automatischen Task in einem Workspace: planen (je nach `plan`: off / auto / approve), auf eigenem Branch umsetzen, fehlgeschlagene Quality-Gates beheben, Pull Request öffnen. Argumente: `workspace`, `prompt`, optional `title`, `issue`, `base_branch`, `plan`, `ship`. Kehrt sofort zurück. |
+| `task_get` | Ein Task — frag ihn ab, um einem Lauf zu folgen (`auto.state`, `pull_request`, `gates`). |
+| `task_plan_decide` | Gibt einen wartenden Plan frei oder lehnt ihn ab (`decision`, optional `feedback`). |
+| `task_message` | Schreibt in einen Task (`text`); mit `resume_auto` läuft der Lauf danach selbstständig weiter. |
+| `task_pause` / `task_resume` | Automatik pausieren / den Task an sie zurückgeben. |
+| `task_ship` | Committet, pusht und öffnet/aktualisiert jetzt den Pull Request des Tasks (optional `draft`). |
+
+Tasks handeln für dich: Dein Claude-Agent arbeitet, und dir gehört der Task.
+Du kannst jeden Task eines Workspaces lesen, dem du angehörst, aber nur in
+deine eigenen Tasks und die, an denen du mitwirkst, schreiben, sie lenken oder
+ausliefern (ein Workspace-Admin darf alle).
 
 ## Typischer Ablauf
 
 Ein Plan-zu-PR-Durchlauf aus einer Planungs-Session:
 
-1. `project_list` / `project_get` — wähle das Projekt, in dem du arbeiten
+1. `workspace_list` / `workspace_get` — wähle den Workspace, in dem du arbeiten
    möchtest.
-2. `workspace_create` — übergib, was umgesetzt werden soll (`prompt`). Wähle
-   `plan` und `ship` oder überlass sie den Projektvorgaben. Das Tool kehrt
+2. `task_create` — übergib, was umgesetzt werden soll (`prompt`). Wähle `plan`
+   und `ship` oder überlass sie den Vorgaben des Workspaces. Das Tool kehrt
    sofort zurück.
-3. `workspace_get` — frage den Lauf ab: `auto.state` des Threads geht von
-   queued → planning → implementing → gating/fixing → shipping → done.
+3. `task_get` — frage den Lauf ab: sein `auto.state` geht von queued →
+   planning → implementing → gating/fixing → shipping → done.
 4. Mit `plan = approve` hält der Lauf bei `awaiting_plan_approval` an:
-   `thread_plan_decide` gibt frei oder lehnt ab (mit Feedback).
-5. Ist der Lauf fertig, zeigt `workspace_get` den Pull Request unter
+   `task_plan_decide` gibt frei oder lehnt ab (mit Feedback).
+5. Ist der Lauf fertig, zeigt `task_get` den Pull Request unter
    `pull_request`; checke seinen Branch lokal aus, um in deiner IDE zu reviewen.
-6. `thread_message` — schick Review-Feedback in den Thread; mit `resume_auto`
-   macht der Lauf danach selbstständig weiter. `workspace_ship` liefert den
-   aktuellen Stand auf Anforderung aus.
+6. `task_message` — schick Review-Feedback in den Task; mit `resume_auto` macht
+   der Lauf danach selbstständig weiter. `task_ship` liefert den aktuellen Stand
+   auf Anforderung aus.
 
 ## Sicherheit
 
@@ -153,8 +156,8 @@ Ein Plan-zu-PR-Durchlauf aus einer Planungs-Session:
   auf `/data/passport`.
 - **Tool-Aufrufe gelingen, aber in der UI passiert nichts** — Läufe sind
   asynchron. Prüfe, ob der Queue-Worker (`queue`-Service) läuft; lies mit
-  `workspace_get` erneut, um den Zustand weiterlaufen zu sehen.
-- **`workspace_create` scheitert mit „kein nutzbarer Agent"** — du brauchst
+  `task_get` erneut, um den Zustand weiterlaufen zu sehen.
+- **`task_create` scheitert mit „kein nutzbarer Agent"** — du brauchst
   einen aktiven eigenen (oder geteilten) Claude-Agenten unter *Agenten*.
 
 ## Siehe auch

@@ -92,13 +92,13 @@ final class SimulateIssueWebhookCommand extends Command
             return self::SUCCESS;
         }
 
-        if ($link->workspace_id === null) {
-            $this->info("Issue ingested, but no run started — the labels did not pass the binding filter, or the project has no automation user (see the binding's last error). Link #{$link->id}.");
+        if ($link->task_id === null) {
+            $this->info("Issue ingested, but no run started — the labels did not pass the binding filter, or the workspace has no automation user (see the binding's last error). Link #{$link->id}.");
 
             return self::SUCCESS;
         }
 
-        $this->info("Automatic run started in workspace {$link->workspace_id} from the simulated issue (link #{$link->id}).");
+        $this->info("Automatic task {$link->task_id} started from the simulated issue (link #{$link->id}).");
 
         return self::SUCCESS;
     }

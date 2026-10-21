@@ -16,18 +16,18 @@ use Illuminate\Support\Facades\Gate;
  *
  * `add()` is the single enforcement point of the `workspace-collaboration`
  * gate (the EE seam for pair programming): with the gate closed a workspace
- * never gets more than its owner.
+ * never gets more than its first admin.
  */
 class WorkspaceMemberService
 {
     public const COLLABORATION_GATE = 'workspace-collaboration';
 
-    /** Make the creator the first owner; not subject to the collaboration gate. */
-    public function addOwner(Workspace $workspace, User $owner): WorkspaceMember
+    /** Make the creator the first admin; not subject to the collaboration gate. */
+    public function addAdmin(Workspace $workspace, User $owner): WorkspaceMember
     {
         return WorkspaceMember::query()->updateOrCreate(
             ['workspace_id' => $workspace->id, 'user_id' => $owner->id],
-            ['role' => WorkspaceRole::Owner, 'added_by' => $owner->id],
+            ['role' => WorkspaceRole::Admin, 'added_by' => $owner->id],
         );
     }
 
@@ -42,7 +42,7 @@ class WorkspaceMemberService
             throw WorkspaceException::translated('workspaces.errors.collaboration_disabled');
         }
 
-        // An existing member only changes role — through the last-owner check.
+        // An existing member only changes role — through the last-admin check.
         if (WorkspaceMember::query()->where('workspace_id', $workspace->id)->where('user_id', $member->id)->exists()) {
             $this->changeRole($workspace, $member, $role);
 
@@ -61,8 +61,8 @@ class WorkspaceMemberService
     {
         DB::transaction(function () use ($workspace, $member, $role): void {
             $entry = $this->find($workspace, $member);
-            if ($entry->role === WorkspaceRole::Owner && $role !== WorkspaceRole::Owner) {
-                $this->assertNotLastOwner($workspace);
+            if ($entry->role === WorkspaceRole::Admin && $role !== WorkspaceRole::Admin) {
+                $this->assertNotLastAdmin($workspace);
             }
             $entry->update(['role' => $role]);
         });
@@ -72,8 +72,8 @@ class WorkspaceMemberService
     {
         DB::transaction(function () use ($workspace, $member): void {
             $entry = $this->find($workspace, $member);
-            if ($entry->role === WorkspaceRole::Owner) {
-                $this->assertNotLastOwner($workspace);
+            if ($entry->role === WorkspaceRole::Admin) {
+                $this->assertNotLastAdmin($workspace);
             }
             $entry->delete();
         });
@@ -88,14 +88,14 @@ class WorkspaceMemberService
             ->firstOrFail();
     }
 
-    private function assertNotLastOwner(Workspace $workspace): void
+    private function assertNotLastAdmin(Workspace $workspace): void
     {
-        $owners = WorkspaceMember::query()
+        $admins = WorkspaceMember::query()
             ->where('workspace_id', $workspace->id)
-            ->where('role', WorkspaceRole::Owner->value)
+            ->where('role', WorkspaceRole::Admin->value)
             ->count();
-        if ($owners <= 1) {
-            throw WorkspaceException::translated('workspaces.errors.last_owner');
+        if ($admins <= 1) {
+            throw WorkspaceException::translated('workspaces.errors.last_admin');
         }
     }
 }

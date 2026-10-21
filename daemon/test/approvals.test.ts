@@ -11,19 +11,19 @@ describe('ApprovalRegistry', () => {
         expect(registry.has(approvalId)).toBe(false);
     });
 
-    it('rejects unknown ids and ids of other threads', () => {
+    it('rejects unknown ids and ids of other tasks', () => {
         const registry = new ApprovalRegistry();
         const { approvalId } = registry.open('t1');
         expect(() => registry.resolve('t1', 'nope', { decision: 'allow' })).toThrow(UnknownApprovalError);
         expect(() => registry.resolve('t2', approvalId, { decision: 'allow' })).toThrow(UnknownApprovalError);
     });
 
-    it('cancels all requests of one thread only', async () => {
+    it('cancels all requests of one task only', async () => {
         const registry = new ApprovalRegistry();
         const a = registry.open('t1');
         const b = registry.open('t1');
         const c = registry.open('t2');
-        expect(registry.cancelThread('t1', 'Interrupted').sort()).toEqual([a.approvalId, b.approvalId].sort());
+        expect(registry.cancelTask('t1', 'Interrupted').sort()).toEqual([a.approvalId, b.approvalId].sort());
         await expect(a.decision).resolves.toEqual({ decision: 'deny', message: 'Interrupted', interrupt: true });
         expect(registry.has(c.approvalId)).toBe(true);
     });

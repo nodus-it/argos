@@ -9,7 +9,7 @@ use App\Enums\WorkerSource;
 use App\Models\AgentCredential;
 use App\Models\ExternalIssueLink;
 use App\Models\ProviderCredential;
-use App\Models\RepoProfile;
+use App\Models\Workspace;
 use Database\Seeders\FullDemoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -27,7 +27,7 @@ it('seeds the full provider matrix', function () {
     $this->seed(FullDemoSeeder::class);
 
     foreach (['github', 'gitlab', 'bitbucket'] as $platform) {
-        expect(RepoProfile::where('name', "provider-demo ({$platform})")->exists())->toBeTrue();
+        expect(Workspace::where('name', "provider-demo ({$platform})")->exists())->toBeTrue();
     }
 });
 
@@ -43,26 +43,25 @@ it('seeds an external issue link that has not started a run yet', function () {
 
     $link = ExternalIssueLink::where('external_id', '4242')->first();
     expect($link)->not->toBeNull();
-    expect($link->workspace_id)->toBeNull();
+    expect($link->task_id)->toBeNull();
 });
 
-it('seeds repo profile feature variants', function () {
+it('seeds workspace feature variants', function () {
     $this->seed(FullDemoSeeder::class);
 
-    expect(RepoProfile::where('live_demo_enabled', true)->exists())->toBeTrue();
-    expect(RepoProfile::where('worker_source', WorkerSource::Byoi->value)->exists())->toBeTrue();
-    expect(RepoProfile::where('worker_source', WorkerSource::Devcontainer->value)->exists())->toBeTrue();
+    expect(Workspace::where('live_demo_enabled', true)->exists())->toBeTrue();
+    expect(Workspace::where('worker_source', WorkerSource::Byoi->value)->exists())->toBeTrue();
 });
 
 it('is idempotent across re-seeds', function () {
     $this->seed(FullDemoSeeder::class);
-    $profiles = RepoProfile::count();
+    $workspaces = Workspace::count();
     $credentials = AgentCredential::count();
     $links = ExternalIssueLink::count();
 
     $this->seed(FullDemoSeeder::class);
 
-    expect(RepoProfile::count())->toBe($profiles);
+    expect(Workspace::count())->toBe($workspaces);
     expect(AgentCredential::count())->toBe($credentials);
     expect(ExternalIssueLink::count())->toBe($links);
 });

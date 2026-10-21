@@ -1,5 +1,5 @@
 @use('App\Enums\WorkspaceStatus')
-{{-- Workspace "Fokus": header (thread switcher, ship), the chat in a centred
+{{-- Workspace "Fokus": header (task switcher, ship), the chat in a centred
      column and the context sidebar. The review mode widens the sidebar into
      the review panel (see resources/js/workspace/focus.js). --}}
 <div class="wf-page" x-data="argosWorkspaceFocus()" x-on:keydown.window="onKey($event)"
@@ -13,12 +13,12 @@
     @endif
 
     <header class="wf-head">
-        <span class="wf-ws-name" title="{{ $workspace->repoProfile->name }} · {{ $workspace->branch }}">
+        <span class="wf-ws-name" title="{{ $workspace->name }} · {{ $workspace->getOwnerRepo() }}">
             <span class="wf-ws-title">{{ $workspace->name }}</span>
             <span @class(['wf-dot', 'is-'.$workspace->status->value]) role="img" aria-label="{{ $workspace->status->label() }}" title="{{ $workspace->status->label() }}"></span>
         </span>
         <span class="wf-head-sep" aria-hidden="true">/</span>
-        @livewire('workspace.thread-switcher', ['workspaceId' => $workspace->id], key('switcher-'.$workspace->id))
+        @livewire('workspace.task-switcher', ['workspaceId' => $workspace->id], key('switcher-'.$workspace->id))
         <span class="wf-review-flag" x-show="review" x-cloak>
             <x-wf.icon name="eye" :size="15" :stroke="2" /> {{ __('workspaces.focus.review_mode') }}
         </span>
@@ -27,8 +27,8 @@
             {{ __('workspaces.focus.close_review') }} <kbd class="wf-kbd">esc</kbd>
         </button>
         @if ($canOperate)
-            <button type="button" class="wf-btn wf-hide-narrow" x-show="!review" x-on:click="$dispatch('thread-new')">
-                <x-wf.icon name="plus" :size="16" :stroke="2" /> {{ __('workspaces.thread.new') }}
+            <button type="button" class="wf-btn wf-hide-narrow" x-show="!review" x-on:click="$dispatch('task-new')">
+                <x-wf.icon name="plus" :size="16" :stroke="2" /> {{ __('workspaces.task.new') }}
             </button>
         @endif
         @if ($this->startAction->isVisible()) {{ $this->startAction }} @endif
@@ -68,7 +68,7 @@
             </div>
         @endif
 
-        @livewire('workspace.thread-chat', ['workspaceId' => $workspace->id], key('chat-'.$workspace->id))
+        @livewire('workspace.task-chat', ['workspaceId' => $workspace->id], key('chat-'.$workspace->id))
     </div>
 
     <aside class="wf-context" aria-label="{{ __('workspaces.focus.context') }}">

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 return [
     'navigation_group' => 'Configuration',
-    'navigation_label' => 'Projects',
-    'model_label' => 'Project',
-    'model_label_plural' => 'Projects',
+    'navigation_label' => 'Workspaces',
+    'model_label' => 'Workspace',
+    'model_label_plural' => 'Workspaces',
 
     'tabs' => [
         'automation' => 'Automation',
@@ -17,13 +17,13 @@ return [
 
     'sections' => [
         'automation' => 'Automation',
-        'automation_description' => 'Defaults for auto-threads in this project: started from the UI, the API, MCP or an issue, they plan, implement, check the quality gates and ship without a human. Each run can override them. Empty fields use the installation defaults.',
+        'automation_description' => 'Defaults for auto-tasks in this project: started from the UI, the API, MCP or an issue, they plan, implement, check the quality gates and ship without a human. Each run can override them. Empty fields use the installation defaults.',
         'platform' => 'Platform',
         'platform_description' => 'Choose a platform — the remaining fields will be unlocked afterwards.',
         'general' => 'General',
         'general_description' => 'The project display name.',
         'worker' => 'Worker',
-        'worker_description' => 'Stack & agent the workspaces of this project run on.',
+        'worker_description' => 'Stack the container of this workspace runs on.',
         'live_demo' => 'Live demo',
         'env_secrets' => 'Environment & secrets',
         'env_secrets_description' => 'Project-specific secrets Argos stores encrypted and injects into the worker and the live demo — e.g. private Composer registries or extra env variables.',
@@ -114,7 +114,7 @@ return [
     ],
 
     'columns' => [
-        'workspaces' => 'Workspaces',
+        'tasks' => 'Tasks',
         'branch' => 'Branch',
     ],
 

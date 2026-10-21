@@ -14,7 +14,7 @@
 #   nginx     — serves static assets + proxies to app:9000, behind Traefik
 #   queue     — Laravel Horizon (same image as app, ARGOS_ROLE=queue)
 #   scheduler — Laravel scheduler (`schedule:work`, ARGOS_ROLE=scheduler)
-#   reverb    — Laravel Reverb websockets (live workspace threads, ARGOS_ROLE=reverb)
+#   reverb    — Laravel Reverb websockets (live workspace tasks, ARGOS_ROLE=reverb)
 #
 # Production vs. development:
 #   Production pulls a prebuilt image (ARGOS_APP_IMAGE points at a registry tag,

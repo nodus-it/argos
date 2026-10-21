@@ -17,7 +17,7 @@ use Illuminate\Database\Eloquent\Model;
 use Laravel\Sanctum\Contracts\HasApiTokens;
 
 /**
- * Lists and mints Sanctum API tokens for any tokenable (ApiClient, RepoProfile).
+ * Lists and mints Sanctum API tokens for any tokenable (ApiClient, Workspace).
  * The plaintext is shown once on creation; only the hash is stored.
  */
 class ApiTokensRelationManager extends RelationManager
@@ -28,9 +28,9 @@ class ApiTokensRelationManager extends RelationManager
 
     /** The abilities a token may carry (mirrors the REST route gates). */
     public const ABILITIES = [
-        'projects:read' => 'projects:read',
         'workspaces:read' => 'workspaces:read',
-        'workspaces:write' => 'workspaces:write',
+        'tasks:read' => 'tasks:read',
+        'tasks:write' => 'tasks:write',
     ];
 
     public static function getTitle(Model $ownerRecord, string $pageClass): string

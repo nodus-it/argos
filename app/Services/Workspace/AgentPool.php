@@ -7,14 +7,14 @@ namespace App\Services\Workspace;
 use App\Enums\AgentCredentialStatus;
 use App\Enums\AgentName;
 use App\Models\AgentCredential;
-use App\Models\Thread;
+use App\Models\Task;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Hands out agent session slots. An open thread session occupies one slot of
+ * Hands out agent session slots. An open task session occupies one slot of
  * its agent; an agent never runs more sessions than its
  * `max_concurrent_sessions`, which protects the owner's subscription limits.
  */
@@ -24,7 +24,7 @@ class AgentPool
     private const DEFAULT_LIMIT_MINUTES = 60;
 
     /**
-     * Agents the user may start a thread on: own and shared ones whose agent
+     * Agents the user may start a task on: own and shared ones whose agent
      * the workspace daemon supports, active and not usage-limited right now.
      *
      * @return Collection<int, AgentCredential>
@@ -46,23 +46,23 @@ class AgentPool
 
     public function activeSessions(AgentCredential $agent): int
     {
-        return Thread::query()
+        return Task::query()
             ->where('agent_credential_id', $agent->id)
             ->where('session_open', true)
             ->count();
     }
 
     /**
-     * Occupy a slot for the thread's agent. Idempotent for a thread that
+     * Occupy a slot for the task's agent. Idempotent for a task that
      * already holds its slot.
      *
      * @throws AgentBusyException when the agent is missing, limited or full
      */
-    public function acquire(Thread $thread): void
+    public function acquire(Task $task): void
     {
-        DB::transaction(function () use ($thread): void {
-            /** @var Thread $locked */
-            $locked = Thread::query()->whereKey($thread->getKey())->lockForUpdate()->firstOrFail();
+        DB::transaction(function () use ($task): void {
+            /** @var Task $locked */
+            $locked = Task::query()->whereKey($task->getKey())->lockForUpdate()->firstOrFail();
             if ($locked->session_open) {
                 return;
             }
@@ -90,13 +90,13 @@ class AgentPool
             $locked->forceFill(['session_open' => true])->save();
         });
 
-        $thread->session_open = true;
+        $task->session_open = true;
     }
 
-    public function release(Thread $thread): void
+    public function release(Task $task): void
     {
-        Thread::query()->whereKey($thread->getKey())->update(['session_open' => false]);
-        $thread->session_open = false;
+        Task::query()->whereKey($task->getKey())->update(['session_open' => false]);
+        $task->session_open = false;
     }
 
     public function markUsageLimited(AgentCredential $agent, ?CarbonImmutable $resetsAt): void

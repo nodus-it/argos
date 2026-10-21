@@ -25,7 +25,7 @@ class RepoCredentialController extends Controller
         $workspace = $request->attributes->get(AuthenticateWorkspaceDaemon::ATTRIBUTE);
 
         try {
-            return response()->json($tokens->gitCredential($workspace->repoProfile));
+            return response()->json($tokens->gitCredential($workspace));
         } catch (Throwable $e) {
             return response()->json(['error' => ['code' => 'credential_unavailable', 'message' => $e->getMessage()]], 409);
         }

@@ -1,10 +1,9 @@
-{{-- Projects (RepoProfiles) list page hero. Embedded via ListRepoProfiles::getHeader(). --}}
+{{-- Workspaces (admin) list page hero. Embedded via ListWorkspaces::getHeader(). --}}
 @php
     use App\Enums\WorkspaceStatus;
-    use App\Models\RepoProfile;
     use App\Models\Workspace;
 
-    $totalProjects = RepoProfile::count();
+    $totalProjects = Workspace::count();
     $runningWorkspaces = Workspace::where('status', WorkspaceStatus::Running)->count();
 
     $chips = [
@@ -26,7 +25,7 @@
        class="btn btn-ghost" style="white-space:nowrap;">
         {{ __('navigation.pages.documentation') }}
     </a>
-    <a href="{{ \App\Filament\Admin\Resources\RepoProfileResource::getUrl('create') }}"
+    <a href="{{ \App\Filament\Admin\Resources\WorkspaceResource::getUrl('create') }}"
        class="btn btn-primary" style="white-space:nowrap;">
         {{ __('widgets.hero.new_project') }}
     </a>

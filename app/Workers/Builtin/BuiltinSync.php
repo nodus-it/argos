@@ -15,7 +15,7 @@ use App\Models\WorkerStack;
  * dockerfile triggers an update of built-in fields only.
  *
  * Built-ins removed from the manifest flip to status=deprecated rather
- * than being deleted, since RepoProfiles may reference them as FK target.
+ * than being deleted, since workspaces may reference them as FK target.
  *
  * User-created rows (is_builtin=false) are never touched.
  *

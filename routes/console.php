@@ -8,13 +8,6 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-// Daily npm-registry poll for every registered agent's pinned package.
-// Result is persisted in agent_versions; the dashboard widget reads from
-// there. Manual trigger: `php artisan argos:check-agent-versions`.
-Schedule::command('argos:check-agent-versions')
-    ->dailyAt('03:00')
-    ->withoutOverlapping();
-
 // Poll issue providers and check plan-comment reactions on a configurable
 // interval (ARGOS_POLL_INTERVAL_MINUTES, default 5; set to 1 locally for fast
 // feedback). Providers don't push reaction events, so approvals are polled too.
@@ -48,12 +41,12 @@ Schedule::command('argos:workspaces:reap-orphans')
     ->everyFifteenMinutes()
     ->withoutOverlapping();
 
-Schedule::command('argos:workspaces:sync-prs')
+Schedule::command('argos:tasks:sync-prs')
     ->cron('*/'.max(1, (int) config('argos.workspaces.pr_sync_minutes', 15)).' * * * *')
     ->withoutOverlapping();
 
-// Delete automatic workspaces (API/MCP/issue) once their pull request is
-// merged/closed or their run ended ARGOS_AUTO_CLEANUP_DAYS ago.
-Schedule::command('argos:workspaces:cleanup-auto')
+// Free preview, worktree and database of tasks that finished more than their
+// workspace's cleanup_after_days ago (the conversation stays).
+Schedule::command('argos:tasks:cleanup')
     ->dailyAt('03:30')
     ->withoutOverlapping();

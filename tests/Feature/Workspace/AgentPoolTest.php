@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Workspace;
 
 use App\Models\AgentCredential;
-use App\Models\Thread;
+use App\Models\Task;
 use App\Models\User;
 use App\Services\Workspace\AgentBusyException;
 use App\Services\Workspace\AgentPool;
@@ -52,8 +52,8 @@ class AgentPoolTest extends TestCase
     public function test_acquire_respects_the_session_limit_and_is_idempotent(): void
     {
         $agent = AgentCredential::factory()->create(['max_concurrent_sessions' => 1]);
-        $first = Thread::factory()->create(['agent_credential_id' => $agent->id]);
-        $second = Thread::factory()->create(['agent_credential_id' => $agent->id]);
+        $first = Task::factory()->create(['agent_credential_id' => $agent->id]);
+        $second = Task::factory()->create(['agent_credential_id' => $agent->id]);
 
         $this->pool->acquire($first);
         $this->pool->acquire($first);
@@ -67,8 +67,8 @@ class AgentPoolTest extends TestCase
     public function test_release_frees_the_slot(): void
     {
         $agent = AgentCredential::factory()->create(['max_concurrent_sessions' => 1]);
-        $first = Thread::factory()->create(['agent_credential_id' => $agent->id]);
-        $second = Thread::factory()->create(['agent_credential_id' => $agent->id]);
+        $first = Task::factory()->create(['agent_credential_id' => $agent->id]);
+        $second = Task::factory()->create(['agent_credential_id' => $agent->id]);
 
         $this->pool->acquire($first);
         $this->pool->release($first);
@@ -81,13 +81,13 @@ class AgentPoolTest extends TestCase
     public function test_higher_limits_allow_parallel_sessions(): void
     {
         $agent = AgentCredential::factory()->create(['max_concurrent_sessions' => 2]);
-        $threads = Thread::factory()->count(3)->create(['agent_credential_id' => $agent->id]);
+        $tasks = Task::factory()->count(3)->create(['agent_credential_id' => $agent->id]);
 
-        $this->pool->acquire($threads[0]);
-        $this->pool->acquire($threads[1]);
+        $this->pool->acquire($tasks[0]);
+        $this->pool->acquire($tasks[1]);
 
         $this->expectException(AgentBusyException::class);
-        $this->pool->acquire($threads[2]);
+        $this->pool->acquire($tasks[2]);
     }
 
     public function test_usage_limited_or_inactive_agents_cannot_be_acquired(): void
@@ -96,12 +96,12 @@ class AgentPoolTest extends TestCase
         $revoked = AgentCredential::factory()->revoked()->create();
 
         foreach ([$limited, $revoked] as $agent) {
-            $thread = Thread::factory()->create(['agent_credential_id' => $agent->id]);
+            $task = Task::factory()->create(['agent_credential_id' => $agent->id]);
             try {
-                $this->pool->acquire($thread);
+                $this->pool->acquire($task);
                 $this->fail('acquire should have thrown');
             } catch (AgentBusyException) {
-                $this->assertFalse($thread->fresh()->session_open);
+                $this->assertFalse($task->fresh()->session_open);
             }
         }
     }

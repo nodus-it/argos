@@ -6,9 +6,9 @@ namespace Tests\Unit\Models;
 
 use App\Enums\TaskProviderKind;
 use App\Models\ConnectedAccount;
-use App\Models\RepoProfile;
 use App\Models\TaskProviderBinding;
 use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -16,7 +16,7 @@ class ConnectedAccountTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_relink_orphaned_repo_profiles_attaches_only_matching_platform(): void
+    public function test_relink_orphaned_workspaces_attaches_only_matching_platform(): void
     {
         $user = User::factory()->create();
         $bbAccount = ConnectedAccount::factory()->create([
@@ -24,13 +24,13 @@ class ConnectedAccountTest extends TestCase
             'provider' => 'bitbucket',
         ]);
 
-        $orphanBb = RepoProfile::factory()->create([
+        $orphanBb = Workspace::factory()->create([
             'platform' => 'bitbucket',
             'auth_method' => 'oauth',
             'connected_account_id' => null,
-            'url' => 'https://bitbucket.org/ws/repo',
+            'repo_url' => 'https://bitbucket.org/ws/repo',
         ]);
-        $orphanGh = RepoProfile::factory()->create([
+        $orphanGh = Workspace::factory()->create([
             'platform' => 'github',
             'auth_method' => 'oauth',
             'connected_account_id' => null,
@@ -43,7 +43,7 @@ class ConnectedAccountTest extends TestCase
         $this->assertNull($orphanGh->fresh()->connected_account_id);
     }
 
-    public function test_relink_skips_pat_profiles(): void
+    public function test_relink_skips_pat_workspaces(): void
     {
         $user = User::factory()->create();
         $account = ConnectedAccount::factory()->create([
@@ -51,7 +51,7 @@ class ConnectedAccountTest extends TestCase
             'provider' => 'github',
         ]);
 
-        $patProfile = RepoProfile::factory()->create([
+        $patWorkspace = Workspace::factory()->create([
             'platform' => 'github',
             'auth_method' => 'pat',
             'token' => 'ghp_xxx',
@@ -60,28 +60,28 @@ class ConnectedAccountTest extends TestCase
 
         $account->relinkOrphanedResources();
 
-        $this->assertNull($patProfile->fresh()->connected_account_id);
+        $this->assertNull($patWorkspace->fresh()->connected_account_id);
     }
 
-    public function test_relink_skips_already_linked_profiles(): void
+    public function test_relink_skips_already_linked_workspaces(): void
     {
         $user = User::factory()->create();
         $other = ConnectedAccount::factory()->create([
             'user_id' => $user->id,
             'provider' => 'gitlab',
         ]);
-        $linkedProfile = RepoProfile::factory()->create([
+        $linkedWorkspace = Workspace::factory()->create([
             'platform' => 'gitlab',
             'auth_method' => 'oauth',
             'connected_account_id' => $other->id,
-            'url' => 'https://gitlab.com/foo/bar',
+            'repo_url' => 'https://gitlab.com/foo/bar',
         ]);
 
         // Reattach: own account is the same record (idempotent reconnect path)
         $count = $other->relinkOrphanedResources();
 
         $this->assertSame(0, $count);
-        $this->assertSame($other->id, $linkedProfile->fresh()->connected_account_id);
+        $this->assertSame($other->id, $linkedWorkspace->fresh()->connected_account_id);
     }
 
     public function test_relink_returns_zero_on_first_connect(): void

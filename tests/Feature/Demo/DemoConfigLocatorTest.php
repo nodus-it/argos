@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Demo;
 
-use App\Models\RepoProfile;
+use App\Models\Workspace;
 use App\Services\Demo\DemoConfigLocator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Saloon\Http\Faking\MockResponse;
@@ -15,11 +15,11 @@ class DemoConfigLocatorTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function profile(): RepoProfile
+    private function workspace(): Workspace
     {
-        return RepoProfile::factory()->create([
+        return Workspace::factory()->create([
             'platform' => 'github',
-            'url' => 'https://github.com/acme/widget',
+            'repo_url' => 'https://github.com/acme/widget',
             'token' => 'ghp-test',
             'default_branch' => 'main',
         ]);
@@ -34,7 +34,7 @@ class DemoConfigLocatorTest extends TestCase
             ]),
         ]);
 
-        $this->assertTrue(app(DemoConfigLocator::class)->hasConfig($this->profile()));
+        $this->assertTrue(app(DemoConfigLocator::class)->hasConfig($this->workspace()));
     }
 
     public function test_missing_compose_file_means_no_config(): void
@@ -48,6 +48,6 @@ class DemoConfigLocatorTest extends TestCase
             'api.github.com/repos/*' => MockResponse::make('', 404),
         ]);
 
-        $this->assertFalse(app(DemoConfigLocator::class)->hasConfig($this->profile()));
+        $this->assertFalse(app(DemoConfigLocator::class)->hasConfig($this->workspace()));
     }
 }

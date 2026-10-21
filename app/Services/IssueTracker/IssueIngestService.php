@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\IssueTracker;
 
-use App\Enums\WorkspaceOrigin;
+use App\Enums\TaskOrigin;
 use App\Models\ExternalIssueLink;
 use App\Models\TaskProviderBinding;
 use App\Services\IssueTracker\DTO\ExternalIssue;
@@ -42,7 +42,7 @@ final class IssueIngestService
         $link->last_synced_at = now();
         $link->signature = $signature;
 
-        // Launch once, ever: a workspace someone deleted is not re-created on
+        // Launch once, ever: a task someone deleted is not re-created on
         // the next poll; an issue first seen not matching (labelled later)
         // still launches.
         if (! $this->filters->passes($issue, $binding) || $link->launched_at !== null) {
@@ -51,9 +51,9 @@ final class IssueIngestService
             return $link;
         }
 
-        $project = $binding->repoProfile;
-        $actor = $project?->automationUser;
-        if ($project === null || $actor === null) {
+        $workspace = $binding->workspace;
+        $actor = $workspace?->automationUser;
+        if ($workspace === null || $actor === null) {
             // Nothing to act for — the binding shows why; the issue launches
             // once an automation user is set.
             $binding->forceFill(['last_error' => __('workspaces.issue.run.no_automation_user')])->save();
@@ -66,7 +66,7 @@ final class IssueIngestService
         $link->save();
         $data = $this->issues->fromExternal($issue, $binding);
         try {
-            $thread = $this->runs->launch($actor, $project, $this->issues->promptFor($data), ['issue' => $data], [], WorkspaceOrigin::Issue);
+            $task = $this->runs->launch($actor, $workspace, $this->issues->promptFor($data), ['issue' => $data], [], TaskOrigin::Issue);
         } catch (WorkspaceException $e) {
             // No agent, capacity reached …: retried on the next poll.
             Log::channel('argos')->info('Issue run could not start', ['binding' => $binding->id, 'issue' => $issue->externalId, 'error' => $e->getMessage()]);
@@ -75,7 +75,7 @@ final class IssueIngestService
             return $link;
         }
 
-        $link->workspace_id = $thread->workspace_id;
+        $link->task_id = $task->id;
         $link->launched_at = now();
         $link->save();
 

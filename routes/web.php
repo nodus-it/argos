@@ -6,23 +6,14 @@ use App\Http\Controllers\Auth\BitbucketConnectedAccountController;
 use App\Http\Controllers\Auth\ConnectedAccountController;
 use App\Http\Controllers\Auth\LinearConnectedAccountController;
 use App\Http\Controllers\SystemLogController;
-use App\Http\Controllers\ThreadAttachmentController;
+use App\Http\Controllers\TaskAttachmentController;
 use App\Http\Controllers\Webhooks\IssueWebhookController;
 use App\Http\Controllers\WorkspaceGateController;
 use App\Http\Controllers\WorkspaceOpenController;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 // Workspaces are the everyday surface; administration lives under /admin.
 Route::get('/', fn () => redirect(config('argos.workspaces.enabled', true) ? '/w' : '/admin'));
-
-// Workspaces moved from the admin panel to their own panel: keep old links
-// (notifications, pull request bodies) working.
-Route::get('/admin/workspaces/{path?}', fn (Request $request, ?string $path = null) => redirect(
-    '/w/workspaces'.($path !== null ? '/'.$path : '').($request->getQueryString() !== null ? '?'.$request->getQueryString() : ''),
-    301,
-))
-    ->where('path', '.*');
 
 // Traefik forwardAuth target for workspace hosts (code-<slug> editor and
 // workspace demos). Checks membership, not just a login. See
@@ -43,8 +34,8 @@ Route::post('/webhooks/issues/{kind}/{binding}', [IssueWebhookController::class,
     ->middleware(['throttle:60,1']);
 
 Route::middleware('auth')->group(function () {
-    Route::get('/threads/{thread}/attachments/{file}', ThreadAttachmentController::class)
-        ->name('threads.attachments');
+    Route::get('/tasks/{task}/attachments/{file}', TaskAttachmentController::class)
+        ->name('tasks.attachments');
 
     // Open a workspace host (editor/preview) with a fresh access ticket.
     Route::get('/workspaces/{workspace}/open/{target}', WorkspaceOpenController::class)

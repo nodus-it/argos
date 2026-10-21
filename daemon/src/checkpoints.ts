@@ -8,7 +8,7 @@ import { ID_CHARS, ID_PATTERN } from './ids.js';
 
 export const CHECKPOINT_PREFIX = 'refs/argos/checkpoints';
 
-/** Checkpoints kept per thread; older refs are deleted. */
+/** Checkpoints kept per task; older refs are deleted. */
 export const MAX_CHECKPOINTS = 200;
 
 export interface Checkpoint {
@@ -20,7 +20,7 @@ export interface Checkpoint {
     label: string;
 }
 
-export type CheckpointErrorCode = 'invalid_thread' | 'invalid_ref' | 'unknown_checkpoint';
+export type CheckpointErrorCode = 'invalid_task' | 'invalid_ref' | 'unknown_checkpoint';
 
 export class CheckpointError extends CodedError {
     constructor(code: CheckpointErrorCode, message: string) {
@@ -40,7 +40,7 @@ const REF_PATTERN = new RegExp(`^${CHECKPOINT_PREFIX}/(${ID_CHARS})/(\\d{1,9})$`
 /**
  * Per-turn snapshots of the working tree (index + files, untracked but not
  * ignored included), stored as commit objects under
- * `refs/argos/checkpoints/<thread>/<n>` — branch, index and working tree
+ * `refs/argos/checkpoints/<task>/<n>` — branch, index and working tree
  * stay untouched. Operations are serialized per workspace.
  */
 export class CheckpointStore {
@@ -51,8 +51,8 @@ export class CheckpointStore {
         private readonly env: NodeJS.ProcessEnv = process.env,
     ) {}
 
-    create(threadId: string, label: string): Promise<Checkpoint> {
-        return this.serial(() => this.createNow(threadId, label));
+    create(taskId: string, label: string): Promise<Checkpoint> {
+        return this.serial(() => this.createNow(taskId, label));
     }
 
     /**
@@ -61,11 +61,11 @@ export class CheckpointStore {
      * left alone; commits made since stay.
      */
     restore(ref: string): Promise<{ before: Checkpoint; removed: string[] }> {
-        const { threadId } = parseRef(ref);
+        const { taskId } = parseRef(ref);
 
         return this.serial(async () => {
             const target = await this.treeOf(ref);
-            const before = await this.createNow(threadId, 'before restore');
+            const before = await this.createNow(taskId, 'before restore');
 
             // Files that exist now but not in the checkpoint go away.
             const added = (await this.git(['diff', '--name-only', '--no-renames', '--diff-filter=A', '-z', target, `${before.sha}^{tree}`])).stdout
@@ -101,8 +101,8 @@ export class CheckpointStore {
         });
     }
 
-    async list(threadId: string): Promise<{ ref: string; n: number }[]> {
-        const out = (await this.git(['for-each-ref', '--format=%(refname)', `${CHECKPOINT_PREFIX}/${threadId}/`])).stdout;
+    async list(taskId: string): Promise<{ ref: string; n: number }[]> {
+        const out = (await this.git(['for-each-ref', '--format=%(refname)', `${CHECKPOINT_PREFIX}/${taskId}/`])).stdout;
 
         return out
             .split('\n')
@@ -111,17 +111,17 @@ export class CheckpointStore {
             .sort((a, b) => a.n - b.n);
     }
 
-    private async createNow(threadId: string, label: string): Promise<Checkpoint> {
-        if (!ID_PATTERN.test(threadId)) {
-            throw new CheckpointError('invalid_thread', 'Invalid thread id');
+    private async createNow(taskId: string, label: string): Promise<Checkpoint> {
+        if (!ID_PATTERN.test(taskId)) {
+            throw new CheckpointError('invalid_task', 'Invalid task id');
         }
-        const existing = await this.list(threadId);
+        const existing = await this.list(taskId);
         const n = (existing.at(-1)?.n ?? 0) + 1;
-        const ref = `${CHECKPOINT_PREFIX}/${threadId}/${n}`;
+        const ref = `${CHECKPOINT_PREFIX}/${taskId}/${n}`;
 
         const tree = await this.snapshotTree();
         const head = await this.head();
-        const message = `argos checkpoint ${threadId}/${n}${label !== '' ? `: ${label}` : ''}`;
+        const message = `argos checkpoint ${taskId}/${n}${label !== '' ? `: ${label}` : ''}`;
         const sha = (await this.git(['commit-tree', tree, ...(head !== null ? ['-p', head] : []), '-m', message], AUTHOR_ENV)).stdout.trim();
         await this.git(['update-ref', ref, sha]);
 
@@ -189,13 +189,13 @@ export class CheckpointStore {
 }
 
 /** Split a checkpoint ref; throws for anything outside the namespace. */
-export function parseRef(ref: string): { threadId: string; n: number } {
+export function parseRef(ref: string): { taskId: string; n: number } {
     const match = REF_PATTERN.exec(ref);
     if (match === null) {
         throw new CheckpointError('invalid_ref', 'Not a checkpoint ref');
     }
 
-    return { threadId: match[1]!, n: Number(match[2]) };
+    return { taskId: match[1]!, n: Number(match[2]) };
 }
 
 /**

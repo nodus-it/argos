@@ -13,10 +13,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 
 /**
- * One quality-gate run in a workspace (see WorkspaceGateService).
+ * One quality-gate run of a task (see WorkspaceGateService).
  *
  * @property string $id
  * @property string $workspace_id
+ * @property string $task_id
+ * @property string|null $base_commit
  * @property int|null $triggered_by
  * @property GateRunStatus $status
  * @property array<string, string>|null $gates
@@ -28,6 +30,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon $created_at
  * @property Carbon $updated_at
  * @property-read Workspace $workspace
+ * @property-read Task $task
  * @property-read User|null $triggeredBy
  */
 class WorkspaceGateRun extends Model
@@ -37,7 +40,7 @@ class WorkspaceGateRun extends Model
 
     use HasUlids;
 
-    protected $fillable = ['workspace_id', 'triggered_by', 'status', 'gates', 'logs', 'baseline', 'message', 'started_at', 'finished_at'];
+    protected $fillable = ['workspace_id', 'task_id', 'base_commit', 'triggered_by', 'status', 'gates', 'logs', 'baseline', 'message', 'started_at', 'finished_at'];
 
     protected function casts(): array
     {
@@ -54,6 +57,12 @@ class WorkspaceGateRun extends Model
     public function workspace(): BelongsTo
     {
         return $this->belongsTo(Workspace::class);
+    }
+
+    /** @return BelongsTo<Task, $this> */
+    public function task(): BelongsTo
+    {
+        return $this->belongsTo(Task::class);
     }
 
     /** @return BelongsTo<User, $this> */

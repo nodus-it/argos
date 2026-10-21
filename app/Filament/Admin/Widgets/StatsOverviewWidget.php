@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Widgets;
 
-use App\Enums\AutoThreadState;
+use App\Enums\AutoTaskState;
 use App\Enums\WorkspaceStatus;
-use App\Models\Thread;
+use App\Models\Task;
 use App\Models\WorkerImageBuild;
 use App\Models\Workspace;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
@@ -26,11 +26,11 @@ class StatsOverviewWidget extends BaseWidget
     {
         $runningWorkspaces = Workspace::query()->where('status', WorkspaceStatus::Running)->count();
 
-        $running = array_values(array_filter(AutoThreadState::cases(), fn (AutoThreadState $state): bool => $state->isRunning()));
-        $inProgress = Thread::query()->whereIn('auto_state', $running)->count();
+        $running = array_values(array_filter(AutoTaskState::cases(), fn (AutoTaskState $state): bool => $state->isRunning()));
+        $inProgress = Task::query()->whereIn('auto_state', $running)->count();
 
-        $waitingForInput = Thread::query()
-            ->whereIn('auto_state', [AutoThreadState::AwaitingPlanApproval, AutoThreadState::Paused])
+        $waitingForInput = Task::query()
+            ->whereIn('auto_state', [AutoTaskState::AwaitingPlanApproval, AutoTaskState::Paused])
             ->count();
 
         // Same definition as WorkerImageBuild::scopeOutdated(), so the counter

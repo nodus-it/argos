@@ -137,9 +137,9 @@ class ConnectedAccount extends Model
 
     /**
      * Heilt verwaiste OAuth-Ressourcen nach einem Re-Connect: sowohl
-     * RepoProfiles als auch Task-Provider-Bindings, deren `connected_account_id`
+     * Workspaces als auch Task-Provider-Bindings, deren `connected_account_id`
      * durch einen Disconnect (foreign-key `nullOnDelete`) auf NULL fiel.
-     * Re-attacht jedes OAuth-RepoProfile gleicher Git-Plattform und jedes
+     * Re-attacht jeden OAuth-Workspace gleicher Git-Plattform und jedes
      * TaskProviderBinding gleicher Issue-Provider-Art ohne Account an diesen
      * frisch wiederverbundenen Account.
      *
@@ -147,13 +147,13 @@ class ConnectedAccount extends Model
      * die Menge leer (kein Schaden), nach Re-Connect werden die Bindungen
      * zurückgesetzt — Poll / Write-back laufen ohne erneutes Seeden wieder.
      *
-     * Annahme single-tenant: Weder RepoProfile noch TaskProviderBinding haben
+     * Annahme single-tenant: Weder Workspace noch TaskProviderBinding haben
      * eine eigene `user_id`. `unique(user_id, provider)` auf
      * `connected_accounts` garantiert aber genau einen aktiven Account pro
      * Plattform — alle verwaisten (oauth, NULL)-Ressourcen gehörten also
      * zwangsläufig dem gerade gelöschten Account.
      *
-     * @return int Anzahl re-attachter RepoProfiles + Bindings
+     * @return int Anzahl re-attachter Workspaces + Bindings
      */
     public function relinkOrphanedResources(): int
     {
@@ -161,7 +161,7 @@ class ConnectedAccount extends Model
 
         $gitProvider = GitProvider::tryFrom($this->provider);
         if ($gitProvider !== null) {
-            $count += RepoProfile::query()
+            $count += Workspace::query()
                 ->where('platform', $gitProvider)
                 ->where('auth_method', AuthMethod::OAuth)
                 ->whereNull('connected_account_id')

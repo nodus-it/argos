@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Tests\Feature\Auth;
 
 use App\Models\ConnectedAccount;
-use App\Models\RepoProfile;
 use App\Models\User;
+use App\Models\Workspace;
 use App\Services\Credentials\CredentialVerification;
 use App\Services\Credentials\CredentialVerifier;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -167,14 +167,14 @@ class ConnectedAccountControllerTest extends TestCase
         ]);
     }
 
-    public function test_callback_relinks_orphaned_profiles_after_reconnect(): void
+    public function test_callback_relinks_orphaned_workspaces_after_reconnect(): void
     {
-        // Vorher verbunden, dann disconnect → Profil zeigt auf NULL
-        $orphan = RepoProfile::factory()->create([
+        // Connected before, then disconnected → the workspace points to NULL
+        $orphan = Workspace::factory()->create([
             'platform' => 'github',
             'auth_method' => 'oauth',
             'connected_account_id' => null,
-            'url' => 'https://github.com/nodus-it/repo',
+            'repo_url' => 'https://github.com/nodus-it/repo',
         ]);
 
         $this->mockSocialiteCallback($this->makeSocialiteUser());

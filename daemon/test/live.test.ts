@@ -16,7 +16,7 @@ import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ApprovalRegistry } from '../src/approvals.js';
 import type { PendingEvent } from '../src/events.js';
-import { ThreadSession, type QueryFactory, type QueryLike } from '../src/threadSession.js';
+import { TaskSession, type QueryFactory, type QueryLike } from '../src/taskSession.js';
 import { waitFor } from './fakeQuery.js';
 
 const token = process.env.ARGOS_LIVE_CLAUDE_TOKEN;
@@ -36,7 +36,7 @@ describe.skipIf(!enabled)('live: Claude subscription in SDK streaming mode', () 
     afterAll(() => rmSync(agentsDir, { recursive: true, force: true }));
 
     const make = (events: PendingEvent[], permissionMode: 'default' | 'acceptEdits', resumeSessionId?: string) =>
-        new ThreadSession('live', { agentId: 'live', oauthToken: token!, model, permissionMode, resumeSessionId: resumeSessionId ?? null }, (e) => events.push(e), approvals, factory, {
+        new TaskSession('live', { agentId: 'live', oauthToken: token!, model, permissionMode, resumeSessionId: resumeSessionId ?? null }, (e) => events.push(e), approvals, factory, {
             workspaceDir: repoDir!,
             agentsDir,
             claudeBin: process.env.ARGOS_CLAUDE_BIN,

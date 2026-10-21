@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Testing;
 
-use App\Enums\ThreadStatus;
+use App\Enums\SessionStatus;
 use App\Enums\WorkspaceStatus;
-use App\Models\Thread;
+use App\Models\Task;
 use App\Models\Workspace;
 use App\Services\Workspace\WorkspaceProvisioner;
 
@@ -27,7 +27,7 @@ class FakeWorkspaceProvisioner extends WorkspaceProvisioner
 
     public function shutdown(Workspace $workspace): void
     {
-        Thread::query()->where('workspace_id', $workspace->id)->update(['session_open' => false, 'status' => ThreadStatus::Closed->value]);
+        Task::query()->where('workspace_id', $workspace->id)->update(['session_open' => false, 'session_status' => SessionStatus::Closed->value]);
         $workspace->forceFill(['status' => WorkspaceStatus::Stopped])->save();
     }
 }

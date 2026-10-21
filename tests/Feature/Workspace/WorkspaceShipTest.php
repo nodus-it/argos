@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Workspace;
 
-use App\Broadcasting\ThreadStream;
+use App\Broadcasting\TaskStream;
 use App\Enums\GitProvider;
-use App\Enums\ThreadEventType;
+use App\Enums\TaskEventType;
+use App\Enums\TaskProviderKind;
+use App\Enums\TaskStatus;
 use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceStatus;
 use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ViewWorkspace;
@@ -16,9 +18,9 @@ use App\Integrations\WorkspaceDaemon\Requests\GitPush;
 use App\Integrations\WorkspaceDaemon\Requests\GitStatus;
 use App\Integrations\WorkspaceDaemon\Requests\RunOneshot;
 use App\Models\AgentCredential;
-use App\Models\RepoProfile;
-use App\Models\Thread;
-use App\Models\ThreadEvent;
+use App\Models\Task;
+use App\Models\TaskEvent;
+use App\Models\TaskProviderBinding;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceMember;
@@ -34,6 +36,7 @@ use Illuminate\Support\Facades\Event;
 use Livewire\Livewire;
 use Mockery;
 use Mockery\MockInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Saloon\Http\Faking\MockResponse;
 use Saloon\Http\PendingRequest;
 use Saloon\Laravel\Facades\Saloon;
@@ -44,6 +47,8 @@ class WorkspaceShipTest extends TestCase
     use RefreshDatabase;
 
     private Workspace $workspace;
+
+    private Task $task;
 
     private User $editor;
 
@@ -57,15 +62,15 @@ class WorkspaceShipTest extends TestCase
         parent::setUp();
         // Workspace pages live in the workspaces panel (/w).
         Filament::setCurrentPanel('workspaces');
-        Event::fake([ThreadStream::class]);
-        $profile = RepoProfile::factory()->create(['url' => 'https://gitlab.com/acme/sub/widget', 'platform' => GitProvider::GitLab, 'token' => 'glpat-x']);
-        $this->workspace = Workspace::factory()->create(['repo_profile_id' => $profile->id, 'status' => WorkspaceStatus::Running, 'branch' => 'ws/login', 'base_branch' => 'main']);
+        Event::fake([TaskStream::class]);
+        $this->workspace = Workspace::factory()->create(['repo_url' => 'https://gitlab.com/acme/sub/widget', 'platform' => GitProvider::GitLab, 'token' => 'glpat-x', 'status' => WorkspaceStatus::Running]);
         $this->editor = User::factory()->create(['name' => 'Ada', 'email' => 'ada@example.com']);
-        WorkspaceMember::query()->create(['workspace_id' => $this->workspace->id, 'user_id' => $this->editor->id, 'role' => WorkspaceRole::Editor]);
+        WorkspaceMember::query()->create(['workspace_id' => $this->workspace->id, 'user_id' => $this->editor->id, 'role' => WorkspaceRole::Member]);
+        $this->task = Task::factory()->ownedBy($this->editor)->create(['workspace_id' => $this->workspace->id, 'branch' => 'ws/login', 'base_branch' => 'develop']);
         AgentCredential::factory()->ownedBy($this->editor)->create(['credentials' => ['token' => 'oat-ada']]);
 
         $this->git = Mockery::mock(GitServiceContract::class);
-        $this->mock(GitServiceFactory::class)->shouldReceive('fromRepoProfile')->andReturn($this->git);
+        $this->mock(GitServiceFactory::class)->shouldReceive('forWorkspace')->andReturn($this->git);
         $this->fakeDaemon();
     }
 
@@ -97,7 +102,7 @@ class WorkspaceShipTest extends TestCase
 
     public function test_draft_asks_claude_on_the_users_subscription(): void
     {
-        $draft = $this->service()->draft($this->workspace, $this->editor);
+        $draft = $this->service()->draft($this->task, $this->editor);
 
         $this->assertSame(['subject' => 'feat: add login', 'body' => 'Adds the login.', 'changed_files' => 1, 'ahead' => 0], $draft);
         $prompt = $this->sent['RunOneshot'][0];
@@ -109,32 +114,44 @@ class WorkspaceShipTest extends TestCase
     public function test_draft_is_empty_without_an_agent_or_when_claude_fails(): void
     {
         AgentCredential::query()->delete();
-        $this->assertSame('', $this->service()->draft($this->workspace, $this->editor)['subject']);
+        $this->assertSame('', $this->service()->draft($this->task, $this->editor)['subject']);
 
         AgentCredential::factory()->ownedBy($this->editor)->create();
         $this->fakeDaemon([RunOneshot::class => MockResponse::make(['error' => ['code' => 'oneshot_failed', 'message' => 'x']], 502)]);
-        $this->assertSame('', $this->service()->draft($this->workspace, $this->editor)['subject']);
+        $this->assertSame('', $this->service()->draft($this->task, $this->editor)['subject']);
     }
 
-    public function test_ship_commits_pushes_and_opens_the_merge_request(): void
+    public function test_ship_commits_pushes_the_task_branch_and_opens_the_merge_request(): void
     {
-        $thread = Thread::factory()->create(['workspace_id' => $this->workspace->id]);
         $this->git->shouldReceive('createPullRequest')->once()
             ->withArgs(fn ($owner, $repo, $title, $body, $head, $base, $options) => $owner === 'acme/sub' && $repo === 'widget' && $title === 'feat: add login'
-                && str_contains($body, 'Adds the login.') && str_contains($body, '/w/workspaces/'.$this->workspace->id) && $head === 'ws/login' && $base === 'main' && $options === ['draft' => true])
+                && str_contains($body, 'Adds the login.') && str_contains($body, '/w/workspaces/'.$this->workspace->id) && str_contains($body, 'task='.$this->task->id)
+                && str_contains($body, __('workspaces.ship.pr_footer', ['url' => $this->task->url(), 'name' => 'Ada']))
+                && $head === 'ws/login' && $base === 'develop' && $options === ['draft' => true])
             ->andReturn(['iid' => 5, 'web_url' => 'https://gitlab.com/acme/sub/widget/-/merge_requests/5', 'state' => 'opened']);
 
-        $url = $this->service()->ship($this->workspace, $this->editor, 'feat: add login', 'Adds the login.', true);
+        $url = $this->service()->ship($this->task, $this->editor, 'feat: add login', 'Adds the login.', true);
 
         $this->assertSame('https://gitlab.com/acme/sub/widget/-/merge_requests/5', $url);
-        $this->workspace->refresh();
-        $this->assertSame(5, $this->workspace->pr_number);
-        $this->assertSame('open', $this->workspace->pr_state);
-        $this->assertNotNull($this->workspace->shipped_at);
+        $this->task->refresh();
+        $this->assertSame(5, $this->task->pr_number);
+        $this->assertSame('https://gitlab.com/acme/sub/widget/-/merge_requests/5', $this->task->pr_url);
+        $this->assertSame('open', $this->task->pr_state);
+        $this->assertSame(TaskStatus::PrOpen, $this->task->status);
+        $this->assertNotNull($this->task->shipped_at);
         $this->assertSame(['name' => 'Ada', 'email' => 'ada@example.com'], $this->sent['GitCommit'][0]['author']);
         $this->assertSame(['branch' => 'ws/login'], $this->sent['GitPush'][0]);
-        $notice = ThreadEvent::query()->where('thread_id', $thread->id)->where('type', ThreadEventType::Notice->value)->firstOrFail();
+        $notice = TaskEvent::query()->where('task_id', $this->task->id)->where('type', TaskEventType::Notice->value)->firstOrFail();
         $this->assertSame('shipped', $notice->payload['kind']);
+    }
+
+    public function test_only_the_owner_and_collaborators_may_ship_a_task(): void
+    {
+        $other = User::factory()->create();
+        WorkspaceMember::query()->create(['workspace_id' => $this->workspace->id, 'user_id' => $other->id, 'role' => WorkspaceRole::Member]);
+
+        $this->expectException(AuthorizationException::class);
+        $this->service()->ship($this->task, $other, 'feat: x', '');
     }
 
     public function test_a_provider_failure_after_the_push_is_a_workspace_exception(): void
@@ -142,48 +159,61 @@ class WorkspaceShipTest extends TestCase
         $this->git->shouldReceive('createPullRequest')->once()->andThrow(new \RuntimeException('422 head branch missing'));
 
         try {
-            $this->service()->ship($this->workspace, $this->editor, 'feat: add login', '');
+            $this->service()->ship($this->task, $this->editor, 'feat: add login', '');
             $this->fail('expected WorkspaceException');
         } catch (WorkspaceException $e) {
             $this->assertSame(__('workspaces.ship.pr_failed', ['message' => '422 head branch missing']), $e->getMessage());
         }
 
         $this->assertCount(1, $this->sent['GitPush']);
-        $this->workspace->refresh();
-        $this->assertNull($this->workspace->pr_number);
-        $this->assertNull($this->workspace->shipped_at);
+        $this->task->refresh();
+        $this->assertNull($this->task->pr_number);
+        $this->assertNull($this->task->shipped_at);
+        $this->assertSame(TaskStatus::Active, $this->task->status);
     }
 
     public function test_draft_is_empty_when_the_daemon_is_unreachable(): void
     {
         $this->fakeDaemon([GitStatus::class => MockResponse::make(['error' => ['code' => 'internal_error', 'message' => 'down']], 500)]);
 
-        $this->assertSame(['subject' => '', 'body' => '', 'changed_files' => 0, 'ahead' => 0], $this->service()->draft($this->workspace, $this->editor));
+        $this->assertSame(['subject' => '', 'body' => '', 'changed_files' => 0, 'ahead' => 0], $this->service()->draft($this->task, $this->editor));
     }
 
-    public function test_shipping_an_issue_workspace_closes_and_comments_on_the_issue(): void
+    /** @return array<string, array{TaskProviderKind, bool, string}> */
+    public static function issueReferences(): array
     {
-        $this->workspace->forceFill(['external_issue' => [
-            'binding_id' => 'b1', 'provider' => 'gitlab', 'owner' => 'acme', 'project' => 'sub/widget',
+        return [
+            'gitlab closes' => [TaskProviderKind::GitLab, true, 'Closes #12'],
+            'github closes' => [TaskProviderKind::GitHub, true, 'Closes #12'],
+            'gitlab without close on merge' => [TaskProviderKind::GitLab, false, 'Refs #12'],
+        ];
+    }
+
+    #[DataProvider('issueReferences')]
+    public function test_shipping_an_issue_task_references_and_comments_on_the_issue(TaskProviderKind $kind, bool $closeOnMerge, string $reference): void
+    {
+        $binding = TaskProviderBinding::factory()->create(['workspace_id' => $this->workspace->id, 'kind' => $kind, 'close_on_merge' => $closeOnMerge]);
+        $this->task->forceFill(['external_ref' => [
+            'binding_id' => $binding->id, 'provider' => $kind->value, 'owner' => 'acme', 'project' => 'sub/widget', 'key' => '12',
             'number' => '12', 'title' => 'Login', 'url' => 'https://gitlab.com/acme/sub/widget/-/issues/12', 'body' => '',
         ]])->save();
-        $issues = $this->mock(WorkspaceIssueService::class);
-        $issues->shouldReceive('pullRequestReference')->andReturn('Closes #12');
-        $issues->shouldReceive('announcePullRequest')->once()->with(Mockery::type(Workspace::class), 'https://x/9');
+        // The reference is real; only the tracker comment is faked.
+        $this->partialMock(WorkspaceIssueService::class)
+            ->shouldReceive('announcePullRequest')->once()->with(Mockery::on(fn ($task) => $task instanceof Task && $task->is($this->task)), 'https://x/9');
         $this->git->shouldReceive('createPullRequest')->once()
-            ->withArgs(fn ($owner, $repo, $title, $body) => str_contains($body, "Adds the login.\n\nCloses #12"))
+            ->withArgs(fn ($owner, $repo, $title, $body) => str_contains($body, "Adds the login.\n\n".$reference))
             ->andReturn(['iid' => 9, 'web_url' => 'https://x/9', 'state' => 'opened']);
 
-        $this->service()->ship($this->workspace, $this->editor, 'feat: add login', 'Adds the login.');
+        $this->service()->ship($this->task, $this->editor, 'feat: add login', 'Adds the login.');
     }
 
     public function test_shipping_again_comments_on_the_existing_pull_request(): void
     {
-        $this->workspace->forceFill(['pr_number' => 5, 'pr_url' => 'https://x/5', 'pr_state' => 'open'])->save();
+        $this->task->forceFill(['pr_number' => 5, 'pr_url' => 'https://x/5', 'pr_state' => 'open'])->save();
         $this->git->shouldReceive('createPullRequest')->never();
         $this->git->shouldReceive('commentOnPullRequest')->once()->withArgs(fn ($owner, $repo, $id, $body) => $id === 5 && str_contains($body, 'feat: more'));
 
-        $this->assertSame('https://x/5', $this->service()->ship($this->workspace, $this->editor, 'feat: more', ''));
+        $this->assertSame('https://x/5', $this->service()->ship($this->task, $this->editor, 'feat: more', ''));
     }
 
     public function test_nothing_to_ship(): void
@@ -195,7 +225,7 @@ class WorkspaceShipTest extends TestCase
 
         $this->expectException(WorkspaceException::class);
         $this->expectExceptionMessage(__('workspaces.ship.nothing'));
-        $this->service()->ship($this->workspace, $this->editor, 'feat: x', '');
+        $this->service()->ship($this->task, $this->editor, 'feat: x', '');
     }
 
     public function test_a_rejected_push_explains_how_to_continue(): void
@@ -203,13 +233,13 @@ class WorkspaceShipTest extends TestCase
         $this->fakeDaemon([GitPush::class => MockResponse::make(['error' => ['code' => 'rejected_non_fast_forward', 'message' => 'rejected']], 409)]);
 
         $this->expectExceptionMessage(__('workspaces.ship.rejected'));
-        $this->service()->ship($this->workspace, $this->editor, 'feat: x', '');
+        $this->service()->ship($this->task, $this->editor, 'feat: x', '');
     }
 
     public function test_viewers_cannot_ship_and_a_subject_is_required(): void
     {
         try {
-            $this->service()->ship($this->workspace, $this->editor, '  ', '');
+            $this->service()->ship($this->task, $this->editor, '  ', '');
             $this->fail('expected WorkspaceException');
         } catch (WorkspaceException) {
             $this->assertArrayNotHasKey('GitCommit', $this->sent);
@@ -218,17 +248,46 @@ class WorkspaceShipTest extends TestCase
         $viewer = User::factory()->create();
         WorkspaceMember::query()->create(['workspace_id' => $this->workspace->id, 'user_id' => $viewer->id, 'role' => WorkspaceRole::Viewer]);
         $this->expectException(AuthorizationException::class);
-        $this->service()->ship($this->workspace, $viewer, 'feat: x', '');
+        $this->service()->ship($this->task, $viewer, 'feat: x', '');
     }
 
-    public function test_sync_reads_the_pull_request_state(): void
+    public function test_sync_marks_a_merged_pull_request_done(): void
     {
-        $this->workspace->forceFill(['pr_number' => 5, 'pr_url' => 'https://x/5', 'pr_state' => 'open'])->save();
+        $this->task->forceFill(['pr_number' => 5, 'pr_url' => 'https://x/5', 'pr_state' => 'open', 'status' => TaskStatus::PrOpen])->save();
         $this->git->shouldReceive('getPullRequest')->once()->with('acme/sub', 'widget', 5)->andReturn(['iid' => 5, 'web_url' => 'https://x/5', 'state' => 'merged']);
 
-        $this->artisan('argos:workspaces:sync-prs')->assertSuccessful();
+        $this->artisan('argos:tasks:sync-prs')->assertSuccessful();
 
-        $this->assertSame('merged', $this->workspace->fresh()->pr_state);
+        $task = $this->task->fresh();
+        $this->assertSame('merged', $task->pr_state);
+        $this->assertSame(TaskStatus::Done, $task->status);
+        $this->assertNotNull($task->done_at);
+    }
+
+    public function test_sync_cancels_a_task_whose_pull_request_was_closed(): void
+    {
+        $this->task->forceFill(['pr_number' => 5, 'pr_url' => 'https://x/5', 'pr_state' => 'open', 'status' => TaskStatus::PrOpen])->save();
+        $this->git->shouldReceive('getPullRequest')->once()->andReturn(['iid' => 5, 'web_url' => 'https://x/5', 'state' => 'closed']);
+
+        $this->service()->syncPullRequest($this->task);
+
+        $task = $this->task->fresh();
+        $this->assertSame('closed', $task->pr_state);
+        $this->assertSame(TaskStatus::Cancelled, $task->status);
+        $this->assertNotNull($task->done_at);
+    }
+
+    public function test_sync_keeps_an_open_pull_request_open(): void
+    {
+        $this->task->forceFill(['pr_number' => 5, 'pr_url' => 'https://x/5', 'pr_state' => 'draft', 'status' => TaskStatus::PrOpen])->save();
+        $this->git->shouldReceive('getPullRequest')->once()->andReturn(['iid' => 5, 'web_url' => 'https://x/5', 'state' => 'opened']);
+
+        $this->service()->syncPullRequest($this->task);
+
+        $task = $this->task->fresh();
+        $this->assertSame('open', $task->pr_state);
+        $this->assertSame(TaskStatus::PrOpen, $task->status);
+        $this->assertNull($task->done_at);
     }
 
     public function test_the_ship_action_prefills_the_draft_and_ships(): void
@@ -242,6 +301,6 @@ class WorkspaceShipTest extends TestCase
             ->callMountedAction()
             ->assertNotified();
 
-        $this->assertSame(9, $this->workspace->fresh()->pr_number);
+        $this->assertSame(9, $this->task->fresh()->pr_number);
     }
 }

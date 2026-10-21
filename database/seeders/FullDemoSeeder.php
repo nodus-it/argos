@@ -10,13 +10,15 @@ use App\Enums\TaskProviderKind;
 use App\Enums\TaskProviderMode;
 use App\Enums\WorkerSource;
 use App\Models\ExternalIssueLink;
-use App\Models\RepoProfile;
 use App\Models\TaskProviderBinding;
+use App\Models\User;
 use App\Models\WorkerStack;
+use App\Models\Workspace;
 use Database\Seeders\Support\CredentialMatrixBuilder;
 use Database\Seeders\Support\DemoUserBuilder;
 use Database\Seeders\Support\ProviderMatrixBuilder;
 use Database\Seeders\Support\WorkerStackBuilder;
+use Database\Seeders\Support\WorkspaceSeeds;
 use Illuminate\Database\Seeder;
 
 /**
@@ -27,7 +29,7 @@ use Illuminate\Database\Seeder;
  *   - the full git/issue provider matrix                          — ProviderMatrixBuilder
  *   - agent + provider credentials in every status                — CredentialMatrixBuilder
  *   - a built-in "update available" stack + a custom BYOI stack   — WorkerStackBuilder
- *   - RepoProfile feature variants (live-demo, BYOI, devcontainer)
+ *   - workspace feature variants (live-demo, BYOI)
  *   - one external issue link on a seeded binding                 — ExternalIssueLink
  *
  * Idempotent — re-seeding updates in place. Run via `composer dev:full`
@@ -48,49 +50,44 @@ final class FullDemoSeeder extends Seeder
         $stacks->flagBuiltinHasUpdate();
         $byoiStack = $stacks->customByoiStack($user);
 
-        $this->showcaseRepo();
-        $this->repoProfileVariants($byoiStack);
+        $this->showcaseRepo($user);
+        $this->workspaceVariants($user, $byoiStack);
         $this->externalIssue($profiles['github']);
 
-        $this->command?->info('Full-Demo profile seeded: providers, credentials, stacks, project variants and an issue link.');
+        $this->command?->info('Full-Demo profile seeded: providers, credentials, stacks, workspace variants and an issue link.');
     }
 
-    /** A plain OAuth project to open workspaces on. */
-    private function showcaseRepo(): RepoProfile
+    /** A plain OAuth workspace to work in. */
+    private function showcaseRepo(User $user): Workspace
     {
-        return RepoProfile::firstOrCreate(
-            ['url' => 'https://github.com/nodus-it/argos-showcase.git'],
-            [
-                'name' => 'showcase',
-                'platform' => GitProvider::GitHub->value,
-                'auth_method' => AuthMethod::OAuth->value,
-                'default_branch' => 'main',
-            ],
-        );
+        return WorkspaceSeeds::upsert($user, 'showcase', [
+            'repo_url' => 'https://github.com/nodus-it/argos-showcase.git',
+            'platform' => GitProvider::GitHub->value,
+            'auth_method' => AuthMethod::OAuth->value,
+            'default_branch' => 'main',
+        ]);
     }
 
-    /** Feature-flag variants so the repo list/form shows each toggle in action. */
-    private function repoProfileVariants(WorkerStack $byoiStack): void
+    /** Feature-flag variants so the workspace list/form shows each toggle in action. */
+    private function workspaceVariants(User $user, WorkerStack $byoiStack): void
     {
-        $this->repoVariant('demo · live-demo', GitProvider::GitHub, ['live_demo_enabled' => true]);
-        $this->repoVariant('demo · BYOI stack', GitProvider::GitHub, [
+        $this->variant($user, 'demo · live-demo', GitProvider::GitHub, ['live_demo_enabled' => true]);
+        $this->variant($user, 'demo · BYOI stack', GitProvider::GitHub, [
             'worker_source' => WorkerSource::Byoi->value,
             'worker_stack_id' => $byoiStack->id,
-        ]);
-        $this->repoVariant('demo · devcontainer', GitProvider::GitLab, [
-            'worker_source' => WorkerSource::Devcontainer->value,
         ]);
     }
 
     /**
      * @param  array<string, mixed>  $extra
      */
-    private function repoVariant(string $name, GitProvider $platform, array $extra): void
+    private function variant(User $user, string $name, GitProvider $platform, array $extra): void
     {
-        RepoProfile::updateOrCreate(
-            ['name' => $name],
+        WorkspaceSeeds::upsert(
+            $user,
+            $name,
             [
-                'url' => 'https://github.com/nodus-it/'.str($name)->slug().'.git',
+                'repo_url' => 'https://github.com/nodus-it/'.str($name)->slug().'.git',
                 'platform' => $platform->value,
                 'auth_method' => AuthMethod::Pat->value,
                 'token' => 'pat-demo',
@@ -101,13 +98,13 @@ final class FullDemoSeeder extends Seeder
     }
 
     /** One external issue link on a real seeded binding (not launched yet). */
-    private function externalIssue(?RepoProfile $githubProfile): void
+    private function externalIssue(?Workspace $githubProfile): void
     {
         if ($githubProfile === null) {
             return;
         }
 
-        $binding = TaskProviderBinding::where('repo_profile_id', $githubProfile->id)
+        $binding = TaskProviderBinding::where('workspace_id', $githubProfile->id)
             ->where('kind', TaskProviderKind::GitHub->value)
             ->where('mode', TaskProviderMode::Webhook->value)
             ->first();

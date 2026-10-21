@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Worker;
 
-use App\Models\RepoProfile;
 use App\Models\Workspace;
 use App\Services\Worker\WorkerSidecarManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -40,12 +39,10 @@ class WorkerSidecarManagerTest extends TestCase
     /** @param  list<string>  $services */
     private function workspaceWithServices(array $services): Workspace
     {
-        $profile = RepoProfile::factory()->withBackingServices($services)->create();
-
-        return Workspace::factory()->create(['repo_profile_id' => $profile->id]);
+        return Workspace::factory()->withBackingServices($services)->create();
     }
 
-    public function test_no_sidecars_when_profile_enables_none(): void
+    public function test_no_sidecars_when_workspace_enables_none(): void
     {
         $manager = new RecordingSidecarManager;
         $sidecars = $manager->startForWorkspace($this->workspaceWithServices([]));
@@ -87,11 +84,10 @@ class WorkerSidecarManagerTest extends TestCase
 
     public function test_custom_mysql_credentials_reach_container_and_connection_env(): void
     {
-        $profile = RepoProfile::factory()
+        $workspace = Workspace::factory()
             ->withBackingServices(['mysql'])
             ->withServiceConfig(['mysql' => ['database' => 'shop', 'username' => 'sa', 'password' => 'pw']])
             ->create();
-        $workspace = Workspace::factory()->create(['repo_profile_id' => $profile->id]);
 
         $manager = new RecordingSidecarManager;
         $sidecars = $manager->startForWorkspace($workspace);

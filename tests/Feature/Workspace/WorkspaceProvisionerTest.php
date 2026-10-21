@@ -4,15 +4,18 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Workspace;
 
-use App\Enums\ThreadStatus;
+use App\Enums\DemoStatus;
+use App\Enums\SessionStatus;
 use App\Enums\WorkspaceStatus;
 use App\Events\Workspace\WorkspaceStarted;
 use App\Integrations\WorkspaceDaemon\Requests\InitWorkspace;
-use App\Integrations\WorkspaceDaemon\Requests\StopThread;
-use App\Models\Thread;
+use App\Integrations\WorkspaceDaemon\Requests\StopTask;
+use App\Models\Demo;
+use App\Models\Task;
 use App\Models\User;
 use App\Models\WorkerStack;
 use App\Models\Workspace;
+use App\Services\Demo\DemoDeployer;
 use App\Services\Worker\WorkerSidecarManager;
 use App\Services\Worker\WorkerSidecars;
 use App\Services\Workspace\WorkspaceContainerManager;
@@ -54,7 +57,7 @@ class WorkspaceProvisionerTest extends TestCase
     {
         $spec = (new \ReflectionClass(AgentSpec::class))->newInstanceWithoutConstructor();
         $resolved = new ResolvedWorkerImage(new WorkerStack, $spec, 'argos-stack:t', 'argos-worker:t');
-        $this->mock(WorkerImageResolver::class)->shouldReceive('resolveForRepoProfile')->andReturn($resolved);
+        $this->mock(WorkerImageResolver::class)->shouldReceive('resolveForWorkspace')->andReturn($resolved);
         $this->mock(WorkspaceImageBuilder::class)->shouldReceive('ensure')->andReturn(['tag' => 'argos-workspace:t', 'log' => '']);
         $this->mock(WorkerSidecarManager::class, function ($mock): void {
             $mock->shouldReceive('startForWorkspace')->andReturn(new WorkerSidecars);
@@ -68,7 +71,7 @@ class WorkspaceProvisionerTest extends TestCase
         });
     }
 
-    public function test_boot_clones_through_the_daemon_and_marks_running(): void
+    public function test_boot_clones_the_default_branch_through_the_daemon_and_marks_running(): void
     {
         Event::fake([WorkspaceStarted::class]);
         $this->bindDocker();
@@ -79,16 +82,18 @@ class WorkspaceProvisionerTest extends TestCase
             return MockResponse::make(['status' => 'ready']);
         }]);
         $creator = User::factory()->create(['name' => 'Ada', 'email' => 'ada@example.com']);
-        $workspace = Workspace::factory()->create(['status' => WorkspaceStatus::Provisioning, 'created_by' => $creator->id, 'branch' => 'ws/login']);
+        $workspace = Workspace::factory()->create(['status' => WorkspaceStatus::Provisioning, 'created_by' => $creator->id, 'default_branch' => 'develop']);
 
         app(WorkspaceProvisioner::class)->boot($workspace);
 
         $workspace->refresh();
         $this->assertSame(WorkspaceStatus::Running, $workspace->status);
         $this->assertSame($workspace->containerName(), $workspace->container_name);
-        $this->assertSame('ws/login', $sent['branch']);
+        // The main clone checks out the default branch; tasks get worktrees later.
+        $this->assertSame('develop', $sent['branch']);
+        $this->assertSame('develop', $sent['base_branch']);
         $this->assertSame('ada@example.com', $sent['git_user_email']);
-        $this->assertSame($workspace->repoProfile->url, $sent['repo_url']);
+        $this->assertSame($workspace->repo_url, $sent['repo_url']);
         $this->assertArrayNotHasKey('repo_token', $sent);
         Event::assertDispatched(WorkspaceStarted::class);
         $this->assertFileExists($this->traefikDir.'/code-'.$workspace->slug.'.yml');
@@ -127,29 +132,47 @@ class WorkspaceProvisionerTest extends TestCase
         }
     }
 
+    public function test_shutdown_stops_every_task_preview_of_the_workspace(): void
+    {
+        $this->bindDocker(function ($mock): void {
+            $mock->shouldReceive('stop')->once();
+        });
+        $this->mock(DemoDeployer::class)->shouldReceive('teardown')->twice();
+        $workspace = Workspace::factory()->create();
+        $live = Demo::factory()->live()->create(['task_id' => Task::factory()->create(['workspace_id' => $workspace->id])->id]);
+        $building = Demo::factory()->create(['task_id' => Task::factory()->create(['workspace_id' => $workspace->id])->id]);
+        $foreign = Demo::factory()->live()->create();
+
+        app(WorkspaceProvisioner::class)->shutdown($workspace);
+
+        $this->assertSame(DemoStatus::Stopped, $live->fresh()->status);
+        $this->assertSame(DemoStatus::Stopped, $building->fresh()->status);
+        $this->assertSame(DemoStatus::Live, $foreign->fresh()->status);
+    }
+
     public function test_shutdown_closes_open_sessions_and_stops_the_container(): void
     {
         $this->bindDocker(function ($mock): void {
             $mock->shouldReceive('stop')->once();
         });
-        $this->mock(WorkspacePreviewService::class)->shouldReceive('stop')->once();
+        $this->mock(WorkspacePreviewService::class)->shouldReceive('stopAll')->once();
         $stopped = [];
-        Saloon::fake([StopThread::class => function (PendingRequest $request) use (&$stopped) {
+        Saloon::fake([StopTask::class => function (PendingRequest $request) use (&$stopped) {
             $stopped[] = $request->getUrl();
 
             return MockResponse::make([], 202);
         }]);
         $workspace = Workspace::factory()->create();
-        $open = Thread::factory()->open()->create(['workspace_id' => $workspace->id]);
-        $closed = Thread::factory()->create(['workspace_id' => $workspace->id]);
+        $open = Task::factory()->open()->create(['workspace_id' => $workspace->id]);
+        $closed = Task::factory()->create(['workspace_id' => $workspace->id]);
 
         app(WorkspaceProvisioner::class)->shutdown($workspace);
 
         $this->assertCount(1, $stopped);
         $this->assertStringContainsString($open->id, $stopped[0]);
         $this->assertFalse($open->fresh()->session_open);
-        $this->assertSame(ThreadStatus::Closed, $open->fresh()->status);
-        $this->assertSame(ThreadStatus::Closed, $closed->fresh()->status);
+        $this->assertSame(SessionStatus::Closed, $open->fresh()->session_status);
+        $this->assertSame(SessionStatus::Closed, $closed->fresh()->session_status);
         $this->assertSame(WorkspaceStatus::Stopped, $workspace->fresh()->status);
         $this->assertFileDoesNotExist($this->traefikDir.'/code-'.$workspace->slug.'.yml');
     }
@@ -159,7 +182,7 @@ class WorkspaceProvisionerTest extends TestCase
         $this->bindDocker(function ($mock): void {
             $mock->shouldReceive('stop')->once()->andThrow(new RuntimeException('docker stop failed'));
         });
-        $this->mock(WorkspacePreviewService::class)->shouldReceive('stop')->once();
+        $this->mock(WorkspacePreviewService::class)->shouldReceive('stopAll')->once();
         $workspace = Workspace::factory()->create(['status' => WorkspaceStatus::Stopping]);
 
         try {

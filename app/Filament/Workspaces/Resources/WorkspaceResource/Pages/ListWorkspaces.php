@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Filament\Workspaces\Resources\WorkspaceResource\Pages;
 
+use App\Filament\Admin\Resources\WorkspaceResource as AdminWorkspaceResource;
 use App\Filament\Workspaces\Resources\WorkspaceResource;
+use App\Models\Workspace;
 use App\Support\DocsLinkAction;
-use Filament\Actions\CreateAction;
+use Filament\Actions\Action;
 use Filament\Resources\Pages\ListRecords;
 
 class ListWorkspaces extends ListRecords
@@ -17,7 +19,12 @@ class ListWorkspaces extends ListRecords
     {
         return [
             DocsLinkAction::make('workspaces'),
-            CreateAction::make(),
+            // Only Argos admins create workspaces (repository, stack, secrets).
+            Action::make('create')
+                ->label(__('workspaces.actions.create'))
+                ->icon('heroicon-o-plus')
+                ->visible(fn (): bool => auth()->user()?->can('create', Workspace::class) ?? false)
+                ->url(fn (): string => AdminWorkspaceResource::getUrl('create', panel: 'admin')),
         ];
     }
 }

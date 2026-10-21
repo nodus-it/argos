@@ -7,9 +7,10 @@ namespace Database\Seeders;
 use App\Enums\AuthMethod;
 use App\Enums\GitProvider;
 use App\Models\ConnectedAccount;
-use App\Models\RepoProfile;
 use App\Models\User;
+use App\Models\Workspace;
 use Database\Seeders\Support\DemoUserBuilder;
+use Database\Seeders\Support\WorkspaceSeeds;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Env;
 
@@ -83,21 +84,22 @@ final class LiveReadySeeder extends Seeder
         );
     }
 
-    private function liveProfile(User $user, ConnectedAccount $account, string $repoUrl, string $branch): RepoProfile
+    private function liveProfile(User $user, ConnectedAccount $account, string $repoUrl, string $branch): Workspace
     {
         // Named after the repo, so a live profile for another repo is not
         // mistaken for Argos itself.
         $name = basename(preg_replace('/\.git$/', '', rtrim($repoUrl, '/')) ?? $repoUrl).' (live)';
 
-        return RepoProfile::updateOrCreate(
-            ['name' => $name],
+        return WorkspaceSeeds::upsert(
+            $user,
+            $name,
             [
-                'url' => $repoUrl,
+                'repo_url' => $repoUrl,
                 'platform' => GitProvider::GitHub->value,
                 'auth_method' => AuthMethod::OAuth->value,
                 'connected_account_id' => $account->id,
                 'default_branch' => $branch,
-                // Issue triggers and project tokens act for the admin.
+                // Issue triggers and workspace tokens act for the admin.
                 'automation_user_id' => $user->id,
                 // Live profile is meant to showcase the end-to-end flow incl.
                 // the workspace preview, so enable it by default.

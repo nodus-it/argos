@@ -34,10 +34,7 @@ class DemoComposeBuilder
         // API keys, …) so the demo's `composer install` + boot see the same env
         // as the worker. Argos-owned keys below win via array_merge order, so
         // the project can't override APP_URL / APP_KEY / SESSION_COOKIE here.
-        $profile = $target->demoRepoProfile();
-        $projectEnv = $profile !== null
-            ? app(ProjectEnvironmentResolver::class)->resolve($profile)
-            : [];
+        $projectEnv = app(ProjectEnvironmentResolver::class)->resolve($target->demoWorkspace());
 
         $override = [
             'services' => [

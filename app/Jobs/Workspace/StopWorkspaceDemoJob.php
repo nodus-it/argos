@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Jobs\Workspace;
 
-use App\Models\Workspace;
+use App\Models\Task;
 use App\Services\Workspace\WorkspacePreviewService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
-/** Stops a workspace's live preview (TTL expiry, workspace stop). */
+/** Stops a task's live preview (TTL expiry). */
 class StopWorkspaceDemoJob implements ShouldQueue
 {
     use Queueable;
@@ -18,15 +18,15 @@ class StopWorkspaceDemoJob implements ShouldQueue
 
     public int $tries = 1;
 
-    public function __construct(public readonly string $workspaceId) {}
+    public function __construct(public readonly string $taskId) {}
 
     public function handle(WorkspacePreviewService $previews): void
     {
-        $workspace = Workspace::query()->withTrashed()->find($this->workspaceId);
-        if ($workspace === null) {
+        $task = Task::query()->find($this->taskId);
+        if ($task === null) {
             return;
         }
 
-        $previews->stop($workspace);
+        $previews->stop($task);
     }
 }

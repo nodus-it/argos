@@ -1,6 +1,6 @@
 import type { Options, PermissionMode, PermissionResult, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 import type { SdkMessageLike } from '../src/normalize.js';
-import type { QueryFactory, QueryLike } from '../src/threadSession.js';
+import type { QueryFactory, QueryLike } from '../src/taskSession.js';
 
 export interface ScriptContext {
     readonly options: Options;

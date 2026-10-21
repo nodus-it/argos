@@ -59,7 +59,7 @@ return [
     'claude_token' => [
         'expiry' => [
             'title' => 'Token expiry',
-            'body' => 'Claude tokens expire after a few weeks. If threads suddenly fail with "401 Unauthorized": run <code>claude setup-token</code> again and paste the new token.',
+            'body' => 'Claude tokens expire after a few weeks. If tasks suddenly fail with "401 Unauthorized": run <code>claude setup-token</code> again and paste the new token.',
             'doc_label' => 'Claude Code quickstart',
             'doc_url' => ':claude_setup_token',
         ],

@@ -1,8 +1,8 @@
 /**
  * Wire types for events the daemon reports to the Argos manager.
  *
- * Every event belongs to a thread (or to the workspace when `thread_id` is
- * null) and carries a per-thread monotonic `seq` so the manager can
+ * Every event belongs to a task (or to the workspace when `task_id` is
+ * null) and carries a per-task monotonic `seq` so the manager can
  * de-duplicate retried batches.
  */
 
@@ -28,7 +28,7 @@ export type DaemonEventType =
     | 'gates.baseline'
     | 'checkpoint.created';
 
-export type ThreadState = 'starting' | 'idle' | 'running' | 'waiting_input' | 'closed';
+export type TaskState = 'starting' | 'idle' | 'running' | 'waiting_input' | 'closed';
 
 /** An event before the outbox stamped it with a sequence number. */
 export interface PendingEvent {
@@ -37,7 +37,7 @@ export interface PendingEvent {
 }
 
 export interface DaemonEvent extends PendingEvent {
-    thread_id: string | null;
+    task_id: string | null;
     seq: number;
     ts: string;
 }
@@ -47,7 +47,7 @@ export interface EventBatch {
     events: DaemonEvent[];
 }
 
-/** Where a thread session sends its events. */
+/** Where a task session sends its events. */
 export type EventSink = (event: PendingEvent) => void;
 
 /** Upper bound for tool input/output payloads relayed to the manager. */

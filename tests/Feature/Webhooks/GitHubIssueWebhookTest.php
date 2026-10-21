@@ -9,8 +9,8 @@ use App\Enums\TaskProviderMode;
 use App\Enums\TaskProviderSyncStatus;
 use App\Jobs\ProcessIncomingIssueJob;
 use App\Models\ExternalIssueLink;
+use App\Models\Task;
 use App\Models\TaskProviderBinding;
-use App\Models\Workspace;
 use App\Services\IssueTracker\IssueIngestService;
 use App\Services\IssueTracker\IssueTrackerRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -39,7 +39,7 @@ class GitHubIssueWebhookTest extends TestCase
             'webhook_secret' => self::SECRET,
             'external_project_ref' => 'acme/widget',
         ]);
-        $this->prepareIssueRuns($this->binding->repoProfile);
+        $this->prepareIssueRuns($this->binding->workspace);
     }
 
     /** @param  array<string, mixed>  $data */
@@ -99,7 +99,7 @@ class GitHubIssueWebhookTest extends TestCase
         Queue::assertPushed(ProcessIncomingIssueJob::class);
     }
 
-    public function test_end_to_end_creates_external_link_and_workspace(): void
+    public function test_end_to_end_creates_external_link_and_task(): void
     {
         $envelope = $this->issueEnvelope();
 
@@ -114,9 +114,9 @@ class GitHubIssueWebhookTest extends TestCase
         ]);
 
         $link = ExternalIssueLink::where('task_provider_binding_id', $this->binding->id)->first();
-        $this->assertNotNull($link->workspace_id, 'A workspace should be launched for the ingested issue');
+        $this->assertNotNull($link->task_id, 'A task should be launched for the ingested issue');
 
-        $this->assertStringEndsWith('Something is broken', Workspace::query()->findOrFail($link->workspace_id)->name);
+        $this->assertStringEndsWith('Something is broken', Task::query()->findOrFail($link->task_id)->title);
     }
 
     // ── invalid signature ────────────────────────────────────────────────────
@@ -209,7 +209,7 @@ class GitHubIssueWebhookTest extends TestCase
         $job->handle(app(IssueTrackerRegistry::class), app(IssueIngestService::class));
 
         $this->assertDatabaseCount(ExternalIssueLink::class, 0);
-        $this->assertDatabaseCount('workspaces', 0);
+        $this->assertDatabaseCount('tasks', 0);
     }
 
     // ── PR envelope is discarded ──────────────────────────────────────────────
@@ -230,6 +230,6 @@ class GitHubIssueWebhookTest extends TestCase
         $job->handle(app(IssueTrackerRegistry::class), app(IssueIngestService::class));
 
         $this->assertDatabaseCount(ExternalIssueLink::class, 0);
-        $this->assertDatabaseCount('workspaces', 0);
+        $this->assertDatabaseCount('tasks', 0);
     }
 }

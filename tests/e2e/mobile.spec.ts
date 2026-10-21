@@ -67,7 +67,7 @@ test.describe('mobile gate @375px', () => {
     await assertTapTarget(page.locator('.ws-composer-bar .btn-primary').first(), 'Workspace · Send');
   });
 
-  test('the new-thread form with the auto toggle fits the phone', async ({ page }) => {
+  test('the new-task form with the auto toggle fits the phone', async ({ page }) => {
     resetDatabase('E2eWorkspaceSeeder');
     await login(page);
 
@@ -79,7 +79,7 @@ test.describe('mobile gate @375px', () => {
     await page.locator('.ws-auto-toggle input[type="checkbox"]').check();
     await expect(page.locator('.ws-auto-grid')).toBeVisible();
 
-    await assertNoHorizontalOverflow(page, 'Workspace · new auto-thread form');
-    await assertTapTarget(page.locator('.ws-new-thread button[type="submit"]'), 'Workspace · Start automatic run');
+    await assertNoHorizontalOverflow(page, 'Workspace · new auto-task form');
+    await assertTapTarget(page.locator('.ws-new-task button[type="submit"]'), 'Workspace · Start automatic run');
   });
 });

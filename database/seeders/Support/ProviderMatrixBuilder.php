@@ -10,16 +10,16 @@ use App\Enums\TaskProviderKind;
 use App\Enums\TaskProviderMode;
 use App\Enums\TaskProviderSyncStatus;
 use App\Models\ConnectedAccount;
-use App\Models\RepoProfile;
 use App\Models\TaskProviderBinding;
 use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Console\Command;
 
 /**
  * Seeds a complete demo matrix for the provider integrations so everything is
  * testable end-to-end right after a reset:
  *
- *   - one demo RepoProfile per GIT provider — GitHub, GitLab, Bitbucket;
+ *   - one demo workspace per GIT provider — GitHub, GitLab, Bitbucket;
  *   - one (webhook + poll) TaskProviderBinding per ISSUE provider — GitHub on
  *     its own profile, GitLab on its own profile, and Linear (which has no git
  *     repo) hung off the Bitbucket profile.
@@ -47,7 +47,7 @@ final class ProviderMatrixBuilder
      * profiles keyed by provider key (github/gitlab/bitbucket) so callers can
      * hang further demo data (e.g. external issue links) off a real binding.
      *
-     * @return array{github: ?RepoProfile, gitlab: ?RepoProfile, bitbucket: ?RepoProfile}
+     * @return array{github: ?Workspace, gitlab: ?Workspace, bitbucket: ?Workspace}
      */
     public function build(User $user): array
     {
@@ -85,16 +85,17 @@ final class ProviderMatrixBuilder
     /**
      * @param  array<string, array<string, mixed>>  $defaults
      */
-    private function seedGitProfile(User $user, GitProvider $platform, string $key, string $ref, array $defaults): RepoProfile
+    private function seedGitProfile(User $user, GitProvider $platform, string $key, string $ref, array $defaults): Workspace
     {
         $account = $user->connectedAccount($key);
         $instance = $this->instanceFor($key, $defaults);
         $url = rtrim($instance, '/')."/{$ref}.git";
 
-        return RepoProfile::updateOrCreate(
-            ['name' => "provider-demo ({$key})"],
+        return WorkspaceSeeds::upsert(
+            $user,
+            "provider-demo ({$key})",
             [
-                'url' => $url,
+                'repo_url' => $url,
                 'platform' => $platform->value,
                 'default_branch' => 'main',
                 'auth_method' => $account !== null ? AuthMethod::OAuth->value : AuthMethod::Pat->value,
@@ -106,7 +107,7 @@ final class ProviderMatrixBuilder
     /**
      * @param  array<string, array<string, mixed>>  $defaults
      */
-    private function seedLinear(User $user, string $label, ?RepoProfile $bitbucketProfile, array $defaults): void
+    private function seedLinear(User $user, string $label, ?Workspace $bitbucketProfile, array $defaults): void
     {
         $override = config('argos.provider_demo.linear_team');
         $team = is_string($override) && $override !== ''
@@ -129,14 +130,14 @@ final class ProviderMatrixBuilder
     }
 
     private function seedBindings(
-        RepoProfile $profile,
+        Workspace $profile,
         TaskProviderKind $kind,
         string $ref,
         ?ConnectedAccount $account,
         string $label,
     ): void {
         foreach (self::MODES as $mode) {
-            $existing = TaskProviderBinding::where('repo_profile_id', $profile->id)
+            $existing = TaskProviderBinding::where('workspace_id', $profile->id)
                 ->where('kind', $kind->value)
                 ->where('mode', $mode->value)
                 ->first();
@@ -150,7 +151,7 @@ final class ProviderMatrixBuilder
 
             TaskProviderBinding::updateOrCreate(
                 [
-                    'repo_profile_id' => $profile->id,
+                    'workspace_id' => $profile->id,
                     'kind' => $kind->value,
                     'mode' => $mode->value,
                 ],

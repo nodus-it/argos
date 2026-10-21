@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Services\IssueTracker;
 
-use App\Enums\AutoThreadState;
+use App\Enums\AutoTaskState;
 use App\Models\ExternalIssueLink;
-use App\Models\Thread;
+use App\Models\Task;
 use App\Services\IssueTracker\Concerns\ParsesExternalProjectRef;
-use App\Services\Workspace\AutoThreadDriver;
+use App\Services\Workspace\AutoTaskDriver;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -27,19 +27,19 @@ final class PlanApprovalService
 
     public function __construct(
         private readonly IssueTrackerRegistry $registry,
-        private readonly AutoThreadDriver $driver,
+        private readonly AutoTaskDriver $driver,
     ) {}
 
     /** True when an authorized 👍 was found and the plan approved. */
     public function check(ExternalIssueLink $link): bool
     {
         $binding = $link->binding;
-        $thread = $link->workspace_id === null ? null : Thread::query()
-            ->with(['workspace', 'creator'])
-            ->where('workspace_id', $link->workspace_id)
-            ->where('auto_state', AutoThreadState::AwaitingPlanApproval->value)
+        $task = $link->task_id === null ? null : Task::query()
+            ->with(['workspace', 'owner'])
+            ->whereKey($link->task_id)
+            ->where('auto_state', AutoTaskState::AwaitingPlanApproval->value)
             ->first();
-        if ($thread === null || $thread->creator === null || $link->plan_comment_id === null || ! $this->registry->has($binding->kind)) {
+        if ($task === null || $task->owner === null || $link->plan_comment_id === null || ! $this->registry->has($binding->kind)) {
             return false;
         }
 
@@ -53,8 +53,8 @@ final class PlanApprovalService
                 }
 
                 // Acts for the run's owner; the approver is logged.
-                $this->driver->decidePlan($thread, $thread->creator, true);
-                Log::channel('argos')->info('Plan approved via issue reaction', ['thread' => $thread->id, 'approver' => $reaction['user_login']]);
+                $this->driver->decidePlan($task, $task->owner, true);
+                Log::channel('argos')->info('Plan approved via issue reaction', ['task' => $task->id, 'approver' => $reaction['user_login']]);
 
                 return true;
             }

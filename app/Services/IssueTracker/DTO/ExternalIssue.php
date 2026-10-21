@@ -29,6 +29,8 @@ final readonly class ExternalIssue extends Dto
         public string $url,
         public string $state,
         public array $labels,
+        // Human-readable key where the tracker has one (Linear: "ENG-118").
+        public string $key = '',
     ) {}
 
     /**
@@ -51,6 +53,7 @@ final readonly class ExternalIssue extends Dto
             url: (string) ($payload['html_url'] ?? $payload['web_url'] ?? ''),
             state: (string) ($payload['state'] ?? $payload['status'] ?? ''),
             labels: self::normalizeLabels($payload['labels'] ?? []),
+            key: (string) ($payload['identifier'] ?? ''),
         );
     }
 

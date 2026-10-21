@@ -4,11 +4,15 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
-/** A member's role in a workspace: owners manage members, editors prompt and approve, viewers only read. */
+/**
+ * A person's role in a workspace. Admins manage settings, secrets, members
+ * and the setup; members create tasks; viewers read (and work in tasks they
+ * are invited to). What a role may do is its capability set.
+ */
 enum WorkspaceRole: string
 {
-    case Owner = 'owner';
-    case Editor = 'editor';
+    case Admin = 'admin';
+    case Member = 'member';
     case Viewer = 'viewer';
 
     public function label(): string
@@ -19,15 +23,30 @@ enum WorkspaceRole: string
     public function color(): string
     {
         return match ($this) {
-            self::Owner => 'primary',
-            self::Editor => 'info',
+            self::Admin => 'primary',
+            self::Member => 'info',
             self::Viewer => 'gray',
         };
     }
 
-    /** Owners and editors may prompt, interrupt and approve. */
-    public function canOperate(): bool
+    /**
+     * Capabilities the role grants across the whole workspace. Task-level
+     * capabilities additionally come from owning or collaborating on a task
+     * (see TaskAccess). Fixed today; configurable roles plug in here.
+     *
+     * @return list<Capability>
+     */
+    public function capabilities(): array
     {
-        return $this !== self::Viewer;
+        return match ($this) {
+            self::Admin => Capability::cases(),
+            self::Member => [Capability::TaskCreate, Capability::WorkspaceOperate, Capability::WorkspaceEditor],
+            self::Viewer => [],
+        };
+    }
+
+    public function grants(Capability $capability): bool
+    {
+        return in_array($capability, $this->capabilities(), true);
     }
 }

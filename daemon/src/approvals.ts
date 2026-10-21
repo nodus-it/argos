@@ -13,7 +13,7 @@ export interface ApprovalDecision {
 }
 
 interface PendingApproval {
-    threadId: string;
+    taskId: string;
     resolve: (decision: ApprovalDecision) => void;
 }
 
@@ -26,8 +26,8 @@ export class UnknownApprovalError extends CodedError {
 /**
  * Holds `canUseTool` calls that wait for a human decision.
  *
- * There is deliberately no timeout: in a shared thread a decision may take a
- * while. A request ends when someone decides, when the thread is interrupted
+ * There is deliberately no timeout: in a shared task a decision may take a
+ * while. A request ends when someone decides, when the task is interrupted
  * or closed, or when the SDK aborts it.
  */
 export class ApprovalRegistry {
@@ -45,11 +45,11 @@ export class ApprovalRegistry {
     }
 
     /** Register a request; the promise settles with the human decision. */
-    open(threadId: string, signal?: AbortSignal, onAbort?: (approvalId: string) => void): { approvalId: string; decision: Promise<ApprovalDecision> } {
+    open(taskId: string, signal?: AbortSignal, onAbort?: (approvalId: string) => void): { approvalId: string; decision: Promise<ApprovalDecision> } {
         const approvalId = ulid();
 
         const decision = new Promise<ApprovalDecision>((resolve) => {
-            this.pending.set(approvalId, { threadId, resolve });
+            this.pending.set(approvalId, { taskId, resolve });
 
             signal?.addEventListener(
                 'abort',
@@ -66,9 +66,9 @@ export class ApprovalRegistry {
         return { approvalId, decision };
     }
 
-    resolve(threadId: string, approvalId: string, decision: ApprovalDecision): void {
+    resolve(taskId: string, approvalId: string, decision: ApprovalDecision): void {
         const entry = this.pending.get(approvalId);
-        if (entry === undefined || entry.threadId !== threadId) {
+        if (entry === undefined || entry.taskId !== taskId) {
             throw new UnknownApprovalError(approvalId);
         }
 
@@ -76,11 +76,11 @@ export class ApprovalRegistry {
         entry.resolve(decision);
     }
 
-    /** Deny (and interrupt) every open request of a thread; returns the affected ids. */
-    cancelThread(threadId: string, message: string): string[] {
+    /** Deny (and interrupt) every open request of a task; returns the affected ids. */
+    cancelTask(taskId: string, message: string): string[] {
         const cancelled: string[] = [];
         for (const [approvalId, entry] of this.pending) {
-            if (entry.threadId !== threadId) {
+            if (entry.taskId !== taskId) {
                 continue;
             }
             this.pending.delete(approvalId);
@@ -95,10 +95,10 @@ export class ApprovalRegistry {
         return this.pending.has(approvalId);
     }
 
-    countFor(threadId: string): number {
+    countFor(taskId: string): number {
         let count = 0;
         for (const entry of this.pending.values()) {
-            if (entry.threadId === threadId) {
+            if (entry.taskId === taskId) {
                 count++;
             }
         }

@@ -31,7 +31,7 @@
                 @endif
                 @if ($row['detail'] !== '')<span class="wf-step-detail">{{ $row['detail'] }}</span>@endif
             </button>
-            <div class="wf-step-body mono" x-show="open" x-cloak>{{ \App\Support\ThreadEventFormatter::json($row['input']) }}@if ($row['output'] !== '')
+            <div class="wf-step-body mono" x-show="open" x-cloak>{{ \App\Support\TaskEventFormatter::json($row['input']) }}@if ($row['output'] !== '')
 
 ────
 {{ \Illuminate\Support\Str::limit($row['output'], 6000) }}@endif</div>

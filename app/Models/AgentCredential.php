@@ -68,10 +68,10 @@ class AgentCredential extends Model
         return $this->belongsTo(User::class);
     }
 
-    /** @return HasMany<Thread, $this> */
-    public function threads(): HasMany
+    /** @return HasMany<Task, $this> */
+    public function tasks(): HasMany
     {
-        return $this->hasMany(Thread::class);
+        return $this->hasMany(Task::class);
     }
 
     public function isShared(): bool
@@ -95,7 +95,7 @@ class AgentCredential extends Model
     }
 
     /**
-     * Agents a user may run threads on: their own plus shared ones.
+     * Agents a user may run tasks on: their own plus shared ones.
      *
      * @param  Builder<AgentCredential>  $query
      */

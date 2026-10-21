@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { DaemonEvent, EventBatch, PendingEvent } from './events.js';
 
-/** Acks returned by the manager: highest processed seq per thread key. */
+/** Acks returned by the manager: highest processed seq per task key. */
 export type Acks = Record<string, number>;
 
 /** Delivers one batch; resolves with the manager's acks or throws on failure. */
@@ -11,22 +11,22 @@ export interface OutboxOptions {
     flushIntervalMs?: number;
     flushMaxEvents?: number;
     maxBatchEvents?: number;
-    maxBufferedPerThread?: number;
+    maxBufferedPerTask?: number;
     maxBackoffMs?: number;
     now?: () => Date;
     onDeliveryError?: (error: unknown) => void;
 }
 
-/** Thread key used for workspace-level events (thread_id = null). */
+/** Task key used for workspace-level events (task_id = null). */
 export const WORKSPACE_KEY = '_workspace';
 
 /**
- * Stamps events with per-thread sequence numbers, batches them and delivers
+ * Stamps events with per-task sequence numbers, batches them and delivers
  * them to the manager until acknowledged.
  *
  * Delivery is at-least-once: every flush re-sends all unacknowledged events
  * (up to `maxBatchEvents`), and the manager drops anything at or below its
- * stored seq. Unacked events are buffered per thread; past the limit the
+ * stored seq. Unacked events are buffered per task; past the limit the
  * oldest streaming deltas are dropped first since the final message carries
  * the same content.
  */
@@ -41,7 +41,7 @@ export class Outbox {
     private readonly flushIntervalMs: number;
     private readonly flushMaxEvents: number;
     private readonly maxBatchEvents: number;
-    private readonly maxBufferedPerThread: number;
+    private readonly maxBufferedPerTask: number;
     private readonly maxBackoffMs: number;
     private readonly now: () => Date;
     private readonly onDeliveryError: (error: unknown) => void;
@@ -50,26 +50,26 @@ export class Outbox {
         this.flushIntervalMs = options.flushIntervalMs ?? 75;
         this.flushMaxEvents = options.flushMaxEvents ?? 20;
         this.maxBatchEvents = options.maxBatchEvents ?? 200;
-        this.maxBufferedPerThread = options.maxBufferedPerThread ?? 5000;
+        this.maxBufferedPerTask = options.maxBufferedPerTask ?? 5000;
         this.maxBackoffMs = options.maxBackoffMs ?? 10_000;
         this.now = options.now ?? (() => new Date());
         this.onDeliveryError = options.onDeliveryError ?? (() => {});
     }
 
     /** Continue numbering after `offset` (the manager's last stored seq). */
-    setSeqOffset(threadId: string | null, offset: number): void {
-        const key = keyOf(threadId);
+    setSeqOffset(taskId: string | null, offset: number): void {
+        const key = keyOf(taskId);
         const current = this.seqs.get(key) ?? 0;
         this.seqs.set(key, Math.max(current, offset));
     }
 
-    push(threadId: string | null, event: PendingEvent): DaemonEvent {
-        const key = keyOf(threadId);
+    push(taskId: string | null, event: PendingEvent): DaemonEvent {
+        const key = keyOf(taskId);
         const seq = (this.seqs.get(key) ?? 0) + 1;
         this.seqs.set(key, seq);
 
         const stamped: DaemonEvent = {
-            thread_id: threadId,
+            task_id: taskId,
             seq,
             ts: this.now().toISOString(),
             type: event.type,
@@ -197,13 +197,13 @@ export class Outbox {
     }
 
     private enforceLimit(buffer: DaemonEvent[]): void {
-        while (buffer.length > this.maxBufferedPerThread) {
+        while (buffer.length > this.maxBufferedPerTask) {
             const deltaIndex = buffer.findIndex((event) => event.type.endsWith('.delta'));
             buffer.splice(deltaIndex === -1 ? 0 : deltaIndex, 1);
         }
     }
 }
 
-function keyOf(threadId: string | null): string {
-    return threadId ?? WORKSPACE_KEY;
+function keyOf(taskId: string | null): string {
+    return taskId ?? WORKSPACE_KEY;
 }

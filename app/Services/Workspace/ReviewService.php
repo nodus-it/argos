@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace App\Services\Workspace;
 
 use App\Models\ReviewFileView;
-use App\Models\Thread;
+use App\Models\Task;
 use App\Models\User;
 use Illuminate\Support\Facades\Gate;
 
 /**
- * Review-mode state of a person: files marked as seen in a thread (bound to
+ * Review-mode state of a person: files marked as seen in a task (bound to
  * the state of the file's changes, so a later change unmarks it) and the
  * preferred diff layout.
  */
@@ -18,19 +18,19 @@ class ReviewService
 {
     public const VIEWS = ['split', 'unified'];
 
-    public function markSeen(Thread $thread, User $user, string $path, string $fileHash): void
+    public function markSeen(Task $task, User $user, string $path, string $fileHash): void
     {
-        Gate::forUser($user)->authorize('view', $thread->workspace);
+        Gate::forUser($user)->authorize('view', $task->workspace);
         ReviewFileView::query()->updateOrCreate(
-            ['thread_id' => $thread->id, 'user_id' => $user->id, 'path_hash' => sha1($path)],
+            ['task_id' => $task->id, 'user_id' => $user->id, 'path_hash' => sha1($path)],
             ['path' => $path, 'file_hash' => $fileHash],
         );
     }
 
-    public function unmarkSeen(Thread $thread, User $user, string $path): void
+    public function unmarkSeen(Task $task, User $user, string $path): void
     {
         ReviewFileView::query()
-            ->where('thread_id', $thread->id)
+            ->where('task_id', $task->id)
             ->where('user_id', $user->id)
             ->where('path_hash', sha1($path))
             ->delete();
@@ -42,10 +42,10 @@ class ReviewService
      * @param  array<string, string>  $hashes  path => current file hash
      * @return list<string>
      */
-    public function seen(Thread $thread, User $user, array $hashes): array
+    public function seen(Task $task, User $user, array $hashes): array
     {
         return ReviewFileView::query()
-            ->where('thread_id', $thread->id)
+            ->where('task_id', $task->id)
             ->where('user_id', $user->id)
             ->get(['path', 'file_hash'])
             ->filter(fn (ReviewFileView $view): bool => ($hashes[$view->path] ?? null) === $view->file_hash)

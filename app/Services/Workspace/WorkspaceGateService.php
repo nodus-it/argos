@@ -6,7 +6,7 @@ namespace App\Services\Workspace;
 
 use App\Enums\GateRunStatus;
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
-use App\Models\Thread;
+use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceGateRun;
@@ -14,25 +14,31 @@ use Illuminate\Support\Facades\Gate;
 
 /**
  * Quality gates on demand: the daemon runs the worker's `quality.sh` gates
- * in the workspace and reports `gates.*` events, which land here. A failed
- * gate never blocks shipping — it is shown as a warning.
+ * for a task and reports `gates.*` events, which land here. A failed gate
+ * never blocks shipping — it is shown as a warning. The baseline (which
+ * failures already exist on the base) is kept per base commit, shared by
+ * the tasks built on it.
  */
 class WorkspaceGateService
 {
     public const BASELINE_STATES = ['missing', 'running', 'ready', 'failed'];
+
+    /** Baseline key when the daemon does not name the base commit. */
+    public const CURRENT_BASE = 'current';
 
     /** A run without a result after this long is considered lost. */
     private const STALE_AFTER_MINUTES = 45;
 
     public function __construct(
         private readonly WorkspaceDaemonClient $daemon,
-        private readonly ThreadStreamPublisher $publisher,
-        private readonly ThreadService $threads,
+        private readonly TaskStreamPublisher $publisher,
+        private readonly TaskService $tasks,
     ) {}
 
-    public function run(Workspace $workspace, User $by): WorkspaceGateRun
+    public function run(Task $task, User $by): WorkspaceGateRun
     {
-        Gate::forUser($by)->authorize('operate', $workspace);
+        Gate::forUser($by)->authorize('prompt', $task);
+        $workspace = $task->workspace;
         $active = $this->active($workspace);
         if ($active !== null) {
             throw WorkspaceException::translated('workspaces.gates.already_running');
@@ -40,9 +46,11 @@ class WorkspaceGateService
 
         $run = WorkspaceGateRun::query()->create([
             'workspace_id' => $workspace->id,
+            'task_id' => $task->id,
             'triggered_by' => $by->id,
             'status' => GateRunStatus::Running,
-            'baseline' => $workspace->gate_baseline,
+            'base_commit' => $task->base_commit,
+            'baseline' => $this->baselineFor($workspace, $task->base_commit),
             'started_at' => now(),
         ]);
 
@@ -57,9 +65,15 @@ class WorkspaceGateService
         return $run->refresh();
     }
 
-    public function latest(Workspace $workspace): ?WorkspaceGateRun
+    public function latest(Task $task): ?WorkspaceGateRun
     {
-        return WorkspaceGateRun::query()->where('workspace_id', $workspace->id)->latest('created_at')->latest('id')->first();
+        return WorkspaceGateRun::query()->where('task_id', $task->id)->latest('created_at')->latest('id')->first();
+    }
+
+    /** Baseline state for a base commit (null: the current checkout's base). */
+    public function baselineFor(Workspace $workspace, ?string $commit): ?string
+    {
+        return $workspace->gate_baselines[$commit ?? self::CURRENT_BASE] ?? null;
     }
 
     /**
@@ -74,7 +88,8 @@ class WorkspaceGateService
             if (! in_array($state, self::BASELINE_STATES, true)) {
                 return false;
             }
-            $workspace->forceFill(['gate_baseline' => $state])->save();
+            $commit = is_string($data['commit'] ?? null) && $data['commit'] !== '' ? $data['commit'] : self::CURRENT_BASE;
+            $workspace->forceFill(['gate_baselines' => [...($workspace->gate_baselines ?? []), $commit => $state]])->save();
 
             return true;
         }
@@ -101,14 +116,14 @@ class WorkspaceGateService
     /** Tell open browsers to reload the gate panel. */
     public function announce(Workspace $workspace): void
     {
-        $this->publisher->publish($workspace->id, ThreadEventIngestor::WORKSPACE_KEY, [['type' => 'gates.updated', 'data' => []]]);
+        $this->publisher->publish($workspace->id, TaskEventIngestor::WORKSPACE_KEY, [['type' => 'gates.updated', 'data' => []]]);
     }
 
     /** Ask the agent to fix a failed gate, with the worker's fix prompt. */
-    public function sendFixToAgent(WorkspaceGateRun $run, Thread $thread, User $by, string $gate, bool $automated = false): void
+    public function sendFixToAgent(WorkspaceGateRun $run, Task $task, User $by, string $gate, bool $automated = false): void
     {
-        Gate::forUser($by)->authorize('prompt', $thread);
-        if ($thread->workspace_id !== $run->workspace_id || ! in_array($gate, $run->failedGates(), true)) {
+        Gate::forUser($by)->authorize('prompt', $task);
+        if ($task->id !== $run->task_id || ! in_array($gate, $run->failedGates(), true)) {
             throw WorkspaceException::translated('workspaces.gates.no_prompt');
         }
 
@@ -121,13 +136,13 @@ class WorkspaceGateService
             throw WorkspaceException::translated('workspaces.gates.no_prompt');
         }
 
-        $this->threads->send($thread, $by, $prompt, automated: $automated);
+        $this->tasks->send($task, $by, $prompt, automated: $automated);
     }
 
     /** "6/7" — for the ship dialog; null when no completed run exists. */
-    public function summary(Workspace $workspace): ?string
+    public function summary(Task $task): ?string
     {
-        $run = $this->latest($workspace);
+        $run = $this->latest($task);
         if ($run === null || ! in_array($run->status, [GateRunStatus::Passed, GateRunStatus::Failed], true)) {
             return null;
         }

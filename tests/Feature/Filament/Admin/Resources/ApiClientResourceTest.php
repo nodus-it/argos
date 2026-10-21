@@ -9,11 +9,11 @@ use App\Filament\Admin\Resources\ApiClientResource;
 use App\Filament\Admin\Resources\ApiClientResource\Pages\CreateApiClient;
 use App\Filament\Admin\Resources\ApiClientResource\Pages\EditApiClient;
 use App\Filament\Admin\Resources\ApiClientResource\Pages\ListApiClients;
-use App\Filament\Admin\Resources\RepoProfileResource;
-use App\Filament\Admin\Resources\RepoProfileResource\Pages\EditRepoProfile;
+use App\Filament\Admin\Resources\WorkspaceResource;
+use App\Filament\Admin\Resources\WorkspaceResource\Pages\EditWorkspace;
 use App\Models\ApiClient;
-use App\Models\RepoProfile;
 use App\Models\User;
+use App\Models\Workspace;
 use Filament\Actions\Testing\TestAction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -60,16 +60,16 @@ class ApiClientResourceTest extends TestCase
             ->assertSeeLivewire(ApiTokensRelationManager::class);
     }
 
-    public function test_repo_profile_also_wires_the_tokens_relation_manager(): void
+    public function test_workspace_also_wires_the_tokens_relation_manager(): void
     {
-        $profile = RepoProfile::factory()->create();
+        $workspace = Workspace::factory()->create();
 
         $this->assertContains(
             ApiTokensRelationManager::class,
-            RepoProfileResource::getRelations(),
+            WorkspaceResource::getRelations(),
         );
 
-        Livewire::test(EditRepoProfile::class, ['record' => $profile->getKey()])
+        Livewire::test(EditWorkspace::class, ['record' => $workspace->getKey()])
             ->assertSuccessful()
             ->assertSee(__('api_tokens.title'));
     }
@@ -84,7 +84,7 @@ class ApiClientResourceTest extends TestCase
         ])
             ->callAction(TestAction::make('generate')->table(), [
                 'name' => 'ci-token',
-                'abilities' => ['workspaces:write'],
+                'abilities' => ['tasks:write'],
             ])
             ->assertHasNoActionErrors()
             ->assertNotified();
@@ -92,7 +92,7 @@ class ApiClientResourceTest extends TestCase
         $this->assertSame(1, $client->tokens()->count());
         $token = $client->tokens()->first();
         $this->assertSame('ci-token', $token->name);
-        $this->assertContains('workspaces:write', $token->abilities);
+        $this->assertContains('tasks:write', $token->abilities);
 
         Livewire::test(ApiTokensRelationManager::class, [
             'ownerRecord' => $client,

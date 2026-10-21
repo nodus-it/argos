@@ -5,7 +5,7 @@ import { Outbox, WORKSPACE_KEY, type Acks } from '../src/outbox.js';
 const ackAll = (batch: EventBatch): Acks => {
     const acks: Acks = {};
     for (const event of batch.events) {
-        const key = event.thread_id ?? WORKSPACE_KEY;
+        const key = event.task_id ?? WORKSPACE_KEY;
         acks[key] = Math.max(acks[key] ?? 0, event.seq);
     }
 
@@ -16,7 +16,7 @@ describe('Outbox', () => {
     beforeEach(() => vi.useFakeTimers());
     afterEach(() => vi.useRealTimers());
 
-    it('numbers events per thread starting after the offset', () => {
+    it('numbers events per task starting after the offset', () => {
         const outbox = new Outbox(async () => ({}));
         outbox.setSeqOffset('t1', 41);
         expect(outbox.push('t1', { type: 'status', data: {} }).seq).toBe(42);
@@ -119,7 +119,7 @@ describe('Outbox', () => {
     it('drops oldest deltas first when the buffer overflows', () => {
         const outbox = new Outbox(async () => {
             throw new Error('down');
-        }, { maxBufferedPerThread: 3 });
+        }, { maxBufferedPerTask: 3 });
         outbox.stop();
         outbox.push('t1', { type: 'tool.started', data: {} });
         outbox.push('t1', { type: 'assistant.delta', data: { n: 1 } });

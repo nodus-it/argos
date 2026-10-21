@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\Project;
 
-use App\Models\RepoProfile;
+use App\Models\Workspace;
 use App\Services\Project\BackingServiceResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -20,7 +20,7 @@ class BackingServiceResolverTest extends TestCase
 
     public function test_coordinates_use_defaults(): void
     {
-        $profile = RepoProfile::factory()->withBackingServices(['mysql', 'redis'])->create();
+        $profile = Workspace::factory()->withBackingServices(['mysql', 'redis'])->create();
         $coords = $this->resolver()->coordinates($profile);
 
         $this->assertSame('db', $coords['mysql']['host']);
@@ -30,7 +30,7 @@ class BackingServiceResolverTest extends TestCase
 
     public function test_credential_overrides_apply_but_host_and_port_stay_fixed(): void
     {
-        $profile = RepoProfile::factory()
+        $profile = Workspace::factory()
             ->withBackingServices(['mysql'])
             ->withServiceConfig(['mysql' => [
                 'database' => 'shop',
@@ -51,7 +51,7 @@ class BackingServiceResolverTest extends TestCase
 
     public function test_connection_env_and_placeholders(): void
     {
-        $profile = RepoProfile::factory()
+        $profile = Workspace::factory()
             ->withBackingServices(['mysql', 'redis'])
             ->withServiceConfig(['mysql' => ['database' => 'shop']])
             ->create();

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Workspace;
 
-use App\Models\Workspace;
+use App\Models\Task;
 use App\Services\Demo\DemoDeployer;
 use App\Services\Demo\TraefikRouter;
 use App\Services\Worker\WorkerSidecarManager;
@@ -23,12 +23,15 @@ class WorkspaceTeardown
         private readonly TraefikRouter $router,
     ) {}
 
-    public function purge(string $slug): void
+    /** @param  list<string>  $taskSlugs  previews to tear down */
+    public function purge(string $slug, array $taskSlugs = []): void
     {
         $this->router->removeCodeRoute($slug);
         $this->containers->removeBySlug($slug);
         $this->sidecars->purgeWorkspace($slug);
-        $this->demos->teardownBySlug(Workspace::demoSlugFor($slug));
+        foreach ($taskSlugs as $taskSlug) {
+            $this->demos->teardownBySlug(Task::demoSlugFor($slug, $taskSlug));
+        }
         $this->containers->removeVolumesBySlug($slug);
     }
 }

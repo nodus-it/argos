@@ -7,9 +7,10 @@ namespace App\Filament\Workspaces\Resources\WorkspaceResource\Pages;
 use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceStatus;
 use App\Filament\Workspaces\Resources\WorkspaceResource;
+use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
-use App\Services\Workspace\ThreadService;
+use App\Services\Workspace\TaskService;
 use App\Services\Workspace\WorkspaceException;
 use App\Services\Workspace\WorkspaceGateService;
 use App\Services\Workspace\WorkspaceMemberService;
@@ -26,10 +27,10 @@ use Illuminate\Contracts\Support\Htmlable;
 use Livewire\Attributes\On;
 
 /**
- * The workspace ("Fokus" layout): a header with the thread switcher and the
+ * The workspace ("Fokus" layout): a header with the task switcher and the
  * ship button, the chat in the middle and a context sidebar (environment,
  * branch, gates, changed files) that turns into the review panel. The parts
- * are Livewire components: thread-switcher, thread-chat, context-panel.
+ * are Livewire components: task-switcher, task-chat, context-panel.
  */
 class ViewWorkspace extends ViewRecord
 {
@@ -38,15 +39,25 @@ class ViewWorkspace extends ViewRecord
     /** Shown in the ship dialog (changed files, unpushed commits). */
     public string $shipSummary = '';
 
+    /** The task shown in the chat (ship, gates and rebase act on it). */
+    public ?string $taskId = null;
+
     public function mount(int|string $record): void
     {
         parent::mount($record);
 
-        // Opening a stopped workspace brings it back (files were kept).
         $workspace = $this->workspace();
-        if ($workspace->pr_number !== null && $workspace->pr_state === 'open' && ($workspace->pr_synced_at === null || $workspace->pr_synced_at->lt(now()->subMinutes(5)))) {
-            app(WorkspaceShipService::class)->syncPullRequest($workspace);
+        $requested = request()->query('task');
+        $this->taskId = is_string($requested) && $workspace->tasks()->whereKey($requested)->exists()
+            ? $requested
+            : $workspace->tasks()->whereNull('archived_at')->latest('updated_at')->value('id');
+
+        $task = $this->task();
+        if ($task !== null && $task->pr_number !== null && in_array($task->pr_state, ['open', 'draft'], true) && ($task->pr_synced_at === null || $task->pr_synced_at->lt(now()->subMinutes(5)))) {
+            app(WorkspaceShipService::class)->syncPullRequest($task);
         }
+
+        // Opening a stopped workspace brings it back (files were kept).
         if ($workspace->status === WorkspaceStatus::Stopped && auth()->user()?->can('operate', $workspace)) {
             try {
                 app(WorkspaceService::class)->start($workspace);
@@ -54,6 +65,17 @@ class ViewWorkspace extends ViewRecord
                 Notification::make()->title($e->getMessage())->warning()->send();
             }
         }
+    }
+
+    #[On('task-changed')]
+    public function taskChanged(?string $id): void
+    {
+        $this->taskId = $id;
+    }
+
+    public function task(): ?Task
+    {
+        return $this->taskId !== null ? $this->workspace()->tasks()->find($this->taskId) : null;
     }
 
     public function workspace(): Workspace
@@ -118,19 +140,21 @@ class ViewWorkspace extends ViewRecord
             ->icon('heroicon-o-paper-airplane')
             ->color('primary')
             ->visible(fn (): bool => $this->workspace()->status === WorkspaceStatus::Running
-                && (auth()->user()?->can('ship', $this->workspace()) ?? false))
+                && ($task = $this->task()) !== null
+                && (auth()->user()?->can('ship', $task) ?? false))
             ->modalHeading(__('workspaces.ship.heading'))
             ->modalWidth('2xl')
             ->fillForm(function (): array {
                 /** @var User $user */
                 $user = auth()->user();
+                $task = $this->requireTask();
                 try {
-                    $draft = app(WorkspaceShipService::class)->draft($this->workspace(), $user);
+                    $draft = app(WorkspaceShipService::class)->draft($task, $user);
                 } catch (\Throwable) {
                     $draft = ['subject' => '', 'body' => '', 'changed_files' => 0, 'ahead' => 0];
                 }
-                $gates = app(WorkspaceGateService::class)->summary($this->workspace());
-                $failed = app(WorkspaceGateService::class)->latest($this->workspace())?->failedGates() !== [];
+                $gates = app(WorkspaceGateService::class)->summary($task);
+                $failed = app(WorkspaceGateService::class)->latest($task)?->failedGates() !== [];
                 $this->shipSummary = __('workspaces.ship.summary', ['files' => $draft['changed_files'], 'ahead' => $draft['ahead']])
                     .($draft['subject'] === '' ? ' '.__('workspaces.ship.no_draft') : '')
                     .($gates !== null ? ' '.__($failed ? 'workspaces.gates.ship_warning' : 'workspaces.gates.ship_summary', ['summary' => $gates]) : '');
@@ -148,13 +172,13 @@ class ViewWorkspace extends ViewRecord
                     ->rows(5),
                 Toggle::make('draft')
                     ->label(__('workspaces.ship.draft'))
-                    ->visible(fn (): bool => $this->workspace()->pr_number === null),
+                    ->visible(fn (): bool => $this->task()?->pr_number === null),
             ])
             ->action(function (array $data): void {
                 /** @var User $user */
                 $user = auth()->user();
                 try {
-                    $url = app(WorkspaceShipService::class)->ship($this->workspace(), $user, (string) $data['subject'], (string) ($data['body'] ?? ''), (bool) ($data['draft'] ?? false));
+                    $url = app(WorkspaceShipService::class)->ship($this->requireTask(), $user, (string) $data['subject'], (string) ($data['body'] ?? ''), (bool) ($data['draft'] ?? false));
                     Notification::make()->title(__('workspaces.ship.shipped', ['url' => $url]))->success()->send();
                 } catch (WorkspaceException $e) {
                     Notification::make()->title($e->getMessage())->danger()->persistent()->send();
@@ -169,12 +193,13 @@ class ViewWorkspace extends ViewRecord
             ->label(__('workspaces.gates.run'))
             ->icon('heroicon-o-shield-check')
             ->visible(fn (): bool => $this->workspace()->status === WorkspaceStatus::Running
-                && (auth()->user()?->can('operate', $this->workspace()) ?? false))
+                && ($task = $this->task()) !== null
+                && (auth()->user()?->can('prompt', $task) ?? false))
             ->action(function (): void {
                 /** @var User $user */
                 $user = auth()->user();
                 try {
-                    app(WorkspaceGateService::class)->run($this->workspace(), $user);
+                    app(WorkspaceGateService::class)->run($this->requireTask(), $user);
                     Notification::make()->title(__('workspaces.gates.started'))->success()->send();
                     $this->dispatch('workspace-focus', target: 'gates');
                 } catch (WorkspaceException $e) {
@@ -189,18 +214,19 @@ class ViewWorkspace extends ViewRecord
             ->label(__('workspaces.ship.rebase'))
             ->icon('heroicon-o-arrow-path-rounded-square')
             ->visible(fn (): bool => $this->workspace()->status === WorkspaceStatus::Running
-                && (auth()->user()?->can('ship', $this->workspace()) ?? false))
+                && ($task = $this->task()) !== null
+                && (auth()->user()?->can('prompt', $task) ?? false))
             ->action(function (): void {
                 /** @var User $user */
                 $user = auth()->user();
-                $thread = $this->workspace()->threads()->whereNull('archived_at')->latest('updated_at')->first();
-                if ($thread === null) {
-                    Notification::make()->title(__('workspaces.ship.no_thread'))->warning()->send();
+                $task = $this->task();
+                if ($task === null) {
+                    Notification::make()->title(__('workspaces.ship.no_task'))->warning()->send();
 
                     return;
                 }
                 try {
-                    app(ThreadService::class)->send($thread, $user, __('workspaces.ship.rebase_prompt', ['branch' => $this->workspace()->branch]));
+                    app(TaskService::class)->send($task, $user, __('workspaces.ship.rebase_prompt', ['branch' => $task->base_branch]));
                 } catch (WorkspaceException $e) {
                     Notification::make()->title($e->getMessage())->danger()->send();
                 }
@@ -227,7 +253,7 @@ class ViewWorkspace extends ViewRecord
                 Select::make('role')
                     ->label(__('workspaces.members.role'))
                     ->options(collect(WorkspaceRole::cases())->mapWithKeys(fn (WorkspaceRole $r): array => [$r->value => $r->label()])->all())
-                    ->default(WorkspaceRole::Editor->value)
+                    ->default(WorkspaceRole::Member->value)
                     ->required(),
             ])
             ->action(function (array $data): void {
@@ -271,6 +297,11 @@ class ViewWorkspace extends ViewRecord
                 app(WorkspaceService::class)->deleteWorkspace($this->workspace());
                 $this->redirect(WorkspaceResource::getUrl('index'));
             });
+    }
+
+    private function requireTask(): Task
+    {
+        return $this->task() ?? throw WorkspaceException::translated('workspaces.ship.no_task');
     }
 
     /**

@@ -6,6 +6,7 @@ namespace App\Services\Git;
 
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
 use App\Integrations\WorkspaceDaemon\WorkspaceDaemonTransport;
+use App\Models\Task;
 use App\Models\Workspace;
 use App\Services\Workspace\WorkspaceDaemonClient;
 use Illuminate\Support\Facades\Cache;
@@ -24,21 +25,22 @@ class WorkspaceDiffService
      *
      * @return array{files: list<array{path: string, from_path: string|null, status: string, additions: int, deletions: int, binary: bool, generated: bool, hash: string}>, ahead: int, uncommitted: int}
      */
-    public function summary(Workspace $workspace): array
+    public function summary(Task $task): array
     {
-        return Cache::remember('ws-changes:'.$workspace->id, 2, function () use ($workspace): array {
+        return Cache::remember('ws-changes:'.$task->id, 2, function () use ($task): array {
+            $workspace = $task->workspace;
             $api = app(WorkspaceDaemonClient::class)->for($workspace, 30);
             $this->fetchThrottled($workspace, $api);
             $status = $api->gitStatus();
 
             try {
-                $files = $api->gitChanges('origin/'.$workspace->base_branch);
+                $files = $api->gitChanges('origin/'.$task->base_branch);
             } catch (DaemonTransportException $e) {
                 // A daemon from before /git/changes (container not restarted yet).
                 if ($e->status !== 404) {
                     throw $e;
                 }
-                $files = $this->changesFromFullDiff($api->gitDiff('origin/'.$workspace->base_branch)['diff']);
+                $files = $this->changesFromFullDiff($api->gitDiff('origin/'.$task->base_branch)['diff']);
             }
 
             return [
@@ -54,10 +56,10 @@ class WorkspaceDiffService
      *
      * @return array{from_path: string, to_path: string, is_new: bool, is_deleted: bool, additions: int, deletions: int, hunks: list<array{header: string, context_hint: string, lines: list<array{type: string, old_num: int|null, new_num: int|null, text: string}>}>}|null
      */
-    public function fileDiff(Workspace $workspace, string $path, string $hash): ?array
+    public function fileDiff(Task $task, string $path, string $hash): ?array
     {
-        return Cache::remember('ws-file-diff:'.$workspace->id.':'.sha1($path.'|'.$hash), 600, function () use ($workspace, $path): ?array {
-            $diff = app(WorkspaceDaemonClient::class)->for($workspace, 30)->gitDiff('origin/'.$workspace->base_branch, $path);
+        return Cache::remember('ws-file-diff:'.$task->id.':'.sha1($path.'|'.$hash), 600, function () use ($task, $path): ?array {
+            $diff = app(WorkspaceDaemonClient::class)->for($task->workspace, 30)->gitDiff('origin/'.$task->base_branch, $path);
 
             return $this->parser->parse($diff['diff'])[0] ?? null;
         });

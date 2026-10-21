@@ -4,19 +4,19 @@ declare(strict_types=1);
 
 namespace App\Integrations\WorkspaceDaemon\Requests;
 
-/** POST /threads/{id}/messages — queue a user message. */
+/** POST /tasks/{id}/messages — queue a user message. */
 class SendMessage extends DaemonRequest
 {
     /**
      * @param  array<string, mixed>  $payload
      */
-    public function __construct(private readonly string $threadId, array $payload = [])
+    public function __construct(private readonly string $taskId, array $payload = [])
     {
         parent::__construct($payload);
     }
 
     public function resolveEndpoint(): string
     {
-        return '/threads/'.rawurlencode($this->threadId).'/messages';
+        return '/tasks/'.rawurlencode($this->taskId).'/messages';
     }
 }

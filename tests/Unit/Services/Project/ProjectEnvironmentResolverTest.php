@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\Project;
 
-use App\Models\RepoProfile;
+use App\Models\Workspace;
 use App\Services\Project\ProjectEnvironmentResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -16,19 +16,19 @@ class ProjectEnvironmentResolverTest extends TestCase
     /**
      * @return array<string, string>
      */
-    private function resolve(RepoProfile $profile): array
+    private function resolve(Workspace $profile): array
     {
         return app(ProjectEnvironmentResolver::class)->resolve($profile);
     }
 
     public function test_empty_profile_yields_no_env(): void
     {
-        $this->assertSame([], $this->resolve(RepoProfile::factory()->create()));
+        $this->assertSame([], $this->resolve(Workspace::factory()->create()));
     }
 
     public function test_builds_composer_auth_from_registries(): void
     {
-        $profile = RepoProfile::factory()->withComposerRegistries([
+        $profile = Workspace::factory()->withComposerRegistries([
             ['host' => 'packages.filamentphp.com', 'username' => 'lic', 'token' => 'secret1'],
             ['host' => 'composer.fluxui.dev', 'username' => '', 'token' => 'secret2'],
         ])->create();
@@ -51,7 +51,7 @@ class ProjectEnvironmentResolverTest extends TestCase
 
     public function test_skips_incomplete_registry_rows(): void
     {
-        $profile = RepoProfile::factory()->withComposerRegistries([
+        $profile = Workspace::factory()->withComposerRegistries([
             ['host' => '', 'token' => 'x'],
             ['host' => 'satis.dedoc.co', 'token' => ''],
         ])->create();
@@ -61,7 +61,7 @@ class ProjectEnvironmentResolverTest extends TestCase
 
     public function test_maps_worker_env_rows_and_skips_nameless(): void
     {
-        $profile = RepoProfile::factory()->withWorkerEnv([
+        $profile = Workspace::factory()->withWorkerEnv([
             ['name' => 'MEILI_KEY', 'value' => 'abc'],
             ['name' => '', 'value' => 'ignored'],
         ])->create();
@@ -74,7 +74,7 @@ class ProjectEnvironmentResolverTest extends TestCase
 
     public function test_hand_written_composer_auth_overrides_generated(): void
     {
-        $profile = RepoProfile::factory()
+        $profile = Workspace::factory()
             ->withComposerRegistries([['host' => 'a.test', 'token' => 'gen']])
             ->withWorkerEnv([['name' => 'COMPOSER_AUTH', 'value' => '{"http-basic":{}}']])
             ->create();
@@ -84,7 +84,7 @@ class ProjectEnvironmentResolverTest extends TestCase
 
     public function test_expands_backing_service_placeholders(): void
     {
-        $profile = RepoProfile::factory()
+        $profile = Workspace::factory()
             ->withBackingServices(['mysql'])
             ->withServiceConfig(['mysql' => ['database' => 'shop']])
             ->withWorkerEnv([
@@ -103,7 +103,7 @@ class ProjectEnvironmentResolverTest extends TestCase
 
     public function test_reserved_keys_are_dropped(): void
     {
-        $profile = RepoProfile::factory()->withWorkerEnv([
+        $profile = Workspace::factory()->withWorkerEnv([
             ['name' => 'REPO_TOKEN', 'value' => 'evil'],
             ['name' => 'APP_URL', 'value' => 'http://evil'],
             ['name' => 'SAFE', 'value' => 'ok'],

@@ -23,26 +23,26 @@ interface WorkspaceDaemonTransport
      * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
      */
-    public function startThread(string $threadId, array $payload): array;
+    public function startTask(string $taskId, array $payload): array;
 
     /**
      * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
      */
-    public function sendMessage(string $threadId, array $payload): array;
+    public function sendMessage(string $taskId, array $payload): array;
 
-    public function interrupt(string $threadId): void;
+    public function interrupt(string $taskId): void;
 
     /**
      * @param  array<string, mixed>  $payload
      */
-    public function resolveApproval(string $threadId, string $approvalId, array $payload): void;
+    public function resolveApproval(string $taskId, string $approvalId, array $payload): void;
 
-    public function setPermissionMode(string $threadId, string $mode): void;
+    public function setPermissionMode(string $taskId, string $mode): void;
 
-    public function setModel(string $threadId, string $model): void;
+    public function setModel(string $taskId, string $model): void;
 
-    public function stopThread(string $threadId): void;
+    public function stopTask(string $taskId): void;
 
     /** @return array{branch: string|null, upstream: string|null, ahead: int, behind: int, dirty: bool, files: list<array{path: string, status: string}>} */
     public function gitStatus(): array;
@@ -81,13 +81,13 @@ interface WorkspaceDaemonTransport
     public function gateFixPrompt(string $gate, string $runId): string;
 
     /** @return array{ref: string, n: int, sha: string, head: string|null, label: string} */
-    public function createCheckpoint(string $threadId, string $label): array;
+    public function createCheckpoint(string $taskId, string $label): array;
 
     /** @return array{diff: string, truncated: bool, head: string|null} */
     public function checkpointDiff(string $ref): array;
 
     /**
-     * Throws `thread_running` while Claude works in the checkpoint's thread.
+     * Throws `task_running` while Claude works in the checkpoint's task.
      *
      * @return array{before: array{ref: string, n: int, sha: string, head: string|null, label: string}, removed: list<string>}
      */

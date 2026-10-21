@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace App\Services\Workspace;
 
-use App\Enums\WorkspaceOrigin;
 use App\Enums\WorkspaceStatus;
 use App\Events\Workspace\WorkspaceCreated;
 use App\Events\Workspace\WorkspaceDeleted;
 use App\Jobs\Workspace\ProvisionWorkspaceJob;
 use App\Jobs\Workspace\StopWorkspaceJob;
-use App\Models\RepoProfile;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\EntityService;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 
 /**
@@ -38,54 +38,58 @@ class WorkspaceService extends EntityService
     }
 
     /**
-     * @param  array{binding_id: string, provider: string, owner: string, project: string, number: string, title: string, url: string, body: string}|null  $issue  from WorkspaceIssueService::load()
+     * Create a workspace (only Argos admins may). The creator becomes its
+     * first admin; the container starts when someone opens it or a task
+     * needs it.
+     *
+     * @param  array<string, mixed>  $attributes  repository, environment and settings (Workspace fillable)
      */
-    public function createWorkspace(User $creator, RepoProfile $profile, string $name, ?string $baseBranch = null, ?array $issue = null, WorkspaceOrigin $origin = WorkspaceOrigin::Manual): Workspace
+    public function createWorkspace(User $creator, array $attributes): Workspace
     {
-        $this->ensureCapacity();
+        Gate::forUser($creator)->authorize('create', Workspace::class);
 
-        $workspace = DB::transaction(function () use ($creator, $profile, $name, $baseBranch, $issue, $origin): Workspace {
-            $slug = Workspace::generateSlug($name);
-            $branch = $issue !== null ? $this->issueBranch($issue) : 'ws/'.$slug;
+        return $this->register($creator, $attributes);
+    }
 
+    /**
+     * createWorkspace() without the permission check — for seeders and
+     * system setup that act outside a person's request.
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    public function register(User $creator, array $attributes): Workspace
+    {
+        $workspace = DB::transaction(function () use ($creator, $attributes): Workspace {
             $workspace = new Workspace;
+            $workspace->fill(Arr::except($attributes, ['slug', 'status', 'daemon_token', 'container_name', 'created_by']));
             $workspace->forceFill([
-                'slug' => $slug,
-                'repo_profile_id' => $profile->id,
+                'slug' => Workspace::generateSlug((string) ($attributes['name'] ?? 'workspace')),
                 'created_by' => $creator->id,
-                'name' => $name,
-                'base_branch' => $baseBranch !== null && $baseBranch !== '' ? $baseBranch : $profile->default_branch,
-                'branch' => $branch,
-                'status' => WorkspaceStatus::Provisioning,
+                'status' => WorkspaceStatus::Stopped,
                 'daemon_token' => Str::random(64),
-                'external_issue' => $issue,
-                'origin' => $origin,
             ])->save();
 
-            $this->members->addOwner($workspace, $creator);
+            $this->members->addAdmin($workspace, $creator);
 
             return $workspace;
         });
 
         $this->emit(new WorkspaceCreated($workspace));
-        ProvisionWorkspaceJob::dispatch($workspace->id);
 
         return $workspace;
     }
 
     /**
-     * `ws/<nr>-<slug>`; a second workspace for the same issue gets a suffix.
+     * Change settings (admins of the workspace).
      *
-     * @param  array{number: string, title: string}  $issue
+     * @param  array<string, mixed>  $attributes
      */
-    private function issueBranch(array $issue): string
+    public function updateSettings(Workspace $workspace, User $by, array $attributes): Workspace
     {
-        $branch = app(WorkspaceIssueService::class)->branchFor($issue['number'], $issue['title']);
-        if (! Workspace::withTrashed()->where('branch', $branch)->exists()) {
-            return $branch;
-        }
+        Gate::forUser($by)->authorize('update', $workspace);
+        $workspace->fill(Arr::except($attributes, ['slug', 'status', 'daemon_token', 'container_name', 'created_by']))->save();
 
-        return mb_substr($branch, 0, WorkspaceIssueService::BRANCH_MAX - 5).'-'.Str::lower(Str::random(4));
+        return $workspace;
     }
 
     /** Start a stopped or failed workspace again. */
@@ -113,8 +117,8 @@ class WorkspaceService extends EntityService
     /** Purge every Docker resource, then soft-delete the row. */
     public function deleteWorkspace(Workspace $workspace): void
     {
-        $this->teardown->purge($workspace->slug);
-        app(ThreadAttachmentService::class)->purgeWorkspace($workspace->id);
+        $this->teardown->purge($workspace->slug, $workspace->tasks()->pluck('slug')->all());
+        app(TaskAttachmentService::class)->purgeWorkspace($workspace->id);
         $workspace->delete();
         $this->emit(new WorkspaceDeleted($workspace));
     }

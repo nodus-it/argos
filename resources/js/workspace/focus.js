@@ -76,8 +76,8 @@ export function argosWorkspaceFocus() {
     };
 }
 
-/** Thread switcher popover: search, groups, arrow keys + Enter. */
-export function argosThreadSwitcher() {
+/** Task switcher popover: search, groups, arrow keys + Enter. */
+export function argosTaskSwitcher() {
     return {
         open: false,
         query: '',
@@ -145,7 +145,7 @@ export function argosThreadSwitcher() {
                 event.preventDefault();
                 const chosen = items[index] ?? items[0];
                 if (chosen) {
-                    this.choose(chosen.dataset.thread);
+                    this.choose(chosen.dataset.task);
                 }
             }
         },

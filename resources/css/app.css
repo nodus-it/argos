@@ -691,7 +691,7 @@ body,
 
 /* Diff icon sizing — a viewBox-only @svg with no rule renders at the
    300×150 replaced-element default. */
-/* Thread / feed */
+/* Task / feed */
 .feed{display:flex;flex-direction:column;}
 /* Respond composer textarea */
 .respond-ta{flex:1;font:inherit;font-size:var(--t-sm);line-height:1.55;padding:10px 14px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);color:var(--text);outline:none;resize:vertical;min-height:42px;}
@@ -976,17 +976,17 @@ body,
   .fi-main .fi-sc-form .fi-sc-actions{padding:14px 16px;}
 }
 
-/* ── Workspaces (interactive threads, editor, preview) ─────────────────────── */
+/* ── Workspaces (interactive tasks, editor, preview) ─────────────────────── */
 /* Desktop: the layout fills the viewport below its own top (measured by
    argosWorkspaceLayout → --ws-top) so only the chat feed and the tool panes
    scroll, never the page. The middle column is the drag gutter. */
 .ws-chat{display:flex;flex-direction:column;height:100%;min-height:0;}
-/* Threads (quiet sidebar) · chat · workbench: the three headers share a 48px row. */
+/* Tasks (quiet sidebar) · chat · workbench: the three headers share a 48px row. */
 .ws-select{font:inherit;font-size:var(--t-sm);padding:6px 8px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);max-width:100%;}
 .ws-select-sm{font-size:var(--t-xs);padding:4px 6px;}
 .ws-input{font:inherit;font-size:var(--t-sm);padding:6px 8px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);flex:1;min-width:0;}
 .ws-avatar{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:99px;background:var(--surface-2);border:1px solid var(--border);font-size:11px;font-weight:700;color:var(--text-2);flex:none;}
-.ws-new-thread{margin:12px;}
+.ws-new-task{margin:12px;}
 .ws-form{display:grid;gap:10px;}
 .ws-field{display:grid;gap:4px;font-size:var(--t-sm);}
 .ws-field>span{font-weight:600;}
@@ -1086,7 +1086,7 @@ body,
   .ws-reset-btn{opacity:1;min-height:44px;}
   .ws-reset-btn span{display:none;}
 }
-/* Auto-threads */
+/* Auto-tasks */
 .ws-auto-chip svg{width:12px;height:12px;}
 .ws-auto-chip.is-success{background:var(--ok-50);color:var(--ok-700);border-color:var(--ok-100);}
 .ws-auto-chip.is-warning{background:var(--wn-50);color:var(--wn-700);}

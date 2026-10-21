@@ -38,7 +38,7 @@ class PollIssueProviderJobGitLabTest extends TestCase
             'external_project_ref' => 'acme/widget',
             'filters' => null,
         ]);
-        $this->prepareIssueRuns($this->binding->repoProfile);
+        $this->prepareIssueRuns($this->binding->workspace);
     }
 
     private function fakeIssuesEndpoint(array $issues): void
@@ -63,7 +63,7 @@ class PollIssueProviderJobGitLabTest extends TestCase
 
     // ── happy path ───────────────────────────────────────────────────────────
 
-    public function test_poll_launches_workspaces_for_matching_issues(): void
+    public function test_poll_launches_tasks_for_matching_issues(): void
     {
         $this->fakeIssuesEndpoint([
             $this->gitlabIssue(1, 'First issue'),
@@ -76,7 +76,7 @@ class PollIssueProviderJobGitLabTest extends TestCase
         );
 
         $this->assertDatabaseCount(ExternalIssueLink::class, 2);
-        $this->assertDatabaseCount('workspaces', 2);
+        $this->assertDatabaseCount('tasks', 2);
     }
 
     public function test_poll_sets_last_polled_at_after_success(): void
@@ -130,7 +130,7 @@ class PollIssueProviderJobGitLabTest extends TestCase
         );
 
         $this->assertDatabaseCount(ExternalIssueLink::class, 2);
-        $this->assertDatabaseCount('workspaces', 2);
+        $this->assertDatabaseCount('tasks', 2);
     }
 
     // ── default state filter ─────────────────────────────────────────────────

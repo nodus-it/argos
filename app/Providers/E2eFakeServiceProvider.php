@@ -41,7 +41,7 @@ class E2eFakeServiceProvider extends ServiceProvider
         $this->app->bind(AnthropicTokenValidator::class, fn (): FakeAnthropicTokenValidator => new FakeAnthropicTokenValidator);
 
         // Replace the git provider registry so every platform resolves to a
-        // fake serving canonical repo/branch data — the RepoProfile dropdowns
+        // fake serving canonical repo/branch data — the workspace form dropdowns
         // then fill in without any external API call.
         $this->app->singleton(GitProviderRegistry::class, function (): GitProviderRegistry {
             $registry = new GitProviderRegistry;

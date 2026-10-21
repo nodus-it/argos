@@ -144,7 +144,7 @@ describe('quality gates', () => {
         expect((await app.inject({ method: 'POST', url: '/gates/run', headers: auth, payload: { run_id: 'r1' } })).statusCode).toBe(202);
         await waitFor(() => batches.flatMap((b) => b.events).some((e) => e.type === 'gates.completed'));
         const completed = batches.flatMap((b) => b.events).find((e) => e.type === 'gates.completed')!;
-        expect(completed.thread_id).toBeNull();
+        expect(completed.task_id).toBeNull();
 
         const prompt = await app.inject({ method: 'GET', url: '/gates/fix-prompt?gate=pest&run_id=r1', headers: auth });
         expect(prompt.json()).toEqual({ prompt: '# Quality-Gate-Fix: pest\n' });

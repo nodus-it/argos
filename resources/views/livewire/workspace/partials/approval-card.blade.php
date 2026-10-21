@@ -2,9 +2,9 @@
     use App\Enums\ApprovalKind;
     use App\Enums\ApprovalStatus;
     use App\Enums\PermissionMode;
-    use App\Support\ThreadEventFormatter as Fmt;
+    use App\Support\TaskEventFormatter as Fmt;
 
-    /** @var \App\Models\ThreadApproval $approval */
+    /** @var \App\Models\TaskApproval $approval */
     $pending = $approval->status === ApprovalStatus::Pending;
     $tool = (string) ($p['tool_name'] ?? $approval->tool_name);
     $title = match (true) {

@@ -7,8 +7,8 @@ namespace Tests\Unit\Workers\Compose;
 use App\Enums\AgentName;
 use App\Enums\WorkerImageEntityStatus;
 use App\Enums\WorkerSource;
-use App\Models\RepoProfile;
 use App\Models\WorkerStack;
+use App\Models\Workspace;
 use App\Workers\Compose\IncompatibleStackAgentException;
 use App\Workers\Compose\WorkerImageBuilder;
 use App\Workers\Compose\WorkerImageResolver;
@@ -34,24 +34,24 @@ class WorkerImageResolverTest extends TestCase
         $this->resolver = new WorkerImageResolver($this->builder);
     }
 
-    public function test_falls_back_to_repo_profile_stack(): void
+    public function test_falls_back_to_workspace_stack(): void
     {
         $stack = WorkerStack::factory()->create(['name' => 'php-8.4', 'capabilities' => ['node']]);
-        $profile = RepoProfile::factory()->create(['worker_stack_id' => $stack->id]);
+        $workspace = Workspace::factory()->create(['worker_stack_id' => $stack->id]);
 
-        $resolved = $this->resolver->resolveForRepoProfile($profile, 'main');
+        $resolved = $this->resolver->resolveForWorkspace($workspace, 'main');
 
         $this->assertSame($stack->id, $resolved->stack->id);
     }
 
-    public function test_falls_back_to_default_stack_when_profile_has_none(): void
+    public function test_falls_back_to_default_stack_when_workspace_has_none(): void
     {
         $defaultStack = WorkerStack::factory()->create(['name' => 'php-8.4', 'capabilities' => ['node']]);
-        $profile = RepoProfile::factory()->create(['worker_stack_id' => null]);
+        $workspace = Workspace::factory()->create(['worker_stack_id' => null]);
 
         config(['argos.compose.default_stack' => 'php-8.4']);
 
-        $resolved = $this->resolver->resolveForRepoProfile($profile, 'main');
+        $resolved = $this->resolver->resolveForWorkspace($workspace, 'main');
 
         $this->assertSame($defaultStack->id, $resolved->stack->id);
     }
@@ -66,23 +66,23 @@ class WorkerImageResolverTest extends TestCase
             ]),
         ]);
 
-        $profile = RepoProfile::factory()->create([
+        $workspace = Workspace::factory()->create([
             'platform' => 'github',
-            'url' => 'https://github.com/acme/widget',
+            'repo_url' => 'https://github.com/acme/widget',
             'token' => 'ghp-test',
             'worker_source' => WorkerSource::Byoi,
             'worker_stack_id' => null,
         ]);
 
-        $resolved = $this->resolver->resolveForRepoProfile($profile, 'main');
+        $resolved = $this->resolver->resolveForWorkspace($workspace, 'main');
 
-        $this->assertSame("byoi-{$profile->id}", $resolved->stack->name);
+        $this->assertSame("byoi-{$workspace->id}", $resolved->stack->name);
         $this->assertSame($dockerfile, $resolved->stack->dockerfile_body);
         $this->assertSame('php:8.4-cli', $resolved->stack->base_image);
         // Capabilities mirror the agent's requirements so the compatibility
         // pre-check passes; the build's validate step enforces reality.
         $this->assertSame(AgentName::ClaudeCode->spec()->requiresStackCapabilities, $resolved->stack->capabilities);
-        $this->assertDatabaseHas(WorkerStack::class, ['name' => "byoi-{$profile->id}", 'is_builtin' => false]);
+        $this->assertDatabaseHas(WorkerStack::class, ['name' => "byoi-{$workspace->id}", 'is_builtin' => false]);
     }
 
     public function test_byoi_throws_when_dockerfile_missing(): void
@@ -91,23 +91,23 @@ class WorkerImageResolverTest extends TestCase
             'api.github.com/repos/*/contents/*' => MockResponse::make('', 404),
         ]);
 
-        $profile = RepoProfile::factory()->create([
+        $workspace = Workspace::factory()->create([
             'platform' => 'github',
-            'url' => 'https://github.com/acme/widget',
+            'repo_url' => 'https://github.com/acme/widget',
             'token' => 'ghp-test',
             'worker_source' => WorkerSource::Byoi,
         ]);
 
         $this->expectException(RuntimeException::class);
-        $this->resolver->resolveForRepoProfile($profile, 'main');
+        $this->resolver->resolveForWorkspace($workspace, 'main');
     }
 
     public function test_default_agent_is_claude_code(): void
     {
         $stack = WorkerStack::factory()->create(['capabilities' => ['node']]);
-        $profile = RepoProfile::factory()->create(['worker_stack_id' => $stack->id]);
+        $workspace = Workspace::factory()->create(['worker_stack_id' => $stack->id]);
 
-        $resolved = $this->resolver->resolveForRepoProfile($profile, 'main');
+        $resolved = $this->resolver->resolveForWorkspace($workspace, 'main');
 
         $this->assertSame(AgentName::ClaudeCode, $resolved->agent->name);
     }
@@ -118,11 +118,11 @@ class WorkerImageResolverTest extends TestCase
             'name' => 'python-3.12',
             'capabilities' => ['python', 'pip'],
         ]);
-        $profile = RepoProfile::factory()->create(['worker_stack_id' => $stack->id]);
+        $workspace = Workspace::factory()->create(['worker_stack_id' => $stack->id]);
 
         $this->expectException(IncompatibleStackAgentException::class);
         $this->expectExceptionMessage("Stack 'python-3.12' lacks capabilities required by agent 'claude-code'");
-        $this->resolver->resolveForRepoProfile($profile, 'main');
+        $this->resolver->resolveForWorkspace($workspace, 'main');
     }
 
     public function test_throws_when_stack_is_disabled(): void
@@ -131,11 +131,11 @@ class WorkerImageResolverTest extends TestCase
             'capabilities' => ['node'],
             'status' => WorkerImageEntityStatus::Disabled,
         ]);
-        $profile = RepoProfile::factory()->create(['worker_stack_id' => $stack->id]);
+        $workspace = Workspace::factory()->create(['worker_stack_id' => $stack->id]);
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('is disabled');
-        $this->resolver->resolveForRepoProfile($profile, 'main');
+        $this->resolver->resolveForWorkspace($workspace, 'main');
     }
 
     public function test_tag_is_deterministic_per_stack_and_agent(): void
@@ -145,10 +145,10 @@ class WorkerImageResolverTest extends TestCase
             'capabilities' => ['node'],
             'dockerfile_body' => 'FROM php:8.4',
         ]);
-        $profile = RepoProfile::factory()->create(['worker_stack_id' => $stack->id]);
+        $workspace = Workspace::factory()->create(['worker_stack_id' => $stack->id]);
 
-        $a = $this->resolver->resolveForRepoProfile($profile, 'main');
-        $b = $this->resolver->resolveForRepoProfile($profile, 'main');
+        $a = $this->resolver->resolveForWorkspace($workspace, 'main');
+        $b = $this->resolver->resolveForWorkspace($workspace, 'main');
 
         $this->assertSame($a->stackTag, $b->stackTag);
         $this->assertSame($a->workerTag, $b->workerTag);
@@ -164,12 +164,12 @@ class WorkerImageResolverTest extends TestCase
             'capabilities' => ['node'],
             'dockerfile_body' => 'FROM php:8.4',
         ]);
-        $profile = RepoProfile::factory()->create(['worker_stack_id' => $stack->id]);
-        $tagBefore = $this->resolver->resolveForRepoProfile($profile, 'main')->workerTag;
+        $workspace = Workspace::factory()->create(['worker_stack_id' => $stack->id]);
+        $tagBefore = $this->resolver->resolveForWorkspace($workspace, 'main')->workerTag;
 
         $stack->forceFill(['dockerfile_body' => "FROM php:8.4\nRUN apt-get install -y new-tool"])->save();
 
-        $tagAfter = $this->resolver->resolveForRepoProfile($profile->fresh(), 'main')->workerTag;
+        $tagAfter = $this->resolver->resolveForWorkspace($workspace->fresh(), 'main')->workerTag;
 
         $this->assertNotSame($tagBefore, $tagAfter);
     }
@@ -187,12 +187,12 @@ class WorkerImageResolverTest extends TestCase
         $resolver = $this->makeResolverWithLibPaths([$rel.'/lib']);
 
         $stack = WorkerStack::factory()->create(['capabilities' => ['node']]);
-        $profile = RepoProfile::factory()->create(['worker_stack_id' => $stack->id]);
+        $workspace = Workspace::factory()->create(['worker_stack_id' => $stack->id]);
 
         try {
-            $tagBefore = $resolver->resolveForRepoProfile($profile, 'main')->workerTag;
+            $tagBefore = $resolver->resolveForWorkspace($workspace, 'main')->workerTag;
             file_put_contents($abs.'/lib/mcp.sh', "v2 with new line\n");
-            $tagAfter = $resolver->resolveForRepoProfile($profile, 'main')->workerTag;
+            $tagAfter = $resolver->resolveForWorkspace($workspace, 'main')->workerTag;
 
             $this->assertNotSame($tagBefore, $tagAfter, 'worker lib change must invalidate the image tag');
         } finally {
@@ -237,11 +237,11 @@ class WorkerImageResolverTest extends TestCase
         $resolver = $this->makeResolverWithLibPaths([$rel.'/lib']);
 
         $stack = WorkerStack::factory()->create(['capabilities' => ['node']]);
-        $profile = RepoProfile::factory()->create(['worker_stack_id' => $stack->id]);
+        $workspace = Workspace::factory()->create(['worker_stack_id' => $stack->id]);
 
         try {
-            $a = $resolver->resolveForRepoProfile($profile, 'main')->workerTag;
-            $b = $resolver->resolveForRepoProfile($profile, 'main')->workerTag;
+            $a = $resolver->resolveForWorkspace($workspace, 'main')->workerTag;
+            $b = $resolver->resolveForWorkspace($workspace, 'main')->workerTag;
             $this->assertSame($a, $b);
         } finally {
             @unlink($abs.'/lib/a.sh');

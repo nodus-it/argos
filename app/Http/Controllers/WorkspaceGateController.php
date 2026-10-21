@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Models\Demo;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Workspace\WorkspaceAccessTokens;
@@ -15,7 +16,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * ForwardAuth target for workspace hosts: `code-<slug>.<base>` (the editor —
- * effectively a shell into the container) and `demo-ws-<slug>.<base>` (the
+ * effectively a shell into the container) and `demo-<workspace>-<task>.<base>` (the
  * workspace preview). Unlike DemoGateController it checks *membership*, not
  * just a login: the editor needs an operating role (owner/editor), the
  * preview any membership.
@@ -114,8 +115,9 @@ class WorkspaceGateController extends Controller
 
     /**
      * Workspace and required ability for the forwarded host: the editor
-     * (`code-<slug>`) is a shell into the container and needs an operating
-     * role; the preview (`demo-ws-<slug>`) is readable by every member.
+     * (`code-<slug>`) is a shell into the container and needs the editor
+     * capability; a task preview (`demo-<workspace>-<task>`, see
+     * Task::demoSlugFor()) is readable by every member.
      *
      * @return array{0: Workspace|null, 1: string}
      */
@@ -128,16 +130,21 @@ class WorkspaceGateController extends Controller
         }
 
         $label = substr($host, 0, -strlen('.'.$base));
-        [$slug, $ability] = match (true) {
-            str_starts_with($label, 'code-') => [substr($label, 5), 'operate'],
-            str_starts_with($label, 'demo-ws-') => [substr($label, 8), 'view'],
-            default => [null, 'view'],
-        };
-        if ($slug === null || $slug === '' || preg_match('/^[a-z0-9-]+$/', $slug) !== 1) {
-            return [null, $ability];
+        if (preg_match('/^[a-z0-9-]+$/', $label) !== 1) {
+            return [null, 'view'];
         }
 
-        return [Workspace::query()->where('slug', $slug)->first(), $ability];
+        if (str_starts_with($label, 'code-')) {
+            return [Workspace::query()->where('slug', substr($label, 5))->first(), 'editor'];
+        }
+
+        if (str_starts_with($label, 'demo-')) {
+            $demo = Demo::query()->where('compose_project', $label)->latest()->first();
+
+            return [$demo?->workspace, 'view'];
+        }
+
+        return [null, 'view'];
     }
 
     /**

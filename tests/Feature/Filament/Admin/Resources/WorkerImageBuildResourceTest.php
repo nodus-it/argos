@@ -9,7 +9,6 @@ use App\Filament\Admin\Resources\WorkerImageBuildResource;
 use App\Filament\Admin\Resources\WorkerImageBuildResource\Pages\ListWorkerImageBuilds;
 use App\Filament\Admin\Resources\WorkerImageBuildResource\Pages\ViewWorkerImageBuild;
 use App\Jobs\BuildWorkerImageJob;
-use App\Models\AgentVersion;
 use App\Models\User;
 use App\Models\WorkerImageBuild;
 use App\Models\WorkerStack;
@@ -65,19 +64,14 @@ class WorkerImageBuildResourceTest extends TestCase
         });
     }
 
-    public function test_outdated_scope_matches_stack_drift_and_agent_drift(): void
+    public function test_outdated_scope_matches_stack_drift_only(): void
     {
         $stack = WorkerStack::factory()->create([
             'dockerfile_body' => "FROM php:8.4\n",
         ]);
         $currentHash = substr(hash('sha256', $stack->dockerfile_body), 0, 8);
 
-        AgentVersion::factory()->withUpdate()->create([
-            'agent_name' => AgentName::ClaudeCode,
-            'last_checked_at' => now(),
-        ]);
-
-        // (1) stack drift: stack_hash != current
+        // Stack drift: stack_hash != current
         $stackDrift = WorkerImageBuild::factory()->ready()->create([
             'worker_stack_id' => $stack->id,
             'agent_name' => AgentName::ClaudeCode,
@@ -85,40 +79,27 @@ class WorkerImageBuildResourceTest extends TestCase
             'built_at' => now(),
         ]);
 
-        // (2) agent drift: stack_hash matches, but built before last npm check
-        $agentDrift = WorkerImageBuild::factory()->ready()->create([
-            'worker_stack_id' => $stack->id,
-            'agent_name' => AgentName::ClaudeCode,
-            'stack_hash' => $currentHash,
-            'built_at' => now()->subHour(),
-        ]);
-
-        // (3) current: stack_hash matches AND built after last check
+        // Current: stack_hash matches — the build age does not matter
+        // (agent version checks are gone).
         $current = WorkerImageBuild::factory()->ready()->create([
             'worker_stack_id' => $stack->id,
             'agent_name' => AgentName::ClaudeCode,
             'stack_hash' => $currentHash,
-            'built_at' => now()->addMinute(),
+            'built_at' => now()->subDay(),
         ]);
 
         $outdatedIds = WorkerImageBuild::query()->outdated()->pluck('id')->all();
 
         $this->assertContains($stackDrift->id, $outdatedIds);
-        $this->assertContains($agentDrift->id, $outdatedIds);
         $this->assertNotContains($current->id, $outdatedIds);
 
         $this->assertTrue($stackDrift->isOutdated());
-        $this->assertTrue($agentDrift->isOutdated());
         $this->assertFalse($current->isOutdated());
     }
 
     public function test_outdated_scope_excludes_builds_without_built_at(): void
     {
         $stack = WorkerStack::factory()->create();
-        AgentVersion::factory()->withUpdate()->create([
-            'agent_name' => AgentName::ClaudeCode,
-            'last_checked_at' => now(),
-        ]);
         $currentHash = substr(hash('sha256', $stack->dockerfile_body), 0, 8);
 
         $failed = WorkerImageBuild::factory()->create([
@@ -178,7 +159,7 @@ class WorkerImageBuildResourceTest extends TestCase
         WorkerImageBuild::factory()->ready()->create([
             'worker_stack_id' => $stack->id,
             'stack_hash' => $currentHash,
-            'built_at' => now()->addMinute(),  // after any potential agent check
+            'built_at' => now(),
         ]);
 
         Livewire::test(ListWorkerImageBuilds::class)

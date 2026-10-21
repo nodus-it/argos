@@ -40,7 +40,7 @@ class ApiClient extends Model implements HasApiTokensContract
         'name',
     ];
 
-    /** The person auto-threads started with this client's tokens act for. */
+    /** The person auto-tasks started with this client's tokens act for. */
     public function runAsUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'run_as_user_id');

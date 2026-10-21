@@ -27,8 +27,9 @@ use Laravel\Passport\HasApiTokens;
  * @property bool $is_admin
  * @property array<string, bool>|null $notification_prefs
  * @property array<string, string>|null $ui_prefs
+ * @property bool $auto_task_consent
  */
-#[Fillable(['name', 'email', 'password', 'locale', 'notification_prefs', 'ui_prefs'])]
+#[Fillable(['name', 'email', 'password', 'locale', 'notification_prefs', 'ui_prefs', 'auto_task_consent'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable implements FilamentUser, OAuthenticatable
 {
@@ -46,6 +47,7 @@ class User extends Authenticatable implements FilamentUser, OAuthenticatable
             'is_admin' => 'boolean',
             'notification_prefs' => 'array',
             'ui_prefs' => 'array',
+            'auto_task_consent' => 'boolean',
         ];
     }
 
@@ -85,6 +87,22 @@ class User extends Authenticatable implements FilamentUser, OAuthenticatable
     public function workspaces(): BelongsToMany
     {
         return $this->belongsToMany(Workspace::class, 'workspace_members')->withPivot('role')->withTimestamps();
+    }
+
+    /** @return HasMany<Task, $this> */
+    public function ownedTasks(): HasMany
+    {
+        return $this->hasMany(Task::class, 'owner_user_id');
+    }
+
+    /**
+     * Tasks this person was invited to.
+     *
+     * @return BelongsToMany<Task, $this>
+     */
+    public function collaboratingTasks(): BelongsToMany
+    {
+        return $this->belongsToMany(Task::class, 'task_members')->withTimestamps();
     }
 
     public function connectedAccount(string $provider): ?ConnectedAccount

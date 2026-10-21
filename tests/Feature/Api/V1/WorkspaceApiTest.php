@@ -4,17 +4,16 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Api\V1;
 
-use App\Broadcasting\ThreadStream;
-use App\Enums\AutoThreadState;
-use App\Enums\WorkspaceOrigin;
+use App\Broadcasting\TaskStream;
+use App\Enums\AutoTaskState;
+use App\Enums\TaskOrigin;
 use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceStatus;
-use App\Jobs\Workspace\AdvanceAutoThreadJob;
+use App\Jobs\Workspace\AdvanceAutoTaskJob;
 use App\Jobs\Workspace\ProvisionWorkspaceJob;
 use App\Models\AgentCredential;
 use App\Models\ApiClient;
-use App\Models\RepoProfile;
-use App\Models\Thread;
+use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceMember;
@@ -31,21 +30,27 @@ class WorkspaceApiTest extends TestCase
 
     private User $bot;
 
-    private RepoProfile $project;
+    private Workspace $workspace;
 
     protected function setUp(): void
     {
         parent::setUp();
-        Bus::fake([ProvisionWorkspaceJob::class, AdvanceAutoThreadJob::class]);
-        Event::fake([ThreadStream::class]);
+        Bus::fake([ProvisionWorkspaceJob::class, AdvanceAutoTaskJob::class]);
+        Event::fake([TaskStream::class]);
         $this->app->singleton(WorkspaceDaemonClient::class, FakeWorkspaceDaemon::class);
         $this->bot = User::factory()->create(['name' => 'CI Bot']);
         AgentCredential::factory()->ownedBy($this->bot)->create();
-        $this->project = RepoProfile::factory()->create(['name' => 'widget']);
+        $this->workspace = Workspace::factory()->create(['name' => 'widget']);
+        $this->join($this->workspace, $this->bot);
+    }
+
+    private function join(Workspace $workspace, User $user, WorkspaceRole $role = WorkspaceRole::Member): void
+    {
+        WorkspaceMember::query()->create(['workspace_id' => $workspace->id, 'user_id' => $user->id, 'role' => $role]);
     }
 
     /** @param  list<string>  $abilities */
-    private function clientToken(array $abilities = ['workspaces:read', 'workspaces:write'], ?User $runAs = null): string
+    private function clientToken(array $abilities = ['workspaces:read', 'tasks:read', 'tasks:write'], ?User $runAs = null): string
     {
         return ApiClient::factory()->create(['run_as_user_id' => ($runAs ?? $this->bot)->id])->createToken('t', $abilities)->plainTextToken;
     }
@@ -53,93 +58,136 @@ class WorkspaceApiTest extends TestCase
     public function test_it_requires_a_token_with_the_ability(): void
     {
         $this->getJson('/api/v1/workspaces')->assertUnauthorized();
-        $this->withToken($this->clientToken(['projects:read']))->getJson('/api/v1/workspaces')->assertForbidden();
+        $this->withToken($this->clientToken(['tasks:read']))->getJson('/api/v1/workspaces')->assertForbidden();
+        $this->withToken($this->clientToken(['tasks:read']))->postJson("/api/v1/workspaces/{$this->workspace->id}/tasks", ['prompt' => 'x'])->assertForbidden();
     }
 
     public function test_a_client_without_a_run_as_user_is_refused(): void
     {
-        $token = ApiClient::factory()->create()->createToken('t', ['workspaces:write'])->plainTextToken;
+        $token = ApiClient::factory()->create()->createToken('t', ['tasks:write'])->plainTextToken;
 
-        $this->withToken($token)->postJson('/api/v1/workspaces', ['project' => 'widget', 'prompt' => 'Do it'])
+        $this->withToken($token)->postJson("/api/v1/workspaces/{$this->workspace->id}/tasks", ['prompt' => 'Do it'])
             ->assertStatus(422)->assertJsonPath('code', 'no_actor');
     }
 
-    public function test_it_starts_an_automatic_run_in_a_new_workspace(): void
+    public function test_it_starts_an_automatic_task_in_the_workspace(): void
     {
-        $response = $this->withToken($this->clientToken())->postJson('/api/v1/workspaces', [
-            'project' => 'widget', 'prompt' => 'Add priorities to notes', 'title' => 'Priorities', 'plan' => 'approve', 'ship' => 'draft_pr', 'max_turns' => 20,
+        $response = $this->withToken($this->clientToken())->postJson("/api/v1/workspaces/{$this->workspace->id}/tasks", [
+            'prompt' => 'Add priorities to notes', 'title' => 'Priorities', 'plan' => 'approve', 'ship' => 'draft_pr', 'max_turns' => 20,
         ]);
 
         $response->assertStatus(202)
             ->assertJsonPath('data.origin', 'api')
-            ->assertJsonPath('data.project.name', 'widget')
-            ->assertJsonPath('data.threads.0.auto.state', 'queued')
-            ->assertJsonPath('data.threads.0.auto.plan', 'approve');
+            ->assertJsonPath('data.title', 'Priorities')
+            ->assertJsonPath('data.workspace_id', $this->workspace->id)
+            ->assertJsonPath('data.owner.name', 'CI Bot')
+            ->assertJsonPath('data.branch', 'argos/priorities')
+            ->assertJsonPath('data.auto.state', 'queued')
+            ->assertJsonPath('data.auto.plan', 'approve');
 
-        $workspace = Workspace::query()->sole();
-        $this->assertSame(WorkspaceOrigin::Api, $workspace->origin);
-        $this->assertSame(WorkspaceRole::Owner, $workspace->roleOf($this->bot));
-        $thread = Thread::query()->sole();
-        $this->assertSame('draft_pr', $thread->auto_config['ship']);
-        $this->assertSame(20, $thread->auto_config['max_turns']);
-        Bus::assertDispatched(AdvanceAutoThreadJob::class, fn ($job): bool => $job->step === 'begin');
+        // No new workspace: the task runs in the existing one.
+        $this->assertSame(1, Workspace::query()->count());
+        $task = Task::query()->sole();
+        $this->assertSame(TaskOrigin::Api, $task->origin);
+        $this->assertSame($this->bot->id, $task->owner_user_id);
+        $this->assertSame('draft_pr', $task->auto_config['ship']);
+        $this->assertSame(20, $task->auto_config['max_turns']);
+        Bus::assertDispatched(AdvanceAutoTaskJob::class, fn ($job): bool => $job->step === 'begin');
+    }
+
+    public function test_a_viewer_cannot_start_tasks(): void
+    {
+        $viewer = User::factory()->create();
+        AgentCredential::factory()->ownedBy($viewer)->create();
+        $this->join($this->workspace, $viewer, WorkspaceRole::Viewer);
+
+        $this->withToken($this->clientToken(runAs: $viewer))->postJson("/api/v1/workspaces/{$this->workspace->id}/tasks", ['prompt' => 'x'])
+            ->assertForbidden();
+        $this->assertSame(0, Task::query()->count());
     }
 
     public function test_a_person_without_an_agent_gets_a_clear_error(): void
     {
         $nobody = User::factory()->create();
+        $this->join($this->workspace, $nobody);
 
-        $this->withToken($this->clientToken(runAs: $nobody))->postJson('/api/v1/workspaces', ['project' => 'widget', 'prompt' => 'x'])
+        $this->withToken($this->clientToken(runAs: $nobody))->postJson("/api/v1/workspaces/{$this->workspace->id}/tasks", ['prompt' => 'x'])
             ->assertStatus(422)->assertJsonPath('code', 'no_usable_agent');
-        $this->assertSame(0, Workspace::query()->count());
+        $this->assertSame(0, Task::query()->count());
     }
 
-    public function test_project_tokens_act_for_the_automation_user_and_stay_in_their_project(): void
+    public function test_workspace_tokens_act_for_the_automation_user_and_stay_in_their_workspace(): void
     {
-        $this->project->forceFill(['automation_user_id' => $this->bot->id])->save();
-        $other = RepoProfile::factory()->create(['name' => 'other']);
-        $token = $this->project->createToken('p', ['workspaces:read', 'workspaces:write'])->plainTextToken;
+        $this->workspace->forceFill(['automation_user_id' => $this->bot->id])->save();
+        $other = Workspace::factory()->create(['name' => 'other']);
+        $this->join($other, $this->bot, WorkspaceRole::Admin);
+        $token = $this->workspace->createToken('p', ['workspaces:read', 'tasks:read', 'tasks:write'])->plainTextToken;
 
-        $this->withToken($token)->postJson('/api/v1/workspaces', ['project' => $this->project->id, 'prompt' => 'x'])->assertStatus(202);
-        $this->withToken($token)->postJson('/api/v1/workspaces', ['project' => $other->id, 'prompt' => 'x'])->assertNotFound();
+        $this->withToken($token)->postJson("/api/v1/workspaces/{$this->workspace->id}/tasks", ['prompt' => 'x'])->assertStatus(202)
+            ->assertJsonPath('data.owner.name', 'CI Bot');
+        $this->withToken($token)->postJson("/api/v1/workspaces/{$other->id}/tasks", ['prompt' => 'x'])->assertNotFound();
 
-        $foreign = Workspace::factory()->create(['repo_profile_id' => $other->id]);
-        WorkspaceMember::query()->create(['workspace_id' => $foreign->id, 'user_id' => $this->bot->id, 'role' => WorkspaceRole::Owner]);
-        $this->withToken($token)->getJson('/api/v1/workspaces/'.$foreign->id)->assertNotFound();
-        $this->withToken($token)->getJson('/api/v1/workspaces')->assertJsonCount(1, 'data');
+        $foreignTask = Task::factory()->create(['workspace_id' => $other->id]);
+        $this->withToken($token)->getJson('/api/v1/workspaces/'.$other->id)->assertNotFound();
+        $this->withToken($token)->getJson('/api/v1/tasks/'.$foreignTask->id)->assertNotFound();
+        $this->withToken($token)->getJson('/api/v1/workspaces')->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $this->workspace->id);
     }
 
     public function test_listing_shows_only_workspaces_of_the_acting_person(): void
     {
-        $mine = Workspace::factory()->create(['repo_profile_id' => $this->project->id]);
-        WorkspaceMember::query()->create(['workspace_id' => $mine->id, 'user_id' => $this->bot->id, 'role' => WorkspaceRole::Editor]);
-        $theirs = Workspace::factory()->create(['repo_profile_id' => $this->project->id]);
+        $theirs = Workspace::factory()->create(['name' => 'theirs']);
 
         $token = $this->clientToken();
-        $this->withToken($token)->getJson('/api/v1/workspaces')->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $mine->id);
+        $this->withToken($token)->getJson('/api/v1/workspaces')->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $this->workspace->id)
+            ->assertJsonPath('data.0.repository', 'test-org/test-repo');
         $this->withToken($token)->getJson('/api/v1/workspaces/'.$theirs->id)->assertNotFound();
+        $this->withToken($token)->getJson("/api/v1/workspaces/{$theirs->id}/tasks")->assertNotFound();
     }
 
-    public function test_threads_can_be_paused_resumed_and_plans_need_a_waiting_plan(): void
+    public function test_every_member_sees_all_tasks_of_the_workspace(): void
     {
-        $workspace = Workspace::factory()->create(['repo_profile_id' => $this->project->id, 'status' => WorkspaceStatus::Running]);
-        WorkspaceMember::query()->create(['workspace_id' => $workspace->id, 'user_id' => $this->bot->id, 'role' => WorkspaceRole::Owner]);
-        $thread = Thread::factory()->create(['workspace_id' => $workspace->id, 'created_by' => $this->bot->id, 'auto_state' => AutoThreadState::Implementing, 'auto_config' => ['plan' => 'off'], 'auto_counters' => []]);
+        $colleague = User::factory()->create();
+        $theirs = Task::factory()->ownedBy($colleague)->create(['workspace_id' => $this->workspace->id, 'title' => 'Their task']);
+        Task::factory()->create(['workspace_id' => $this->workspace->id, 'archived_at' => now()]);
+        $token = $this->clientToken(['tasks:read']);
+
+        $this->withToken($token)->getJson("/api/v1/workspaces/{$this->workspace->id}/tasks")
+            ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $theirs->id);
+        $this->withToken($token)->getJson("/api/v1/workspaces/{$this->workspace->id}/tasks?archived=1")->assertJsonCount(2, 'data');
+        $this->withToken($token)->getJson("/api/v1/tasks/{$theirs->id}")->assertOk()
+            ->assertJsonPath('data.title', 'Their task')
+            ->assertJsonPath('data.owner.id', $colleague->id);
+    }
+
+    public function test_tasks_can_be_paused_resumed_and_plans_need_a_waiting_plan(): void
+    {
+        $this->workspace->forceFill(['status' => WorkspaceStatus::Running])->save();
+        $task = Task::factory()->ownedBy($this->bot)->create(['workspace_id' => $this->workspace->id, 'auto_state' => AutoTaskState::Implementing, 'auto_config' => ['plan' => 'off'], 'auto_counters' => []]);
         $token = $this->clientToken();
 
-        $this->withToken($token)->postJson("/api/v1/threads/{$thread->id}/pause")->assertOk()->assertJsonPath('data.auto.state', 'paused');
-        $this->withToken($token)->postJson("/api/v1/threads/{$thread->id}/resume")->assertStatus(202)->assertJsonPath('data.auto.state', 'gating');
-        $this->withToken($token)->postJson("/api/v1/threads/{$thread->id}/plan", ['decision' => 'approve'])
+        $this->withToken($token)->postJson("/api/v1/tasks/{$task->id}/pause")->assertOk()->assertJsonPath('data.auto.state', 'paused');
+        $this->withToken($token)->postJson("/api/v1/tasks/{$task->id}/resume")->assertStatus(202)->assertJsonPath('data.auto.state', 'gating');
+        $this->withToken($token)->postJson("/api/v1/tasks/{$task->id}/plan", ['decision' => 'approve'])
             ->assertStatus(422)->assertJsonPath('code', 'no_plan_waiting');
-        $this->withToken($token)->postJson("/api/v1/threads/{$thread->id}/plan", ['decision' => 'maybe'])->assertStatus(422);
+        $this->withToken($token)->postJson("/api/v1/tasks/{$task->id}/plan", ['decision' => 'maybe'])->assertStatus(422);
     }
 
-    public function test_another_automatic_run_can_start_in_an_existing_workspace(): void
+    public function test_a_member_cannot_steer_someone_elses_task(): void
     {
-        $workspace = Workspace::factory()->create(['repo_profile_id' => $this->project->id, 'status' => WorkspaceStatus::Running]);
-        WorkspaceMember::query()->create(['workspace_id' => $workspace->id, 'user_id' => $this->bot->id, 'role' => WorkspaceRole::Owner]);
+        $task = Task::factory()->create(['workspace_id' => $this->workspace->id, 'auto_state' => AutoTaskState::Implementing, 'auto_config' => ['plan' => 'off'], 'auto_counters' => []]);
 
-        $this->withToken($this->clientToken())->postJson("/api/v1/workspaces/{$workspace->id}/threads", ['prompt' => 'Second task', 'plan' => 'off'])
-            ->assertStatus(202)->assertJsonPath('data.auto.state', 'queued')->assertJsonPath('data.auto.plan', 'off');
+        $this->withToken($this->clientToken())->postJson("/api/v1/tasks/{$task->id}/pause")
+            ->assertForbidden()->assertJsonPath('code', 'forbidden');
+        $this->assertSame(AutoTaskState::Implementing, $task->fresh()->auto_state);
+    }
+
+    public function test_another_automatic_task_can_start_on_another_base_branch(): void
+    {
+        Task::factory()->ownedBy($this->bot)->create(['workspace_id' => $this->workspace->id]);
+
+        $this->withToken($this->clientToken())->postJson("/api/v1/workspaces/{$this->workspace->id}/tasks", ['prompt' => 'Second task', 'plan' => 'off', 'base_branch' => 'develop'])
+            ->assertStatus(202)->assertJsonPath('data.auto.state', 'queued')->assertJsonPath('data.auto.plan', 'off')
+            ->assertJsonPath('data.base_branch', 'develop');
+        $this->assertSame(2, Task::query()->count());
     }
 }

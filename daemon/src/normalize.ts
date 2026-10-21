@@ -1,4 +1,4 @@
-import { truncateUtf8, type PendingEvent, type ThreadState } from './events.js';
+import { truncateUtf8, type PendingEvent, type TaskState } from './events.js';
 import { extractResetAt, isUsageLimitMessage, resetsAtFromEpoch } from './usageLimit.js';
 
 /**
@@ -19,7 +19,7 @@ interface ContentBlock {
 
 /**
  * Turns the SDK's message stream into Argos daemon events. One instance per
- * thread session; it remembers the id of the assistant message that is
+ * task session; it remembers the id of the assistant message that is
  * currently streaming so deltas can be attributed to it.
  *
  * The categories mirror `app/Services/Workflow/AgentStreamParser.php`
@@ -73,7 +73,7 @@ export class Normalizer {
         }
 
         if (message.subtype === 'session_state_changed' && typeof message.state === 'string') {
-            const state: ThreadState | null =
+            const state: TaskState | null =
                 message.state === 'idle' ? 'idle' : message.state === 'running' ? 'running' : message.state === 'requires_action' ? 'waiting_input' : null;
 
             return state === null ? [] : [{ type: 'status', data: { state } }];

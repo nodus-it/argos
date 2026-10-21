@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Feature\Workspace;
 
 use App\Enums\GitProvider;
-use App\Models\RepoProfile;
 use App\Models\Workspace;
 use App\Services\GitProvider\RepoTokenResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -22,8 +21,7 @@ class RepoCredentialEndpointTest extends TestCase
 
     public function test_returns_the_git_credential_for_the_daemon_token(): void
     {
-        $profile = RepoProfile::factory()->create(['token' => 'ghp-secret']);
-        $workspace = Workspace::factory()->create(['repo_profile_id' => $profile->id, 'daemon_token' => 'tok-1']);
+        $workspace = Workspace::factory()->create(['token' => 'ghp-secret', 'daemon_token' => 'tok-1']);
 
         $this->getJson($this->url($workspace), ['Authorization' => 'Bearer tok-1'])
             ->assertOk()
@@ -51,8 +49,7 @@ class RepoCredentialEndpointTest extends TestCase
 
     public function test_reports_a_missing_repository_token(): void
     {
-        $profile = RepoProfile::factory()->create(['token' => null]);
-        $workspace = Workspace::factory()->create(['repo_profile_id' => $profile->id, 'daemon_token' => 'tok-1']);
+        $workspace = Workspace::factory()->create(['token' => null, 'daemon_token' => 'tok-1']);
 
         $this->getJson($this->url($workspace), ['Authorization' => 'Bearer tok-1'])
             ->assertStatus(409)
@@ -63,8 +60,8 @@ class RepoCredentialEndpointTest extends TestCase
     {
         $resolver = app(RepoTokenResolver::class);
 
-        $this->assertSame(['username' => 'x-token-auth', 'password' => 't'], $resolver->gitCredential(RepoProfile::factory()->make(['platform' => GitProvider::Bitbucket, 'token' => 't'])));
-        $this->assertSame(['username' => 'oauth2', 'password' => 't'], $resolver->gitCredential(RepoProfile::factory()->make(['platform' => GitProvider::GitLab, 'token' => 't'])));
-        $this->assertSame(['username' => 'me', 'password' => 'app:pw'], $resolver->gitCredential(RepoProfile::factory()->make(['platform' => GitProvider::Bitbucket, 'token' => 'me:app:pw'])));
+        $this->assertSame(['username' => 'x-token-auth', 'password' => 't'], $resolver->gitCredential(Workspace::factory()->make(['platform' => GitProvider::Bitbucket, 'token' => 't'])));
+        $this->assertSame(['username' => 'oauth2', 'password' => 't'], $resolver->gitCredential(Workspace::factory()->make(['platform' => GitProvider::GitLab, 'token' => 't'])));
+        $this->assertSame(['username' => 'me', 'password' => 'app:pw'], $resolver->gitCredential(Workspace::factory()->make(['platform' => GitProvider::Bitbucket, 'token' => 'me:app:pw'])));
     }
 }

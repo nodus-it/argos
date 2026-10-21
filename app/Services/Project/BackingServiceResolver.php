@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Project;
 
 use App\Enums\BackingService;
-use App\Models\RepoProfile;
+use App\Models\Workspace;
 
 /**
  * Single source of truth for a project's backing-service coordinates. Merges
@@ -26,7 +26,7 @@ class BackingServiceResolver
      *
      * @return array<string, array<string, string>>
      */
-    public function coordinates(RepoProfile $profile): array
+    public function coordinates(Workspace $profile): array
     {
         $config = $profile->worker_service_config ?? [];
         $out = [];
@@ -54,7 +54,7 @@ class BackingServiceResolver
      *
      * @return array<string, string>
      */
-    public function connectionEnv(RepoProfile $profile): array
+    public function connectionEnv(Workspace $profile): array
     {
         $env = [];
         foreach ($this->coordinates($profile) as $key => $coords) {
@@ -70,7 +70,7 @@ class BackingServiceResolver
      *
      * @return array<string, string>
      */
-    public function placeholders(RepoProfile $profile): array
+    public function placeholders(Workspace $profile): array
     {
         $map = [];
         foreach ($this->coordinates($profile) as $key => $coords) {

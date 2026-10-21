@@ -221,15 +221,20 @@ Jeder Workspace hat **Mitglieder**:
 
 | Rolle | Darf |
 |---|---|
-| Besitzer | alles, was ein Bearbeiter darf, dazu Mitglieder verwalten, den Workspace löschen und *Freigaben umgehen* nutzen |
-| Bearbeiter | in Threads schreiben, Claude stoppen, Freigaben entscheiden, Modus/Modell wechseln, den Editor nutzen, den Workspace und seine Preview starten/stoppen |
-| Leser | Threads lesen und die Preview öffnen |
+| Admin (`admin`) | alles: Einstellungen, Integrationen, Mitglieder und jeden Task |
+| Mitglied (`member`) | Tasks starten, den Editor nutzen, den Workspace und seine Preview starten/stoppen |
+| Leser (`viewer`) | alle Tasks lesen und die Preview öffnen |
 
-Besitzer fügen Mitglieder über **⋯ → Mitglied hinzufügen** hinzu. Der Kopf der
+Alle in einem Workspace sehen alle seine Tasks. In einen Task schreiben,
+Claude stoppen, Freigaben entscheiden, Review-Kommentare und Ausliefern sind
+Sache der **Besitzerin** des Tasks und der **Mitwirkenden**, die sie einlädt
+(und der Workspace-Admins); nur die Besitzerin darf einladen, den Task
+übergeben oder archivieren.
+
+Workspace-Admins fügen Mitglieder über **⋯ → Mitglied hinzufügen** hinzu. Der Kopf der
 Workspace-Seite zeigt, wer gerade da ist; der Chat zeigt, wer tippt. Jede
 Nachricht trägt ihren Autor, und Claude sieht sie als `[Name]: …`.
-Administratoren sehen alle Workspaces, treten zum Schreiben aber als Mitglied
-bei.
+Argos-Administratoren dürfen in jedem Workspace alles.
 
 Administratoren verwalten die Personen einer Installation unter **Benutzer**.
 
@@ -432,10 +437,8 @@ ein ganz normaler Thread.
 
 - In einem Workspace: **Neuer Thread → Automatisch umsetzen**, dann die Arbeit
   beschreiben.
-- Mit einem neuen Workspace: **Mit dem Workspace einen automatischen Lauf
-  starten** im Formular — der Lauf wartet, bis der Workspace bereit ist.
-- Von außen: die [REST-API](REST-API.md#workspaces-und-automatische-laufe)
-  (`POST /api/v1/workspaces`), [MCP](SETUP-MCP.md) (`workspace_create`) oder ein
+- Von außen: die [REST-API](REST-API.md#tasks)
+  (`POST /api/v1/workspaces/{workspace}/tasks`), [MCP](SETUP-MCP.md) (`task_create`) oder ein
   Issue eines verbundenen Trackers ([Issue-Trigger](SETUP-TASK-PROVIDERS.md#issue-zu-automatischem-lauf)).
 
 **Wie er läuft**

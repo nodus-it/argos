@@ -47,9 +47,8 @@ class DocCoverageTest extends TestCase
 
     public function test_rest_api_documents_the_versioned_endpoints(): void
     {
-        $this->assertDocMentions('REST-API.md', '/api/v1/projects', 'API endpoint');
         $this->assertDocMentions('REST-API.md', '/api/v1/workspaces', 'API endpoint');
-        $this->assertDocMentions('REST-API.md', '/api/v1/threads', 'API endpoint');
+        $this->assertDocMentions('REST-API.md', '/api/v1/tasks', 'API endpoint');
     }
 
     public function test_projects_doc_documents_every_backing_service(): void
@@ -59,11 +58,11 @@ class DocCoverageTest extends TestCase
         }
     }
 
-    public function test_auto_thread_modes_are_documented(): void
+    public function test_auto_task_modes_are_documented(): void
     {
         foreach ([...AutoPlanMode::cases(), ...AutoShipMode::cases()] as $mode) {
-            $this->assertDocMentions('CONFIGURATION.md', '`'.$mode->value.'`', 'Auto-thread mode');
-            $this->assertDocMentions('REST-API.md', '`'.$mode->value.'`', 'Auto-thread mode');
+            $this->assertDocMentions('CONFIGURATION.md', '`'.$mode->value.'`', 'Auto-task mode');
+            $this->assertDocMentions('REST-API.md', '`'.$mode->value.'`', 'Auto-task mode');
         }
     }
 

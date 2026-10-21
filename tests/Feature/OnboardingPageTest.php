@@ -11,8 +11,8 @@ use App\Filament\Admin\Pages\Onboarding;
 use App\Models\AgentCredential;
 use App\Models\ProviderCredential;
 use App\Models\ProviderOAuthConfig;
-use App\Models\RepoProfile;
 use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
@@ -365,7 +365,7 @@ class OnboardingPageTest extends TestCase
             ->assertSee(route('filament.admin.resources.provider-oauth-configs.create'));
     }
 
-    public function test_inline_create_with_oauth_account_creates_repo_profile(): void
+    public function test_inline_create_with_oauth_account_creates_workspace(): void
     {
         $this->configureClaudeAgent();
 
@@ -398,19 +398,19 @@ class OnboardingPageTest extends TestCase
             ->call('createProject')
             ->assertSet('currentStep', 4)
             ->assertSee(__('onboarding.done.create_workspace'))
-            ->assertSee('/w/workspaces/create');
+            ->assertSee('/w/workspaces/'.Workspace::query()->where('name', 'widget')->value('id'));
 
-        $this->assertDatabaseHas(RepoProfile::class, [
+        $this->assertDatabaseHas(Workspace::class, [
             'name' => 'widget',
             'platform' => 'github',
             'auth_method' => 'oauth',
             'connected_account_id' => $account->id,
             'default_branch' => 'main',
-            'url' => 'https://github.com/acme/widget',
+            'repo_url' => 'https://github.com/acme/widget',
         ]);
     }
 
-    public function test_inline_create_with_pat_credential_creates_repo_profile(): void
+    public function test_inline_create_with_pat_credential_creates_workspace(): void
     {
         $this->configureClaudeAgent();
 
@@ -436,17 +436,17 @@ class OnboardingPageTest extends TestCase
             ->call('createProject')
             ->assertSet('currentStep', 4);
 
-        $profile = RepoProfile::query()->where('name', 'gadget')->first();
-        $this->assertNotNull($profile);
-        $this->assertSame('pat', $profile->auth_method->value);
-        $this->assertNull($profile->connected_account_id);
-        $this->assertSame('ghp-secret', $profile->token);
+        $workspace = Workspace::query()->where('name', 'gadget')->first();
+        $this->assertNotNull($workspace);
+        $this->assertSame('pat', $workspace->auth_method->value);
+        $this->assertNull($workspace->connected_account_id);
+        $this->assertSame('ghp-secret', $workspace->token);
     }
 
     public function test_inline_create_rejects_duplicate_name(): void
     {
         $this->configureClaudeAgent();
-        RepoProfile::factory()->create(['name' => 'widget']);
+        Workspace::factory()->create(['name' => 'widget']);
 
         $credential = ProviderCredential::factory()->create([
             'provider' => IntegrationProvider::GitHub,
@@ -462,12 +462,12 @@ class OnboardingPageTest extends TestCase
             ->call('createProject')
             ->assertSet('currentStep', 3);
 
-        $this->assertSame(1, RepoProfile::query()->where('name', 'widget')->count());
+        $this->assertSame(1, Workspace::query()->where('name', 'widget')->count());
     }
 
     public function test_onboarding_hidden_from_nav_when_project_exists(): void
     {
-        RepoProfile::factory()->create();
+        Workspace::factory()->create();
 
         $this->assertFalse(Onboarding::shouldRegisterNavigation());
     }

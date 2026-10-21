@@ -9,8 +9,8 @@ use App\Filament\Admin\Resources\AgentCredentialResource\Pages\CreateAgentCreden
 use App\Filament\Admin\Resources\AgentCredentialResource\Pages\EditAgentCredential;
 use App\Filament\Admin\Resources\AgentCredentialResource\Pages\ListAgentCredentials;
 use App\Models\AgentCredential;
-use App\Models\RepoProfile;
 use App\Models\User;
+use App\Models\Workspace;
 use App\Services\Credentials\CredentialVerification;
 use App\Services\Credentials\CredentialVerifier;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -25,7 +25,7 @@ class AgentCredentialScopingTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        RepoProfile::factory()->create();
+        Workspace::factory()->create();
         $verifier = Mockery::mock(CredentialVerifier::class);
         $verifier->shouldReceive('verifyClaudeToken')->andReturn(CredentialVerification::valid());
         $this->app->instance(CredentialVerifier::class, $verifier);

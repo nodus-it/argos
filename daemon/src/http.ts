@@ -6,7 +6,7 @@ import { ApprovalRegistry } from './approvals.js';
 import { CodedError } from './errors.js';
 import { ID_PATTERN } from './ids.js';
 import type { Outbox } from './outbox.js';
-import { ThreadSession, USER_PERMISSION_MODES, type QueryFactory, type SessionEnvironment } from './threadSession.js';
+import { TaskSession, USER_PERMISSION_MODES, type QueryFactory, type SessionEnvironment } from './taskSession.js';
 import { initWorkspace } from './workspaceInit.js';
 import * as gitOps from './gitOps.js';
 import { FileIndex, readWorkspaceFile } from './files.js';
@@ -30,7 +30,7 @@ export interface AppDependencies {
 
 const permissionMode = z.enum(USER_PERMISSION_MODES);
 
-/** Thread, agent and run ids. */
+/** Task, agent and run ids. */
 const idSchema = z.string().regex(ID_PATTERN);
 
 /** Checkpoint refs; the shape is checked by `parseRef`. */
@@ -96,14 +96,14 @@ const oneshotSchema = z.object({
  * workspace's bearer token; the daemon is only reachable on the internal
  * `argos_ws` network.
  */
-export function buildApp(deps: AppDependencies): { app: FastifyInstance; sessions: Map<string, ThreadSession> } {
+export function buildApp(deps: AppDependencies): { app: FastifyInstance; sessions: Map<string, TaskSession> } {
     const app = Fastify({ logger: false, bodyLimit: 40 * 1024 * 1024 });
-    const sessions = new Map<string, ThreadSession>();
+    const sessions = new Map<string, TaskSession>();
     const approvals = new ApprovalRegistry();
     const gates = deps.gateScript === undefined ? null : new GateRunner(deps.gateScript, (event) => deps.outbox.push(null, event), deps.environment.workspaceDir);
     const checkpoints = new CheckpointStore(deps.environment.workspaceDir);
-    const announceCheckpoint = (threadId: string, checkpoint: Checkpoint, clientMsgId: string | null): void => {
-        deps.outbox.push(threadId, {
+    const announceCheckpoint = (taskId: string, checkpoint: Checkpoint, clientMsgId: string | null): void => {
+        deps.outbox.push(taskId, {
             type: 'checkpoint.created',
             data: { ref: checkpoint.ref, n: checkpoint.n, sha: checkpoint.sha, head: checkpoint.head, label: checkpoint.label, client_msg_id: clientMsgId },
         });
@@ -136,11 +136,11 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
         return reply.code(status).send({ error: { code: 'internal_error', message: error instanceof Error ? error.message : 'Internal error' } });
     });
 
-    const sessionFor = (request: FastifyRequest): ThreadSession => {
+    const sessionFor = (request: FastifyRequest): TaskSession => {
         const id = idSchema.parse((request.params as { id?: string }).id);
         const session = sessions.get(id);
         if (session === undefined) {
-            throw new CodedError(404, 'unknown_thread', `Thread ${id} is not running`);
+            throw new CodedError(404, 'unknown_task', `Task ${id} is not running`);
         }
 
         return session;
@@ -150,7 +150,7 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
         version: DAEMON_VERSION,
         sdk_version: deps.versions?.sdk ?? null,
         claude_version: deps.versions?.claude ?? null,
-        threads: [...sessions.values()].map((s) => ({ id: s.threadId, state: s.currentState, claude_session_id: s.sessionId })),
+        tasks: [...sessions.values()].map((s) => ({ id: s.taskId, state: s.currentState, claude_session_id: s.sessionId })),
     }));
 
     app.post('/workspace/init', async (request) => {
@@ -169,7 +169,7 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
         return { status };
     });
 
-    app.post('/threads/:id/start', async (request) => {
+    app.post('/tasks/:id/start', async (request) => {
         const id = idSchema.parse((request.params as { id?: string }).id);
         const body = startSchema.parse(request.body);
 
@@ -179,7 +179,7 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
         }
 
         deps.outbox.setSeqOffset(id, body.seq_offset);
-        const session = new ThreadSession(
+        const session = new TaskSession(
             id,
             {
                 agentId: body.agent_id,
@@ -201,33 +201,33 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
         return { state: session.currentState };
     });
 
-    app.post('/threads/:id/messages', async (request, reply: FastifyReply) => {
+    app.post('/tasks/:id/messages', async (request, reply: FastifyReply) => {
         const session = sessionFor(request);
         const body = messageSchema.parse(request.body);
         if (session.currentState === 'closed') {
-            throw new CodedError(409, 'thread_closed', 'Thread session is closed; start it again');
+            throw new CodedError(409, 'task_closed', 'Task session is closed; start it again');
         }
         const accepted = session.send({ clientMsgId: body.client_msg_id, author: body.author, text: body.text, images: body.images });
 
         return reply.code(202).send({ queued: accepted });
     });
 
-    app.post('/threads/:id/interrupt', async (request, reply) => {
+    app.post('/tasks/:id/interrupt', async (request, reply) => {
         await sessionFor(request).interrupt();
 
         return reply.code(202).send({});
     });
 
-    app.post('/threads/:id/approvals/:approvalId', async (request, reply) => {
+    app.post('/tasks/:id/approvals/:approvalId', async (request, reply) => {
         const session = sessionFor(request);
         const approvalId = z.string().min(1).parse((request.params as { approvalId?: string }).approvalId);
         const body = approvalSchema.parse(request.body);
-        approvals.resolve(session.threadId, approvalId, { decision: body.decision, updatedInput: body.updated_input, message: body.message, remember: body.remember });
+        approvals.resolve(session.taskId, approvalId, { decision: body.decision, updatedInput: body.updated_input, message: body.message, remember: body.remember });
 
         return reply.code(202).send({});
     });
 
-    app.post('/threads/:id/permission-mode', async (request, reply) => {
+    app.post('/tasks/:id/permission-mode', async (request, reply) => {
         const session = sessionFor(request);
         const { mode } = z.object({ mode: permissionMode }).parse(request.body);
         await session.setPermissionMode(mode);
@@ -235,7 +235,7 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
         return reply.code(202).send({});
     });
 
-    app.post('/threads/:id/model', async (request, reply) => {
+    app.post('/tasks/:id/model', async (request, reply) => {
         const session = sessionFor(request);
         const { model } = z.object({ model: z.string().min(1) }).parse(request.body);
         await session.setModel(model);
@@ -243,10 +243,10 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
         return reply.code(202).send({});
     });
 
-    app.post('/threads/:id/stop', async (request, reply) => {
+    app.post('/tasks/:id/stop', async (request, reply) => {
         const session = sessionFor(request);
         await session.stop();
-        sessions.delete(session.threadId);
+        sessions.delete(session.taskId);
 
         return reply.code(202).send({});
     });
@@ -306,9 +306,9 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
     });
 
     app.post('/checkpoints', async (request, reply) => {
-        const body = z.object({ thread_id: idSchema, label: z.string().max(120).default('') }).parse(request.body);
-        const checkpoint = await checkpoints.create(body.thread_id, body.label);
-        announceCheckpoint(body.thread_id, checkpoint, null);
+        const body = z.object({ task_id: idSchema, label: z.string().max(120).default('') }).parse(request.body);
+        const checkpoint = await checkpoints.create(body.task_id, body.label);
+        announceCheckpoint(body.task_id, checkpoint, null);
 
         return reply.code(201).send(checkpoint);
     });
@@ -321,14 +321,14 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
 
     app.post('/checkpoints/restore', async (request) => {
         const { ref } = z.object({ ref: checkpointRefSchema }).parse(request.body);
-        const { threadId } = parseRef(ref);
-        // A restore rewrites the whole working tree, so no thread may be working.
+        const { taskId } = parseRef(ref);
+        // A restore rewrites the whole working tree, so no task may be working.
         const busy = [...sessions.values()].find((s) => s.currentState === 'running' || s.currentState === 'starting' || s.currentState === 'waiting_input');
         if (busy !== undefined) {
-            throw new CodedError(409, 'thread_running', busy.threadId === threadId ? 'Claude is working in this thread; interrupt it first' : `Claude is working in thread ${busy.threadId}; interrupt it first`);
+            throw new CodedError(409, 'task_running', busy.taskId === taskId ? 'Claude is working in this task; interrupt it first' : `Claude is working in task ${busy.taskId}; interrupt it first`);
         }
         const result = await checkpoints.restore(ref);
-        announceCheckpoint(threadId, result.before, null);
+        announceCheckpoint(taskId, result.before, null);
 
         return result;
     });

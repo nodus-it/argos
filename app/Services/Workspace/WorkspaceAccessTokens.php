@@ -8,7 +8,7 @@ use App\Models\User;
 use App\Models\Workspace;
 
 /**
- * Signed access tokens for workspace hosts (code-<slug>, demo-ws-<slug>).
+ * Signed access tokens for workspace hosts (code-<slug>, demo-<workspace>-<task>).
  *
  * The Argos session cookie only reaches those hosts when they share the
  * app's registrable domain. Everywhere else (local nip.io setups) the page

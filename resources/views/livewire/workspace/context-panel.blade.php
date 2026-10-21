@@ -1,5 +1,6 @@
 @php
     /** @var \App\Models\Workspace $workspace */
+    /** @var \App\Models\Task|null $task */
     /** @var array{files: array<int, array<string, mixed>>, truncated: bool, ahead: int, uncommitted: int}|null $diff */
 @endphp
 {{-- Context sidebar: environment, branch, quality gates, changed files.
@@ -17,43 +18,47 @@
                 <span class="wf-env-icon"><x-wf.icon name="code" :size="18" /></span>
                 <span class="wf-env-text">
                     <span class="wf-env-name">VS Code</span>
-                    @if (! $canOperate)
+                    @if (! $canEdit)
                         <span class="wf-env-state">{{ __('workspaces.focus.code_viewer') }}</span>
                     @else
                         <span @class(['wf-env-state', 'is-ok' => $running])>{{ $running ? __('workspaces.focus.code_ready') : __('workspaces.focus.code_off') }}</span>
                     @endif
                 </span>
-                @if ($canOperate && $running)
+                @if ($canEdit && $running)
                     <a class="wf-btn wf-btn-sm wf-btn-soft" href="{{ route('workspaces.open', ['workspace' => $workspace, 'target' => 'code']) }}" target="argos-code-{{ $workspace->slug }}">{{ __('workspaces.tabs.open') }}</a>
                 @endif
             </div>
         </div>
-        @livewire('workspace.preview-panel', ['workspaceId' => $workspace->id], key('preview-'.$workspace->id))
+        @if ($task !== null)
+            @livewire('workspace.preview-panel', ['workspaceId' => $workspace->id, 'taskId' => $task->id], key('preview-'.$task->id))
+        @endif
     </section>
 
+    @if ($task !== null)
     <section class="wf-section">
         <h2 class="wf-section-title">{{ __('workspaces.focus.branch') }}</h2>
         <div class="wf-card wf-branch">
-            <span class="mono wf-branch-name">{{ $workspace->branch }}</span>
-            <span class="wf-muted">→ {{ $workspace->base_branch }} · {{ $workspace->repoProfile->name }}</span>
+            <span class="mono wf-branch-name">{{ $task->branch }}</span>
+            <span class="wf-muted">→ {{ $task->base_branch }} · {{ $workspace->name }}</span>
             <div class="wf-tiles">
                 <div class="wf-tile"><div class="wf-tile-num">{{ $diff['uncommitted'] ?? '–' }}</div><div class="wf-muted">{{ __('workspaces.focus.uncommitted') }}</div></div>
                 <div class="wf-tile"><div class="wf-tile-num">{{ $diff['ahead'] ?? '–' }}</div><div class="wf-muted">{{ __('workspaces.focus.unpushed') }}</div></div>
             </div>
-            @if ($workspace->pr_url || $issueLabel !== null)
+            @if ($task->pr_url || $issueLabel !== null)
                 <div class="wf-branch-links">
-                    @if ($workspace->pr_url)
-                        <a class="wf-link" href="{{ $workspace->pr_url }}" target="_blank" rel="noopener">
-                            <x-wf.icon name="git-pr" :size="14" :stroke="2" /> #{{ $workspace->pr_number }}@if ($workspace->pr_state) · {{ __('workspaces.pr_state.'.$workspace->pr_state) }}@endif
+                    @if ($task->pr_url)
+                        <a class="wf-link" href="{{ $task->pr_url }}" target="_blank" rel="noopener">
+                            <x-wf.icon name="git-pr" :size="14" :stroke="2" /> #{{ $task->pr_number }}@if ($task->pr_state) · {{ __('workspaces.pr_state.'.$task->pr_state) }}@endif
                         </a>
                     @endif
                     @if ($issueLabel !== null)
-                        <a class="wf-link" href="{{ $workspace->external_issue['url'] }}" target="_blank" rel="noopener" title="{{ __('workspaces.fields.issue') }}">{{ $issueLabel }}</a>
+                        <a class="wf-link" href="{{ $task->external_ref['url'] ?? '#' }}" target="_blank" rel="noopener" title="{{ __('workspaces.fields.issue') }}">{{ $issueLabel }}</a>
                     @endif
                 </div>
             @endif
         </div>
     </section>
+    @endif
 
     <section class="wf-section">
         <div class="wf-section-head">

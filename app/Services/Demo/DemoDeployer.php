@@ -6,9 +6,10 @@ namespace App\Services\Demo;
 
 use App\Enums\DemoStatus;
 use App\Models\Demo;
-use App\Models\RepoProfile;
+use App\Models\Task;
 use App\Models\Workspace;
 use App\Services\GitProvider\GitServiceFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Symfony\Component\Process\Process;
@@ -48,11 +49,7 @@ class DemoDeployer
      */
     public function deploy(DemoTarget $target): Demo
     {
-        $profile = $target->demoRepoProfile();
-        if ($profile === null) {
-            throw new RuntimeException("Demo target '{$target->demoSlug()}' has no repo profile — cannot deploy a demo.");
-        }
-
+        $profile = $target->demoWorkspace();
         $slug = $target->demoSlug();
         $project = $slug;
 
@@ -143,10 +140,7 @@ class DemoDeployer
             throw new RuntimeException('No live demo to re-run the setup commands in.');
         }
 
-        $profile = $target->demoRepoProfile();
-        if ($profile === null) {
-            throw new RuntimeException('Demo target has no repo profile.');
-        }
+        $profile = $target->demoWorkspace();
 
         [, $settings] = $this->readContract($profile);
         $entry = $this->parseEntry($settings);
@@ -171,7 +165,8 @@ class DemoDeployer
     private function ownerColumns(DemoTarget $target): array
     {
         return [
-            'workspace_id' => $target instanceof Workspace ? $target->id : null,
+            'workspace_id' => $target->demoWorkspace()->id,
+            'task_id' => $target instanceof Task ? $target->id : null,
         ];
     }
 
@@ -198,21 +193,34 @@ class DemoDeployer
     }
 
     /**
-     * Honour preview.max_concurrent: if running demos of OTHER targets would push
-     * the total over the cap (counting the one we're about to start), evict the
+     * Honour the workspace's preview limit and the platform's
+     * preview.max_concurrent: if running demos of OTHER targets would push a
+     * total over its cap (counting the one we're about to start), evict the
      * oldest ones until there is room. Evictions are logged — never silent.
      */
     private function enforceConcurrencyCap(DemoTarget $current): string
     {
-        $max = (int) config('argos.preview.max_concurrent', 10);
+        $own = $this->ownerColumns($current);
+        $log = $this->evictOverflow(
+            (int) $current->demoWorkspace()->max_previews,
+            fn ($q) => $q->where('workspace_id', $own['workspace_id']),
+            $own['task_id'],
+        );
+
+        return $log.$this->evictOverflow((int) config('argos.preview.max_concurrent', 10), fn ($q) => $q, $own['task_id']);
+    }
+
+    /** @param  callable(Builder<Demo>): mixed  $scope */
+    private function evictOverflow(int $max, callable $scope, ?string $exceptTaskId): string
+    {
         if ($max <= 0) {
             return '';
         }
 
-        $own = $this->ownerColumns($current);
         $active = Demo::query()
             ->whereIn('status', [DemoStatus::Building->value, DemoStatus::Live->value])
-            ->when($own['workspace_id'] !== null, fn ($q) => $q->where('workspace_id', '!=', $own['workspace_id']))
+            ->where($scope)
+            ->when($exceptTaskId !== null, fn ($q) => $q->where('task_id', '!=', $exceptTaskId))
             ->orderBy('created_at')
             ->get();
 
@@ -230,10 +238,10 @@ class DemoDeployer
             }
             $demo->update(['status' => DemoStatus::Stopped, 'url' => null]);
 
-            $log .= "[cap] evicted demo {$demo->id} (workspace {$demo->workspace_id}) to stay under max_concurrent={$max}\n";
+            $log .= "[cap] evicted demo {$demo->id} (task {$demo->task_id}) to stay under {$max} previews\n";
             Log::channel('argos')->info('Evicted demo to honour concurrency cap', [
                 'demo' => $demo->id,
-                'workspace' => $demo->workspace_id,
+                'task' => $demo->task_id,
                 'max' => $max,
             ]);
         }
@@ -247,9 +255,9 @@ class DemoDeployer
      *
      * @return array{0: string, 1: array<string, mixed>} [composeYaml, settings]
      */
-    private function readContract(RepoProfile $profile): array
+    private function readContract(Workspace $profile): array
     {
-        $service = $this->gitFactory->fromRepoProfile($profile);
+        $service = $this->gitFactory->forWorkspace($profile);
         $ownerRepo = $profile->getOwnerRepo();
         $ref = $profile->default_branch;
 
@@ -284,7 +292,7 @@ class DemoDeployer
      *
      * @return array{0: string, 1: string} [composeYaml, settingsYaml]
      */
-    private function defaultContract(RepoProfile $profile): array
+    private function defaultContract(Workspace $profile): array
     {
         return app(DemoContractBuilder::class)->buildDefault($profile);
     }

@@ -29,8 +29,8 @@ class CleanupExpiredDemos extends Command
             ->get();
 
         foreach ($expired as $demo) {
-            StopWorkspaceDemoJob::dispatch($demo->workspace_id);
-            $this->info("Dispatched teardown for expired demo {$demo->id} (workspace {$demo->workspace_id}).");
+            StopWorkspaceDemoJob::dispatch($demo->task_id);
+            $this->info("Dispatched teardown for expired demo {$demo->id} (task {$demo->task_id}).");
         }
 
         if ($expired->isEmpty()) {

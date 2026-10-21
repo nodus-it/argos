@@ -10,12 +10,13 @@ use App\Events\Workspace\WorkspaceCreated;
 use App\Events\Workspace\WorkspaceDeleted;
 use App\Jobs\Workspace\ProvisionWorkspaceJob;
 use App\Jobs\Workspace\StopWorkspaceJob;
-use App\Models\RepoProfile;
+use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Workspace\WorkspaceException;
 use App\Services\Workspace\WorkspaceService;
 use App\Services\Workspace\WorkspaceTeardown;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
@@ -36,46 +37,76 @@ class WorkspaceServiceTest extends TestCase
         return app(WorkspaceService::class);
     }
 
-    public function test_create_records_the_workspace_owner_and_queues_provisioning(): void
+    /** @return array<string, mixed> */
+    private function attributes(array $overrides = []): array
+    {
+        return [
+            'name' => 'Login Redesign',
+            'repo_url' => 'https://github.com/acme/widget',
+            'platform' => 'github',
+            'auth_method' => 'pat',
+            'token' => 'ghp-test',
+            'default_branch' => 'develop',
+            ...$overrides,
+        ];
+    }
+
+    public function test_create_records_the_admin_and_starts_stopped(): void
     {
         Event::fake([WorkspaceCreated::class]);
-        $user = User::factory()->create();
-        $profile = RepoProfile::factory()->create(['default_branch' => 'develop']);
+        $user = User::factory()->create(['is_admin' => true]);
 
-        $workspace = $this->service()->createWorkspace($user, $profile, 'Login Redesign');
+        $workspace = $this->service()->createWorkspace($user, $this->attributes());
 
         $this->assertSame('login-redesign', $workspace->slug);
-        $this->assertSame('ws/login-redesign', $workspace->branch);
-        $this->assertSame('develop', $workspace->base_branch);
-        $this->assertSame(WorkspaceStatus::Provisioning, $workspace->status);
+        $this->assertSame('https://github.com/acme/widget', $workspace->repo_url);
+        $this->assertSame('develop', $workspace->default_branch);
+        $this->assertSame(WorkspaceStatus::Stopped, $workspace->status);
+        $this->assertSame($user->id, $workspace->created_by);
         $this->assertSame(64, strlen($workspace->daemon_token));
-        $this->assertSame(WorkspaceRole::Owner, $workspace->roleOf($user));
-        Queue::assertPushed(ProvisionWorkspaceJob::class, fn (ProvisionWorkspaceJob $job): bool => $job->workspaceId === $workspace->id);
+        $this->assertSame(WorkspaceRole::Admin, $workspace->roleOf($user));
+        // The container starts when someone opens the workspace, not on create.
+        Queue::assertNotPushed(ProvisionWorkspaceJob::class);
         Event::assertDispatched(WorkspaceCreated::class);
     }
 
-    public function test_an_explicit_base_branch_wins(): void
+    public function test_only_argos_admins_create_workspaces(): void
     {
-        $workspace = $this->service()->createWorkspace(User::factory()->create(), RepoProfile::factory()->create(), 'X', 'release/1.0');
+        $this->expectException(AuthorizationException::class);
+        try {
+            $this->service()->createWorkspace(User::factory()->create(), $this->attributes());
+        } finally {
+            $this->assertSame(0, Workspace::query()->count());
+        }
+    }
 
-        $this->assertSame('release/1.0', $workspace->base_branch);
+    public function test_operational_columns_cannot_be_set_through_the_attributes(): void
+    {
+        $workspace = $this->service()->register(User::factory()->create(), $this->attributes([
+            'slug' => 'hijack',
+            'status' => WorkspaceStatus::Running,
+            'daemon_token' => 'known',
+        ]));
+
+        $this->assertSame('login-redesign', $workspace->slug);
+        $this->assertSame(WorkspaceStatus::Stopped, $workspace->status);
+        $this->assertNotSame('known', $workspace->daemon_token);
     }
 
     public function test_capacity_is_enforced_without_evicting(): void
     {
         config(['argos.workspaces.max_active' => 2]);
-        Workspace::factory()->count(2)->create();
+        $running = Workspace::factory()->count(2)->create();
         $stopped = Workspace::factory()->stopped()->create();
 
         try {
-            $this->service()->createWorkspace(User::factory()->create(), RepoProfile::factory()->create(), 'Third');
+            $this->service()->start($stopped);
             $this->fail('expected WorkspaceException');
         } catch (WorkspaceException) {
-            $this->assertSame(3, Workspace::query()->count());
+            $this->assertSame(WorkspaceStatus::Stopped, $stopped->fresh()->status);
+            $running->each(fn (Workspace $ws) => $this->assertSame(WorkspaceStatus::Running, $ws->fresh()->status));
+            Queue::assertNothingPushed();
         }
-
-        $this->expectException(WorkspaceException::class);
-        $this->service()->start($stopped);
     }
 
     public function test_capacity_zero_disables_the_cap(): void
@@ -112,7 +143,9 @@ class WorkspaceServiceTest extends TestCase
     {
         Event::fake([WorkspaceDeleted::class]);
         $workspace = Workspace::factory()->create(['slug' => 'gone']);
-        $this->mock(WorkspaceTeardown::class)->shouldReceive('purge')->once()->with('gone');
+        Task::factory()->create(['workspace_id' => $workspace->id, 'slug' => 'login']);
+        // The task slugs name the per-task databases and preview stacks.
+        $this->mock(WorkspaceTeardown::class)->shouldReceive('purge')->once()->with('gone', ['login']);
 
         $this->service()->deleteWorkspace($workspace);
 

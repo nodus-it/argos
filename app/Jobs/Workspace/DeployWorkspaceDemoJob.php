@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Jobs\Workspace;
 
-use App\Models\Workspace;
+use App\Models\Task;
 use App\Services\Demo\DemoDeployer;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
-/** Builds (or rebuilds) the live preview of a workspace. */
+/** Builds (or rebuilds) the live preview of a task. */
 class DeployWorkspaceDemoJob implements ShouldQueue
 {
     use Queueable;
@@ -18,15 +18,15 @@ class DeployWorkspaceDemoJob implements ShouldQueue
 
     public int $tries = 1;
 
-    public function __construct(public readonly string $workspaceId) {}
+    public function __construct(public readonly string $taskId) {}
 
     public function handle(DemoDeployer $deployer): void
     {
-        $workspace = Workspace::query()->find($this->workspaceId);
-        if ($workspace === null) {
+        $task = Task::query()->find($this->taskId);
+        if ($task === null) {
             return;
         }
 
-        $deployer->deploy($workspace);
+        $deployer->deploy($task);
     }
 }

@@ -74,7 +74,7 @@ class WorkspaceContainerManager
             $cmd[] = '-e';
             $cmd[] = "{$key}={$value}";
         }
-        foreach (app(ProjectEnvironmentResolver::class)->resolve($workspace->repoProfile) as $key => $value) {
+        foreach (app(ProjectEnvironmentResolver::class)->resolve($workspace) as $key => $value) {
             $cmd[] = '-e';
             $cmd[] = "{$key}={$value}";
         }

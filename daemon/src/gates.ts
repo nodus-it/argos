@@ -48,7 +48,7 @@ export function scriptRunner(script: string, cwd: string): GateScript {
 /**
  * Quality gates for the workspace (`worker/lib/quality.sh` via
  * `run-gates.sh`). One run at a time; results travel as workspace-level
- * events (thread_id = null) keyed by the manager's run id.
+ * events (task_id = null) keyed by the manager's run id.
  */
 export class GateRunner {
     private current: string | null = null;

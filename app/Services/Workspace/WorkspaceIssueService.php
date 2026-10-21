@@ -6,7 +6,7 @@ namespace App\Services\Workspace;
 
 use App\Enums\TaskProviderKind;
 use App\Enums\TaskProviderSyncStatus;
-use App\Models\RepoProfile;
+use App\Models\Task;
 use App\Models\TaskProviderBinding;
 use App\Models\Workspace;
 use App\Services\IssueTracker\Concerns\ParsesExternalProjectRef;
@@ -19,16 +19,14 @@ use Illuminate\Support\Str;
 use Throwable;
 
 /**
- * Start a workspace from an issue of the project's bound tracker: search and
- * load the issue, derive name/branch, prefill the first message and link the
- * pull request back to the issue when shipping. The issue is never closed
- * here — merging the PR (`Closes #…`) does that.
+ * Tickets of a task: search and load issues of the workspace's bound
+ * tracker, prefill the first message, comment on the issue and link the pull
+ * request back to it. GitHub and GitLab close the issue through `Closes #…`
+ * in the pull request when the integration says so.
  */
 class WorkspaceIssueService
 {
     use ParsesExternalProjectRef;
-
-    public const BRANCH_MAX = 50;
 
     private const LIST_CACHE_SECONDS = 60;
 
@@ -39,14 +37,14 @@ class WorkspaceIssueService
         private readonly UntrustedInput $untrusted,
     ) {}
 
-    /** The project's first usable tracker binding, if any. */
-    public function bindingFor(?RepoProfile $profile): ?TaskProviderBinding
+    /** The workspace's first usable tracker binding, if any. */
+    public function bindingFor(?Workspace $workspace): ?TaskProviderBinding
     {
-        if ($profile === null) {
+        if ($workspace === null) {
             return null;
         }
 
-        return $profile->taskProviderBindings()
+        return $workspace->taskProviderBindings()
             ->where('sync_status', TaskProviderSyncStatus::Active->value)
             ->whereNotNull('external_project_ref')
             ->get()
@@ -58,9 +56,9 @@ class WorkspaceIssueService
      *
      * @return array<string, string> number => "#number title"
      */
-    public function search(RepoProfile $profile, string $query, int $limit = 30): array
+    public function search(Workspace $workspace, string $query, int $limit = 30): array
     {
-        $binding = $this->bindingFor($profile);
+        $binding = $this->bindingFor($workspace);
         if ($binding === null) {
             return [];
         }
@@ -96,13 +94,13 @@ class WorkspaceIssueService
     }
 
     /**
-     * Load one issue as stored on the workspace.
+     * Load one issue as stored on the task (`external_ref`).
      *
-     * @return array{binding_id: string, provider: string, owner: string, project: string, number: string, title: string, url: string, body: string}
+     * @return array{binding_id: string, provider: string, key: string, owner: string, project: string, number: string, title: string, url: string, body: string}
      */
-    public function load(RepoProfile $profile, string $number): array
+    public function load(Workspace $workspace, string $number): array
     {
-        $binding = $this->bindingFor($profile) ?? throw WorkspaceException::translated('workspaces.issue.no_binding');
+        $binding = $this->bindingFor($workspace) ?? throw WorkspaceException::translated('workspaces.issue.no_binding');
         [$owner, $project] = $this->parseRef((string) $binding->external_project_ref);
 
         try {
@@ -111,12 +109,15 @@ class WorkspaceIssueService
             throw WorkspaceException::translated('workspaces.issue.load_failed', ['message' => $e->getMessage()]);
         }
 
+        $number = $issue->externalId !== '' ? $issue->externalId : $number;
+
         return [
             'binding_id' => $binding->id,
             'provider' => $binding->kind->value,
+            'key' => $this->key($binding->kind, $number, $issue->key),
             'owner' => $owner,
             'project' => $project,
-            'number' => $issue->externalId !== '' ? $issue->externalId : $number,
+            'number' => $number,
             'title' => $issue->title,
             'url' => $issue->url,
             'body' => mb_substr($issue->body, 0, self::BODY_LIMIT),
@@ -128,18 +129,19 @@ class WorkspaceIssueService
         return '#'.$this->shortNumber($number).' '.$title;
     }
 
-    /** `ws/<nr>-<slug-of-title>`, at most BRANCH_MAX characters. */
-    public function branchFor(string $number, string $title): string
+    /**
+     * Short ticket key shown in lists and used in branch names: the tracker's
+     * own key where it has one ("ENG-118"), else "<provider>-<number>".
+     */
+    public function key(TaskProviderKind $kind, string $number, string $trackerKey = ''): string
     {
-        $branch = 'ws/'.trim($this->shortNumber($number).'-'.Str::slug($title), '-');
-
-        return rtrim(mb_substr($branch, 0, self::BRANCH_MAX), '-');
+        return $trackerKey !== '' ? $trackerKey : $kind->value.'-'.$this->shortNumber($number);
     }
 
     /** The prefilled first message: the issue, wrapped as untrusted input. */
-    public function composerDraft(Workspace $workspace): string
+    public function composerDraft(Task $task): string
     {
-        $issue = $workspace->external_issue;
+        $issue = $task->external_ref;
 
         return $issue === null ? '' : $this->promptFor($issue);
     }
@@ -158,9 +160,9 @@ class WorkspaceIssueService
     }
 
     /**
-     * The workspace's issue data from an ingested issue (as load() returns it).
+     * The task's issue data from an ingested issue (as load() returns it).
      *
-     * @return array{binding_id: string, provider: string, owner: string, project: string, number: string, title: string, url: string, body: string}
+     * @return array{binding_id: string, provider: string, key: string, owner: string, project: string, number: string, title: string, url: string, body: string}
      */
     public function fromExternal(ExternalIssue $issue, TaskProviderBinding $binding): array
     {
@@ -169,6 +171,7 @@ class WorkspaceIssueService
         return [
             'binding_id' => $binding->id,
             'provider' => $binding->kind->value,
+            'key' => $this->key($binding->kind, $issue->externalId, $issue->key),
             'owner' => $owner,
             'project' => $project,
             'number' => $issue->externalId,
@@ -178,11 +181,11 @@ class WorkspaceIssueService
         ];
     }
 
-    /** Post a comment on the workspace's issue; returns its id. Failures are only logged. */
-    public function comment(Workspace $workspace, string $body): ?string
+    /** Post a comment on the task's issue; returns its id. Failures are only logged. */
+    public function comment(Task $task, string $body): ?string
     {
-        $issue = $workspace->external_issue;
-        $binding = $issue !== null ? TaskProviderBinding::query()->find($issue['binding_id']) : null;
+        $issue = $task->external_ref;
+        $binding = $issue !== null ? TaskProviderBinding::query()->find($issue['binding_id'] ?? null) : null;
         if ($issue === null || $binding === null || ! $this->registry->has($binding->kind)) {
             return null;
         }
@@ -190,32 +193,37 @@ class WorkspaceIssueService
         try {
             $tracker = $this->registry->make($binding->kind, $binding);
 
-            return $tracker->commentId($tracker->createComment($issue['owner'], $issue['project'], $issue['number'], $body));
+            return $tracker->commentId($tracker->createComment((string) ($issue['owner'] ?? ''), (string) ($issue['project'] ?? ''), $issue['number'], $body));
         } catch (Throwable $e) {
-            Log::channel('argos')->warning('Workspace issue comment failed', ['workspace' => $workspace->slug, 'error' => $e->getMessage()]);
+            Log::channel('argos')->warning('Task issue comment failed', ['task' => $task->id, 'error' => $e->getMessage()]);
 
             return null;
         }
     }
 
-    /** Line for the PR body that links (and on merge closes) the issue. */
-    public function pullRequestReference(Workspace $workspace): ?string
+    /**
+     * Line for the PR body that links the issue — and on merge closes it
+     * (GitHub/GitLab) unless the integration turned closing off.
+     */
+    public function pullRequestReference(Task $task): ?string
     {
-        $issue = $workspace->external_issue;
+        $issue = $task->external_ref;
         if ($issue === null) {
             return null;
         }
 
+        $closes = TaskProviderBinding::query()->whereKey($issue['binding_id'] ?? null)->value('close_on_merge') ?? true;
+
         return match (TaskProviderKind::tryFrom($issue['provider'])) {
-            TaskProviderKind::GitHub, TaskProviderKind::GitLab => 'Closes #'.$issue['number'],
+            TaskProviderKind::GitHub, TaskProviderKind::GitLab => ($closes ? 'Closes #' : 'Refs #').$issue['number'],
             default => $issue['url'] !== '' ? __('workspaces.issue.pr_reference', ['url' => $issue['url']]) : null,
         };
     }
 
     /** Tell the issue that a pull request exists; failures are only logged. */
-    public function announcePullRequest(Workspace $workspace, string $prUrl): void
+    public function announcePullRequest(Task $task, string $prUrl): void
     {
-        $this->comment($workspace, __('workspaces.issue.pr_comment', ['url' => $prUrl, 'workspace' => $workspace->name]));
+        $this->comment($task, __('workspaces.issue.pr_comment', ['url' => $prUrl, 'workspace' => $task->workspace->name]));
     }
 
     /** Linear ids are UUIDs — keep labels and branches short. */

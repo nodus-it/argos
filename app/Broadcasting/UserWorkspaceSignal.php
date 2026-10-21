@@ -22,7 +22,7 @@ class UserWorkspaceSignal implements ShouldBroadcastNow
     use InteractsWithSockets;
 
     /**
-     * @param  array{workspace_id: string, workspace_name: string, thread_id: string|null, kind: string, title: string, body: string, url: string}  $signal
+     * @param  array{workspace_id: string, workspace_name: string, task_id: string|null, kind: string, title: string, body: string, url: string}  $signal
      */
     public function __construct(
         public readonly int $userId,

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Services\GitProvider;
 
 use App\Enums\GitProvider;
-use App\Models\RepoProfile;
+use App\Models\Workspace;
 
 /**
  * The repository token a workspace authenticates git with, and its git
@@ -15,7 +15,7 @@ use App\Models\RepoProfile;
 class RepoTokenResolver
 {
     /** PAT or (refreshed) OAuth token of the project. */
-    public function token(RepoProfile $profile): string
+    public function token(Workspace $profile): string
     {
         return $profile->resolveToken();
     }
@@ -28,7 +28,7 @@ class RepoTokenResolver
      *
      * @return array{username: string, password: string}
      */
-    public function gitCredential(RepoProfile $profile): array
+    public function gitCredential(Workspace $profile): array
     {
         $token = $this->token($profile);
 

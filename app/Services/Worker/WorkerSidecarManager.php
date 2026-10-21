@@ -30,7 +30,7 @@ class WorkerSidecarManager
      */
     public function startForWorkspace(Workspace $workspace): WorkerSidecars
     {
-        $profile = $workspace->repoProfile;
+        $profile = $workspace;
         $services = $profile->backingServices();
         if ($services === []) {
             return new WorkerSidecars;
@@ -87,7 +87,7 @@ class WorkerSidecarManager
     public function stopWorkspaceContainers(Workspace $workspace): void
     {
         $network = $this->workspaceNetworkName($workspace);
-        foreach ($workspace->repoProfile->backingServices() as $service) {
+        foreach ($workspace->backingServices() as $service) {
             $alias = $service->defaultCoordinates()['host'];
             $this->runQuietly(['docker', 'rm', '-f', $network.'-'.$alias], 30);
         }

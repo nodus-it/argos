@@ -10,9 +10,9 @@ use App\Filament\Admin\Resources\AgentCredentialResource\Pages\ListAgentCredenti
 use App\Filament\Admin\Resources\ApiClientResource\Pages\ListApiClients;
 use App\Filament\Admin\Resources\ProviderCredentialResource\Pages\ListProviderCredentials;
 use App\Filament\Admin\Resources\ProviderOAuthConfigResource\Pages\ListProviderOAuthConfigs;
-use App\Filament\Admin\Resources\RepoProfileResource\Pages\CreateRepoProfile;
-use App\Filament\Admin\Resources\RepoProfileResource\Pages\ListRepoProfiles;
 use App\Filament\Admin\Resources\WorkerStackResource\Pages\ListWorkerStacks;
+use App\Filament\Admin\Resources\WorkspaceResource\Pages\CreateWorkspace;
+use App\Filament\Admin\Resources\WorkspaceResource\Pages\ListWorkspaces;
 use App\Models\User;
 use App\Support\DocLink;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -51,7 +51,7 @@ class DocsDeepLinksTest extends TestCase
     public function test_worker_source_field_links_to_the_byoi_doc(): void
     {
         // The worker section is only visible once a platform is chosen.
-        Livewire::test(CreateRepoProfile::class)
+        Livewire::test(CreateWorkspace::class)
             ->fillForm(['platform' => 'github'])
             ->assertSee(DocLink::url('byoi'), escape: false);
     }
@@ -59,7 +59,7 @@ class DocsDeepLinksTest extends TestCase
     public function test_section_landings_link_to_their_doc(): void
     {
         $landings = [
-            [ListRepoProfiles::class, 'projects'],
+            [ListWorkspaces::class, 'projects'],
             [ListWorkerStacks::class, 'worker-stacks'],
             [ListAgentCredentials::class, 'agents'],
             [ListProviderCredentials::class, 'credentials'],
@@ -75,7 +75,7 @@ class DocsDeepLinksTest extends TestCase
 
     public function test_create_masks_link_to_their_docs(): void
     {
-        Livewire::test(CreateRepoProfile::class)
+        Livewire::test(CreateWorkspace::class)
             ->assertSuccessful()
             ->assertSee(DocLink::url('projects'), escape: false);
     }

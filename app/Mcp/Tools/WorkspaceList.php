@@ -20,23 +20,19 @@ class WorkspaceList extends Tool
 
     protected string $name = 'workspace_list';
 
-    protected string $description = 'Lists the workspaces you can see — newest first — with their automatic runs (state, fix rounds), pull request and gate results. Filter by `origin` (manual, api, mcp, issue).';
+    protected string $description = 'Lists the workspaces (projects) you can see, by name: repository, default branch and container status.';
 
     public function schema(JsonSchema $schema): array
     {
-        return [
-            'origin' => $schema->string()->description('Only workspaces started this way: manual, api, mcp or issue')->nullable(),
-        ];
+        return [];
     }
 
     public function handle(Request $request): Response
     {
         $user = $this->user();
         $workspaces = Workspace::query()
-            ->with(['repoProfile', 'threads'])
             ->when(! $user->isAdmin(), fn ($q) => $q->whereHas('members', fn ($m) => $m->where('user_id', $user->id)))
-            ->when(is_string($request->get('origin')) && $request->get('origin') !== '', fn ($q) => $q->where('origin', $request->get('origin')))
-            ->latest()
+            ->orderBy('name')
             ->limit(50)
             ->get();
 

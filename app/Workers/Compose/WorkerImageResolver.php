@@ -7,8 +7,8 @@ namespace App\Workers\Compose;
 use App\Enums\AgentName;
 use App\Enums\WorkerImageEntityStatus;
 use App\Enums\WorkerSource;
-use App\Models\RepoProfile;
 use App\Models\WorkerStack;
+use App\Models\Workspace;
 use App\Services\GitProvider\GitServiceFactory;
 use App\Workers\Agents\AgentSpec;
 use RuntimeException;
@@ -17,7 +17,7 @@ use RuntimeException;
  * Resolves the (stack × agent) pair a workspace image is built from and
  * computes deterministic image tags.
  *
- * Stack resolution: RepoProfile setting (BYOI or stack) → config default.
+ * Stack resolution: workspace setting (BYOI or stack) → config default.
  */
 class WorkerImageResolver
 {
@@ -56,7 +56,7 @@ class WorkerImageResolver
      * (BYOI read at `$ref`) with Claude Code, the agent the workspace daemon
      * hosts.
      */
-    public function resolveForRepoProfile(RepoProfile $profile, string $ref): ResolvedWorkerImage
+    public function resolveForWorkspace(Workspace $profile, string $ref): ResolvedWorkerImage
     {
         $agentName = AgentName::ClaudeCode;
 
@@ -76,11 +76,11 @@ class WorkerImageResolver
      * tracking) applies unchanged. The file is read via the provider API at the
      * workspace's base branch — before any image (and thus any clone) exists.
      */
-    private function resolveByoiStack(RepoProfile $profile, string $ref, AgentName $agentName): WorkerStack
+    private function resolveByoiStack(Workspace $profile, string $ref, AgentName $agentName): WorkerStack
     {
 
         $dockerfile = app(GitServiceFactory::class)
-            ->fromRepoProfile($profile)
+            ->forWorkspace($profile)
             ->getFileContents($profile->getOwnerRepo(), self::BYOI_DOCKERFILE_PATH, $ref);
 
         if ($dockerfile === null || trim($dockerfile) === '') {

@@ -10,11 +10,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 
 /**
- * A file a person marked "seen" in the review of a thread, with the hash of
+ * A file a person marked "seen" in the review of a task, with the hash of
  * its changes at that moment (seen only while the hash still matches).
  *
  * @property string $id
- * @property string $thread_id
+ * @property string $task_id
  * @property int $user_id
  * @property string $path
  * @property string $path_hash
@@ -26,11 +26,11 @@ class ReviewFileView extends Model
 {
     use HasUlids;
 
-    protected $fillable = ['thread_id', 'user_id', 'path', 'path_hash', 'file_hash'];
+    protected $fillable = ['task_id', 'user_id', 'path', 'path_hash', 'file_hash'];
 
-    /** @return BelongsTo<Thread, $this> */
-    public function thread(): BelongsTo
+    /** @return BelongsTo<Task, $this> */
+    public function task(): BelongsTo
     {
-        return $this->belongsTo(Thread::class);
+        return $this->belongsTo(Task::class);
     }
 }

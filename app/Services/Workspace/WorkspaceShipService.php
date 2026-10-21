@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Services\Workspace;
 
-use App\Enums\ThreadEventType;
+use App\Enums\TaskEventType;
+use App\Enums\TaskStatus;
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
 use App\Integrations\WorkspaceDaemon\WorkspaceDaemonTransport;
-use App\Models\Thread;
-use App\Models\ThreadEvent;
+use App\Models\Task;
+use App\Models\TaskEvent;
 use App\Models\User;
-use App\Models\Workspace;
 use App\Services\GitProvider\GitServiceFactory;
 use App\Services\GitProvider\PullRequestInfo;
 use Illuminate\Support\Facades\Gate;
@@ -18,9 +18,11 @@ use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
- * "Ship" a workspace: commit what changed, push the branch and open (or
- * update) its pull/merge request. The commit message is drafted by Claude
- * from the diff and the threads, on the shipping user's subscription.
+ * "Ship" a task: commit what changed, push its branch and open (or update)
+ * its pull/merge request. The commit message is drafted by Claude from the
+ * diff and the conversation, on the shipping user's subscription. Commits
+ * carry the shipping person; branch and pull request use the workspace's
+ * repository access.
  */
 class WorkspaceShipService
 {
@@ -31,7 +33,7 @@ class WorkspaceShipService
         private readonly WorkspaceDaemonClient $daemon,
         private readonly AgentPool $pool,
         private readonly GitServiceFactory $git,
-        private readonly ThreadService $threads,
+        private readonly TaskService $tasks,
         private readonly WorkspaceNotifier $notifier,
         private readonly WorkspaceIssueService $issues,
     ) {}
@@ -42,9 +44,10 @@ class WorkspaceShipService
      *
      * @return array{subject: string, body: string, changed_files: int, ahead: int}
      */
-    public function draft(Workspace $workspace, User $by): array
+    public function draft(Task $task, User $by): array
     {
-        Gate::forUser($by)->authorize('ship', $workspace);
+        Gate::forUser($by)->authorize('ship', $task);
+        $workspace = $task->workspace;
         $api = $this->daemon->for($workspace, 120);
         $empty = ['subject' => '', 'body' => '', 'changed_files' => 0, 'ahead' => 0];
 
@@ -57,18 +60,18 @@ class WorkspaceShipService
                 return $empty;
             }
 
-            $diff = $api->gitDiff('origin/'.$workspace->base_branch)['diff'];
+            $diff = $api->gitDiff('origin/'.$task->base_branch)['diff'];
             $result = $api->oneshot([
                 'agent_id' => $agent->id,
                 'oauth_token' => (string) ($agent->credentials['token'] ?? ''),
                 // Alias: always the newest Haiku the subscription offers.
                 'model' => 'haiku',
                 'system_prompt' => (string) file_get_contents(base_path('worker/prompts/commit-message.system.md')),
-                'user_prompt' => $this->prompt($workspace, $diff),
+                'user_prompt' => $this->prompt($task, $diff),
                 'json_schema' => json_decode((string) file_get_contents(base_path('worker/schemas/commit-message.schema.json')), true),
             ]);
         } catch (Throwable $e) {
-            Log::channel('argos')->info('Commit message draft failed', ['workspace' => $workspace->slug, 'error' => $e->getMessage()]);
+            Log::channel('argos')->info('Commit message draft failed', ['task' => $task->id, 'error' => $e->getMessage()]);
 
             return $empty;
         }
@@ -84,13 +87,13 @@ class WorkspaceShipService
 
     /**
      * Commit, push and open/update the pull request. Returns the PR URL.
+     *
+     * @param  bool  $pullRequest  false: commit and push only (auto-tasks with ship mode `none`)
      */
-    /**
-     * @param  bool  $pullRequest  false: commit and push only (auto-threads with ship mode `none`)
-     */
-    public function ship(Workspace $workspace, User $by, string $subject, string $body, bool $draft = false, bool $pullRequest = true): string
+    public function ship(Task $task, User $by, string $subject, string $body, bool $draft = false, bool $pullRequest = true): string
     {
-        Gate::forUser($by)->authorize('ship', $workspace);
+        Gate::forUser($by)->authorize('ship', $task);
+        $workspace = $task->workspace;
         $subject = trim($subject);
         if ($subject === '') {
             throw WorkspaceException::translated('workspaces.ship.subject_required');
@@ -99,10 +102,10 @@ class WorkspaceShipService
         $api = $this->daemon->for($workspace, 300);
         try {
             $commit = $api->gitCommit($subject, $body, ['name' => $by->name, 'email' => $by->email]);
-            if ($commit === null && (int) $api->gitStatus()['ahead'] === 0 && $this->nothingToShip($workspace, $api)) {
+            if ($commit === null && (int) $api->gitStatus()['ahead'] === 0 && $this->nothingToShip($task, $api)) {
                 throw WorkspaceException::translated('workspaces.ship.nothing');
             }
-            $api->gitPush($workspace->branch);
+            $api->gitPush((string) $task->branch);
         } catch (DaemonTransportException $e) {
             throw WorkspaceException::fromDaemon($e, [
                 'rejected_non_fast_forward' => 'workspaces.ship.rejected',
@@ -111,123 +114,125 @@ class WorkspaceShipService
         }
 
         if (! $pullRequest) {
-            $workspace->forceFill(['shipped_at' => now()])->save();
+            $task->forceFill(['shipped_at' => now()])->save();
 
-            return (string) $workspace->pr_url;
+            return (string) $task->pr_url;
         }
 
-        $profile = $workspace->repoProfile;
-        [$owner, $repo] = $profile->ownerAndRepo();
+        [$owner, $repo] = $workspace->ownerAndRepo();
 
         // The branch is pushed by now; a provider failure leaves it there and
         // shipping again retries only the pull request part.
         try {
-            $service = $this->git->fromRepoProfile($profile);
-            if ($workspace->pr_number === null) {
-                $raw = $service->createPullRequest($owner, $repo, $subject, $this->pullRequestBody($workspace, $body), $workspace->branch, $workspace->base_branch, ['draft' => $draft]);
-                $info = PullRequestInfo::from($profile->platform, $raw);
-                $workspace->forceFill([
+            $service = $this->git->forWorkspace($workspace);
+            if ($task->pr_number === null) {
+                $raw = $service->createPullRequest($owner, $repo, $subject, $this->pullRequestBody($task, $body, $by), (string) $task->branch, $task->base_branch, ['draft' => $draft]);
+                $info = PullRequestInfo::from($workspace->platform, $raw);
+                $task->forceFill([
                     'pr_url' => $info->url,
                     'pr_number' => $info->number,
-                    'pr_state' => $info->state ?? 'open',
+                    'pr_state' => $info->state ?? ($draft ? 'draft' : 'open'),
                     'pr_synced_at' => now(),
+                    'status' => TaskStatus::PrOpen,
                 ]);
                 // Never throws: tracker failures are only logged.
-                $this->issues->announcePullRequest($workspace, (string) $info->url);
+                $this->issues->announcePullRequest($task, (string) $info->url);
             } else {
-                $service->commentOnPullRequest($owner, $repo, $workspace->pr_number, __('workspaces.ship.pr_comment', ['subject' => $subject, 'name' => $by->name]));
+                $service->commentOnPullRequest($owner, $repo, $task->pr_number, __('workspaces.ship.pr_comment', ['subject' => $subject, 'name' => $by->name]));
             }
         } catch (Throwable $e) {
-            Log::channel('argos')->warning('Pull request step of ship failed', ['workspace' => $workspace->slug, 'error' => $e->getMessage()]);
+            Log::channel('argos')->warning('Pull request step of ship failed', ['task' => $task->id, 'error' => $e->getMessage()]);
 
             throw WorkspaceException::translated('workspaces.ship.pr_failed', ['message' => $e->getMessage()]);
         }
 
-        $workspace->forceFill(['shipped_at' => now()])->save();
-        $this->announce($workspace, $by, (string) $workspace->pr_url);
-        $this->notifier->notify($workspace, null, 'ship', __('workspaces.notifications.ship', ['name' => $by->name]), (string) $workspace->pr_url, $by->id);
+        $task->forceFill(['shipped_at' => now()])->save();
+        $this->tasks->notice($task, 'shipped', $by, ['url' => (string) $task->pr_url]);
+        $this->notifier->notify($workspace, $task, 'ship', __('workspaces.notifications.ship', ['name' => $by->name]), (string) $task->pr_url, $by->id);
 
-        return (string) $workspace->pr_url;
+        return (string) $task->pr_url;
     }
 
-    /** Refresh the PR state from the provider; failures keep the old state. */
-    public function syncPullRequest(Workspace $workspace): void
+    /**
+     * Refresh the PR state from the provider; failures keep the old state.
+     * Merged finishes the task, closed without merge cancels it.
+     */
+    public function syncPullRequest(Task $task): void
     {
-        if ($workspace->pr_number === null) {
+        if ($task->pr_number === null) {
             return;
         }
 
-        $profile = $workspace->repoProfile;
-        [$owner, $repo] = $profile->ownerAndRepo();
+        $workspace = $task->workspace;
+        [$owner, $repo] = $workspace->ownerAndRepo();
         try {
-            $info = PullRequestInfo::from($profile->platform, $this->git->fromRepoProfile($profile)->getPullRequest($owner, $repo, $workspace->pr_number));
+            $info = PullRequestInfo::from($workspace->platform, $this->git->forWorkspace($workspace)->getPullRequest($owner, $repo, $task->pr_number));
         } catch (Throwable $e) {
-            Log::channel('argos')->info('Pull request sync failed', ['workspace' => $workspace->slug, 'error' => $e->getMessage()]);
+            Log::channel('argos')->info('Pull request sync failed', ['task' => $task->id, 'error' => $e->getMessage()]);
 
             return;
         }
 
-        $workspace->forceFill([
-            'pr_state' => $info->state ?? $workspace->pr_state,
-            'pr_url' => $info->url ?? $workspace->pr_url,
+        $state = $info->state ?? $task->pr_state;
+        $task->forceFill([
+            'pr_state' => $state,
+            'pr_url' => $info->url ?? $task->pr_url,
             'pr_synced_at' => now(),
-        ])->save();
+        ]);
+        if (! $task->status->isFinished() && in_array($state, ['merged', 'closed'], true)) {
+            $task->forceFill([
+                'status' => $state === 'merged' ? TaskStatus::Done : TaskStatus::Cancelled,
+                'done_at' => now(),
+            ]);
+        }
+        $task->save();
     }
 
     /**
      * Nothing new to ship: with a PR there is no new commit to push; without
      * one, the branch carries no change against the base.
      */
-    private function nothingToShip(Workspace $workspace, WorkspaceDaemonTransport $api): bool
+    private function nothingToShip(Task $task, WorkspaceDaemonTransport $api): bool
     {
-        if ($workspace->pr_number !== null) {
+        if ($task->pr_number !== null) {
             return true;
         }
 
-        return trim($api->gitDiff('origin/'.$workspace->base_branch)['diff']) === '';
+        return trim($api->gitDiff('origin/'.$task->base_branch)['diff']) === '';
     }
 
-    private function prompt(Workspace $workspace, string $diff): string
+    private function prompt(Task $task, string $diff): string
     {
-        $lines = ThreadEvent::query()
-            ->whereIn('thread_id', $workspace->threads()->pluck('id'))
-            ->whereIn('type', [ThreadEventType::UserMessage->value, ThreadEventType::AssistantMessage->value])
+        $lines = TaskEvent::query()
+            ->where('task_id', $task->id)
+            ->whereIn('type', [TaskEventType::UserMessage->value, TaskEventType::AssistantMessage->value])
             ->latest('id')
             ->limit(20)
             ->get()
             ->reverse()
-            ->map(fn (ThreadEvent $e): string => ($e->type === ThreadEventType::UserMessage ? '['.($e->payload['author_name'] ?? 'User').']' : '[Claude]').' '.mb_substr((string) ($e->payload['text'] ?? ''), 0, 600))
+            ->map(fn (TaskEvent $e): string => ($e->type === TaskEventType::UserMessage ? '['.($e->payload['author_name'] ?? 'User').']' : '[Claude]').' '.mb_substr((string) ($e->payload['text'] ?? ''), 0, 600))
             ->implode("\n");
 
         return implode("\n", [
             '# Commit-Message generieren',
             '',
-            'Kein Konzept-Dokument: Dies ist ein interaktiver Workspace. Der Gesprächsauszug unten beschreibt, worum es ging.',
+            'Kein Konzept-Dokument: Dies ist eine interaktive Aufgabe ('.$task->title.'). Der Gesprächsauszug unten beschreibt, worum es ging.',
             '',
             '## Gesprächsauszug',
             $lines !== '' ? $lines : '(kein Verlauf)',
             '',
-            "## git diff origin/{$workspace->base_branch}",
+            "## git diff origin/{$task->base_branch}",
             '```diff',
             mb_strcut($diff, 0, self::PROMPT_DIFF_LIMIT),
             '```',
         ]);
     }
 
-    private function pullRequestBody(Workspace $workspace, string $body): string
+    private function pullRequestBody(Task $task, string $body, User $by): string
     {
-        $link = $workspace->url();
-        $reference = $this->issues->pullRequestReference($workspace);
+        $reference = $this->issues->pullRequestReference($task);
 
-        return trim($body).($reference !== null ? "\n\n".$reference : '')."\n\n---\n".__('workspaces.ship.pr_footer', ['url' => $link]);
-    }
-
-    /** Note the shipment in every open thread and broadcast it. */
-    private function announce(Workspace $workspace, User $by, string $url): void
-    {
-        $threads = Thread::query()->where('workspace_id', $workspace->id)->whereNull('archived_at')->get();
-        foreach ($threads as $thread) {
-            $this->threads->notice($thread, 'shipped', $by, ['url' => $url]);
-        }
+        return trim($body).($reference !== null ? "\n\n".$reference : '')
+            ."\n\n---\n".__('workspaces.ship.pr_footer', ['url' => $task->url(), 'name' => $by->name]);
     }
 }

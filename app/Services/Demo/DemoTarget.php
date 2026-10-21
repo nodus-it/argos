@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Services\Demo;
 
-use App\Models\RepoProfile;
+use App\Models\Workspace;
 
 /**
- * Something a live demo can be built for. Workspaces are the only
- * implementation today; the interface stays as the seam. The demo mounts the target's workspace volume, so
- * what it shows is always the target's current files.
+ * Something a live demo can be built for. Tasks are the only implementation
+ * today; the interface stays as the seam. The demo mounts the target's
+ * workspace volume, so what it shows is always the target's current files.
  */
 interface DemoTarget
 {
@@ -19,7 +19,8 @@ interface DemoTarget
     /** Docker volume holding the checkout the demo mounts. */
     public function workspaceVolumeName(): string;
 
-    public function demoRepoProfile(): ?RepoProfile;
+    /** The workspace whose environment (contract, services, secrets) the demo uses. */
+    public function demoWorkspace(): Workspace;
 
     /**
      * uid:gid the contract commands run as, or null for the image default.

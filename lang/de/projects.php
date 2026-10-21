@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 return [
     'navigation_group' => 'Konfiguration',
-    'navigation_label' => 'Projekte',
-    'model_label' => 'Projekt',
-    'model_label_plural' => 'Projekte',
+    'navigation_label' => 'Workspaces',
+    'model_label' => 'Workspace',
+    'model_label_plural' => 'Workspaces',
 
     'tabs' => [
         'automation' => 'Automatik',
@@ -17,13 +17,13 @@ return [
 
     'sections' => [
         'automation' => 'Automatik',
-        'automation_description' => 'Standards für Auto-Threads in diesem Projekt: Aus der UI, per API, MCP oder aus einem Issue gestartet, planen sie, setzen um, prüfen die Quality-Gates und liefern aus — ohne Menschen. Jeder Lauf kann sie überschreiben. Leere Felder nehmen die Standards der Installation.',
+        'automation_description' => 'Standards für automatische Aufgaben in diesem Workspace: Aus der UI, per API, MCP oder aus einem Issue gestartet, planen sie, setzen um, prüfen die Quality-Gates und liefern aus — ohne Menschen. Jeder Lauf kann sie überschreiben. Leere Felder nehmen die Standards der Installation.',
         'platform' => 'Plattform',
         'platform_description' => 'Wähle die Plattform — danach werden die weiteren Felder freigeschaltet.',
         'general' => 'Allgemein',
         'general_description' => 'Anzeigename des Projekts.',
         'worker' => 'Worker',
-        'worker_description' => 'Stack & Agent, auf denen die Workspaces dieses Projekts laufen.',
+        'worker_description' => 'Stack, auf dem der Container dieses Workspaces läuft.',
         'live_demo' => 'Live-Demo',
         'env_secrets' => 'Environment & Secrets',
         'env_secrets_description' => 'Projekt-spezifische Secrets, die Argos verschlüsselt speichert und in Worker und Live-Demo injiziert — z.B. private Composer-Registries oder zusätzliche Env-Variablen.',
@@ -114,7 +114,7 @@ return [
     ],
 
     'columns' => [
-        'workspaces' => 'Workspaces',
+        'tasks' => 'Aufgaben',
         'branch' => 'Branch',
     ],
 

@@ -2,7 +2,7 @@
 
 Argos ships a built-in [MCP](https://modelcontextprotocol.io) server so an
 external MCP client — in particular **Claude Code** — can drive Argos directly:
-list projects, hand over what to implement as an **automatic run** in a new
+list workspaces, hand over what to implement as an **automatic task** in a
 workspace, follow it, approve its plan, steer it with feedback, and pick up the
 pull request.
 
@@ -72,46 +72,48 @@ tools below become available.
 
 ## Available tools
 
-The server exposes ten tools. A `project` or `workspace` argument always
-accepts either the record's ULID **or** its exact name.
+The server exposes nine tools. A `workspace` argument accepts either the
+workspace's ULID **or** its exact name; a `task` argument takes the task's
+ULID.
 
-### Workspaces and automatic runs
+### Workspaces (read)
 
 | Tool | What it does |
 | --- | --- |
-| `workspace_create` | Creates a workspace and starts an automatic run: plan (per `plan`: off / auto / approve), implement, fix failing quality gates, open the pull request. Args: `project`, `prompt`, optional `title`, `base_branch`, `plan`, `ship`. Returns immediately. |
-| `workspace_list` | Lists your workspaces (optional `origin`) with their runs, pull request and gate results. |
-| `workspace_get` | One workspace by id or name — poll it to follow a run (`threads[].auto.state`, `pull_request`). |
-| `thread_plan_decide` | Approves or rejects a waiting plan (`decision`, optional `feedback`). |
-| `thread_message` | Writes into a thread (`text`); `resume_auto` lets the run continue on its own afterwards. |
-| `thread_pause` / `thread_resume` | Pause automation / hand the thread back to it. |
-| `workspace_ship` | Commits, pushes and opens/updates the pull request now (optional `draft`). |
+| `workspace_list` | Lists the workspaces you can see: repository, default branch and container status. |
+| `workspace_get` | One workspace by id or name, with its open tasks (owner, status, branch, pull request, gates, ticket, `auto.state`). |
 
-Runs act for you: your Claude agent does the work and you own the workspace.
-
-### Projects (read)
+### Tasks and automatic runs
 
 | Tool | What it does |
-|---|---|
-| `project_list` | Lists the configured repository profiles (projects) Argos works on, with their automation defaults (`auto_settings`) and the number of open workspaces. |
-| `project_get` | Returns one project (by id or name) together with its automation defaults and an overview of its workspaces (status, origin, branch, pull request). |
+| --- | --- |
+| `task_create` | Starts an automatic task in a workspace: plan (per `plan`: off / auto / approve), implement on its own branch, fix failing quality gates, open the pull request. Args: `workspace`, `prompt`, optional `title`, `issue`, `base_branch`, `plan`, `ship`. Returns immediately. |
+| `task_get` | One task — poll it to follow a run (`auto.state`, `pull_request`, `gates`). |
+| `task_plan_decide` | Approves or rejects a waiting plan (`decision`, optional `feedback`). |
+| `task_message` | Writes into a task (`text`); `resume_auto` lets the run continue on its own afterwards. |
+| `task_pause` / `task_resume` | Pause automation / hand the task back to it. |
+| `task_ship` | Commits, pushes and opens/updates the task's pull request now (optional `draft`). |
+
+Tasks act for you: your Claude agent does the work and you own the task. You
+can read every task of a workspace you belong to, but only write into, steer or
+ship your own tasks and those you collaborate on (a workspace admin may all).
 
 ## Typical flow
 
 A plan → PR round trip from a planning session:
 
-1. `project_list` / `project_get` — pick the project to work in.
-2. `workspace_create` — hand over what to implement (`prompt`). Choose `plan`
-   and `ship`, or leave them to the project's defaults. It returns immediately.
-3. `workspace_get` — poll the run: the thread's `auto.state` goes queued →
-   planning → implementing → gating/fixing → shipping → done.
+1. `workspace_list` / `workspace_get` — pick the workspace to work in.
+2. `task_create` — hand over what to implement (`prompt`). Choose `plan` and
+   `ship`, or leave them to the workspace's defaults. It returns immediately.
+3. `task_get` — poll the run: its `auto.state` goes queued → planning →
+   implementing → gating/fixing → shipping → done.
 4. With `plan = approve` the run stops at `awaiting_plan_approval`:
-   `thread_plan_decide` approves or rejects (with feedback).
-5. When the run is done, `workspace_get` shows the pull request under
+   `task_plan_decide` approves or rejects (with feedback).
+5. When the run is done, `task_get` shows the pull request under
    `pull_request`; check out its branch locally to review in your IDE.
-6. `thread_message` — send review feedback into the thread; set `resume_auto`
-   to let the run continue on its own. `workspace_ship` ships the current state
-   on demand.
+6. `task_message` — send review feedback into the task; set `resume_auto` to
+   let the run continue on its own. `task_ship` ships the current state on
+   demand.
 
 ## Security
 
@@ -142,8 +144,8 @@ A plan → PR round trip from a planning session:
   persistent volume; in the stock compose stack it points at `/data/passport`.
 - **Tool calls succeed but nothing happens in the UI** — runs are
   asynchronous. Confirm the queue worker (`queue` service) is up; re-read
-  with `workspace_get` to see the state advance.
-- **`workspace_create` fails with "no usable agent"** — you need an active
+  with `task_get` to see the state advance.
+- **`task_create` fails with "no usable agent"** — you need an active
   Claude agent of your own (or a shared one) under *Agents*.
 
 ## See also

@@ -354,11 +354,11 @@
                     <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ __('onboarding.done.heading') }}</h2>
                     <p class="text-sm text-gray-500 dark:text-gray-400 max-w-md mx-auto">{{ __('onboarding.done.description') }}</p>
                     <div class="flex items-center justify-center gap-3 pt-2">
-                        <x-filament::button tag="a" href="{{ \App\Filament\Workspaces\Resources\WorkspaceResource::getUrl('create', panel: 'workspaces') }}" icon="heroicon-o-plus">
-                            {{ __('onboarding.done.create_workspace') }}
-                        </x-filament::button>
                         @if ($createdProfileId)
-                            <x-filament::button tag="a" color="gray" href="{{ route('filament.admin.resources.repo-profiles.edit', ['record' => $createdProfileId]) }}">
+                            <x-filament::button tag="a" href="{{ \App\Filament\Workspaces\Resources\WorkspaceResource::getUrl('view', ['record' => $createdProfileId], panel: 'workspaces') }}" icon="heroicon-o-arrow-right">
+                                {{ __('onboarding.done.create_workspace') }}
+                            </x-filament::button>
+                            <x-filament::button tag="a" color="gray" href="{{ route('filament.admin.resources.workspaces.edit', ['record' => $createdProfileId]) }}">
                                 {{ __('onboarding.done.view_project') }}
                             </x-filament::button>
                         @endif

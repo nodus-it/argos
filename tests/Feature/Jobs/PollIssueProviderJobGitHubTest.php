@@ -38,7 +38,7 @@ class PollIssueProviderJobGitHubTest extends TestCase
             'external_project_ref' => 'acme/widget',
             'filters' => null,
         ]);
-        $this->prepareIssueRuns($this->binding->repoProfile);
+        $this->prepareIssueRuns($this->binding->workspace);
     }
 
     private function fakeIssuesEndpoint(array $issues): void
@@ -50,7 +50,7 @@ class PollIssueProviderJobGitHubTest extends TestCase
 
     // ── happy path ───────────────────────────────────────────────────────────
 
-    public function test_poll_launches_workspaces_for_matching_issues(): void
+    public function test_poll_launches_tasks_for_matching_issues(): void
     {
         $this->fakeIssuesEndpoint([
             ['id' => 1, 'title' => 'First issue', 'body' => 'body', 'state' => 'open', 'labels' => [], 'html_url' => 'https://github.com/acme/widget/issues/1'],
@@ -63,7 +63,7 @@ class PollIssueProviderJobGitHubTest extends TestCase
         );
 
         $this->assertDatabaseCount(ExternalIssueLink::class, 2);
-        $this->assertDatabaseCount('workspaces', 2);
+        $this->assertDatabaseCount('tasks', 2);
     }
 
     public function test_poll_filters_out_pull_requests(): void
@@ -152,9 +152,9 @@ class PollIssueProviderJobGitHubTest extends TestCase
 
         // Both issues are linked, but only the labelled one becomes a Task.
         $this->assertDatabaseCount(ExternalIssueLink::class, 2);
-        $this->assertDatabaseCount('workspaces', 1);
-        $this->assertNotNull(ExternalIssueLink::where('external_id', '1')->first()->workspace_id);
-        $this->assertNull(ExternalIssueLink::where('external_id', '2')->first()->workspace_id);
+        $this->assertDatabaseCount('tasks', 1);
+        $this->assertNotNull(ExternalIssueLink::where('external_id', '1')->first()->task_id);
+        $this->assertNull(ExternalIssueLink::where('external_id', '2')->first()->task_id);
     }
 
     // ── pagination ───────────────────────────────────────────────────────────
@@ -179,7 +179,7 @@ class PollIssueProviderJobGitHubTest extends TestCase
         );
 
         $this->assertDatabaseCount(ExternalIssueLink::class, 2);
-        $this->assertDatabaseCount('workspaces', 2);
+        $this->assertDatabaseCount('tasks', 2);
     }
 
     // ── error handling ───────────────────────────────────────────────────────

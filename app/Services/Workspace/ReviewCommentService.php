@@ -6,13 +6,13 @@ namespace App\Services\Workspace;
 
 use App\Enums\ReviewCommentStatus;
 use App\Models\ReviewComment;
-use App\Models\Thread;
+use App\Models\Task;
 use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 
 /**
- * Line comments of the review: collected per thread and person (they
+ * Line comments of the review: collected per task and person (they
  * survive a reload), shown in the diff and as chips in the composer, and
  * sent to Claude together with the free text as ONE structured message.
  * Stale comments (Claude changed their lines) only go along on request,
@@ -23,18 +23,18 @@ class ReviewCommentService
     /** Context lines around the commented lines in the snippet. */
     public const CONTEXT = 2;
 
-    public function __construct(private readonly ThreadService $threads) {}
+    public function __construct(private readonly TaskService $tasks) {}
 
     /**
      * @param  array<int, string>  $lines  line number => text, of the side commented on (with context around the range)
      */
-    public function add(Thread $thread, User $user, string $path, string $side, int $start, int $end, string $body, array $lines): ReviewComment
+    public function add(Task $task, User $user, string $path, string $side, int $start, int $end, string $body, array $lines): ReviewComment
     {
-        Gate::forUser($user)->authorize('prompt', $thread);
+        Gate::forUser($user)->authorize('prompt', $task);
         [$start, $end] = [min($start, $end), max($start, $end)];
 
         return ReviewComment::query()->create([
-            'thread_id' => $thread->id,
+            'task_id' => $task->id,
             'user_id' => $user->id,
             'path' => $path,
             'side' => $side === 'old' ? 'old' : 'new',
@@ -60,14 +60,14 @@ class ReviewCommentService
     }
 
     /**
-     * Comments still collected in this thread by this person.
+     * Comments still collected in this task by this person.
      *
      * @return Collection<int, ReviewComment>
      */
-    public function open(Thread $thread, User $user): Collection
+    public function open(Task $task, User $user): Collection
     {
         return ReviewComment::query()
-            ->where('thread_id', $thread->id)
+            ->where('task_id', $task->id)
             ->where('user_id', $user->id)
             ->whereIn('status', [ReviewCommentStatus::Draft->value, ReviewCommentStatus::Stale->value])
             ->orderBy('path')
@@ -109,11 +109,11 @@ class ReviewCommentService
      * @param  array<string, string>  $contents  path => current file content (files that vanished are missing)
      * @return int comments changed
      */
-    public function reanchor(Thread $thread, array $contents): int
+    public function reanchor(Task $task, array $contents): int
     {
         $changed = 0;
         $comments = ReviewComment::query()
-            ->where('thread_id', $thread->id)
+            ->where('task_id', $task->id)
             ->where('status', ReviewCommentStatus::Draft->value)
             ->where('outdated', false)
             ->where('side', 'new')
@@ -151,10 +151,10 @@ class ReviewCommentService
      *
      * @return list<string>
      */
-    public function anchoredPaths(Thread $thread): array
+    public function anchoredPaths(Task $task): array
     {
         return ReviewComment::query()
-            ->where('thread_id', $thread->id)
+            ->where('task_id', $task->id)
             ->where('status', ReviewCommentStatus::Draft->value)
             ->where('outdated', false)
             ->where('side', 'new')
@@ -178,16 +178,16 @@ class ReviewCommentService
      *
      * @return int number of comments sent
      */
-    public function send(Thread $thread, User $user, string $text): int
+    public function send(Task $task, User $user, string $text): int
     {
-        $comments = $this->open($thread, $user)->filter(
+        $comments = $this->open($task, $user)->filter(
             fn (ReviewComment $c): bool => $c->status === ReviewCommentStatus::Draft,
         )->values();
         if ($comments->isEmpty() && trim($text) === '') {
             return 0;
         }
 
-        $this->threads->send($thread, $user, self::message($comments, $text));
+        $this->tasks->send($task, $user, self::message($comments, $text));
         ReviewComment::query()->whereKey($comments->pluck('id'))->update(['status' => ReviewCommentStatus::Sent->value, 'sent_at' => now()]);
 
         return $comments->count();

@@ -15,7 +15,7 @@
                         <span>{{ $ws->name }}</span>
                         <span class="badge {{ \App\Support\BadgeClass::for($ws->status->color()) }}">{{ $ws->status->label() }}</span>
                     </div>
-                    <div class="ws-overview-meta muted mono">{{ $ws->repoProfile->name }} · {{ $ws->branch }}</div>
+                    <div class="ws-overview-meta muted mono">{{ $ws->getOwnerRepo() }}</div>
                     <div class="ws-overview-state">
                         @if ($sum['waiting_for_me'])
                             <span class="badge badge-running">@svg('heroicon-o-hand-raised') {{ __('workspaces.overview.waiting_for_you') }}</span>
@@ -23,11 +23,11 @@
                         @if ($sum['working'] > 0)
                             <span class="badge badge-running"><span class="ws-dot"></span> {{ trans_choice('workspaces.overview.working', $sum['working'], ['count' => $sum['working']]) }}</span>
                         @endif
-                        <span class="muted">{{ trans_choice('workspaces.overview.threads', $sum['threads'], ['count' => $sum['threads']]) }}</span>
-                        @if ($sum['pr_state'])
-                            <span class="badge badge-draft">PR · {{ __('workspaces.pr_state.'.$sum['pr_state']) }}</span>
+                        <span class="muted">{{ trans_choice('workspaces.overview.tasks', $sum['tasks'], ['count' => $sum['tasks']]) }}</span>
+                        @if ($sum['pr_open'] > 0)
+                            <span class="badge badge-draft">{{ trans_choice('workspaces.overview.pr_open', $sum['pr_open'], ['count' => $sum['pr_open']]) }}</span>
                         @endif
-                        @if ($sum['preview'] === 'live')
+                        @if ($sum['previews'] > 0)
                             <span class="badge badge-success">{{ __('workspaces.tabs.preview') }}</span>
                         @endif
                     </div>

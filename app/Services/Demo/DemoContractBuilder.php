@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Demo;
 
 use App\Enums\BackingService;
-use App\Models\RepoProfile;
+use App\Models\Workspace;
 use Symfony\Component\Yaml\Yaml;
 
 /**
@@ -21,7 +21,7 @@ class DemoContractBuilder
     /**
      * @return array{0: string, 1: string} [composeYaml, settingsYaml]
      */
-    public function buildDefault(RepoProfile $profile): array
+    public function buildDefault(Workspace $profile): array
     {
         $dir = resource_path('stubs/demo/laravel');
         $settingsYaml = (string) file_get_contents($dir.'/demo.yml');
@@ -44,7 +44,7 @@ class DemoContractBuilder
      *
      * @param  array<string, mixed>  $compose
      */
-    private function applyMysqlCredentials(array &$compose, RepoProfile $profile): void
+    private function applyMysqlCredentials(array &$compose, Workspace $profile): void
     {
         $config = $profile->worker_service_config['mysql'] ?? null;
         if (! is_array($config)) {
@@ -76,7 +76,7 @@ class DemoContractBuilder
      *
      * @param  array<string, mixed>  $compose
      */
-    private function applyRedis(array &$compose, RepoProfile $profile): void
+    private function applyRedis(array &$compose, Workspace $profile): void
     {
         if (! in_array(BackingService::Redis, $profile->backingServices(), true)) {
             return;

@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Broadcast;
 
 /*
 | Realtime channels (Laravel Reverb). A workspace's presence channel carries
-| every live update of its threads; joining it requires being able to view
+| every live update of its tasks; joining it requires being able to view
 | the workspace. The returned array is what other members see in presence.
 */
 
