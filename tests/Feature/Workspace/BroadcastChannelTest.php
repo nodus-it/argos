@@ -54,5 +54,8 @@ class BroadcastChannelTest extends TestCase
 
         $this->auth($user, 'private-user.'.$user->id)->assertOk();
         $this->auth(User::factory()->create(), 'private-user.'.$user->id)->assertForbidden();
+        // Filament's notification bell channel.
+        $this->auth($user, 'private-App.Models.User.'.$user->id)->assertOk();
+        $this->auth(User::factory()->create(), 'private-App.Models.User.'.$user->id)->assertForbidden();
     }
 }

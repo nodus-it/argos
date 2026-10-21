@@ -22,3 +22,6 @@ Broadcast::channel('workspace.{workspaceId}', function (User $user, string $work
 });
 
 Broadcast::channel('user.{userId}', fn (User $user, int $userId): bool => $user->id === $userId);
+
+// Filament's database notifications (the bell) listen here for live updates.
+Broadcast::channel('App.Models.User.{userId}', fn (User $user, int $userId): bool => $user->id === $userId);

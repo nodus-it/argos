@@ -61,13 +61,14 @@ if [[ -f /app/composer.lock ]]; then
     fi
 fi
 
-# Refresh the package-discovery cache when it's stale relative to composer.lock.
+# Rebuild the package-discovery cache on every start. It is derived from
+# vendor/ and cheap to rebuild; comparing mtimes with composer.lock missed
+# caches written after the lock but before a package was removed — the app
+# then crashed on boot loading a provider that no longer exists. Removing
+# the old files first matters: artisan itself boots from them.
 if [[ -f /app/composer.lock ]]; then
-    if [[ ! -f /app/bootstrap/cache/packages.php ]] \
-            || [[ /app/composer.lock -nt /app/bootstrap/cache/packages.php ]]; then
-        echo "Package discovery cache stale — running package:discover..."
-        php /app/artisan package:discover --no-interaction --ansi || true
-    fi
+    rm -f /app/bootstrap/cache/packages.php /app/bootstrap/cache/services.php
+    php /app/artisan package:discover --no-interaction --ansi || true
 fi
 
 # Make the data volume writable for www-data.
