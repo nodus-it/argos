@@ -14,6 +14,7 @@ export function argosThreadStream(config) {
         typing: {},
         channel: null,
         refreshTimer: null,
+        threadsTimer: null,
         lastWhisper: 0,
         dragging: false,
         commands: [],
@@ -47,6 +48,8 @@ export function argosThreadStream(config) {
         },
 
         onStream(payload) {
+            // The switcher and the hint chip follow every thread of the workspace.
+            this.announceThreads();
             if (payload.thread_id === '_workspace') {
                 // Workspace-level change (quality gates): the Review tab reloads.
                 window.dispatchEvent(new CustomEvent('argos-gates-updated'));
@@ -94,6 +97,11 @@ export function argosThreadStream(config) {
             if (persisted) {
                 this.scheduleRefresh();
             }
+        },
+
+        announceThreads() {
+            clearTimeout(this.threadsTimer);
+            this.threadsTimer = setTimeout(() => window.dispatchEvent(new CustomEvent('argos-threads-changed')), 700);
         },
 
         scheduleRefresh(delay = 150) {

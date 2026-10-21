@@ -1,5 +1,9 @@
 @use('App\Enums\WorkspaceStatus')
-<x-filament-panels::page>
+{{-- Workspace "Fokus": header (thread switcher, ship), the chat in a centred
+     column and the context sidebar. The review mode widens the sidebar into
+     the review panel (see resources/js/workspace/focus.js). --}}
+<div class="wf-page" x-data="argosWorkspaceFocus()" x-on:keydown.window="onKey($event)"
+     :class="{ 'is-review': review, 'is-max': review && maximized, 'is-drawer-open': drawer }">
     {{-- Lets notifications.js skip signals for the workspace in front of you. --}}
     <script>window.ArgosCurrentWorkspace = @js($workspace->id);</script>
 
@@ -8,41 +12,56 @@
         <div wire:poll.3s="refreshStatus" class="hidden"></div>
     @endif
 
-    @if ($workspace->status !== WorkspaceStatus::Running)
-        <div @class(['ws-alert', 'ws-alert-error' => $workspace->status === WorkspaceStatus::Failed, 'ws-alert-warn' => $workspace->status !== WorkspaceStatus::Failed]) role="status">
-            @if ($transitional) <span class="ws-dot"></span> @else @svg('heroicon-o-information-circle') @endif
-            <span>{{ __('workspaces.states.'.$workspace->status->value) }}</span>
-            @if ($workspace->status === WorkspaceStatus::Failed && $workspace->status_message)
-                <pre class="ws-error-detail mono">{{ $workspace->status_message }}</pre>
-            @endif
-        </div>
-    @endif
+    <header class="wf-head">
+        <span class="wf-ws-name" title="{{ $workspace->repoProfile->name }} · {{ $workspace->branch }}">
+            <span class="wf-ws-title">{{ $workspace->name }}</span>
+            <span @class(['wf-dot', 'is-'.$workspace->status->value]) role="img" aria-label="{{ $workspace->status->label() }}" title="{{ $workspace->status->label() }}"></span>
+        </span>
+        <span class="wf-head-sep" aria-hidden="true">/</span>
+        @livewire('workspace.thread-switcher', ['workspaceId' => $workspace->id], key('switcher-'.$workspace->id))
+        <span class="wf-review-flag" x-show="review" x-cloak>
+            <x-wf.icon name="eye" :size="15" :stroke="2" /> {{ __('workspaces.focus.review_mode') }}
+        </span>
+        <span class="wf-spacer"></span>
+        <button type="button" class="wf-btn" x-show="review" x-cloak x-on:click="closeReview()">
+            {{ __('workspaces.focus.close_review') }} <kbd class="wf-kbd">esc</kbd>
+        </button>
+        @if ($canOperate)
+            <button type="button" class="wf-btn wf-hide-narrow" x-show="!review" x-on:click="$dispatch('thread-new')">
+                <x-wf.icon name="plus" :size="16" :stroke="2" /> {{ __('workspaces.thread.new') }}
+            </button>
+        @endif
+        @if ($this->startAction->isVisible()) {{ $this->startAction }} @endif
+        @if ($this->shipAction->isVisible()) {{ $this->shipAction }} @endif
+        <x-filament-actions::group
+            :actions="[$this->gatesAction, $this->rebaseAction, $this->membersAction, $this->stopAction, $this->deleteAction]"
+            icon="heroicon-o-ellipsis-horizontal"
+            :label="__('workspaces.focus.more')"
+            color="gray"
+            dropdown-placement="bottom-end"
+        />
+        <button type="button" class="wf-icon-btn wf-drawer-toggle" x-on:click="drawer = !drawer" :aria-expanded="drawer" aria-label="{{ __('workspaces.focus.context') }}">
+            <x-wf.icon name="layout" :size="18" />
+        </button>
+    </header>
 
-    {{-- Fills the viewport below the header; the chat feed scrolls inside.
-         The gutter between the panes sets the split (remembered per browser). --}}
-    <div class="ws-layout" x-data="argosWorkspaceLayout()" x-on:workspace-focus.window="show($event.detail.target)"
-         :class="{ 'is-resizing': resizing }" :style="style()">
-        <section class="ws-pane ws-pane-chat card" id="ws-chat-pane">
-            @livewire('workspace.thread-chat', ['workspaceId' => $workspace->id], key('chat-'.$workspace->id))
-        </section>
-
-        <div class="ws-gutter" role="separator" tabindex="0" aria-orientation="vertical"
-             aria-label="{{ __('workspaces.tabs.resize') }}" aria-controls="ws-chat-pane"
-             aria-valuemin="25" aria-valuemax="70" :aria-valuenow="Math.round(split)"
-             x-on:pointerdown.prevent="startResize($event)"
-             x-on:keydown.left.prevent="nudge(-2)" x-on:keydown.right.prevent="nudge(2)"
-             x-on:keydown.home.prevent="nudge(-100)" x-on:keydown.end.prevent="nudge(100)"></div>
-
-        <section class="ws-pane ws-pane-tools card">
-            {{-- Workbench: editor and preview open in their own tabs; the
-                 review (diff, line comments, gates) stays here. --}}
-            <div class="ws-workbench-bar" :class="{ 'is-highlighted': highlight === 'preview' }">
-                @include('filament.workspaces.partials.code-tool')
-                @livewire('workspace.preview-panel', ['workspaceId' => $workspace->id], key('preview-'.$workspace->id))
+    <div class="wf-center">
+        @if ($workspace->status !== WorkspaceStatus::Running)
+            <div @class(['wf-banner', 'is-error' => $workspace->status === WorkspaceStatus::Failed]) role="status">
+                @if ($transitional) <span class="wf-spin"></span> @else <x-wf.icon name="alert" :size="16" /> @endif
+                <span>{{ __('workspaces.states.'.$workspace->status->value) }}</span>
+                @if ($workspace->status === WorkspaceStatus::Failed && $workspace->status_message)
+                    <pre class="wf-banner-detail mono">{{ $workspace->status_message }}</pre>
+                @endif
             </div>
-            <div class="ws-review-wrap" x-ref="review">
-                @livewire('workspace.review-panel', ['workspaceId' => $workspace->id], key('review-'.$workspace->id))
-            </div>
-        </section>
+        @endif
+
+        @livewire('workspace.thread-chat', ['workspaceId' => $workspace->id], key('chat-'.$workspace->id))
     </div>
-</x-filament-panels::page>
+
+    <aside class="wf-context" aria-label="{{ __('workspaces.focus.context') }}">
+        @livewire('workspace.context-panel', ['workspaceId' => $workspace->id], key('context-'.$workspace->id))
+    </aside>
+
+    <x-filament-actions::modals />
+</div>

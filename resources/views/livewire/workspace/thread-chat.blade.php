@@ -21,90 +21,34 @@
     ];
 @endphp
 
-<div class="ws-chat" x-data="window.argosThreadStream ? window.argosThreadStream(@js($streamConfig)) : {}" x-init="$nextTick(() => scrollDown?.())">
-    <div class="ws-chat-body">
-    {{-- Thread sidebar --}}
-    <aside class="ws-threads" x-data="{ collapsed: window.innerWidth < 640 }" :class="{ 'is-collapsed': collapsed }">
-        <div class="ws-threads-head">
-            <button type="button" class="btn btn-ghost btn-sm" x-on:click="collapsed = !collapsed" :aria-expanded="!collapsed" title="{{ __('workspaces.thread.threads') }}" aria-label="{{ __('workspaces.thread.threads') }}">@svg('heroicon-o-bars-3')</button>
-            <span class="ws-threads-label" x-show="!collapsed">{{ __('workspaces.thread.threads') }}</span>
-            @if ($canWrite)
-                <button type="button" class="btn btn-ghost btn-sm" wire:click="startCreating" title="{{ __('workspaces.thread.new') }}" aria-label="{{ __('workspaces.thread.new') }}" x-show="!collapsed">@svg('heroicon-o-plus')</button>
-            @endif
-        </div>
-        <ul class="ws-thread-list" x-show="!collapsed">
-            @forelse ($threads as $t)
-                <li @class(['ws-thread-item', 'is-active' => $thread?->id === $t->id, 'is-archived' => $t->archived_at !== null]) wire:key="t-{{ $t->id }}">
-                    @if ($renamingId === $t->id)
-                        <form wire:submit="rename" class="ws-row">
-                            <input type="text" class="ws-input" wire:model="renameTitle" maxlength="120" x-init="$el.focus()">
-                        </form>
-                    @else
-                        <button type="button" class="ws-thread-link" wire:click="selectThread('{{ $t->id }}')">
-                            <span class="ws-status-dot ws-status-{{ $t->status->value }}" role="img" aria-label="{{ $t->status->label() }}" title="{{ $t->status->label() }}"></span>
-                            @if ($t->auto_state)
-                                <span class="ws-auto-icon" role="img" aria-label="{{ __('workspaces.auto.label') }}" title="{{ __('workspaces.auto.label') }} · {{ $t->auto_state->label() }}">@svg('heroicon-s-bolt')</span>
-                            @endif
-                            <span class="ws-thread-name">{{ $t->title }}</span>
-                            @if (($unread[$t->id] ?? 0) > 0 && $thread?->id !== $t->id)
-                                <span class="ws-unread">{{ $unread[$t->id] }}</span>
-                            @endif
-                        </button>
-                        <span class="ws-thread-meta muted">{{ $t->agentCredential?->name }} · {{ $t->updated_at?->diffForHumans(short: true) }}</span>
-                        @if ($canWrite)
-                            <span class="ws-thread-actions">
-                                <button type="button" class="btn btn-ghost btn-sm" wire:click="startRename('{{ $t->id }}')" title="{{ __('workspaces.thread.rename') }}" aria-label="{{ __('workspaces.thread.rename') }}">@svg('heroicon-o-pencil')</button>
-                                @if ($t->archived_at === null)
-                                    <button type="button" class="btn btn-ghost btn-sm" wire:click="archive('{{ $t->id }}')" title="{{ __('workspaces.thread.archive') }}" aria-label="{{ __('workspaces.thread.archive') }}">@svg('heroicon-o-archive-box')</button>
-                                @else
-                                    <button type="button" class="btn btn-ghost btn-sm" wire:click="unarchive('{{ $t->id }}')" title="{{ __('workspaces.thread.unarchive') }}" aria-label="{{ __('workspaces.thread.unarchive') }}">@svg('heroicon-o-arrow-uturn-left')</button>
-                                @endif
-                            </span>
-                        @endif
-                    @endif
-                </li>
-            @empty
-                <li class="muted ws-thread-empty">{{ __('workspaces.thread.none_short') }}</li>
-            @endforelse
-        </ul>
-        <label class="ws-inline ws-show-archived" x-show="!collapsed">
-            <input type="checkbox" wire:model.live="showArchived"> {{ __('workspaces.thread.show_archived') }}
-        </label>
-    </aside>
-
-    <div class="ws-chat-main">
-        {{-- Current thread + who is here --}}
-        <div class="ws-chat-head">
-            <div class="ws-thread-picker">
-                <strong class="ws-thread-title">{{ $thread?->title ?? __('workspaces.thread.new') }}</strong>
-                @if ($thread)
-                    <span class="ws-status-dot ws-status-{{ $thread->status->value }}" role="img" aria-label="{{ $thread->status->label() }}" title="{{ $thread->status->label() }}"></span>
-                @endif
-                @if ($thread?->auto_state)
-                    @php
-                        $autoRounds = $thread->auto_state === AutoThreadState::Fixing || $thread->auto_state === AutoThreadState::Gating
-                            ? ' · '.__('workspaces.auto.round', ['n' => (int) ($thread->auto_counters['fix_rounds'] ?? 0), 'max' => (int) ($thread->auto_config['max_fix_rounds'] ?? 0)])
-                            : '';
-                    @endphp
-                    <span class="ws-chip ws-auto-chip is-{{ $thread->auto_state->color() }}" title="{{ $thread->auto_message }}">
-                        @svg('heroicon-s-bolt') {{ $thread->auto_state->label() }}{{ $autoRounds }}
-                    </span>
-                    @if ($canWrite)
-                        @if ($thread->auto_state->isRunning())
-                            <button type="button" class="ws-tool-icon-btn" wire:click="pauseAuto" title="{{ __('workspaces.auto.pause') }}" aria-label="{{ __('workspaces.auto.pause') }}">@svg('heroicon-o-pause')</button>
-                        @elseif ($thread->auto_state !== AutoThreadState::Done)
-                            <button type="button" class="ws-tool-icon-btn" wire:click="resumeAuto" title="{{ __('workspaces.auto.resume') }}" aria-label="{{ __('workspaces.auto.resume') }}">@svg('heroicon-o-play')</button>
-                        @endif
+<div class="ws-chat wf-chat" x-data="window.argosThreadStream ? window.argosThreadStream(@js($streamConfig)) : {}" x-init="$nextTick(() => scrollDown?.())"
+     x-on:scroll-to-approval.window="setTimeout(() => $root.querySelector('.ws-approval.is-pending')?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 700)">
+    <div class="wf-chat-main">
+        {{-- Auto-thread state and who else is here (the thread itself is picked in the header). --}}
+        @if ($thread?->auto_state)
+            @php
+                $autoRounds = $thread->auto_state === AutoThreadState::Fixing || $thread->auto_state === AutoThreadState::Gating
+                    ? ' · '.__('workspaces.auto.round', ['n' => (int) ($thread->auto_counters['fix_rounds'] ?? 0), 'max' => (int) ($thread->auto_config['max_fix_rounds'] ?? 0)])
+                    : '';
+            @endphp
+            <div class="wf-thread-bar">
+                <span class="ws-chip ws-auto-chip is-{{ $thread->auto_state->color() }}" title="{{ $thread->auto_message }}">
+                    @svg('heroicon-s-bolt') {{ $thread->auto_state->label() }}{{ $autoRounds }}
+                </span>
+                @if ($canWrite)
+                    @if ($thread->auto_state->isRunning())
+                        <button type="button" class="wf-icon-btn wf-icon-btn-sm" wire:click="pauseAuto" title="{{ __('workspaces.auto.pause') }}" aria-label="{{ __('workspaces.auto.pause') }}"><x-wf.icon name="pause" :size="15" :stroke="2" /></button>
+                    @elseif ($thread->auto_state !== AutoThreadState::Done)
+                        <button type="button" class="wf-icon-btn wf-icon-btn-sm" wire:click="resumeAuto" title="{{ __('workspaces.auto.resume') }}" aria-label="{{ __('workspaces.auto.resume') }}"><x-wf.icon name="play" :size="15" :stroke="2" /></button>
                     @endif
                 @endif
             </div>
-
-            <div class="ws-presence" x-show="members && members.length" x-cloak>
-                <span class="ws-presence-label">{{ __('workspaces.thread.present') }}</span>
-                <template x-for="m in members" :key="m.id">
-                    <span class="ws-avatar" :title="m.name" x-text="initials(m.name)"></span>
-                </template>
-            </div>
+        @endif
+        <div class="wf-presence" x-show="members && members.length > 1" x-cloak>
+            <span class="wf-muted">{{ __('workspaces.thread.present') }}</span>
+            <template x-for="m in members" :key="m.id">
+                <span class="ws-avatar ws-avatar-sm" :title="m.name" x-text="initials(m.name)"></span>
+            </template>
         </div>
 
     @if ($thread?->auto_state && $thread->auto_message && ! $thread->auto_state->isRunning())
@@ -490,6 +434,5 @@
             <div class="ws-viewer muted">{{ __('workspaces.thread.viewer_hint') }}</div>
         @endif
     @endif
-    </div>{{-- .ws-chat-main --}}
-    </div>{{-- .ws-chat-body --}}
+    </div>{{-- .wf-chat-main --}}
 </div>

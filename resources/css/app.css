@@ -8,6 +8,8 @@
 @import '@fontsource/ibm-plex-mono/500.css';
 @import '@fontsource/ibm-plex-mono/600.css';
 @import '@fontsource/ibm-plex-mono/700.css';
+@import '@fontsource-variable/geist';
+@import '@fontsource-variable/geist-mono';
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
@@ -1214,3 +1216,5 @@ button.as-toggle{background:none;border:0;padding:0;font:inherit;font-size:var(-
 .ws-auto-toggle input{margin-top:3px;}
 .ws-auto-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;}
 .ws-auto-note{margin:8px 12px 0;}
+
+@import './workspace.css';

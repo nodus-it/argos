@@ -12,6 +12,7 @@ use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ViewWorkspace;
 use App\Integrations\WorkspaceDaemon\Requests\GitDiff;
 use App\Integrations\WorkspaceDaemon\Requests\GitFetch;
 use App\Integrations\WorkspaceDaemon\Requests\GitStatus;
+use App\Livewire\Workspace\ContextPanel;
 use App\Livewire\Workspace\ReviewPanel;
 use App\Models\AgentCredential;
 use App\Models\Thread;
@@ -62,7 +63,7 @@ class ReviewPanelTest extends TestCase
 
         Livewire::actingAs($this->editor)
             ->test(ViewWorkspace::class, ['record' => $this->workspace->getKey()])
-            ->assertSeeLivewire(ReviewPanel::class);
+            ->assertSeeLivewire(ContextPanel::class);
     }
 
     public function test_shows_the_diff_once_loaded(): void

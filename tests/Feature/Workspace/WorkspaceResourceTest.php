@@ -10,6 +10,7 @@ use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\CreateWorkspace;
 use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ListWorkspaces;
 use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ViewWorkspace;
 use App\Jobs\Workspace\ProvisionWorkspaceJob;
+use App\Livewire\Workspace\ContextPanel;
 use App\Models\RepoProfile;
 use App\Models\User;
 use App\Models\Workspace;
@@ -17,6 +18,8 @@ use App\Models\WorkspaceMember;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
+use App\Services\Workspace\WorkspaceDaemonClient;
+use App\Testing\FakeWorkspaceDaemon;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -146,8 +149,10 @@ class WorkspaceResourceTest extends TestCase
         $openUrl = route('workspaces.open', ['workspace' => $workspace, 'target' => 'code']);
 
         $this->actingAs($me)->get(ViewWorkspace::getUrl(['record' => $workspace]))
-            ->assertDontSee('<iframe', false)
-            ->assertSee('href="'.$openUrl.'" target="argos-code-'.$workspace->slug.'"', false);
+            ->assertDontSee('<iframe', false);
+        $this->app->singleton(WorkspaceDaemonClient::class, FakeWorkspaceDaemon::class);
+        Livewire::withoutLazyLoading()->actingAs($me)->test(ContextPanel::class, ['workspaceId' => $workspace->id])
+            ->assertSeeHtml('href="'.$openUrl.'" target="argos-code-'.$workspace->slug.'"');
     }
 
     public function test_code_tab_explains_a_stopped_workspace(): void
@@ -156,7 +161,10 @@ class WorkspaceResourceTest extends TestCase
         $workspace = $this->workspaceFor($me, WorkspaceRole::Editor, ['status' => WorkspaceStatus::Failed]);
 
         $this->actingAs($me)->get(ViewWorkspace::getUrl(['record' => $workspace]))
-            ->assertSee(__('workspaces.tabs.not_running'));
+            ->assertSee(__('workspaces.states.failed'));
+        Livewire::withoutLazyLoading()->actingAs($me)->test(ContextPanel::class, ['workspaceId' => $workspace->id])
+            ->assertSee(__('workspaces.focus.code_off'))
+            ->assertSee(__('workspaces.focus.unavailable'));
     }
 
     public function test_viewers_do_not_get_the_editor(): void
@@ -164,9 +172,9 @@ class WorkspaceResourceTest extends TestCase
         $me = User::factory()->create();
         $workspace = $this->workspaceFor($me, WorkspaceRole::Viewer);
 
-        $this->actingAs($me)->get(ViewWorkspace::getUrl(['record' => $workspace]))
-            ->assertSee(__('workspaces.tabs.viewer_short'))
-            ->assertDontSee('target=code', false)
-            ->assertDontSee('/open/code', false);
+        $this->app->singleton(WorkspaceDaemonClient::class, FakeWorkspaceDaemon::class);
+        Livewire::withoutLazyLoading()->actingAs($me)->test(ContextPanel::class, ['workspaceId' => $workspace->id])
+            ->assertSee(__('workspaces.focus.code_viewer'))
+            ->assertDontSeeHtml('/open/code');
     }
 }

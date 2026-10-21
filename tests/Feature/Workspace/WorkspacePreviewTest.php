@@ -11,6 +11,7 @@ use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ViewWorkspace;
 use App\Jobs\Workspace\DeployWorkspaceDemoJob;
 use App\Jobs\Workspace\RerunWorkspaceDemoCommandsJob;
 use App\Jobs\Workspace\StopWorkspaceDemoJob;
+use App\Livewire\Workspace\ContextPanel;
 use App\Livewire\Workspace\PreviewPanel;
 use App\Models\Demo;
 use App\Models\RepoProfile;
@@ -117,6 +118,9 @@ class WorkspacePreviewTest extends TestCase
     {
         Livewire::actingAs($this->editor)
             ->test(ViewWorkspace::class, ['record' => $this->workspace->getKey()])
+            ->assertSeeLivewire(ContextPanel::class);
+        Livewire::withoutLazyLoading()->actingAs($this->editor)
+            ->test(ContextPanel::class, ['workspaceId' => $this->workspace->id])
             ->assertSeeLivewire(PreviewPanel::class);
 
         Livewire::actingAs($this->editor)

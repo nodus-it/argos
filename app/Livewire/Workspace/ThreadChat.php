@@ -34,14 +34,15 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
 
 /**
- * The chat of a workspace: thread switcher, history, approvals and the
- * composer. Live streaming happens client-side (resources/js/workspace);
+ * The chat of a workspace: history, approvals and the composer of the
+ * thread picked in the header's switcher (ThreadSwitcher). Live streaming happens client-side (resources/js/workspace);
  * this component renders persisted state and runs every action through
  * ThreadService, which enforces the policies.
  */
@@ -88,12 +89,6 @@ class ThreadChat extends Component
 
     public string $newMode = 'default';
 
-    public bool $showArchived = false;
-
-    public ?string $renamingId = null;
-
-    public string $renameTitle = '';
-
     /** "Reset to here" dialog: the checkpoint and its diff preview. */
     public ?string $restoreId = null;
 
@@ -120,19 +115,28 @@ class ThreadChat extends Component
         }
     }
 
+    #[On('thread-select')]
     public function selectThread(string $id): void
     {
-        if ($this->threads()->contains('id', $id)) {
+        if ($this->threads(withArchived: true)->contains('id', $id)) {
             $this->threadId = $id;
             $this->limit = self::PAGE;
             $this->creating = false;
+            $this->announceThread();
         }
     }
 
+    #[On('thread-new')]
     public function startCreating(): void
     {
         $this->creating = true;
         $this->newAgentId ??= $this->usableAgents()->first()?->id;
+    }
+
+    /** Keep the header's switcher on the thread shown here. */
+    private function announceThread(): void
+    {
+        $this->dispatch('thread-changed', id: $this->threadId);
     }
 
     public function createThread(): void
@@ -169,6 +173,7 @@ class ThreadChat extends Component
                 $this->threadId = $thread->id;
                 $this->creating = false;
                 $this->reset('newTitle', 'newPrompt', 'newAuto', 'newPlan', 'newShip', 'newMaxFixRounds');
+                $this->announceThread();
             });
 
             return;
@@ -188,6 +193,7 @@ class ThreadChat extends Component
             $this->threadId = $thread->id;
             $this->creating = false;
             $this->newTitle = '';
+            $this->announceThread();
             // Started from an issue: prefill, never send — the person reviews it.
             if ($firstThread) {
                 $this->draft = app(WorkspaceIssueService::class)->composerDraft($this->workspace());
@@ -432,42 +438,14 @@ class ThreadChat extends Component
         }
     }
 
-    public function startRename(string $id): void
+    /** The switcher archived the thread shown here: show the next one. */
+    #[On('thread-archived')]
+    public function threadArchived(string $id): void
     {
-        $thread = $this->threads(true)->firstWhere('id', $id);
-        if ($thread !== null) {
-            $this->renamingId = $id;
-            $this->renameTitle = $thread->title;
-        }
-    }
-
-    public function rename(): void
-    {
-        $thread = $this->threads(true)->firstWhere('id', $this->renamingId);
-        $title = trim($this->renameTitle);
-        if ($thread !== null && $title !== '') {
-            $this->attempt(fn () => app(ThreadService::class)->rename($thread, $this->user(), mb_substr($title, 0, 120)));
-        }
-        $this->renamingId = null;
-    }
-
-    public function archive(string $id): void
-    {
-        $thread = $this->threads()->firstWhere('id', $id);
-        if ($thread === null) {
-            return;
-        }
-        $this->attempt(fn () => app(ThreadService::class)->archive($thread, $this->user()));
         if ($this->threadId === $id) {
             $this->threadId = $this->threads()->first()?->id;
-        }
-    }
-
-    public function unarchive(string $id): void
-    {
-        $thread = $this->threads(true)->firstWhere('id', $id);
-        if ($thread !== null) {
-            $this->attempt(fn () => app(ThreadService::class)->unarchive($thread, $this->user()));
+            $this->creating = $this->threadId === null;
+            $this->announceThread();
         }
     }
 
@@ -517,13 +495,9 @@ class ThreadChat extends Component
         if ($thread !== null) {
             app(ThreadReadService::class)->markRead($thread, $this->user());
         }
-        $sidebar = $this->threads($this->showArchived);
-
         return view('livewire.workspace.thread-chat', [
             'workspace' => $workspace,
             'thread' => $thread,
-            'threads' => $sidebar,
-            'unread' => app(ThreadReadService::class)->unreadCounts($sidebar, $this->user()),
             'events' => $events,
             'hasOlder' => $hasOlder,
             'toolResults' => $events->where('type', ThreadEventType::ToolResult)->keyBy(fn (ThreadEvent $e) => (string) ($e->payload['tool_use_id'] ?? '')),

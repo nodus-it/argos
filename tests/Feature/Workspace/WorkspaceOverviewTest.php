@@ -13,7 +13,7 @@ use App\Filament\Admin\Pages\Dashboard;
 use App\Filament\Admin\Pages\Profile;
 use App\Filament\Admin\Widgets\MyWorkspacesWidget;
 use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ListWorkspaces;
-use App\Livewire\Workspace\ThreadChat;
+use App\Livewire\Workspace\ThreadSwitcher;
 use App\Models\RepoProfile;
 use App\Models\Thread;
 use App\Models\ThreadApproval;
@@ -157,16 +157,16 @@ class WorkspaceOverviewTest extends TestCase
         $this->assertSame([$this->workspace->id, $quiet->id], $rows->map(fn ($r) => $r['workspace']->id)->all());
     }
 
-    public function test_sidebar_shows_unread_threads_and_archiving_hides_them(): void
+    public function test_switcher_shows_unread_threads_and_archiving_hides_them(): void
     {
         $other = Thread::factory()->create(['workspace_id' => $this->workspace->id, 'title' => 'Checkout']);
         ThreadEvent::query()->create(['thread_id' => $other->id, 'type' => ThreadEventType::AssistantMessage, 'payload' => ['text' => 'news']]);
 
         $chat = Livewire::withQueryParams(['thread' => $this->thread->id])
             ->actingAs($this->editor)
-            ->test(ThreadChat::class, ['workspaceId' => $this->workspace->id])
+            ->test(ThreadSwitcher::class, ['workspaceId' => $this->workspace->id])
             ->assertSee('Checkout')
-            ->assertSeeHtml('<span class="ws-unread">1</span>');
+            ->assertSeeHtml('class="wf-unread"');
 
         $chat->call('archive', $other->id)->assertDontSee('Checkout');
         $this->assertNotNull($other->fresh()->archived_at);

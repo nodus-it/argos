@@ -1,12 +1,13 @@
 import Echo from 'laravel-echo';
 import Pusher from 'pusher-js';
 import { argosThreadStream } from './workspace/thread-stream';
-import { argosWorkspaceLayout } from './workspace/layout';
+import { argosThreadSwitcher, argosWorkspaceFocus } from './workspace/focus';
 import { listenForWorkspaceSignals } from './workspace/notifications';
 
 // Alpine data factory for the workspace chat; available with or without realtime.
 window.argosThreadStream = argosThreadStream;
-window.argosWorkspaceLayout = argosWorkspaceLayout;
+window.argosWorkspaceFocus = argosWorkspaceFocus;
+window.argosThreadSwitcher = argosThreadSwitcher;
 
 /**
  * Realtime (Laravel Reverb). The server renders `window.ArgosRealtime` (see
