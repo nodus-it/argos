@@ -23,6 +23,15 @@ trait InteractsWithWorkspace
 {
     private ?Workspace $workspaceModel = null;
 
+    /**
+     * Every later request of the component asks again: someone removed from
+     * the workspace while the page was open reads and does nothing more.
+     */
+    public function hydrateInteractsWithWorkspace(): void
+    {
+        abort_unless($this->user()->can('view', $this->workspace()), 403);
+    }
+
     protected function user(): User
     {
         /** @var User $user */

@@ -32,6 +32,7 @@ use App\Services\Workspace\TaskService;
 use App\Services\Workspace\WorkspaceDaemonClient;
 use App\Testing\FakeWorkspaceDaemon;
 use Filament\Notifications\DatabaseNotification;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;
@@ -167,6 +168,23 @@ class AutoTaskDriverTest extends TestCase
 
         $driver->decidePlan($task, $this->owner, true);
         $this->assertSame(AutoTaskState::Done, $task->fresh()->auto_state);
+    }
+
+    public function test_someone_who_may_not_decide_changes_nothing(): void
+    {
+        $task = $this->start(['plan' => 'approve']);
+        $viewer = User::factory()->create();
+        WorkspaceMember::query()->create(['workspace_id' => $this->workspace->id, 'user_id' => $viewer->id, 'role' => WorkspaceRole::Viewer]);
+
+        try {
+            app(AutoTaskDriver::class)->decidePlan($task, $viewer, true);
+            $this->fail('expected an AuthorizationException');
+        } catch (AuthorizationException) {
+        }
+
+        $task->refresh();
+        $this->assertSame(AutoTaskState::AwaitingPlanApproval, $task->auto_state);
+        $this->assertSame(PermissionMode::Plan, $task->permission_mode);
     }
 
     public function test_a_human_message_pauses_and_resume_continues_with_the_gates(): void

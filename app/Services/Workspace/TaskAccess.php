@@ -17,7 +17,8 @@ use App\Models\Workspace;
  *   (admins: all; members: create tasks, start the container, editor).
  * - On a task, its owner and invited collaborators may write, approve,
  *   review and ship; inviting, handing over and archiving stay with the
- *   owner. Everyone in the workspace can read every task.
+ *   owner — as long as they are still in the workspace. Everyone in the
+ *   workspace can read every task.
  */
 class TaskAccess
 {
@@ -28,7 +29,13 @@ class TaskAccess
         }
 
         $workspace = $subject instanceof Task ? $subject->workspace : $subject;
-        if ($workspace->roleOf($user)?->grants($capability) ?? false) {
+        $role = $workspace->roleOf($user);
+        if ($role === null) {
+            // Removed from the workspace: owning or being invited to a task
+            // there grants nothing anymore.
+            return false;
+        }
+        if ($role->grants($capability)) {
             return true;
         }
 

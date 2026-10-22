@@ -8,6 +8,7 @@ use App\Enums\ApprovalStatus;
 use App\Enums\SessionStatus;
 use App\Enums\TaskEventType;
 use App\Enums\TaskStatus;
+use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceStatus;
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
 use App\Integrations\WorkspaceDaemon\WorkspaceDaemonTransport;
@@ -18,6 +19,7 @@ use App\Models\Task;
 use App\Models\TaskApproval;
 use App\Models\TaskEvent;
 use App\Models\Workspace;
+use App\Models\WorkspaceMember;
 use App\Services\Workspace\TaskService;
 use App\Services\Workspace\TaskSessionReconciler;
 use App\Services\Workspace\WorkspaceDaemonClient;
@@ -128,6 +130,7 @@ class TaskSessionReconcilerTest extends TestCase
     public function test_stopping_a_session_the_daemon_no_longer_knows_closes_it(): void
     {
         $task = $this->task(['session_status' => SessionStatus::Running]);
+        WorkspaceMember::query()->create(['workspace_id' => $this->workspace->id, 'user_id' => $task->owner_user_id, 'role' => WorkspaceRole::Member]);
         $this->mock(WorkspaceDaemonClient::class, function (MockInterface $mock): void {
             $api = \Mockery::mock(WorkspaceDaemonTransport::class);
             $api->shouldReceive('interrupt')->andThrow(new DaemonTransportException('Task is not running', 404, 'unknown_task'));

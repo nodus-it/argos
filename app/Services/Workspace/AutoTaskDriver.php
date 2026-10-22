@@ -151,6 +151,9 @@ class AutoTaskDriver
      */
     public function decidePlan(Task $task, User $by, bool $approve, ?string $feedback = null): void
     {
+        // Before anything changes: the transition and the mode switch below
+        // must never happen for someone who may not decide.
+        Gate::forUser($by)->authorize('resolveApproval', $task);
         if ($task->auto_state !== AutoTaskState::AwaitingPlanApproval) {
             throw WorkspaceException::translated('workspaces.auto.no_plan_waiting');
         }

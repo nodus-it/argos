@@ -308,6 +308,7 @@ class TaskService
         if (! in_array($decision, ['allow', 'always', 'deny'], true)) {
             return false;
         }
+        Gate::forUser($by)->authorize('resolveApproval', $approval->task);
         $remember = $decision === 'always';
         $allow = $decision !== 'deny';
         $message = $message !== '' ? $message : null;

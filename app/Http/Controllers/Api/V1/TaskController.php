@@ -88,6 +88,10 @@ class TaskController extends Controller
             if (! $actor->can('view', $task)) {
                 abort(404);
             }
+            // A comment shows up in the task as a notice: writing, not reading.
+            if (! $actor->can('update', $task)) {
+                abort(403);
+            }
             $tickets->ticketComment($task, (string) $request->input('author'), (string) $request->input('body'), $request->input('url'));
 
             return new JsonResponse([], 202);

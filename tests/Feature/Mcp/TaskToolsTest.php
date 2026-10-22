@@ -131,6 +131,8 @@ class TaskToolsTest extends TestCase
     public function test_only_the_owner_or_a_collaborator_may_ship(): void
     {
         $task = Task::factory()->create(['workspace_id' => $this->workspace->id]);
+        // Task rights need workspace membership.
+        WorkspaceMember::query()->create(['workspace_id' => $this->workspace->id, 'user_id' => $task->owner_user_id, 'role' => WorkspaceRole::Member]);
 
         $this->assertFalse($this->user->can('ship', $task));
         $this->assertTrue($task->owner->can('ship', $task));

@@ -9,6 +9,7 @@ use App\Enums\TaskEventType;
 use App\Enums\TaskStatus;
 use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceStatus;
+use App\Livewire\Workspace\TaskChat;
 use App\Models\AgentCredential;
 use App\Models\Task;
 use App\Models\TaskEvent;
@@ -24,6 +25,7 @@ use App\Testing\FakeWorkspaceDaemon;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 /** Owners invite collaborators, hand tasks over, cancel, delete and follow up. */
@@ -90,6 +92,27 @@ class TaskCollaborationTest extends TestCase
         $this->assertSame(1, $task->members()->count());
         app(TaskMembershipService::class)->uninvite($task, $this->ada, $this->bob);
         $this->assertFalse($this->bob->can('prompt', $task->fresh()));
+    }
+
+    public function test_leaving_the_workspace_ends_the_rights_on_own_and_invited_tasks(): void
+    {
+        $task = $this->task();
+        app(TaskMembershipService::class)->invite($task, $this->ada, $this->bob);
+        WorkspaceMember::query()->where('user_id', $this->bob->id)->delete();
+        WorkspaceMember::query()->where('user_id', $this->ada->id)->delete();
+
+        $task = $task->fresh();
+        $this->assertFalse($this->bob->can('update', $task), 'invited, but no longer a member');
+        $this->assertFalse($this->ada->can('update', $task), 'owner, but no longer a member');
+        $this->assertFalse($this->ada->can('ship', $task));
+    }
+
+    public function test_an_open_page_stops_working_once_the_person_is_removed(): void
+    {
+        $chat = Livewire::actingAs($this->bob)->test(TaskChat::class, ['workspaceId' => $this->workspace->id]);
+        WorkspaceMember::query()->where('user_id', $this->bob->id)->delete();
+
+        $chat->call('startCreating')->assertForbidden();
     }
 
     public function test_only_the_owner_invites_and_only_members(): void
