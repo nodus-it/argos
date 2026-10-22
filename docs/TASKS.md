@@ -145,9 +145,14 @@ steps fold into *Show N more steps*.
 - Claude works in the task's worktree. Slash commands, skills and `CLAUDE.md`
   of the repository are loaded like in Claude Code.
 
-While there are uncommitted changes, a **change tray** above the text field
-shows how many files changed, the added/removed lines and the state of the
-[quality gates](#quality-gates), with **Check gates** and **Review**.
+An **action bar** above the text field shows what changed — files, added and
+removed lines and the state of the [quality gates](#quality-gates), or commits
+not pushed yet — with **Check gates**, **Review** and **Commit & PR**. Below
+it, the to-dos that need someone now, each with its action: red gates
+(*Show*), a red pipeline (*Let Claude fix it*), conflicts or a moved base
+branch (*Rebase by Claude*), new review comments (*Collect in my review*) and
+a draft pull request (*Mark ready*). It only shows while there is something
+to do.
 
 ## Images, files and commands
 
@@ -193,7 +198,7 @@ File tools outside the task's worktree (and `/tmp`) always ask, even in
 
 ## Working together
 
-- **Invite** (header **⋯ → Invite to this task**): the owner picks workspace
+- **Invite** (the **+** next to the pictures in the header): the owner picks workspace
   members as collaborators. They write, approve, review and ship in this task;
   it keeps running on the owner's subscription. A click on a collaborator's
   picture in the header removes them again (after a confirmation).
@@ -252,7 +257,7 @@ need `ARGOS_PREVIEW_ENABLED` and the workspace's *Live demo* toggle; at most
 
 ## The review
 
-**Review** in the change tray, a changed file in the sidebar or `/review`
+**Review** in the action bar, a changed file in the sidebar or `/review`
 switches to the **review mode**: the sidebar widens into the review panel and
 the chat shrinks to a narrow column. **Maximise** gives the diff the full
 width. **Close review** or **Esc** returns; the mode is part of the URL
@@ -288,7 +293,7 @@ only moved. If the commented lines themselves changed, it becomes
 
 ## Quality gates
 
-**Check gates** (change tray, *Check all* in the sidebar or `/gates`) runs the quality gates in the task's worktree: Artisan boot, Pint on
+**Check gates** (action bar, *Check all* in the sidebar or `/gates`) runs the quality gates in the task's worktree: Artisan boot, Pint on
 changed files, Pest/PHPUnit, PHPStan, migration syntax, debug calls and test
 presence. They are made for PHP/Laravel projects; on other stacks the gates
 are skipped.
@@ -331,7 +336,7 @@ files are not touched. A task keeps its newest 200 checkpoints.
 
 ## Shipping: commit and pull request
 
-**Commit & PR** (header, or `/ship`) commits everything that changed in the
+**Commit & PR** (action bar, or `/ship`) commits everything that changed in the
 task, pushes its branch and opens a pull request (GitLab: merge request)
 against the base branch.
 

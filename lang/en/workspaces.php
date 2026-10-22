@@ -143,6 +143,18 @@ return [
         'thinking' => 'Thinking',
     ],
     'tray' => [
+        'label' => 'Changes and to-dos',
+        'unpushed' => '{1} 1 commit not pushed yet|[0,*] :count commits not pushed yet',
+        'todo_count' => '{1} 1 thing needs you|[0,*] :count things need you',
+        'todo' => [
+            'gates' => 'Gates failed: :gates',
+            'gates_action' => 'Show',
+            'pipeline' => 'The pull request\'s pipeline failed',
+            'conflicts' => 'Conflicts with :branch',
+            'behind' => ':branch moved on',
+            'comments' => '{1} 1 new review comment|[0,*] :count new review comments',
+            'draft' => 'The pull request is a draft',
+        ],
         'gate_errors' => '{1} :gate: :count error|[0,*] :gate: :count errors',
         'files' => '{1} :count file changed|[0,*] :count files changed',
         'gates_none' => 'Gates not run yet',

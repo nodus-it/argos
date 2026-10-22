@@ -159,10 +159,15 @@ drei Schritte klappen zu *N weitere Schritte anzeigen* zusammen.
 - Claude arbeitet im Worktree der Aufgabe. Slash-Commands, Skills und die
   `CLAUDE.md` des Repositorys werden wie in Claude Code geladen.
 
-Solange es nicht committete Änderungen gibt, zeigt eine **Änderungsleiste**
-über dem Eingabefeld, wie viele Dateien sich geändert haben, die
-hinzugefügten/entfernten Zeilen und den Stand der
-[Quality-Gates](#quality-gates), mit **Gates prüfen** und **Review**.
+Eine **Aktionsleiste** über dem Eingabefeld zeigt, was sich geändert hat —
+Dateien, hinzugefügte und entfernte Zeilen und den Stand der
+[Quality-Gates](#quality-gates) oder noch nicht gepushte Commits —, mit
+**Gates prüfen**, **Review** und **Commit & PR**. Darunter stehen die
+To-dos, die gerade jemanden brauchen, jeweils mit ihrer Aktion: rote Gates
+(*Ansehen*), eine rote Pipeline (*Claude fixen lassen*), Konflikte oder ein
+weitergelaufener Basis-Branch (*Rebase durch Claude*), neue Review-Kommentare
+(*In mein Review übernehmen*) und ein Pull-Request-Entwurf (*Als bereit
+markieren*). Sie erscheint nur, wenn es etwas zu tun gibt.
 
 ## Bilder, Dateien und Befehle
 
@@ -212,7 +217,7 @@ alle sehen, wer entschieden hat.
 
 ## Zusammenarbeiten
 
-- **Einladen** (Kopfzeile **⋯ → Zur Aufgabe einladen**): Wem die Aufgabe
+- **Einladen** (das **+** neben den Bildern in der Kopfzeile): Wem die Aufgabe
   gehört, wählt Mitglieder des Workspaces als Mitarbeitende aus. Sie schreiben,
   geben frei, reviewen und liefern in dieser Aufgabe aus; sie läuft weiter über
   das Abo der Person, der sie gehört. Ein Klick auf das Bild einer
@@ -277,7 +282,7 @@ pro Workspace laufen höchstens *Parallele Previews*.
 
 ## Das Review
 
-**Review** in der Änderungsleiste, eine geänderte Datei in der Seitenleiste
+**Review** in der Aktionsleiste, eine geänderte Datei in der Seitenleiste
 oder `/review` schalten in den **Review-Modus**: Die Seitenleiste wird zum
 Review-Panel, der Chat schrumpft auf eine schmale Spalte. **Maximieren** gibt
 dem Diff die volle Breite. **Review schließen** oder **Esc** kehrt zurück; der
@@ -318,7 +323,7 @@ neue Zeile verschieben** oder **Verwerfen**.
 
 ## Quality-Gates
 
-**Gates prüfen** (Änderungsleiste, *Alle prüfen* in der Seitenleiste oder
+**Gates prüfen** (Aktionsleiste, *Alle prüfen* in der Seitenleiste oder
 `/gates`) führt die Quality-Gates im Worktree der Aufgabe aus:
 Artisan-Start, Pint auf geänderten Dateien, Pest/PHPUnit, PHPStan,
 Migrations-Syntax, Debug-Aufrufe und vorhandene Tests. Sie sind für
@@ -367,7 +372,7 @@ neuesten 200 Checkpoints.
 
 ## Ausliefern: Commit und Pull Request
 
-**Commit & PR** (Kopfzeile oder `/ship`) committet alles, was sich in der
+**Commit & PR** (Aktionsleiste oder `/ship`) committet alles, was sich in der
 Aufgabe geändert hat, pusht ihren Branch und öffnet einen Pull Request (GitLab:
 Merge Request) gegen den Basis-Branch.
 

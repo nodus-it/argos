@@ -181,4 +181,30 @@ class TaskActionsTest extends TestCase
         $this->expectException(\App\Services\Workspace\WorkspaceException::class);
         app(WorkspaceGateService::class)->run($this->task($this->ada), $this->ada, 'rm -rf');
     }
+
+    public function test_the_header_is_lean(): void
+    {
+        $task = $this->task($this->ada, ['pr_number' => 4, 'pr_url' => 'https://github.com/acme/widget/pull/4', 'pr_state' => 'open']);
+
+        $html = $this->page($this->ada, $task)->html();
+        $header = substr($html, (int) strpos($html, 'wf-task-meta'), 3000);
+
+        // No PR chip (the sidebar has it), no "Commit & PR" (the action bar has it), invite only as "+".
+        $this->assertStringNotContainsString('is-pr', substr($header, 0, (int) strpos($header, 'wf-review-flag')));
+        $this->assertStringContainsString("mountAction('invite')", $html);
+        $this->page($this->ada, $task)->assertActionVisible('ship');
+    }
+
+    public function test_the_action_bar_offers_ship_and_the_to_dos(): void
+    {
+        $task = $this->task($this->ada);
+        FakeWorkspaceDaemon::$gateOutcome = 'fail';
+        app(WorkspaceGateService::class)->run($task, $this->ada);
+
+        Livewire::withoutLazyLoading()->actingAs($this->ada)
+            ->test(\App\Livewire\Workspace\ChangeTray::class, ['workspaceId' => $this->workspace->id, 'taskId' => $task->id])
+            ->assertSeeHtml('data-testid="tray-ship"')
+            ->assertSee(__('workspaces.tray.todo.gates', ['gates' => 'Pest / PHPUnit']))
+            ->assertSee(__('workspaces.tray.todo.gates_action'));
+    }
 }

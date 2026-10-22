@@ -145,9 +145,10 @@ A workspace page has three parts:
 
 - A **header** with the workspace, the [task switcher](TASKS.md#the-task-switcher)
   (**⌘J** / **Ctrl+J**), a chip when another task waits for approval, the
-  current task's owner, collaborators (with presence), ticket and pull request,
-  **New task**, **Commit & PR** and the **⋯** menu (invite, hand over, link or
-  create a ticket, follow-up task, cancel, delete, settings, start/stop).
+  current task's owner and collaborators (with presence, **+** invites), the
+  ticket, **New task** and the **⋯** menu (hand over, link or create a ticket,
+  follow-up task, rebase, cancel, delete, settings, keyboard shortcuts,
+  start/stop). **Commit & PR** sits in the action bar above the text field.
 - The **chat** of the current task as a centred column.
 - The task's **sidebar**: VS Code (the task's folder), preview, branch, pull
   request, quality gates and changed files — see

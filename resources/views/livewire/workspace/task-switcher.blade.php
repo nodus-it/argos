@@ -138,7 +138,8 @@
 
         <div class="wf-pop-foot">
             @if ($canCreate)
-                <button type="button" class="wf-btn wf-btn-sm wf-btn-primary" x-on:click="close(); $dispatch('task-new')">
+                {{-- The header has "New task" on wide screens; here it is for narrow ones. --}}
+                <button type="button" class="wf-btn wf-btn-sm wf-btn-primary wf-only-narrow" x-on:click="close(); $dispatch('task-new')">
                     <x-wf.icon name="plus" :size="14" :stroke="2" /> {{ __('workspaces.task.new') }}
                 </button>
             @endif

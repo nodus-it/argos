@@ -94,6 +94,7 @@ class ContextPanel extends Component
         });
     }
 
+    #[On('pr-mark-ready')]
     public function prMarkReady(): void
     {
         $this->prAction(fn (PullRequestService $pr, Task $task) => $pr->markReady($task, $this->user()));
@@ -104,12 +105,14 @@ class ContextPanel extends Component
         $this->prAction(fn (PullRequestService $pr, Task $task) => $pr->setAutoMerge($task, $this->user(), $on));
     }
 
+    #[On('pr-fix-checks')]
     public function prFixChecks(): void
     {
         $this->prAction(fn (PullRequestService $pr, Task $task) => $pr->fixChecks($task, $this->user()));
     }
 
     /** "Collect in my review": the pull request's comments join the person's own review. */
+    #[On('pr-collect')]
     public function prCollect(): void
     {
         $this->prAction(function (PullRequestService $pr, Task $task): void {
@@ -123,6 +126,7 @@ class ContextPanel extends Component
         });
     }
 
+    #[On('pr-rebase')]
     public function prRebase(): void
     {
         $this->prAction(fn (PullRequestService $pr, Task $task) => $pr->rebase($task, $this->user()));

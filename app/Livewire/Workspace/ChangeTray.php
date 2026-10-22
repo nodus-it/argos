@@ -11,6 +11,7 @@ use App\Models\Task;
 use App\Models\User;
 use App\Models\WorkspaceGateRun;
 use App\Services\Git\WorkspaceDiffService;
+use App\Services\Workspace\PullRequestService;
 use App\Services\Workspace\WorkspaceGateService;
 use App\Support\GateAnnotations;
 use Illuminate\Contracts\View\View;
@@ -19,9 +20,12 @@ use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 /**
- * The change tray above the composer of a task: "N files changed +X −Y · gate state"
- * with "Check gates" and "Review". Only shown while there are uncommitted
- * changes; re-renders after a turn or a gate run.
+ * The action bar above the composer of a task: what changed ("N files
+ * changed +X −Y · gate state", unpushed commits), the to-dos that need
+ * someone now (red gates or pipeline, conflicts, review comments, a draft
+ * pull request) and the actions for them — Check gates, Review, Commit &
+ * PR. Shown while there is something to do; re-renders after a turn, a
+ * gate run or a pull request change.
  */
 #[Lazy]
 class ChangeTray extends Component
@@ -56,15 +60,60 @@ class ChangeTray extends Component
             }
         }
         $files = $diff['files'] ?? [];
+        $run = app(WorkspaceGateService::class)->latest($task);
+        $canOperate = $this->user()->can('prompt', $task);
+        $canShip = $this->user()->can('ship', $task) && $task->workspace->status === WorkspaceStatus::Running;
+        $todos = $this->todos($task, $run, $canOperate, $canShip);
+        $uncommitted = (int) ($diff['uncommitted'] ?? 0);
+        $ahead = (int) ($diff['ahead'] ?? 0);
 
         return view('livewire.workspace.change-tray', [
-            'show' => $diff !== null && $diff['uncommitted'] > 0 && $files !== [],
+            'show' => $diff !== null && ($uncommitted > 0 || $ahead > 0 || $todos !== []),
+            'hasChanges' => $files !== [],
+            'ahead' => $ahead,
+            'todos' => $todos,
+            'canShip' => $canShip && ($uncommitted > 0 || $ahead > 0),
             'count' => count($files),
             'additions' => array_sum(array_column($files, 'additions')),
             'deletions' => array_sum(array_column($files, 'deletions')),
-            'gates' => self::gateSummary(app(WorkspaceGateService::class)->latest($task)),
-            'canOperate' => $this->user()->can('prompt', $task),
+            'gates' => self::gateSummary($run),
+            'canOperate' => $canOperate,
         ]);
+    }
+
+    /**
+     * What needs someone now, each with the one action that handles it.
+     *
+     * @return list<array{kind: string, label: string, action: string, event?: string, gate?: string}>
+     */
+    private function todos(Task $task, ?WorkspaceGateRun $run, bool $canOperate, bool $canShip): array
+    {
+        $todos = [];
+        $failed = array_values(array_filter(ContextPanel::gateRows($run), fn (array $row): bool => $row['state'] === 'fail'));
+        if ($failed !== [] && $run?->status !== GateRunStatus::Running) {
+            $todos[] = ['kind' => 'fail', 'label' => __('workspaces.tray.todo.gates', ['gates' => implode(', ', array_column($failed, 'label'))]), 'action' => __('workspaces.tray.todo.gates_action'), 'gate' => $failed[0]['key']];
+        }
+
+        $pr = $task->pr_number !== null ? app(PullRequestService::class)->details($task) : null;
+        $open = in_array($pr?->state ?? $task->pr_state, ['open', 'draft'], true);
+        if ($pr !== null && $open) {
+            if ($pr->checksFailed() && $canOperate) {
+                $todos[] = ['kind' => 'fail', 'label' => __('workspaces.tray.todo.pipeline'), 'action' => __('workspaces.pr.fix_checks'), 'event' => 'pr-fix-checks'];
+            }
+            if (($pr->conflicts || $pr->behindBase === true) && $canOperate) {
+                $todos[] = ['kind' => 'warn', 'label' => $pr->conflicts ? __('workspaces.tray.todo.conflicts', ['branch' => $task->base_branch]) : __('workspaces.tray.todo.behind', ['branch' => $task->base_branch]), 'action' => __('workspaces.pr.rebase'), 'event' => 'pr-rebase'];
+            }
+            $collected = app(PullRequestService::class)->collectedIds($task, $this->user());
+            $new = count(array_filter(app(PullRequestService::class)->feedback($task)['comments'], fn (array $c): bool => ! in_array($c['id'], $collected, true)));
+            if ($new > 0 && $canOperate) {
+                $todos[] = ['kind' => 'info', 'label' => trans_choice('workspaces.tray.todo.comments', $new, ['count' => $new]), 'action' => __('workspaces.review.collect_all'), 'event' => 'pr-collect'];
+            }
+            if ($pr->isDraft() && $canShip) {
+                $todos[] = ['kind' => 'info', 'label' => __('workspaces.tray.todo.draft'), 'action' => __('workspaces.pr.ready'), 'event' => 'pr-mark-ready'];
+            }
+        }
+
+        return $todos;
     }
 
     /** One phrase for the gate state: not run, running, all green, or which failed. */

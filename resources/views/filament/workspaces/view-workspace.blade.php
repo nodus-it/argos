@@ -21,7 +21,7 @@
         @livewire('workspace.task-switcher', ['workspaceId' => $workspace->id], key('switcher-'.$workspace->id))
         @if ($task !== null)
             {{-- Who the task belongs to, who works on it, what it refers to. --}}
-            <div class="wf-task-meta wf-hide-narrow">
+            <div class="wf-task-meta">
                 @if ($task->owner !== null)
                     <x-wf.avatar :user="$task->owner" class="wf-avatar-xs is-owner" title="{{ __('workspaces.switcher.owner', ['name' => $task->owner->name]) }}" aria-label="{{ __('workspaces.switcher.owner', ['name' => $task->owner->name]) }}" />
                 @endif
@@ -43,13 +43,8 @@
                     </button>
                 @endif
                 @if ($task->external_ref !== null)
-                    <a class="wf-ref-chip" href="{{ $task->external_ref['url'] ?? '#' }}" target="_blank" rel="noopener" title="{{ $task->external_ref['title'] ?? '' }}">
+                    <a class="wf-ref-chip wf-hide-narrow" href="{{ $task->external_ref['url'] ?? '#' }}" target="_blank" rel="noopener" title="{{ $task->external_ref['title'] ?? '' }}">
                         <x-wf.icon name="link" :size="11" :stroke="2" /> {{ \App\Support\TaskRefs::ticketLabel($task) }}
-                    </a>
-                @endif
-                @if ($task->pr_url !== null)
-                    <a class="wf-ref-chip is-pr is-{{ $task->pr_state ?? 'open' }}" href="{{ $task->pr_url }}" target="_blank" rel="noopener">
-                        <x-wf.icon name="git-pr" :size="11" :stroke="2" /> #{{ $task->pr_number }} · {{ __('workspaces.pr_state.'.($task->pr_state ?? 'open')) }}
                     </a>
                 @endif
             </div>
@@ -67,10 +62,9 @@
             </button>
         @endif
         @if ($this->startAction->isVisible()) {{ $this->startAction }} @endif
-        @if ($this->shipAction->isVisible()) {{ $this->shipAction }} @endif
         <x-filament-actions::group
             :actions="[
-                \Filament\Actions\ActionGroup::make([$this->inviteAction, $this->transferAction, $this->linkTicketAction, $this->createTicketAction, $this->followUpAction, $this->rebaseAction])->dropdown(false),
+                \Filament\Actions\ActionGroup::make([$this->transferAction, $this->linkTicketAction, $this->createTicketAction, $this->followUpAction, $this->rebaseAction])->dropdown(false),
                 \Filament\Actions\ActionGroup::make([$this->cancelTaskAction, $this->deleteTaskAction])->dropdown(false),
                 \Filament\Actions\ActionGroup::make([$this->settingsAction, $this->shortcutsAction, $this->stopAction, $this->deleteAction])->dropdown(false),
             ]"

@@ -143,6 +143,18 @@ return [
         'thinking' => 'Denkt nach',
     ],
     'tray' => [
+        'label' => 'Änderungen und To-dos',
+        'unpushed' => '{1} 1 Commit noch nicht gepusht|[0,*] :count Commits noch nicht gepusht',
+        'todo_count' => '{1} 1 Sache braucht dich|[0,*] :count Sachen brauchen dich',
+        'todo' => [
+            'gates' => 'Gates rot: :gates',
+            'gates_action' => 'Ansehen',
+            'pipeline' => 'Die Pipeline des Pull Requests ist rot',
+            'conflicts' => 'Konflikte mit :branch',
+            'behind' => ':branch ist weitergelaufen',
+            'comments' => '{1} 1 neuer Review-Kommentar|[0,*] :count neue Review-Kommentare',
+            'draft' => 'Der Pull Request ist ein Entwurf',
+        ],
         'gate_errors' => '{1} :gate: :count Fehler|[0,*] :gate: :count Fehler',
         'files' => '{1} :count Datei geändert|[0,*] :count Dateien geändert',
         'gates_none' => 'Gates noch nicht gelaufen',
