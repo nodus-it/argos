@@ -4,7 +4,7 @@ A [task](TASKS.md) can be linked to **exactly one ticket** — an issue in
 GitHub, GitLab or Linear, or a ticket of your own system. The ticket gives the
 task its title and description, names its branch, and hears back what
 happens: started, plan waiting, pull request, done or cancelled. The switcher,
-the task header and [My work](WORKSPACES.md#the-w-area) always show the
+the task header and [My work](WORKSPACES.md#the-app-and-its-addresses) always show the
 ticket as a link (*GitLab #42*, *ENG-118*).
 
 Tickets come from the workspace's **integrations** (Settings → Integrations →
@@ -203,7 +203,7 @@ Every payload has the same frame:
     "id": "01J…",
     "title": "CSV export drops umlauts",
     "status": "pr_open",
-    "url": "https://argos.example.com/w/workspaces/01J…?task=01J…",
+    "url": "https://argos.example.com/shop-api/fix-login",
     "branch": "sup-1234-csv-export-drops-umlauts",
     "pull_request": { "url": "https://github.com/acme/app/pull/7", "number": 7, "state": "open" }
   },

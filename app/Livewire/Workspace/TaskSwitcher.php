@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Workspace;
 
+use App\Support\RequestedTask;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
@@ -50,11 +51,8 @@ class TaskSwitcher extends Component
         abort_unless($this->user()->can('view', $this->workspace()), 403);
 
         // Same default as TaskChat: the task from the URL, else the latest.
-        $requested = request()->query('task');
-        $tasks = Task::query()->where('workspace_id', $workspaceId)->whereNull('archived_at')->latest('updated_at')->pluck('id');
-        $this->currentId = is_string($requested) && Task::query()->where('workspace_id', $workspaceId)->whereKey($requested)->exists()
-            ? $requested
-            : $tasks->first();
+        $this->currentId = RequestedTask::id($workspaceId)
+            ?? Task::query()->where('workspace_id', $workspaceId)->whereNull('archived_at')->latest('updated_at')->value('id');
     }
 
     #[On('task-changed')]

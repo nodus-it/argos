@@ -23,7 +23,7 @@ hand the work back to Claude. Merging the pull request finishes the task.
   checks, reviews, conflict warnings and the actions below; **Refresh** reads
   it again right away.
 - The task header, the [task switcher](TASKS.md#the-task-switcher) and
-  [My work](WORKSPACES.md#the-w-area) show the pull request and its state.
+  [My work](WORKSPACES.md#the-app-and-its-addresses) show the pull request and its state.
 - Changes are announced in the chat (*The pipeline failed*, *Changes were
   requested in the review*, *The pull request was merged — the task is done*,
   …) and as notifications of kind *Someone shipped a task* to the task's owner

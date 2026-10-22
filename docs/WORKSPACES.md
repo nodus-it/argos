@@ -10,12 +10,12 @@ and the Claude sessions of all its [tasks](TASKS.md).
 Every conversation with Claude in a workspace is a **task** with its own
 owner, branch, working copy, database, preview and pull request — see
 [Tasks](TASKS.md). This page covers the workspace itself: who may do what, how
-a workspace is created, the `/w` area, the container and its limits.
+a workspace is created, the app's layout and addresses, the container and its limits.
 
 ## Contents
 
 - [What you need](#what-you-need)
-- [The /w area](#the-w-area)
+- [The app and its addresses](#the-app-and-its-addresses)
 - [Roles](#roles)
 - [Creating a workspace](#creating-a-workspace)
 - [Settings](#settings)
@@ -36,12 +36,28 @@ a workspace is created, the `/w` area, the container and its limits.
 - An **agent** of your own (your Claude subscription) or a shared one — see
   [Agents](AGENTS.md). Without one you can read tasks but not start any.
 
-## The /w area
+## The app and its addresses
 
-Workspaces have their own area at **`/w`** (also where `/` leads): full width,
-with a slim **rail** on the left instead of a top bar:
+The app is full width, with a slim **rail** on the left instead of a top bar.
+Every workspace and task has a readable address made from its name:
 
-- **My work** (`/w/my-work`, the start page) — your own tasks and the ones you
+| Address | Shows |
+|---|---|
+| `/` | My work |
+| `/workspaces` | All workspaces |
+| `/new` | Create a workspace |
+| `/shop-api` | The workspace "Shop API" (its latest task) |
+| `/shop-api/fix-login` | Its task "Fix login" |
+| `/shop-api/settings` | Its settings |
+
+A workspace's address comes from its name when it is created; a name already
+taken gets a number (`shop-api-2`). Names the app uses itself (`docs`,
+`account`, `system`, `api`, `login`, …) get one too. Links from before
+(`/w/workspaces/…?task=…`) still lead to the right place.
+
+The rail:
+
+- **My work** (`/`, the start page) — your own tasks and the ones you
   were invited to, across all workspaces: *Waiting for you* first, then
   *Running*, *PR open* and *Ready* (the most recently active ready tasks; the
   rest are counted). Each row shows the workspace, owner, ticket and pull
@@ -53,7 +69,7 @@ with a slim **rail** on the left instead of a top bar:
   notifications, language, consent to automatic tasks, light/dark theme, sign
   out).
 
-One login covers `/w` and `/admin`. On phones the rail moves to the bottom.
+One login covers the app and `/admin`. On phones the rail moves to the bottom.
 
 ## Roles
 
@@ -91,7 +107,7 @@ continue.
 
 Only **Argos administrators** create workspaces:
 
-- in `/w` with **New workspace** on the workspace list,
+- with **New workspace** on the workspace list (`/new`),
 - in the admin panel under **Workspaces → New**,
 - in the onboarding wizard (its repository step), or
 - through the REST API: `POST /api/v1/workspaces` with a `workspaces:write`
@@ -125,7 +141,7 @@ subscription*; add one and choose **Revise setup** in the settings.
 ## Settings
 
 Workspace admins (and Argos administrators) open **Workspace settings** from
-the workspace header or at `/w/workspaces/{id}/settings`. The tabs:
+the workspace header or at `/{workspace}/settings`. The tabs:
 
 | Tab | What it holds |
 |---|---|

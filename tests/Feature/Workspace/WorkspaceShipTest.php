@@ -175,7 +175,7 @@ class WorkspaceShipTest extends TestCase
     {
         $this->git->shouldReceive('createPullRequest')->once()
             ->withArgs(fn ($owner, $repo, $title, $body, $head, $base, $options) => $owner === 'acme/sub' && $repo === 'widget' && $title === 'feat: add login'
-                && str_contains($body, 'Adds the login.') && str_contains($body, '/w/workspaces/'.$this->workspace->id) && str_contains($body, 'task='.$this->task->id)
+                && str_contains($body, 'Adds the login.') && str_contains($body, $this->task->url())
                 && str_contains($body, __('workspaces.ship.pr_footer', ['url' => $this->task->url(), 'name' => 'Ada']))
                 && $head === 'ws/login' && $base === 'develop' && $options === ['draft' => true])
             ->andReturn(['iid' => 5, 'web_url' => 'https://gitlab.com/acme/sub/widget/-/merge_requests/5', 'state' => 'opened']);

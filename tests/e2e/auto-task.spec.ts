@@ -11,9 +11,9 @@ import { login } from './helpers/auth';
  */
 async function openWorkspace(page: Page): Promise<void> {
   await login(page, 'admin@argos.local');
-  await page.goto('/w/workspaces');
+  await page.goto('/workspaces');
   await page.getByText('E2E pairing').first().click();
-  await page.waitForURL(/\/w\/workspaces\/[0-9A-Za-z]+/);
+  await page.waitForURL(/:\d+\/(?!workspaces\b|new\b)[a-z0-9][a-z0-9-]*(\/|$)/);
   await expect(page.locator('.ws-chat')).toBeVisible();
 }
 

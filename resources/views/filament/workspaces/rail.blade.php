@@ -10,7 +10,8 @@
     $onMyWork = request()->routeIs(MyWork::getRouteName(filament()->getPanel('workspaces')));
     $onList = request()->routeIs('filament.workspaces.resources.workspaces.index');
     $record = request()->route('record');
-    $activeId = is_string($record) ? $record : ($record instanceof \App\Models\Workspace ? $record->id : null);
+    // The route names the workspace by slug (older links: ULID).
+    $activeId = $record instanceof \App\Models\Workspace ? $record->id : (is_string($record) ? \App\Models\Workspace::query()->where('slug', $record)->orWhere('id', $record)->value('id') : null);
 @endphp
 @if ($user)
 <nav class="wf-rail" aria-label="{{ __('workspaces.panel.navigation') }}">

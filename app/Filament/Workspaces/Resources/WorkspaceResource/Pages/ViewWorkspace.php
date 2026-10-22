@@ -18,6 +18,7 @@ use App\Services\Workspace\WorkspaceIssueService;
 use App\Services\Workspace\WorkspaceMemberService;
 use App\Services\Workspace\WorkspaceService;
 use App\Services\Workspace\WorkspaceShipService;
+use App\Support\RequestedTask;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -49,15 +50,14 @@ class ViewWorkspace extends ViewRecord
     /** The task shown in the chat (ship, gates and rebase act on it). */
     public ?string $taskId = null;
 
-    public function mount(int|string $record): void
+    /** `/{workspace}/{task?}` — the task is read by RequestedTask. */
+    public function mount(int|string $record, ?string $task = null): void
     {
         parent::mount($record);
 
         $workspace = $this->workspace();
-        $requested = request()->query('task');
-        $this->taskId = is_string($requested) && $workspace->tasks()->whereKey($requested)->exists()
-            ? $requested
-            : $workspace->tasks()->whereNull('archived_at')->latest('updated_at')->value('id');
+        $this->taskId = RequestedTask::id($workspace->id)
+            ?? $workspace->tasks()->whereNull('archived_at')->latest('updated_at')->value('id');
 
         $task = $this->task();
         if ($task !== null && $task->pr_number !== null && in_array($task->pr_state, ['open', 'draft'], true) && ($task->pr_synced_at === null || $task->pr_synced_at->lt(now()->subMinutes(5)))) {

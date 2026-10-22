@@ -107,7 +107,7 @@ class TicketFlowTest extends TestCase
 
     public function test_a_task_with_a_ticket_says_it_started(): void
     {
-        $this->tracker->shouldReceive('createComment')->once()->with('', 'ENG', 'uuid-118', Mockery::on(fn (string $body): bool => str_contains($body, '/w/workspaces/')))->andReturn(['id' => 'c-1']);
+        $this->tracker->shouldReceive('createComment')->once()->with('', 'ENG', 'uuid-118', Mockery::on(fn (string $body): bool => str_contains($body, $this->workspace->slug.'/')))->andReturn(['id' => 'c-1']);
 
         $this->task($this->ref($this->binding));
     }

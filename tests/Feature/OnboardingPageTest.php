@@ -442,7 +442,7 @@ class OnboardingPageTest extends TestCase
             ->call('createWorkspace')
             ->assertSet('currentStep', 4)
             ->assertSee(__('onboarding.done.create_workspace'))
-            ->assertSee('/w/workspaces/'.Workspace::query()->where('name', 'widget')->value('id'));
+            ->assertSee(Workspace::query()->where('name', 'widget')->first()->url());
 
         $this->assertDatabaseHas(Workspace::class, [
             'name' => 'widget',

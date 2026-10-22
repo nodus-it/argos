@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Workspace;
 
+use App\Support\RequestedTask;
 use App\Enums\WorkspaceStatus;
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
 use App\Models\ReviewComment;
@@ -69,10 +70,8 @@ class ReviewPanel extends Component
         $this->workspaceId = $workspaceId;
         abort_unless($this->user()->can('view', $this->workspace()), 403);
 
-        $requested = request()->query('task');
-        $this->taskId = is_string($requested) && $this->task($requested) !== null
-            ? $requested
-            : Task::query()->where('workspace_id', $workspaceId)->whereNull('archived_at')->latest('updated_at')->value('id');
+        $this->taskId = RequestedTask::id($workspaceId)
+            ?? Task::query()->where('workspace_id', $workspaceId)->whereNull('archived_at')->latest('updated_at')->value('id');
         $this->view = app(ReviewService::class)->diffView($this->user());
         $this->active = request()->query('review') === '1';
     }

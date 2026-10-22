@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Workspace;
 
+use App\Support\RequestedTask;
 use App\Enums\GateRunStatus;
 use App\Enums\GitProvider;
 use App\Enums\WorkspaceStatus;
@@ -53,10 +54,8 @@ class ContextPanel extends Component
     {
         $this->workspaceId = $workspaceId;
         abort_unless($this->user()->can('view', $this->workspace()), 403);
-        $requested = request()->query('task');
-        $this->taskId = is_string($requested) && Task::query()->where('workspace_id', $workspaceId)->whereKey($requested)->exists()
-            ? $requested
-            : Task::query()->where('workspace_id', $workspaceId)->whereNull('archived_at')->latest('updated_at')->value('id');
+        $this->taskId = RequestedTask::id($workspaceId)
+            ?? Task::query()->where('workspace_id', $workspaceId)->whereNull('archived_at')->latest('updated_at')->value('id');
     }
 
     #[On('task-changed')]

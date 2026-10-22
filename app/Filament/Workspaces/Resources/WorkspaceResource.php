@@ -12,8 +12,10 @@ use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ViewWorkspace;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Workspace\WorkspaceSummaryService;
+use Closure;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
+use Filament\Panel;
 use Filament\Resources\Resource;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
@@ -21,6 +23,7 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Route;
 
 /**
  * Interactive workspaces: one long-lived container per piece of work, with
@@ -148,14 +151,34 @@ class WorkspaceResource extends Resource
             ->poll('10s');
     }
 
+    /**
+     * Workspaces sit at the top level — `/argos-playground`,
+     * `/argos-playground/fix-login` — so the routes have no prefix; the
+     * route names stay `…resources.workspaces.*`. `{record}` never matches a
+     * reserved name (see `argos.reserved_slugs`).
+     */
+    public static function getRoutePrefix(Panel $panel): string
+    {
+        return '';
+    }
+
+    public static function routes(Panel $panel, ?Closure $registerPageRoutes = null): void
+    {
+        Route::name(static::getRelativeRouteName($panel).'.')
+            ->middleware(static::getRouteMiddleware($panel))
+            ->withoutMiddleware(static::getWithoutRouteMiddleware($panel))
+            ->where(['record' => Workspace::routePattern(), 'task' => '[a-z0-9][a-z0-9-]*'])
+            ->group($registerPageRoutes);
+    }
+
     public static function getPages(): array
     {
+        // Before '/{record}/{task?}' so "settings" is not read as a task.
         return [
-            'index' => ListWorkspaces::route('/'),
-            // Before '/{record}' so "create" is not read as a record key.
-            'create' => CreateWorkspace::route('/create'),
-            'view' => ViewWorkspace::route('/{record}'),
+            'index' => ListWorkspaces::route('/workspaces'),
+            'create' => CreateWorkspace::route('/new'),
             'settings' => EditWorkspaceSettings::route('/{record}/settings'),
+            'view' => ViewWorkspace::route('/{record}/{task?}'),
         ];
     }
 }

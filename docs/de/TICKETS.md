@@ -5,7 +5,7 @@ Issue in GitHub, GitLab oder Linear oder einem Ticket deines eigenen Systems.
 Das Ticket gibt der Aufgabe Titel und Beschreibung, benennt ihren Branch und
 erfährt, was passiert: gestartet, Plan wartet, Pull Request, fertig oder
 abgebrochen. Der Switcher, der Kopf der Aufgabe und
-[Meine Arbeit](WORKSPACES.md#der-bereich-w) zeigen das Ticket immer als Link
+[Meine Arbeit](WORKSPACES.md#die-app-und-ihre-adressen) zeigen das Ticket immer als Link
 (*GitLab #42*, *ENG-118*).
 
 Tickets kommen aus den **Integrationen** des Workspaces (Einstellungen →
@@ -217,7 +217,7 @@ Jeder Payload hat denselben Rahmen:
     "id": "01J…",
     "title": "CSV export drops umlauts",
     "status": "pr_open",
-    "url": "https://argos.example.com/w/workspaces/01J…?task=01J…",
+    "url": "https://argos.example.com/shop-api/fix-login",
     "branch": "sup-1234-csv-export-drops-umlauts",
     "pull_request": { "url": "https://github.com/acme/app/pull/7", "number": 7, "state": "open" }
   },

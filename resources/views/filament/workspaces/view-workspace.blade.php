@@ -3,6 +3,7 @@
      column and the context sidebar. The review mode widens the sidebar into
      the review panel (see resources/js/workspace/focus.js). --}}
 <div class="wf-page" x-data="argosWorkspaceFocus()" x-on:keydown.window="onKey($event)"
+     x-on:argos-task-url.window="if (new URL($event.detail.url).pathname !== location.pathname) history.replaceState(history.state, '', $event.detail.url)"
      :class="{ 'is-review': review, 'is-max': review && maximized, 'is-drawer-open': drawer }">
     {{-- Lets notifications.js skip signals for the workspace in front of you. --}}
     <script>window.ArgosCurrentWorkspace = @js($workspace->id);</script>

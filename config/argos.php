@@ -225,4 +225,15 @@ return [
         'bitbucket_pat' => 'https://support.atlassian.com/bitbucket-cloud/docs/repository-access-tokens/',
         'claude_setup_token' => 'https://docs.claude.com/en/docs/claude-code/quickstart',
     ],
+
+    /*
+     * Top-level paths the app uses itself. A workspace lives at `/{slug}`,
+     * so these can never be a workspace slug (a clashing name gets `-2`).
+     */
+    'reserved_slugs' => [
+        'account', 'admin', 'api', 'auth', 'broadcasting', 'docs', 'email-verification', 'filament',
+        'filament-developer-logins', 'horizon', 'internal', 'login', 'logout', 'mcp', 'my-work', 'new',
+        'oauth', 'password-reset', 'profile', 'register', 'sanctum', 'setup', 'storage', 'system', 'tasks',
+        'up', 'users', 'w', 'webhooks', 'workspaces',
+    ],
 ];

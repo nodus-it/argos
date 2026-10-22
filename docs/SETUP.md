@@ -172,8 +172,8 @@ cached image.
 
 Open the admin UI:
 
-- `http://localhost:8080/admin` (or `${APP_URL}/admin`). Visiting `/`
-  redirects to `/w` (your work), or to `/admin` when workspaces are disabled.
+- `http://localhost:8080` (or `${APP_URL}`) — the app; `/` is your work.
+  Administration is at `/admin`.
 
 Log in with the credentials from the installer summary:
 

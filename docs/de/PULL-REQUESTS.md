@@ -25,7 +25,7 @@ Requests schließt die Aufgabe ab.
   **Aktualisieren** liest ihn sofort neu ein.
 - Die Kopfzeile der Aufgabe, der
   [Aufgaben-Wechsler](TASKS.md#der-aufgaben-wechsler) und
-  [Meine Arbeit](WORKSPACES.md#der-bereich-w) zeigen den Pull Request und seinen
+  [Meine Arbeit](WORKSPACES.md#die-app-und-ihre-adressen) zeigen den Pull Request und seinen
   Zustand.
 - Änderungen werden im Chat angekündigt (*Die Pipeline ist fehlgeschlagen*,
   *Im Review wurden Änderungen gewünscht*, *Der Pull Request wurde gemergt — die

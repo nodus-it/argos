@@ -14,9 +14,9 @@ use Filament\Support\Enums\Width;
 use Filament\View\PanelsRenderHook;
 
 /**
- * The workspace app (/w): full width, no top bar — a 64px icon rail ("My
+ * The workspace app at the root (`/`, workspaces at `/{slug}`): full width, no top bar — a 64px icon rail ("My
  * work", the workspaces, administration, the bell, the user menu) instead,
- * so chat, review and the context sidebar get the whole screen. /w lands on
+ * so chat, review and the context sidebar get the whole screen. `/` is
  * "My work". Administration (agents, users, settings) stays in the admin
  * panel.
  */
@@ -28,7 +28,7 @@ class WorkspacesPanelProvider extends PanelProvider
     {
         return $this->configureArgosPanel($panel
             ->id('workspaces')
-            ->path('w'))
+            ->path(''))
             ->topbar(false)
             ->navigation(false)
             ->databaseNotifications(livewireComponent: RailNotifications::class)

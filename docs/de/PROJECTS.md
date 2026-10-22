@@ -9,7 +9,7 @@ Einrichtungs-Aufgabe) unter [Ein Repository vorbereiten](PREPARE-PROJECT.md).
 
 **Wo:** Workspace-Admins (und Argos-Admins) öffnen die
 **Workspace-Einstellungen** über den Kopf des Workspaces, unter
-`/w/workspaces/{id}/settings`. Jeder Tab hat seinen eigenen
+`/{workspace}/settings`. Jeder Tab hat seinen eigenen
 **Speichern**-Button. Argos-Admins finden dasselbe Formular im Admin-Panel
 unter **Workspaces** (mit den Issue-Trackern und API-Tokens unter dem
 Formular). Neue Workspaces legen nur Argos-Admins an — siehe

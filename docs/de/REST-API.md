@@ -98,7 +98,7 @@ curl https://your-argos-host/api/v1/workspaces \
       "default_branch": "main",
       "status": "running",
       "setup": "ready",
-      "url": "https://your-argos-host/w/workspaces/01J...",
+      "url": "https://your-argos-host/shop-api",
       "created_at": "2026-10-21T10:00:00.000000Z",
       "updated_at": "2026-10-21T10:00:00.000000Z"
     }
@@ -174,7 +174,7 @@ Eine Aufgabe, wie die API sie zurückgibt:
       "max_fix_rounds": 3,
       "turns": 12
     },
-    "url": "https://your-argos-host/w/workspaces/01J...?task=01J...",
+    "url": "https://your-argos-host/shop-api/fix-login",
     "created_at": "…",
     "updated_at": "…"
   }

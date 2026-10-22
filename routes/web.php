@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Http\Controllers\Auth\BitbucketConnectedAccountController;
 use App\Http\Controllers\Auth\ConnectedAccountController;
 use App\Http\Controllers\Auth\LinearConnectedAccountController;
+use App\Http\Controllers\LegacyWorkspaceRedirectController;
 use App\Http\Controllers\SystemLogController;
 use App\Http\Controllers\TaskAttachmentController;
 use App\Http\Controllers\UserAvatarController;
@@ -13,8 +14,13 @@ use App\Http\Controllers\WorkspaceGateController;
 use App\Http\Controllers\WorkspaceOpenController;
 use Illuminate\Support\Facades\Route;
 
-// Workspaces are the everyday surface; administration lives under /admin.
-Route::get('/', fn () => redirect(config('argos.workspaces.enabled', true) ? '/w' : '/admin'));
+// The workspace app sits at the root (`/`, `/{workspace}/{task}`); links
+// from before still point at /w/… — they keep working.
+Route::middleware('auth')->group(function () {
+    Route::get('/w/{path?}', LegacyWorkspaceRedirectController::class)
+        ->where('path', '.*')
+        ->name('workspaces.legacy');
+});
 
 // Traefik forwardAuth target for workspace hosts (code-<slug> editor and
 // workspace demos). Checks membership, not just a login. See

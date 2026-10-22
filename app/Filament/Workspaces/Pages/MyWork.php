@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Workspace\MyWorkOverview;
 use Filament\Pages\Page;
+use Filament\Panel;
 use Illuminate\Contracts\Support\Htmlable;
 
 /**
@@ -23,6 +24,12 @@ class MyWork extends Page
     protected string $view = 'filament.workspaces.my-work';
 
     protected static ?string $slug = 'my-work';
+
+    /** The app's home: `/`. */
+    public static function getRoutePath(Panel $panel): string
+    {
+        return '/';
+    }
 
     /** First navigation item, so /w redirects here. */
     protected static ?int $navigationSort = -10;

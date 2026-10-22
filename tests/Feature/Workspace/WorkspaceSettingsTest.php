@@ -64,7 +64,7 @@ class WorkspaceSettingsTest extends TestCase
             route('filament.workspaces.resources.workspaces.settings', ['record' => $workspace]),
             WorkspaceResource::getUrl('settings', ['record' => $workspace]),
         );
-        $this->assertStringEndsWith("/w/workspaces/{$workspace->id}/settings", WorkspaceResource::getUrl('settings', ['record' => $workspace]));
+        $this->assertStringEndsWith("/{$workspace->slug}/settings", WorkspaceResource::getUrl('settings', ['record' => $workspace]));
     }
 
     public function test_workspace_admins_and_argos_admins_open_the_settings(): void

@@ -362,10 +362,10 @@
                     <p class="text-sm text-gray-500 dark:text-gray-400 max-w-md mx-auto">{{ __('onboarding.done.description') }}</p>
                     <div class="flex items-center justify-center gap-3 pt-2">
                         @if ($createdWorkspaceId)
-                            <x-filament::button tag="a" href="{{ \App\Filament\Workspaces\Resources\WorkspaceResource::getUrl('view', ['record' => $createdWorkspaceId], panel: 'workspaces') }}" icon="heroicon-o-arrow-right">
+                            <x-filament::button tag="a" href="{{ \App\Models\Workspace::query()->find($createdWorkspaceId)?->url() }}" icon="heroicon-o-arrow-right">
                                 {{ __('onboarding.done.create_workspace') }}
                             </x-filament::button>
-                            <x-filament::button tag="a" color="gray" href="{{ route('filament.workspaces.resources.workspaces.settings', ['record' => $createdWorkspaceId]) }}">
+                            <x-filament::button tag="a" color="gray" href="{{ route('filament.workspaces.resources.workspaces.settings', ['record' => \App\Models\Workspace::query()->find($createdWorkspaceId)?->slug]) }}">
                                 {{ __('onboarding.done.view_project') }}
                             </x-filament::button>
                         @endif

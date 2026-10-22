@@ -179,9 +179,8 @@ verbirgt das meiste davon), danach verwenden spätere Starts das gecachte Image.
 
 Öffne die Admin-UI:
 
-- `http://localhost:8080/admin` (oder `${APP_URL}/admin`). Der Aufruf von `/`
-  leitet auf `/w` (deine Arbeit) um, oder auf `/admin`, wenn Workspaces
-  deaktiviert sind.
+- `http://localhost:8080` (oder `${APP_URL}`) — die App; `/` ist deine Arbeit.
+  Die Administration liegt unter `/admin`.
 
 Melde dich mit den Zugangsdaten aus der Installer-Zusammenfassung an:
 

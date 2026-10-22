@@ -11,12 +11,12 @@ Jede Unterhaltung mit Claude in einem Workspace ist eine **Aufgabe** mit
 eigenem Besitz, eigenem Branch, eigener Arbeitskopie, Datenbank, Preview und
 eigenem Pull Request — siehe [Aufgaben](TASKS.md). Diese Seite behandelt den
 Workspace selbst: wer was darf, wie ein Workspace angelegt wird, den Bereich
-`/w`, den Container und seine Grenzen.
+Aufbau und Adressen der App, den Container und seine Grenzen.
 
 ## Inhalt
 
 - [Was du brauchst](#was-du-brauchst)
-- [Der Bereich /w](#der-bereich-w)
+- [Die App und ihre Adressen](#die-app-und-ihre-adressen)
 - [Rollen](#rollen)
 - [Einen Workspace anlegen](#einen-workspace-anlegen)
 - [Einstellungen](#einstellungen)
@@ -39,12 +39,30 @@ Workspace selbst: wer was darf, wie ein Workspace angelegt wird, den Bereich
   [Agenten](AGENTS.md). Ohne einen kannst du Aufgaben lesen, aber keine
   starten.
 
-## Der Bereich /w
+## Die App und ihre Adressen
 
-Workspaces haben einen eigenen Bereich unter **`/w`** (dorthin führt auch `/`):
-volle Breite, links eine schmale **Leiste** statt einer oberen Leiste:
+Die App nutzt die volle Breite, mit einer schmalen **Leiste** links statt einer
+Kopfleiste. Jeder Workspace und jede Aufgabe hat eine lesbare Adresse aus
+ihrem Namen:
 
-- **Meine Arbeit** (`/w/my-work`, die Startseite) — deine eigenen Aufgaben und
+| Adresse | Zeigt |
+|---|---|
+| `/` | Meine Arbeit |
+| `/workspaces` | Alle Workspaces |
+| `/new` | Workspace anlegen |
+| `/shop-api` | Den Workspace „Shop API" (seine letzte Aufgabe) |
+| `/shop-api/fix-login` | Seine Aufgabe „Fix login" |
+| `/shop-api/settings` | Seine Einstellungen |
+
+Die Adresse eines Workspaces entsteht beim Anlegen aus seinem Namen; ist der
+Name schon vergeben, kommt eine Zahl dazu (`shop-api-2`). Namen, die die App
+selbst nutzt (`docs`, `account`, `system`, `api`, `login`, …), bekommen
+ebenfalls eine. Links von früher (`/w/workspaces/…?task=…`) führen weiterhin
+an die richtige Stelle.
+
+Die Leiste:
+
+- **Meine Arbeit** (`/`, die Startseite) — deine eigenen Aufgaben und
   die, zu denen du eingeladen wurdest, über alle Workspaces: zuerst *Wartet auf
   dich*, dann *Läuft*, *PR offen* und *Bereit* (die zuletzt aktiven bereiten
   Aufgaben; der Rest wird gezählt). Jede Zeile zeigt Workspace, Besitz, Ticket
@@ -56,7 +74,7 @@ volle Breite, links eine schmale **Leiste** statt einer oberen Leiste:
   Benachrichtigungen, Sprache, Zustimmung zu automatischen Aufgaben,
   helles/dunkles Design, Abmelden).
 
-Ein Login gilt für `/w` und `/admin`. Auf Smartphones wandert die Leiste nach
+Ein Login gilt für die App und `/admin`. Auf Smartphones wandert die Leiste nach
 unten.
 
 ## Rollen
@@ -98,7 +116,7 @@ soll.
 
 Nur **Argos-Admins** legen Workspaces an:
 
-- in `/w` mit **Neuer Workspace** in der Workspace-Liste,
+- mit **Neuer Workspace** in der Workspace-Liste (`/new`),
 - im Admin-Panel unter **Workspaces → Erstellen**,
 - im Onboarding-Assistenten (in seinem Repository-Schritt) oder
 - über die REST-API: `POST /api/v1/workspaces` mit einem
@@ -135,7 +153,7 @@ eines und wähle in den Einstellungen **Einrichtung überarbeiten**.
 ## Einstellungen
 
 Workspace-Admins (und Argos-Admins) öffnen die **Workspace-Einstellungen** über
-den Kopf des Workspaces oder unter `/w/workspaces/{id}/settings`. Die Tabs:
+den Kopf des Workspaces oder unter `/{workspace}/settings`. Die Tabs:
 
 | Tab | Was er enthält |
 |---|---|

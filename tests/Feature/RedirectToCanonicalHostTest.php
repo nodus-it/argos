@@ -20,13 +20,13 @@ class RedirectToCanonicalHostTest extends TestCase
 
     public function test_page_loads_on_another_host_go_to_the_app_host(): void
     {
-        $this->withHeaders(['Accept' => 'text/html'])->get('http://localhost:8080/w/login?x=1')
-            ->assertRedirect('http://argos.localhost:8080/w/login?x=1');
+        $this->withHeaders(['Accept' => 'text/html'])->get('http://localhost:8080/login?x=1')
+            ->assertRedirect('http://argos.localhost:8080/login?x=1');
     }
 
     public function test_the_app_host_is_served_normally(): void
     {
-        $this->withHeaders(['Accept' => 'text/html'])->get('http://argos.localhost:8080/w/login')->assertOk();
+        $this->withHeaders(['Accept' => 'text/html'])->get('http://argos.localhost:8080/login')->assertOk();
     }
 
     public function test_machine_traffic_is_never_redirected(): void
@@ -43,6 +43,6 @@ class RedirectToCanonicalHostTest extends TestCase
         $this->app['env'] = 'production';
 
         $this->withHeaders(['Accept' => 'text/html'])->get('http://localhost:8080/up')->assertOk();
-        $this->withHeaders(['Accept' => 'text/html'])->get('http://localhost:8080/w/login')->assertOk();
+        $this->withHeaders(['Accept' => 'text/html'])->get('http://localhost:8080/login')->assertOk();
     }
 }

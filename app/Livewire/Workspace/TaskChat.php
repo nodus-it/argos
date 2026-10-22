@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Workspace;
 
+use App\Support\RequestedTask;
 use App\Enums\ApprovalKind;
 use App\Enums\AutoTaskState;
 use App\Enums\Capability;
@@ -44,7 +45,6 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
-use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
@@ -70,7 +70,6 @@ class TaskChat extends Component
     #[Locked]
     public string $workspaceId;
 
-    #[Url(as: 'task')]
     public ?string $taskId = null;
 
     public int $limit = self::PAGE;
@@ -129,6 +128,7 @@ class TaskChat extends Component
         $this->workspaceId = $workspaceId;
         abort_unless($this->user()->can('view', $this->workspace()), 403);
 
+        $this->taskId = RequestedTask::id($workspaceId);
         if ($this->taskId === null || $this->activeTask() === null) {
             $this->taskId = $this->tasks()->first()?->id;
         }
@@ -200,10 +200,14 @@ class TaskChat extends Component
         return app(WorkspaceIssueService::class)->search($this->workspace(), $query, $limit);
     }
 
-    /** Keep the header's switcher on the task shown here. */
+    /** Keep the header's switcher — and the address bar — on the task shown here. */
     private function announceTask(): void
     {
         $this->dispatch('task-changed', id: $this->taskId);
+        $task = $this->activeTask();
+        if ($task !== null) {
+            $this->dispatch('argos-task-url', url: $task->url());
+        }
     }
 
     public function createTask(): void

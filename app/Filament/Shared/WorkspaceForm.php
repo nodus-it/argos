@@ -621,7 +621,7 @@ final class WorkspaceForm
                         ->action(function (?Workspace $record, $livewire): void {
                             try {
                                 $task = app(WorkspaceSetupService::class)->start($record, self::currentUser());
-                                $livewire->redirect(WorkspaceResource::getUrl('view', ['record' => $record]).'?task='.$task->id);
+                                $livewire->redirect($record->url($task));
                             } catch (WorkspaceException $e) {
                                 Notification::make()->title($e->getMessage())->warning()->send();
                             }

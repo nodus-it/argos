@@ -31,11 +31,11 @@ const MASKS: { label: string; path: string }[] = [
   { label: 'Connected accounts', path: '/admin/connected-accounts' },
   { label: 'Settings', path: '/admin/settings' },
   { label: 'Documentation', path: '/admin/docs' },
-  { label: 'Workspaces', path: '/w/workspaces' },
-  { label: 'My work', path: '/w/my-work' },
+  { label: 'Workspaces', path: '/workspaces' },
+  { label: 'My work', path: '/' },
   { label: 'Users', path: '/admin/users' },
   // Forms must not break on mobile (Filament stacks grids to 1 column below lg).
-  { label: 'Create workspace', path: '/w/workspaces/create' },
+  { label: 'Create workspace', path: '/new' },
 ];
 
 test.describe('mobile gate @375px', () => {
@@ -56,7 +56,7 @@ test.describe('mobile gate @375px', () => {
     resetDatabase('E2eWorkspaceSeeder');
     await login(page);
 
-    await gotoStable(page, '/w/workspaces');
+    await gotoStable(page, '/workspaces');
     await assertNoHorizontalOverflow(page, 'Workspaces list');
     await page.getByText('E2E pairing').first().click();
     await expect(page.locator('.ws-chat')).toBeVisible();
@@ -77,7 +77,7 @@ test.describe('mobile gate @375px', () => {
     resetDatabase('E2eWorkspaceSeeder');
     await login(page);
 
-    await gotoStable(page, '/w/workspaces');
+    await gotoStable(page, '/workspaces');
     await page.getByText('E2E pairing').first().click();
     await expect(page.locator('.ws-chat')).toBeVisible();
 

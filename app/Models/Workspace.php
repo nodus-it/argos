@@ -12,6 +12,7 @@ use App\Enums\WorkspaceSetupStatus;
 use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceStatus;
 use App\Services\OAuth\TokenRefresher;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
@@ -20,6 +21,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
@@ -152,10 +154,30 @@ class Workspace extends Model implements HasApiTokensContract
         ];
     }
 
+    /** URLs name the workspace (`/argos-playground`), not its ULID. */
+    public function getRouteKeyName(): string
+    {
+        return 'slug';
+    }
+
+    /**
+     * The slug — or the ULID that older links and API clients carry.
+     *
+     * @param  Builder<static>|Relation<*, *, *>  $query
+     */
+    public function resolveRouteBindingQuery($query, $value, $field = null)
+    {
+        if ($field !== null && $field !== 'slug') {
+            return parent::resolveRouteBindingQuery($query, $value, $field);
+        }
+
+        return $query->where(fn ($q) => $q->where($this->qualifyColumn('slug'), (string) $value)->orWhere($this->qualifyColumn('id'), (string) $value));
+    }
+
     /** Link to the workspace page, optionally opened on a task. */
     public function url(?Task $task = null): string
     {
-        return route('filament.workspaces.resources.workspaces.view', ['record' => $this->id] + ($task !== null ? ['task' => $task->id] : []));
+        return route('filament.workspaces.resources.workspaces.view', ['record' => $this->slug] + ($task !== null ? ['task' => $task->slug] : []));
     }
 
     /** @return BelongsTo<User, $this> */
@@ -336,6 +358,25 @@ class Workspace extends Model implements HasApiTokensContract
         return rtrim(substr($slug, 0, $max), '-');
     }
 
+    /**
+     * The workspace's address is `/{slug}`: names the app itself uses at the
+     * top level (account, docs, api, …) cannot be a workspace.
+     */
+    public static function isReservedSlug(string $slug): bool
+    {
+        return in_array($slug, config('argos.reserved_slugs', []), true) || str_starts_with($slug, 'livewire');
+    }
+
+    /** Route pattern for `{record}`: any slug that is not reserved. */
+    public static function routePattern(): string
+    {
+        $reserved = implode('|', array_map(fn (string $s): string => preg_quote($s, '#'), config('argos.reserved_slugs', [])));
+
+        // The pattern sits inside the whole route's regex: "end of the name" is
+        // "no further slug character", not `$`.
+        return '(?!(?:'.$reserved.')(?![a-z0-9-]))(?!livewire)[a-z0-9][a-z0-9-]*';
+    }
+
     /** Unique slug for a new workspace (soft-deleted ones included). */
     public static function generateSlug(string $name): string
     {
@@ -346,7 +387,7 @@ class Workspace extends Model implements HasApiTokensContract
 
         $slug = $base;
         $suffix = 2;
-        while (self::withTrashed()->where('slug', $slug)->exists()) {
+        while (self::isReservedSlug($slug) || self::withTrashed()->where('slug', $slug)->exists()) {
             $slug = $base.'-'.$suffix++;
         }
 

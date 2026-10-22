@@ -8,7 +8,7 @@ the repository side (`.argos/`, the setup task) see
 [Preparing a Repository](PREPARE-PROJECT.md).
 
 **Where:** workspace admins (and Argos administrators) open **Workspace
-settings** from the workspace header, at `/w/workspaces/{id}/settings`. Each
+settings** from the workspace header, at `/{workspace}/settings`. Each
 tab has its own **Save** button. Argos administrators find the same form in
 the admin panel under **Workspaces** (with the issue trackers and API tokens
 below the form). New workspaces are created by Argos administrators only — see
