@@ -38,18 +38,16 @@
     <section class="wf-section" x-data="{ ...argosFold('branch') }" :class="{ 'is-folded': !open }">
         <h2 class="wf-section-h"><button type="button" class="wf-section-title wf-fold-btn" x-on:click="toggleFold()" :aria-expanded="open"><x-wf.icon name="chevron-right" :size="12" :stroke="2.4" class="wf-fold-chev" />{{ __('workspaces.focus.branch') }}</button></h2>
         <div class="wf-card wf-branch">
-            <span class="mono wf-branch-name">{{ $task->branch }}</span>
-            <span class="wf-muted">→ {{ $task->base_branch }} · {{ $workspace->name }}</span>
-            <div class="wf-tiles">
-                <div class="wf-tile"><div class="wf-tile-num">{{ $diff['uncommitted'] ?? '–' }}</div><div class="wf-muted">{{ __('workspaces.focus.uncommitted') }}</div></div>
-                <div class="wf-tile"><div class="wf-tile-num">{{ $diff['ahead'] ?? '–' }}</div><div class="wf-muted">{{ __('workspaces.focus.unpushed') }}</div></div>
+            <span class="mono wf-branch-name" title="{{ $task->branch }} → {{ $task->base_branch }}">{{ $task->branch }} <span class="wf-muted">→ {{ $task->base_branch }}</span></span>
+            <div class="wf-branch-stats">
+                <span><strong>{{ $diff['uncommitted'] ?? '–' }}</strong> {{ __('workspaces.focus.uncommitted') }}</span>
+                <span><strong>{{ $diff['ahead'] ?? '–' }}</strong> {{ __('workspaces.focus.unpushed') }}</span>
             </div>
-            @if ($task->pr_url || $issueLabel !== null)
+            {{-- The pull request has its own section; without one its link sits here. --}}
+            @if (($task->pr_url && $task->pr_number === null) || $issueLabel !== null)
                 <div class="wf-branch-links">
-                    @if ($task->pr_url)
-                        <a class="wf-link" href="{{ $task->pr_url }}" target="_blank" rel="noopener">
-                            <x-wf.icon name="git-pr" :size="14" :stroke="2" /> #{{ $task->pr_number }}@if ($task->pr_state) · {{ __('workspaces.pr_state.'.$task->pr_state) }}@endif
-                        </a>
+                    @if ($task->pr_url && $task->pr_number === null)
+                        <a class="wf-link" href="{{ $task->pr_url }}" target="_blank" rel="noopener"><x-wf.icon name="git-pr" :size="14" :stroke="2" /> {{ __('workspaces.pr.title') }}</a>
                     @endif
                     @if ($issueLabel !== null)
                         <a class="wf-link" href="{{ $task->external_ref['url'] ?? '#' }}" target="_blank" rel="noopener" title="{{ __('workspaces.fields.issue') }}">{{ $issueLabel }}</a>
@@ -70,7 +68,10 @@
     <section class="wf-section wf-pr" data-testid="pr-section" x-data="{ ...argosFold('pr') }" :class="{ 'is-folded': !open }">
         <div class="wf-section-head">
             <h2 class="wf-section-h"><button type="button" class="wf-section-title wf-fold-btn" x-on:click="toggleFold()" :aria-expanded="open"><x-wf.icon name="chevron-right" :size="12" :stroke="2.4" class="wf-fold-chev" />{{ __('workspaces.pr.title') }} · #{{ $task->pr_number }}@if ($prState) · {{ __('workspaces.pr_state.'.$prState) }}@endif</button></h2>
-            <button type="button" class="wf-text-btn" wire:click="prRefresh" wire:loading.attr="disabled">{{ __('workspaces.pr.refresh') }}</button>
+            <span class="wf-section-actions">
+                @if ($task->pr_url)<a class="wf-text-btn" href="{{ $task->pr_url }}" target="_blank" rel="noopener" title="{{ __('workspaces.pr.open_on_provider') }}">↗</a>@endif
+                <button type="button" class="wf-text-btn" wire:click="prRefresh" wire:loading.attr="disabled" title="{{ __('workspaces.pr.refresh') }}"><x-wf.icon name="refresh" :size="13" :stroke="2" label="{{ __('workspaces.pr.refresh') }}" /></button>
+            </span>
         </div>
         <div class="wf-card wf-pr-card">
             <div class="wf-pr-row">

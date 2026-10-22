@@ -64,7 +64,7 @@
 .wf-rail-avatar { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; border: 0; background: var(--wf-ink); color: var(--wf-on-ink); font: 600 12px/1 var(--font-sans); cursor: pointer; }
 
 /* ---- Page grid: header / chat / context ---- */
-.wf-page { display: grid; grid-template-columns: minmax(0, 1fr) 340px; grid-template-rows: 60px minmax(0, 1fr); grid-template-areas: "head ctx" "chat ctx"; height: 100dvh; background: var(--wf-bg); transition: grid-template-columns .2s ease; }
+.wf-page { display: grid; grid-template-columns: minmax(0, 1fr) clamp(340px, 26vw, 460px); grid-template-rows: 60px minmax(0, 1fr); grid-template-areas: "head ctx" "chat ctx"; height: 100dvh; background: var(--wf-bg); transition: grid-template-columns .2s ease; }
 .wf-page.is-review { grid-template-columns: 420px minmax(0, 1fr); grid-template-areas: "head head" "chat ctx"; }
 .wf-page.is-max { grid-template-columns: 56px minmax(0, 1fr); }
 .wf-head { grid-area: head; position: relative; z-index: 6; display: flex; align-items: center; gap: 10px; padding: 0 24px; border-bottom: 1px solid var(--wf-border); min-width: 0; }
@@ -709,3 +709,20 @@ a.wf-ref-chip:hover { text-decoration: underline; }
 .wf-pr-card .wf-fold-chev { transform: rotate(0deg); }
 .wf-pr-card .wf-fold-chev.is-open { transform: rotate(90deg); }
 .wf-pr-card .wf-fold-btn { font-size: 12.5px; color: var(--wf-text); }
+
+/* Compact sidebar: branch in two lines, gates in two columns. */
+.wf-context-inner { gap: 12px; padding: 16px; }
+.wf-branch { gap: 6px; }
+.wf-branch-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wf-branch-stats { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--wf-muted); }
+.wf-branch-stats strong { color: var(--wf-text); font-weight: 600; }
+.wf-section-actions { display: inline-flex; align-items: center; gap: 10px; }
+.wf-env { padding: 8px 10px; }
+@media (min-width: 1101px) {
+  .wf-gates { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .wf-gates .wf-gate-item + .wf-gate-item { border-top: 0; }
+  .wf-gates .wf-gate-item:nth-child(n + 3) { border-top: 1px solid var(--wf-border); }
+  .wf-gates .wf-gate-item:nth-child(even) { border-left: 1px solid var(--wf-border); }
+  .wf-gates .wf-gate { padding: 7px 10px; min-height: 0; }
+  .wf-gates .wf-gate-chev { display: none; }
+}
