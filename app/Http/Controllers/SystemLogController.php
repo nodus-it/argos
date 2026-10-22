@@ -6,21 +6,23 @@ namespace App\Http\Controllers;
 
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
+/**
+ * The newest Argos log (app, queue and scheduler share the log directory),
+ * falling back to Laravel's own log.
+ */
 class SystemLogController extends Controller
 {
     public function __invoke(): BinaryFileResponse
     {
-        $logPath = storage_path('logs/argos.log');
+        $dir = dirname((string) config('logging.channels.argos.path'));
+        // The argos channel rotates daily: argos-YYYY-MM-DD.log.
+        $daily = glob($dir.'/argos-*.log') ?: [];
+        rsort($daily);
+        $logPath = $daily[0] ?? (string) config('logging.channels.single.path');
 
-        if (! file_exists($logPath)) {
-            $logPath = storage_path('logs/laravel.log');
-        }
+        abort_unless(is_file($logPath), 404, 'Log file not found');
 
-        abort_unless(file_exists($logPath), 404, 'Log file not found');
-
-        $filename = sprintf('argos-app-%s.log', now()->format('Y-m-d'));
-
-        return response()->download($logPath, $filename, [
+        return response()->download($logPath, basename($logPath), [
             'Content-Type' => 'text/plain; charset=UTF-8',
         ]);
     }

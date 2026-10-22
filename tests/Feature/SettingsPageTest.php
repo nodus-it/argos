@@ -45,4 +45,19 @@ class SettingsPageTest extends TestCase
         $this->assertFalse(Gate::forUser($member)->allows('viewHorizon'));
         $this->assertTrue(Gate::forUser(User::factory()->admin()->create())->allows('viewHorizon'));
     }
+
+    public function test_the_log_download_serves_the_newest_daily_argos_log(): void
+    {
+        $dir = sys_get_temp_dir().'/argos-logs-'.uniqid();
+        mkdir($dir);
+        file_put_contents($dir.'/argos-2026-10-21.log', 'older');
+        file_put_contents($dir.'/argos-2026-10-22.log', 'newest');
+        config(['logging.channels.argos.path' => $dir.'/argos.log']);
+
+        $response = $this->get(route('system.log.download'))->assertOk();
+
+        $this->assertSame('newest', file_get_contents($response->baseResponse->getFile()->getPathname()));
+        array_map('unlink', glob($dir.'/*') ?: []);
+        rmdir($dir);
+    }
 }

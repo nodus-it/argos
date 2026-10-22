@@ -3,6 +3,11 @@
 // Closed-deployment app — driver choices are fixed, only credentials are ENV-driven.
 
 use Monolog\Handler\NullHandler;
+use Monolog\Handler\StreamHandler;
+
+// Compose points ARGOS_LOG_DIR at the shared data volume: app, queue and
+// scheduler write the same files, and they survive an upgrade.
+$logDir = rtrim((string) env('ARGOS_LOG_DIR', storage_path('logs')), '/');
 
 return [
 
@@ -17,14 +22,25 @@ return [
 
         'stack' => [
             'driver' => 'stack',
-            'channels' => ['single'],
+            // Errors also go to stderr, so `docker compose logs` shows them.
+            'channels' => ['single', 'stderr'],
             'ignore_exceptions' => false,
         ],
 
         'single' => [
             'driver' => 'single',
-            'path' => storage_path('logs/laravel.log'),
+            'path' => $logDir.'/laravel.log',
             'level' => env('LOG_LEVEL', 'debug'),
+            // Written by containers under different uids (see the argos channel).
+            'permission' => 0666,
+            'replace_placeholders' => true,
+        ],
+
+        'stderr' => [
+            'driver' => 'monolog',
+            'level' => 'error',
+            'handler' => StreamHandler::class,
+            'with' => ['stream' => 'php://stderr'],
             'replace_placeholders' => true,
         ],
 
@@ -40,12 +56,12 @@ return [
         ],
 
         'emergency' => [
-            'path' => storage_path('logs/laravel.log'),
+            'path' => $logDir.'/laravel.log',
         ],
 
         'argos' => [
             'driver' => 'daily',
-            'path' => storage_path('logs/argos.log'),
+            'path' => $logDir.'/argos.log',
             'level' => env('LOG_LEVEL', 'debug'),
             'days' => 30,
             // app (www-data), queue and scheduler containers write this shared

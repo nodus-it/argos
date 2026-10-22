@@ -1,12 +1,6 @@
 <?php
 
-use Illuminate\Foundation\Inspiring;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
-
-Artisan::command('inspire', function () {
-    $this->comment(Inspiring::quote());
-})->purpose('Display an inspiring quote');
 
 // Poll issue providers and check plan-comment reactions on a configurable
 // interval (ARGOS_POLL_INTERVAL_MINUTES, default 5; set to 1 locally for fast
@@ -60,3 +54,10 @@ Schedule::command('argos:tasks:sync-prs')
 Schedule::command('argos:tasks:cleanup')
     ->dailyAt('03:30')
     ->withoutOverlapping();
+
+// Housekeeping: failed jobs (two weeks for a look), expired API/OAuth
+// tokens and used or expired access links.
+Schedule::command('queue:prune-failed', ['--hours' => 336])->daily()->withoutOverlapping();
+Schedule::command('passport:purge')->daily()->withoutOverlapping();
+Schedule::command('sanctum:prune-expired', ['--hours' => 168])->daily()->withoutOverlapping();
+Schedule::command('auth:clear-resets')->daily()->withoutOverlapping();

@@ -37,6 +37,8 @@ services:
       APP_DEBUG:             "${APP_DEBUG:-true}"
       APP_KEY:               "${APP_KEY:-base64:28CjcHgVoyT5B9N4+XGZuGrahXj6KrALGKEbrbgm+JY=}"
       LOG_LEVEL:             "${LOG_LEVEL:-debug}"
+      # Logs stay in the bind-mounted storage/logs in dev.
+      ARGOS_LOG_DIR:         /app/storage/logs
       ADMIN_PASSWORD:        "${ADMIN_PASSWORD:-12345}"
       ARGOS_PREVIEW_ENABLED: "${ARGOS_PREVIEW_ENABLED:-true}"
       # Demo seeder (composer dev:live) — non-secret repo target only. The
@@ -61,6 +63,8 @@ services:
       APP_DEBUG:             "${APP_DEBUG:-true}"
       APP_KEY:               "${APP_KEY:-base64:28CjcHgVoyT5B9N4+XGZuGrahXj6KrALGKEbrbgm+JY=}"
       LOG_LEVEL:             "${LOG_LEVEL:-debug}"
+      # Logs stay in the bind-mounted storage/logs in dev.
+      ARGOS_LOG_DIR:         /app/storage/logs
       ARGOS_PREVIEW_ENABLED: "${ARGOS_PREVIEW_ENABLED:-true}"
     volumes:
       - ../..:/app
@@ -75,6 +79,7 @@ services:
       APP_DEBUG: "${APP_DEBUG:-true}"
       APP_KEY:   "${APP_KEY:-base64:28CjcHgVoyT5B9N4+XGZuGrahXj6KrALGKEbrbgm+JY=}"
       LOG_LEVEL: "${LOG_LEVEL:-debug}"
+      ARGOS_LOG_DIR: /app/storage/logs
     volumes:
       - ../..:/app
       - /app/node_modules
@@ -88,6 +93,7 @@ services:
       APP_DEBUG: "${APP_DEBUG:-true}"
       APP_KEY:   "${APP_KEY:-base64:28CjcHgVoyT5B9N4+XGZuGrahXj6KrALGKEbrbgm+JY=}"
       LOG_LEVEL: "${LOG_LEVEL:-debug}"
+      ARGOS_LOG_DIR: /app/storage/logs
     volumes:
       - ../..:/app
       - /app/node_modules
