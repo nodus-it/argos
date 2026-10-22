@@ -49,12 +49,15 @@ class WorkspaceMemberService
             return $this->find($workspace, $member);
         }
 
-        return WorkspaceMember::query()->create([
+        $entry = WorkspaceMember::query()->create([
             'workspace_id' => $workspace->id,
             'user_id' => $member->id,
             'role' => $role,
             'added_by' => $actor->id,
         ]);
+        app(WorkspaceNotifier::class)->addedToWorkspace($workspace, $member, $actor);
+
+        return $entry;
     }
 
     public function changeRole(Workspace $workspace, User $member, WorkspaceRole $role): void

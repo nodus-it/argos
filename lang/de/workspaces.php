@@ -428,6 +428,7 @@ return [
         'agent_renew' => 'Token erneuern',
         'ship' => ':name hat eine Aufgabe ausgeliefert',
         'invite' => ':name hat dich zu einer Aufgabe eingeladen',
+        'added_to_workspace' => ':name hat dich zum Workspace :workspace hinzugefügt',
         'transferred' => ':name hat dir eine Aufgabe übergeben',
         'settings' => 'Workspace-Benachrichtigungen',
         'settings_description' => 'Wähle, worüber dich Workspaces benachrichtigen. Der Browser zeigt eine Benachrichtigung nur, wenn dieser Workspace gerade nicht vor dir geöffnet ist.',

@@ -428,6 +428,7 @@ return [
         'agent_renew' => 'Renew token',
         'ship' => ':name shipped a task',
         'invite' => ':name invited you to a task',
+        'added_to_workspace' => ':name added you to the workspace :workspace',
         'transferred' => ':name handed a task over to you',
         'settings' => 'Workspace notifications',
         'settings_description' => 'Choose what workspaces notify you about. The browser only shows a notification when that workspace is not open in front of you.',

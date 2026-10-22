@@ -51,6 +51,22 @@ class WorkspaceNotifier
         }
     }
 
+    /** Someone was added to a workspace: they learn about it in the bell. */
+    public function addedToWorkspace(Workspace $workspace, User $member, User $by): void
+    {
+        if ($member->id === $by->id || ! $member->wantsNotification('invite')) {
+            return;
+        }
+        $title = __('workspaces.notifications.added_to_workspace', ['name' => $by->name, 'workspace' => $workspace->name], $member->locale ?: null);
+        $this->signal($member, $workspace, null, 'invite', $title, '', $workspace->url());
+        Notification::make()
+            ->title($title)
+            ->body($workspace->getOwnerRepo())
+            ->icon('heroicon-o-user-plus')
+            ->actions([Action::make('open')->label(__('workspaces.notifications.open', [], $member->locale ?: null))->url($workspace->url())])
+            ->sendToDatabase($member);
+    }
+
     /** Quiet refresh signal for overviews (task status changed). */
     public function summaryChanged(Workspace $workspace, ?Task $task): void
     {

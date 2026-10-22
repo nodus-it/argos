@@ -44,6 +44,18 @@ class WorkspaceMemberServiceTest extends TestCase
         $this->assertNull($this->workspace->roleOf($pair));
     }
 
+    public function test_a_new_member_hears_about_it_once(): void
+    {
+        $pair = User::factory()->create();
+
+        $this->members->add($this->workspace, $this->owner, $pair, WorkspaceRole::Member);
+        $this->members->add($this->workspace, $this->owner, $pair, WorkspaceRole::Viewer);
+
+        $this->assertSame(1, $pair->notifications()->count());
+        $this->assertStringContainsString($this->workspace->name, (string) $pair->notifications()->first()->data['title']);
+        $this->assertSame(0, $this->owner->notifications()->count());
+    }
+
     public function test_adding_members_is_blocked_when_the_collaboration_gate_is_closed(): void
     {
         config(['argos.workspaces.collaboration' => false]);
