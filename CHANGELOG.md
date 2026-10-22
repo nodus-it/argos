@@ -42,14 +42,23 @@ New environment variables:
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
 | `ARGOS_REVERB_APP_SECRET` | **yes** | — | Secret of the Reverb realtime server. Fresh installs and the installer's update mode generate it; add a random value by hand otherwise. |
+| `ADMIN_PASSWORD` | **yes** (fresh install) | — | Password of the first administrator. A production install no longer falls back to `12345` and refuses to create the admin without it. |
+| `ARGOS_TRUSTED_PROXIES` | recommended | private ranges | Addresses whose `X-Forwarded-*` headers Traefik accepts — set it to your TLS proxy. |
 | `ARGOS_REVERB_APP_KEY` | no | `argos` | Reverb app key. |
 | `ARGOS_FEEDBACK_URL` | no | *(empty: upstream issue chooser)* | Where *Send feedback* leads; a GitHub/GitLab `…/issues/new` link is prefilled. |
 | `ARGOS_ACCESS_LINK_HOURS` | no | `72` | Validity of access links (set/reset a password without mail). |
 | `LOG_LEVEL` | no | `info` | Log level of app, queue, scheduler and Reverb (was `debug`). |
+| `ARGOS_WORKSPACE_PIDS_LIMIT`, `ARGOS_WORKSPACE_SIDECAR_MEMORY` | no | `4096`, `1g` | Process limit of a workspace container, memory of its MySQL/Redis sidecars. |
 | `ARGOS_WORKSPACE_COLLABORATION`, `ARGOS_WORKSPACE_MAX_ACTIVE`, `ARGOS_WORKSPACE_IDLE_MINUTES`, `ARGOS_WORKSPACE_CPUS`, `ARGOS_WORKSPACE_MEMORY`, `ARGOS_WORKSPACE_EDITOR_COOKIE_HOURS`, `ARGOS_WORKSPACE_PR_SYNC_MINUTES`, `ARGOS_WORKSPACE_UPLOAD_MAX_MB`, `ARGOS_OPENVSCODE_VERSION` | no | see [Configuration](docs/CONFIGURATION.md) | Workspace limits and timings. |
 | `ARGOS_AUTO_PLAN`, `ARGOS_AUTO_SHIP`, `ARGOS_AUTO_MAX_FIX_ROUNDS`, `ARGOS_AUTO_MAX_TURNS`, `ARGOS_AUTO_MAX_COST_USD`, `ARGOS_AUTO_MAX_MINUTES` | no | see [Configuration](docs/CONFIGURATION.md) | Defaults for automatic tasks. |
 
 No longer read: `ARGOS_MEM_LIMIT`, `ARGOS_CPU_LIMIT` (now `ARGOS_WORKSPACE_MEMORY` / `ARGOS_WORKSPACE_CPUS`), `ARGOS_PREVIEW_BASIC_PASSWORD`, `ARGOS_CONCEPT_MAX_TURNS_DEFAULT`, `ARGOS_MAX_TURNS_DEFAULT`, `MEDIA_DISK`, `SEED_CODEX_AUTH_JSON_B64` — remove them from `.env`.
+
+`SESSION_DOMAIN` should now stay empty: the session cookie is host-only, previews
+and editors use their own access cookie. Preview contracts (`.argos/demo.compose.yml`)
+are checked before they start — see [Preparing a project](docs/PREPARE-PROJECT.md).
+The shared `composer_cache` and `npm_cache` volumes are no longer used (each
+workspace has its own) and can be removed.
 
 Colleagues join through **Administration → Users** with an access link (see [Adding colleagues](docs/SETUP.md#adding-colleagues)); the bootstrap admin `admin@argos.local` is only created on an empty user table.
 
