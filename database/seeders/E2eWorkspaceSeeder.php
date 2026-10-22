@@ -25,7 +25,8 @@ use Illuminate\Support\Str;
 /**
  * Browser-E2E fixture for pair programming (tests/e2e/workspace.spec.ts):
  * the seeded admin plus a second user, one project, a running workspace with
- * both as members and one task on the admin's agent. Fake mode
+ * both as members and two tasks on the admin's agent, owned by the admin with
+ * the second user invited to both. Fake mode
  * (ARGOS_E2E_FAKE=1) answers the daemon side.
  */
 class E2eWorkspaceSeeder extends Seeder
@@ -107,5 +108,10 @@ class E2eWorkspaceSeeder extends Seeder
             'cost_usd' => 0,
             'session_open' => false,
         ])->save();
+
+        // Tasks belong to their owner; Pair writes and decides approvals as an invited collaborator.
+        foreach ([$side, $task] as $invitedTo) {
+            $invitedTo->collaborators()->attach($pair->id, ['invited_by' => $admin->id]);
+        }
     }
 }

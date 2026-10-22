@@ -58,11 +58,15 @@ test.describe('mobile gate @375px', () => {
     await gotoStable(page, '/workspaces');
     await assertNoHorizontalOverflow(page, 'Workspaces list');
     await page.getByText('E2E pairing').first().click();
-    await expect(page.locator('.ws-chat')).toBeVisible();
+    await expect(page.locator('.ag-chat')).toBeVisible();
 
     await assertNoHorizontalOverflow(page, 'Workspace · chat');
 
-    await assertTapTarget(page.locator('.ws-composer-bar .btn-primary').first(), 'Workspace · Send');
+    // KNOWN FAILURE (app bug, not a stale selector): the redesigned send button
+    // `.ag-send` is a fixed 36x36px (resources/css/workspace.css) and the mobile
+    // 44px touch-target rules in resources/css/app.css only cover the legacy
+    // `.btn`/`.ws-*` controls. Fix the CSS, don't relax this check.
+    await assertTapTarget(page.locator('.ag-composer').getByRole('button', { name: 'Send', exact: true }), 'Workspace · Send');
 
     // The workspace settings (every tab) must fit the phone as well.
     const settings = page.url().replace(/\?.*$/, '') + '/settings';
@@ -78,13 +82,16 @@ test.describe('mobile gate @375px', () => {
 
     await gotoStable(page, '/workspaces');
     await page.getByText('E2E pairing').first().click();
-    await expect(page.locator('.ws-chat')).toBeVisible();
+    await expect(page.locator('.ag-chat')).toBeVisible();
 
-    await page.locator('[wire\\:click="startCreating"]').click();
-    await page.locator('.ws-auto-toggle input[type="checkbox"]').check();
-    await expect(page.locator('.ws-auto-grid')).toBeVisible();
+    await page.getByTestId('switcher-new-task').click();
+    const form = page.getByTestId('new-task-form');
+    await form.getByRole('checkbox', { name: /Run automatically/ }).check();
+    // The auto options (plan, when done, fix rounds) are revealed by the toggle.
+    await expect(form.getByRole('combobox', { name: 'Plan', exact: true })).toBeVisible();
+    await expect(form.getByRole('combobox', { name: 'When done', exact: true })).toBeVisible();
 
     await assertNoHorizontalOverflow(page, 'Workspace · new auto-task form');
-    await assertTapTarget(page.locator('.ws-new-task button[type="submit"]'), 'Workspace · Start automatic run');
+    await assertTapTarget(form.getByRole('button', { name: 'Start automatically' }), 'Workspace · Start automatic run');
   });
 });

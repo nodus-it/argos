@@ -24,5 +24,8 @@ class E2eWorkspaceSeederTest extends TestCase
         $this->assertSame(WorkspaceRole::Admin, $workspace->roleOf(User::query()->where('email', 'admin@argos.local')->firstOrFail()));
         $this->assertSame(WorkspaceRole::Member, $workspace->roleOf(User::query()->where('email', 'pair@argos.local')->firstOrFail()));
         $this->assertSame(2, Task::query()->where('workspace_id', $workspace->id)->count());
+        $pair = User::query()->where('email', 'pair@argos.local')->firstOrFail();
+        Task::query()->where('workspace_id', $workspace->id)->get()
+            ->each(fn (Task $task) => $this->assertTrue($pair->can('update', $task)));
     }
 }

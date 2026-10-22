@@ -35,7 +35,7 @@
                     : '';
             @endphp
             <div class="ag-task-bar">
-                <span class="ws-chip ws-auto-chip is-{{ $task->auto_state->color() }}" title="{{ $task->auto_message }}">
+                <span class="ws-chip ws-auto-chip is-{{ $task->auto_state->color() }}" data-testid="auto-chip" title="{{ $task->auto_message }}">
                     @svg('heroicon-s-bolt') {{ $task->auto_state->label() }}{{ $autoRounds }}
                 </span>
                 @if ($canWrite)
@@ -47,10 +47,10 @@
                 @endif
             </div>
         @endif
-        <div class="ag-presence" x-show="members && members.length > 1" x-cloak>
+        <div class="ag-presence" data-testid="presence" x-show="members && members.length > 1" x-cloak>
             <span class="ag-muted">{{ __('workspaces.task.present') }}</span>
             <template x-for="m in members" :key="m.id">
-                <span class="ws-avatar ws-avatar-sm" :title="m.name" x-text="initials(m.name)"></span>
+                <span class="ws-avatar ws-avatar-sm" data-testid="presence-avatar" :title="m.name" x-text="initials(m.name)"></span>
             </template>
         </div>
 
@@ -73,7 +73,7 @@
 
     {{-- New task form --}}
     @if ($creating && $canWrite)
-        <div class="card card-pad ws-new-task">
+        <div class="card card-pad ws-new-task" data-testid="new-task-form">
             @if ($agents->isEmpty())
                 <p class="muted">{{ __('workspaces.task.no_agent') }}</p>
                 <a class="btn btn-secondary btn-sm" href="{{ \App\Filament\App\Clusters\Account\Resources\AgentCredentialResource::getUrl('create', panel: 'app') }}">{{ __('workspaces.task.add_agent') }}</a>
@@ -451,7 +451,7 @@
                     @endif
 
                     <div class="ws-suggest-wrap">
-                        <ul class="ws-suggest" x-show="suggestions.length > 0" x-cloak role="listbox">
+                        <ul class="ws-suggest" data-testid="composer-suggestions" x-show="suggestions.length > 0" x-cloak role="listbox">
                             <template x-for="(item, i) in suggestions" :key="item.value">
                                 <li :class="{ 'on': i === suggestIndex }" x-on:mousedown.prevent="choose(i)" role="option">
                                     <span class="mono" x-text="item.label"></span>

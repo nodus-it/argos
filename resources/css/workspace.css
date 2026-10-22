@@ -471,6 +471,8 @@ button.ag-gate-chip { cursor: pointer; }
   .ag-ws-name, .ag-head-sep, .ag-switch-count, .ag-wait-chip { display: none; }
   .ag-switch-btn { height: 44px; }
   .ag-icon-btn, .ag-btn { min-height: 44px; }
+  .ag-send { width: 44px; height: 44px; }
+  .ag-stop, .ag-pill { height: 44px; }
   .ag-head .fi-btn, .ag-head .fi-icon-btn { min-height: 44px; }
 }
 

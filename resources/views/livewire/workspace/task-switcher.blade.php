@@ -13,7 +13,7 @@
      x-on:argos-tasks-changed.window="$wire.$refresh()"
      x-on:argos-switcher-toggle.window="toggle()"
      x-on:keydown.escape.prevent.stop="close()">
-    <button type="button" class="ag-switch-btn" x-ref="button" x-on:click="toggle()"
+    <button type="button" class="ag-switch-btn" x-ref="button" data-testid="task-switcher" x-on:click="toggle()"
             aria-haspopup="dialog" :aria-expanded="open" aria-controls="ag-switcher-pop">
         <span @class(['ag-dot', 'is-'.($currentGroup ?? 'done')]) aria-hidden="true"></span>
         <span class="ag-switch-title">{{ $current?->title ?? __('workspaces.task.new') }}</span>
