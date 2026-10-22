@@ -323,13 +323,9 @@ class ViewWorkspace extends ViewRecord
     /** " Gates: …" for the commit and push dialogs, empty before the first run. */
     private function gateNote(Task $task): string
     {
-        $gates = app(WorkspaceGateService::class);
-        $summary = $gates->summary($task);
-        if ($summary === null) {
-            return '';
-        }
+        $outcome = app(WorkspaceGateService::class)->outcome($task);
 
-        return ' '.__($gates->latest($task)?->failedGates() !== [] ? 'workspaces.gates.ship_warning' : 'workspaces.gates.ship_summary', ['summary' => $summary]);
+        return $outcome === null ? '' : ' '.__($outcome['failed'] !== [] ? 'workspaces.gates.ship_warning' : 'workspaces.gates.ship_summary', ['summary' => $outcome['summary']]);
     }
 
     public function gatesAction(): Action

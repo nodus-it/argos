@@ -56,25 +56,25 @@ class TaskOverview
             ->when($mine !== null, fn ($q) => $q->where(fn ($q) => $q->where('owner_user_id', $mine->id)->orWhereHas('members', fn ($m) => $m->where('user_id', $mine->id))))
             ->latest('updated_at')
             ->get();
+        // The rows check abilities per task: one workspace with its members for all.
+        $workspace->loadMissing('members');
+        $tasks->each(fn (Task $task) => $task->setRelation('workspace', $workspace));
         $pending = $this->pendingApprovals($tasks);
+        $groupOf = $tasks->mapWithKeys(fn (Task $task): array => [$task->id => $this->group($task, $pending->get($task->id))]);
+        // Only running tasks show their step, only ready ones their files.
+        $steps = $this->lastSteps($groupOf->filter(fn (string $g): bool => $g === self::RUNNING)->keys()->all());
+        $files = $this->filesChangedInLastTurn($groupOf->filter(fn (string $g): bool => $g === self::READY)->keys()->all());
 
         $groups = array_fill_keys(self::GROUPS, []);
         foreach ($tasks as $task) {
-            $approval = $pending->get($task->id);
-            $group = $this->group($task, $approval);
-            $groups[$group][] = ['task' => $task, 'text' => $this->text($task, $group, $approval)];
+            $group = $groupOf[$task->id];
+            $groups[$group][] = ['task' => $task, 'text' => $this->text($task, $group, $pending->get($task->id), $steps[$task->id] ?? '', $files[$task->id] ?? 0)];
         }
 
         return [
             ...$groups,
             'archived' => Task::query()->where('workspace_id', $workspace->id)->whereNotNull('archived_at')->count(),
         ];
-    }
-
-    /** Tasks waiting for a decision — the header's hint chip. */
-    public function waitingCount(Workspace $workspace): int
-    {
-        return count($this->for($workspace)[self::WAITING]);
     }
 
     public function group(Task $task, ?TaskApproval $approval): string
@@ -86,7 +86,7 @@ class TaskOverview
         return $task->state()->group();
     }
 
-    private function text(Task $task, string $group, ?TaskApproval $approval): string
+    private function text(Task $task, string $group, ?TaskApproval $approval, string $step, int $files): string
     {
         if ($approval !== null) {
             return __('workspaces.switcher.text.approval', ['what' => $this->approvalSummary($approval)]);
@@ -98,8 +98,6 @@ class TaskOverview
             if ($task->status === TaskStatus::Preparing) {
                 return __('workspaces.switcher.text.preparing');
             }
-            $step = $this->lastStep($task);
-
             return $step === '' ? __('workspaces.switcher.text.working') : __('workspaces.switcher.text.working_on', ['step' => $step]);
         }
         if ($task->queued_at !== null) {
@@ -117,8 +115,6 @@ class TaskOverview
         if ($task->auto_state !== null && $task->auto_state !== AutoTaskState::Done) {
             return $task->auto_state->label();
         }
-        $files = $this->filesChangedInLastTurn($task);
-
         return $files > 0 ? trans_choice('workspaces.switcher.text.done_files', $files, ['count' => $files]) : __('workspaces.switcher.text.done');
     }
 
@@ -136,40 +132,52 @@ class TaskOverview
         return Str::limit($summary !== '' ? $summary : $approval->tool_name, 60);
     }
 
-    private function lastStep(Task $task): string
+    /**
+     * "What Claude does": the latest tool call of each task, in one query.
+     *
+     * @param  list<string>  $taskIds
+     * @return array<string, string> task id => step
+     */
+    private function lastSteps(array $taskIds): array
     {
-        $event = TaskEvent::query()
-            ->where('task_id', $task->id)
-            ->where('type', TaskEventType::ToolCall->value)
-            ->latest('id')
-            ->first();
-        if ($event === null) {
-            return '';
+        if ($taskIds === []) {
+            return [];
         }
+        $latest = TaskEvent::query()->selectRaw('max(id)')->whereIn('task_id', $taskIds)->where('type', TaskEventType::ToolCall->value)->groupBy('task_id');
 
-        $summary = TaskEventFormatter::toolSummary((string) ($event->payload['name'] ?? ''), $event->payload['input'] ?? null);
+        return TaskEvent::query()->whereIn('id', $latest)->get()
+            ->mapWithKeys(function (TaskEvent $event): array {
+                $summary = TaskEventFormatter::toolSummary((string) ($event->payload['name'] ?? ''), $event->payload['input'] ?? null);
 
-        return Str::limit($summary !== '' ? basename($summary) : (string) ($event->payload['name'] ?? ''), 48);
+                return [$event->task_id => Str::limit($summary !== '' ? basename($summary) : (string) ($event->payload['name'] ?? ''), 48)];
+            })
+            ->all();
     }
 
-    /** Distinct files the edit tools touched since the last message of a person. */
-    private function filesChangedInLastTurn(Task $task): int
+    /**
+     * Distinct files the edit tools touched since a person last wrote, per
+     * task — two queries for all tasks.
+     *
+     * @param  list<string>  $taskIds
+     * @return array<string, int> task id => files
+     */
+    private function filesChangedInLastTurn(array $taskIds): array
     {
-        $since = (int) TaskEvent::query()
-            ->where('task_id', $task->id)
-            ->where('type', TaskEventType::UserMessage->value)
-            ->max('id');
+        if ($taskIds === []) {
+            return [];
+        }
+        $since = TaskEvent::query()->whereIn('task_id', $taskIds)->where('type', TaskEventType::UserMessage->value)
+            ->groupBy('task_id')->selectRaw('task_id, max(id) as since')->pluck('since', 'task_id');
 
         return TaskEvent::query()
-            ->where('task_id', $task->id)
+            ->whereIn('task_id', $taskIds)
             ->where('type', TaskEventType::ToolCall->value)
-            ->where('id', '>', $since)
-            ->get()
-            ->filter(fn (TaskEvent $e): bool => in_array($e->payload['name'] ?? '', self::EDIT_TOOLS, true))
-            ->map(fn (TaskEvent $e): string => (string) ($e->payload['input']['file_path'] ?? $e->payload['input']['notebook_path'] ?? ''))
-            ->filter()
-            ->unique()
-            ->count();
+            ->where('id', '>', (int) ($since->min() ?? 0))
+            ->get(['id', 'task_id', 'payload'])
+            ->filter(fn (TaskEvent $e): bool => $e->id > (int) ($since[$e->task_id] ?? 0) && in_array($e->payload['name'] ?? '', self::EDIT_TOOLS, true))
+            ->groupBy('task_id')
+            ->map(fn ($events): int => $events->map(fn (TaskEvent $e): string => (string) ($e->payload['input']['file_path'] ?? $e->payload['input']['notebook_path'] ?? ''))->filter()->unique()->count())
+            ->all();
     }
 
     /**

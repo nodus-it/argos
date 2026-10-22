@@ -143,9 +143,11 @@ class TaskEventIngestor
         $outgoing = array_values(array_filter($outgoing));
         if ($outgoing !== []) {
             $this->publisher->publish($workspace->id, $taskId, $outgoing);
-            $this->notify($workspace, $taskId, $outgoing);
-            // Resolved lazily: the driver depends on services that depend on this ingestor's peers.
+            // Re-read once after the transaction; notify and the follow-ups share it.
             $task = Task::query()->find($taskId);
+            if ($task !== null) {
+                $this->notify($workspace, $task, $outgoing);
+            }
             // A session ended: a waiting task can have it.
             if (collect($events)->contains(fn (array $e): bool => ($e['type'] ?? '') === 'status' && (($e['data']['state'] ?? '') === 'closed'))) {
                 DrainSessionQueueJob::dispatch($workspace->id);
@@ -171,13 +173,8 @@ class TaskEventIngestor
      *
      * @param  list<array<string, mixed>>  $events
      */
-    private function notify(Workspace $workspace, string $taskId, array $events): void
+    private function notify(Workspace $workspace, Task $task, array $events): void
     {
-        $task = Task::query()->find($taskId);
-        if ($task === null) {
-            return;
-        }
-
         $statusChanged = false;
         foreach ($events as $event) {
             $data = is_array($event['data'] ?? null) ? $event['data'] : [];

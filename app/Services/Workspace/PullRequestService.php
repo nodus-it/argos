@@ -46,11 +46,20 @@ class PullRequestService
      * Fetch and store the pull request's state; failures keep the old one.
      * Returns the details, or null without a pull request or on failure.
      */
+    /**
+     * Feedback per task within one request — the sidebar, action bar and
+     * review all ask for it (the service is request-scoped).
+     *
+     * @var array<string, array<string, mixed>>
+     */
+    private array $feedbackMemo = [];
+
     public function refresh(Task $task): ?PullRequestDetails
     {
         if ($task->pr_number === null) {
             return null;
         }
+        unset($this->feedbackMemo[$task->id]);
 
         $workspace = $task->workspace;
         [$owner, $repo] = $workspace->ownerAndRepo();
@@ -207,6 +216,10 @@ class PullRequestService
      */
     public function feedback(Task $task, bool $wait = false): array
     {
+        if (isset($this->feedbackMemo[$task->id])) {
+            /** @var array{reviews: list<array<string, mixed>>, comments: list<array<string, mixed>>, reviewers: list<array<string, mixed>>} */
+            return $this->feedbackMemo[$task->id];
+        }
         $details = $task->pr_number !== null ? $this->details($task, $wait) : null;
         if ($details === null) {
             return ['reviews' => [], 'comments' => [], 'reviewers' => []];
@@ -222,7 +235,7 @@ class PullRequestService
             $reviewers[$review['author']] = $person($review);
         }
 
-        return [
+        return $this->feedbackMemo[$task->id] = [
             'reviews' => array_map($person, array_values(array_filter($details->reviews, fn (array $r): bool => trim($r['body']) !== '' || in_array($r['state'], ['approved', 'changes_requested'], true)))),
             'comments' => array_map($person, $comments),
             'reviewers' => array_values($reviewers),
@@ -286,9 +299,10 @@ class PullRequestService
     public function collect(Task $task, User $by, ?string $commentId = null): array
     {
         Gate::forUser($by)->authorize('prompt', $task);
+        $collected = $this->collectedIds($task, $by);
         $comments = collect($this->feedback($task, wait: true)['comments'])
             ->when($commentId !== null, fn ($c) => $c->where('id', $commentId))
-            ->reject(fn (array $c): bool => in_array($c['id'], $this->collectedIds($task, $by), true));
+            ->reject(fn (array $c): bool => in_array($c['id'], $collected, true));
 
         $daemon = app(WorkspaceDaemonClient::class)->for($task->workspace, 15);
         $files = [];
@@ -320,6 +334,18 @@ class PullRequestService
             ->whereNotNull('source_id')
             ->where('status', '!=', ReviewCommentStatus::Discarded->value)
             ->pluck('source_id')->all();
+    }
+
+    /**
+     * Pull request comments the person has not taken into their review yet.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function uncollectedComments(Task $task, User $user): array
+    {
+        $collected = $this->collectedIds($task, $user);
+
+        return array_values(array_filter($this->feedback($task)['comments'], fn (array $c): bool => ! in_array($c['id'], $collected, true)));
     }
 
     /** General comments as text for the composer (they have no line to sit on). */

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\App\Clusters\System\Widgets;
 
+use Illuminate\Support\Facades\DB;
 use App\Enums\AutoTaskState;
 use App\Enums\WorkspaceStatus;
 use App\Models\Task;
@@ -36,10 +37,8 @@ class StatsOverviewWidget extends BaseWidget
         // Same definition as WorkerImageBuild::scopeOutdated(), so the counter
         // and the list/bulk action agree. Unique (stack × agent) tuples: a
         // stack with five historical hashes for one agent needs one rebuild.
-        $pendingUpdates = WorkerImageBuild::query()
-            ->outdated()
-            ->get(['worker_stack_id', 'agent_name'])
-            ->unique(fn ($b) => $b->worker_stack_id.'|'.$b->agent_name->value)
+        $pendingUpdates = DB::query()
+            ->fromSub(WorkerImageBuild::query()->outdated()->select(['worker_stack_id', 'agent_name'])->distinct(), 'pending')
             ->count();
 
         return [

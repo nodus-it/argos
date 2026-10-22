@@ -16,7 +16,6 @@ use App\Filament\App\Clusters\Account\Resources\AgentCredentialResource\Pages\Ed
 use App\Filament\App\Clusters\Account\Resources\AgentCredentialResource\Pages\ListAgentCredentials;
 use App\Models\AgentCredential;
 use App\Models\User;
-use App\Services\Workspace\AgentPool;
 use App\Workers\Agents\AgentRegistry;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\EditAction;
@@ -74,7 +73,8 @@ class AgentCredentialResource extends Resource
      */
     public static function getEloquentQuery(): Builder
     {
-        $query = parent::getEloquentQuery()->with('user');
+        // Open sessions per agent in one query (the "Sessions" column).
+        $query = parent::getEloquentQuery()->with('user')->withCount(['tasks as open_sessions_count' => fn (Builder $q) => $q->where('session_open', true)]);
 
         return self::isAdmin() ? $query : $query->where('user_id', auth()->id());
     }
@@ -176,7 +176,7 @@ class AgentCredentialResource extends Resource
 
                 TextColumn::make('max_concurrent_sessions')
                     ->label(__('worker.credentials.fields.sessions'))
-                    ->formatStateUsing(fn (AgentCredential $record): string => app(AgentPool::class)->activeSessions($record).' / '.$record->max_concurrent_sessions)
+                    ->formatStateUsing(fn (AgentCredential $record): string => ((int) ($record->open_sessions_count ?? 0)).' / '.$record->max_concurrent_sessions)
                     ->visibleFrom('md'),
 
                 TextColumn::make('usage_limited_until')

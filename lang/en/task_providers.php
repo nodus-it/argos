@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 return [
+    'model_label' => 'issue tracker',
+    'model_label_plural' => 'issue trackers',
     'title' => 'Task Providers',
 
     'form' => [

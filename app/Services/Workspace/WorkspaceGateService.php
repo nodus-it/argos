@@ -186,12 +186,24 @@ class WorkspaceGateService
     /** "6/7" — for the ship dialog; null when no completed run exists. */
     public function summary(Task $task): ?string
     {
+        return $this->outcome($task)['summary'] ?? null;
+    }
+
+    /**
+     * The latest finished run in one query: "4/5" and which gates failed —
+     * for the ship dialogs and the pull request text. Null before the first
+     * finished run.
+     *
+     * @return array{summary: string, failed: list<string>}|null
+     */
+    public function outcome(Task $task): ?array
+    {
         $run = $this->latest($task);
         if ($run === null || ! in_array($run->status, [GateRunStatus::Passed, GateRunStatus::Failed], true)) {
             return null;
         }
 
-        return $run->passedCount().'/'.count($run->ranGates());
+        return ['summary' => $run->passedCount().'/'.count($run->ranGates()), 'failed' => array_values($run->failedGates())];
     }
 
     private function active(Workspace $workspace): ?WorkspaceGateRun

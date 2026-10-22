@@ -223,6 +223,8 @@ class TaskProviderBindingsRelationManager extends RelationManager
     public function table(Table $table): Table
     {
         return $table
+            ->modelLabel(__('task_providers.model_label'))
+            ->pluralModelLabel(__('task_providers.model_label_plural'))
             ->columns([
                 TextColumn::make('kind')
                     ->label(__('task_providers.columns.provider'))

@@ -12,6 +12,7 @@ use App\Enums\TaskStatus;
 use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceStatus;
 use App\Filament\App\Resources\WorkspaceResource\Pages\ViewWorkspace;
+use App\Integrations\WorkspaceDaemon\Requests\GitChanges;
 use App\Integrations\WorkspaceDaemon\Requests\GitCommit;
 use App\Integrations\WorkspaceDaemon\Requests\GitDiff;
 use App\Integrations\WorkspaceDaemon\Requests\GitPush;
@@ -81,6 +82,7 @@ class WorkspaceShipTest extends TestCase
         $defaults = [
             GitStatus::class => MockResponse::make(['branch' => 'ws/login', 'upstream' => null, 'ahead' => 0, 'behind' => 0, 'dirty' => true, 'files' => [['path' => 'a.php', 'status' => 'M']]]),
             GitDiff::class => MockResponse::make(['diff' => "diff --git a/a.php b/a.php\n+new\n", 'truncated' => false]),
+            GitChanges::class => MockResponse::make(['files' => []]),
             RunOneshot::class => MockResponse::make(['text' => '', 'structured' => ['subject' => 'feat: add login', 'body' => 'Adds the login.'], 'cost_usd' => 0.001]),
             GitCommit::class => MockResponse::make(['sha' => str_repeat('b', 40)], 201),
             GitPush::class => MockResponse::make([], 202),

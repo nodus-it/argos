@@ -108,8 +108,7 @@ class ChangeTray extends Component
             if (($pr->conflicts || $pr->behindBase === true) && $canOperate) {
                 $todos[] = ['kind' => 'warn', 'label' => $pr->conflicts ? __('workspaces.tray.todo.conflicts', ['branch' => $task->base_branch]) : __('workspaces.tray.todo.behind', ['branch' => $task->base_branch]), 'action' => __('workspaces.pr.rebase'), 'event' => 'pr-rebase'];
             }
-            $collected = app(PullRequestService::class)->collectedIds($task, $this->user());
-            $new = count(array_filter(app(PullRequestService::class)->feedback($task)['comments'], fn (array $c): bool => ! in_array($c['id'], $collected, true)));
+            $new = count(app(PullRequestService::class)->uncollectedComments($task, $this->user()));
             if ($new > 0 && $canOperate) {
                 $todos[] = ['kind' => 'info', 'label' => trans_choice('workspaces.tray.todo.comments', $new, ['count' => $new]), 'action' => __('workspaces.review.collect_all'), 'event' => 'pr-collect'];
             }

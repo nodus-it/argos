@@ -440,13 +440,12 @@ class AutoTaskDriver
 
     private function gateNote(Task $task): string
     {
-        $summary = $this->gates->summary($task);
-        $failed = $this->gates->latest($task)?->failedGates() ?? [];
+        $outcome = $this->gates->outcome($task);
 
         return match (true) {
-            $summary === null => '',
-            $failed === [] => __('workspaces.auto.pr_gates_ok', ['summary' => $summary]),
-            default => __('workspaces.auto.pr_gates_failed', ['summary' => $summary, 'gates' => implode(', ', $failed)]),
+            $outcome === null => '',
+            $outcome['failed'] === [] => __('workspaces.auto.pr_gates_ok', ['summary' => $outcome['summary']]),
+            default => __('workspaces.auto.pr_gates_failed', ['summary' => $outcome['summary'], 'gates' => implode(', ', $outcome['failed'])]),
         };
     }
 

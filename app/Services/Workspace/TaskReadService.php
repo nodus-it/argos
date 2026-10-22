@@ -14,9 +14,10 @@ use Illuminate\Support\Collection;
 /** Per-member read position of tasks, for unread counters. */
 class TaskReadService
 {
-    public function markRead(Task $task, User $user): void
+    /** @param  int|null  $latest  the newest event id, when the caller has it already */
+    public function markRead(Task $task, User $user, ?int $latest = null): void
     {
-        $latest = (int) TaskEvent::query()->where('task_id', $task->id)->max('id');
+        $latest ??= (int) TaskEvent::query()->where('task_id', $task->id)->max('id');
 
         $read = TaskRead::query()->firstOrNew(['task_id' => $task->id, 'user_id' => $user->id]);
         if ($read->exists && $read->last_read_event_id >= $latest) {

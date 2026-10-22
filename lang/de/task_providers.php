@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 return [
+    'model_label' => 'Issue-Tracker',
+    'model_label_plural' => 'Issue-Tracker',
     'title' => 'Task-Provider',
 
     'form' => [

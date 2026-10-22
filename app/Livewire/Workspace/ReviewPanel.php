@@ -169,7 +169,7 @@ class ReviewPanel extends Component
             return;
         }
         try {
-            $content = app(WorkspaceDaemonClient::class)->for($this->workspace(), 15)->fileContent($task->slug, $path)['content'];
+            $content = $this->fileContent($task, $path);
         } catch (DaemonTransportException) {
             return;
         }
@@ -299,15 +299,14 @@ class ReviewPanel extends Component
 
         // What reviewers wrote on the pull request, at their lines of this file.
         // Taken over ones show as the person's own drafts instead.
-        $collectedIds = $task !== null ? app(PullRequestService::class)->collectedIds($task, $this->user()) : [];
         $prComments = $task !== null && $current !== null
-            ? collect(app(PullRequestService::class)->feedback($task)['comments'])->where('path', $current['path'])->reject(fn (array $c): bool => in_array($c['id'], $collectedIds, true))
+            ? collect(app(PullRequestService::class)->uncollectedComments($task, $this->user()))->where('path', $current['path'])
             : collect();
 
         $markdown = null;
         if ($current !== null && $task !== null && $this->rendered && self::isMarkdown($current['path']) && $current['status'] !== 'D') {
             try {
-                $markdown = TaskEventFormatter::markdown((string) app(WorkspaceDaemonClient::class)->for($workspace, 15)->fileContent($task->slug, $current['path'])['content']);
+                $markdown = TaskEventFormatter::markdown($this->fileContent($task, $current['path']));
             } catch (DaemonTransportException) {
                 $markdown = null;
             }
@@ -392,7 +391,7 @@ class ReviewPanel extends Component
             return;
         }
         try {
-            $content = app(WorkspaceDaemonClient::class)->for($this->workspace(), 15)->fileContent($task->slug, $path)['content'];
+            $content = $this->fileContent($task, $path);
         } catch (DaemonTransportException) {
             return;
         }
@@ -477,14 +476,28 @@ class ReviewPanel extends Component
         return $this->taskId !== null ? $this->task($this->taskId) : null;
     }
 
+    /** @var array<string, ?Task> tasks read in this request */
+    private array $tasks = [];
+
+    /** @var array<string, string> file contents read in this request ("task:path") */
+    private array $files = [];
+
+    private ?Workspace $workspaceModel = null;
+
     private function task(string $id): ?Task
     {
-        return Task::query()->where('workspace_id', $this->workspaceId)->find($id);
+        return array_key_exists($id, $this->tasks) ? $this->tasks[$id] : $this->tasks[$id] = Task::query()->where('workspace_id', $this->workspaceId)->find($id);
     }
 
     private function workspace(): Workspace
     {
-        return Workspace::query()->findOrFail($this->workspaceId);
+        return $this->workspaceModel ??= Workspace::query()->findOrFail($this->workspaceId);
+    }
+
+    /** A file of the task's working copy — read once per request (anchoring and Markdown both need it). */
+    private function fileContent(Task $task, string $path): string
+    {
+        return $this->files[$task->id.':'.$path] ??= (string) app(WorkspaceDaemonClient::class)->for($this->workspace(), 15)->fileContent($task->slug, $path)['content'];
     }
 
     private function user(): User

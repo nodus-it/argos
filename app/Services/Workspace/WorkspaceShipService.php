@@ -11,6 +11,7 @@ use App\Integrations\WorkspaceDaemon\WorkspaceDaemonTransport;
 use App\Models\Task;
 use App\Models\TaskEvent;
 use App\Models\User;
+use App\Services\Git\WorkspaceDiffService;
 use App\Services\GitProvider\GitServiceFactory;
 use App\Services\GitProvider\PullRequestInfo;
 use App\Services\IssueTracker\IssueRunReporter;
@@ -108,9 +109,10 @@ class WorkspaceShipService
      */
     public function pending(Task $task): array
     {
-        $status = $this->daemon->for($task->workspace)->gitStatus($task->slug);
+        // The same (briefly cached) numbers the action bar shows.
+        $summary = app(WorkspaceDiffService::class)->summary($task);
 
-        return ['changed_files' => count($status['files']), 'ahead' => (int) $status['ahead']];
+        return ['changed_files' => $summary['uncommitted'], 'ahead' => $summary['ahead']];
     }
 
     /**
@@ -128,6 +130,7 @@ class WorkspaceShipService
         if ($commit === null) {
             throw WorkspaceException::translated('workspaces.ship.nothing_to_commit');
         }
+        app(WorkspaceDiffService::class)->forget($task);
         $this->tasks->notice($task, 'committed', $by, ['subject' => $subject]);
 
         return $commit['sha'];
@@ -182,6 +185,7 @@ class WorkspaceShipService
             'rejected_non_fast_forward' => 'workspaces.ship.rejected',
             'auth' => 'workspaces.ship.auth',
         ]);
+        app(WorkspaceDiffService::class)->forget($task);
 
         if (! $pullRequest) {
             $task->forceFill(['shipped_at' => now()])->save();

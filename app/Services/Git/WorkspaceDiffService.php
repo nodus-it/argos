@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services\Git;
 
-use App\Integrations\WorkspaceDaemon\DaemonTransportException;
-use App\Integrations\WorkspaceDaemon\WorkspaceDaemonTransport;
 use App\Jobs\Workspace\FetchWorkspaceRemoteJob;
 use App\Models\Task;
 use App\Models\Workspace;
@@ -31,25 +29,21 @@ class WorkspaceDiffService
         return Cache::remember('ws-changes:'.$task->id, 2, function () use ($task): array {
             $workspace = $task->workspace;
             $api = app(WorkspaceDaemonClient::class)->for($workspace, 30);
-            $this->fetchThrottled($workspace, $api);
+            $this->fetchThrottled($workspace);
             $status = $api->gitStatus($task->slug);
 
-            try {
-                $files = $api->gitChanges($task->slug, 'origin/'.$task->base_branch);
-            } catch (DaemonTransportException $e) {
-                // A daemon from before /git/changes (container not restarted yet).
-                if ($e->status !== 404) {
-                    throw $e;
-                }
-                $files = $this->changesFromFullDiff($api->gitDiff($task->slug, 'origin/'.$task->base_branch)['diff']);
-            }
-
             return [
-                'files' => $files,
+                'files' => $api->gitChanges($task->slug, 'origin/'.$task->base_branch),
                 'ahead' => (int) $status['ahead'],
                 'uncommitted' => count($status['files']),
             ];
         });
+    }
+
+    /** After a commit or push the numbers move on — the next summary asks again. */
+    public function forget(Task $task): void
+    {
+        Cache::forget('ws-changes:'.$task->id);
     }
 
     /**
@@ -70,31 +64,11 @@ class WorkspaceDiffService
      * Keep origin/<base> current without making anyone wait: at most once a
      * minute a background job fetches; the diff uses what is there now.
      */
-    private function fetchThrottled(Workspace $workspace, WorkspaceDaemonTransport $api): void
+    private function fetchThrottled(Workspace $workspace): void
     {
         if (Cache::add('ws-fetch:'.$workspace->id, true, self::FETCH_THROTTLE)) {
             FetchWorkspaceRemoteJob::dispatch($workspace->id);
         }
     }
 
-    /**
-     * @return list<array{path: string, from_path: string|null, status: string, additions: int, deletions: int, binary: bool, generated: bool, hash: string}>
-     */
-    private function changesFromFullDiff(string $diff): array
-    {
-        return array_map(function (array $f): array {
-            $path = $f['to_path'] !== '' ? $f['to_path'] : $f['from_path'];
-
-            return [
-                'path' => $path,
-                'from_path' => $f['from_path'] !== $path ? $f['from_path'] : null,
-                'status' => $f['is_new'] ? 'A' : ($f['is_deleted'] ? 'D' : 'M'),
-                'additions' => $f['additions'],
-                'deletions' => $f['deletions'],
-                'binary' => false,
-                'generated' => (bool) preg_match('#(^|/)(composer\.lock|package-lock\.json|yarn\.lock|pnpm-lock\.yaml)$|\.min\.(js|css)$|\.map$#', $path),
-                'hash' => sha1(serialize($f['hunks'])),
-            ];
-        }, $this->parser->parse($diff));
-    }
 }

@@ -195,7 +195,7 @@ class ReviewPanelTest extends TestCase
     public function test_pull_request_review_comments_show_at_their_lines(): void
     {
         $this->app->singleton(WorkspaceDaemonClient::class, FakeWorkspaceDaemon::class);
-        $pr = $this->mock(\App\Services\Workspace\PullRequestService::class);
+        $pr = $this->partialMock(\App\Services\Workspace\PullRequestService::class);
         $pr->shouldReceive('collectedIds')->andReturn([]);
         $pr->shouldReceive('feedback')->andReturn(['reviews' => [], 'comments' => [
             ['id' => 'c1', 'author' => 'grace', 'avatar' => 'https://avatars.example/grace', 'profile' => 'https://github.com/grace', 'body' => 'Say hello to everyone', 'path' => 'README.md', 'line' => 1, 'url' => 'https://x/c1', 'created_at' => '2026-10-22T08:00:00Z', 'user' => null],

@@ -11,6 +11,7 @@ use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -33,6 +34,18 @@ class AgentPool
      */
     public function usableAgentsFor(User $user): Collection
     {
+        return $this->usableQuery($user)->orderByRaw('user_id is null')->orderBy('name')->get();
+    }
+
+    /** Whether the person has an agent to run a task on (one query, nothing loaded). */
+    public function hasUsableAgent(User $user): bool
+    {
+        return $this->usableQuery($user)->exists();
+    }
+
+    /** @return Builder<AgentCredential> */
+    private function usableQuery(User $user): Builder
+    {
         return AgentCredential::query()
             ->usableBy($user)
             ->whereIn('agent_name', array_map(
@@ -40,10 +53,7 @@ class AgentPool
                 array_filter(AgentName::cases(), fn (AgentName $name): bool => $name->supportsWorkspaces()),
             ))
             ->where('status', AgentCredentialStatus::Active->value)
-            ->where(fn ($q) => $q->whereNull('usage_limited_until')->orWhere('usage_limited_until', '<=', now()))
-            ->orderByRaw('user_id is null')
-            ->orderBy('name')
-            ->get();
+            ->where(fn ($q) => $q->whereNull('usage_limited_until')->orWhere('usage_limited_until', '<=', now()));
     }
 
     public function activeSessions(AgentCredential $agent): int

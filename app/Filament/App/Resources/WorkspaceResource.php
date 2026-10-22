@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\App\Resources;
 
+use App\Enums\ApprovalStatus;
 use App\Enums\WorkspaceStatus;
 use App\Filament\App\Resources\WorkspaceResource\Pages\CreateWorkspace;
 use App\Filament\App\Resources\WorkspaceResource\Pages\EditWorkspaceSettings;
@@ -130,7 +131,7 @@ class WorkspaceResource extends Resource
                     ->query(fn (Builder $query): Builder => $query
                         ->whereHas('tasks', fn (Builder $q) => $q
                             ->where(fn (Builder $mine) => $mine->where('owner_user_id', auth()->id())->orWhereHas('members', fn (Builder $m) => $m->where('user_id', auth()->id())))
-                            ->whereHas('approvals', fn (Builder $a) => $a->where('status', 'pending')))),
+                            ->whereHas('approvals', fn (Builder $a) => $a->where('status', ApprovalStatus::Pending->value)))),
                 Filter::make('mine')
                     ->label(__('workspaces.filters.mine'))
                     ->query(fn (Builder $query): Builder => $query->whereHas('members', fn (Builder $q) => $q->where('user_id', auth()->id())))

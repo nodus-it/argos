@@ -25,7 +25,8 @@ class WorkspaceSummaryService
      */
     public function for(Workspace $workspace, User $user): array
     {
-        $tasks = Task::query()->where('workspace_id', $workspace->id)->whereNull('archived_at')->get(['id', 'status', 'session_status', 'owner_user_id']);
+        // Members eager: "involves" must not ask per task.
+        $tasks = Task::query()->with('members:id,task_id,user_id')->where('workspace_id', $workspace->id)->whereNull('archived_at')->get(['id', 'status', 'session_status', 'owner_user_id']);
         $waiting = $tasks->where('session_status', SessionStatus::WaitingInput)->count();
         // Only the people of a task decide — "waiting for me" means my tasks or ones I was invited to.
         $mine = $tasks->filter(fn (Task $task): bool => $task->involves($user))->pluck('id');

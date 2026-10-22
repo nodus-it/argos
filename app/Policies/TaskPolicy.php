@@ -28,7 +28,7 @@ class TaskPolicy
     public function create(User $user, Workspace $workspace): bool
     {
         return $this->access->allows($user, Capability::TaskCreate, $workspace)
-            && app(AgentPool::class)->usableAgentsFor($user)->isNotEmpty();
+            && app(AgentPool::class)->hasUsableAgent($user);
     }
 
     public function prompt(User $user, Task $task): bool

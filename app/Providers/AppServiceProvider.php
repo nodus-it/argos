@@ -42,6 +42,8 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        // Request-scoped: the pull request feedback is memoized per request.
+        $this->app->scoped(\App\Services\Workspace\PullRequestService::class);
 
         $this->app->singleton(GitProviderRegistry::class, function (): GitProviderRegistry {
             $registry = new GitProviderRegistry;

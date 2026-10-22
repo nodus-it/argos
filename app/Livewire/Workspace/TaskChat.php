@@ -667,9 +667,17 @@ class TaskChat extends Component
         $this->limit += self::PAGE;
     }
 
+    /**
+     * Within one request the workspace, the shown task and the person's
+     * agents are read once (render() starts fresh after the actions ran).
+     *
+     * @var array{workspace?: Workspace, task?: array{0: ?string, 1: ?Task}, agents?: Collection<int, AgentCredential>}
+     */
+    private array $memo = [];
+
     public function workspace(): Workspace
     {
-        return Workspace::query()->findOrFail($this->workspaceId);
+        return $this->memo['workspace'] ??= Workspace::query()->findOrFail($this->workspaceId);
     }
 
     /** @return Collection<int, Task> */
@@ -688,11 +696,13 @@ class TaskChat extends Component
         if ($this->taskId === null) {
             return null;
         }
+        if (($this->memo['task'][0] ?? null) !== $this->taskId) {
+            $this->memo['task'] = [$this->taskId, Task::query()->with(['agentCredential.user', 'workspace'])->where('workspace_id', $this->workspaceId)->find($this->taskId)];
+        }
 
-        return Task::query()->with(['agentCredential.user', 'workspace'])->where('workspace_id', $this->workspaceId)->find($this->taskId);
+        return $this->memo['task'][1];
     }
 
-    /** @return Collection<int, AgentCredential> */
     /** The composer asks once it shows (see task-chat.blade.php): fresh model lists, no message sent. */
     public function refreshModels(): void
     {
@@ -721,13 +731,16 @@ class TaskChat extends Component
             ->values();
     }
 
+    /** @return Collection<int, AgentCredential> */
     public function usableAgents(): Collection
     {
-        return app(AgentPool::class)->usableAgentsFor($this->user());
+        return $this->memo['agents'] ??= app(AgentPool::class)->usableAgentsFor($this->user());
     }
 
     public function render(): View
     {
+        // Actions of this request may have changed task and agents.
+        $this->memo = [];
         $workspace = $this->workspace();
         $task = $this->activeTask();
         // Without a task: the capability alone, so people without an agent
@@ -738,7 +751,7 @@ class TaskChat extends Component
 
         [$events, $hasOlder] = $task !== null ? $this->events($task) : [collect(), false];
         if ($task !== null) {
-            app(TaskReadService::class)->markRead($task, $this->user());
+            app(TaskReadService::class)->markRead($task, $this->user(), $events->max('id') ?? 0);
         }
         $toolResults = $events->where('type', TaskEventType::ToolResult)->keyBy(fn (TaskEvent $e) => (string) ($e->payload['tool_use_id'] ?? ''));
         $approvals = $task !== null ? TaskApproval::query()->with('resolver')->where('task_id', $task->id)->get()->keyBy('id') : collect();
