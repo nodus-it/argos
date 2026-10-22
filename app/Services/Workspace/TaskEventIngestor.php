@@ -18,6 +18,7 @@ use App\Models\Workspace;
 use App\Services\Credentials\AgentCredentialService;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
@@ -149,24 +150,43 @@ class TaskEventIngestor
             if ($task !== null) {
                 $this->notify($workspace, $task, $outgoing);
             }
-            // A session ended: a waiting task can have it.
-            if (collect($events)->contains(fn (array $e): bool => ($e['type'] ?? '') === 'status' && (($e['data']['state'] ?? '') === 'closed'))) {
-                DrainSessionQueueJob::dispatch($workspace->id);
-            }
+            // The events are stored and acknowledged with this answer: a failing
+            // follow-up must neither fail the batch (the daemon would resend
+            // events that are skipped as seen) nor keep the others from running.
+            $this->followUp('drain', function () use ($events, $workspace): void {
+                // A session ended: a waiting task can have it.
+                if (collect($events)->contains(fn (array $e): bool => ($e['type'] ?? '') === 'status' && (($e['data']['state'] ?? '') === 'closed'))) {
+                    DrainSessionQueueJob::dispatch($workspace->id);
+                }
+            });
             if ($task !== null && in_array('prepare.completed', array_column($events, 'type'), true)) {
-                app(TaskPreparer::class)->afterPrepared($task);
+                $this->followUp('prepared', fn () => app(TaskPreparer::class)->afterPrepared($task));
             }
             if ($task?->auto_state !== null) {
-                app(AutoTaskDriver::class)->onTaskEvents($task, $outgoing);
+                $this->followUp('auto', fn () => app(AutoTaskDriver::class)->onTaskEvents($task, $outgoing));
             }
             // Claude may have changed lines that carry collected review comments.
-            if ($task !== null && in_array('turn.completed', array_column($outgoing, 'type'), true)
-                && app(ReviewCommentService::class)->anchoredPaths($task) !== []) {
-                ReanchorReviewCommentsJob::dispatch($task->id);
+            if ($task !== null && in_array('turn.completed', array_column($outgoing, 'type'), true)) {
+                $this->followUp('reanchor', function () use ($task): void {
+                    if (app(ReviewCommentService::class)->anchoredPaths($task) !== []) {
+                        ReanchorReviewCommentsJob::dispatch($task->id);
+                    }
+                });
             }
         }
 
         return $ack;
+    }
+
+    /** Run one follow-up of an ingested batch; a failure is reported, not thrown. */
+    private function followUp(string $name, callable $step): void
+    {
+        try {
+            $step();
+        } catch (Throwable $e) {
+            Log::channel('argos')->error('Task event follow-up failed', ['step' => $name, 'error' => $e->getMessage()]);
+            report($e);
+        }
     }
 
     /**

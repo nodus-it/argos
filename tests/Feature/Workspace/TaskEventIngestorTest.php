@@ -9,14 +9,18 @@ use App\Enums\AgentCredentialStatus;
 use App\Enums\ApprovalStatus;
 use App\Enums\SessionStatus;
 use App\Enums\TaskEventType;
+use App\Enums\TaskStatus;
+use App\Jobs\Workspace\DrainSessionQueueJob;
 use App\Models\AgentCredential;
 use App\Models\Task;
 use App\Models\TaskApproval;
 use App\Models\TaskEvent;
 use App\Models\Workspace;
 use App\Services\Workspace\TaskEventIngestor;
+use App\Services\Workspace\TaskPreparer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class TaskEventIngestorTest extends TestCase
@@ -175,5 +179,17 @@ class TaskEventIngestorTest extends TestCase
 
         $this->assertSame(AgentCredentialStatus::Expired, $this->task->agentCredential->fresh()->status);
         $this->assertSame('auth_failed', TaskEvent::query()->where('task_id', $this->task->id)->latest('id')->first()->payload['code']);
+    }
+
+    public function test_a_failing_follow_up_neither_fails_the_batch_nor_stops_the_others(): void
+    {
+        Queue::fake([DrainSessionQueueJob::class]);
+        $this->task->forceFill(['status' => TaskStatus::Preparing])->save();
+        $this->partialMock(TaskPreparer::class)->shouldReceive('afterPrepared')->andThrow(new \RuntimeException('boom'));
+
+        $acks = $this->ingest([['prepare.completed', ['path' => '/x', 'base_commit' => 'abc', 'created' => true, 'setup' => 'ok', 'log' => '']], ['status', ['state' => 'closed']]]);
+
+        $this->assertSame(2, $acks[$this->task->id]);
+        Queue::assertPushed(DrainSessionQueueJob::class);
     }
 }
