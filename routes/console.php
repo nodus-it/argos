@@ -47,7 +47,7 @@ Schedule::command('argos:tasks:sync-ticket-comments')
     ->withoutOverlapping();
 
 Schedule::command('argos:tasks:sync-prs')
-    ->cron('*/'.max(1, (int) config('argos.workspaces.pr_sync_minutes', 15)).' * * * *')
+    ->cron('*/'.max(1, (int) config('argos.workspaces.pr_sync_minutes', 3)).' * * * *')
     ->withoutOverlapping();
 
 // Free preview, worktree and database of tasks that finished more than their

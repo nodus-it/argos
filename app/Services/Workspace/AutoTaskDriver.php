@@ -317,7 +317,7 @@ class AutoTaskDriver
         try {
             $url = $this->ship->ship($task, $actor, $subject, $body, $mode === AutoShipMode::DraftPullRequest, $mode !== AutoShipMode::None);
         } catch (WorkspaceException $e) {
-            if ($e->getMessage() !== __('workspaces.ship.nothing')) {
+            if ($e->reason !== 'nothing') {
                 throw $e;
             }
             $url = '';

@@ -238,4 +238,28 @@ class TaskActionsTest extends TestCase
         // Viewers may not own tasks, Carl has no agent to run it on.
         $this->assertSame([$this->bob->id => 'Bob'], $tasks->transferCandidates($task));
     }
+
+    public function test_a_task_is_only_deleted_with_its_working_copy(): void
+    {
+        $task = $this->task($this->ada);
+        $this->workspace->forceFill(['status' => WorkspaceStatus::Stopped])->save();
+
+        try {
+            app(\App\Services\Workspace\TaskService::class)->discard($task->fresh(), $this->ada);
+            $this->fail('expected a WorkspaceException');
+        } catch (\App\Services\Workspace\WorkspaceException $e) {
+            $this->assertSame('discard_needs_running', $e->reason);
+        }
+        $this->assertNotNull(Task::query()->find($task->id));
+    }
+
+    public function test_daemon_failures_say_what_happened(): void
+    {
+        $refused = \App\Services\Workspace\WorkspaceException::fromDaemon(new \App\Integrations\WorkspaceDaemon\DaemonTransportException('Worktree missing', 404, 'worktree_missing'));
+        $this->assertSame(__('workspaces.errors.daemon_failed', ['message' => 'Worktree missing']), $refused->getMessage());
+        $this->assertSame('worktree_missing', $refused->reason);
+
+        $silent = \App\Services\Workspace\WorkspaceException::fromDaemon(new \App\Integrations\WorkspaceDaemon\DaemonTransportException('Connection refused'));
+        $this->assertSame('daemon_unreachable', $silent->reason);
+    }
 }

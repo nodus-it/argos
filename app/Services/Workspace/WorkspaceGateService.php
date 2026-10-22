@@ -142,11 +142,7 @@ class WorkspaceGateService
             throw WorkspaceException::translated('workspaces.gates.no_prompt');
         }
 
-        try {
-            $prompt = $this->daemon->for($run->workspace)->gateFixPrompt($task->slug, $gate, $run->logRunFor($gate));
-        } catch (DaemonTransportException $e) {
-            throw WorkspaceException::fromDaemon($e);
-        }
+        $prompt = WorkspaceException::wrapDaemon(fn () => $this->daemon->for($run->workspace)->gateFixPrompt($task->slug, $gate, $run->logRunFor($gate)));
         if (trim($prompt) === '') {
             throw WorkspaceException::translated('workspaces.gates.no_prompt');
         }

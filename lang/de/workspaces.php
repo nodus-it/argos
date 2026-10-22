@@ -589,6 +589,8 @@ return [
         'transfer_needs_member' => ':name muss Mitglied (oder Admin) dieses Workspaces sein, um eine Aufgabe zu besitzen.',
         'transfer_needs_agent' => ':name hat kein nutzbares Claude-Abo, auf dem die Aufgabe laufen kann.',
         'preparing' => 'Diese Aufgabe wird noch vorbereitet (Arbeitskopie, Datenbank, Setup). Versuch es gleich noch einmal.',
+        'daemon_failed' => 'Der Workspace hat abgelehnt: :message',
+        'discard_needs_running' => 'Starte den Workspace, um die Aufgabe zu löschen — ihre Arbeitskopie und Datenbank gehen mit.',
         'daemon_unreachable' => 'Der Workspace hat nicht geantwortet: :message',
         'bypass_owner_only' => 'Nur Admins des Workspaces dürfen Freigaben umgehen.',
         'capacity' => 'Es laufen bereits :max Workspaces. Stoppe einen, bevor du einen weiteren startest.',

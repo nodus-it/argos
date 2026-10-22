@@ -127,13 +127,9 @@ class TaskCheckpointService
      */
     private function call(callable $call): mixed
     {
-        try {
-            return $call();
-        } catch (DaemonTransportException $e) {
-            throw WorkspaceException::fromDaemon($e, [
-                'task_running' => 'workspaces.checkpoints.busy',
-                'unknown_checkpoint' => 'workspaces.checkpoints.gone',
-            ]);
-        }
+        return WorkspaceException::wrapDaemon($call, [
+            'task_running' => 'workspaces.checkpoints.busy',
+            'unknown_checkpoint' => 'workspaces.checkpoints.gone',
+        ]);
     }
 }

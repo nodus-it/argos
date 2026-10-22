@@ -124,11 +124,7 @@ class WorkspaceShipService
             throw WorkspaceException::translated('workspaces.ship.subject_required');
         }
 
-        try {
-            $commit = $this->daemon->for($task->workspace, 120)->gitCommit($task->slug, $subject, $body, ['name' => $by->name, 'email' => $by->email]);
-        } catch (DaemonTransportException $e) {
-            throw WorkspaceException::fromDaemon($e);
-        }
+        $commit = WorkspaceException::wrapDaemon(fn () => $this->daemon->for($task->workspace, 120)->gitCommit($task->slug, $subject, $body, ['name' => $by->name, 'email' => $by->email]));
         if ($commit === null) {
             throw WorkspaceException::translated('workspaces.ship.nothing_to_commit');
         }
@@ -148,12 +144,8 @@ class WorkspaceShipService
     {
         Gate::forUser($by)->authorize('ship', $task);
         $api = $this->daemon->for($task->workspace, 300);
-        try {
-            if ((int) $api->gitStatus($task->slug)['ahead'] === 0 && $this->nothingToShip($task, $api)) {
-                throw WorkspaceException::translated('workspaces.ship.nothing');
-            }
-        } catch (DaemonTransportException $e) {
-            throw WorkspaceException::fromDaemon($e);
+        if (WorkspaceException::wrapDaemon(fn () => (int) $api->gitStatus($task->slug)['ahead'] === 0 && $this->nothingToShip($task, $api))) {
+            throw WorkspaceException::translated('workspaces.ship.nothing');
         }
 
         return $this->pushAndOpen($task, $by, $api, trim((string) $title) !== '' ? trim((string) $title) : $task->title, $body, $draft, $pullRequest);
@@ -174,13 +166,10 @@ class WorkspaceShipService
         }
 
         $api = $this->daemon->for($task->workspace, 300);
-        try {
-            $commit = $api->gitCommit($task->slug, $subject, $body, ['name' => $by->name, 'email' => $by->email]);
-            if ($commit === null && (int) $api->gitStatus($task->slug)['ahead'] === 0 && $this->nothingToShip($task, $api)) {
-                throw WorkspaceException::translated('workspaces.ship.nothing');
-            }
-        } catch (DaemonTransportException $e) {
-            throw WorkspaceException::fromDaemon($e);
+        $nothing = WorkspaceException::wrapDaemon(fn () => $api->gitCommit($task->slug, $subject, $body, ['name' => $by->name, 'email' => $by->email]) === null
+            && (int) $api->gitStatus($task->slug)['ahead'] === 0 && $this->nothingToShip($task, $api));
+        if ($nothing) {
+            throw WorkspaceException::translated('workspaces.ship.nothing');
         }
 
         return $this->pushAndOpen($task, $by, $api, $subject, $body, $draft, $pullRequest);
@@ -189,14 +178,10 @@ class WorkspaceShipService
     private function pushAndOpen(Task $task, User $by, WorkspaceDaemonTransport $api, string $title, string $body, bool $draft, bool $pullRequest): string
     {
         $workspace = $task->workspace;
-        try {
-            $api->gitPush($task->slug, (string) $task->branch);
-        } catch (DaemonTransportException $e) {
-            throw WorkspaceException::fromDaemon($e, [
-                'rejected_non_fast_forward' => 'workspaces.ship.rejected',
-                'auth' => 'workspaces.ship.auth',
-            ]);
-        }
+        WorkspaceException::wrapDaemon(fn () => $api->gitPush($task->slug, (string) $task->branch), [
+            'rejected_non_fast_forward' => 'workspaces.ship.rejected',
+            'auth' => 'workspaces.ship.auth',
+        ]);
 
         if (! $pullRequest) {
             $task->forceFill(['shipped_at' => now()])->save();

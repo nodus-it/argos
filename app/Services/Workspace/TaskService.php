@@ -244,7 +244,7 @@ class TaskService
             return;
         }
 
-        $this->callDaemon(fn () => $this->daemon->for($task->workspace)->interrupt($task->id));
+        WorkspaceException::wrapDaemon(fn () => $this->daemon->for($task->workspace)->interrupt($task->id));
         $this->notice($task, 'interrupted', $by);
     }
 
@@ -255,7 +255,7 @@ class TaskService
 
         $task->forceFill(['permission_mode' => $mode])->save();
         if ($task->session_open) {
-            $this->callDaemon(fn () => $this->daemon->for($task->workspace)->setPermissionMode($task->id, $mode->value));
+            WorkspaceException::wrapDaemon(fn () => $this->daemon->for($task->workspace)->setPermissionMode($task->id, $mode->value));
         }
         $this->notice($task, 'permission_mode', $by, ['mode' => $mode->value]);
     }
@@ -268,7 +268,7 @@ class TaskService
     {
         $task->forceFill(['permission_mode' => $mode])->save();
         if ($task->session_open) {
-            $this->callDaemon(fn () => $this->daemon->for($task->workspace)->setPermissionMode($task->id, $mode->value));
+            WorkspaceException::wrapDaemon(fn () => $this->daemon->for($task->workspace)->setPermissionMode($task->id, $mode->value));
         }
     }
 
@@ -278,7 +278,7 @@ class TaskService
 
         $task->forceFill(['model' => $model])->save();
         if ($task->session_open) {
-            $this->callDaemon(fn () => $this->daemon->for($task->workspace)->setModel($task->id, $model));
+            WorkspaceException::wrapDaemon(fn () => $this->daemon->for($task->workspace)->setModel($task->id, $model));
         }
         $this->notice($task, 'model', $by, ['model' => $model]);
     }
@@ -293,7 +293,7 @@ class TaskService
 
         $task->forceFill(['effort' => $effort])->save();
         if ($task->session_open) {
-            $this->callDaemon(fn () => $this->daemon->for($task->workspace)->setEffort($task->id, $effort));
+            WorkspaceException::wrapDaemon(fn () => $this->daemon->for($task->workspace)->setEffort($task->id, $effort));
         }
         $this->notice($task, 'effort', $by, ['effort' => $effort]);
     }
@@ -645,10 +645,14 @@ class TaskService
     public function discard(Task $task, User $by): void
     {
         Gate::forUser($by)->authorize('delete', $task);
+        // Its worktree and database go first — a task deleted without them
+        // would leave both behind in the workspace.
+        if (! app(TaskCleanup::class)->cleanup($task)) {
+            throw WorkspaceException::translated('workspaces.errors.discard_needs_running');
+        }
         if ($task->session_open) {
             $this->close($task);
         }
-        app(TaskCleanup::class)->cleanup($task);
         $task->delete();
     }
 
@@ -842,15 +846,7 @@ class TaskService
 
         $this->pool->release($task);
         $this->open($task);
-        $this->callDaemon(fn () => $this->daemon->for($task->workspace)->sendMessage($task->id, $payload));
+        WorkspaceException::wrapDaemon(fn () => $this->daemon->for($task->workspace)->sendMessage($task->id, $payload));
     }
 
-    private function callDaemon(callable $call): void
-    {
-        try {
-            $call();
-        } catch (DaemonTransportException $e) {
-            throw WorkspaceException::fromDaemon($e);
-        }
-    }
 }
