@@ -10,14 +10,16 @@ use App\Filament\App\Resources\WorkspaceResource;
 use App\Filament\App\Resources\WorkspaceResource\Pages\CreateWorkspace;
 use App\Filament\App\Resources\WorkspaceResource\Pages\EditWorkspaceSettings;
 use App\Filament\App\Resources\WorkspaceResource\Pages\ListWorkspaces;
+use App\Filament\App\Resources\WorkspaceResource\Pages\ViewWorkspace;
 use App\Filament\App\Resources\WorkspaceResource\RelationManagers\TaskProviderBindingsRelationManager;
 use App\Filament\Shared\WorkspaceForm;
 use App\Models\ConnectedAccount;
 use App\Models\ProviderCredential;
-use App\Models\Task;
 use App\Models\TaskProviderBinding;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Services\Workspace\WorkspaceService;
+use App\Services\Workspace\WorkspaceTeardown;
 use Filament\Actions\CreateAction;
 use Filament\Actions\Testing\TestAction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -168,8 +170,8 @@ class WorkspaceFormTest extends TestCase
         $this->assertSame('github', $workspace->fresh()->platform->value);
 
         // The service ignores them, whoever calls it.
-        $admin = \App\Models\User::factory()->create(['is_admin' => true]);
-        app(\App\Services\Workspace\WorkspaceService::class)->updateSettings($workspace, $admin, ['repo_url' => 'https://github.com/evil/other', 'platform' => 'gitlab', 'name' => 'Renamed']);
+        $admin = User::factory()->create(['is_admin' => true]);
+        app(WorkspaceService::class)->updateSettings($workspace, $admin, ['repo_url' => 'https://github.com/evil/other', 'platform' => 'gitlab', 'name' => 'Renamed']);
         $this->assertSame($repo, $workspace->fresh()->repo_url);
         $this->assertSame('github', $workspace->fresh()->platform->value);
         $this->assertSame('Renamed', $workspace->fresh()->name);
@@ -179,9 +181,9 @@ class WorkspaceFormTest extends TestCase
     {
         $workspace = Workspace::factory()->create();
 
-        $this->mock(\App\Services\Workspace\WorkspaceTeardown::class)->shouldReceive('purge')->once();
+        $this->mock(WorkspaceTeardown::class)->shouldReceive('purge')->once();
 
-        Livewire::test(\App\Filament\App\Resources\WorkspaceResource\Pages\ViewWorkspace::class, ['record' => $workspace->getKey()])
+        Livewire::test(ViewWorkspace::class, ['record' => $workspace->getKey()])
             ->callAction('delete')
             ->assertRedirect(WorkspaceResource::getUrl('index'));
 

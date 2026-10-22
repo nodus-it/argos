@@ -66,5 +66,4 @@ class ProviderOAuthConfig extends Model
         static::saved(fn () => app(OAuthConfigHydrator::class)->forgetCache());
         static::deleted(fn () => app(OAuthConfigHydrator::class)->forgetCache());
     }
-
 }

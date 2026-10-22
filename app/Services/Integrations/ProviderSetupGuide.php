@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\Integrations;
 
-use App\Support\RepoUrlBuilder;
 use App\Enums\IntegrationProvider;
+use App\Support\RepoUrlBuilder;
 
 /**
  * Builds the "create a token / OAuth app at the provider" deep links and the

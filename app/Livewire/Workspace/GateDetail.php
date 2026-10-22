@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 namespace App\Livewire\Workspace;
 
-use App\Support\GateRows;
-use App\Livewire\Concerns\InteractsWithWorkspace;
 use App\Enums\GateRunStatus;
 use App\Enums\WorkspaceStatus;
+use App\Livewire\Concerns\InteractsWithWorkspace;
 use App\Models\Task;
 use App\Models\WorkspaceGateRun;
 use App\Services\Workspace\WorkspaceException;
 use App\Services\Workspace\WorkspaceGateService;
 use App\Support\GateAnnotations;
+use App\Support\GateRows;
 use Carbon\CarbonInterval;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\View\View;
@@ -202,5 +202,4 @@ class GateDetail extends Component
     {
         return $this->findTask($this->taskId);
     }
-
 }

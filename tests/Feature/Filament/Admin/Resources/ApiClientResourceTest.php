@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Filament\Admin\Resources;
 
-use App\Filament\App\Resources\WorkspaceResource\RelationManagers\ApiTokensRelationManager;
 use App\Filament\App\Clusters\System\Resources\ApiClientResource;
 use App\Filament\App\Clusters\System\Resources\ApiClientResource\Pages\CreateApiClient;
 use App\Filament\App\Clusters\System\Resources\ApiClientResource\Pages\EditApiClient;
 use App\Filament\App\Clusters\System\Resources\ApiClientResource\Pages\ListApiClients;
 use App\Filament\App\Resources\WorkspaceResource\Pages\EditWorkspaceSettings;
+use App\Filament\App\Resources\WorkspaceResource\RelationManagers\ApiTokensRelationManager;
 use App\Models\ApiClient;
 use App\Models\User;
 use App\Models\Workspace;

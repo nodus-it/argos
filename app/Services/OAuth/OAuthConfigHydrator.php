@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\OAuth;
 
-use App\Support\RepoUrlBuilder;
 use App\Models\ProviderOAuthConfig;
+use App\Support\RepoUrlBuilder;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
 use Throwable;

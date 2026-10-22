@@ -4,18 +4,18 @@ declare(strict_types=1);
 
 namespace App\Filament\App\Clusters\Account\Resources;
 
-use App\Filament\Support\Actions\ServiceDeleteAction;
-use App\Filament\Support\Actions\ServiceDeleteBulkAction;
-use App\Services\Credentials\AgentCredentialService;
 use App\Enums\AgentCredentialStatus;
-use App\Filament\App\Clusters\Account;
 use App\Enums\AgentName;
 use App\Enums\ClaudeModel;
+use App\Filament\App\Clusters\Account;
 use App\Filament\App\Clusters\Account\Resources\AgentCredentialResource\Pages\CreateAgentCredential;
 use App\Filament\App\Clusters\Account\Resources\AgentCredentialResource\Pages\EditAgentCredential;
 use App\Filament\App\Clusters\Account\Resources\AgentCredentialResource\Pages\ListAgentCredentials;
+use App\Filament\Support\Actions\ServiceDeleteAction;
+use App\Filament\Support\Actions\ServiceDeleteBulkAction;
 use App\Models\AgentCredential;
 use App\Models\User;
+use App\Services\Credentials\AgentCredentialService;
 use App\Workers\Agents\AgentRegistry;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\EditAction;

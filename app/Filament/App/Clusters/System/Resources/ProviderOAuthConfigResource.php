@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace App\Filament\App\Clusters\System\Resources;
 
-use App\Filament\Support\Actions\ServiceDeleteAction;
-use App\Filament\Support\Actions\ServiceDeleteBulkAction;
-use App\Services\OAuth\ProviderOAuthConfigService;
 use App\Enums\IntegrationProvider;
-use App\Filament\Concerns\AdminOnly;
 use App\Filament\App\Clusters\System;
 use App\Filament\App\Clusters\System\Resources\ProviderOAuthConfigResource\Pages\CreateProviderOAuthConfig;
 use App\Filament\App\Clusters\System\Resources\ProviderOAuthConfigResource\Pages\EditProviderOAuthConfig;
 use App\Filament\App\Clusters\System\Resources\ProviderOAuthConfigResource\Pages\ListProviderOAuthConfigs;
+use App\Filament\Concerns\AdminOnly;
+use App\Filament\Support\Actions\ServiceDeleteAction;
+use App\Filament\Support\Actions\ServiceDeleteBulkAction;
 use App\Models\ProviderOAuthConfig;
 use App\Services\Integrations\ProviderSetupGuide;
+use App\Services\OAuth\ProviderOAuthConfigService;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Placeholder;
@@ -60,8 +60,6 @@ class ProviderOAuthConfigResource extends Resource
     {
         return 'heroicon-o-shield-check';
     }
-
-
 
     public static function getModelLabel(): string
     {
@@ -233,7 +231,6 @@ class ProviderOAuthConfigResource extends Resource
             'note' => $guide['url'] === null ? __('credentials.oauth.guide.manual_note') : __('credentials.oauth.guide.callback_note'),
         ]);
     }
-
 
     public static function getPages(): array
     {

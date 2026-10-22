@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Filament\App\Clusters\System\Resources\ProviderOAuthConfigResource\Pages;
 
-use App\Filament\Support\Actions\ServiceDeleteAction;
-use App\Filament\Concerns\HasArgosEditHeading;
 use App\Filament\App\Clusters\System\Resources\ProviderOAuthConfigResource;
+use App\Filament\Concerns\HasArgosEditHeading;
+use App\Filament\Support\Actions\ServiceDeleteAction;
 use App\Filament\Support\Pages\EditRecord;
 use App\Models\ProviderOAuthConfig;
 use App\Services\EntityService;

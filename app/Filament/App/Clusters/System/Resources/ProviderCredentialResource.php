@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 namespace App\Filament\App\Clusters\System\Resources;
 
-use App\Filament\Support\Actions\ServiceDeleteAction;
-use App\Filament\Support\Actions\ServiceDeleteBulkAction;
 use App\Enums\IntegrationProvider;
 use App\Enums\ProviderCredentialStatus;
-use App\Filament\Concerns\AdminOnly;
 use App\Filament\App\Clusters\System;
 use App\Filament\App\Clusters\System\Resources\ProviderCredentialResource\Pages\CreateProviderCredential;
 use App\Filament\App\Clusters\System\Resources\ProviderCredentialResource\Pages\EditProviderCredential;
 use App\Filament\App\Clusters\System\Resources\ProviderCredentialResource\Pages\ListProviderCredentials;
+use App\Filament\Concerns\AdminOnly;
+use App\Filament\Support\Actions\ServiceDeleteAction;
+use App\Filament\Support\Actions\ServiceDeleteBulkAction;
 use App\Models\ProviderCredential;
 use App\Services\Credentials\ProviderCredentialService;
 use App\Services\Integrations\ProviderSetupGuide;
@@ -58,8 +58,6 @@ class ProviderCredentialResource extends Resource
     {
         return 'heroicon-o-key';
     }
-
-
 
     public static function getModelLabel(): string
     {
@@ -237,7 +235,6 @@ class ProviderCredentialResource extends Resource
             'note' => null,
         ]);
     }
-
 
     public static function getPages(): array
     {

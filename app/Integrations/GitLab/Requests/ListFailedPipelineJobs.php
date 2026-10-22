@@ -20,7 +20,7 @@ class ListFailedPipelineJobs extends Request
 
     public function resolveEndpoint(): string
     {
-        return "/projects/".urlencode("{$this->owner}/{$this->repo}")."/pipelines/{$this->pipelineId}/jobs";
+        return '/projects/'.urlencode("{$this->owner}/{$this->repo}")."/pipelines/{$this->pipelineId}/jobs";
     }
 
     /**

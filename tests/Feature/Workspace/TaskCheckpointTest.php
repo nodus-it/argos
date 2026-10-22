@@ -198,8 +198,8 @@ class TaskCheckpointTest extends TestCase
     }
 
     /** The checkpoint taken before a message (the first, when Claude made several). */
-    private function checkpointOf(TaskEvent $message): ?\App\Models\TaskCheckpoint
+    private function checkpointOf(TaskEvent $message): ?TaskCheckpoint
     {
-        return \App\Models\TaskCheckpoint::query()->where('task_event_id', $message->id)->orderBy('n')->first();
+        return TaskCheckpoint::query()->where('task_event_id', $message->id)->orderBy('n')->first();
     }
 }

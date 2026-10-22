@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Filament\App\Clusters\System\Pages;
 
-use App\Filament\Concerns\AdminOnly;
 use App\Filament\App\Clusters\System;
 use App\Filament\App\Clusters\System\Widgets\StatsOverviewWidget;
+use App\Filament\Concerns\AdminOnly;
 use Filament\Pages\Page;
 
 /** Administration → Overview (`/system/overview`): state of the installation and the log download. */

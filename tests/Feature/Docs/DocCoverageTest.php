@@ -8,7 +8,7 @@ use App\Enums\AgentName;
 use App\Enums\AutoPlanMode;
 use App\Enums\AutoShipMode;
 use App\Enums\BackingService;
-use App\Filament\App\Resources\WorkspaceResource\RelationManagers\ApiTokensRelationManager;
+use App\Services\Api\ApiTokenService;
 use App\Services\Docs\DocManifest;
 use Tests\TestCase;
 
@@ -40,7 +40,7 @@ class DocCoverageTest extends TestCase
 
     public function test_rest_api_documents_every_ability(): void
     {
-        foreach (\App\Services\Api\ApiTokenService::ABILITIES as $ability) {
+        foreach (ApiTokenService::ABILITIES as $ability) {
             $this->assertDocMentions('REST-API.md', (string) $ability, 'API ability');
         }
     }

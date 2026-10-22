@@ -86,7 +86,6 @@ class Documentation extends Page
         return 'heroicon-o-book-open';
     }
 
-
     public static function getNavigationLabel(): string
     {
         return __('navigation.pages.documentation');

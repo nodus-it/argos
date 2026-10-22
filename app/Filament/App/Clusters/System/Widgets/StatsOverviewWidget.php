@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Filament\App\Clusters\System\Widgets;
 
-use Illuminate\Support\Facades\DB;
 use App\Enums\AutoTaskState;
 use App\Enums\WorkspaceStatus;
 use App\Models\Task;
@@ -12,6 +11,7 @@ use App\Models\WorkerImageBuild;
 use App\Models\Workspace;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
+use Illuminate\Support\Facades\DB;
 
 class StatsOverviewWidget extends BaseWidget
 {

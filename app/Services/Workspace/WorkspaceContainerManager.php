@@ -6,9 +6,9 @@ namespace App\Services\Workspace;
 
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
 use App\Models\Workspace;
-use App\Services\Workspace\Environment\EnvironmentResolver;
 use App\Services\Worker\WorkerSidecarManager;
 use App\Services\Worker\WorkerSidecars;
+use App\Services\Workspace\Environment\EnvironmentResolver;
 use RuntimeException;
 use Symfony\Component\Process\Process;
 

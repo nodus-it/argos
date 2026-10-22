@@ -4,18 +4,13 @@ declare(strict_types=1);
 
 namespace App\Filament\App\Pages;
 
-use App\Filament\Concerns\VerifiesCredentialOnSave;
-use App\Filament\App\Clusters\System\Resources\ProviderCredentialResource;
-use App\Filament\App\Clusters\System\Resources\ProviderOAuthConfigResource;
-use App\Services\Credentials\CredentialVerifier;
-use App\Services\Credentials\ProviderCredentialService;
-use App\Services\OAuth\ProviderOAuthConfigService;
-use Filament\Schemas\Schema;
-use Livewire\WithFileUploads;
 use App\Enums\AgentCredentialStatus;
 use App\Enums\AgentName;
 use App\Enums\AuthMethod;
+use App\Filament\App\Clusters\System\Resources\ProviderCredentialResource;
+use App\Filament\App\Clusters\System\Resources\ProviderOAuthConfigResource;
 use App\Filament\Concerns\AdminOnly;
+use App\Filament\Concerns\VerifiesCredentialOnSave;
 use App\Models\ProviderCredential;
 use App\Models\ProviderOAuthConfig;
 use App\Models\User;
@@ -23,9 +18,12 @@ use App\Models\Workspace;
 use App\Services\Account\AccountPasswordService;
 use App\Services\Anthropic\AnthropicTokenValidator;
 use App\Services\Credentials\AgentCredentialService;
-use App\Services\Git\RepositoryFetcher;
 use App\Services\Credentials\CredentialRefResolver;
+use App\Services\Credentials\CredentialVerifier;
+use App\Services\Credentials\ProviderCredentialService;
+use App\Services\Git\RepositoryFetcher;
 use App\Services\OAuth\ConnectedAccountService;
+use App\Services\OAuth\ProviderOAuthConfigService;
 use App\Services\OAuth\TokenRefresher;
 use App\Services\User\UserService;
 use App\Services\Workspace\AgentPool;
@@ -36,10 +34,12 @@ use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Filament\Schemas\Schema;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rules\Password;
+use Livewire\WithFileUploads;
 
 /**
  * Guided four-step setup wizard: secure the account, add your own Claude
@@ -57,8 +57,9 @@ class Onboarding extends Page
 
     /** `/setup`: the first-run wizard. */
     protected static ?string $slug = 'setup';
-    use WithFileUploads;
+
     use VerifiesCredentialOnSave;
+    use WithFileUploads;
 
     public const TOTAL_STEPS = 4;
 

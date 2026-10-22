@@ -92,31 +92,31 @@ class MembersRelationManager extends RelationManager
             ->recordActions([
                 // One "…" menu per row keeps the table narrow at 375px.
                 ActionGroup::make([
-                Action::make('changeRole')
-                    ->label(__('workspaces.settings.members.change_role'))
-                    ->icon('heroicon-o-arrows-right-left')
-                    ->visible(fn (): bool => $this->canManage())
-                    ->fillForm(fn (WorkspaceMember $record): array => ['role' => $record->role->value])
-                    ->schema([self::roleSelect()])
-                    ->action(function (WorkspaceMember $record, array $data): void {
-                        $this->attempt(
-                            fn (WorkspaceMemberService $members) => $members->changeRole($this->workspace(), $record->user, WorkspaceRole::from((string) $data['role'])),
-                            __('workspaces.settings.members.role_changed', ['name' => $record->user->name]),
-                        );
-                    }),
-                Action::make('removeMember')
-                    ->label(__('workspaces.settings.members.remove'))
-                    ->icon('heroicon-o-user-minus')
-                    ->color('danger')
-                    ->visible(fn (): bool => $this->canManage())
-                    ->requiresConfirmation()
-                    ->modalDescription(__('workspaces.settings.members.remove_confirm'))
-                    ->action(function (WorkspaceMember $record): void {
-                        $this->attempt(
-                            fn (WorkspaceMemberService $members) => $members->remove($this->workspace(), $record->user),
-                            __('workspaces.settings.members.removed', ['name' => $record->user->name]),
-                        );
-                    }),
+                    Action::make('changeRole')
+                        ->label(__('workspaces.settings.members.change_role'))
+                        ->icon('heroicon-o-arrows-right-left')
+                        ->visible(fn (): bool => $this->canManage())
+                        ->fillForm(fn (WorkspaceMember $record): array => ['role' => $record->role->value])
+                        ->schema([self::roleSelect()])
+                        ->action(function (WorkspaceMember $record, array $data): void {
+                            $this->attempt(
+                                fn (WorkspaceMemberService $members) => $members->changeRole($this->workspace(), $record->user, WorkspaceRole::from((string) $data['role'])),
+                                __('workspaces.settings.members.role_changed', ['name' => $record->user->name]),
+                            );
+                        }),
+                    Action::make('removeMember')
+                        ->label(__('workspaces.settings.members.remove'))
+                        ->icon('heroicon-o-user-minus')
+                        ->color('danger')
+                        ->visible(fn (): bool => $this->canManage())
+                        ->requiresConfirmation()
+                        ->modalDescription(__('workspaces.settings.members.remove_confirm'))
+                        ->action(function (WorkspaceMember $record): void {
+                            $this->attempt(
+                                fn (WorkspaceMemberService $members) => $members->remove($this->workspace(), $record->user),
+                                __('workspaces.settings.members.removed', ['name' => $record->user->name]),
+                            );
+                        }),
                 ])->visible(fn (): bool => $this->canManage()),
             ]);
     }

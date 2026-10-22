@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Enums\WorkspaceRole;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
@@ -27,7 +28,7 @@ class RootRedirectTest extends TestCase
     {
         $user = User::factory()->create(['is_admin' => false]);
         $workspace = Workspace::factory()->create(['name' => 'Argos Playground', 'slug' => 'argos-playground']);
-        WorkspaceMember::query()->create(['workspace_id' => $workspace->id, 'user_id' => $user->id, 'role' => \App\Enums\WorkspaceRole::Member]);
+        WorkspaceMember::query()->create(['workspace_id' => $workspace->id, 'user_id' => $user->id, 'role' => WorkspaceRole::Member]);
         $task = Task::factory()->ownedBy($user)->create(['workspace_id' => $workspace->id, 'slug' => 'fix-login']);
 
         $this->assertSame(url('/argos-playground/fix-login'), $task->url());

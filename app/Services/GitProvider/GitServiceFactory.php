@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Services\GitProvider;
 
-use App\Support\RepoUrlBuilder;
 use App\Enums\GitProvider as GitProviderEnum;
 use App\Models\Workspace;
 use App\Services\GitProvider\Contracts\GitServiceContract;
+use App\Support\RepoUrlBuilder;
 
 class GitServiceFactory
 {

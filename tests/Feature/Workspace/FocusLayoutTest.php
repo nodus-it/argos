@@ -26,6 +26,7 @@ use App\Models\WorkspaceGateRun;
 use App\Models\WorkspaceMember;
 use App\Services\Workspace\TaskOverview;
 use App\Services\Workspace\WorkspaceDaemonClient;
+use App\Support\GateRows;
 use App\Support\TaskTimeline;
 use App\Testing\FakeWorkspaceDaemon;
 use Filament\Facades\Filament;
@@ -171,9 +172,9 @@ class FocusLayoutTest extends TestCase
             'gates' => ['pint' => 'pass', 'phpunit' => 'fail', 'phpstan' => 'skip', 'artisan' => 'pass', 'migrations' => 'pass'],
         ]);
 
-        $rows = collect(\App\Support\GateRows::of(WorkspaceGateRun::query()->first()))->pluck('state', 'key')->all();
+        $rows = collect(GateRows::of(WorkspaceGateRun::query()->first()))->pluck('state', 'key')->all();
         $this->assertSame(['pint' => 'pass', 'pest' => 'fail', 'phpstan' => 'skip', 'artisan' => 'pass', 'migrations' => 'pass'], $rows);
-        $this->assertSame('open', \App\Support\GateRows::of(null)[0]['state']);
+        $this->assertSame('open', GateRows::of(null)[0]['state']);
 
         $files = ContextPanel::changedFiles([
             ['path' => 'app/a.php', 'status' => 'M', 'additions' => 2, 'deletions' => 1],

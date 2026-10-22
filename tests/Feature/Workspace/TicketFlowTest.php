@@ -14,6 +14,8 @@ use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceStatus;
 use App\Integrations\TicketWebhook\Requests\PostTicketEvent;
 use App\Jobs\SendTicketWebhookJob;
+use App\Jobs\Workspace\AdvanceAutoTaskJob;
+use App\Jobs\Workspace\PrepareTaskJob;
 use App\Models\AgentCredential;
 use App\Models\ConnectedAccount;
 use App\Models\Task;
@@ -23,10 +25,14 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceMember;
 use App\Services\IssueTracker\Contracts\IssueTrackerContract;
+use App\Services\IssueTracker\DTO\ExternalIssue;
+use App\Services\IssueTracker\IssueIngestService;
 use App\Services\IssueTracker\IssueRunReporter;
 use App\Services\IssueTracker\IssueTrackerRegistry;
 use App\Services\IssueTracker\TicketCommentSync;
+use App\Services\Workspace\TaskMembershipService;
 use App\Services\Workspace\TaskService;
+use App\Services\Workspace\TaskTicketService;
 use App\Services\Workspace\WorkspaceDaemonClient;
 use App\Testing\FakeWorkspaceDaemon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -150,7 +156,7 @@ class TicketFlowTest extends TestCase
         $task = $this->task($this->ref($this->binding));
         $this->tracker->shouldReceive('assignIssue')->once()->with('', 'ENG', 'uuid-118', 'bob@example.com')->andReturn(true);
 
-        app(\App\Services\Workspace\TaskMembershipService::class)->transfer($task, $this->ada, $bob);
+        app(TaskMembershipService::class)->transfer($task, $this->ada, $bob);
     }
 
     public function test_a_task_links_or_creates_its_ticket_afterwards(): void
@@ -158,13 +164,13 @@ class TicketFlowTest extends TestCase
         $this->tracker->shouldReceive('getIssue')->andReturn(['id' => 'uuid-9', 'identifier' => 'ENG-9', 'title' => 'Billing', 'url' => 'https://linear.app/x/issue/ENG-9', 'description' => '']);
         $task = $this->task();
 
-        app(\App\Services\Workspace\TaskTicketService::class)->linkTicket($task, $this->ada, 'uuid-9');
+        app(TaskTicketService::class)->linkTicket($task, $this->ada, 'uuid-9');
         $this->assertSame('ENG-9', $task->fresh()->external_ref['key']);
 
         $other = $this->task();
         $this->tracker->shouldReceive('createIssue')->once()->with(Mockery::any(), Mockery::any(), 'Dark mode', Mockery::on(fn (string $body): bool => str_contains($body, $other->url())))
             ->andReturn(['id' => 'uuid-10', 'identifier' => 'ENG-10', 'title' => 'Dark mode', 'url' => 'https://linear.app/x/issue/ENG-10', 'description' => '']);
-        app(\App\Services\Workspace\TaskTicketService::class)->createTicket($other, $this->ada, 'Dark mode', 'Please.');
+        app(TaskTicketService::class)->createTicket($other, $this->ada, 'Dark mode', 'Please.');
         $this->assertSame('ENG-10', $other->fresh()->external_ref['key']);
         $this->assertContains('ticket_created', TaskEvent::query()->where('task_id', $other->id)->where('type', TaskEventType::Notice->value)->get()->pluck('payload.kind')->all());
     }
@@ -227,10 +233,10 @@ class TicketFlowTest extends TestCase
         $carol = $this->member('Carol');
         AgentCredential::factory()->ownedBy($carol)->create();
         ConnectedAccount::factory()->create(['user_id' => $carol->id, 'provider' => 'github', 'nickname' => 'carol-gh']);
-        Bus::fake([\App\Jobs\Workspace\AdvanceAutoTaskJob::class, \App\Jobs\Workspace\PrepareTaskJob::class]);
+        Bus::fake([AdvanceAutoTaskJob::class, PrepareTaskJob::class]);
 
-        $ingest = fn (string $number) => app(\App\Services\IssueTracker\IssueIngestService::class)->ingest(
-            new \App\Services\IssueTracker\DTO\ExternalIssue($number, 'Issue '.$number, 'Body', 'https://github.com/acme/widget/issues/'.$number, 'open', [], '', 'carol-gh'),
+        $ingest = fn (string $number) => app(IssueIngestService::class)->ingest(
+            new ExternalIssue($number, 'Issue '.$number, 'Body', 'https://github.com/acme/widget/issues/'.$number, 'open', [], '', 'carol-gh'),
             $github,
         );
 

@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Filament\App\Clusters\Account\Resources\AgentCredentialResource\Pages;
 
 use App\Enums\AgentName;
-use App\Filament\Concerns\VerifiesCredentialOnSave;
 use App\Filament\App\Clusters\Account\Resources\AgentCredentialResource;
+use App\Filament\Concerns\VerifiesCredentialOnSave;
 use App\Filament\Support\Pages\CreateRecord;
 use App\Services\Credentials\AgentCredentialService;
 use App\Services\Credentials\CredentialVerifier;

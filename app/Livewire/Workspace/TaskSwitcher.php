@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace App\Livewire\Workspace;
 
 use App\Livewire\Concerns\InteractsWithWorkspace;
-use App\Support\RequestedTask;
 use App\Models\Task;
 use App\Models\Workspace;
 use App\Services\Workspace\TaskOverview;
 use App\Services\Workspace\TaskReadService;
 use App\Services\Workspace\TaskService;
+use App\Support\RequestedTask;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
@@ -145,7 +145,4 @@ class TaskSwitcher extends Component
     {
         return $this->findTask($id);
     }
-
-
-
 }

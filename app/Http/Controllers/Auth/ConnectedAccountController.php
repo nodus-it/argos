@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Auth;
 
-use App\Support\RepoUrlBuilder;
 use App\Http\Controllers\Auth\Concerns\ReturnsAfterConnect;
 use App\Http\Controllers\Auth\Concerns\ReverifiesConnectedAccount;
 use App\Http\Controllers\Controller;
 use App\Models\ProviderOAuthConfig;
 use App\Models\User;
 use App\Services\OAuth\ConnectedAccountService;
+use App\Support\RepoUrlBuilder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;

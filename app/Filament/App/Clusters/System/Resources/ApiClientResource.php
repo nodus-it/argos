@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace App\Filament\App\Clusters\System\Resources;
 
-use App\Filament\Support\Actions\ServiceDeleteAction;
-use App\Filament\Support\Actions\ServiceDeleteBulkAction;
-use App\Services\Api\ApiClientService;
-use App\Filament\Concerns\AdminOnly;
 use App\Filament\App\Clusters\System;
-use App\Filament\App\Resources\WorkspaceResource\RelationManagers\ApiTokensRelationManager;
 use App\Filament\App\Clusters\System\Resources\ApiClientResource\Pages\CreateApiClient;
 use App\Filament\App\Clusters\System\Resources\ApiClientResource\Pages\EditApiClient;
 use App\Filament\App\Clusters\System\Resources\ApiClientResource\Pages\ListApiClients;
+use App\Filament\App\Resources\WorkspaceResource\RelationManagers\ApiTokensRelationManager;
+use App\Filament\Concerns\AdminOnly;
+use App\Filament\Support\Actions\ServiceDeleteAction;
+use App\Filament\Support\Actions\ServiceDeleteBulkAction;
 use App\Models\ApiClient;
 use App\Models\User;
+use App\Services\Api\ApiClientService;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Select;
@@ -49,8 +49,6 @@ class ApiClientResource extends Resource
     {
         return 'heroicon-o-cpu-chip';
     }
-
-
 
     public static function getModelLabel(): string
     {

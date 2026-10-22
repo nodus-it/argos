@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Enums;
 
 use App\Enums\Concerns\ProvidesOptions;
+
 enum TaskProviderMode: string
 {
     use ProvidesOptions;

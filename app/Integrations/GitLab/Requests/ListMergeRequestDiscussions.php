@@ -20,7 +20,7 @@ class ListMergeRequestDiscussions extends Request
 
     public function resolveEndpoint(): string
     {
-        return "/projects/".urlencode("{$this->owner}/{$this->repo}")."/merge_requests/{$this->mergeRequestId}/discussions";
+        return '/projects/'.urlencode("{$this->owner}/{$this->repo}")."/merge_requests/{$this->mergeRequestId}/discussions";
     }
 
     /**

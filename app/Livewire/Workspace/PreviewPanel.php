@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Livewire\Workspace;
 
-use App\Livewire\Concerns\InteractsWithWorkspace;
 use App\Enums\DemoStatus;
+use App\Livewire\Concerns\InteractsWithWorkspace;
 use App\Models\Task;
 use App\Services\Workspace\WorkspacePreviewService;
 use Filament\Notifications\Notification;
@@ -89,6 +89,4 @@ class PreviewPanel extends Component
     {
         return $this->findTaskOrFail($this->taskId);
     }
-
-
 }

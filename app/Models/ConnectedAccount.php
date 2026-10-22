@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Support\RepoUrlBuilder;
 use App\Enums\AuthMethod;
 use App\Enums\GitProvider;
 use App\Enums\TaskProviderKind;
+use App\Support\RepoUrlBuilder;
 use Database\Factories\ConnectedAccountFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;

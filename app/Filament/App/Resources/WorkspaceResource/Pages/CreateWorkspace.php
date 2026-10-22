@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Filament\App\Resources\WorkspaceResource\Pages;
 
-use App\Filament\Support\Pages\CreateRecord;
-use App\Filament\Shared\WorkspaceForm;
 use App\Filament\App\Resources\WorkspaceResource;
+use App\Filament\Shared\WorkspaceForm;
+use App\Filament\Support\Pages\CreateRecord;
 use App\Models\User;
 use App\Services\EntityService;
 use App\Services\Workspace\WorkspaceService;

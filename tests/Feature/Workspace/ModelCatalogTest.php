@@ -4,12 +4,24 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Workspace;
 
+use App\Broadcasting\TaskStream;
+use App\Enums\WorkspaceRole;
+use App\Enums\WorkspaceStatus;
+use App\Livewire\Workspace\TaskChat;
 use App\Models\AgentCredential;
 use App\Models\Task;
+use App\Models\TaskEvent;
+use App\Models\User;
 use App\Models\Workspace;
+use App\Models\WorkspaceMember;
 use App\Services\Workspace\ModelCatalog;
 use App\Services\Workspace\TaskEventIngestor;
+use App\Services\Workspace\WorkspaceDaemonClient;
+use App\Testing\FakeWorkspaceDaemon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Event;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 class ModelCatalogTest extends TestCase
@@ -40,7 +52,7 @@ class ModelCatalogTest extends TestCase
         ]]);
 
         // Kept in the database: survives a cache clear.
-        \Illuminate\Support\Facades\Cache::flush();
+        Cache::flush();
         $agent->refresh();
         $catalog = app(ModelCatalog::class);
         $options = $catalog->options($agent);
@@ -66,16 +78,16 @@ class ModelCatalogTest extends TestCase
 
     public function test_any_valid_model_id_can_be_entered_by_hand(): void
     {
-        $workspace = Workspace::factory()->create(['status' => \App\Enums\WorkspaceStatus::Running]);
-        $owner = \App\Models\User::factory()->create();
-        \App\Models\WorkspaceMember::query()->create(['workspace_id' => $workspace->id, 'user_id' => $owner->id, 'role' => \App\Enums\WorkspaceRole::Member]);
+        $workspace = Workspace::factory()->create(['status' => WorkspaceStatus::Running]);
+        $owner = User::factory()->create();
+        WorkspaceMember::query()->create(['workspace_id' => $workspace->id, 'user_id' => $owner->id, 'role' => WorkspaceRole::Member]);
         $agent = AgentCredential::factory()->ownedBy($owner)->create();
         $task = Task::factory()->ownedBy($owner)->create(['workspace_id' => $workspace->id, 'agent_credential_id' => $agent->id, 'model' => 'sonnet']);
-        $this->app->singleton(\App\Services\Workspace\WorkspaceDaemonClient::class, \App\Testing\FakeWorkspaceDaemon::class);
-        \Illuminate\Support\Facades\Event::fake([\App\Broadcasting\TaskStream::class]);
+        $this->app->singleton(WorkspaceDaemonClient::class, FakeWorkspaceDaemon::class);
+        Event::fake([TaskStream::class]);
 
-        $chat = \Livewire\Livewire::withQueryParams(['task' => $task->id])->actingAs($owner)
-            ->test(\App\Livewire\Workspace\TaskChat::class, ['workspaceId' => $workspace->id])
+        $chat = Livewire::withQueryParams(['task' => $task->id])->actingAs($owner)
+            ->test(TaskChat::class, ['workspaceId' => $workspace->id])
             ->assertSee(__('workspaces.models.custom'))
             ->assertSee(__('workspaces.models.group_latest'));
 
@@ -98,56 +110,56 @@ class ModelCatalogTest extends TestCase
 
     public function test_the_composer_asks_for_the_models_once_without_sending_a_message(): void
     {
-        $workspace = Workspace::factory()->create(['status' => \App\Enums\WorkspaceStatus::Running]);
-        $owner = \App\Models\User::factory()->create();
-        \App\Models\WorkspaceMember::query()->create(['workspace_id' => $workspace->id, 'user_id' => $owner->id, 'role' => \App\Enums\WorkspaceRole::Member]);
+        $workspace = Workspace::factory()->create(['status' => WorkspaceStatus::Running]);
+        $owner = User::factory()->create();
+        WorkspaceMember::query()->create(['workspace_id' => $workspace->id, 'user_id' => $owner->id, 'role' => WorkspaceRole::Member]);
         $agent = AgentCredential::factory()->ownedBy($owner)->create(['credentials' => ['token' => 'oat-a']]);
         $task = Task::factory()->ownedBy($owner)->create(['workspace_id' => $workspace->id, 'agent_credential_id' => $agent->id, 'model' => 'sonnet']);
-        $this->app->singleton(\App\Services\Workspace\WorkspaceDaemonClient::class, \App\Testing\FakeWorkspaceDaemon::class);
-        \Illuminate\Support\Facades\Event::fake([\App\Broadcasting\TaskStream::class]);
+        $this->app->singleton(WorkspaceDaemonClient::class, FakeWorkspaceDaemon::class);
+        Event::fake([TaskStream::class]);
 
-        $chat = \Livewire\Livewire::withQueryParams(['task' => $task->id])->actingAs($owner)
-            ->test(\App\Livewire\Workspace\TaskChat::class, ['workspaceId' => $workspace->id])
+        $chat = Livewire::withQueryParams(['task' => $task->id])->actingAs($owner)
+            ->test(TaskChat::class, ['workspaceId' => $workspace->id])
             ->assertSeeHtml('$wire.refreshModels()')
             ->call('refreshModels')
             ->assertDontSeeHtml('$wire.refreshModels()')
             ->assertSee('Default (recommended) · Sonnet 5.5')
             ->assertSee('Opus 5.5');
 
-        $this->assertSame([$agent->id], \App\Testing\FakeWorkspaceDaemon::$modelRequests);
+        $this->assertSame([$agent->id], FakeWorkspaceDaemon::$modelRequests);
         $this->assertNotNull($agent->fresh()->models_refreshed_at);
         // Nothing went to Claude as a message.
-        $this->assertSame(0, \App\Models\TaskEvent::query()->where('task_id', $task->id)->count());
+        $this->assertSame(0, TaskEvent::query()->where('task_id', $task->id)->count());
 
         // Fresh: no second ask; after REFRESH_HOURS it asks again.
         $chat->call('refreshModels');
-        $this->assertCount(1, \App\Testing\FakeWorkspaceDaemon::$modelRequests);
+        $this->assertCount(1, FakeWorkspaceDaemon::$modelRequests);
         $this->travel(ModelCatalog::REFRESH_HOURS + 1)->hours();
         $this->assertTrue(app(ModelCatalog::class)->isStale($agent->fresh()));
     }
 
     public function test_effort_follows_the_model_and_reaches_the_running_session(): void
     {
-        $workspace = Workspace::factory()->create(['status' => \App\Enums\WorkspaceStatus::Running]);
-        $owner = \App\Models\User::factory()->create();
-        \App\Models\WorkspaceMember::query()->create(['workspace_id' => $workspace->id, 'user_id' => $owner->id, 'role' => \App\Enums\WorkspaceRole::Member]);
+        $workspace = Workspace::factory()->create(['status' => WorkspaceStatus::Running]);
+        $owner = User::factory()->create();
+        WorkspaceMember::query()->create(['workspace_id' => $workspace->id, 'user_id' => $owner->id, 'role' => WorkspaceRole::Member]);
         $agent = AgentCredential::factory()->ownedBy($owner)->create(['models_refreshed_at' => now(), 'models' => [
             ['value' => 'opus', 'label' => 'Opus', 'description' => '', 'resolved' => 'claude-opus-5-5', 'effort_levels' => ['low', 'high', 'max']],
             ['value' => 'haiku', 'label' => 'Haiku', 'description' => '', 'resolved' => 'claude-haiku-5-5', 'effort_levels' => []],
         ]]);
         $task = Task::factory()->ownedBy($owner)->create(['workspace_id' => $workspace->id, 'agent_credential_id' => $agent->id, 'model' => 'claude-opus-5-5', 'session_open' => true]);
-        $this->app->singleton(\App\Services\Workspace\WorkspaceDaemonClient::class, \App\Testing\FakeWorkspaceDaemon::class);
-        \Illuminate\Support\Facades\Event::fake([\App\Broadcasting\TaskStream::class]);
+        $this->app->singleton(WorkspaceDaemonClient::class, FakeWorkspaceDaemon::class);
+        Event::fake([TaskStream::class]);
 
-        $chat = \Livewire\Livewire::withQueryParams(['task' => $task->id])->actingAs($owner)
-            ->test(\App\Livewire\Workspace\TaskChat::class, ['workspaceId' => $workspace->id])
+        $chat = Livewire::withQueryParams(['task' => $task->id])->actingAs($owner)
+            ->test(TaskChat::class, ['workspaceId' => $workspace->id])
             ->assertSee(__('workspaces.models.efforts.max'))
             ->assertDontSee(__('workspaces.models.efforts.medium'))
             ->call('setEffort', 'high');
 
         $this->assertSame('high', $task->fresh()->effort);
-        $this->assertSame([[$task->id, 'high']], \App\Testing\FakeWorkspaceDaemon::$efforts);
-        $notice = \App\Models\TaskEvent::query()->where('task_id', $task->id)->latest('id')->first();
+        $this->assertSame([[$task->id, 'high']], FakeWorkspaceDaemon::$efforts);
+        $notice = TaskEvent::query()->where('task_id', $task->id)->latest('id')->first();
         $this->assertSame(['effort', 'high'], [$notice->payload['kind'], $notice->payload['effort']]);
 
         $chat->call('setEffort', 'ultra')->assertNotified(__('workspaces.models.effort_invalid'));

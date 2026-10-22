@@ -70,5 +70,4 @@ class WorkspaceDiffService
             FetchWorkspaceRemoteJob::dispatch($workspace->id);
         }
     }
-
 }

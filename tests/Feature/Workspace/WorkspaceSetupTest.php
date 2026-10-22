@@ -8,6 +8,7 @@ use App\Broadcasting\TaskStream;
 use App\Enums\TaskEventType;
 use App\Enums\TaskKind;
 use App\Enums\TaskStatus;
+use App\Enums\WorkerImageBuildStatus;
 use App\Enums\WorkerImageEntityStatus;
 use App\Enums\WorkerSource;
 use App\Enums\WorkspaceRole;
@@ -20,6 +21,7 @@ use App\Models\AgentCredential;
 use App\Models\Task;
 use App\Models\TaskEvent;
 use App\Models\User;
+use App\Models\WorkerImageBuild;
 use App\Models\WorkerStack;
 use App\Models\Workspace;
 use App\Models\WorkspaceMember;
@@ -32,7 +34,10 @@ use App\Services\Workspace\WorkspaceService;
 use App\Services\Workspace\WorkspaceSetupService;
 use App\Services\Workspace\WorkspaceShipService;
 use App\Testing\FakeWorkspaceDaemon;
+use App\Workers\Compose\WorkerImageBuilder;
+use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Event;
@@ -163,7 +168,7 @@ class WorkspaceSetupTest extends TestCase
         $member = User::factory()->create();
         WorkspaceMember::query()->create(['workspace_id' => $this->workspace->id, 'user_id' => $member->id, 'role' => WorkspaceRole::Member]);
 
-        $this->expectException(\Illuminate\Auth\Access\AuthorizationException::class);
+        $this->expectException(AuthorizationException::class);
         $this->service()->start($this->workspace, $member);
     }
 
@@ -250,8 +255,8 @@ class WorkspaceSetupTest extends TestCase
         $task = $this->setupTask();
         $this->files = ['.argos/worker.dockerfile' => "FROM debian:bookworm\n"];
         $this->mock(WorkspaceShipService::class)->shouldReceive('ship')->andReturn('https://x/3');
-        $build = new \App\Models\WorkerImageBuild(['status' => \App\Enums\WorkerImageBuildStatus::Ready, 'build_log' => 'ok']);
-        $this->mock(\App\Workers\Compose\WorkerImageBuilder::class)->shouldReceive('build')->once()->andReturn($build);
+        $build = new WorkerImageBuild(['status' => WorkerImageBuildStatus::Ready, 'build_log' => 'ok']);
+        $this->mock(WorkerImageBuilder::class)->shouldReceive('build')->once()->andReturn($build);
 
         $this->service()->check($task, $this->admin);
 
@@ -306,7 +311,7 @@ class WorkspaceSetupTest extends TestCase
             ->assertSee(__('workspaces.setup.steps.image'))
             ->assertSee(__('workspaces.setup.source_preview').': '.__('workspaces.setup.source.missing'))
             ->assertSee(__('workspaces.setup.revise'))
-            ->callAction(\Filament\Actions\Testing\TestAction::make('reviseSetup')->schemaComponent('setupActions', schema: 'environmentForm'));
+            ->callAction(TestAction::make('reviseSetup')->schemaComponent('setupActions', schema: 'environmentForm'));
 
         $this->assertTrue(Task::query()->where('kind', TaskKind::Setup->value)->exists());
     }

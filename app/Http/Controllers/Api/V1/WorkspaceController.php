@@ -4,18 +4,18 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Enums\AuthMethod;
+use App\Enums\GitProvider;
 use App\Http\Controllers\Api\V1\Concerns\ActsForAutomation;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\V1\WorkspaceResource;
-use App\Enums\AuthMethod;
-use App\Enums\GitProvider;
 use App\Models\ConnectedAccount;
 use App\Models\Workspace;
 use App\Services\Workspace\WorkspaceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Validation\Rule;
 
 /** Workspaces the token may see; Argos admins' clients may create them. */
 class WorkspaceController extends Controller

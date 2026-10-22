@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Filament\App\Resources\WorkspaceResource\Pages;
 
-use App\Filament\App\Resources\WorkspaceResource\RelationManagers\ApiTokensRelationManager;
-use App\Filament\App\Resources\WorkspaceResource\RelationManagers\TaskProviderBindingsRelationManager;
-use App\Filament\Support\Pages\EditRecord;
-use App\Filament\Shared\WorkspaceForm;
 use App\Filament\App\Resources\WorkspaceResource;
+use App\Filament\App\Resources\WorkspaceResource\RelationManagers\ApiTokensRelationManager;
 use App\Filament\App\Resources\WorkspaceResource\RelationManagers\MembersRelationManager;
+use App\Filament\App\Resources\WorkspaceResource\RelationManagers\TaskProviderBindingsRelationManager;
+use App\Filament\Shared\WorkspaceForm;
+use App\Filament\Support\Pages\EditRecord;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\EntityService;

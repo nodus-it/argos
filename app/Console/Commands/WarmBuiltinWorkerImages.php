@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Enums\WorkerImageEntityStatus;
-use App\Services\Worker\WorkerStackBuildDispatcher;
 use App\Models\WorkerStack;
+use App\Services\Worker\WorkerStackBuildDispatcher;
 use App\Workers\Agents\AgentRegistry;
 use App\Workers\Compose\WorkerImageBuilder;
 use App\Workers\Compose\WorkerImageResolver;

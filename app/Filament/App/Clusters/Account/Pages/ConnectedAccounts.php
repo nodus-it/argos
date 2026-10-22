@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Filament\App\Clusters\Account\Pages;
 
+use App\Filament\App\Clusters\Account;
 use App\Models\ConnectedAccount;
 use App\Models\ProviderOAuthConfig;
 use App\Models\User;
 use App\Services\OAuth\ConnectedAccountService;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
-use App\Filament\App\Clusters\Account;
 use Filament\Pages\Page;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;

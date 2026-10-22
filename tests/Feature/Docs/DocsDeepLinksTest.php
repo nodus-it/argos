@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace Tests\Feature\Docs;
 
 use App\Filament\App\Clusters\Account\Pages\ConnectedAccounts;
-use App\Filament\App\Pages\Onboarding;
 use App\Filament\App\Clusters\Account\Resources\AgentCredentialResource\Pages\ListAgentCredentials;
 use App\Filament\App\Clusters\System\Resources\ApiClientResource\Pages\ListApiClients;
 use App\Filament\App\Clusters\System\Resources\ProviderCredentialResource\Pages\ListProviderCredentials;
 use App\Filament\App\Clusters\System\Resources\ProviderOAuthConfigResource\Pages\ListProviderOAuthConfigs;
+use App\Filament\App\Pages\Documentation;
+use App\Filament\App\Pages\Onboarding;
 use App\Filament\App\Resources\WorkspaceResource\Pages\CreateWorkspace;
 use App\Filament\App\Resources\WorkspaceResource\Pages\ListWorkspaces;
 use App\Models\User;
@@ -89,7 +90,7 @@ class DocsDeepLinksTest extends TestCase
 
     public function test_renamed_pages_keep_their_old_address(): void
     {
-        Livewire::test(\App\Filament\App\Pages\Documentation::class, ['slug' => 'projects'])
-            ->assertRedirect(\App\Filament\App\Pages\Documentation::getUrl(['slug' => 'workspace-settings']));
+        Livewire::test(Documentation::class, ['slug' => 'projects'])
+            ->assertRedirect(Documentation::getUrl(['slug' => 'workspace-settings']));
     }
 }

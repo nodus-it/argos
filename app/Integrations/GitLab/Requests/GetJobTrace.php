@@ -20,6 +20,6 @@ class GetJobTrace extends Request
 
     public function resolveEndpoint(): string
     {
-        return "/projects/".urlencode("{$this->owner}/{$this->repo}")."/jobs/{$this->jobId}/trace";
+        return '/projects/'.urlencode("{$this->owner}/{$this->repo}")."/jobs/{$this->jobId}/trace";
     }
 }

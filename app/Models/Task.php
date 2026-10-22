@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Services\GitProvider\PullRequestDetails;
 use App\Enums\AutoTaskState;
 use App\Enums\PermissionMode;
 use App\Enums\SessionStatus;
@@ -13,6 +12,7 @@ use App\Enums\TaskOrigin;
 use App\Enums\TaskState;
 use App\Enums\TaskStatus;
 use App\Services\Demo\DemoTarget;
+use App\Services\GitProvider\PullRequestDetails;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;

@@ -13,6 +13,8 @@ use App\Models\ProviderCredential;
 use App\Models\ProviderOAuthConfig;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Services\Credentials\CredentialVerification;
+use App\Services\Credentials\CredentialVerifier;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
@@ -382,16 +384,16 @@ class OnboardingPageTest extends TestCase
     public function test_an_access_token_is_added_in_a_dialog_and_verified(): void
     {
         $this->configureClaudeAgent();
-        $this->mock(\App\Services\Credentials\CredentialVerifier::class)
+        $this->mock(CredentialVerifier::class)
             ->shouldReceive('verifyProvider')->once()->with('github', 'test-pat', '')
-            ->andReturn(\App\Services\Credentials\CredentialVerification::valid());
+            ->andReturn(CredentialVerification::valid());
 
         Livewire::test(Onboarding::class)
             ->callAction('addAccessToken', ['provider' => 'github', 'label' => 'Test', 'token' => 'test-pat', 'status' => 'active'])
             ->assertHasNoActionErrors()
             ->assertSet('currentStep', 3);
 
-        $credential = \App\Models\ProviderCredential::query()->sole();
+        $credential = ProviderCredential::query()->sole();
         $this->assertSame('Test', $credential->label);
         $this->assertNotNull($credential->last_validated_at);
     }
@@ -399,14 +401,14 @@ class OnboardingPageTest extends TestCase
     public function test_a_rejected_access_token_is_not_stored(): void
     {
         $this->configureClaudeAgent();
-        $this->mock(\App\Services\Credentials\CredentialVerifier::class)
+        $this->mock(CredentialVerifier::class)
             ->shouldReceive('verifyProvider')->once()
-            ->andReturn(\App\Services\Credentials\CredentialVerification::rejected('Bad credentials'));
+            ->andReturn(CredentialVerification::rejected('Bad credentials'));
 
         Livewire::test(Onboarding::class)
             ->callAction('addAccessToken', ['provider' => 'github', 'label' => 'Test', 'token' => 'nope', 'status' => 'active']);
 
-        $this->assertSame(0, \App\Models\ProviderCredential::query()->count());
+        $this->assertSame(0, ProviderCredential::query()->count());
     }
 
     public function test_inline_create_with_oauth_account_creates_workspace(): void

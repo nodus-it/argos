@@ -20,6 +20,6 @@ class GetMergeRequestApprovals extends Request
 
     public function resolveEndpoint(): string
     {
-        return "/projects/".urlencode("{$this->owner}/{$this->repo}")."/merge_requests/{$this->mergeRequestId}/approvals";
+        return '/projects/'.urlencode("{$this->owner}/{$this->repo}")."/merge_requests/{$this->mergeRequestId}/approvals";
     }
 }

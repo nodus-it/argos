@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Filament;
 
+use App\Filament\App\Clusters\Account;
 use App\Filament\App\Clusters\Account\Pages\ConnectedAccounts;
 use App\Models\ConnectedAccount;
 use App\Models\User;
@@ -91,7 +92,7 @@ class ConnectedAccountsPageTest extends TestCase
 
     public function test_page_belongs_to_my_account(): void
     {
-        $this->assertSame(\App\Filament\App\Clusters\Account::class, ConnectedAccounts::getCluster());
+        $this->assertSame(Account::class, ConnectedAccounts::getCluster());
     }
 
     public function test_only_current_users_account_shown(): void

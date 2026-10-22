@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services\IssueTracker\Providers;
 
-use App\Support\RepoUrlBuilder;
 use App\Integrations\GitLab\GitLabConnector;
 use App\Integrations\GitLab\Requests\CloseIssue;
 use App\Integrations\GitLab\Requests\CreateIssue;
@@ -21,6 +20,7 @@ use App\Integrations\GitLab\Requests\RegisterWebhook;
 use App\Integrations\GitLab\Requests\UnregisterWebhook;
 use App\Integrations\GitLab\Requests\UpdateIssueAssignees;
 use App\Services\IssueTracker\Contracts\IssueTrackerContract;
+use App\Support\RepoUrlBuilder;
 use Illuminate\Support\Facades\Log;
 
 class GitLabIssueTracker implements IssueTrackerContract

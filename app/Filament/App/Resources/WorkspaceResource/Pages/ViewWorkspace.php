@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Filament\App\Resources\WorkspaceResource\Pages;
 
-use App\Filament\App\Resources\WorkspaceResource\Pages\Concerns\ManagesTask;
-use App\Filament\App\Resources\WorkspaceResource\Pages\Concerns\ShipsTask;
 use App\Enums\WorkspaceStatus;
 use App\Filament\App\Resources\WorkspaceResource;
+use App\Filament\App\Resources\WorkspaceResource\Pages\Concerns\ManagesTask;
+use App\Filament\App\Resources\WorkspaceResource\Pages\Concerns\ShipsTask;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;

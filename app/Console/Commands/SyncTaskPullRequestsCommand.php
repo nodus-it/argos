@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Services\GitProvider\PullRequestDetails;
 use App\Models\Task;
+use App\Services\GitProvider\PullRequestDetails;
 use App\Services\Workspace\PullRequestService;
 use Illuminate\Console\Command;
 

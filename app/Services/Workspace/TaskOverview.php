@@ -98,6 +98,7 @@ class TaskOverview
             if ($task->status === TaskStatus::Preparing) {
                 return __('workspaces.switcher.text.preparing');
             }
+
             return $step === '' ? __('workspaces.switcher.text.working') : __('workspaces.switcher.text.working_on', ['step' => $step]);
         }
         if ($task->queued_at !== null) {
@@ -115,6 +116,7 @@ class TaskOverview
         if ($task->auto_state !== null && $task->auto_state !== AutoTaskState::Done) {
             return $task->auto_state->label();
         }
+
         return $files > 0 ? trans_choice('workspaces.switcher.text.done_files', $files, ['count' => $files]) : __('workspaces.switcher.text.done');
     }
 

@@ -15,7 +15,9 @@ use App\Models\TaskEvent;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceMember;
+use App\Services\Workspace\TaskMembershipService;
 use App\Services\Workspace\TaskService;
+use App\Services\Workspace\TaskTicketService;
 use App\Services\Workspace\WorkspaceDaemonClient;
 use App\Services\Workspace\WorkspaceException;
 use App\Testing\FakeWorkspaceDaemon;
@@ -77,16 +79,16 @@ class TaskCollaborationTest extends TestCase
         $task = $this->task();
         $this->assertFalse($this->bob->can('prompt', $task));
 
-        app(\App\Services\Workspace\TaskMembershipService::class)->invite($task, $this->ada, $this->bob);
+        app(TaskMembershipService::class)->invite($task, $this->ada, $this->bob);
 
         $this->assertTrue($this->bob->fresh()->can('prompt', $task->fresh()));
         $this->assertContains('invited', $this->noticeKinds($task));
         $this->assertDatabaseHas('notifications', ['notifiable_id' => $this->bob->id]);
 
         // Again is a no-op; removing takes the right back.
-        app(\App\Services\Workspace\TaskMembershipService::class)->invite($task, $this->ada, $this->bob);
+        app(TaskMembershipService::class)->invite($task, $this->ada, $this->bob);
         $this->assertSame(1, $task->members()->count());
-        app(\App\Services\Workspace\TaskMembershipService::class)->uninvite($task, $this->ada, $this->bob);
+        app(TaskMembershipService::class)->uninvite($task, $this->ada, $this->bob);
         $this->assertFalse($this->bob->can('prompt', $task->fresh()));
     }
 
@@ -97,12 +99,12 @@ class TaskCollaborationTest extends TestCase
 
         $this->expectException(AuthorizationException::class);
         try {
-            app(\App\Services\Workspace\TaskMembershipService::class)->invite($task, $this->ada, $stranger);
+            app(TaskMembershipService::class)->invite($task, $this->ada, $stranger);
             $this->fail('expected a refusal');
         } catch (WorkspaceException) {
             // not a member
         }
-        app(\App\Services\Workspace\TaskMembershipService::class)->invite($task, $this->bob, $this->bob);
+        app(TaskMembershipService::class)->invite($task, $this->bob, $this->bob);
     }
 
     public function test_inviting_sits_behind_the_collaboration_gate(): void
@@ -111,7 +113,7 @@ class TaskCollaborationTest extends TestCase
         $task = $this->task();
 
         $this->expectException(WorkspaceException::class);
-        app(\App\Services\Workspace\TaskMembershipService::class)->invite($task, $this->ada, $this->bob);
+        app(TaskMembershipService::class)->invite($task, $this->ada, $this->bob);
     }
 
     public function test_handing_over_moves_the_task_to_the_new_owners_subscription(): void
@@ -121,7 +123,7 @@ class TaskCollaborationTest extends TestCase
         $this->service()->send($task, $this->ada, 'start');
         $this->assertTrue($task->fresh()->session_open);
 
-        app(\App\Services\Workspace\TaskMembershipService::class)->transfer($task->fresh(), $this->ada, $this->bob);
+        app(TaskMembershipService::class)->transfer($task->fresh(), $this->ada, $this->bob);
 
         $task->refresh();
         $this->assertSame($this->bob->id, $task->owner_user_id);
@@ -142,7 +144,7 @@ class TaskCollaborationTest extends TestCase
 
         foreach ([$viewer, $this->bob] as $newOwner) {
             try {
-                app(\App\Services\Workspace\TaskMembershipService::class)->transfer($task, $this->ada, $newOwner);
+                app(TaskMembershipService::class)->transfer($task, $this->ada, $newOwner);
                 $this->fail('expected a refusal for '.$newOwner->name);
             } catch (WorkspaceException) {
                 $this->assertSame($this->ada->id, $task->fresh()->owner_user_id);
@@ -194,7 +196,7 @@ class TaskCollaborationTest extends TestCase
         $this->assertSame('42', $follow->external_ref['number']);
         $this->assertStringStartsWith('github-42-', (string) $follow->branch);
         $this->assertNotSame($task->branch, $follow->branch);
-        $brief = app(\App\Services\Workspace\TaskTicketService::class)->followUpBrief($follow);
+        $brief = app(TaskTicketService::class)->followUpBrief($follow);
         $this->assertStringContainsString('https://github.com/acme/widget/pull/7', $brief);
         $this->assertStringContainsString('Login works now.', $brief);
     }
