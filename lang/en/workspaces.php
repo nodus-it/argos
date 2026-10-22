@@ -554,6 +554,7 @@ return [
         'tool' => 'Tool',
         'error' => 'Error',
         'interrupted' => ':name stopped Claude.',
+        'session_lost' => 'The workspace restarted and Claude’s session ended — the running turn was interrupted. Write again to continue.',
         'permission_mode' => ':name switched the mode to :mode.',
         'effort' => ':name set the effort to :effort.',
         'model' => ':name switched the model to :model.',

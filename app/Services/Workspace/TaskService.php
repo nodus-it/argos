@@ -233,7 +233,15 @@ class TaskService
             return;
         }
 
-        WorkspaceException::wrapDaemon(fn () => $this->daemon->for($task->workspace)->interrupt($task->id));
+        try {
+            WorkspaceException::wrapDaemon(fn () => $this->daemon->for($task->workspace)->interrupt($task->id));
+        } catch (WorkspaceException $e) {
+            if ($e->reason !== 'unknown_task') {
+                throw $e;
+            }
+            // The daemon lost the session (restart): nothing left to stop — close it here too.
+            app(TaskSessionReconciler::class)->forgetSession($task);
+        }
         $this->notices->notice($task, 'interrupted', $by);
     }
 
@@ -694,5 +702,4 @@ class TaskService
         $this->open($task);
         WorkspaceException::wrapDaemon(fn () => $this->daemon->for($task->workspace)->sendMessage($task->id, $payload));
     }
-
 }

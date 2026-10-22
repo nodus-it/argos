@@ -37,6 +37,11 @@ Schedule::command('argos:workspaces:idle-stop')
     ->everyFiveMinutes()
     ->withoutOverlapping();
 
+// Sessions live in the daemon's memory: close what a restarted daemon lost.
+Schedule::command('argos:workspaces:reconcile-sessions')
+    ->everyMinute()
+    ->withoutOverlapping();
+
 Schedule::command('argos:workspaces:reap-orphans')
     ->everyFifteenMinutes()
     ->withoutOverlapping();

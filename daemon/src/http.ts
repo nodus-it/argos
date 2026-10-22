@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { timingSafeEqual } from 'node:crypto';
+import { randomUUID, timingSafeEqual } from 'node:crypto';
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { ApprovalRegistry } from './approvals.js';
@@ -142,6 +142,7 @@ const oneshotSchema = z.object({
 export function buildApp(deps: AppDependencies): { app: FastifyInstance; sessions: Map<string, TaskSession> } {
     const app = Fastify({ logger: false, bodyLimit: 40 * 1024 * 1024 });
     const sessions = new Map<string, TaskSession>();
+    const bootId = randomUUID();
     const sessionsIn = (dir: string): TaskSession[] => [...sessions.values()].filter((s) => s.cwd === dir);
     const approvals = new ApprovalRegistry();
     const layout: Layout = layoutFor(deps.environment.workspaceDir);
@@ -225,6 +226,8 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
 
     app.get('/health', async () => ({
         version: DAEMON_VERSION,
+        // A new id per daemon process: the manager notices a restart (lost sessions, cut preparations).
+        boot_id: bootId,
         sdk_version: deps.versions?.sdk ?? null,
         claude_version: deps.versions?.claude ?? null,
         tasks: [...sessions.values()].map((s) => ({ id: s.taskId, state: s.currentState, claude_session_id: s.sessionId })),

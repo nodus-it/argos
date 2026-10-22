@@ -34,6 +34,7 @@ class WorkspaceProvisioner
         private readonly WorkspaceDaemonClient $daemon,
         private readonly TaskService $tasks,
         private readonly TraefikRouter $router,
+        private readonly TaskSessionReconciler $sessions,
     ) {}
 
     /**
@@ -51,7 +52,7 @@ class WorkspaceProvisioner
             $this->containers->prepareVolumes($workspace);
             $sidecars = $this->sidecars->startForWorkspace($workspace);
             $this->containers->run($workspace, $image, $sidecars);
-            $this->containers->waitForHealth($workspace);
+            $health = $this->containers->waitForHealth($workspace);
             $this->router->writeCodeRoute($workspace->slug, $workspace->editorToken(), (int) config('argos.workspaces.editor_port', 3000));
 
             $creator = $workspace->creator;
@@ -76,6 +77,10 @@ class WorkspaceProvisioner
         ])->save();
 
         event(new WorkspaceStarted($workspace));
+
+        // A fresh container holds no session: whatever the database still
+        // calls open died with the old one.
+        $this->sessions->afterBoot($workspace, $health);
 
         Task::query()->where('workspace_id', $workspace->id)->where('status', TaskStatus::Preparing->value)->pluck('id')
             ->each(fn (string $id) => PrepareTaskJob::dispatch($id));

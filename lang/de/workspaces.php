@@ -554,6 +554,7 @@ return [
         'tool' => 'Tool',
         'error' => 'Fehler',
         'interrupted' => ':name hat Claude gestoppt.',
+        'session_lost' => 'Der Workspace wurde neu gestartet und Claudes Session ist beendet – der laufende Turn wurde unterbrochen. Schreib erneut, um weiterzumachen.',
         'permission_mode' => ':name hat den Modus auf :mode gestellt.',
         'effort' => ':name hat den Effort auf :effort gestellt.',
         'model' => ':name hat das Modell auf :model gestellt.',
