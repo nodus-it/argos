@@ -400,9 +400,16 @@ Hinweise:
 
 **Sicherung.** Der zu sichernde Zustand liegt in den benannten Volumes:
 
-- `argos-db` — die MariaDB-Datenbank (das primäre Backup-Ziel)
+- `argos-db` — die MariaDB-Datenbank (das primäre Backup-Ziel). Erstelle einen
+  logischen Dump, statt die laufenden Dateien zu kopieren:
+  `docker compose exec db mariadb-dump --single-transaction -uargos -p argos > argos.sql`
 - `argos-data` — persistierter App-Zustand (`APP_KEY`-Fallback,
-  Passport-Schlüssel, `ARGOS_CONFIG_DIR`)
+  Passport-Schlüssel, `ARGOS_CONFIG_DIR`) und Uploads (Avatare, an Nachrichten
+  angehängte Bilder, unter `/data/files`)
+- `ws_<slug>` und `ws_<slug>_agents` — ein Paar pro Workspace: der Clone mit
+  den Arbeitskopien aller Aufgaben (uncommittete Arbeit, Backup-Referenzen) und
+  Claudes Session-Zustand. Gepushte Arbeit liegt sicher beim Git-Host; sichere
+  diese Volumes, wenn laufende Arbeit wichtig ist.
 
 Verwende Bind-Mounts (siehe
 [Produktionsnahe Installation](#produktionsnahe-installation)), um diese mit deinem

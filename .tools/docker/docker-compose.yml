@@ -169,6 +169,7 @@ services:
       # workspace jobs run queued.
       ARGOS_E2E_FAKE:                    "${ARGOS_E2E_FAKE:-}"
       ARGOS_CONFIG_DIR:                  /data/config
+      ARGOS_FILES_DIR:                   /data/files
       ARGOS_TRAEFIK_DIR:                 /data/traefik
       DB_CONNECTION:                     "mariadb"
       ARGOS_DB_HOST:                     "db"
@@ -269,6 +270,7 @@ services:
       # Browser-E2E only — see the note on the app service above.
       ARGOS_E2E_FAKE:                    "${ARGOS_E2E_FAKE:-}"
       ARGOS_CONFIG_DIR:                  /data/config
+      ARGOS_FILES_DIR:                   /data/files
       ARGOS_TRAEFIK_DIR:                 /data/traefik
       DB_CONNECTION:                     "mariadb"
       ARGOS_DB_HOST:                     "db"

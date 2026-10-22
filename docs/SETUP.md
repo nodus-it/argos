@@ -375,9 +375,16 @@ Notes:
 
 **Backup.** The state to back up lives in the named volumes:
 
-- `argos-db` — the MariaDB database (the primary backup target)
+- `argos-db` — the MariaDB database (the primary backup target). Take a
+  logical dump rather than copying the live files:
+  `docker compose exec db mariadb-dump --single-transaction -uargos -p argos > argos.sql`
 - `argos-data` — persisted app state (`APP_KEY` fallback, Passport keys,
-  `ARGOS_CONFIG_DIR`)
+  `ARGOS_CONFIG_DIR`) and uploads (avatars, images attached to messages,
+  under `/data/files`)
+- `ws_<slug>` and `ws_<slug>_agents` — one pair per workspace: the clone with
+  every task's working copy (uncommitted work, backup refs) and Claude's
+  session state. Pushed work is safe on the git host; back these up if work in
+  progress matters.
 
 Use bind mounts (see [Production-style install](#production-style-install)) to
 back these up with your host tooling, or snapshot the volumes directly. The

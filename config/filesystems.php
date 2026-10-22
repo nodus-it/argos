@@ -10,7 +10,9 @@ return [
 
         'local' => [
             'driver' => 'local',
-            'root' => storage_path('app/private'),
+            // Uploads (avatars, task images) must outlive the container and be
+            // readable by the queue too: compose points this at the shared /data volume.
+            'root' => env('ARGOS_FILES_DIR', storage_path('app/private')),
             'serve' => true,
             'throw' => false,
             'report' => false,

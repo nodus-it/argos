@@ -72,7 +72,7 @@ if [[ -f /app/composer.lock ]]; then
 fi
 
 # Make the data volume writable for www-data.
-mkdir -p /data/config
+mkdir -p /data/config /data/files
 chown -R www-data:www-data /data
 
 # Seed the static Traefik route for the Argos app (file provider). Traefik does
