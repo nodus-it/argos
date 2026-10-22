@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Filament\App\Clusters\System\Resources;
 
+use App\Filament\Support\Actions\ServiceDeleteAction;
+use App\Filament\Support\Actions\ServiceDeleteBulkAction;
 use App\Enums\IntegrationProvider;
 use App\Enums\ProviderCredentialStatus;
 use App\Filament\Concerns\AdminOnly;
@@ -16,8 +18,6 @@ use App\Services\Credentials\ProviderCredentialService;
 use App\Services\Integrations\ProviderSetupGuide;
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteAction;
-use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
@@ -176,11 +176,11 @@ class ProviderCredentialResource extends Resource
             ->recordActions([
                 self::testConnectionAction(),
                 EditAction::make(),
-                DeleteAction::make(),
+                ServiceDeleteAction::make(ProviderCredentialService::class),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
-                    DeleteBulkAction::make(),
+                    ServiceDeleteBulkAction::make(ProviderCredentialService::class),
                 ]),
             ])
             ->defaultSort('updated_at', 'desc');

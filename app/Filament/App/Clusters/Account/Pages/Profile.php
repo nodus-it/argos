@@ -142,18 +142,13 @@ final class Profile extends EditProfile
     }
 
     /**
-     * The picture goes through UserService (it removes the previous file);
-     * everything else is saved as before.
+     * Saved through UserService like every other user write.
      *
      * @param  array<string, mixed>  $data
      */
     protected function handleRecordUpdate(Model $record, array $data): Model
     {
-        if ($record instanceof User && array_key_exists('avatar_path', $data)) {
-            app(UserService::class)->setAvatar($record, $data['avatar_path']);
-            unset($data['avatar_path']);
-        }
-
-        return parent::handleRecordUpdate($record, $data);
+        /** @var User $record */
+        return app(UserService::class)->updateProfile($record, $data);
     }
 }

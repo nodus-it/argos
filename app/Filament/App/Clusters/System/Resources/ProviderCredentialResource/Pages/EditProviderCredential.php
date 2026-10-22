@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\App\Clusters\System\Resources\ProviderCredentialResource\Pages;
 
+use App\Filament\Support\Actions\ServiceDeleteAction;
 use App\Filament\Concerns\HasArgosEditHeading;
 use App\Filament\Concerns\VerifiesCredentialOnSave;
 use App\Filament\App\Clusters\System\Resources\ProviderCredentialResource;
@@ -12,7 +13,6 @@ use App\Models\ProviderCredential;
 use App\Services\Credentials\CredentialVerifier;
 use App\Services\Credentials\ProviderCredentialService;
 use App\Services\EntityService;
-use Filament\Actions\DeleteAction;
 
 class EditProviderCredential extends EditRecord
 {
@@ -44,7 +44,7 @@ class EditProviderCredential extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            DeleteAction::make(),
+            ServiceDeleteAction::make(ProviderCredentialService::class),
         ];
     }
 

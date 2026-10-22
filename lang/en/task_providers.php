@@ -8,6 +8,7 @@ return [
     'form' => [
         'provider' => 'Provider',
         'mode' => 'Mode',
+        'credential_not_yours' => 'That connected account is not yours — pick one of your own.',
         'credential' => 'Access',
         'credential_help' => 'OAuth account or stored access token (PAT) for this provider.',
         'project' => 'Project / Team',

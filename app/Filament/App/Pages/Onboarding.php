@@ -26,6 +26,7 @@ use App\Services\Account\AccountPasswordService;
 use App\Services\Anthropic\AnthropicTokenValidator;
 use App\Services\Credentials\AgentCredentialService;
 use App\Services\Git\RepositoryFetcher;
+use App\Services\Credentials\CredentialRefResolver;
 use App\Services\OAuth\ConnectedAccountService;
 use App\Services\OAuth\TokenRefresher;
 use App\Services\User\UserService;
@@ -631,32 +632,13 @@ class Onboarding extends Page
     {
         /** @var User|null $user */
         $user = Auth::user();
+        $providers = array_keys(self::OAUTH_PROVIDERS);
 
-        $oauth = [];
-        if ($user !== null) {
-            // Every connected git account — including multiple GitLab instances
-            // (public + self-hosted), which connectedAccount() would collapse to one.
-            $accounts = app(ConnectedAccountService::class)
-                ->selectableFor($user, array_keys(self::OAUTH_PROVIDERS));
-            foreach ($accounts as $account) {
-                $label = $account->name ?? $account->nickname ?? "#{$account->id}";
-                $host = ($account->instance_url !== null && $account->instance_url !== '')
-                    ? ' ('.(parse_url($account->instance_url, PHP_URL_HOST) ?: $account->instance_url).')'
-                    : '';
-                $oauth["oauth:{$account->id}"] = ucfirst($account->provider).$host.' · '.$label;
-            }
-        }
-
-        $pat = [];
-        $credentials = ProviderCredential::query()
-            ->whereIn('provider', array_keys(self::OAUTH_PROVIDERS))
-            ->orderBy('label')
-            ->get();
-        foreach ($credentials as $credential) {
-            $pat["pat:{$credential->id}"] = $credential->provider->label().' · '.$credential->label;
-        }
-
-        return ['oauth' => $oauth, 'pat' => $pat];
+        // Every connected git account — including multiple GitLab instances
+        // (public + self-hosted), which connectedAccount() would collapse to one.
+        return $user !== null
+            ? app(CredentialRefResolver::class)->options($user, $providers, $providers, withProvider: true)
+            : ['oauth' => [], 'pat' => []];
     }
 
     public function hasAnyRepoSource(): bool
@@ -674,9 +656,13 @@ class Onboarding extends Page
      */
     private function resolveRepoSource(): ?array
     {
+        /** @var User $user */
+        $user = Auth::user();
+        $refs = app(CredentialRefResolver::class);
         if (str_starts_with($this->repoSource, 'oauth:')) {
-            $account = ConnectedAccount::find((int) substr($this->repoSource, 6));
-            if (! $account instanceof ConnectedAccount) {
+            // Only the person's own accounts — the ref arrives from the browser.
+            $account = $refs->account($user, $this->repoSource);
+            if ($account === null) {
                 return null;
             }
             $account = app(TokenRefresher::class)->refreshIfNeeded($account);
@@ -692,8 +678,8 @@ class Onboarding extends Page
         }
 
         if (str_starts_with($this->repoSource, 'pat:')) {
-            $credential = ProviderCredential::find(substr($this->repoSource, 4));
-            if (! $credential instanceof ProviderCredential) {
+            $credential = $refs->credential($this->repoSource);
+            if ($credential === null) {
                 return null;
             }
 

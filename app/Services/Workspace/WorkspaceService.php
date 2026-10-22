@@ -121,6 +121,14 @@ class WorkspaceService extends EntityService
         StopWorkspaceJob::dispatch($workspace->id);
     }
 
+    /** Opening a stopped workspace brings it back (files were kept) — for those who may operate it. */
+    public function resumeOnOpen(Workspace $workspace, User $by): void
+    {
+        if ($workspace->status === WorkspaceStatus::Stopped && $by->can('operate', $workspace)) {
+            $this->start($workspace);
+        }
+    }
+
     /** Purge every Docker resource, then soft-delete the row. */
     public function deleteWorkspace(Workspace $workspace): void
     {

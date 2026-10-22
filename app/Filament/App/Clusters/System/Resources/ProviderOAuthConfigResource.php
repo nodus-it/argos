@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Filament\App\Clusters\System\Resources;
 
+use App\Filament\Support\Actions\ServiceDeleteAction;
+use App\Filament\Support\Actions\ServiceDeleteBulkAction;
+use App\Services\OAuth\ProviderOAuthConfigService;
 use App\Enums\IntegrationProvider;
 use App\Filament\Concerns\AdminOnly;
 use App\Filament\App\Clusters\System;
@@ -13,8 +16,6 @@ use App\Filament\App\Clusters\System\Resources\ProviderOAuthConfigResource\Pages
 use App\Models\ProviderOAuthConfig;
 use App\Services\Integrations\ProviderSetupGuide;
 use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteAction;
-use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
@@ -180,11 +181,11 @@ class ProviderOAuthConfigResource extends Resource
             ])
             ->recordActions([
                 EditAction::make(),
-                DeleteAction::make(),
+                ServiceDeleteAction::make(ProviderOAuthConfigService::class),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
-                    DeleteBulkAction::make(),
+                    ServiceDeleteBulkAction::make(ProviderOAuthConfigService::class),
                 ]),
             ])
             ->defaultSort('provider');

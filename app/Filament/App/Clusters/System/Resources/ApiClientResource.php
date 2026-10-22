@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Filament\App\Clusters\System\Resources;
 
+use App\Filament\Support\Actions\ServiceDeleteAction;
+use App\Filament\Support\Actions\ServiceDeleteBulkAction;
+use App\Services\Api\ApiClientService;
 use App\Filament\Concerns\AdminOnly;
 use App\Filament\App\Clusters\System;
 use App\Filament\App\Resources\WorkspaceResource\RelationManagers\ApiTokensRelationManager;
@@ -13,8 +16,6 @@ use App\Filament\App\Clusters\System\Resources\ApiClientResource\Pages\ListApiCl
 use App\Models\ApiClient;
 use App\Models\User;
 use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteAction;
-use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -104,11 +105,11 @@ class ApiClientResource extends Resource
             ])
             ->recordActions([
                 EditAction::make(),
-                DeleteAction::make(),
+                ServiceDeleteAction::make(ApiClientService::class),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
-                    DeleteBulkAction::make(),
+                    ServiceDeleteBulkAction::make(ApiClientService::class),
                 ]),
             ])
             ->defaultSort('name');

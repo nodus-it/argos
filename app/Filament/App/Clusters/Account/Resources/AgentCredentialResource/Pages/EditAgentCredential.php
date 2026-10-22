@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\App\Clusters\Account\Resources\AgentCredentialResource\Pages;
 
+use App\Filament\Support\Actions\ServiceDeleteAction;
 use App\Enums\AgentName;
 use App\Filament\Concerns\HasArgosEditHeading;
 use App\Filament\Concerns\VerifiesCredentialOnSave;
@@ -13,7 +14,6 @@ use App\Models\AgentCredential;
 use App\Services\Credentials\AgentCredentialService;
 use App\Services\Credentials\CredentialVerifier;
 use App\Services\EntityService;
-use Filament\Actions\DeleteAction;
 
 class EditAgentCredential extends EditRecord
 {
@@ -30,7 +30,7 @@ class EditAgentCredential extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            DeleteAction::make(),
+            ServiceDeleteAction::make(AgentCredentialService::class),
         ];
     }
 

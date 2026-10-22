@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Filament\App\Resources\WorkspaceResource\RelationManagers;
 
+use App\Models\User;
 use App\Models\Workspace;
+use App\Services\Api\ApiTokenService;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Forms\Components\CheckboxList;
@@ -17,6 +19,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Sanctum\Contracts\HasApiTokens;
+use Laravel\Sanctum\PersonalAccessToken;
 
 /**
  * Lists and mints Sanctum API tokens for any tokenable (ApiClient, Workspace).
@@ -28,25 +31,16 @@ class ApiTokensRelationManager extends RelationManager
 
     protected static string|\BackedEnum|null $icon = 'heroicon-o-key';
 
-    /** The abilities a token may carry (mirrors the REST route gates). */
-    public const ABILITIES = [
-        'workspaces:read' => 'workspaces:read',
-        'workspaces:write' => 'workspaces:write',
-        'tasks:read' => 'tasks:read',
-        'tasks:write' => 'tasks:write',
-    ];
-
     /**
-     * Abilities offered for this owner: a workspace's own token never
-     * creates workspaces.
+     * Abilities offered for this owner (see ApiTokenService::abilitiesFor).
      *
      * @return array<string, string>
      */
     private function abilities(): array
     {
-        return $this->getOwnerRecord() instanceof Workspace
-            ? array_diff_key(self::ABILITIES, ['workspaces:write' => true])
-            : self::ABILITIES;
+        $abilities = app(ApiTokenService::class)->abilitiesFor($this->getOwnerRecord());
+
+        return array_combine($abilities, $abilities);
     }
 
     public static function getTitle(Model $ownerRecord, string $pageClass): string
@@ -106,26 +100,17 @@ class ApiTokensRelationManager extends RelationManager
                 Action::make('generate')
                     ->label(__('api_tokens.actions.create'))
                     ->icon('heroicon-o-plus')
-                    ->schema([
-                        TextInput::make('name')
-                            ->label(__('api_tokens.fields.name'))
-                            ->required()
-                            ->maxLength(255),
-
-                        CheckboxList::make('abilities')
-                            ->label(__('api_tokens.fields.abilities'))
-                            ->options(fn (): array => $this->abilities())
-                            ->required(),
-                    ])
+                    ->schema(fn (Schema $schema): Schema => $this->form($schema))
                     ->action(function (array $data): void {
                         $owner = $this->getOwnerRecord();
                         if (! $owner instanceof HasApiTokens) {
                             return;
                         }
-
-                        /** @var array<int, string> $abilities */
-                        $abilities = $data['abilities'];
-                        $token = $owner->createToken((string) $data['name'], $abilities);
+                        /** @var User $user */
+                        $user = Auth::user();
+                        /** @var list<string> $abilities */
+                        $abilities = array_values($data['abilities']);
+                        $token = app(ApiTokenService::class)->mint($owner, $user, (string) $data['name'], $abilities);
 
                         // Shown once — only the hash is persisted.
                         Notification::make()
@@ -138,7 +123,14 @@ class ApiTokensRelationManager extends RelationManager
             ])
             ->recordActions([
                 DeleteAction::make()
-                    ->label(__('api_tokens.actions.revoke')),
+                    ->label(__('api_tokens.actions.revoke'))
+                    ->using(function (PersonalAccessToken $record): bool {
+                        /** @var User $user */
+                        $user = Auth::user();
+                        app(ApiTokenService::class)->revoke($record, $user);
+
+                        return true;
+                    }),
             ]);
     }
 }

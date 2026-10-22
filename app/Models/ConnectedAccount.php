@@ -71,6 +71,17 @@ class ConnectedAccount extends Model
     /**
      * Returns the GitLab instance URL, defaulting to https://gitlab.com for public GitLab.
      */
+    /** How the account is named in pickers: "Octocat", plus the host of a self-hosted instance. */
+    public function displayLabel(bool $withProvider = false): string
+    {
+        $label = $this->name ?? $this->nickname ?? '#'.$this->id;
+        $host = $this->instance_url !== null && $this->instance_url !== ''
+            ? ' ('.(parse_url($this->instance_url, PHP_URL_HOST) ?: $this->instance_url).')'
+            : '';
+
+        return $withProvider ? ucfirst($this->provider).$host.' · '.$label : $label.$host;
+    }
+
     public function getInstanceUrl(): string
     {
         // '' is the public-instance sentinel (was null before the multi-instance

@@ -40,7 +40,7 @@ class DocCoverageTest extends TestCase
 
     public function test_rest_api_documents_every_ability(): void
     {
-        foreach (array_keys(ApiTokensRelationManager::ABILITIES) as $ability) {
+        foreach (\App\Services\Api\ApiTokenService::ABILITIES as $ability) {
             $this->assertDocMentions('REST-API.md', (string) $ability, 'API ability');
         }
     }

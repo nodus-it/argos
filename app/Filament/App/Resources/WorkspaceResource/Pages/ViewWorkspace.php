@@ -59,18 +59,13 @@ class ViewWorkspace extends ViewRecord
         $this->taskId = RequestedTask::id($workspace->id)
             ?? $workspace->tasks()->whereNull('archived_at')->latest('updated_at')->value('id');
 
-        $task = $this->task();
-        if ($task !== null && $task->pr_number !== null && in_array($task->pr_state, ['open', 'draft'], true) && ($task->pr_synced_at === null || $task->pr_synced_at->lt(now()->subMinutes(5)))) {
-            app(WorkspaceShipService::class)->syncPullRequest($task);
-        }
-
-        // Opening a stopped workspace brings it back (files were kept).
-        if ($workspace->status === WorkspaceStatus::Stopped && auth()->user()?->can('operate', $workspace)) {
-            try {
-                app(WorkspaceService::class)->start($workspace);
-            } catch (WorkspaceException $e) {
-                Notification::make()->title($e->getMessage())->warning()->send();
-            }
+        // The pull request refreshes in the background (PullRequestService::details).
+        /** @var User $user */
+        $user = auth()->user();
+        try {
+            app(WorkspaceService::class)->resumeOnOpen($workspace, $user);
+        } catch (WorkspaceException $e) {
+            Notification::make()->title($e->getMessage())->warning()->send();
         }
     }
 
@@ -417,12 +412,7 @@ class ViewWorkspace extends ViewRecord
             ->schema([
                 Select::make('user_id')
                     ->label(__('workspaces.members.user'))
-                    ->options(fn (): array => $this->workspace()->users()
-                        ->whereKeyNot($this->task()?->owner_user_id)
-                        ->whereNotIn('users.id', $this->task()?->members()->pluck('user_id') ?? [])
-                        ->orderBy('name')
-                        ->pluck('name', 'users.id')
-                        ->all())
+                    ->options(fn (): array => app(TaskService::class)->inviteCandidates($this->requireTask()))
                     ->searchable()
                     ->required(),
             ])
@@ -460,12 +450,7 @@ class ViewWorkspace extends ViewRecord
             ->schema([
                 Select::make('user_id')
                     ->label(__('workspaces.task_actions.new_owner'))
-                    ->options(fn (): array => $this->workspace()->users()
-                        ->wherePivotIn('role', [WorkspaceRole::Admin->value, WorkspaceRole::Member->value])
-                        ->whereKeyNot($this->task()?->owner_user_id)
-                        ->orderBy('name')
-                        ->pluck('name', 'users.id')
-                        ->all())
+                    ->options(fn (): array => app(TaskService::class)->transferCandidates($this->requireTask()))
                     ->searchable()
                     ->required(),
             ])

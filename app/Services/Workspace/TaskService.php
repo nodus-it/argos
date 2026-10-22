@@ -513,6 +513,36 @@ class TaskService
      * Invite a workspace member to collaborate (write, approve, review,
      * ship). Readers of the workspace become collaborators of this task only.
      */
+    /**
+     * Who can be invited to a task: workspace members besides the owner and
+     * the ones already in it.
+     *
+     * @return array<int, string> user id => name
+     */
+    public function inviteCandidates(Task $task): array
+    {
+        return $task->workspace->users()
+            ->whereKeyNot($task->owner_user_id)
+            ->whereNotIn('users.id', $task->members()->pluck('user_id'))
+            ->orderBy('name')
+            ->pluck('name', 'users.id')
+            ->all();
+    }
+
+    /**
+     * Who a task can be handed to: members whose role may create tasks and
+     * who have an agent the task can run on (what transfer() checks).
+     *
+     * @return array<int, string> user id => name
+     */
+    public function transferCandidates(Task $task): array
+    {
+        return $task->workspace->users()->whereKeyNot($task->owner_user_id)->orderBy('name')->get()
+            ->filter(fn (User $user): bool => ($task->workspace->roleOf($user)?->grants(Capability::TaskCreate) ?? false) && $this->pool->usableAgentsFor($user)->isNotEmpty())
+            ->pluck('name', 'id')
+            ->all();
+    }
+
     public function invite(Task $task, User $by, User $member): void
     {
         Gate::forUser($by)->authorize('invite', $task);
@@ -555,8 +585,8 @@ class TaskService
         if ($role === null || ! $role->grants(Capability::TaskCreate)) {
             throw WorkspaceException::translated('workspaces.errors.transfer_needs_member', ['name' => $newOwner->name]);
         }
-        $agent ??= $this->pool->usableAgentsFor($newOwner)->first(fn (AgentCredential $a): bool => $a->user_id === $newOwner->id)
-            ?? $this->pool->usableAgentsFor($newOwner)->first();
+        // Own agents come first (AgentPool orders them so).
+        $agent ??= $this->pool->usableAgentsFor($newOwner)->first();
         if ($agent === null || ! Gate::forUser($newOwner)->allows('use', $agent)) {
             throw WorkspaceException::translated('workspaces.errors.transfer_needs_agent', ['name' => $newOwner->name]);
         }
@@ -742,7 +772,7 @@ class TaskService
 
     private function assertModeAllowed(Workspace $workspace, User $by, PermissionMode $mode): void
     {
-        if ($mode === PermissionMode::BypassPermissions && ! $by->isAdmin() && $workspace->roleOf($by) !== WorkspaceRole::Admin) {
+        if ($mode === PermissionMode::BypassPermissions && ! $by->can('bypassPermissions', $workspace)) {
             throw WorkspaceException::translated('workspaces.errors.bypass_owner_only');
         }
     }

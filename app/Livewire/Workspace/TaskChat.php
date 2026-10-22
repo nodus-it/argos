@@ -730,7 +730,6 @@ class TaskChat extends Component
     {
         $workspace = $this->workspace();
         $task = $this->activeTask();
-        $role = $workspace->roleOf($this->user());
         // Without a task: the capability alone, so people without an agent
         // see the form's "add an agent" hint (the policy also needs an agent).
         $canWrite = $task !== null
@@ -754,7 +753,8 @@ class TaskChat extends Component
             'hasOlder' => $hasOlder,
             'approvals' => $approvals,
             'canWrite' => $canWrite,
-            'isOwner' => $this->user()->isAdmin() || $role === WorkspaceRole::Admin,
+            // Permission modes the person may pick ("bypass" only for workspace admins).
+            'modes' => array_values(array_filter(PermissionMode::cases(), fn (PermissionMode $mode): bool => $mode !== PermissionMode::BypassPermissions || $this->user()->can('bypassPermissions', $workspace))),
             'agents' => $this->usableAgents(),
             'models' => app(ModelCatalog::class)->options($task?->agentCredential, $task?->model),
             'efforts' => app(ModelCatalog::class)->effortLevels($task?->agentCredential, $task?->model),
@@ -763,7 +763,6 @@ class TaskChat extends Component
             'issuesEnabled' => $this->creating && app(WorkspaceIssueService::class)->bindingFor($workspace) !== null,
             'issueResults' => $this->creating && $this->newIssueQuery !== '' ? $this->issueOptions($this->newIssueQuery) : [],
             'chosenIssue' => $this->creating && $this->newIssue !== null ? ($this->issueOptions($this->newIssue, 200)[$this->newIssue] ?? '#'.$this->newIssue) : null,
-            'modes' => PermissionMode::cases(),
             'busy' => $task !== null && $task->session_status->isBusy(),
             'user' => $this->user(),
             'commands' => $task !== null ? $this->commandList() : [],

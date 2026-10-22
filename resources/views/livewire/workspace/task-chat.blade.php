@@ -179,9 +179,7 @@
                         <span>{{ __('workspaces.task.mode') }}</span>
                         <select class="ws-select" wire:model="newMode">
                             @foreach ($modes as $mode)
-                                @if ($mode !== PermissionMode::BypassPermissions || $isOwner)
-                                    <option value="{{ $mode->value }}">{{ $mode->label() }}</option>
-                                @endif
+                                <option value="{{ $mode->value }}">{{ $mode->label() }}</option>
                             @endforeach
                         </select>
                     </label>
@@ -482,9 +480,7 @@
                         <input type="file" class="sr-only" tabindex="-1" aria-hidden="true" x-ref="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple x-on:change="attach($event.target.files); $event.target.value = ''">
                         <select class="ag-pill" wire:change="setMode($event.target.value)" wire:key="mode-{{ $task->permission_mode->value }}-{{ $controlsVersion }}" aria-label="{{ __('workspaces.chat.mode') }}">
                             @foreach ($modes as $mode)
-                                @if ($mode !== PermissionMode::BypassPermissions || $isOwner)
-                                    <option value="{{ $mode->value }}" @selected($task->permission_mode === $mode)>{{ $mode->label() }}</option>
-                                @endif
+                                <option value="{{ $mode->value }}" @selected($task->permission_mode === $mode)>{{ $mode->label() }}</option>
                             @endforeach
                         </select>
                         <select class="ag-pill mono" wire:key="model-{{ $task->model }}-{{ $controlsVersion }}" aria-label="{{ __('workspaces.chat.model') }}"

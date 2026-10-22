@@ -8,6 +8,7 @@ return [
     'form' => [
         'provider' => 'Provider',
         'mode' => 'Modus',
+        'credential_not_yours' => 'Dieser verknüpfte Account gehört dir nicht — wähle einen eigenen.',
         'credential' => 'Zugang',
         'credential_help' => 'OAuth-Account oder gespeichertes Access-Token (PAT) für diesen Provider.',
         'project' => 'Projekt / Team',

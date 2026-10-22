@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Filament\App\Clusters\Account\Resources;
 
+use App\Filament\Support\Actions\ServiceDeleteAction;
+use App\Filament\Support\Actions\ServiceDeleteBulkAction;
+use App\Services\Credentials\AgentCredentialService;
 use App\Enums\AgentCredentialStatus;
 use App\Filament\App\Clusters\Account;
 use App\Enums\AgentName;
@@ -16,8 +19,6 @@ use App\Models\User;
 use App\Services\Workspace\AgentPool;
 use App\Workers\Agents\AgentRegistry;
 use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteAction;
-use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -205,11 +206,11 @@ class AgentCredentialResource extends Resource
             ])
             ->recordActions([
                 EditAction::make(),
-                DeleteAction::make(),
+                ServiceDeleteAction::make(AgentCredentialService::class),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
-                    DeleteBulkAction::make(),
+                    ServiceDeleteBulkAction::make(AgentCredentialService::class),
                 ]),
             ])
             ->defaultSort('updated_at', 'desc');

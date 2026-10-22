@@ -225,4 +225,17 @@ class TaskActionsTest extends TestCase
         $this->assertSame(1, substr_count($html, 'ag-notice-avatar'));
         $this->assertStringContainsString(__('workspaces.events.committed', ['name' => 'Bob', 'subject' => 'feat: x']), html_entity_decode($html));
     }
+
+    public function test_invite_and_transfer_offer_who_the_service_accepts(): void
+    {
+        $task = $this->task($this->ada);
+        $carl = $this->member('Carl'); // no agent of his own
+        $viewer = User::factory()->create(['name' => 'Vera']);
+        WorkspaceMember::query()->create(['workspace_id' => $this->workspace->id, 'user_id' => $viewer->id, 'role' => WorkspaceRole::Viewer]);
+        $tasks = app(\App\Services\Workspace\TaskService::class);
+
+        $this->assertSame([$this->bob->id => 'Bob', $carl->id => 'Carl', $viewer->id => 'Vera'], $tasks->inviteCandidates($task));
+        // Viewers may not own tasks, Carl has no agent to run it on.
+        $this->assertSame([$this->bob->id => 'Bob'], $tasks->transferCandidates($task));
+    }
 }

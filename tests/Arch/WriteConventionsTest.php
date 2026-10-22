@@ -66,6 +66,9 @@ function presentationSourceFiles(): array
     $exempt = [
         'app/Filament/Support/Pages/CreateRecord.php',
         'app/Filament/Support/Pages/EditRecord.php',
+        // Delegate deletes to the entity service, like the base pages.
+        'app/Filament/Support/Actions/ServiceDeleteAction.php',
+        'app/Filament/Support/Actions/ServiceDeleteBulkAction.php',
     ];
 
     $files = [];
@@ -104,6 +107,29 @@ it('keeps write calls out of the presentation layer', function (string $relative
     expect($source)
         ->not->toMatch('/->\s*(save|update|delete|forceFill|forceDelete)\s*\(/')
         ->and($source)->not->toMatch('/::\s*(create|updateOrCreate|firstOrCreate)\s*\(/');
+})->with(presentationSourceFiles());
+
+// Filament's built-in write actions persist the model themselves. Each one in
+// the presentation layer routes through a service: ->using(...) / ->action(...)
+// or the ServiceDeleteAction / ServiceDeleteBulkAction helpers. Create/Edit
+// only write inline in relation managers — in resources they link to the
+// create/edit pages, which write through the base pages.
+it('routes Filament write actions through services', function (string $relativePath): void {
+    if (str_starts_with($relativePath, 'app/Filament/Support/Actions/')) {
+        expect($relativePath)->toBeString();
+
+        return;
+    }
+    $source = (string) file_get_contents(dirname(__DIR__, 2).'/'.$relativePath);
+    $kinds = str_contains($relativePath, '/RelationManagers/') ? 'Delete|DeleteBulk|Create|Edit|ForceDelete|Restore' : 'Delete|DeleteBulk|ForceDelete|Restore';
+    preg_match_all('/\b('.$kinds.')Action::make\([^)]*\)/', $source, $matches, PREG_OFFSET_CAPTURE);
+    expect($matches[0])->toBeArray();
+
+    foreach ($matches[0] as [$call, $offset]) {
+        // The chain until the action ends (next action, closing bracket of the list).
+        $chain = substr($source, $offset, 600);
+        expect($chain)->toMatch('/->\s*(using|action)\s*\(/', "{$relativePath}: {$call} writes the model itself — route it through a service");
+    }
 })->with(presentationSourceFiles());
 
 // --- R2 : no process / shell execution in the presentation layer ------------

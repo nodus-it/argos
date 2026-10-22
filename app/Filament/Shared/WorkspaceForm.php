@@ -258,6 +258,8 @@ final class WorkspaceForm
                 TextInput::make('name')
                     ->label(__('workspaces.fields.name'))
                     ->required()
+                    // One name per workspace, as onboarding already asks for.
+                    ->unique(Workspace::class, 'name', ignoreRecord: true)
                     ->maxLength(255),
 
                 TextInput::make('branch_pattern')

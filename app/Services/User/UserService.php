@@ -108,6 +108,26 @@ class UserService extends EntityService
         }
     }
 
+    /**
+     * A person's own profile (My account → Profile): the picture (the
+     * previous file goes) and the rest. Nobody makes themselves an
+     * administrator here.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function updateProfile(User $user, array $data): User
+    {
+        if (array_key_exists('avatar_path', $data)) {
+            $this->setAvatar($user, $data['avatar_path']);
+            unset($data['avatar_path']);
+        }
+        unset($data['is_admin']);
+        /** @var User $user */
+        $user = $this->update($user, $data);
+
+        return $user;
+    }
+
     /** The language a person sees Argos in (`en` or `de`). */
     public function setLocale(User $user, string $locale): void
     {

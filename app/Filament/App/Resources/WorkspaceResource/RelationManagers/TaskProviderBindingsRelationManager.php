@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Filament\App\Resources\WorkspaceResource\RelationManagers;
 
-use App\Enums\AuthMethod;
 use App\Enums\TaskProviderKind;
 use App\Enums\TaskProviderMode;
 use App\Enums\TaskProviderSyncStatus;
@@ -14,8 +13,9 @@ use App\Models\TaskProviderBinding;
 use App\Models\User;
 use App\Services\IssueTracker\Contracts\IssueTrackerContract;
 use App\Services\IssueTracker\IssueTrackerRegistry;
+use App\Services\Credentials\CredentialRefResolver;
 use App\Services\IssueTracker\ProviderSetupService;
-use App\Services\OAuth\ConnectedAccountService;
+use App\Services\IssueTracker\TaskProviderBindingService;
 use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
@@ -58,35 +58,6 @@ class TaskProviderBindingsRelationManager extends RelationManager
         return $get('kind') === TaskProviderKind::Custom->value;
     }
 
-    /**
-     * Own systems need no credentials, mode or filters; they get a signing
-     * secret for the webhook instead — generated once on create; editing
-     * keeps it (the receiver verifies signatures with it).
-     *
-     * @param  array<string, mixed>  $data
-     * @return array<string, mixed>
-     */
-    protected function applyCustom(array $data, bool $creating = false): array
-    {
-        if (($data['kind'] ?? null) !== TaskProviderKind::Custom->value) {
-            return $data;
-        }
-
-        $data = [
-            ...$data,
-            'mode' => TaskProviderMode::Webhook->value,
-            'auth_method' => AuthMethod::Pat->value,
-            'sync_status' => TaskProviderSyncStatus::Active->value,
-        ];
-        if ($creating) {
-            $data['webhook_secret'] = bin2hex(random_bytes(24));
-        } else {
-            unset($data['webhook_secret']);
-        }
-
-        return $data;
-    }
-
     public function form(Schema $schema): Schema
     {
         return $schema->components([
@@ -112,7 +83,7 @@ class TaskProviderBindingsRelationManager extends RelationManager
             // Unified credential picker: OAuth accounts and stored Personal
             // Access Tokens (PATs) for this provider in one field. The chosen
             // option encodes both the auth method and the source id (see
-            // applyCredentialRef / mutateRecordDataUsing).
+            // TaskProviderBindingService / mutateRecordDataUsing).
             Select::make('credential_ref')
                 ->visible(fn (Get $get): bool => ! self::isCustom($get))
                 ->label(__('task_providers.form.credential'))
@@ -175,85 +146,18 @@ class TaskProviderBindingsRelationManager extends RelationManager
      */
     protected function credentialRefOptions(Get $get): array
     {
-        $kind = TaskProviderKind::tryFrom((string) $get('kind'));
-
-        $groups = [];
-
         /** @var User|null $user */
         $user = Auth::user();
-        if ($user !== null) {
-            $oauth = app(ConnectedAccountService::class)
-                ->selectableFor($user, $kind !== null ? [$kind->providerKey()] : [])
-                ->mapWithKeys(fn (ConnectedAccount $account): array => [
-                    "oauth:{$account->id}" => $account->name ?? $account->nickname ?? "#{$account->id}",
-                ])
-                ->all();
-
-            if ($oauth !== []) {
-                $groups[__('task_providers.form.groups.oauth')] = $oauth;
-            }
+        if ($user === null) {
+            return [];
         }
+        $kind = TaskProviderKind::tryFrom((string) $get('kind'));
+        $options = app(CredentialRefResolver::class)->options($user, $kind !== null ? [$kind->providerKey()] : [], $kind !== null ? [$kind->value] : null);
 
-        $pats = ProviderCredential::query()
-            ->when(
-                $kind !== null,
-                fn ($query) => $query->where('provider', $kind->value),
-            )
-            ->get()
-            ->mapWithKeys(fn (ProviderCredential $credential): array => [
-                "pat:{$credential->id}" => $credential->label,
-            ])
-            ->all();
-
-        if ($pats !== []) {
-            $groups[__('task_providers.form.groups.pat')] = $pats;
-        }
-
-        return $groups;
-    }
-
-    /**
-     * Translate the picker's "credential_ref" virtual value into the persisted
-     * columns (auth_method + connected_account_id / provider_credential_id).
-     *
-     * @param  array<string, mixed>  $data
-     * @return array<string, mixed>
-     */
-    protected function applyCredentialRef(array $data): array
-    {
-        $ref = $data['credential_ref'] ?? null;
-        unset($data['credential_ref']);
-
-        $data['connected_account_id'] = null;
-        $data['provider_credential_id'] = null;
-
-        if (is_string($ref) && str_starts_with($ref, 'oauth:')) {
-            $data['auth_method'] = AuthMethod::OAuth->value;
-            $data['connected_account_id'] = (int) substr($ref, 6);
-        } elseif (is_string($ref) && str_starts_with($ref, 'pat:')) {
-            $data['auth_method'] = AuthMethod::Pat->value;
-            $data['provider_credential_id'] = substr($ref, 4);
-        }
-
-        return $data;
-    }
-
-    /**
-     * Reconstruct the picker's "credential_ref" value from a stored binding so
-     * the edit form pre-selects the right option.
-     *
-     * @param  array<string, mixed>  $data
-     * @return array<string, mixed>
-     */
-    protected function hydrateCredentialRef(array $data): array
-    {
-        if (! empty($data['provider_credential_id'])) {
-            $data['credential_ref'] = 'pat:'.$data['provider_credential_id'];
-        } elseif (! empty($data['connected_account_id'])) {
-            $data['credential_ref'] = 'oauth:'.$data['connected_account_id'];
-        }
-
-        return $data;
+        return array_filter([
+            __('task_providers.form.groups.oauth') => $options['oauth'],
+            __('task_providers.form.groups.pat') => $options['pat'],
+        ]);
     }
 
     /**
@@ -303,25 +207,17 @@ class TaskProviderBindingsRelationManager extends RelationManager
      */
     protected function trackerForRef(TaskProviderKind $kind, string $ref): ?IssueTrackerContract
     {
+        /** @var User|null $user */
+        $user = Auth::user();
+        $refs = app(CredentialRefResolver::class);
         $registry = app(IssueTrackerRegistry::class);
-
-        if (str_starts_with($ref, 'oauth:')) {
-            $account = ConnectedAccount::find((int) substr($ref, 6));
-
-            return $account instanceof ConnectedAccount
-                ? $registry->makeFromAccount($kind, $account)
-                : null;
+        $account = $user !== null ? $refs->account($user, $ref) : null;
+        if ($account !== null) {
+            return $registry->makeFromAccount($kind, $account);
         }
+        $credential = $refs->credential($ref);
 
-        if (str_starts_with($ref, 'pat:')) {
-            $credential = ProviderCredential::find(substr($ref, 4));
-
-            return $credential instanceof ProviderCredential
-                ? $registry->makeFromProviderCredential($kind, $credential)
-                : null;
-        }
-
-        return null;
+        return $credential !== null ? $registry->makeFromProviderCredential($kind, $credential) : null;
     }
 
     public function table(Table $table): Table
@@ -364,12 +260,12 @@ class TaskProviderBindingsRelationManager extends RelationManager
             ])
             ->headerActions([
                 CreateAction::make()
-                    ->mutateDataUsing(fn (array $data): array => $this->applyCustom($this->applyCredentialRef($data), creating: true)),
+                    ->using(fn (array $data): TaskProviderBinding => app(TaskProviderBindingService::class)->createFor($this->getOwnerRecord(), $this->user(), $data)),
             ])
             ->actions([
                 EditAction::make()
-                    ->mutateRecordDataUsing(fn (array $data): array => $this->hydrateCredentialRef($data))
-                    ->mutateDataUsing(fn (array $data): array => $this->applyCustom($this->applyCredentialRef($data))),
+                    ->mutateRecordDataUsing(fn (array $data): array => [...$data, 'credential_ref' => CredentialRefResolver::fromColumns($data['connected_account_id'] ?? null, $data['provider_credential_id'] ?? null)])
+                    ->using(fn (TaskProviderBinding $record, array $data): TaskProviderBinding => app(TaskProviderBindingService::class)->updateBy($record, $this->user(), $data)),
 
                 Action::make('setup')
                     ->visible(fn (TaskProviderBinding $record): bool => ! $record->kind->isCustom())
@@ -402,7 +298,20 @@ class TaskProviderBindingsRelationManager extends RelationManager
                         }
                     }),
 
-                DeleteAction::make(),
+                DeleteAction::make()
+                    ->using(function (TaskProviderBinding $record): bool {
+                        app(TaskProviderBindingService::class)->deleteBy($record, $this->user());
+
+                        return true;
+                    }),
             ]);
+    }
+
+    private function user(): User
+    {
+        /** @var User $user */
+        $user = Auth::user();
+
+        return $user;
     }
 }

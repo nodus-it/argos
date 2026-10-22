@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Policies;
 
 use App\Enums\Capability;
+use App\Enums\WorkspaceRole;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Workspace\TaskAccess;
@@ -32,6 +33,12 @@ class WorkspacePolicy
     public function create(User $user): bool
     {
         return $user->isAdmin();
+    }
+
+    /** Let Claude run every tool without asking (permission mode "bypass"): workspace admins and Argos administrators. */
+    public function bypassPermissions(User $user, Workspace $workspace): bool
+    {
+        return $user->isAdmin() || $workspace->roleOf($user) === WorkspaceRole::Admin;
     }
 
     /** Settings, secrets, integrations. */
