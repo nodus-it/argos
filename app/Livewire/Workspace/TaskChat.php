@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Workspace;
 
+use App\Livewire\Concerns\InteractsWithWorkspace;
 use App\Support\RequestedTask;
 use App\Enums\ApprovalKind;
 use App\Enums\AutoTaskState;
@@ -39,7 +40,6 @@ use App\Services\Workspace\WorkspaceIssueService;
 use App\Services\Workspace\WorkspaceSetupService;
 use App\Support\TaskTimeline;
 use Filament\Notifications\Notification;
-use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Collection;
@@ -57,6 +57,8 @@ use Livewire\WithFileUploads;
  */
 class TaskChat extends Component
 {
+    use InteractsWithWorkspace;
+
     use WithFileUploads;
 
     private const PAGE = 200;
@@ -675,7 +677,7 @@ class TaskChat extends Component
      */
     private array $memo = [];
 
-    public function workspace(): Workspace
+    protected function workspace(): Workspace
     {
         return $this->memo['workspace'] ??= Workspace::query()->findOrFail($this->workspaceId);
     }
@@ -806,29 +808,8 @@ class TaskChat extends Component
         return [$rows->take($this->limit)->reverse()->values(), $hasOlder];
     }
 
-    private function user(): User
-    {
-        /** @var User $user */
-        $user = auth()->user();
-
-        return $user;
-    }
 
     /** Run an action and report failures; true when it went through. */
-    private function attempt(callable $action): bool
-    {
-        try {
-            $action();
-
-            return true;
-        } catch (WorkspaceException $e) {
-            Notification::make()->title($e->getMessage())->danger()->send();
-        } catch (AuthorizationException) {
-            Notification::make()->title(__('workspaces.task.viewer_hint'))->warning()->send();
-        }
-
-        return false;
-    }
 
     /** Session closed although the task was used: offer to resume. */
     public static function canResume(Task $task): bool

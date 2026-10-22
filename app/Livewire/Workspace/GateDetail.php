@@ -4,18 +4,16 @@ declare(strict_types=1);
 
 namespace App\Livewire\Workspace;
 
+use App\Livewire\Concerns\InteractsWithWorkspace;
 use App\Enums\GateRunStatus;
 use App\Enums\WorkspaceStatus;
-use App\Integrations\WorkspaceDaemon\DaemonTransportException;
 use App\Models\Task;
-use App\Models\User;
 use App\Models\WorkspaceGateRun;
 use App\Services\Workspace\WorkspaceException;
 use App\Services\Workspace\WorkspaceGateService;
 use App\Support\GateAnnotations;
 use Carbon\CarbonInterval;
 use Filament\Notifications\Notification;
-use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
@@ -29,6 +27,8 @@ use Livewire\Component;
  */
 class GateDetail extends Component
 {
+    use InteractsWithWorkspace;
+
     /** Gates whose failures are compared against the base commit's baseline. */
     private const BASELINE_GATES = ['pest', 'phpunit', 'phpstan'];
 
@@ -69,15 +69,10 @@ class GateDetail extends Component
             return;
         }
 
-        try {
-            app(WorkspaceGateService::class)->sendFixToAgent($run, $task, $this->user(), $gate);
+        if ($this->attempt(fn () => app(WorkspaceGateService::class)->sendFixToAgent($run, $task, $this->user(), $gate))) {
             Notification::make()->title(__('workspaces.gates.fix_sent'))->success()->send();
             $this->gate = null;
             $this->dispatch('gate-detail-closed');
-        } catch (WorkspaceException|DaemonTransportException $e) {
-            Notification::make()->title($e->getMessage())->danger()->send();
-        } catch (AuthorizationException) {
-            Notification::make()->title(__('workspaces.task.viewer_hint'))->warning()->send();
         }
     }
 
@@ -89,14 +84,9 @@ class GateDetail extends Component
             return;
         }
 
-        try {
-            app(WorkspaceGateService::class)->run($task, $this->user(), $gate);
+        if ($this->attempt(fn () => app(WorkspaceGateService::class)->run($task, $this->user(), $gate), warn: true)) {
             Notification::make()->title(__('workspaces.gates.rerun_one_started', ['gate' => $gate]))->success()->send();
             $this->dispatch('argos-gates-updated');
-        } catch (WorkspaceException $e) {
-            Notification::make()->title($e->getMessage())->warning()->send();
-        } catch (AuthorizationException) {
-            Notification::make()->title(__('workspaces.task.viewer_hint'))->warning()->send();
         }
     }
 
@@ -209,14 +199,7 @@ class GateDetail extends Component
 
     private function task(): ?Task
     {
-        return $this->taskId !== null ? Task::query()->with('workspace')->where('workspace_id', $this->workspaceId)->find($this->taskId) : null;
+        return $this->findTask($this->taskId);
     }
 
-    private function user(): User
-    {
-        /** @var User $user */
-        $user = auth()->user();
-
-        return $user;
-    }
 }

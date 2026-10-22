@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Livewire\Workspace;
 
+use App\Livewire\Concerns\InteractsWithWorkspace;
 use App\Support\RequestedTask;
 use App\Enums\WorkspaceStatus;
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
 use App\Models\ReviewComment;
 use App\Models\Task;
-use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Git\WorkspaceDiffService;
 use App\Services\Workspace\ReviewCommentService;
@@ -17,7 +17,6 @@ use App\Services\Workspace\ReviewService;
 use App\Services\Workspace\WorkspaceDaemonClient;
 use App\Services\Workspace\WorkspaceGateService;
 use App\Services\Workspace\PullRequestService;
-use App\Services\Workspace\WorkspaceException;
 use App\Support\GateAnnotations;
 use App\Support\ReviewDiff;
 use App\Support\TaskEventFormatter;
@@ -38,6 +37,8 @@ use Livewire\Component;
  */
 class ReviewPanel extends Component
 {
+    use InteractsWithWorkspace;
+
     #[Locked]
     public string $workspaceId;
 
@@ -70,8 +71,7 @@ class ReviewPanel extends Component
         $this->workspaceId = $workspaceId;
         abort_unless($this->user()->can('view', $this->workspace()), 403);
 
-        $this->taskId = RequestedTask::id($workspaceId)
-            ?? Task::query()->where('workspace_id', $workspaceId)->whereNull('archived_at')->latest('updated_at')->value('id');
+        $this->taskId = RequestedTask::idOrLatest($workspaceId);
         $this->view = app(ReviewService::class)->diffView($this->user());
         $this->active = request()->query('review') === '1';
     }
@@ -108,17 +108,13 @@ class ReviewPanel extends Component
             return;
         }
 
-        try {
+        $this->attempt(function () use ($task, $commentId): void {
             $result = app(PullRequestService::class)->collect($task, $this->user(), $commentId);
             if ($result['general'] !== []) {
                 $this->dispatch('composer-append', text: PullRequestService::generalText($result['general']));
             }
             $this->dispatch('review-comments-changed');
-        } catch (WorkspaceException $e) {
-            Notification::make()->title($e->getMessage())->warning()->send();
-        } catch (AuthorizationException) {
-            Notification::make()->title(__('workspaces.task.viewer_hint'))->warning()->send();
-        }
+        }, warn: true);
     }
 
     public function setRendered(bool $rendered): void
@@ -482,17 +478,11 @@ class ReviewPanel extends Component
     /** @var array<string, string> file contents read in this request ("task:path") */
     private array $files = [];
 
-    private ?Workspace $workspaceModel = null;
-
     private function task(string $id): ?Task
     {
-        return array_key_exists($id, $this->tasks) ? $this->tasks[$id] : $this->tasks[$id] = Task::query()->where('workspace_id', $this->workspaceId)->find($id);
+        return array_key_exists($id, $this->tasks) ? $this->tasks[$id] : $this->tasks[$id] = $this->findTask($id);
     }
 
-    private function workspace(): Workspace
-    {
-        return $this->workspaceModel ??= Workspace::query()->findOrFail($this->workspaceId);
-    }
 
     /** A file of the task's working copy — read once per request (anchoring and Markdown both need it). */
     private function fileContent(Task $task, string $path): string
@@ -500,11 +490,4 @@ class ReviewPanel extends Component
         return $this->files[$task->id.':'.$path] ??= (string) app(WorkspaceDaemonClient::class)->for($this->workspace(), 15)->fileContent($task->slug, $path)['content'];
     }
 
-    private function user(): User
-    {
-        /** @var User $user */
-        $user = auth()->user();
-
-        return $user;
-    }
 }

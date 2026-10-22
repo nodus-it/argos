@@ -13,6 +13,13 @@ use App\Models\Task;
  */
 final class RequestedTask
 {
+    /** The requested task, else the most recently active open one — what every part of the page shows first. */
+    public static function idOrLatest(string $workspaceId): ?string
+    {
+        return self::id($workspaceId)
+            ?? Task::query()->where('workspace_id', $workspaceId)->whereNull('archived_at')->latest('updated_at')->value('id');
+    }
+
     public static function id(string $workspaceId): ?string
     {
         $wanted = request()->route('task') ?? request()->query('task');

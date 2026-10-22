@@ -4,16 +4,13 @@ declare(strict_types=1);
 
 namespace App\Livewire\Workspace;
 
+use App\Livewire\Concerns\InteractsWithWorkspace;
 use App\Support\RequestedTask;
 use App\Models\Task;
-use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Workspace\TaskOverview;
 use App\Services\Workspace\TaskReadService;
 use App\Services\Workspace\TaskService;
-use App\Services\Workspace\WorkspaceException;
-use Filament\Notifications\Notification;
-use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
@@ -30,6 +27,8 @@ use Livewire\Component;
  */
 class TaskSwitcher extends Component
 {
+    use InteractsWithWorkspace;
+
     #[Locked]
     public string $workspaceId;
 
@@ -51,8 +50,7 @@ class TaskSwitcher extends Component
         abort_unless($this->user()->can('view', $this->workspace()), 403);
 
         // Same default as TaskChat: the task from the URL, else the latest.
-        $this->currentId = RequestedTask::id($workspaceId)
-            ?? Task::query()->where('workspace_id', $workspaceId)->whereNull('archived_at')->latest('updated_at')->value('id');
+        $this->currentId = RequestedTask::idOrLatest($workspaceId);
     }
 
     #[On('task-changed')]
@@ -145,30 +143,9 @@ class TaskSwitcher extends Component
 
     private function task(string $id): ?Task
     {
-        return Task::query()->where('workspace_id', $this->workspaceId)->find($id);
+        return $this->findTask($id);
     }
 
-    private function workspace(): Workspace
-    {
-        return Workspace::query()->findOrFail($this->workspaceId);
-    }
 
-    private function user(): User
-    {
-        /** @var User $user */
-        $user = auth()->user();
 
-        return $user;
-    }
-
-    private function attempt(callable $action): void
-    {
-        try {
-            $action();
-        } catch (WorkspaceException $e) {
-            Notification::make()->title($e->getMessage())->danger()->send();
-        } catch (AuthorizationException) {
-            Notification::make()->title(__('workspaces.task.viewer_hint'))->warning()->send();
-        }
-    }
 }

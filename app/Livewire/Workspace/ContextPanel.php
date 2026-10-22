@@ -4,22 +4,20 @@ declare(strict_types=1);
 
 namespace App\Livewire\Workspace;
 
+use App\Livewire\Concerns\InteractsWithWorkspace;
 use App\Support\RequestedTask;
 use App\Enums\GateRunStatus;
 use App\Enums\GitProvider;
 use App\Enums\WorkspaceStatus;
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
 use App\Models\Task;
-use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceGateRun;
 use App\Services\Git\WorkspaceDiffService;
 use App\Services\Workspace\PullRequestService;
-use App\Services\Workspace\WorkspaceException;
 use App\Services\Workspace\WorkspaceGateService;
 use App\Support\TaskRefs;
 use Filament\Notifications\Notification;
-use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Lazy;
@@ -36,6 +34,8 @@ use Livewire\Component;
 #[Lazy]
 class ContextPanel extends Component
 {
+    use InteractsWithWorkspace;
+
     /** The four gates the sidebar always lists, with the run keys behind each row. */
     public const GATE_ROWS = [
         'pint' => ['label' => 'Pint', 'keys' => ['pint']],
@@ -54,8 +54,7 @@ class ContextPanel extends Component
     {
         $this->workspaceId = $workspaceId;
         abort_unless($this->user()->can('view', $this->workspace()), 403);
-        $this->taskId = RequestedTask::id($workspaceId)
-            ?? Task::query()->where('workspace_id', $workspaceId)->whereNull('archived_at')->latest('updated_at')->value('id');
+        $this->taskId = RequestedTask::idOrLatest($workspaceId);
     }
 
     #[On('task-changed')]
@@ -75,13 +74,8 @@ class ContextPanel extends Component
             return;
         }
 
-        try {
-            app(WorkspaceGateService::class)->run($task, $this->user());
+        if ($this->attempt(fn () => app(WorkspaceGateService::class)->run($task, $this->user()), warn: true)) {
             Notification::make()->title(__('workspaces.gates.started'))->success()->send();
-        } catch (WorkspaceException $e) {
-            Notification::make()->title($e->getMessage())->warning()->send();
-        } catch (AuthorizationException) {
-            Notification::make()->title(__('workspaces.task.viewer_hint'))->warning()->send();
         }
     }
 
@@ -144,13 +138,7 @@ class ContextPanel extends Component
             return;
         }
 
-        try {
-            $action(app(PullRequestService::class), $task);
-        } catch (WorkspaceException $e) {
-            Notification::make()->title($e->getMessage())->warning()->send();
-        } catch (AuthorizationException) {
-            Notification::make()->title(__('workspaces.task.viewer_hint'))->warning()->send();
-        }
+        $this->attempt(fn () => $action(app(PullRequestService::class), $task), warn: true);
     }
 
     public function placeholder(): string
@@ -263,19 +251,8 @@ class ContextPanel extends Component
 
     private function task(): ?Task
     {
-        return $this->taskId !== null ? Task::query()->where('workspace_id', $this->workspaceId)->find($this->taskId) : null;
+        return $this->findTask($this->taskId);
     }
 
-    private function workspace(): Workspace
-    {
-        return Workspace::query()->findOrFail($this->workspaceId);
-    }
 
-    private function user(): User
-    {
-        /** @var User $user */
-        $user = auth()->user();
-
-        return $user;
-    }
 }

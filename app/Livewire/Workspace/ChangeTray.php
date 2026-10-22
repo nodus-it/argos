@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Livewire\Workspace;
 
+use App\Livewire\Concerns\InteractsWithWorkspace;
 use App\Enums\GateRunStatus;
 use App\Enums\WorkspaceStatus;
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
 use App\Models\Task;
-use App\Models\User;
 use App\Models\WorkspaceGateRun;
 use App\Services\Git\WorkspaceDiffService;
 use App\Services\Workspace\PullRequestService;
@@ -30,6 +30,8 @@ use Livewire\Component;
 #[Lazy]
 class ChangeTray extends Component
 {
+    use InteractsWithWorkspace;
+
     #[Locked]
     public string $workspaceId;
 
@@ -144,14 +146,7 @@ class ChangeTray extends Component
 
     private function task(): Task
     {
-        return Task::query()->with('workspace')->where('workspace_id', $this->workspaceId)->findOrFail($this->taskId);
+        return $this->findTaskOrFail($this->taskId);
     }
 
-    private function user(): User
-    {
-        /** @var User $user */
-        $user = auth()->user();
-
-        return $user;
-    }
 }

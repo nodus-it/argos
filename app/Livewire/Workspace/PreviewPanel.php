@@ -4,13 +4,11 @@ declare(strict_types=1);
 
 namespace App\Livewire\Workspace;
 
+use App\Livewire\Concerns\InteractsWithWorkspace;
 use App\Enums\DemoStatus;
 use App\Models\Task;
-use App\Models\User;
-use App\Services\Workspace\WorkspaceException;
 use App\Services\Workspace\WorkspacePreviewService;
 use Filament\Notifications\Notification;
-use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Carbon;
 use Livewire\Attributes\Locked;
@@ -23,6 +21,8 @@ use Livewire\Component;
  */
 class PreviewPanel extends Component
 {
+    use InteractsWithWorkspace;
+
     #[Locked]
     public string $workspaceId;
 
@@ -87,25 +87,8 @@ class PreviewPanel extends Component
 
     private function task(): Task
     {
-        return Task::query()->with('workspace')->where('workspace_id', $this->workspaceId)->findOrFail($this->taskId);
+        return $this->findTaskOrFail($this->taskId);
     }
 
-    private function user(): User
-    {
-        /** @var User $user */
-        $user = auth()->user();
 
-        return $user;
-    }
-
-    private function attempt(callable $action): void
-    {
-        try {
-            $action();
-        } catch (WorkspaceException $e) {
-            Notification::make()->title($e->getMessage())->danger()->send();
-        } catch (AuthorizationException) {
-            Notification::make()->title(__('workspaces.task.viewer_hint'))->warning()->send();
-        }
-    }
 }

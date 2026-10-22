@@ -56,8 +56,7 @@ class ViewWorkspace extends ViewRecord
         parent::mount($record);
 
         $workspace = $this->workspace();
-        $this->taskId = RequestedTask::id($workspace->id)
-            ?? $workspace->tasks()->whereNull('archived_at')->latest('updated_at')->value('id');
+        $this->taskId = RequestedTask::idOrLatest($workspace->id);
 
         // The pull request refreshes in the background (PullRequestService::details).
         /** @var User $user */
