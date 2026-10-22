@@ -152,8 +152,13 @@ drei Schritte klappen zu *N weitere Schritte anzeigen* zusammen.
     etwas ändert,
   - *Freigaben umgehen* — Claude führt jedes Tool ohne Rückfrage aus. Nur
     Workspace-Admins (und Argos-Admins) können das wählen.
-- Das **Modell** (die zweite Pille) lässt sich jederzeit wechseln. Die Kosten
-  der Aufgabe stehen neben dem Senden-Knopf.
+- Das **Modell** (die zweite Pille) lässt sich jederzeit wechseln — wie
+  `/model` in Claude Code. *Immer die neueste Version* listet die Aliasse, die
+  dein Abo anbietet (mit der Version, für die sie heute stehen); *Feste
+  Version* legt genau dieses Modell fest (z. B. `claude-opus-5-5`), das auch
+  bleibt, wenn ein neueres erscheint; *Andere Modell-ID …* nimmt jede
+  Modell-ID von Hand. Die Liste erscheint nach der ersten Session des Agents.
+  Die Kosten der Aufgabe stehen neben dem Senden-Knopf.
 - Ist eine Session beendet (Container-Neustart, Absturz), setzt **Session
   fortsetzen** dieselbe Claude-Unterhaltung fort.
 - Claude arbeitet im Worktree der Aufgabe. Slash-Commands, Skills und die

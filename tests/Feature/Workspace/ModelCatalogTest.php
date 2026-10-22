@@ -32,18 +32,58 @@ class ModelCatalogTest extends TestCase
         app(TaskEventIngestor::class)->ingest($workspace, [[
             'task_id' => $task->id, 'seq' => 1, 'type' => 'session.started',
             'data' => ['claude_session_id' => 's1', 'models' => [
-                ['value' => 'default', 'display_name' => 'Default (recommended)', 'description' => 'Sonnet 5.5'],
-                ['value' => 'opus', 'display_name' => 'Opus', 'description' => 'Opus 5.5'],
+                ['value' => 'default', 'display_name' => 'Default (recommended)', 'description' => 'Everyday tasks', 'resolved_model' => 'claude-sonnet-5-5'],
+                ['value' => 'opus', 'display_name' => 'Opus', 'description' => 'Most capable', 'resolved_model' => 'claude-opus-5-5'],
+                ['value' => 'sonnet[1m]', 'display_name' => 'Sonnet (1M context)', 'description' => 'Long sessions', 'resolved_model' => 'claude-sonnet-5-5[1m]'],
                 ['value' => 'rm -rf /', 'display_name' => 'evil'],
             ]],
         ]]);
 
+        // Kept in the database: survives a cache clear.
+        \Illuminate\Support\Facades\Cache::flush();
+        $agent->refresh();
         $catalog = app(ModelCatalog::class);
-        $this->assertSame(['default', 'opus'], array_column($catalog->options($agent), 'value'));
+        $options = $catalog->options($agent);
+        // Like Claude Code: the aliases (always the newest) plus the fixed versions they resolve to today.
+        $this->assertSame(['default', 'opus', 'sonnet[1m]', 'claude-sonnet-5-5', 'claude-opus-5-5', 'claude-sonnet-5-5[1m]'], array_column($options, 'value'));
+        $this->assertSame(['latest', 'latest', 'latest', 'pinned', 'pinned', 'pinned'], array_column($options, 'group'));
+        $this->assertSame(['Default (recommended) · Sonnet 5.5', 'Opus · Opus 5.5', 'Sonnet (1M context) · Sonnet 5.5 (1M)', 'Sonnet 5.5', 'Opus 5.5', 'Sonnet 5.5 (1M)'], array_column($options, 'label'));
         // Other agents (subscriptions) are not affected.
         $this->assertSame(['sonnet', 'opus', 'haiku'], array_column($catalog->options(AgentCredential::factory()->create()), 'value'));
         // A task still on an old id keeps it selectable.
-        $this->assertContains('claude-sonnet-4-6', array_column($catalog->options($agent, 'claude-sonnet-4-6'), 'value'));
+        $old = collect($catalog->options($agent, 'claude-sonnet-4-6'))->firstWhere('value', 'claude-sonnet-4-6');
+        $this->assertSame(['label' => 'Sonnet 4.6', 'group' => 'other'], ['label' => $old['label'], 'group' => $old['group']]);
+    }
+
+    public function test_versions_get_readable_names(): void
+    {
+        $this->assertSame('Opus 5.5', ModelCatalog::versionLabel('claude-opus-5-5'));
+        $this->assertSame('Haiku 4.5', ModelCatalog::versionLabel('claude-haiku-4-5-20251001'));
+        $this->assertSame('Sonnet 5.5 (1M)', ModelCatalog::versionLabel('claude-sonnet-5-5[1m]'));
+        $this->assertSame('Opus 5', ModelCatalog::versionLabel('claude-opus-5'));
+        $this->assertNull(ModelCatalog::versionLabel('opus'));
+    }
+
+    public function test_any_valid_model_id_can_be_entered_by_hand(): void
+    {
+        $workspace = Workspace::factory()->create(['status' => \App\Enums\WorkspaceStatus::Running]);
+        $owner = \App\Models\User::factory()->create();
+        \App\Models\WorkspaceMember::query()->create(['workspace_id' => $workspace->id, 'user_id' => $owner->id, 'role' => \App\Enums\WorkspaceRole::Member]);
+        $agent = AgentCredential::factory()->ownedBy($owner)->create();
+        $task = Task::factory()->ownedBy($owner)->create(['workspace_id' => $workspace->id, 'agent_credential_id' => $agent->id, 'model' => 'sonnet']);
+        $this->app->singleton(\App\Services\Workspace\WorkspaceDaemonClient::class, \App\Testing\FakeWorkspaceDaemon::class);
+        \Illuminate\Support\Facades\Event::fake([\App\Broadcasting\TaskStream::class]);
+
+        $chat = \Livewire\Livewire::withQueryParams(['task' => $task->id])->actingAs($owner)
+            ->test(\App\Livewire\Workspace\TaskChat::class, ['workspaceId' => $workspace->id])
+            ->assertSee(__('workspaces.models.custom'))
+            ->assertSee(__('workspaces.models.group_latest'));
+
+        $chat->call('setModel', 'rm -rf')->assertNotified(__('workspaces.models.invalid'));
+        $this->assertSame('sonnet', $task->fresh()->model);
+
+        $chat->call('setModel', 'claude-opus-5');
+        $this->assertSame('claude-opus-5', $task->fresh()->model);
     }
 
     public function test_model_ids_are_validated(): void

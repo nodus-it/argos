@@ -138,8 +138,12 @@ steps fold into *Show N more steps*.
     anything,
   - *Bypass permissions* — Claude runs every tool without asking. Only
     workspace admins (and Argos administrators) can choose it.
-- **Model** (the second pill) can be switched at any time. The task's cost sits
-  next to the send button.
+- **Model** (the second pill) can be switched at any time — like `/model` in
+  Claude Code. *Always the newest version* lists the aliases your subscription
+  offers (with the version they stand for today); *Fixed version* pins that
+  exact model (e.g. `claude-opus-5-5`), which stays when a newer one ships;
+  *Other model ID …* takes any model id by hand. The list appears after the
+  agent's first session. The task's cost sits next to the send button.
 - If a session ended (container restart, crash), **Resume session** continues
   the same Claude conversation.
 - Claude works in the task's worktree. Slash commands, skills and `CLAUDE.md`

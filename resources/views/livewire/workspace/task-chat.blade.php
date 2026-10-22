@@ -165,11 +165,10 @@
                     </label>
                     <label class="ws-field">
                         <span>{{ __('workspaces.task.model') }}</span>
-                        <select class="ws-select" wire:model="newModel">
-                            <option value="">{{ __('workspaces.task.model_default') }}</option>
-                            @foreach ($newModels as $model)
-                                <option value="{{ $model['value'] }}" title="{{ $model['description'] }}">{{ $model['label'] }}</option>
-                            @endforeach
+                        <select class="ws-select" wire:key="new-model-{{ $newModel }}"
+                                x-on:change="const id = $event.target.value === '__custom' ? (prompt(@js(__('workspaces.models.custom_prompt')), '') ?? '').trim() : $event.target.value; $event.target.value === '__custom' && id === '' ? $wire.$refresh() : $wire.set('newModel', id === '' ? null : id)">
+                            <option value="" @selected($newModel === null)>{{ __('workspaces.task.model_default') }}</option>
+                            @include('livewire.workspace.partials.model-options', ['models' => $newModels, 'selected' => $newModel])
                         </select>
                     </label>
                     <label class="ws-field" @if ($newAuto) hidden @endif>
@@ -484,10 +483,9 @@
                                 @endif
                             @endforeach
                         </select>
-                        <select class="wf-pill mono" wire:change="setModel($event.target.value)" wire:key="model-{{ $task->model }}-{{ $controlsVersion }}" aria-label="{{ __('workspaces.chat.model') }}">
-                            @foreach ($models as $model)
-                                <option value="{{ $model['value'] }}" title="{{ $model['description'] }}" @selected($task->model === $model['value'])>{{ $model['label'] }}</option>
-                            @endforeach
+                        <select class="wf-pill mono" wire:key="model-{{ $task->model }}-{{ $controlsVersion }}" aria-label="{{ __('workspaces.chat.model') }}"
+                                x-on:change="const id = $event.target.value === '__custom' ? (prompt(@js(__('workspaces.models.custom_prompt')), '') ?? '').trim() : $event.target.value; id !== '' ? $wire.setModel(id) : $wire.$refresh()">
+                            @include('livewire.workspace.partials.model-options', ['models' => $models, 'selected' => $task->model])
                         </select>
                         @if ($task->permission_mode === PermissionMode::BypassPermissions)
                             <span class="wf-pill-tag is-danger" title="{{ __('workspaces.task.bypass_warning') }}"><x-wf.icon name="alert" :size="12" :stroke="2" /> {{ PermissionMode::BypassPermissions->label() }}</span>

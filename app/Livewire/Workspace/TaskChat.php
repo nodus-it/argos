@@ -213,7 +213,11 @@ class TaskChat extends Component
             'newIssue' => ['nullable', 'string', 'max:64'],
             'newBaseBranch' => ['nullable', 'string', 'max:255', 'regex:/^[A-Za-z0-9._\/-]*$/'],
             'newAgentId' => ['required', 'string'],
-            'newModel' => ['nullable', 'string', 'max:90'],
+            'newModel' => ['nullable', 'string', 'max:90', function (string $attribute, mixed $value, \Closure $fail): void {
+                if (is_string($value) && ! ModelCatalog::isValidId($value)) {
+                    $fail(__('workspaces.models.invalid'));
+                }
+            }],
             'newMode' => ['required', 'string'],
             'newPrompt' => [$this->newAuto ? 'required' : 'nullable', 'string', 'max:20000'],
             'newPlan' => ['nullable', 'in:off,auto,approve'],
@@ -570,10 +574,17 @@ class TaskChat extends Component
     public function setModel(string $model): void
     {
         $task = $this->activeTask();
-        if ($task !== null && ModelCatalog::isValidId($model)) {
-            if (! $this->attempt(fn () => app(TaskService::class)->setModel($task, $this->user(), $model))) {
-                $this->controlsVersion++;
-            }
+        if ($task === null) {
+            return;
+        }
+        if (! ModelCatalog::isValidId($model)) {
+            $this->controlsVersion++;
+            Notification::make()->title(__('workspaces.models.invalid'))->warning()->send();
+
+            return;
+        }
+        if (! $this->attempt(fn () => app(TaskService::class)->setModel($task, $this->user(), $model))) {
+            $this->controlsVersion++;
         }
     }
 

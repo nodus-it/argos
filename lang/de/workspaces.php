@@ -50,6 +50,12 @@ return [
     ],
     'models' => [
         'alias' => ':family (neuestes)',
+        'group_latest' => 'Immer die neueste Version',
+        'group_pinned' => 'Feste Version',
+        'group_other' => 'Von Hand eingetragen',
+        'custom' => 'Andere Modell-ID …',
+        'custom_prompt' => 'Modell-ID, z. B. claude-opus-5-5 oder sonnet[1m]',
+        'invalid' => 'Das ist keine gültige Modell-ID (z. B. claude-opus-5-5, opus, sonnet[1m]).',
     ],
     'focus' => [
         'filter_files' => 'Dateien filtern',
