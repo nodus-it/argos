@@ -23,8 +23,8 @@ use Livewire\Component;
  * The action bar above the composer of a task: what changed ("N files
  * changed +X −Y · gate state", unpushed commits), the to-dos that need
  * someone now (red gates or pipeline, conflicts, review comments, a draft
- * pull request) and the actions for them — Check gates, Review, Commit &
- * PR. Shown while there is something to do; re-renders after a turn, a
+ * pull request) and the actions for them — Check gates, Review, Commit,
+ * Push (& PR). Shown while there is something to do; re-renders after a turn, a
  * gate run or a pull request change.
  */
 #[Lazy]
@@ -66,13 +66,18 @@ class ChangeTray extends Component
         $todos = $this->todos($task, $run, $canOperate, $canShip);
         $uncommitted = (int) ($diff['uncommitted'] ?? 0);
         $ahead = (int) ($diff['ahead'] ?? 0);
+        // Pushed, but the pull request is still missing (e.g. its step failed).
+        $push = $ahead > 0 || ($task->pr_number === null && $files !== [] && $uncommitted === 0);
 
         return view('livewire.workspace.change-tray', [
-            'show' => $diff !== null && ($uncommitted > 0 || $ahead > 0 || $todos !== []),
+            'show' => $diff !== null && ($uncommitted > 0 || $push || $todos !== []),
             'hasChanges' => $files !== [],
             'ahead' => $ahead,
             'todos' => $todos,
-            'canShip' => $canShip && ($uncommitted > 0 || $ahead > 0),
+            'canShip' => $canShip,
+            'canPush' => $canShip && $push,
+            'uncommitted' => $uncommitted,
+            'hasPr' => $task->pr_number !== null && in_array($task->pr_state, ['open', 'draft'], true),
             'count' => count($files),
             'additions' => array_sum(array_column($files, 'additions')),
             'deletions' => array_sum(array_column($files, 'deletions')),

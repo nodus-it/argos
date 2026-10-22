@@ -1,0 +1,18 @@
+{
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "minLength": 10,
+      "maxLength": 72,
+      "description": "Pull request title in Conventional Commits style"
+    },
+    "body": {
+      "type": "string",
+      "maxLength": 4000,
+      "description": "Markdown description: what, why, testing"
+    }
+  },
+  "required": ["title", "body"],
+  "additionalProperties": false
+}

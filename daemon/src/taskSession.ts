@@ -36,6 +36,8 @@ export interface TaskStartParams {
     permissionMode: UserPermissionMode;
     resumeSessionId?: string | null;
     appendSystemPrompt?: string;
+    /** Author and committer of the commits Claude makes in this session. */
+    gitAuthor?: { name: string; email: string } | null;
 }
 
 export type { SessionEnvironment } from './claudeEnv.js';
@@ -177,7 +179,11 @@ export class TaskSession {
     }
 
     private launch(): void {
-        const env = { ...claudeChildEnv(this.environment, this.params.agentId, this.params.oauthToken), ...taskEnv(this.params.cwd) };
+        const author = this.params.gitAuthor;
+        const gitIdentity = author
+            ? { GIT_AUTHOR_NAME: author.name, GIT_AUTHOR_EMAIL: author.email, GIT_COMMITTER_NAME: author.name, GIT_COMMITTER_EMAIL: author.email }
+            : {};
+        const env = { ...claudeChildEnv(this.environment, this.params.agentId, this.params.oauthToken), ...taskEnv(this.params.cwd), ...gitIdentity };
         // Only this query's stderr belongs in its failure report.
         this.stderrTail = [];
 

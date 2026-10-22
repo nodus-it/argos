@@ -1,7 +1,7 @@
 # Pull Requests
 
 Jede [Aufgabe](TASKS.md) endet in ihrem eigenen Pull Request (GitLab: Merge
-Request) gegen ihren Basis-Branch. Sobald **Commit & PR** ihn geöffnet hat,
+Request) gegen ihren Basis-Branch. Sobald **Pushen & PR** ihn geöffnet hat,
 folgt ihm die Seitenleiste der Aufgabe: Zustand, Checks, Reviews und Konflikte
 — mit Aktionen, die die Arbeit an Claude zurückgeben. Der Merge des Pull
 Requests schließt die Aufgabe ab.

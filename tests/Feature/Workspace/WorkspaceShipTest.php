@@ -109,7 +109,56 @@ class WorkspaceShipTest extends TestCase
         $prompt = $this->sent['RunOneshot'][0];
         $this->assertSame('oat-ada', $prompt['oauth_token']);
         $this->assertStringContainsString('+new', $prompt['user_prompt']);
+        // Uncommitted changes: the message describes exactly what this commit takes.
+        $this->assertStringContainsString('## git diff HEAD', $prompt['user_prompt']);
         $this->assertSame(['subject', 'body'], $prompt['json_schema']['required']);
+    }
+
+    public function test_the_pull_request_draft_covers_the_whole_branch(): void
+    {
+        $this->fakeDaemon([RunOneshot::class => MockResponse::make(['text' => '', 'structured' => ['title' => 'feat: add login', 'body' => "## What\n- Login"], 'cost_usd' => 0.001])]);
+
+        $this->assertSame(['title' => 'feat: add login', 'body' => "## What\n- Login"], $this->service()->pullRequestDraft($this->task, $this->editor));
+        $prompt = $this->sent['RunOneshot'][0];
+        $this->assertStringContainsString('## git diff origin/develop', $prompt['user_prompt']);
+        $this->assertSame(['title', 'body'], $prompt['json_schema']['required']);
+        $this->assertStringContainsString('## Testing', $prompt['system_prompt']);
+    }
+
+    public function test_commit_and_push_are_separate_steps(): void
+    {
+        $sha = $this->service()->commit($this->task, $this->editor, 'feat: add login', 'Adds the login.');
+
+        $this->assertSame(str_repeat('b', 40), $sha);
+        $this->assertSame(['name' => 'Ada', 'email' => 'ada@example.com'], $this->sent['GitCommit'][0]['author']);
+        $this->assertArrayNotHasKey('GitPush', $this->sent);
+        $notice = TaskEvent::query()->where('task_id', $this->task->id)->where('type', TaskEventType::Notice->value)->sole();
+        $this->assertSame(['committed', 'feat: add login'], [$notice->payload['kind'], $notice->payload['subject']]);
+
+        $this->fakeDaemon([GitStatus::class => MockResponse::make(['branch' => 'ws/login', 'upstream' => null, 'ahead' => 2, 'behind' => 0, 'dirty' => false, 'files' => []])]);
+        $this->git->shouldReceive('createPullRequest')->once()
+            ->withArgs(fn ($owner, $repo, $title, $body, $head, $base, $options) => $title === 'feat: login' && str_contains($body, '## What') && $options === ['draft' => false])
+            ->andReturn(['iid' => 9, 'web_url' => 'https://x/9', 'state' => 'opened']);
+
+        $this->assertSame('https://x/9', $this->service()->push($this->task, $this->editor, 'feat: login', "## What\n- Login"));
+        $this->assertSame(1, count($this->sent['GitCommit']));
+        $this->assertCount(1, $this->sent['GitPush']);
+        $this->assertSame(9, $this->task->fresh()->pr_number);
+    }
+
+    public function test_nothing_to_commit_and_nothing_to_push(): void
+    {
+        $this->fakeDaemon([GitCommit::class => MockResponse::make(['error' => ['code' => 'no_changes', 'message' => 'Nothing to commit']], 409)]);
+        try {
+            $this->service()->commit($this->task, $this->editor, 'feat: x', '');
+            $this->fail('expected WorkspaceException');
+        } catch (WorkspaceException $e) {
+            $this->assertSame(__('workspaces.ship.nothing_to_commit'), $e->getMessage());
+        }
+
+        $this->task->forceFill(['pr_number' => 5, 'pr_url' => 'https://x/5', 'pr_state' => 'open'])->save();
+        $this->expectExceptionMessage(__('workspaces.ship.nothing'));
+        $this->service()->push($this->task, $this->editor);
     }
 
     public function test_draft_is_empty_without_an_agent_or_when_claude_fails(): void
@@ -291,17 +340,40 @@ class WorkspaceShipTest extends TestCase
         $this->assertNull($task->done_at);
     }
 
-    public function test_the_ship_action_prefills_the_draft_and_ships(): void
+    public function test_the_commit_dialog_prefills_the_draft_and_can_go_on_to_push(): void
     {
-        $this->git->shouldReceive('createPullRequest')->once()->andReturn(['iid' => 9, 'web_url' => 'https://x/9', 'state' => 'opened']);
-
-        Livewire::actingAs($this->editor)
+        $page = Livewire::actingAs($this->editor)
             ->test(ViewWorkspace::class, ['record' => $this->workspace->getKey()])
-            ->mountAction('ship')
-            ->assertActionDataSet(['subject' => 'feat: add login', 'body' => 'Adds the login.'])
+            ->call('openShipDialog')
+            ->assertActionMounted('commit')
+            ->assertActionDataSet(['subject' => 'feat: add login', 'body' => 'Adds the login.', 'then_push' => false])
+            ->setActionData(['then_push' => true])
             ->callMountedAction()
-            ->assertNotified();
+            ->assertNotified(__('workspaces.ship.committed'))
+            ->assertActionMounted('push');
+        $this->assertArrayNotHasKey('GitPush', $this->sent);
+
+        // The pull request text is drafted from the whole branch (the fake answers with the commit shape).
+        $this->git->shouldReceive('createPullRequest')->once()->withArgs(fn ($owner, $repo, $title) => $title === $this->task->title)->andReturn(['iid' => 9, 'web_url' => 'https://x/9', 'state' => 'opened']);
+        $page->assertActionDataSet(['draft' => false])->callMountedAction()->assertNotified();
 
         $this->assertSame(9, $this->task->fresh()->pr_number);
+    }
+
+    public function test_the_push_dialog_only_confirms_when_the_pull_request_is_open(): void
+    {
+        $this->task->forceFill(['pr_number' => 5, 'pr_url' => 'https://x/5', 'pr_state' => 'open'])->save();
+        $this->fakeDaemon([GitStatus::class => MockResponse::make(['branch' => 'ws/login', 'upstream' => 'origin/ws/login', 'ahead' => 2, 'behind' => 0, 'dirty' => false, 'files' => []])]);
+        $this->git->shouldReceive('commentOnPullRequest')->once();
+
+        $page = Livewire::actingAs($this->editor)
+            ->test(ViewWorkspace::class, ['record' => $this->workspace->getKey()])
+            ->call('openShipDialog')
+            ->assertActionMounted('push');
+        $this->assertStringStartsWith(trans_choice('workspaces.ship.push_summary', 2, ['count' => 2]), $page->get('shipSummary'));
+        $page->callMountedAction()->assertNotified();
+
+        $this->assertArrayNotHasKey('RunOneshot', $this->sent);
+        $this->assertCount(1, $this->sent['GitPush']);
     }
 }

@@ -188,6 +188,10 @@ class TaskServiceTest extends TestCase
         $this->assertSame(0, $start['seq_offset']);
         $this->assertNull($start['resume_session_id']);
         $this->assertStringContainsString('[Ada]', $start['append_system_prompt']);
+        // Claude commits finished parts itself, as the task owner, and never pushes.
+        $this->assertStringContainsString('Conventional Commits', $start['append_system_prompt']);
+        $this->assertStringContainsString('Never push', $start['append_system_prompt']);
+        $this->assertSame(['name' => $task->owner->name, 'email' => $task->owner->email], $start['git_author']);
 
         $message = $this->calls['SendMessage'][0]['body'];
         $this->assertSame((string) $event->id, $message['client_msg_id']);

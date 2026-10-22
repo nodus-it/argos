@@ -191,21 +191,23 @@ class TaskActionsTest extends TestCase
         $html = $this->page($this->ada, $task)->html();
         $header = substr($html, (int) strpos($html, 'wf-task-meta'), 3000);
 
-        // No PR chip (the sidebar has it), no "Commit & PR" (the action bar has it), invite only as "+".
+        // No PR chip (the sidebar has it), no commit/push (the action bar has them), invite only as "+".
         $this->assertStringNotContainsString('is-pr', substr($header, 0, (int) strpos($header, 'wf-review-flag')));
         $this->assertStringContainsString("mountAction('invite')", $html);
-        $this->page($this->ada, $task)->assertActionVisible('ship');
+        $this->page($this->ada, $task)->assertActionVisible('commit')->assertActionVisible('push');
     }
 
-    public function test_the_action_bar_offers_ship_and_the_to_dos(): void
+    public function test_the_action_bar_offers_commit_push_and_the_to_dos(): void
     {
         $task = $this->task($this->ada);
         FakeWorkspaceDaemon::$gateOutcome = 'fail';
         app(WorkspaceGateService::class)->run($task, $this->ada);
 
+        // The fake has an uncommitted file and an unpushed commit: commit is the next step.
         Livewire::withoutLazyLoading()->actingAs($this->ada)
             ->test(\App\Livewire\Workspace\ChangeTray::class, ['workspaceId' => $this->workspace->id, 'taskId' => $task->id])
-            ->assertSeeHtml('data-testid="tray-ship"')
+            ->assertSeeHtmlInOrder(['wf-btn-primary', 'data-testid="tray-commit"', 'wf-btn-surface', 'data-testid="tray-push"'])
+            ->assertSee(__('workspaces.ship.push_pr'))
             ->assertSee(__('workspaces.tray.todo.gates', ['gates' => 'Pest / PHPUnit']))
             ->assertSee(__('workspaces.tray.todo.gates_action'));
     }

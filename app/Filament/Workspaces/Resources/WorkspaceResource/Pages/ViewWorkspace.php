@@ -39,7 +39,7 @@ class ViewWorkspace extends ViewRecord
 {
     protected static string $resource = WorkspaceResource::class;
 
-    /** Shown in the ship dialog (changed files, unpushed commits). */
+    /** Shown in the commit and push dialogs (changes, commits, gates). */
     public string $shipSummary = '';
 
     /** The task shown in the chat (ship, gates and rebase act on it). */
@@ -99,11 +99,22 @@ class ViewWorkspace extends ViewRecord
         return $this->workspace()->name;
     }
 
-    /** `/ship` in the composer opens the ship dialog. */
+    /**
+     * Action bar and `/ship`: open the commit or the push dialog — without a
+     * step, whichever comes next (commit while something is uncommitted).
+     */
     #[On('workspace-ship')]
-    public function openShipDialog(): void
+    public function openShipDialog(?string $step = null): void
     {
-        $this->mountAction('ship');
+        if ($step === null) {
+            $task = $this->task();
+            try {
+                $step = $task !== null && app(WorkspaceShipService::class)->pending($task)['changed_files'] > 0 ? 'commit' : 'push';
+            } catch (\Throwable) {
+                $step = 'commit';
+            }
+        }
+        $this->mountAction($step === 'push' ? 'push' : 'commit');
     }
 
     /** Re-read the record while the container changes state (polled). */
@@ -136,18 +147,15 @@ class ViewWorkspace extends ViewRecord
             });
     }
 
-    public function shipAction(): Action
+    /** Commit what is not committed yet — message drafted by Claude, optionally pushing right after. */
+    public function commitAction(): Action
     {
-        return Action::make('ship')
-            ->label(__('workspaces.ship.action'))
-            ->icon('heroicon-o-paper-airplane')
+        return Action::make('commit')
+            ->label(__('workspaces.ship.commit'))
+            ->icon('heroicon-o-check-circle')
             ->color('primary')
-            // Icon only on phones: the header stays one line.
-            ->labeledFrom('sm')
-            ->visible(fn (): bool => $this->workspace()->status === WorkspaceStatus::Running
-                && ($task = $this->task()) !== null
-                && (auth()->user()?->can('ship', $task) ?? false))
-            ->modalHeading(__('workspaces.ship.heading'))
+            ->visible(fn (): bool => $this->canShip())
+            ->modalHeading(__('workspaces.ship.commit_heading'))
             ->modalWidth('2xl')
             ->fillForm(function (): array {
                 /** @var User $user */
@@ -158,13 +166,11 @@ class ViewWorkspace extends ViewRecord
                 } catch (\Throwable) {
                     $draft = ['subject' => '', 'body' => '', 'changed_files' => 0, 'ahead' => 0];
                 }
-                $gates = app(WorkspaceGateService::class)->summary($task);
-                $failed = app(WorkspaceGateService::class)->latest($task)?->failedGates() !== [];
-                $this->shipSummary = __('workspaces.ship.summary', ['files' => $draft['changed_files'], 'ahead' => $draft['ahead']])
+                $this->shipSummary = trans_choice('workspaces.ship.commit_summary', $draft['changed_files'], ['count' => $draft['changed_files']])
                     .($draft['subject'] === '' ? ' '.__('workspaces.ship.no_draft') : '')
-                    .($gates !== null ? ' '.__($failed ? 'workspaces.gates.ship_warning' : 'workspaces.gates.ship_summary', ['summary' => $gates]) : '');
+                    .$this->gateNote($task);
 
-                return ['subject' => $draft['subject'], 'body' => $draft['body'], 'draft' => false];
+                return ['subject' => $draft['subject'], 'body' => $draft['body'], 'then_push' => false];
             })
             ->modalDescription(fn (): string => $this->shipSummary)
             ->schema([
@@ -175,21 +181,108 @@ class ViewWorkspace extends ViewRecord
                 Textarea::make('body')
                     ->label(__('workspaces.ship.body'))
                     ->rows(5),
-                Toggle::make('draft')
-                    ->label(__('workspaces.ship.draft'))
-                    ->visible(fn (): bool => $this->task()?->pr_number === null),
+                Toggle::make('then_push')
+                    ->label(fn (): string => __($this->task()?->pr_number === null ? 'workspaces.ship.then_push_pr' : 'workspaces.ship.then_push')),
             ])
+            ->modalSubmitActionLabel(__('workspaces.ship.commit'))
             ->action(function (array $data): void {
                 /** @var User $user */
                 $user = auth()->user();
                 try {
-                    $url = app(WorkspaceShipService::class)->ship($this->requireTask(), $user, (string) $data['subject'], (string) ($data['body'] ?? ''), (bool) ($data['draft'] ?? false));
+                    app(WorkspaceShipService::class)->commit($this->requireTask(), $user, (string) $data['subject'], (string) ($data['body'] ?? ''));
+                    Notification::make()->title(__('workspaces.ship.committed'))->success()->send();
+                } catch (WorkspaceException $e) {
+                    Notification::make()->title($e->getMessage())->danger()->persistent()->send();
+
+                    return;
+                }
+                $this->dispatch('argos-workspace-changed');
+                if ((bool) ($data['then_push'] ?? false)) {
+                    $this->replaceMountedAction('push');
+                }
+            });
+    }
+
+    /**
+     * Push the branch. Without a pull request yet: open it, title and
+     * description drafted by Claude from all commits; with one: confirm.
+     */
+    public function pushAction(): Action
+    {
+        $opens = fn (): bool => $this->task()?->pr_number === null;
+
+        return Action::make('push')
+            ->label(fn (): string => __($opens() ? 'workspaces.ship.push_pr' : 'workspaces.ship.push'))
+            ->icon('heroicon-o-arrow-up-circle')
+            ->color('primary')
+            ->visible(fn (): bool => $this->canShip())
+            ->modalHeading(fn (): string => __($opens() ? 'workspaces.ship.push_pr_heading' : 'workspaces.ship.push_heading'))
+            ->modalWidth(fn (): string => $opens() ? '3xl' : 'md')
+            ->fillForm(function () use ($opens): array {
+                /** @var User $user */
+                $user = auth()->user();
+                $task = $this->requireTask();
+                $service = app(WorkspaceShipService::class);
+                try {
+                    $pending = $service->pending($task);
+                } catch (\Throwable) {
+                    $pending = ['changed_files' => 0, 'ahead' => 0];
+                }
+                $draft = $opens() ? $service->pullRequestDraft($task, $user) : ['title' => '', 'body' => ''];
+                $this->shipSummary = trans_choice('workspaces.ship.push_summary', $pending['ahead'], ['count' => $pending['ahead']])
+                    .($pending['changed_files'] > 0 ? ' '.trans_choice('workspaces.ship.uncommitted_left', $pending['changed_files'], ['count' => $pending['changed_files']]) : '')
+                    .($opens() && $draft['title'] === '' ? ' '.__('workspaces.ship.no_pr_draft') : '')
+                    .$this->gateNote($task);
+
+                return ['title' => $draft['title'] !== '' ? $draft['title'] : $task->title, 'body' => $draft['body'], 'draft' => false];
+            })
+            ->modalDescription(fn (): string => $this->shipSummary)
+            ->schema([
+                TextInput::make('title')
+                    ->label(__('workspaces.ship.pr_title'))
+                    ->required($opens)
+                    ->maxLength(200)
+                    ->visible($opens),
+                Textarea::make('body')
+                    ->label(__('workspaces.ship.pr_body'))
+                    ->rows(12)
+                    ->visible($opens),
+                Toggle::make('draft')
+                    ->label(__('workspaces.ship.draft'))
+                    ->visible($opens),
+            ])
+            ->modalSubmitActionLabel(fn (): string => __($opens() ? 'workspaces.ship.push_pr' : 'workspaces.ship.push'))
+            ->action(function (array $data): void {
+                /** @var User $user */
+                $user = auth()->user();
+                try {
+                    $url = app(WorkspaceShipService::class)->push($this->requireTask(), $user, (string) ($data['title'] ?? ''), (string) ($data['body'] ?? ''), (bool) ($data['draft'] ?? false));
                     Notification::make()->title(__('workspaces.ship.shipped', ['url' => $url]))->success()->send();
                 } catch (WorkspaceException $e) {
                     Notification::make()->title($e->getMessage())->danger()->persistent()->send();
                 }
+                $this->dispatch('argos-workspace-changed');
                 $this->refreshStatus();
             });
+    }
+
+    private function canShip(): bool
+    {
+        return $this->workspace()->status === WorkspaceStatus::Running
+            && ($task = $this->task()) !== null
+            && (auth()->user()?->can('ship', $task) ?? false);
+    }
+
+    /** " Gates: …" for the commit and push dialogs, empty before the first run. */
+    private function gateNote(Task $task): string
+    {
+        $gates = app(WorkspaceGateService::class);
+        $summary = $gates->summary($task);
+        if ($summary === null) {
+            return '';
+        }
+
+        return ' '.__($gates->latest($task)?->failedGates() !== [] ? 'workspaces.gates.ship_warning' : 'workspaces.gates.ship_summary', ['summary' => $summary]);
     }
 
     public function gatesAction(): Action

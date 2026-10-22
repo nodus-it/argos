@@ -148,7 +148,7 @@ A workspace page has three parts:
   current task's owner and collaborators (with presence, **+** invites), the
   ticket and the **⋯** menu (hand over, link or create a ticket,
   follow-up task, rebase, cancel, delete, settings, keyboard shortcuts,
-  start/stop). **Commit & PR** sits in the action bar above the text field.
+  start/stop). **Commit** and **Push & PR** sit in the action bar above the text field.
 - The **chat** of the current task as a centred column.
 - The task's **sidebar**: VS Code (the task's folder), preview, branch, pull
   request, quality gates and changed files — see

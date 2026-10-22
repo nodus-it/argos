@@ -86,7 +86,8 @@ other, as they would in a shared repository.
 4. **Work.** Claude reads, edits and runs commands, asking for approval as the
    task's mode requires. Check the [quality gates](TASKS.md#quality-gates),
    the [review](TASKS.md#the-review) and the [preview](LIVE-DEMOS.md).
-5. **Ship.** **Commit & PR** pushes the branch and opens the pull request; the
+5. **Ship.** Claude commits finished parts itself; **Commit** and **Push & PR**
+   commit what is left, push the branch and open the pull request; the
    sidebar then follows its [checks, reviews and conflicts](PULL-REQUESTS.md).
    Merged → the task is done; closed → cancelled.
 

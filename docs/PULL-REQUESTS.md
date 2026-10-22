@@ -1,7 +1,7 @@
 # Pull Requests
 
 Every [task](TASKS.md) ends in its own pull request (GitLab: merge request)
-against its base branch. Once **Commit & PR** has opened it, the task's
+against its base branch. Once **Push & PR** has opened it, the task's
 sidebar follows it: state, checks, reviews and conflicts — with actions that
 hand the work back to Claude. Merging the pull request finishes the task.
 

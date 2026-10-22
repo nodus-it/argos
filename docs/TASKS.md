@@ -147,7 +147,8 @@ steps fold into *Show N more steps*.
 
 An **action bar** above the text field shows what changed — files, added and
 removed lines and the state of the [quality gates](#quality-gates), or commits
-not pushed yet — with **Check gates**, **Review** and **Commit & PR**. Below
+not pushed yet — with **Check gates**, **Review**, **Commit** and **Push & PR**
+(see [Shipping](#shipping-commit-and-pull-request)). Below
 it, the to-dos that need someone now, each with its action: red gates
 (*Show*), a red pipeline (*Let Claude fix it*), conflicts or a moved base
 branch (*Rebase by Claude*), new review comments (*Collect in my review*) and
@@ -168,7 +169,7 @@ to do.
   | Command | Does |
   |---|---|
   | `/plan [request]` | Switch to plan mode, optionally send the request. |
-  | `/ship` | Open the commit & pull request dialog. |
+  | `/ship` | Open the next shipping step: commit while something is uncommitted, otherwise push & pull request. |
   | `/review` | Open the [review](#the-review). |
   | `/preview` | Show the preview in the sidebar (unfolded and marked; on narrow screens it opens the drawer). |
   | `/gates` | Run the [quality gates](#quality-gates). |
@@ -311,7 +312,7 @@ are skipped.
 - In the [review](#the-review), PHPStan errors appear **at their line** and
   Pint flags the file; **Add to my review** there adds the finding to your
   collected comments.
-- The commit dialog mentions the last result. Failed gates are a warning, never
+- The commit and push dialogs mention the last result. Failed gates are a warning, never
   a blocker.
 
 Gate logs live in `.agent/logs/` inside the worktree, which git ignores
@@ -336,24 +337,37 @@ files are not touched. A task keeps its newest 200 checkpoints.
 
 ## Shipping: commit and pull request
 
-**Commit & PR** (action bar, or `/ship`) commits everything that changed in the
-task, pushes its branch and opens a pull request (GitLab: merge request)
-against the base branch.
+Shipping has two steps — commit, then push with the pull request (GitLab: merge
+request) against the base branch. The action bar always offers the next one as
+its main button.
 
-- Claude drafts the commit message from the diff and the conversation, on
-  **your** subscription. Without one, or if it fails, you write it yourself.
+1. **Claude commits on its own.** When a self-contained part is done and its
+   tests pass, Claude commits it with a Conventional Commits message
+   (`feat: …`, `fix: …`) and a `Co-Authored-By: Claude` trailer. The commit
+   carries the **task owner** as author. Claude never pushes and never opens a
+   pull request.
+2. **Commit** commits whatever is still uncommitted. Claude drafts the message
+   from exactly these changes and the conversation, on **your** subscription;
+   without one, or if it fails, you write it yourself. The commit carries your
+   name and e-mail. *Then push and open the pull request* goes straight on to
+   step 3.
+3. **Push & PR** pushes the branch. Without a pull request yet, Claude drafts
+   its title and description from the whole branch and the conversation —
+   *What*, *Why*, *Testing* — and you edit them before it opens. A linked
+   ticket is referenced (see [Tickets](TICKETS.md#closing-on-merge)); *Open as
+   draft* opens a draft pull request. With a pull request open, **Push** only
+   confirms how many commits go out and comments on the pull request.
+
 - The push and the pull request use the workspace's repository access; the
-  commit carries the name and e-mail of the person shipping, and the pull
-  request says who shipped it. A linked ticket is referenced in the pull
-  request (see [Tickets](TICKETS.md#closing-on-merge)).
-- *Open as draft* opens a draft pull request. Shipping again pushes the new
-  commits and comments on the existing pull request.
+  pull request says who opened it.
+- Uncommitted files stay behind when you push — the push dialog says so.
 - If the remote branch moved, the push is refused. When the pull request
   reports conflicts or a base branch that moved on, **Ask Claude to rebase**
   (header menu, and *Rebase by Claude* in the sidebar) asks Claude to fetch,
   rebase and resolve conflicts.
 - From then on the sidebar follows the pull request — see
   [Pull Requests](PULL-REQUESTS.md).
+- [Automatic tasks](#automatic-tasks), the API and MCP do both steps at once.
 
 The owner, collaborators and workspace admins may ship.
 

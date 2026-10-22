@@ -159,8 +159,8 @@ Eine Workspace-Seite hat drei Teile:
   aktuelle Aufgabe gehört, den Mitarbeitenden (mit Anwesenheit, **+** lädt
   ein), dem Ticket und dem **⋯**-Menü (übergeben, Ticket
   verknüpfen oder anlegen, Folge-Aufgabe, Rebase, abbrechen, löschen,
-  Einstellungen, Tastenkürzel, starten/stoppen). **Commit & PR** sitzt in der
-  Aktionsleiste über dem Eingabefeld.
+  Einstellungen, Tastenkürzel, starten/stoppen). **Committen** und **Pushen & PR**
+  sitzen in der Aktionsleiste über dem Eingabefeld.
 - Den **Chat** der aktuellen Aufgabe als zentrierte Spalte.
 - Die **Seitenleiste** der Aufgabe: VS Code (der Ordner der Aufgabe), Preview,
   Branch, Pull Request, Quality Gates und geänderte Dateien — siehe

@@ -162,7 +162,8 @@ drei Schritte klappen zu *N weitere Schritte anzeigen* zusammen.
 Eine **Aktionsleiste** über dem Eingabefeld zeigt, was sich geändert hat —
 Dateien, hinzugefügte und entfernte Zeilen und den Stand der
 [Quality-Gates](#quality-gates) oder noch nicht gepushte Commits —, mit
-**Gates prüfen**, **Review** und **Commit & PR**. Darunter stehen die
+**Gates prüfen**, **Review**, **Committen** und **Pushen & PR** (siehe
+[Ausliefern](#ausliefern-commit-und-pull-request)). Darunter stehen die
 To-dos, die gerade jemanden brauchen, jeweils mit ihrer Aktion: rote Gates
 (*Ansehen*), eine rote Pipeline (*Claude fixen lassen*), Konflikte oder ein
 weitergelaufener Basis-Branch (*Rebase durch Claude*), neue Review-Kommentare
@@ -185,7 +186,7 @@ markieren*). Sie erscheint nur, wenn es etwas zu tun gibt.
   | Befehl | Wirkung |
   |---|---|
   | `/plan [Anfrage]` | In den Plan-Mode wechseln, optional die Anfrage senden. |
-  | `/ship` | Den Dialog für Commit und Pull Request öffnen. |
+  | `/ship` | Den nächsten Schritt zum Ausliefern öffnen: Committen, solange etwas nicht committet ist, sonst Pushen & Pull Request. |
   | `/review` | Das [Review](#das-review) öffnen. |
   | `/preview` | Die Preview in der Seitenleiste zeigen (aufgeklappt und markiert; auf schmalen Bildschirmen öffnet sich die Schublade). |
   | `/gates` | Die [Quality-Gates](#quality-gates) ausführen. |
@@ -345,7 +346,7 @@ PHP/Laravel-Projekte gemacht; bei anderen Stacks werden die Gates
 - Im [Review](#das-review) erscheinen PHPStan-Fehler **an ihrer Zeile**, und
   Pint markiert die Datei; **Ins Review übernehmen** legt den Befund dort zu
   deinen gesammelten Kommentaren.
-- Der Commit-Dialog nennt das letzte Ergebnis. Fehlgeschlagene Gates sind ein
+- Commit- und Push-Dialog nennen das letzte Ergebnis. Fehlgeschlagene Gates sind ein
   Warnhinweis, nie eine Sperre.
 
 Die Gate-Logs liegen in `.agent/logs/` im Worktree, das git lokal ignoriert.
@@ -372,24 +373,41 @@ neuesten 200 Checkpoints.
 
 ## Ausliefern: Commit und Pull Request
 
-**Commit & PR** (Aktionsleiste oder `/ship`) committet alles, was sich in der
-Aufgabe geändert hat, pusht ihren Branch und öffnet einen Pull Request (GitLab:
-Merge Request) gegen den Basis-Branch.
+Ausliefern hat zwei Schritte — committen, dann pushen mit dem Pull Request
+(GitLab: Merge Request) gegen den Basis-Branch. Die Aktionsleiste bietet den
+jeweils nächsten als Hauptknopf an.
 
-- Claude entwirft die Commit-Message aus dem Diff und der Unterhaltung, auf
-  **deinem** Abo. Ohne Abo oder wenn das fehlschlägt, schreibst du sie selbst.
-- Push und Pull Request nutzen den Repository-Zugang des Workspaces; der Commit
-  trägt Namen und E-Mail-Adresse der Person, die ausliefert, und der Pull
-  Request nennt, wer ihn ausgeliefert hat. Ein verknüpftes Ticket wird im Pull
-  Request referenziert (siehe [Tickets](TICKETS.md#schliessen-beim-merge)).
-- *Als Entwurf öffnen* öffnet einen Entwurfs-Pull-Request. Erneutes Ausliefern
-  pusht die neuen Commits und kommentiert den bestehenden Pull Request.
+1. **Claude committet selbst.** Ist ein abgeschlossener Teil fertig und laufen
+   seine Tests, committet Claude ihn mit einer Conventional-Commits-Nachricht
+   (`feat: …`, `fix: …`) und einem `Co-Authored-By: Claude`-Trailer. Autor des
+   Commits ist die **Person, der die Aufgabe gehört**. Claude pusht nie und
+   öffnet nie einen Pull Request.
+2. **Committen** committet, was noch nicht committet ist. Claude entwirft die
+   Nachricht aus genau diesen Änderungen und der Unterhaltung, auf **deinem**
+   Abo; ohne Abo oder wenn das fehlschlägt, schreibst du sie selbst. Der Commit
+   trägt deinen Namen und deine E-Mail-Adresse. *Danach pushen und Pull Request
+   öffnen* geht direkt weiter zu Schritt 3.
+3. **Pushen & PR** pusht den Branch. Gibt es noch keinen Pull Request, entwirft
+   Claude Titel und Beschreibung aus dem ganzen Branch und der Unterhaltung —
+   *What*, *Why*, *Testing* —, und du bearbeitest sie, bevor er sich öffnet.
+   Ein verknüpftes Ticket wird referenziert (siehe
+   [Tickets](TICKETS.md#schliessen-beim-merge)); *Als Entwurf öffnen* öffnet
+   einen Entwurfs-Pull-Request. Ist ein Pull Request offen, bestätigt
+   **Pushen** nur, wie viele Commits rausgehen, und kommentiert den Pull
+   Request.
+
+- Push und Pull Request nutzen den Repository-Zugang des Workspaces; der Pull
+  Request nennt, wer ihn geöffnet hat.
+- Nicht committete Dateien bleiben beim Pushen zurück — der Push-Dialog sagt
+  das.
 - Hat sich der Remote-Branch bewegt, wird der Push abgelehnt. Meldet der Pull
   Request Konflikte oder einen weitergelaufenen Basis-Branch, bittet **Claude
   rebasen lassen** (Menü der Kopfzeile, in der Seitenleiste *Rebase durch
   Claude*) Claude, zu fetchen, zu rebasen und Konflikte zu lösen.
 - Ab dann folgt die Seitenleiste dem Pull Request — siehe
   [Pull Requests](PULL-REQUESTS.md).
+- [Automatische Aufgaben](#automatische-aufgaben), die API und MCP erledigen
+  beide Schritte auf einmal.
 
 Ausliefern dürfen die Person, der die Aufgabe gehört, die Mitarbeitenden und
 die Workspace-Admins.

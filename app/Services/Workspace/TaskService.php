@@ -143,6 +143,8 @@ class TaskService
                 'resume_session_id' => $task->claude_session_id,
                 'seq_offset' => $task->last_seq,
                 'append_system_prompt' => $this->systemPrompt($task),
+                // Claude's own commits carry the person the task belongs to.
+                'git_author' => $task->owner !== null ? ['name' => $task->owner->name, 'email' => $task->owner->email] : null,
             ]);
         } catch (DaemonTransportException $e) {
             $this->pool->release($task);
@@ -716,7 +718,8 @@ class TaskService
             'Several humans may write in this task; every user message starts with the author in brackets, e.g. "[Ada]: …". Address people by name when it helps.',
             "Work only in this task's own folder ({$task->worktree_path}): it has its own branch, database and preview. Other tasks of the workspace have their own folders — leave them alone.",
             'Humans may edit files in the editor while you work — re-read a file before changing it if it might have moved on.',
-            'Do not push and do not open pull requests: the humans ship through Argos. Commit only when someone asks you to.',
+            'Commit on your own whenever a self-contained, working part is done and checked (tests and linters you ran are green): one logical change per commit, a Conventional Commits message (feat:, fix:, refactor:, test:, docs:, chore:; subject ≤ 72 characters, imperative; a short body with what and why), ending with the trailer "Co-Authored-By: Claude <noreply@anthropic.com>". The git author is already set to the task owner — do not change it.',
+            'Never push, never rewrite pushed history and never open pull requests: the humans push and open the pull request through Argos.',
             'Do what is asked directly in the code. Write a concept, plan or design document only when someone asks for one in so many words; when a request is unclear, ask in the chat instead.',
         ]);
     }

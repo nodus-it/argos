@@ -93,7 +93,8 @@ einem gemeinsamen Repository.
    so nach Freigaben, wie es der Modus der Aufgabe verlangt. Prüfe die
    [Quality Gates](TASKS.md#quality-gates), das
    [Review](TASKS.md#das-review) und die [Preview](LIVE-DEMOS.md).
-5. **Ausliefern.** **Commit & PR** pusht den Branch und öffnet den Pull
+5. **Ausliefern.** Claude committet fertige Teile selbst; **Committen** und
+   **Pushen & PR** committen den Rest, pushen den Branch und öffnen den Pull
    Request; die Seitenleiste verfolgt dann seine
    [Checks, Reviews und Konflikte](PULL-REQUESTS.md). Gemergt → die Aufgabe ist
    erledigt; geschlossen → abgebrochen.

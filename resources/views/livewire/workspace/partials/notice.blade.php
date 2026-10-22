@@ -9,6 +9,7 @@
         'permission_mode' => __('workspaces.events.permission_mode', ['name' => $p['author_name'] ?? '', 'mode' => \App\Enums\PermissionMode::tryFrom((string) ($p['mode'] ?? ''))?->label() ?? '']),
         'model' => __('workspaces.events.model', ['name' => $p['author_name'] ?? '', 'model' => $p['model'] ?? '']),
         'shipped' => __('workspaces.events.shipped', ['name' => $p['author_name'] ?? '']),
+        'committed' => __('workspaces.events.committed', ['name' => $p['author_name'] ?? '', 'subject' => $p['subject'] ?? '']),
         'restored' => __('workspaces.events.restored', ['name' => $p['author_name'] ?? '', 'excerpt' => $p['excerpt'] ?? '']),
         'checkpoint' => __('workspaces.events.checkpoint', ['name' => $p['author_name'] ?? '', 'label' => ($p['label'] ?? '') !== '' ? $p['label'] : '—']),
         'prepare_step' => in_array($p['step'] ?? '', ['worktree', 'setup'], true) ? __('workspaces.events.prepare_step.'.$p['step']) : '',

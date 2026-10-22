@@ -73,6 +73,20 @@ describe('TaskSession', () => {
             ],
         });
         expect(session.currentState).toBe('idle');
+        expect(options.env?.GIT_AUTHOR_NAME).toBeUndefined();
+        await session.stop();
+    });
+
+    it('commits as the task owner when a git author is given', async () => {
+        const { session, queries } = make(echo, { gitAuthor: { name: 'Ada Lovelace', email: 'ada@example.com' } });
+        session.start();
+        await waitFor(() => ofType('session.started').length === 1);
+
+        const env = queries[0]!.options.env;
+        expect(env?.GIT_AUTHOR_NAME).toBe('Ada Lovelace');
+        expect(env?.GIT_AUTHOR_EMAIL).toBe('ada@example.com');
+        expect(env?.GIT_COMMITTER_NAME).toBe('Ada Lovelace');
+        expect(env?.GIT_COMMITTER_EMAIL).toBe('ada@example.com');
         await session.stop();
     });
 

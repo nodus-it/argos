@@ -54,6 +54,8 @@ const startSchema = z.object({
     resume_session_id: z.string().min(1).nullish(),
     seq_offset: z.number().int().min(0).default(0),
     append_system_prompt: z.string().default(''),
+    /** Who Claude's commits in this task are by (the task's owner). */
+    git_author: z.object({ name: z.string().min(1).max(120), email: z.string().min(3).max(200) }).nullish(),
 });
 
 const messageSchema = z.object({
@@ -482,6 +484,7 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
                 permissionMode: body.permission_mode,
                 resumeSessionId: body.resume_session_id ?? null,
                 appendSystemPrompt: body.append_system_prompt,
+                gitAuthor: body.git_author ?? null,
             },
             (event) => deps.outbox.push(id, event),
             approvals,

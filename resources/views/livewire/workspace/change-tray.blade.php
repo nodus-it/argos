@@ -1,4 +1,5 @@
-{{-- Action bar above the composer: changes, to-dos, Check gates · Review · Commit & PR. --}}
+{{-- Action bar above the composer: changes, to-dos, Check gates · Review · Commit · Push (& PR).
+     The next step is the primary button: commit while something is uncommitted, then push. --}}
 <div x-on:argos-turn-completed.window="$wire.$refresh()" x-on:argos-workspace-changed.window="$wire.$refresh()" x-on:argos-gates-updated.window="$wire.$refresh()">
     @if ($show)
         <div class="wf-tray" role="region" aria-label="{{ __('workspaces.tray.label') }}">
@@ -22,9 +23,16 @@
                 @if ($hasChanges)
                     <button type="button" class="wf-btn wf-btn-sm wf-btn-surface" x-on:click="window.dispatchEvent(new CustomEvent('review-open', { detail: { file: null } }))">{{ __('workspaces.tray.review') }}</button>
                 @endif
-                @if ($canShip)
-                    <button type="button" class="wf-btn wf-btn-sm wf-btn-primary" wire:click="$dispatch('workspace-ship')" data-testid="tray-ship">
-                        <x-wf.icon name="git-pr" :size="14" :stroke="2" /> {{ __('workspaces.ship.action') }}
+                @if ($canShip && $uncommitted > 0)
+                    <button type="button" class="wf-btn wf-btn-sm wf-btn-primary" wire:click="$dispatch('workspace-ship', { step: 'commit' })" data-testid="tray-commit">
+                        <x-wf.icon name="check" :size="14" :stroke="2" /> {{ __('workspaces.ship.commit') }}
+                    </button>
+                @endif
+                @if ($canPush)
+                    <button type="button" @class(['wf-btn wf-btn-sm', 'wf-btn-primary' => $uncommitted === 0, 'wf-btn-surface' => $uncommitted > 0])
+                            wire:click="$dispatch('workspace-ship', { step: 'push' })" data-testid="tray-push"
+                            @if ($ahead > 0) title="{{ trans_choice('workspaces.tray.unpushed', $ahead, ['count' => $ahead]) }}" @endif>
+                        <x-wf.icon name="{{ $hasPr ? 'arrow-up' : 'git-pr' }}" :size="14" :stroke="2" /> {{ __($hasPr ? 'workspaces.ship.push' : 'workspaces.ship.push_pr') }}
                     </button>
                 @endif
             </div>
