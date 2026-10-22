@@ -65,8 +65,8 @@ interface WorkspaceDaemonTransport
      */
     public function setupCheck(string $ref, array $env): array;
 
-    /** Remove a task's worktree and local branch (remote branch stays). */
-    public function removeWorktree(string $worktree): void;
+    /** Remove a task's worktree and local branch (remote branch stays); returns the backup ref of work no remote held. */
+    public function removeWorktree(string $worktree): ?string;
 
     /**
      * Methods taking `$worktree` act on one task's working copy (its slug).

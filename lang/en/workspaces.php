@@ -557,6 +557,7 @@ return [
         'undelivered' => 'Not delivered',
         'undelivered_hint' => 'The session ended before Claude read this message.',
         'resend' => 'Send again',
+        'work_backed_up' => 'The working copy was cleaned up. Changes that were on no remote branch are kept in the workspace under :ref (check it out in the editor’s terminal to continue).',
         'session_lost' => 'The workspace restarted and Claude’s session ended — the running turn was interrupted. Write again to continue.',
         'permission_mode' => ':name switched the mode to :mode.',
         'effort' => ':name set the effort to :effort.',

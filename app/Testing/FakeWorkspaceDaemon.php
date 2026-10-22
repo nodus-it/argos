@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Testing;
 
 use App\Enums\ApprovalKind;
-use App\Enums\SessionStatus;
 use App\Enums\PermissionMode;
+use App\Enums\SessionStatus;
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
 use App\Integrations\WorkspaceDaemon\WorkspaceDaemonTransport;
 use App\Models\Task;
@@ -239,9 +239,11 @@ class FakeWorkspaceDaemon extends WorkspaceDaemonClient implements WorkspaceDaem
         $this->emit((string) $payload['task_id'], $events);
     }
 
-    public function removeWorktree(string $worktree): void
+    public function removeWorktree(string $worktree): ?string
     {
         self::$removed[] = $worktree;
+
+        return null;
     }
 
     public function gitStatus(string $worktree): array

@@ -13,7 +13,8 @@ use Illuminate\Support\Facades\Log;
 /**
  * Frees what a finished task holds in its workspace: the preview, the
  * worktree with its local branch, and its database. The conversation, the
- * remote branch and the pull request stay. Needs the workspace container
+ * remote branch and the pull request stay; work no remote holds is kept
+ * under a backup ref in the main clone. Needs the workspace container
  * running; a stopped workspace is cleaned up on a later pass.
  */
 class TaskCleanup
@@ -34,7 +35,7 @@ class TaskCleanup
 
         $this->previews->stop($task);
         try {
-            $this->daemon->for($workspace, 60)->removeWorktree($task->slug);
+            $backup = $this->daemon->for($workspace, 60)->removeWorktree($task->slug);
         } catch (DaemonTransportException $e) {
             Log::channel('argos')->info('Task worktree removal failed', ['task' => $task->id, 'error' => $e->getMessage()]);
 
@@ -44,6 +45,11 @@ class TaskCleanup
             $this->sidecars->dropTaskDatabase($workspace, $task->db_name);
         }
         $task->forceFill(['cleaned_at' => now()])->save();
+        if ($backup !== null) {
+            // Work no remote held is kept in the main clone — say where.
+            Log::channel('argos')->info('Unpushed task work kept under a backup ref', ['task' => $task->id, 'ref' => $backup]);
+            app(TaskNoticeService::class)->systemNotice($task, 'work_backed_up', ['ref' => $backup]);
+        }
 
         return true;
     }

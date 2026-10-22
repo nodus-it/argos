@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { strippedEnv } from './claudeEnv.js';
 import { CodedError } from './errors.js';
@@ -77,18 +78,78 @@ async function mergeBase(dir: string, baseCommit: string): Promise<string> {
     return result.exitCode === 0 && result.stdout.trim() !== '' ? result.stdout.trim() : baseCommit;
 }
 
+const BACKUP_AUTHOR_ENV = {
+    ...process.env,
+    GIT_AUTHOR_NAME: 'Argos',
+    GIT_AUTHOR_EMAIL: 'backup@argos.invalid',
+    GIT_COMMITTER_NAME: 'Argos',
+    GIT_COMMITTER_EMAIL: 'backup@argos.invalid',
+};
+
+/** Where the work of a removed worktree that no remote holds is kept. */
+export function backupRef(slug: string): string {
+    return `refs/argos/backup/${slug}`;
+}
+
+/**
+ * Keep what only this worktree holds before it goes: uncommitted changes
+ * (tracked and untracked, .gitignore respected) become a commit on top of
+ * HEAD, and when that commit — or HEAD itself — is on no remote branch it is
+ * kept under `refs/argos/backup/<slug>` in the main clone. Returns the ref,
+ * or null when everything was already pushed.
+ */
+export async function backupUnsavedWork(layout: Layout, slug: string): Promise<string | null> {
+    const dir = worktreeDir(layout, slug);
+    if (!existsSync(join(dir, '.git'))) {
+        return null;
+    }
+    const headResult = await gitUnchecked(['rev-parse', '--verify', '--quiet', 'HEAD'], dir);
+    let sha = headResult.exitCode === 0 ? headResult.stdout.trim() : '';
+
+    const dirty = (await git(['status', '--porcelain', '--untracked-files=all'], dir)).stdout.trim() !== '';
+    if (dirty) {
+        const index = join(tmpdir(), `argos-backup-${slug}-${process.pid}-${Date.now()}`);
+        const env = { ...BACKUP_AUTHOR_ENV, GIT_INDEX_FILE: index };
+        try {
+            if (sha !== '') {
+                await git(['read-tree', sha], dir, env);
+            }
+            await git(['add', '-A'], dir, env);
+            const tree = (await git(['write-tree'], dir, env)).stdout.trim();
+            sha = (await git(['commit-tree', tree, ...(sha !== '' ? ['-p', sha] : []), '-m', `argos backup: uncommitted work of ${slug}`], dir, env)).stdout.trim();
+        } finally {
+            rmSync(index, { force: true });
+        }
+    }
+    if (sha === '') {
+        return null;
+    }
+
+    const onRemote = (await git(['for-each-ref', '--contains', sha, '--format=%(refname)', 'refs/remotes/'], dir)).stdout.trim() !== '';
+    if (onRemote) {
+        return null;
+    }
+    await git(['update-ref', backupRef(slug), sha], dir);
+
+    return backupRef(slug);
+}
+
 /**
  * Remove a task's worktree and its local branch. The remote branch (and any
- * pull request) stays.
+ * pull request) stays; work no remote holds is kept first (see
+ * backupUnsavedWork). Returns the backup ref when there was such work.
  */
-export async function removeWorktree(layout: Layout, slug: string): Promise<void> {
+export async function removeWorktree(layout: Layout, slug: string, options: { backup?: boolean } = {}): Promise<string | null> {
     const dir = worktreeDir(layout, slug);
+    const backup = options.backup === false ? null : await backupUnsavedWork(layout, slug);
     const branch = existsSync(dir) ? (await gitUnchecked(['symbolic-ref', '--quiet', '--short', 'HEAD'], dir)).stdout.trim() : '';
     await gitUnchecked(['worktree', 'remove', '--force', dir], layout.mainDir);
     await gitUnchecked(['worktree', 'prune'], layout.mainDir);
     if (branch !== '') {
         await gitUnchecked(['branch', '-D', branch], layout.mainDir);
     }
+
+    return backup;
 }
 
 /**

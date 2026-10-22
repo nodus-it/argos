@@ -7,13 +7,15 @@ namespace Tests\Feature\Workspace;
 use App\Enums\DemoStatus;
 use App\Enums\TaskStatus;
 use App\Enums\WorkspaceStatus;
+use App\Integrations\WorkspaceDaemon\WorkspaceDaemonTransport;
 use App\Models\Demo;
 use App\Models\Task;
+use App\Models\TaskEvent;
 use App\Models\Workspace;
 use App\Services\Demo\DemoDeployer;
 use App\Services\Worker\WorkerSidecarManager;
+use App\Services\Workspace\PullRequestService;
 use App\Services\Workspace\WorkspaceDaemonClient;
-use App\Services\Workspace\WorkspaceShipService;
 use App\Testing\FakeWorkspaceDaemon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery\MockInterface;
@@ -114,7 +116,7 @@ class TaskHousekeepingTest extends TestCase
         $this->task('no-pr');
 
         $synced = [];
-        $this->mock(\App\Services\Workspace\PullRequestService::class, function (MockInterface $mock) use (&$synced): void {
+        $this->mock(PullRequestService::class, function (MockInterface $mock) use (&$synced): void {
             $mock->shouldReceive('refresh')->andReturnUsing(function (Task $task) use (&$synced): ?\App\Services\GitProvider\PullRequestDetails {
                 $synced[] = $task->id;
 
@@ -128,5 +130,21 @@ class TaskHousekeepingTest extends TestCase
         $expected = [$open->id, $draft->id];
         sort($expected);
         $this->assertSame($expected, $synced);
+    }
+
+    public function test_cleanup_says_where_unpushed_work_was_kept(): void
+    {
+        $task = $this->finished('unpushed', 20);
+        $this->mock(WorkspaceDaemonClient::class, function (MockInterface $mock): void {
+            $api = \Mockery::mock(WorkspaceDaemonTransport::class);
+            $api->shouldReceive('removeWorktree')->once()->andReturn('refs/argos/backup/unpushed');
+            $mock->shouldReceive('for')->andReturn($api);
+        });
+
+        $this->artisan('argos:tasks:cleanup')->assertSuccessful();
+
+        $notice = TaskEvent::query()->where('task_id', $task->id)->latest('id')->firstOrFail();
+        $this->assertSame(['kind' => 'work_backed_up', 'ref' => 'refs/argos/backup/unpushed'], $notice->payload);
+        $this->assertNotNull($task->fresh()->cleaned_at);
     }
 }

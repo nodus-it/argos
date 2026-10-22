@@ -29,6 +29,7 @@
         'pr_ready', 'auto_merge_on', 'auto_merge_off' => __('workspaces.events.'.$p['kind'], ['name' => $p['author_name'] ?? '']),
         'auto_merge_unavailable', 'pr_checks_failed', 'pr_checks_passed', 'pr_changes_requested', 'pr_approved', 'pr_merged', 'pr_closed' => __('workspaces.events.'.$p['kind']),
         'setup_testing', 'setup_passed', 'setup_failed', 'session_lost' => __('workspaces.events.'.$p['kind']),
+        'work_backed_up' => __('workspaces.events.work_backed_up', ['ref' => $p['ref'] ?? '']),
         default => '',
     } }}
     @if (in_array($p['kind'] ?? '', ['setup_passed', 'setup_failed'], true) && ! empty($p['steps']))

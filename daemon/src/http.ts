@@ -345,14 +345,14 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
         }
         preparing.add(SETUP_CHECK_SLUG);
         try {
-            await removeWorktree(layout, SETUP_CHECK_SLUG);
+            await removeWorktree(layout, SETUP_CHECK_SLUG, { backup: false });
             const worktree = await prepareWorktree(layout, { slug: SETUP_CHECK_SLUG, branch: 'argos/setup-check', baseBranch: body.ref, env: body.env });
             writeEnv(worktree.path, body.env);
             const result = await deps.setupScript(worktree.path, body.env, SETUP_TIMEOUT_MS);
 
             return { setup: result.code === 0 ? 'ok' : 'failed', log: tail(result.output) };
         } finally {
-            await removeWorktree(layout, SETUP_CHECK_SLUG);
+            await removeWorktree(layout, SETUP_CHECK_SLUG, { backup: false });
             preparing.delete(SETUP_CHECK_SLUG);
         }
     });
@@ -364,11 +364,11 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
         if (sessionsIn(dir).some((s) => s.currentState !== 'closed')) {
             throw new CodedError(409, 'task_running', 'A session still works in this task');
         }
-        await removeWorktree(layout, slug);
+        const backup = await removeWorktree(layout, slug);
         checkpointStores.delete(dir);
         fileIndexes.delete(dir);
 
-        return reply.code(202).send({});
+        return reply.code(202).send({ backup_ref: backup });
     });
 
     app.get('/worktrees/:slug/files', async (request) => {

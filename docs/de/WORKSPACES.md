@@ -226,6 +226,17 @@ Jeder Workspace läuft in einem Container mit:
   (Standard 3) — eine weitere stoppt die älteste. CPU und Arbeitsspeicher
   gelten ab dem nächsten Container-Start (leer: `ARGOS_WORKSPACE_CPUS` /
   `ARGOS_WORKSPACE_MEMORY`).
+- **Neustarts:** Sessions leben im Container. Startet er (oder sein Daemon)
+  neu, schließt Argos die Sessions innerhalb von etwa einer Minute: Ein
+  laufender Turn endet mit einem Hinweis, offene Entscheidungen verfallen, und
+  Nachrichten, die Claude noch nicht gelesen hatte, werden als *Nicht
+  zugestellt* mit **Erneut senden** markiert.
+- **Ungepushte Arbeit:** Wird die Arbeitskopie einer Aufgabe entfernt
+  (Aufräumen abgeschlossener Aufgaben, Löschen einer Aufgabe), sichert Argos
+  vorher Commits und uncommittete Änderungen, die auf keinem Remote-Branch
+  liegen, unter `refs/argos/backup/<slug>` im Haupt-Clone; der Verlauf der
+  Aufgabe nennt die Referenz. Zum Weitermachen im Terminal des Editors
+  auschecken (`git switch -c <branch> refs/argos/backup/<slug>`).
 
 ## Einen Workspace löschen
 

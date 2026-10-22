@@ -20,12 +20,12 @@ use App\Integrations\WorkspaceDaemon\Requests\GitStatus;
 use App\Integrations\WorkspaceDaemon\Requests\InitWorkspace;
 use App\Integrations\WorkspaceDaemon\Requests\InterruptTask;
 use App\Integrations\WorkspaceDaemon\Requests\ListFiles;
+use App\Integrations\WorkspaceDaemon\Requests\ListModels;
 use App\Integrations\WorkspaceDaemon\Requests\PrepareWorktree;
 use App\Integrations\WorkspaceDaemon\Requests\RemoveWorktree;
 use App\Integrations\WorkspaceDaemon\Requests\ResolveApproval;
 use App\Integrations\WorkspaceDaemon\Requests\RestoreCheckpoint;
 use App\Integrations\WorkspaceDaemon\Requests\RunGates;
-use App\Integrations\WorkspaceDaemon\Requests\ListModels;
 use App\Integrations\WorkspaceDaemon\Requests\RunOneshot;
 use App\Integrations\WorkspaceDaemon\Requests\SendMessage;
 use App\Integrations\WorkspaceDaemon\Requests\SetEffort;
@@ -133,9 +133,11 @@ class WorkspaceDaemonApi implements WorkspaceDaemonTransport
         return ['setup' => (string) ($body['setup'] ?? 'failed'), 'log' => (string) ($body['log'] ?? '')];
     }
 
-    public function removeWorktree(string $worktree): void
+    public function removeWorktree(string $worktree): ?string
     {
-        $this->call(new RemoveWorktree($worktree));
+        $ref = $this->call(new RemoveWorktree($worktree))['backup_ref'] ?? null;
+
+        return is_string($ref) && $ref !== '' ? $ref : null;
     }
 
     public function gitStatus(string $worktree): array

@@ -557,6 +557,7 @@ return [
         'undelivered' => 'Nicht zugestellt',
         'undelivered_hint' => 'Die Session endete, bevor Claude diese Nachricht gelesen hat.',
         'resend' => 'Erneut senden',
+        'work_backed_up' => 'Die Arbeitskopie wurde aufgeräumt. Änderungen, die auf keinem Remote-Branch lagen, sind im Workspace unter :ref gesichert (im Terminal des Editors auschecken, um weiterzumachen).',
         'session_lost' => 'Der Workspace wurde neu gestartet und Claudes Session ist beendet – der laufende Turn wurde unterbrochen. Schreib erneut, um weiterzumachen.',
         'permission_mode' => ':name hat den Modus auf :mode gestellt.',
         'effort' => ':name hat den Effort auf :effort gestellt.',

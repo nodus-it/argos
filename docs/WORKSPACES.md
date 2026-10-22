@@ -208,6 +208,15 @@ Each workspace runs in one container with:
   the [session queue](TASKS.md#session-queue). *Parallel previews* (default 3)
   — starting one more stops the oldest. CPU and memory apply from the next
   container start (empty: `ARGOS_WORKSPACE_CPUS` / `ARGOS_WORKSPACE_MEMORY`).
+- **Restarts:** sessions live in the container. When it (or its daemon)
+  restarts, Argos closes the sessions within about a minute: a running turn
+  ends with a notice, open decisions lapse, and messages Claude had not read
+  yet are marked *Not delivered* with **Send again**.
+- **Unpushed work:** when a task's working copy is removed (cleanup of
+  finished tasks, deleting a task), commits and uncommitted changes that are
+  on no remote branch are kept first under `refs/argos/backup/<slug>` in the
+  main clone; the task's history says so. Check it out in the editor's
+  terminal to continue (`git switch -c <branch> refs/argos/backup/<slug>`).
 
 ## Deleting a workspace
 

@@ -73,6 +73,28 @@ describe('task worktrees', () => {
         await removeWorktree(ws.layout, 'existing');
     }, 20_000);
 
+    it('keeps work no remote holds under a backup ref before removing the worktree', async () => {
+        const prepared = await prepare('unsaved', 'argos/unsaved');
+        writeFileSync(join(prepared.path, 'committed.txt'), 'local commit\n');
+        git(['add', 'committed.txt'], prepared.path);
+        git(['-c', 'user.name=T', '-c', 'user.email=t@x', 'commit', '-qm', 'local only'], prepared.path);
+        writeFileSync(join(prepared.path, 'draft.txt'), 'not committed\n');
+
+        const ref = await removeWorktree(ws.layout, 'unsaved');
+
+        expect(ref).toBe('refs/argos/backup/unsaved');
+        expect(existsSync(prepared.path)).toBe(false);
+        expect(git(['show', `${ref}:draft.txt`], ws.layout.mainDir)).toBe('not committed\n');
+        expect(git(['show', `${ref}~1:committed.txt`], ws.layout.mainDir)).toBe('local commit\n');
+    }, 20_000);
+
+    it('needs no backup when everything is on the remote', async () => {
+        await prepare('pushed', 'argos/pushed');
+
+        expect(await removeWorktree(ws.layout, 'pushed')).toBeNull();
+        expect(git(['for-each-ref', 'refs/argos/backup/'], ws.layout.mainDir).trim()).toBe('');
+    }, 20_000);
+
     it('refuses an uninitialized workspace and invalid slugs', async () => {
         const empty = layoutFor(join(ws.tmp, 'empty'));
         await expect(prepareWorktree(empty, { slug: 'a', branch: 'argos/a', baseBranch: 'main', env: {} })).rejects.toMatchObject({ code: 'not_initialized' });
