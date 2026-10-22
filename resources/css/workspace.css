@@ -742,3 +742,41 @@ a.wf-ref-chip:hover { text-decoration: underline; }
 .wf-gates .wf-gate:hover { background: var(--wf-raised); }
 .wf-gates .wf-gate-chev { display: none; }
 .wf-gates .wf-gate-state:not(.is-fail):not(.is-running) { display: none; }
+
+/* Pull request: state, provider, status icons, reviewers, comments. */
+.wf-pr-sub-title { font-size: 13px; }
+.wf-pr-state { padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; background: var(--wf-raised); color: var(--wf-muted); }
+.wf-pr-state.is-open { background: var(--wf-ok-soft); color: var(--wf-ok); }
+.wf-pr-state.is-merged { background: var(--wf-info-soft); color: var(--wf-info); }
+.wf-pr-state.is-closed { background: var(--wf-danger-soft); color: var(--wf-danger); }
+.wf-pr-provider { font-size: 11px; font-weight: 500; color: var(--wf-muted); }
+.wf-pr-icon { flex: none; width: 18px; height: 18px; border-radius: 50%; display: inline-grid; place-items: center; border: 1.5px solid var(--wf-border); color: var(--wf-muted); }
+.wf-pr-icon.is-pass { background: var(--wf-ok); border-color: var(--wf-ok); color: var(--wf-on-accent); }
+.wf-pr-icon.is-fail { background: var(--wf-danger); border-color: var(--wf-danger); color: var(--wf-on-accent); }
+.wf-pr-icon.is-info { background: var(--wf-info-soft); border-color: var(--wf-info-soft); color: var(--wf-info); }
+.wf-pr-icon.is-running { border-color: var(--wf-warn); color: var(--wf-warn); }
+.wf-pr-icon.is-running svg { animation: spin 1.2s linear infinite; }
+.wf-pr-reviewers { display: inline-flex; margin-left: auto; }
+.wf-pr-reviewers + .wf-muted { margin-left: 6px; }
+.wf-pr-reviewer { position: relative; margin-left: -4px; }
+.wf-pr-reviewer .wf-avatar-xs { width: 22px; height: 22px; border: 2px solid var(--wf-surface); box-sizing: content-box; }
+.wf-pr-reviewer-badge { position: absolute; right: -2px; bottom: -2px; width: 9px; height: 9px; border-radius: 50%; border: 2px solid var(--wf-surface); }
+.wf-pr-reviewer-badge.is-pass { background: var(--wf-ok); }
+.wf-pr-reviewer-badge.is-fail { background: var(--wf-danger); }
+.wf-pr-fb-head .wf-avatar-xs { width: 22px; height: 22px; }
+.wf-pr-fb-time { font-size: 11.5px; }
+.wf-pr-fb-where { display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; padding: 1px 6px; border: 0; border-radius: 5px; background: var(--wf-raised); color: var(--wf-text); font-size: 11.5px; cursor: pointer; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wf-pr-fb-where.is-general { cursor: default; font-family: var(--font-sans); color: var(--wf-muted); }
+
+/* Links on pull request people, times and titles (all open a new tab). */
+.wf-pr-person { display: inline-flex; align-items: center; gap: 6px; min-width: 0; color: inherit; text-decoration: none; }
+.wf-pr-person strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+a.wf-pr-person:hover strong, .wf-pr-title-link:hover, a.wf-pr-fb-time:hover, a.wf-pr-provider:hover { text-decoration: underline; }
+.wf-pr-person .wf-avatar-xs { width: 22px; height: 22px; flex: none; }
+.wf-pr-title-link, a.wf-pr-provider, a.wf-pr-fb-time { color: inherit; text-decoration: none; }
+
+/* Pull request comments in the diff: readable in the narrow split column too. */
+.wf-dnote.is-pr .wf-dnote-head { flex-wrap: wrap; row-gap: 4px; }
+.wf-dnote.is-pr .wf-dnote-head > * { white-space: nowrap; }
+.wf-dnote.is-pr .wf-pr-person strong { overflow: visible; }
+.wf-dnote-foot { display: flex; justify-content: flex-end; margin-top: 6px; }

@@ -90,12 +90,14 @@ class GitLabMergeRequestReviewTest extends TestCase
 
         // Unresolved thread outweighs the approval.
         $this->assertSame('changes_requested', $details->reviewState);
-        $this->assertSame([['author' => 'anna', 'state' => 'approved', 'body' => '', 'submitted_at' => null]], $details->reviews);
+        $this->assertSame([['author' => 'anna', 'avatar' => null, 'profile' => null, 'state' => 'approved', 'body' => '', 'submitted_at' => null]], $details->reviews);
 
         $this->assertSame(['11', '12'], array_column($details->comments, 'id'));
         $this->assertSame([
             'id' => '12',
             'author' => 'bob',
+            'avatar' => null,
+            'profile' => null,
             'body' => 'Rename this',
             'path' => 'src/B.php',
             'line' => 8,

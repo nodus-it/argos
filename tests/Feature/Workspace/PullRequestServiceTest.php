@@ -293,6 +293,32 @@ class PullRequestServiceTest extends TestCase
         $this->assertSame(['1'], array_column($feedback['comments'], 'id'));
     }
 
+    public function test_reviewers_are_matched_to_argos_people(): void
+    {
+        $grace = User::factory()->create(['name' => 'Grace Hopper']);
+        \App\Models\ConnectedAccount::factory()->create(['user_id' => $grace->id, 'provider' => 'github', 'nickname' => 'grace']);
+        $this->git->shouldReceive('pullRequestDetails')->andReturn($this->details([
+            'reviewState' => 'approved',
+            'reviews' => [['author' => 'grace', 'avatar' => 'https://avatars.example/grace', 'state' => 'approved', 'body' => 'Looks good', 'submitted_at' => '2026-10-22T08:00:00Z']],
+            'comments' => [['id' => '1', 'author' => 'octo', 'avatar' => 'https://avatars.example/octo', 'profile' => 'https://github.com/octo', 'body' => 'Typo', 'path' => 'a.php', 'line' => 3, 'url' => 'https://github.com/c/1', 'created_at' => '2026-10-22T08:05:00Z']],
+        ]));
+
+        $feedback = $this->service()->feedback($this->task);
+
+        $this->assertTrue($feedback['reviewers'][0]['user']?->is($grace));
+        $this->assertNull($feedback['comments'][0]['user']);
+
+        Livewire::actingAs($this->owner)
+            ->test(ContextPanel::class, ['workspaceId' => $this->workspace->id])
+            ->set('taskId', $this->task->id)
+            ->assertSee('Grace Hopper')
+            ->assertSeeHtml('https://avatars.example/octo')
+            // People link to their profile, times to the comment — in a new tab.
+            ->assertSeeHtml('href="https://github.com/octo" target="_blank"')
+            ->assertSeeHtml('href="https://github.com/c/1" target="_blank"')
+            ->assertSee('GitHub');
+    }
+
     public function test_the_sidebar_lists_the_review_comments(): void
     {
         $this->git->shouldReceive('pullRequestDetails')->andReturn($this->details([

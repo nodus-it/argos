@@ -48,8 +48,8 @@ trait SummarizesPullRequests
     }
 
     /**
-     * @param  list<array{id: string, author: string, body: string, path: ?string, line: ?int, url: ?string, created_at: ?string}>  $comments
-     * @return list<array{id: string, author: string, body: string, path: ?string, line: ?int, url: ?string, created_at: ?string}>
+     * @param  list<array{id: string, author: string, avatar?: ?string, profile?: ?string, body: string, path: ?string, line: ?int, url: ?string, created_at: ?string}>  $comments
+     * @return list<array{id: string, author: string, avatar?: ?string, profile?: ?string, body: string, path: ?string, line: ?int, url: ?string, created_at: ?string}>
      */
     private function sortComments(array $comments): array
     {

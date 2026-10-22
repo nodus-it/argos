@@ -64,16 +64,30 @@
         $prState = $pr?->state ?? $task->pr_state;
         $open = in_array($prState, ['open', 'draft'], true);
         @endphp
+        @php
+            $platform = $workspace->platform;
+            $checkIcon = match ($checks) { 'success' => 'check', 'failure' => 'x', 'pending' => 'refresh', default => null };
+            $reviewIcon = match ($review) { 'approved' => 'check', 'changes_requested' => 'alert', 'commented' => 'message', default => null };
+        @endphp
         <div class="wf-pr-sub" data-testid="pr-section">
-            <span class="wf-pr-sub-title"><x-wf.icon name="git-pr" :size="13" :stroke="2" /> {{ __('workspaces.pr.title') }} #{{ $task->pr_number }}@if ($prState) · {{ __('workspaces.pr_state.'.$prState) }}@endif</span>
+            <span class="wf-pr-sub-title">
+                <x-wf.icon name="git-pr" :size="14" :stroke="2" />
+                @if ($task->pr_url)
+                    <a class="wf-pr-title-link" href="{{ $task->pr_url }}" target="_blank" rel="noopener">{{ __('workspaces.pr.title') }} #{{ $task->pr_number }}</a>
+                @else
+                    <span>{{ __('workspaces.pr.title') }} #{{ $task->pr_number }}</span>
+                @endif
+                @if ($prState)<span @class(['wf-pr-state', 'is-'.$prState])>{{ __('workspaces.pr_state.'.$prState) }}</span>@endif
+            </span>
             <span class="wf-section-actions">
-                @if ($task->pr_url)<a class="wf-text-btn" href="{{ $task->pr_url }}" target="_blank" rel="noopener" title="{{ __('workspaces.pr.open_on_provider') }}">↗</a>@endif
-                <button type="button" class="wf-text-btn" wire:click="prRefresh" wire:loading.attr="disabled" title="{{ __('workspaces.pr.refresh') }}"><x-wf.icon name="refresh" :size="13" :stroke="2" label="{{ __('workspaces.pr.refresh') }}" /></button>
+                <a class="wf-pr-provider" href="{{ $workspace->repo_url }}" target="_blank" rel="noopener" title="{{ $workspace->getOwnerRepo() }}">{{ $platform->label() }}</a>
+                @if ($task->pr_url)<a class="wf-icon-btn wf-icon-btn-sm" href="{{ $task->pr_url }}" target="_blank" rel="noopener" title="{{ __('workspaces.pr.open_on_provider') }}" aria-label="{{ __('workspaces.pr.open_on_provider') }}"><x-wf.icon name="link" :size="13" :stroke="2" /></a>@endif
+                <button type="button" class="wf-icon-btn wf-icon-btn-sm" wire:click="prRefresh" wire:loading.attr="disabled" title="{{ __('workspaces.pr.refresh') }}" aria-label="{{ __('workspaces.pr.refresh') }}"><x-wf.icon name="refresh" :size="13" :stroke="2" /></button>
             </span>
         </div>
         <div class="wf-card wf-pr-card">
             <div class="wf-pr-row">
-                <span @class(['wf-gate-dot', 'is-pass' => $checks === 'success', 'is-fail' => $checks === 'failure', 'is-running' => $checks === 'pending', 'is-open' => $checks === 'none']) aria-hidden="true"></span>
+                <span @class(['wf-pr-icon', 'is-pass' => $checks === 'success', 'is-fail' => $checks === 'failure', 'is-running' => $checks === 'pending']) aria-hidden="true">@if ($checkIcon)<x-wf.icon :name="$checkIcon" :size="12" :stroke="2.6" />@endif</span>
                 <span class="wf-gate-name">{{ __('workspaces.pr.checks') }}</span>
                 @if (! empty($pr?->checks['url'] ?? $task->pr_checks['url'] ?? null))
                     <a class="wf-link" href="{{ $pr?->checks['url'] ?? $task->pr_checks['url'] }}" target="_blank" rel="noopener">{{ __('workspaces.pr.checks_state.'.$checks) }} ↗</a>
@@ -86,8 +100,18 @@
             @endif
 
             <div class="wf-pr-row">
-                <span @class(['wf-gate-dot', 'is-pass' => $review === 'approved', 'is-fail' => $review === 'changes_requested', 'is-open' => ! in_array($review, ['approved', 'changes_requested'], true)]) aria-hidden="true"></span>
+                <span @class(['wf-pr-icon', 'is-pass' => $review === 'approved', 'is-fail' => $review === 'changes_requested', 'is-info' => $review === 'commented']) aria-hidden="true">@if ($reviewIcon)<x-wf.icon :name="$reviewIcon" :size="12" :stroke="2.4" />@endif</span>
                 <span class="wf-gate-name">{{ __('workspaces.pr.reviews') }}</span>
+                @if ($feedback['reviewers'] !== [])
+                    <span class="wf-pr-reviewers">
+                        @foreach ($feedback['reviewers'] as $reviewer)
+                            <a class="wf-pr-reviewer" href="{{ $reviewer['url'] ?? $reviewer['profile'] ?? $task->pr_url }}" target="_blank" rel="noopener" title="{{ ($reviewer['user']?->name ?? $reviewer['author']).' · '.__('workspaces.pr.review_state.'.$reviewer['state']) }}">
+                                <x-wf.avatar :user="$reviewer['user']" :name="$reviewer['author']" :url="$reviewer['avatar'] ?? null" />
+                                @if (in_array($reviewer['state'], ['approved', 'changes_requested'], true))<span @class(['wf-pr-reviewer-badge', 'is-pass' => $reviewer['state'] === 'approved', 'is-fail' => $reviewer['state'] === 'changes_requested'])></span>@endif
+                            </a>
+                        @endforeach
+                    </span>
+                @endif
                 <span class="wf-muted">{{ $review !== null ? __('workspaces.pr.review_state.'.$review) : __('workspaces.pr.no_reviews_yet') }}</span>
             </div>
             @if ($feedback['reviews'] !== [] || $feedback['comments'] !== [])
@@ -98,26 +122,38 @@
                     {{ trans_choice('workspaces.pr.feedback_count', $feedbackCount, ['count' => $feedbackCount]) }}
                 </button>
                 <ul class="wf-pr-feedback" data-testid="pr-feedback" x-show="open" x-cloak>
-                    @foreach ($feedback['reviews'] as $review)
-                        @if (trim($review['body']) !== '')
+                    @foreach ($feedback['reviews'] as $entry)
+                        @if (trim($entry['body']) !== '')
                             <li class="wf-pr-fb">
-                                <div class="wf-pr-fb-head"><strong>{{ $review['author'] }}</strong> <span class="wf-muted">· {{ __('workspaces.pr.review_state.'.$review['state']) }}</span></div>
-                                <div class="wf-md ws-md prose wf-pr-fb-body">{{ \App\Support\TaskEventFormatter::markdown($review['body']) }}</div>
+                                <div class="wf-pr-fb-head">
+                                    @include('livewire.workspace.partials.pr-person', ['who' => $entry])
+                                    <span class="wf-pill-tag">{{ __('workspaces.pr.review_state.'.$entry['state']) }}</span>
+                                    @if (! empty($entry['submitted_at']))
+                                        @php $when = \Illuminate\Support\Carbon::parse($entry['submitted_at']); @endphp
+                                        <a class="wf-muted wf-pr-fb-time" href="{{ $entry['url'] ?? $task->pr_url }}" target="_blank" rel="noopener" title="{{ $when->isoFormat('LLL') }}"><time datetime="{{ $entry['submitted_at'] }}">{{ $when->diffForHumans(short: true) }}</time></a>
+                                    @endif
+                                </div>
+                                <div class="wf-md ws-md prose wf-pr-fb-body">{{ \App\Support\TaskEventFormatter::markdown($entry['body']) }}</div>
                             </li>
                         @endif
                     @endforeach
                     @foreach ($feedback['comments'] as $comment)
                         <li class="wf-pr-fb">
                             <div class="wf-pr-fb-head">
-                                <strong>{{ $comment['author'] }}</strong>
-                                @if ($comment['path'] !== null)
-                                    <button type="button" class="wf-link mono wf-pr-fb-where" x-on:click="$dispatch('review-open', { file: @js($comment['path']) })">{{ basename($comment['path']).($comment['line'] !== null ? ':'.$comment['line'] : '') }}</button>
-                                @else
-                                    <span class="wf-muted">· {{ __('workspaces.pr.general_comment') }}</span>
+                                @include('livewire.workspace.partials.pr-person', ['who' => $comment])
+                                @if (! empty($comment['created_at']))
+                                    @php $when = \Illuminate\Support\Carbon::parse($comment['created_at']); @endphp
+                                    <a class="wf-muted wf-pr-fb-time" href="{{ $comment['url'] ?? $task->pr_url }}" target="_blank" rel="noopener" title="{{ $when->isoFormat('LLL') }}"><time datetime="{{ $comment['created_at'] }}">{{ $when->diffForHumans(short: true) }}</time></a>
                                 @endif
-                                @if (! empty($comment['url']))<a class="wf-link" href="{{ $comment['url'] }}" target="_blank" rel="noopener" title="{{ __('workspaces.pr.open_on_provider') }}">↗</a>@endif
-                                @if (in_array($comment['id'], $collectedIds, true))<span class="wf-pill-tag">{{ __('workspaces.review.collected') }}</span>@endif
+                                <span class="wf-spacer"></span>
+                                @if (in_array($comment['id'], $collectedIds, true))<span class="wf-pill-tag" title="{{ __('workspaces.review.collected') }}"><x-wf.icon name="check" :size="11" :stroke="2.6" /> {{ __('workspaces.review.collected') }}</span>@endif
+                                @if (! empty($comment['url']))<a class="wf-icon-btn wf-icon-btn-sm" href="{{ $comment['url'] }}" target="_blank" rel="noopener" title="{{ __('workspaces.pr.open_on_provider') }}" aria-label="{{ __('workspaces.pr.open_on_provider') }}"><x-wf.icon name="link" :size="12" :stroke="2" /></a>@endif
                             </div>
+                            @if ($comment['path'] !== null)
+                                <button type="button" class="wf-pr-fb-where mono" x-on:click="$dispatch('review-open', { file: @js($comment['path']) })" title="{{ $comment['path'] }}"><x-wf.icon name="file" :size="11" :stroke="2" /> {{ basename($comment['path']).($comment['line'] !== null ? ':'.$comment['line'] : '') }}</button>
+                            @else
+                                <span class="wf-pr-fb-where is-general"><x-wf.icon name="message" :size="11" :stroke="2" /> {{ __('workspaces.pr.general_comment') }}</span>
+                            @endif
                             <div class="wf-md ws-md prose wf-pr-fb-body">{{ \App\Support\TaskEventFormatter::markdown($comment['body']) }}</div>
                         </li>
                     @endforeach

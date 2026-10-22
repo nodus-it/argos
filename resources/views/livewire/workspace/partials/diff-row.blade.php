@@ -49,7 +49,13 @@
                     <x-wf.avatar :user="$comment->user" />
                     <strong>{{ __('workspaces.events.you') }}</strong>
                     @if ($comment->source_author !== null)
-                        <span class="wf-pill-tag" title="{{ $comment->source_url }}">{{ __('workspaces.review.from_pr', ['name' => $comment->source_author]) }}</span>
+                        <span class="wf-muted">·</span>
+                        @include('livewire.workspace.partials.pr-person', ['who' => ['author' => $comment->source_author, 'avatar' => $comment->source_avatar, 'profile' => $comment->source_profile]])
+                        @if ($comment->source_url)
+                            <a class="wf-pill-tag" href="{{ $comment->source_url }}" target="_blank" rel="noopener">{{ __('workspaces.review.pr_comment') }} ↗</a>
+                        @else
+                            <span class="wf-pill-tag">{{ __('workspaces.review.pr_comment') }}</span>
+                        @endif
                     @endif
                     <span class="wf-muted">{{ $comment->line_end > $comment->line_start ? $comment->location() : __('workspaces.review.in_draft') }}</span>
                     @if ($comment->status === \App\Enums\ReviewCommentStatus::Stale)

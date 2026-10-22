@@ -6,6 +6,7 @@ namespace App\Services\Workspace;
 
 use App\Enums\ReviewCommentStatus;
 use App\Enums\TaskStatus;
+use App\Models\ConnectedAccount;
 use App\Models\ReviewComment;
 use App\Models\Task;
 use App\Models\User;
@@ -162,19 +163,54 @@ class PullRequestService
      * What people wrote on the pull request: reviews with text and comments,
      * without Argos' own comments (pushed commits, issue links).
      *
-     * @return array{reviews: list<array{author: string, state: string, body: string, submitted_at: ?string}>, comments: list<array{id: string, author: string, body: string, path: ?string, line: ?int, url: ?string, created_at: ?string}>}
+     * @return array{reviews: list<array{author: string, avatar?: ?string, profile?: ?string, url?: ?string, state: string, body: string, submitted_at: ?string, user: ?User}>, comments: list<array{id: string, author: string, avatar?: ?string, profile?: ?string, body: string, path: ?string, line: ?int, url: ?string, created_at: ?string, user: ?User}>, reviewers: list<array{author: string, avatar?: ?string, profile?: ?string, url?: ?string, state: string, body: string, submitted_at: ?string, user: ?User}>}
      */
     public function feedback(Task $task): array
     {
         $details = $task->pr_number !== null ? $this->details($task) : null;
         if ($details === null) {
-            return ['reviews' => [], 'comments' => []];
+            return ['reviews' => [], 'comments' => [], 'reviewers' => []];
+        }
+
+        $comments = array_values(array_filter($details->comments, fn (array $c): bool => ! self::fromArgos($c['body'])));
+        $people = $this->people($task, [...array_column($details->reviews, 'author'), ...array_column($comments, 'author')]);
+        $person = fn (array $entry): array => [...$entry, 'user' => $people[$entry['author']] ?? null];
+
+        // Each reviewer once, with their latest state (for the avatar row).
+        $reviewers = [];
+        foreach ($details->reviews as $review) {
+            $reviewers[$review['author']] = $person($review);
         }
 
         return [
-            'reviews' => array_values(array_filter($details->reviews, fn (array $r): bool => trim($r['body']) !== '' || in_array($r['state'], ['approved', 'changes_requested'], true))),
-            'comments' => array_values(array_filter($details->comments, fn (array $c): bool => ! self::fromArgos($c['body']))),
+            'reviews' => array_map($person, array_values(array_filter($details->reviews, fn (array $r): bool => trim($r['body']) !== '' || in_array($r['state'], ['approved', 'changes_requested'], true)))),
+            'comments' => array_map($person, $comments),
+            'reviewers' => array_values($reviewers),
         ];
+    }
+
+    /**
+     * Argos people behind provider logins (their connected account), so the
+     * sidebar shows their name and profile picture.
+     *
+     * @param  list<string>  $logins
+     * @return array<string, User> login => user
+     */
+    private function people(Task $task, array $logins): array
+    {
+        $logins = array_values(array_unique(array_filter($logins)));
+        if ($logins === []) {
+            return [];
+        }
+
+        return ConnectedAccount::query()
+            ->with('user')
+            ->where('provider', $task->workspace->platform->value)
+            ->whereIn('nickname', $logins)
+            ->get()
+            ->filter(fn (ConnectedAccount $a): bool => $a->user !== null)
+            ->mapWithKeys(fn (ConnectedAccount $a): array => [(string) $a->nickname => $a->user])
+            ->all();
     }
 
     /** Hand the reviews and review comments to Claude. */
@@ -205,7 +241,7 @@ class PullRequestService
      * one's own and sent to Claude together. Comments already taken over
      * are skipped; general comments (no line) come back for the composer.
      *
-     * @return array{collected: int, general: list<array{id: string, author: string, body: string, path: ?string, line: ?int, url: ?string, created_at: ?string}>}
+     * @return array{collected: int, general: list<array{id: string, author: string, avatar?: ?string, profile?: ?string, body: string, path: ?string, line: ?int, url: ?string, created_at: ?string}>}
      */
     public function collect(Task $task, User $by, ?string $commentId = null): array
     {
@@ -224,7 +260,7 @@ class PullRequestService
                 $files[$comment['path']] = [];
             }
             app(ReviewCommentService::class)->add($task, $by, $comment['path'], 'new', (int) $comment['line'], (int) $comment['line'], $comment['body'], $files[$comment['path']],
-                ['id' => $comment['id'], 'author' => $comment['author'], 'url' => $comment['url']]);
+                ['id' => $comment['id'], 'author' => $comment['author'], 'url' => $comment['url'], 'avatar' => $comment['avatar'] ?? null, 'profile' => $comment['profile'] ?? null]);
             $collected++;
         }
 

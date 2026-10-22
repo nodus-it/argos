@@ -6,6 +6,8 @@ namespace App\Support;
 
 use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
+use League\CommonMark\Extension\Autolink\AutolinkExtension;
+use League\CommonMark\Extension\ExternalLink\ExternalLinkExtension;
 
 /**
  * Display helpers for workspace task events: one-line tool summaries and
@@ -39,13 +41,20 @@ final class TaskEventFormatter
         return Str::limit(preg_replace('/\s+/', ' ', $text) ?? $text, 140);
     }
 
+    /** Markdown as HTML; links leave Argos in a new tab, bare URLs become links. */
     public static function markdown(string $text): HtmlString
     {
         return new HtmlString(Str::markdown($text, [
             'html_input' => 'escape',
             'allow_unsafe_links' => false,
             'max_nesting_level' => 20,
-        ]));
+            'external_link' => [
+                'internal_hosts' => array_values(array_filter([parse_url((string) config('app.url'), PHP_URL_HOST)])),
+                'open_in_new_window' => true,
+                'noopener' => 'external',
+                'noreferrer' => 'external',
+            ],
+        ], [new AutolinkExtension, new ExternalLinkExtension]));
     }
 
     /** Pretty JSON for the "show input" toggle. */

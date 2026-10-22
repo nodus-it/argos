@@ -249,7 +249,7 @@ class GitLabGitService implements GitProviderContract
                 $comments !== [] => 'commented',
                 default => null,
             },
-            reviews: array_map(fn (string $user): array => ['author' => $user, 'state' => 'approved', 'body' => '', 'submitted_at' => null], $approvedBy),
+            reviews: array_map(fn (array $user): array => ['author' => $user['username'], 'avatar' => $user['avatar'], 'profile' => $user['profile'], 'state' => 'approved', 'body' => '', 'submitted_at' => null], $approvedBy),
             comments: $comments,
             autoMerge: ($mr['merge_when_pipeline_succeeds'] ?? false) === true,
         );
@@ -447,7 +447,7 @@ class GitLabGitService implements GitProviderContract
      * Non-system notes of all threads, oldest first.
      *
      * @param  list<array<string, mixed>>  $discussions
-     * @return list<array{id: string, author: string, body: string, path: ?string, line: ?int, url: ?string, created_at: ?string}>
+     * @return list<array{id: string, author: string, avatar?: ?string, profile?: ?string, body: string, path: ?string, line: ?int, url: ?string, created_at: ?string}>
      */
     private function comments(array $discussions, ?string $mrUrl): array
     {
@@ -465,6 +465,8 @@ class GitLabGitService implements GitProviderContract
                 $comments[] = [
                     'id' => $id,
                     'author' => (string) ($note['author']['username'] ?? ''),
+                    'avatar' => $this->stringOrNull($note['author']['avatar_url'] ?? null),
+                    'profile' => $this->stringOrNull($note['author']['web_url'] ?? null),
                     'body' => (string) ($note['body'] ?? ''),
                     'path' => $this->stringOrNull($position['new_path'] ?? $position['old_path'] ?? null),
                     'line' => $this->intOrNull($position['new_line'] ?? $position['old_line'] ?? null),
@@ -495,7 +497,7 @@ class GitLabGitService implements GitProviderContract
 
     /**
      * @param  array<string, mixed>  $approvals
-     * @return list<string>
+     * @return list<array{username: string, avatar: ?string, profile: ?string}>
      */
     private function approvedBy(array $approvals): array
     {
@@ -504,7 +506,7 @@ class GitLabGitService implements GitProviderContract
         foreach (is_array($approvals['approved_by'] ?? null) ? $approvals['approved_by'] : [] as $entry) {
             $username = is_array($entry) ? ($entry['user']['username'] ?? null) : null;
             if (is_string($username) && $username !== '') {
-                $users[] = $username;
+                $users[] = ['username' => $username, 'avatar' => $this->stringOrNull($entry['user']['avatar_url'] ?? null), 'profile' => $this->stringOrNull($entry['user']['web_url'] ?? null)];
             }
         }
 

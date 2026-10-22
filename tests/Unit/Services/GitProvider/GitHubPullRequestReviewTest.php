@@ -67,7 +67,7 @@ class GitHubPullRequestReviewTest extends TestCase
             ]]),
             ListPullRequestReviews::class => MockResponse::make([
                 ['user' => ['login' => 'anna'], 'state' => 'APPROVED', 'body' => 'LGTM', 'submitted_at' => '2026-01-01T10:00:00Z'],
-                ['user' => ['login' => 'bob'], 'state' => 'CHANGES_REQUESTED', 'body' => 'Fix it', 'submitted_at' => '2026-01-01T11:00:00Z'],
+                ['user' => ['login' => 'bob', 'avatar_url' => 'https://avatars.githubusercontent.com/u/2'], 'state' => 'CHANGES_REQUESTED', 'body' => 'Fix it', 'submitted_at' => '2026-01-01T11:00:00Z'],
                 ['user' => ['login' => 'anna'], 'state' => 'COMMENTED', 'body' => 'nit', 'submitted_at' => '2026-01-01T12:00:00Z'],
                 ['user' => ['login' => 'carl'], 'state' => 'PENDING', 'body' => '', 'submitted_at' => null],
             ]),
@@ -98,7 +98,7 @@ class GitHubPullRequestReviewTest extends TestCase
         // anna's later COMMENTED doesn't drop her approval; bob's change request wins.
         $this->assertSame('changes_requested', $details->reviewState);
         $this->assertCount(3, $details->reviews);
-        $this->assertSame(['author' => 'bob', 'state' => 'changes_requested', 'body' => 'Fix it', 'submitted_at' => '2026-01-01T11:00:00Z'], $details->reviews[1]);
+        $this->assertSame(['author' => 'bob', 'avatar' => 'https://avatars.githubusercontent.com/u/2', 'profile' => null, 'url' => null, 'state' => 'changes_requested', 'body' => 'Fix it', 'submitted_at' => '2026-01-01T11:00:00Z'], $details->reviews[1]);
 
         $this->assertSame(['900', '501'], array_column($details->comments, 'id'));
         $this->assertSame('src/A.php', $details->comments[1]['path']);

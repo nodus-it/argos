@@ -27,7 +27,7 @@ class ReviewCommentService
 
     /**
      * @param  array<int, string>  $lines  line number => text, of the side commented on (with context around the range)
-     * @param  array{id: string, author: string, url: ?string}|null  $source  the pull request comment it is taken over from
+     * @param  array{id: string, author: string, url: ?string, avatar?: ?string, profile?: ?string}|null  $source  the pull request comment it is taken over from
      */
     public function add(Task $task, User $user, string $path, string $side, int $start, int $end, string $body, array $lines, ?array $source = null): ReviewComment
     {
@@ -47,6 +47,8 @@ class ReviewCommentService
             'source_id' => $source['id'] ?? null,
             'source_author' => $source['author'] ?? null,
             'source_url' => $source['url'] ?? null,
+            'source_avatar' => $source['avatar'] ?? null,
+            'source_profile' => $source['profile'] ?? null,
             'status' => ReviewCommentStatus::Draft,
         ]);
     }

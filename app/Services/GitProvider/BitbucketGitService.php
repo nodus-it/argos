@@ -389,7 +389,7 @@ class BitbucketGitService implements GitProviderContract
      * Participants who approved or requested changes.
      *
      * @param  array<string, mixed>  $pr
-     * @return list<array{author: string, state: string, body: string, submitted_at: ?string}>
+     * @return list<array{author: string, avatar?: ?string, profile?: ?string, url?: ?string, state: string, body: string, submitted_at: ?string}>
      */
     private function reviews(array $pr): array
     {
@@ -412,6 +412,8 @@ class BitbucketGitService implements GitProviderContract
 
             $reviews[] = [
                 'author' => $this->author($participant['user'] ?? null),
+                'avatar' => $this->stringOrNull($participant['user']['links']['avatar']['href'] ?? null),
+                'profile' => $this->stringOrNull($participant['user']['links']['html']['href'] ?? null),
                 'state' => $state,
                 'body' => '',
                 'submitted_at' => $this->stringOrNull($participant['participated_on'] ?? null),
@@ -422,7 +424,7 @@ class BitbucketGitService implements GitProviderContract
     }
 
     /**
-     * @return list<array{id: string, author: string, body: string, path: ?string, line: ?int, url: ?string, created_at: ?string}>
+     * @return list<array{id: string, author: string, avatar?: ?string, profile?: ?string, body: string, path: ?string, line: ?int, url: ?string, created_at: ?string}>
      */
     private function comments(string $owner, string $repo, int|string $number): array
     {
@@ -441,6 +443,8 @@ class BitbucketGitService implements GitProviderContract
             $comments[] = [
                 'id' => (string) ($comment['id'] ?? ''),
                 'author' => $this->author($comment['user'] ?? null),
+                'avatar' => $this->stringOrNull($comment['user']['links']['avatar']['href'] ?? null),
+                'profile' => $this->stringOrNull($comment['user']['links']['html']['href'] ?? null),
                 'body' => (string) ($comment['content']['raw'] ?? ''),
                 'path' => $this->stringOrNull($inline['path'] ?? null),
                 'line' => $this->intOrNull($inline['to'] ?? $inline['from'] ?? null),

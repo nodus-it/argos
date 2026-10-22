@@ -13,8 +13,8 @@ namespace App\Services\GitProvider;
  *
  * @phpstan-type FailedCheck array{name: string, url: ?string}
  * @phpstan-type Checks array{state: 'pending'|'success'|'failure'|'none', url: ?string, failed: list<FailedCheck>}
- * @phpstan-type Review array{author: string, state: string, body: string, submitted_at: ?string}
- * @phpstan-type Comment array{id: string, author: string, body: string, path: ?string, line: ?int, url: ?string, created_at: ?string}
+ * @phpstan-type Review array{author: string, avatar?: ?string, profile?: ?string, url?: ?string, state: string, body: string, submitted_at: ?string}
+ * @phpstan-type Comment array{id: string, author: string, avatar?: ?string, profile?: ?string, body: string, path: ?string, line: ?int, url: ?string, created_at: ?string}
  */
 final readonly class PullRequestDetails
 {

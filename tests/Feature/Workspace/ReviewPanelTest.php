@@ -198,7 +198,7 @@ class ReviewPanelTest extends TestCase
         $pr = $this->mock(\App\Services\Workspace\PullRequestService::class);
         $pr->shouldReceive('collectedIds')->andReturn([]);
         $pr->shouldReceive('feedback')->andReturn(['reviews' => [], 'comments' => [
-            ['id' => 'c1', 'author' => 'grace', 'body' => 'Say hello to everyone', 'path' => 'README.md', 'line' => 1, 'url' => 'https://x/c1', 'created_at' => null],
+            ['id' => 'c1', 'author' => 'grace', 'avatar' => 'https://avatars.example/grace', 'profile' => 'https://github.com/grace', 'body' => 'Say hello to everyone', 'path' => 'README.md', 'line' => 1, 'url' => 'https://x/c1', 'created_at' => '2026-10-22T08:00:00Z', 'user' => null],
             ['id' => 'c2', 'author' => 'grace', 'body' => 'Old line remark', 'path' => 'README.md', 'line' => 99, 'url' => null, 'created_at' => null],
             ['id' => 'c3', 'author' => 'grace', 'body' => 'Other file', 'path' => 'app/Other.php', 'line' => 1, 'url' => null, 'created_at' => null],
         ]]);
@@ -209,6 +209,8 @@ class ReviewPanelTest extends TestCase
             ->call('setRendered', false)
             ->assertSee('Say hello to everyone')
             ->assertSeeHtml('wire:key="prc-c1"')
+            ->assertSeeHtml('https://avatars.example/grace')
+            ->assertSeeHtml('href="https://github.com/grace" target="_blank"')
             ->assertSee(__('workspaces.review.pr_comments_outside'))
             ->assertSee('Old line remark')
             ->assertDontSee('Other file')

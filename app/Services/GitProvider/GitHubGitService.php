@@ -489,7 +489,7 @@ class GitHubGitService implements GitProviderContract
 
     /**
      * @param  list<array<string, mixed>>  $reviews
-     * @return list<array{author: string, state: string, body: string, submitted_at: ?string}>
+     * @return list<array{author: string, avatar?: ?string, profile?: ?string, url?: ?string, state: string, body: string, submitted_at: ?string}>
      */
     private function reviews(array $reviews): array
     {
@@ -503,6 +503,9 @@ class GitHubGitService implements GitProviderContract
 
             $out[] = [
                 'author' => (string) ($review['user']['login'] ?? ''),
+                'avatar' => $this->stringOrNull($review['user']['avatar_url'] ?? null),
+                'profile' => $this->stringOrNull($review['user']['html_url'] ?? null),
+                'url' => $this->stringOrNull($review['html_url'] ?? null),
                 'state' => strtolower($state),
                 'body' => (string) ($review['body'] ?? ''),
                 'submitted_at' => $this->stringOrNull($review['submitted_at'] ?? null),
@@ -513,7 +516,7 @@ class GitHubGitService implements GitProviderContract
     }
 
     /**
-     * @return list<array{id: string, author: string, body: string, path: ?string, line: ?int, url: ?string, created_at: ?string}>
+     * @return list<array{id: string, author: string, avatar?: ?string, profile?: ?string, body: string, path: ?string, line: ?int, url: ?string, created_at: ?string}>
      */
     private function comments(string $owner, string $repo, int|string $number): array
     {
@@ -528,6 +531,8 @@ class GitHubGitService implements GitProviderContract
             $comments[] = [
                 'id' => (string) ($comment['id'] ?? ''),
                 'author' => (string) ($comment['user']['login'] ?? ''),
+                'avatar' => $this->stringOrNull($comment['user']['avatar_url'] ?? null),
+                'profile' => $this->stringOrNull($comment['user']['html_url'] ?? null),
                 'body' => (string) ($comment['body'] ?? ''),
                 'path' => $this->stringOrNull($comment['path'] ?? null),
                 'line' => $this->intOrNull($comment['line'] ?? $comment['original_line'] ?? null),
@@ -540,6 +545,8 @@ class GitHubGitService implements GitProviderContract
             $comments[] = [
                 'id' => (string) ($comment['id'] ?? ''),
                 'author' => (string) ($comment['user']['login'] ?? ''),
+                'avatar' => $this->stringOrNull($comment['user']['avatar_url'] ?? null),
+                'profile' => $this->stringOrNull($comment['user']['html_url'] ?? null),
                 'body' => (string) ($comment['body'] ?? ''),
                 'path' => null,
                 'line' => null,
