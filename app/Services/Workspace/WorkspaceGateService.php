@@ -39,9 +39,19 @@ class WorkspaceGateService
         private readonly TaskService $tasks,
     ) {}
 
-    public function run(Task $task, User $by): WorkspaceGateRun
+    /** Gates that can be re-checked on their own (run-gates.sh --only). */
+    public const SINGLE_GATES = ['artisan', 'pint', 'pest', 'phpunit', 'phpstan', 'migrations', 'debug_code', 'test_presence'];
+
+    /**
+     * Run the gates — all, or `$only` one of them again (the other results
+     * stay from the run before).
+     */
+    public function run(Task $task, User $by, ?string $only = null): WorkspaceGateRun
     {
         Gate::forUser($by)->authorize('prompt', $task);
+        if ($only !== null && ! in_array($only, self::SINGLE_GATES, true)) {
+            throw WorkspaceException::translated('workspaces.gates.unknown_gate');
+        }
         $workspace = $task->workspace;
         $active = $this->active($workspace);
         if ($active !== null) {
@@ -55,11 +65,12 @@ class WorkspaceGateService
             'status' => GateRunStatus::Running,
             'base_commit' => $task->base_commit,
             'baseline' => $this->baselineFor($workspace, $task->base_commit),
+            'only' => $only,
             'started_at' => now(),
         ]);
 
         try {
-            $this->daemon->for($workspace)->runGates($task->slug, $run->id, $task->base_commit);
+            $this->daemon->for($workspace)->runGates($task->slug, $run->id, $task->base_commit, $only);
         } catch (DaemonTransportException $e) {
             $run->forceFill(['status' => GateRunStatus::Error, 'message' => $e->getMessage(), 'finished_at' => now()])->save();
 
@@ -132,7 +143,7 @@ class WorkspaceGateService
         }
 
         try {
-            $prompt = $this->daemon->for($run->workspace)->gateFixPrompt($task->slug, $gate, $run->id);
+            $prompt = $this->daemon->for($run->workspace)->gateFixPrompt($task->slug, $gate, $run->logRunFor($gate));
         } catch (DaemonTransportException $e) {
             throw WorkspaceException::fromDaemon($e);
         }
@@ -164,7 +175,7 @@ class WorkspaceGateService
         }
 
         try {
-            $full = $this->daemon->for($workspace)->gateLog($task->slug, $gate, $run->id);
+            $full = $this->daemon->for($workspace)->gateLog($task->slug, $gate, $run->logRunFor($gate));
         } catch (DaemonTransportException) {
             return ['log' => $tail, 'truncated' => strlen($tail) >= self::TAIL_BYTES, 'complete' => false];
         }
@@ -215,10 +226,30 @@ class WorkspaceGateService
             }
         }
 
+        $logRuns = [];
+        if ($run->only !== null) {
+            // One gate re-checked: the others keep their result and log from the run before.
+            $previous = WorkspaceGateRun::query()
+                ->where('task_id', $run->task_id)
+                ->whereKeyNot($run->id)
+                ->whereNotNull('finished_at')
+                ->latest('finished_at')
+                ->first();
+            $checked = $run->only === 'pest' ? ['pest', 'phpunit'] : [$run->only];
+            foreach ($previous?->gates ?? [] as $gate => $result) {
+                if (! in_array($gate, $checked, true)) {
+                    $gates[$gate] = $result;
+                    $logs[$gate] = (string) ($previous->logs[$gate] ?? '');
+                    $logRuns[$gate] = $previous->logRunFor($gate);
+                }
+            }
+        }
+
         $run->forceFill([
             'status' => in_array('fail', $gates, true) ? GateRunStatus::Failed : GateRunStatus::Passed,
             'gates' => $gates,
             'logs' => $logs,
+            'log_runs' => $logRuns === [] ? null : $logRuns,
             'baseline' => $this->baseline($data) ?? $run->baseline,
             'finished_at' => now(),
         ])->save();

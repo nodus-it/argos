@@ -11,6 +11,7 @@ use App\Enums\PermissionMode;
 use App\Enums\ReviewCommentStatus;
 use App\Enums\SessionStatus;
 use App\Enums\TaskEventType;
+use App\Enums\WorkspaceStatus;
 use App\Enums\WorkspaceRole;
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
 use App\Models\AgentCredential;
@@ -39,6 +40,7 @@ use App\Support\TaskTimeline;
 use Filament\Notifications\Notification;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
@@ -76,6 +78,9 @@ class TaskChat extends Component
     public string $draft = '';
 
     public bool $creating = false;
+
+    /** Bumped when a mode/model change failed, so the selects show the real value again. */
+    public int $controlsVersion = 0;
 
     public string $newTitle = '';
 
@@ -139,6 +144,15 @@ class TaskChat extends Component
             $this->limit = self::PAGE;
             $this->creating = false;
             $this->announceTask();
+        }
+    }
+
+    /** "Cancel" on the new-task form: back to the task shown before. */
+    public function cancelCreating(): void
+    {
+        if ($this->taskId !== null) {
+            $this->creating = false;
+            $this->reset('newParentId', 'newIssue', 'newIssueQuery', 'newBaseBranch');
         }
     }
 
@@ -426,14 +440,35 @@ class TaskChat extends Component
 
         match ($m[1]) {
             'plan' => $this->runPlan($rest),
-            'ship' => $this->dispatch('workspace-ship'),
+            'ship' => $this->unavailable('ship') ?? $this->dispatch('workspace-ship'),
             'preview' => $this->dispatch('workspace-focus', target: 'preview'),
             'review' => $this->dispatch('workspace-focus', target: 'review'),
-            'gates' => [$this->dispatch('workspace-focus', target: 'gates'), $this->dispatch('workspace-run-gates')],
+            'gates' => $this->unavailable('prompt') ?? [$this->dispatch('workspace-focus', target: 'gates'), $this->dispatch('workspace-run-gates')],
             'checkpoint' => $this->runCheckpoint($rest),
         };
 
         return true;
+    }
+
+    /**
+     * Why a command cannot run right now (told as a notification), or null
+     * when it can: the container must run and the person needs `$ability`.
+     */
+    private function unavailable(string $ability): ?bool
+    {
+        $task = $this->activeTask();
+        $reason = match (true) {
+            $task === null => __('workspaces.ship.no_task'),
+            $this->workspace()->status !== WorkspaceStatus::Running => __('workspaces.chat.command_not_running'),
+            ! $this->user()->can($ability, $task) => __('workspaces.task.viewer_hint'),
+            default => null,
+        };
+        if ($reason === null) {
+            return null;
+        }
+        Notification::make()->title($reason)->warning()->send();
+
+        return false;
     }
 
     private function runCheckpoint(string $label): void
@@ -526,7 +561,9 @@ class TaskChat extends Component
         $task = $this->activeTask();
         $value = PermissionMode::tryFrom($mode);
         if ($task !== null && $value !== null) {
-            $this->attempt(fn () => app(TaskService::class)->setPermissionMode($task, $this->user(), $value));
+            if (! $this->attempt(fn () => app(TaskService::class)->setPermissionMode($task, $this->user(), $value))) {
+                $this->controlsVersion++;
+            }
         }
     }
 
@@ -534,7 +571,9 @@ class TaskChat extends Component
     {
         $task = $this->activeTask();
         if ($task !== null && ModelCatalog::isValidId($model)) {
-            $this->attempt(fn () => app(TaskService::class)->setModel($task, $this->user(), $model));
+            if (! $this->attempt(fn () => app(TaskService::class)->setModel($task, $this->user(), $model))) {
+                $this->controlsVersion++;
+            }
         }
     }
 
@@ -581,7 +620,10 @@ class TaskChat extends Component
     {
         $task = $this->activeTask();
         if ($task !== null) {
-            $this->attempt(fn () => app(TaskService::class)->open($task));
+            $this->attempt(function () use ($task): void {
+                Gate::forUser($this->user())->authorize('prompt', $task);
+                app(TaskService::class)->open($task);
+            });
         }
     }
 
@@ -706,15 +748,20 @@ class TaskChat extends Component
         return $user;
     }
 
-    private function attempt(callable $action): void
+    /** Run an action and report failures; true when it went through. */
+    private function attempt(callable $action): bool
     {
         try {
             $action();
+
+            return true;
         } catch (WorkspaceException $e) {
             Notification::make()->title($e->getMessage())->danger()->send();
         } catch (AuthorizationException) {
             Notification::make()->title(__('workspaces.task.viewer_hint'))->warning()->send();
         }
+
+        return false;
     }
 
     /** Session closed although the task was used: offer to resume. */

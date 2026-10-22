@@ -124,7 +124,7 @@ export class GateRunner {
     }
 
     /** Start a run in `dir`; throws GatesBusyError while another run is active. */
-    start(runId: string, dir: string, baseCommit: string | null): Promise<void> {
+    start(runId: string, dir: string, baseCommit: string | null, only: string | null = null): Promise<void> {
         if (this.current !== null) {
             throw new GatesBusyError(`Gate run ${this.current} is still running`);
         }
@@ -134,7 +134,7 @@ export class GateRunner {
             .then((baseline) => {
                 this.emit({ type: 'gates.started', data: { run_id: runId, baseline } });
 
-                return this.execute(runId, dir, baseline);
+                return this.execute(runId, dir, baseline, only);
             })
             .finally(() => {
                 this.current = null;
@@ -187,9 +187,10 @@ export class GateRunner {
         return 'ready';
     }
 
-    private async execute(runId: string, dir: string, baseline: BaselineState): Promise<void> {
+    private async execute(runId: string, dir: string, baseline: BaselineState, only: string | null): Promise<void> {
         try {
-            const { code, stdout, stderr } = await this.script(['--dir', dir, '--run', runId], RUN_TIMEOUT_MS, taskEnv(dir));
+            const args = ['--dir', dir, '--run', runId, ...(only !== null ? ['--only', only] : [])];
+            const { code, stdout, stderr } = await this.script(args, RUN_TIMEOUT_MS, taskEnv(dir));
             const gates = parseGates(stdout);
             if (code !== 0 || gates === null) {
                 this.emit({ type: 'gates.failed', data: { run_id: runId, message: tail(stderr.trim() || `run-gates.sh exited with ${code}`, 2000) } });

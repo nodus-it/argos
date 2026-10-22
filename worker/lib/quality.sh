@@ -226,6 +226,14 @@ quality_is_infra_crash() {
         "$log"
 }
 
+# quality_gate_wanted: Whether a gate runs in this pass — all of them, or
+# only the one named in QUALITY_ONLY (re-checking a single gate).
+# Args: $1=gate
+# Returns: 0 when the gate runs, 1 otherwise
+quality_gate_wanted() {
+    [[ -z "${QUALITY_ONLY:-}" || "${QUALITY_ONLY:-}" == "$1" ]]
+}
+
 # quality_gates_run: run all quality gates and return the gates JSON.
 # Args: $1=iteration (used in log filenames)
 # Output: JSON object on stdout.
@@ -238,7 +246,7 @@ quality_gates_run() {
     # ── 1. php artisan smoke test ─────────────────────────────────────────
     # Verifies the app bootstraps: service providers, autoload, config.
     # A fatal error here makes test results meaningless.
-    if [[ -f "${QUALITY_DIR:-/workspace}/artisan" ]]; then
+    if quality_gate_wanted artisan && [[ -f "${QUALITY_DIR:-/workspace}/artisan" ]]; then
         if (cd "${QUALITY_DIR:-/workspace}" && php artisan list --no-ansi) \
                 &> "${QUALITY_DIR:-/workspace}/.agent/logs/artisan-smoke.${iteration}.log"; then
             gates="$(printf '%s' "$gates" | jq '.artisan = "pass"')"
@@ -250,7 +258,7 @@ quality_gates_run() {
     # ── 2. Pint (code style) ─────────────────────────────────────────────
     # Only lint files Claude actually touched — pre-existing debt is not
     # Claude's to fix and would otherwise block every implement run.
-    if [[ -x "${QUALITY_DIR:-/workspace}/vendor/bin/pint" ]]; then
+    if quality_gate_wanted pint && [[ -x "${QUALITY_DIR:-/workspace}/vendor/bin/pint" ]]; then
         local -a changed_files=()
         mapfile -d '' -t changed_files < <(quality_changed_php_files)
 
@@ -273,7 +281,7 @@ quality_gates_run() {
     # never block (otherwise every implement → PR is unwinnable on a repo that
     # is not 100% green). No baseline → every failure counts (strict).
     local new_failures
-    if [[ -x "${QUALITY_DIR:-/workspace}/vendor/bin/pest" ]]; then
+    if quality_gate_wanted pest && [[ -x "${QUALITY_DIR:-/workspace}/vendor/bin/pest" ]]; then
         local pest_log="${QUALITY_DIR:-/workspace}/.agent/logs/pest.${iteration}.log" pest_exit=0
         (cd "${QUALITY_DIR:-/workspace}" && vendor/bin/pest --no-coverage --log-junit "${QUALITY_DIR:-/workspace}/.agent/logs/pest.${iteration}.xml") \
             &> "$pest_log" || pest_exit=$?
@@ -295,7 +303,7 @@ quality_gates_run() {
                     >> "$pest_log"
             fi
         fi
-    elif [[ -x "${QUALITY_DIR:-/workspace}/vendor/bin/phpunit" ]]; then
+    elif { quality_gate_wanted pest || quality_gate_wanted phpunit; } && [[ -x "${QUALITY_DIR:-/workspace}/vendor/bin/phpunit" ]]; then
         local phpunit_log="${QUALITY_DIR:-/workspace}/.agent/logs/phpunit.${iteration}.log" phpunit_exit=0
         (cd "${QUALITY_DIR:-/workspace}" && vendor/bin/phpunit --log-junit "${QUALITY_DIR:-/workspace}/.agent/logs/phpunit.${iteration}.xml") \
             &> "$phpunit_log" || phpunit_exit=$?
@@ -326,7 +334,7 @@ quality_gates_run() {
     # every error counts → strict gating. The stderr stream is kept separately so
     # the infra-crash heuristic can inspect it (OOM/broken config go there, not
     # into the json report).
-    if [[ -f "${QUALITY_DIR:-/workspace}/phpstan.neon" || -f "${QUALITY_DIR:-/workspace}/phpstan.neon.dist" ]] \
+    if quality_gate_wanted phpstan && [[ -f "${QUALITY_DIR:-/workspace}/phpstan.neon" || -f "${QUALITY_DIR:-/workspace}/phpstan.neon.dist" ]] \
             && [[ -x "${QUALITY_DIR:-/workspace}/vendor/bin/phpstan" ]]; then
         local phpstan_log="${QUALITY_DIR:-/workspace}/.agent/logs/phpstan.${iteration}.log" phpstan_exit=0
         local phpstan_json="${QUALITY_DIR:-/workspace}/.agent/logs/phpstan.${iteration}.json"
@@ -365,7 +373,7 @@ quality_gates_run() {
         cd "${QUALITY_DIR:-/workspace}" && git diff -z --name-only --diff-filter=A HEAD \
             -- 'database/migrations/*.php' 2>/dev/null
     )
-    if [[ ${#new_migrations[@]} -gt 0 ]]; then
+    if quality_gate_wanted migrations && [[ ${#new_migrations[@]} -gt 0 ]]; then
         local migrations_ok=true
         : > "${QUALITY_DIR:-/workspace}/.agent/logs/migrations.${iteration}.log"
         for mf in "${new_migrations[@]}"; do
@@ -392,7 +400,7 @@ quality_gates_run() {
             nontestphp+=("${QUALITY_DIR:-/workspace}/$f")
         fi
     done
-    if [[ ${#nontestphp[@]} -gt 0 ]]; then
+    if quality_gate_wanted debug_code && [[ ${#nontestphp[@]} -gt 0 ]]; then
         if grep -lE '\bdd\(|\bdump\(|\bray\(|\bvar_dump\(|\bddd\(' \
                 "${nontestphp[@]}" \
                 > "${QUALITY_DIR:-/workspace}/.agent/logs/debug-code.${iteration}.log" 2>/dev/null; then
@@ -410,7 +418,7 @@ quality_gates_run() {
         cd "${QUALITY_DIR:-/workspace}" && git diff -z --name-only --diff-filter=A HEAD \
             -- 'app/*.php' 'app/**/*.php' 2>/dev/null
     )
-    if [[ ${#new_app_files[@]} -gt 0 ]]; then
+    if quality_gate_wanted test_presence && [[ ${#new_app_files[@]} -gt 0 ]]; then
         local -a untested=()
         for f in "${new_app_files[@]}"; do
             local base

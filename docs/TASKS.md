@@ -109,8 +109,9 @@ changed, *Waiting for a free session*) and the time of the last activity.
 
 - The filter switches between **Mine + invited** and **All**.
 - Type to search by title; arrow keys and **Enter** switch, **Esc** closes.
-- Hover a task to rename or archive it; the footer has *New task* and the
-  **Archive** with archived tasks to restore.
+- Hover a task to rename or archive it (only on tasks you may change; archiving
+  asks first); the footer has *New task* and the **Archive** with archived
+  tasks to restore.
 - Unread entries show as a counter; the switcher updates live.
 
 When **another** task waits for an approval, a chip *N waits for approval*
@@ -125,10 +126,10 @@ steps as a **compact timeline**: one row per tool call with its state, a verb
 a short result. Click a row for the full input and output; more than three
 steps fold into *Show N more steps*.
 
-- **Follow-ups while Claude works** are queued and picked up as soon as Claude
-  is ready — they show *queued* until then.
-- **Stop** (it replaces the send button while Claude works) interrupts the
-  current turn. Open approvals are cancelled.
+- **Follow-ups while Claude works** are queued (send button or `Enter`) and
+  picked up as soon as Claude is ready — they show *queued* until then.
+- **Stop** (next to the send button while Claude works) interrupts the current
+  turn. Open approvals are cancelled.
 - **Mode** (the first pill under the text field) controls how much Claude may
   do without asking:
   - *Ask before changes* (default) — every edit and command needs an approval,
@@ -164,15 +165,17 @@ shows how many files changed, the added/removed lines and the state of the
   | `/plan [request]` | Switch to plan mode, optionally send the request. |
   | `/ship` | Open the commit & pull request dialog. |
   | `/review` | Open the [review](#the-review). |
-  | `/preview` | Show the sidebar (on narrow screens it is a drawer). |
+  | `/preview` | Show the preview in the sidebar (unfolded and marked; on narrow screens it opens the drawer). |
   | `/gates` | Run the [quality gates](#quality-gates). |
   | `/checkpoint [name]` | Set a named [checkpoint](#checkpoints-and-reset). |
 
   All other commands — the repository's commands and skills, `/compact` and
-  friends — go to Claude Code as typed.
+  friends — go to Claude Code as typed. `/ship` and `/gates` say so when the
+  workspace is not running or you may not use them.
 
 `Enter` sends, `Shift+Enter` adds a line; while the suggestion list is open,
-`Enter`/`Tab` pick the highlighted entry.
+`Enter`/`Tab` pick the highlighted entry. **?** (outside a text field) or
+**⋯ → Keyboard shortcuts** lists all shortcuts.
 
 ## Approvals, plans and questions
 
@@ -192,7 +195,8 @@ File tools outside the task's worktree (and `/tmp`) always ask, even in
 
 - **Invite** (header **⋯ → Invite to this task**): the owner picks workspace
   members as collaborators. They write, approve, review and ship in this task;
-  it keeps running on the owner's subscription. **Remove** takes them out again.
+  it keeps running on the owner's subscription. A click on a collaborator's
+  picture in the header removes them again (after a confirmation).
 - **Hand over**: the task then belongs to the new owner (a workspace admin or
   member with a usable Claude subscription) and runs on their subscription;
   the open session ends, the previous owner stays on as a collaborator, and the
@@ -284,8 +288,7 @@ only moved. If the commented lines themselves changed, it becomes
 
 ## Quality gates
 
-**Check gates** (change tray, *Check all* in the sidebar, the **⋯** menu or
-`/gates`) runs the quality gates in the task's worktree: Artisan boot, Pint on
+**Check gates** (change tray, *Check all* in the sidebar or `/gates`) runs the quality gates in the task's worktree: Artisan boot, Pint on
 changed files, Pest/PHPUnit, PHPStan, migration syntax, debug calls and test
 presence. They are made for PHP/Laravel projects; on other stacks the gates
 are skipped.
@@ -297,10 +300,11 @@ are skipped.
 - One run at a time per task. A click on any gate — green ones too — opens
   its **gate details**: result, duration, when it ran, the baseline hint, the
   full log with search, and the affected files (a click opens the review on
-  that file). A failed gate offers **Let Claude fix it**, which posts a fix
-  prompt with the log into the task.
+  that file). **Check again** re-runs just that gate (the other gates keep
+  their result); a failed gate also offers **Let Claude fix it**, which posts
+  a fix prompt with the log into the task.
 - In the [review](#the-review), PHPStan errors appear **at their line** and
-  Pint flags the file; **Let Claude fix it** there adds the finding to your
+  Pint flags the file; **Add to my review** there adds the finding to your
   collected comments.
 - The commit dialog mentions the last result. Failed gates are a warning, never
   a blocker.
@@ -339,8 +343,10 @@ against the base branch.
   request (see [Tickets](TICKETS.md#closing-on-merge)).
 - *Open as draft* opens a draft pull request. Shipping again pushes the new
   commits and comments on the existing pull request.
-- If the remote branch moved, the push is refused; **Ask Claude to rebase**
-  (header menu) asks Claude to fetch, rebase and resolve conflicts.
+- If the remote branch moved, the push is refused. When the pull request
+  reports conflicts or a base branch that moved on, **Ask Claude to rebase**
+  (header menu, and *Rebase by Claude* in the sidebar) asks Claude to fetch,
+  rebase and resolve conflicts.
 - From then on the sidebar follows the pull request — see
   [Pull Requests](PULL-REQUESTS.md).
 

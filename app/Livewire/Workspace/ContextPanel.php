@@ -20,6 +20,7 @@ use App\Support\TaskRefs;
 use Filament\Notifications\Notification;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Lazy;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
@@ -87,7 +88,10 @@ class ContextPanel extends Component
 
     public function prRefresh(): void
     {
-        $this->prAction(fn (PullRequestService $pr, Task $task) => $pr->refresh($task));
+        $this->prAction(function (PullRequestService $pr, Task $task): void {
+            Gate::forUser($this->user())->authorize('view', $task);
+            $pr->refresh($task);
+        });
     }
 
     public function prMarkReady(): void

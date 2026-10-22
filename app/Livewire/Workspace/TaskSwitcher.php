@@ -125,8 +125,8 @@ class TaskSwitcher extends Component
             'archived' => $this->showArchived
                 ? Task::query()->where('workspace_id', $this->workspaceId)->whereNotNull('archived_at')->latest('archived_at')->get()
                 : collect(),
-            'canWrite' => $this->user()->can('create', [Task::class, $workspace]),
             'user' => $this->user(),
+            'canCreate' => $this->user()->can('create', [Task::class, $workspace]),
             'others' => $this->mine ? Task::query()->where('workspace_id', $workspace->id)->whereNull('archived_at')->count() - $all->count() : 0,
         ]);
     }

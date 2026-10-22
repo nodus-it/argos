@@ -101,7 +101,7 @@ interface WorkspaceDaemonTransport
     public function fileContent(string $worktree, string $path): array;
 
     /** Start a gate run in the task's worktree; throws `gates_running` while one is active. */
-    public function runGates(string $worktree, string $runId, ?string $baseCommit): void;
+    public function runGates(string $worktree, string $runId, ?string $baseCommit, ?string $only = null): void;
 
     public function gateFixPrompt(string $worktree, string $gate, string $runId): string;
 

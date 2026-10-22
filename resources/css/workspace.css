@@ -800,3 +800,21 @@ a.wf-pr-person:hover strong, .wf-pr-title-link:hover, a.wf-pr-fb-time:hover, a.w
 .wf-review-msg-body { margin-top: 6px; font-size: 14px; }
 .wf-review-msg-body > :first-child { margin-top: 0; }
 .wf-review-msg-body > :last-child { margin-bottom: 0; }
+
+/* Sidebar section reached from a command (/preview, /gates). */
+.wf-section.is-flash .wf-env-grid, .wf-section.is-flash .wf-gates { outline: 2px solid var(--wf-accent); outline-offset: 4px; border-radius: 10px; }
+
+/* Collaborator avatars that remove on click. */
+.wf-avatar-btn { padding: 0; border: 0; background: none; cursor: pointer; border-radius: 50%; }
+.wf-avatar-btn:hover .wf-avatar-xs, .wf-avatar-btn:focus-visible .wf-avatar-xs { outline: 2px solid var(--wf-danger); outline-offset: 1px; }
+
+/* Keyboard shortcuts overlay. */
+.wf-keys-backdrop { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 16px; background: rgba(0, 0, 0, .35); }
+.wf-keys { width: min(520px, 100%); max-height: 90dvh; overflow: auto; padding: 18px 20px; border-radius: 14px; border: 1px solid var(--wf-border); background: var(--wf-surface); color: var(--wf-text); box-shadow: var(--wf-shadow-pop); }
+.wf-keys-head { display: flex; align-items: center; justify-content: space-between; }
+.wf-keys h2 { margin: 0; font-size: 16px; }
+.wf-keys h3 { margin: 16px 0 6px; font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--wf-muted); }
+.wf-keys dl { margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.wf-keys dl > div { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 10px; align-items: baseline; font-size: 13.5px; }
+.wf-keys dt { display: flex; flex-wrap: wrap; gap: 4px; }
+.wf-keys dd { margin: 0; }

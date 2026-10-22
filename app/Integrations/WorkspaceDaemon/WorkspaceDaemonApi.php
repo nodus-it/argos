@@ -205,9 +205,9 @@ class WorkspaceDaemonApi implements WorkspaceDaemonTransport
         return ['content' => (string) ($data['content'] ?? ''), 'truncated' => (bool) ($data['truncated'] ?? false)];
     }
 
-    public function runGates(string $worktree, string $runId, ?string $baseCommit): void
+    public function runGates(string $worktree, string $runId, ?string $baseCommit, ?string $only = null): void
     {
-        $this->call(new RunGates($worktree, ['run_id' => $runId, 'base_commit' => $baseCommit]));
+        $this->call(new RunGates($worktree, ['run_id' => $runId, 'base_commit' => $baseCommit] + ($only !== null ? ['only' => $only] : [])));
     }
 
     public function gateFixPrompt(string $worktree, string $gate, string $runId): string

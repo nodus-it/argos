@@ -10,6 +10,7 @@ use App\Filament\Workspaces\Resources\WorkspaceResource;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Services\Workspace\PullRequestService;
 use App\Services\Workspace\TaskService;
 use App\Services\Workspace\WorkspaceException;
 use App\Services\Workspace\WorkspaceGateService;
@@ -217,9 +218,12 @@ class ViewWorkspace extends ViewRecord
         return Action::make('rebase')
             ->label(__('workspaces.ship.rebase'))
             ->icon('heroicon-o-arrow-path-rounded-square')
+            // Only when there is something to rebase onto: the pull request reports
+            // conflicts or a base branch that moved on.
             ->visible(fn (): bool => $this->workspace()->status === WorkspaceStatus::Running
                 && ($task = $this->task()) !== null
-                && (auth()->user()?->can('prompt', $task) ?? false))
+                && (auth()->user()?->can('prompt', $task) ?? false)
+                && $this->needsRebase($task))
             ->action(function (): void {
                 /** @var User $user */
                 $user = auth()->user();
@@ -235,6 +239,16 @@ class ViewWorkspace extends ViewRecord
                     Notification::make()->title($e->getMessage())->danger()->send();
                 }
             });
+    }
+
+    private function needsRebase(Task $task): bool
+    {
+        if ($task->pr_conflicts) {
+            return true;
+        }
+        $details = app(PullRequestService::class)->details($task);
+
+        return $details !== null && ($details->conflicts || $details->behindBase === true);
     }
 
     /** Workspace settings (repository, environment, resources, integrations, members). */
@@ -277,7 +291,12 @@ class ViewWorkspace extends ViewRecord
     public function uninviteAction(): Action
     {
         return Action::make('uninvite')
+            ->label(__('workspaces.task_actions.uninvite'))
+            ->color('danger')
             ->requiresConfirmation()
+            ->modalHeading(fn (array $arguments): string => __('workspaces.task_actions.uninvite_heading', ['name' => (string) User::query()->whereKey($arguments['user'] ?? 0)->value('name')]))
+            ->modalDescription(__('workspaces.task_actions.uninvite_confirm'))
+            ->modalSubmitActionLabel(__('workspaces.task_actions.uninvite'))
             ->visible(fn (): bool => ($task = $this->task()) !== null && (auth()->user()?->can('invite', $task) ?? false))
             ->action(function (array $arguments): void {
                 $member = User::query()->findOrFail($arguments['user'] ?? 0);
@@ -392,8 +411,9 @@ class ViewWorkspace extends ViewRecord
             ->modalDescription(__('workspaces.task_actions.delete_confirm'))
             ->action(function (): void {
                 $id = $this->taskId;
-                $this->taskAction(fn (Task $task, User $user) => app(TaskService::class)->discard($task, $user));
-                $this->dispatch('task-archived', id: $id);
+                if ($this->taskAction(fn (Task $task, User $user) => app(TaskService::class)->discard($task, $user))) {
+                    $this->dispatch('task-archived', id: $id);
+                }
             });
     }
 
@@ -401,17 +421,20 @@ class ViewWorkspace extends ViewRecord
      * Run an action on the current task and report the outcome.
      *
      * @param  callable(Task, User): mixed  $action
+     * @return bool whether it went through
      */
-    private function taskAction(callable $action, ?string $success = null): void
+    private function taskAction(callable $action, ?string $success = null): bool
     {
         /** @var User $user */
         $user = auth()->user();
         $task = $this->task();
         if ($task === null) {
-            return;
+            return false;
         }
+        $done = false;
         try {
             $action($task, $user);
+            $done = true;
             if ($success !== null) {
                 Notification::make()->title($success)->success()->send();
             }
@@ -421,6 +444,17 @@ class ViewWorkspace extends ViewRecord
             Notification::make()->title(__('workspaces.task.viewer_hint'))->warning()->send();
         }
         $this->dispatch('argos-tasks-changed');
+
+        return $done;
+    }
+
+    /** Keyboard shortcuts overlay (also on "?"). */
+    public function shortcutsAction(): Action
+    {
+        return Action::make('shortcuts')
+            ->label(__('workspaces.shortcuts.title'))
+            ->icon('heroicon-o-command-line')
+            ->alpineClickHandler("window.dispatchEvent(new CustomEvent('argos-shortcuts'))");
     }
 
     public function stopAction(): Action

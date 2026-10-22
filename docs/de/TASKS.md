@@ -116,7 +116,8 @@ eine freie Session*) und die Zeit der letzten Aktivität.
 - Der Filter wechselt zwischen **Meine + eingeladen** und **Alle**.
 - Tippen sucht im Titel; mit den Pfeiltasten und **Enter** wechselst du,
   **Esc** schließt.
-- Fährst du über eine Aufgabe, kannst du sie umbenennen oder archivieren; unten
+- Fährst du über eine Aufgabe, kannst du sie umbenennen oder archivieren (nur
+  bei Aufgaben, die du ändern darfst; Archivieren fragt vorher nach); unten
   gibt es *Neue Aufgabe* und das **Archiv** mit archivierten Aufgaben zum
   Wiederherstellen.
 - Ungelesene Einträge erscheinen als Zähler; der Wechsler aktualisiert sich
@@ -136,10 +137,10 @@ Tool-Aufruf mit Zustand, einem Verb (*Bearbeitet*, *Erstellt*, *Ausgeführt*,
 Ergebnis. Ein Klick auf eine Zeile zeigt Ein- und Ausgabe vollständig; mehr als
 drei Schritte klappen zu *N weitere Schritte anzeigen* zusammen.
 
-- **Folgenachrichten, während Claude arbeitet,** werden eingereiht und
-  aufgenommen, sobald Claude bereit ist — bis dahin zeigen sie *in
-  Warteschlange*.
-- **Stopp** (ersetzt den Senden-Knopf, solange Claude arbeitet) unterbricht den
+- **Folgenachrichten, während Claude arbeitet,** werden eingereiht
+  (Senden-Knopf oder `Enter`) und aufgenommen, sobald Claude bereit ist — bis
+  dahin zeigen sie *in Warteschlange*.
+- **Stopp** (neben dem Senden-Knopf, solange Claude arbeitet) unterbricht den
   aktuellen Turn. Offene Freigaben werden abgebrochen.
 - **Modus** (die erste Pille unter dem Eingabefeld) legt fest, wie viel Claude
   ohne Rückfrage tun darf:
@@ -181,15 +182,18 @@ hinzugefügten/entfernten Zeilen und den Stand der
   | `/plan [Anfrage]` | In den Plan-Mode wechseln, optional die Anfrage senden. |
   | `/ship` | Den Dialog für Commit und Pull Request öffnen. |
   | `/review` | Das [Review](#das-review) öffnen. |
-  | `/preview` | Die Seitenleiste zeigen (auf schmalen Bildschirmen ist sie eine Schublade). |
+  | `/preview` | Die Preview in der Seitenleiste zeigen (aufgeklappt und markiert; auf schmalen Bildschirmen öffnet sich die Schublade). |
   | `/gates` | Die [Quality-Gates](#quality-gates) ausführen. |
   | `/checkpoint [Name]` | Einen benannten [Checkpoint](#checkpoints-und-zurucksetzen) setzen. |
 
   Alle anderen Befehle — die Commands und Skills des Repositorys, `/compact`
-  und Co. — gehen so an Claude Code, wie du sie tippst.
+  und Co. — gehen so an Claude Code, wie du sie tippst. `/ship` und `/gates`
+  sagen Bescheid, wenn der Workspace nicht läuft oder du sie nicht nutzen
+  darfst.
 
 `Enter` sendet, `Shift+Enter` fügt eine Zeile ein; solange die Vorschlagsliste
-offen ist, übernehmen `Enter`/`Tab` den markierten Eintrag.
+offen ist, übernehmen `Enter`/`Tab` den markierten Eintrag. **?** (außerhalb
+eines Eingabefelds) oder **⋯ → Tastenkürzel** zeigt alle Tastenkürzel.
 
 ## Freigaben, Pläne und Fragen
 
@@ -211,7 +215,9 @@ alle sehen, wer entschieden hat.
 - **Einladen** (Kopfzeile **⋯ → Zur Aufgabe einladen**): Wem die Aufgabe
   gehört, wählt Mitglieder des Workspaces als Mitarbeitende aus. Sie schreiben,
   geben frei, reviewen und liefern in dieser Aufgabe aus; sie läuft weiter über
-  das Abo der Person, der sie gehört. **Entfernen** nimmt sie wieder heraus.
+  das Abo der Person, der sie gehört. Ein Klick auf das Bild einer
+  mitarbeitenden Person in der Kopfzeile nimmt sie (nach einer Rückfrage)
+  wieder heraus.
 - **Übergeben**: Die Aufgabe gehört dann der neuen Person (Workspace-Admin oder
   Mitglied mit nutzbarem Claude-Abo) und läuft über deren Abo; die offene
   Session endet, wem sie bisher gehörte, arbeitet als mitarbeitende Person
@@ -312,8 +318,8 @@ neue Zeile verschieben** oder **Verwerfen**.
 
 ## Quality-Gates
 
-**Gates prüfen** (Änderungsleiste, *Alle prüfen* in der Seitenleiste, das
-**⋯**-Menü oder `/gates`) führt die Quality-Gates im Worktree der Aufgabe aus:
+**Gates prüfen** (Änderungsleiste, *Alle prüfen* in der Seitenleiste oder
+`/gates`) führt die Quality-Gates im Worktree der Aufgabe aus:
 Artisan-Start, Pint auf geänderten Dateien, Pest/PHPUnit, PHPStan,
 Migrations-Syntax, Debug-Aufrufe und vorhandene Tests. Sie sind für
 PHP/Laravel-Projekte gemacht; bei anderen Stacks werden die Gates
@@ -327,11 +333,12 @@ PHP/Laravel-Projekte gemacht; bei anderen Stacks werden die Gates
 - Ein Lauf gleichzeitig pro Aufgabe. Ein Klick auf ein Gate — auch ein grünes —
   öffnet seine **Gate-Details**: Ergebnis, Dauer, Zeitpunkt, den
   Baseline-Hinweis, das vollständige Log mit Suche und die betroffenen Dateien
-  (ein Klick öffnet das Review auf dieser Datei). Ein fehlgeschlagenes Gate
-  bietet **Claude fixen lassen**; das schickt einen Fix-Prompt mit dem Log in
-  die Aufgabe.
+  (ein Klick öffnet das Review auf dieser Datei). **Erneut prüfen** führt nur
+  dieses Gate noch einmal aus (die anderen behalten ihr Ergebnis); ein
+  fehlgeschlagenes Gate bietet außerdem **Claude fixen lassen**, das einen
+  Fix-Prompt mit dem Log in die Aufgabe schickt.
 - Im [Review](#das-review) erscheinen PHPStan-Fehler **an ihrer Zeile**, und
-  Pint markiert die Datei; **Claude fixen lassen** legt den Befund dort zu
+  Pint markiert die Datei; **Ins Review übernehmen** legt den Befund dort zu
   deinen gesammelten Kommentaren.
 - Der Commit-Dialog nennt das letzte Ergebnis. Fehlgeschlagene Gates sind ein
   Warnhinweis, nie eine Sperre.
@@ -372,9 +379,10 @@ Merge Request) gegen den Basis-Branch.
   Request referenziert (siehe [Tickets](TICKETS.md#schliessen-beim-merge)).
 - *Als Entwurf öffnen* öffnet einen Entwurfs-Pull-Request. Erneutes Ausliefern
   pusht die neuen Commits und kommentiert den bestehenden Pull Request.
-- Hat sich der Remote-Branch bewegt, wird der Push abgelehnt; **Claude rebasen
-  lassen** (Menü der Kopfzeile) bittet Claude, zu fetchen, zu rebasen und
-  Konflikte zu lösen.
+- Hat sich der Remote-Branch bewegt, wird der Push abgelehnt. Meldet der Pull
+  Request Konflikte oder einen weitergelaufenen Basis-Branch, bittet **Claude
+  rebasen lassen** (Menü der Kopfzeile, in der Seitenleiste *Rebase durch
+  Claude*) Claude, zu fetchen, zu rebasen und Konflikte zu lösen.
 - Ab dann folgt die Seitenleiste dem Pull Request — siehe
   [Pull Requests](PULL-REQUESTS.md).
 

@@ -294,20 +294,24 @@ class FakeWorkspaceDaemon extends WorkspaceDaemonClient implements WorkspaceDaem
     public static string $gateOutcome = 'fail';
 
     /** Gates: pint passes, pest fails with one test (or passes) — enough to drive the fix flow. */
-    public function runGates(string $worktree, string $runId, ?string $baseCommit): void
+    public function runGates(string $worktree, string $runId, ?string $baseCommit, ?string $only = null): void
     {
         if ($this->workspace === null) {
             throw new \LogicException('FakeWorkspaceDaemon used without a workspace');
         }
 
+        $gates = ['artisan' => 'pass', 'pint' => 'pass', 'pest' => self::$gateOutcome === 'pass' ? 'pass' : 'fail', 'phpstan' => 'skip'];
+        $logs = ['artisan' => '', 'pint' => "PASS\n", 'pest' => "FAILED  Tests\\Feature\\LoginTest > redirects home\n"];
+        if ($only !== null) {
+            // One gate re-checked: the others skip, as run-gates.sh --only does.
+            $gates = array_map(fn (string $result): string => 'skip', $gates);
+            $gates[$only] = $only === 'pest' ? (self::$gateOutcome === 'pass' ? 'pass' : 'fail') : 'pass';
+            $logs = array_intersect_key($logs, [$only => true]);
+        }
+
         app(TaskEventIngestor::class)->ingest($this->workspace, [
             ['task_id' => null, 'seq' => 1, 'type' => 'gates.started', 'data' => ['run_id' => $runId, 'baseline' => 'ready']],
-            ['task_id' => null, 'seq' => 2, 'type' => 'gates.completed', 'data' => [
-                'run_id' => $runId,
-                'baseline' => 'ready',
-                'gates' => ['artisan' => 'pass', 'pint' => 'pass', 'pest' => self::$gateOutcome === 'pass' ? 'pass' : 'fail', 'phpstan' => 'skip'],
-                'logs' => ['artisan' => '', 'pint' => "PASS\n", 'pest' => "FAILED  Tests\\Feature\\LoginTest > redirects home\n"],
-            ]],
+            ['task_id' => null, 'seq' => 2, 'type' => 'gates.completed', 'data' => ['run_id' => $runId, 'baseline' => 'ready', 'gates' => $gates, 'logs' => $logs]],
         ]);
     }
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Workspace;
 
 use App\Enums\GateRunStatus;
+use App\Enums\WorkspaceStatus;
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
 use App\Models\Task;
 use App\Models\User;
@@ -80,6 +81,25 @@ class GateDetail extends Component
         }
     }
 
+    /** "Check again": re-run just this gate (the others keep their result). */
+    public function rerunGate(string $gate): void
+    {
+        $task = $this->task();
+        if ($task === null) {
+            return;
+        }
+
+        try {
+            app(WorkspaceGateService::class)->run($task, $this->user(), $gate);
+            Notification::make()->title(__('workspaces.gates.rerun_one_started', ['gate' => $gate]))->success()->send();
+            $this->dispatch('argos-gates-updated');
+        } catch (WorkspaceException $e) {
+            Notification::make()->title($e->getMessage())->warning()->send();
+        } catch (AuthorizationException) {
+            Notification::make()->title(__('workspaces.task.viewer_hint'))->warning()->send();
+        }
+    }
+
     public function render(): View
     {
         return view('livewire.workspace.gate-detail', ['detail' => $this->detail()]);
@@ -130,6 +150,8 @@ class GateDetail extends Component
             'complete' => collect($logs)->every(fn (array $l): bool => $l['complete']),
             'files' => $row['state'] === 'fail' ? $this->affectedFiles($task, $logs) : [],
             'canFix' => $row['failed'] !== [] && $this->user()->can('prompt', $task),
+            'canRerun' => in_array($row['key'], WorkspaceGateService::SINGLE_GATES, true) && $this->user()->can('prompt', $task)
+                && $task->workspace->status === WorkspaceStatus::Running && $run?->status !== GateRunStatus::Running,
         ];
     }
 

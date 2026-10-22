@@ -23,7 +23,9 @@ use Illuminate\Support\Carbon;
  * @property GateRunStatus $status
  * @property array<string, string>|null $gates
  * @property array<string, string>|null $logs
+ * @property array<string, string>|null $log_runs gate => run id whose logs hold it (after re-checking one gate)
  * @property string|null $baseline
+ * @property string|null $only the one gate this run re-checked
  * @property string|null $message
  * @property Carbon|null $started_at
  * @property Carbon|null $finished_at
@@ -40,7 +42,7 @@ class WorkspaceGateRun extends Model
 
     use HasUlids;
 
-    protected $fillable = ['workspace_id', 'task_id', 'base_commit', 'triggered_by', 'status', 'gates', 'logs', 'baseline', 'message', 'started_at', 'finished_at'];
+    protected $fillable = ['workspace_id', 'task_id', 'base_commit', 'triggered_by', 'status', 'gates', 'logs', 'log_runs', 'baseline', 'only', 'message', 'started_at', 'finished_at'];
 
     protected function casts(): array
     {
@@ -48,6 +50,7 @@ class WorkspaceGateRun extends Model
             'status' => GateRunStatus::class,
             'gates' => 'array',
             'logs' => 'array',
+            'log_runs' => 'array',
             'started_at' => 'datetime',
             'finished_at' => 'datetime',
         ];
@@ -79,6 +82,12 @@ class WorkspaceGateRun extends Model
     public function ranGates(): array
     {
         return array_filter($this->gates ?? [], fn (string $result): bool => $result !== 'skip');
+    }
+
+    /** The run whose log files hold `$gate` (an earlier one after re-checking another gate). */
+    public function logRunFor(string $gate): string
+    {
+        return (string) ($this->log_runs[$gate] ?? $this->id);
     }
 
     /** @return list<string> */

@@ -430,8 +430,13 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
 
     app.post('/worktrees/:slug/gates/run', async (request, reply) => {
         const dir = worktreeOf(request);
-        const body = z.object({ run_id: idSchema, base_commit: z.string().regex(/^[0-9a-f]{40}$/).nullish() }).parse(request.body);
-        void gateRunner().start(body.run_id, dir, body.base_commit ?? null);
+        const body = z.object({
+            run_id: idSchema,
+            base_commit: z.string().regex(/^[0-9a-f]{40}$/).nullish(),
+            // Re-check one gate only (the others come back as skip).
+            only: z.string().regex(/^[a-z_]{1,32}$/).nullish(),
+        }).parse(request.body);
+        void gateRunner().start(body.run_id, dir, body.base_commit ?? null, body.only ?? null);
 
         return reply.code(202).send({ run_id: body.run_id });
     });

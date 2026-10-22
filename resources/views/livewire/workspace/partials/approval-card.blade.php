@@ -83,13 +83,18 @@
             @if ($kind === ApprovalKind::Plan)
                 <template x-if="!rejecting">
                     <div class="ws-row">
-                        <label class="ws-inline">
-                            <span class="muted">{{ __('workspaces.approval.next_mode') }}</span>
-                            <select class="ws-select ws-select-sm" x-model="nextMode">
-                                <option value="{{ PermissionMode::AcceptEdits->value }}">{{ PermissionMode::AcceptEdits->label() }}</option>
-                                <option value="{{ PermissionMode::Default->value }}">{{ PermissionMode::Default->label() }}</option>
-                            </select>
-                        </label>
+                        @if ($approval->task->auto_state !== null)
+                            {{-- An automatic task implements without anyone to answer approvals. --}}
+                            <span class="muted">{{ __('workspaces.approval.auto_next_mode') }}</span>
+                        @else
+                            <label class="ws-inline">
+                                <span class="muted">{{ __('workspaces.approval.next_mode') }}</span>
+                                <select class="ws-select ws-select-sm" x-model="nextMode">
+                                    <option value="{{ PermissionMode::AcceptEdits->value }}">{{ PermissionMode::AcceptEdits->label() }}</option>
+                                    <option value="{{ PermissionMode::Default->value }}">{{ PermissionMode::Default->label() }}</option>
+                                </select>
+                            </label>
+                        @endif
                         <button type="button" class="wf-btn wf-btn-ink" x-on:click="$wire.resolveApproval(@js($approval->id), 'allow', null, null, nextMode)">{{ __('workspaces.approval.accept_plan') }}</button>
                         <button type="button" class="wf-btn" x-on:click="rejecting = true">{{ __('workspaces.approval.reject_plan') }}</button>
                     </div>
@@ -99,6 +104,7 @@
                         <textarea class="respond-ta" rows="2" x-model="feedback" placeholder="{{ __('workspaces.approval.feedback') }}"></textarea>
                         <div class="ws-row">
                             <button type="button" class="wf-btn wf-btn-ink" x-on:click="$wire.resolveApproval(@js($approval->id), 'deny', feedback)">{{ __('workspaces.approval.deny') }}</button>
+                            <button type="button" class="wf-btn" x-on:click="rejecting = false">{{ __('workspaces.review.cancel') }}</button>
                         </div>
                     </div>
                 </template>

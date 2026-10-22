@@ -285,6 +285,12 @@ describe('quality gates over HTTP', () => {
         await waitFor(() => events().some((e) => e.type === 'gates.completed'));
 
         expect(calls).toContainEqual(['--dir', worktree.path, '--run', 'r1']);
+        // One gate only: passed on to run-gates.sh.
+        const single = await app.inject({ method: 'POST', url: '/worktrees/fix-login/gates/run', headers: auth, payload: { run_id: 'r2', only: 'pest' } });
+        expect(single.statusCode).toBe(202);
+        await waitFor(() => calls.some((c) => c.includes('r2')));
+        expect(calls).toContainEqual(['--dir', worktree.path, '--run', 'r2', '--only', 'pest']);
+        expect((await app.inject({ method: 'POST', url: '/worktrees/fix-login/gates/run', headers: auth, payload: { run_id: 'r3', only: '../x' } })).statusCode).toBe(422);
         const started = events().find((e) => e.type === 'gates.started')!;
         expect(started.task_id).toBeNull();
         expect(started.data).toEqual({ run_id: 'r1', baseline: 'missing' });

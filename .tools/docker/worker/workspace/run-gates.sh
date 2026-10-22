@@ -5,7 +5,7 @@
 # every workspace judges code the same way.
 #
 # Usage:
-#   run-gates.sh [--dir <path>] --run <run-id>                gates JSON on stdout
+#   run-gates.sh [--dir <path>] --run <run-id> [--only <gate>] gates JSON on stdout (one gate: the others skip)
 #   run-gates.sh [--dir <path>] --baseline                    composer install + pest/phpstan baselines
 #   run-gates.sh [--dir <path>] --fix-prompt <gate> <run-id>  fix prompt on stdout
 #   run-gates.sh [--dir <path>] --log-path <gate> <run-id>    path of a gate's log
@@ -81,6 +81,10 @@ mode="${1:-}"
 case "$mode" in
     --run)
         run_id="$(gates_safe_id "${2:-}")"
+        if [[ "${3:-}" == "--only" ]]; then
+            QUALITY_ONLY="$(gates_safe_gate "${4:-}")"
+            export QUALITY_ONLY
+        fi
         gates_prepare
         quality_gates_run "$run_id"
         ;;
@@ -101,7 +105,7 @@ case "$mode" in
         quality_gate_log_path "$gate" "$run_id"
         ;;
     *)
-        echo "usage: run-gates.sh [--dir <path>] --run <id> | --baseline | --fix-prompt <gate> <id> | --log-path <gate> <id>" >&2
+        echo "usage: run-gates.sh [--dir <path>] --run <id> [--only <gate>] | --baseline | --fix-prompt <gate> <id> | --log-path <gate> <id>" >&2
         exit 2
         ;;
 esac

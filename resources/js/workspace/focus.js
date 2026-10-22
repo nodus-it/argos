@@ -20,11 +20,29 @@ export function argosWorkspaceFocus() {
             window.addEventListener('argos-review-count', (event) => { this.commentCount = Number(event.detail) || 0; });
             // `/review`, `/gates`, `/preview` and the gates action (Livewire `workspace-focus`).
             window.addEventListener('workspace-focus', (event) => {
-                if (event.detail?.target === 'review') {
+                const target = event.detail?.target;
+                if (target === 'review') {
                     this.openReview(null);
-                } else if (window.matchMedia('(max-width: 1100px)').matches) {
+                    return;
+                }
+                // `/preview`, `/gates`: show that part of the sidebar, unfolded and marked.
+                if (this.review) {
+                    this.closeReview();
+                }
+                if (window.matchMedia('(max-width: 1100px)').matches) {
                     this.drawer = true;
                 }
+                const key = target === 'preview' ? 'env' : target;
+                window.dispatchEvent(new CustomEvent('argos-fold-open', { detail: { key } }));
+                window.setTimeout(() => {
+                    const section = document.getElementById('ctx-' + key);
+                    if (!section) {
+                        return;
+                    }
+                    section.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                    section.classList.add('is-flash');
+                    window.setTimeout(() => section.classList.remove('is-flash'), 1600);
+                }, 80);
             });
         },
 
@@ -57,6 +75,12 @@ export function argosWorkspaceFocus() {
         },
 
         onKey(event) {
+            const typing = event.target instanceof HTMLElement && (event.target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName));
+            if (event.key === '?' && !typing && !event.metaKey && !event.ctrlKey) {
+                event.preventDefault();
+                window.dispatchEvent(new CustomEvent('argos-shortcuts'));
+                return;
+            }
             if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === 'j') {
                 event.preventDefault();
                 window.dispatchEvent(new CustomEvent('argos-switcher-toggle'));
@@ -238,6 +262,13 @@ export function argosFold(key, openByDefault = true) {
 
     return {
         open,
+        init() {
+            window.addEventListener('argos-fold-open', (event) => {
+                if (event.detail?.key === key) {
+                    this.open = true;
+                }
+            });
+        },
         toggleFold() {
             this.open = !this.open;
             try {

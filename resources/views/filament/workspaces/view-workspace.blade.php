@@ -26,7 +26,16 @@
                     <x-wf.avatar :user="$task->owner" class="wf-avatar-xs is-owner" title="{{ __('workspaces.switcher.owner', ['name' => $task->owner->name]) }}" aria-label="{{ __('workspaces.switcher.owner', ['name' => $task->owner->name]) }}" />
                 @endif
                 @foreach ($task->collaborators as $collaborator)
-                    <x-wf.avatar :user="$collaborator" title="{{ __('workspaces.task_actions.collaborator', ['name' => $collaborator->name]) }}" />
+                    @if ($canInvite)
+                        {{-- Owners remove collaborators with a click on their picture. --}}
+                        <button type="button" class="wf-avatar-btn" wire:click="mountAction('uninvite', { user: {{ $collaborator->id }} })"
+                                title="{{ __('workspaces.task_actions.collaborator', ['name' => $collaborator->name]) }} · {{ __('workspaces.task_actions.uninvite') }}"
+                                aria-label="{{ __('workspaces.task_actions.uninvite_heading', ['name' => $collaborator->name]) }}">
+                            <x-wf.avatar :user="$collaborator" />
+                        </button>
+                    @else
+                        <x-wf.avatar :user="$collaborator" title="{{ __('workspaces.task_actions.collaborator', ['name' => $collaborator->name]) }}" />
+                    @endif
                 @endforeach
                 @if ($canInvite)
                     <button type="button" class="wf-icon-btn wf-icon-btn-xs" wire:click="mountAction('invite')" aria-label="{{ __('workspaces.task_actions.invite') }}" title="{{ __('workspaces.task_actions.invite') }}">
@@ -61,9 +70,9 @@
         @if ($this->shipAction->isVisible()) {{ $this->shipAction }} @endif
         <x-filament-actions::group
             :actions="[
-                \Filament\Actions\ActionGroup::make([$this->inviteAction, $this->transferAction, $this->linkTicketAction, $this->createTicketAction, $this->followUpAction, $this->gatesAction, $this->rebaseAction])->dropdown(false),
+                \Filament\Actions\ActionGroup::make([$this->inviteAction, $this->transferAction, $this->linkTicketAction, $this->createTicketAction, $this->followUpAction, $this->rebaseAction])->dropdown(false),
                 \Filament\Actions\ActionGroup::make([$this->cancelTaskAction, $this->deleteTaskAction])->dropdown(false),
-                \Filament\Actions\ActionGroup::make([$this->settingsAction, $this->stopAction, $this->deleteAction])->dropdown(false),
+                \Filament\Actions\ActionGroup::make([$this->settingsAction, $this->shortcutsAction, $this->stopAction, $this->deleteAction])->dropdown(false),
             ]"
             icon="heroicon-o-ellipsis-horizontal"
             :label="__('workspaces.focus.more')"
@@ -75,12 +84,38 @@
         </button>
     </header>
 
+    {{-- Keyboard shortcuts ("?" or the ⋯ menu). --}}
+    <div class="wf-keys-backdrop" x-data="{ show: false }" x-show="show" x-cloak
+         x-on:argos-shortcuts.window="show = true" x-on:keydown.escape.window="show = false" x-on:click.self="show = false">
+        <div class="wf-keys" role="dialog" aria-modal="true" aria-labelledby="wf-keys-title">
+            <div class="wf-keys-head">
+                <h2 id="wf-keys-title">{{ __('workspaces.shortcuts.title') }}</h2>
+                <button type="button" class="wf-icon-btn wf-icon-btn-sm" x-on:click="show = false" aria-label="{{ __('workspaces.shortcuts.close') }}"><x-wf.icon name="x" :size="15" :stroke="2" /></button>
+            </div>
+            @php
+                $shortcutGroups = [
+                    'navigate' => [['⌘/Ctrl J', 'switcher'], ['?', 'help'], ['Esc', 'escape']],
+                    'compose' => [['Enter', 'send'], ['Shift Enter', 'newline'], ['/', 'command'], ['@', 'mention'], ['↑ ↓ Tab', 'pick']],
+                    'review' => [['+', 'comment'], ['Enter', 'save_comment']],
+                ];
+            @endphp
+            @foreach ($shortcutGroups as $group => $rows)
+                <h3>{{ __('workspaces.shortcuts.groups.'.$group) }}</h3>
+                <dl>
+                    @foreach ($rows as [$combo, $item])
+                        <div><dt>@foreach (explode(' ', $combo) as $k)<kbd class="wf-kbd">{{ $k }}</kbd>@endforeach</dt><dd>{{ __('workspaces.shortcuts.items.'.$item) }}</dd></div>
+                    @endforeach
+                </dl>
+            @endforeach
+        </div>
+    </div>
+
     {{-- Maximised review: the chat folds into a strip. --}}
     <div class="wf-chat-strip" x-show="review && maximized" x-cloak>
         <button type="button" class="wf-icon-btn" x-on:click="maximized = false" aria-label="{{ __('workspaces.review.chat_strip') }}" title="{{ __('workspaces.review.chat_strip') }}">
             <x-wf.icon name="chevron-right" :size="16" :stroke="2" />
         </button>
-        <button type="button" class="wf-icon-btn wf-strip-comments" x-on:click="maximized = false" x-show="commentCount > 0" aria-label="{{ __('workspaces.review.send_review') }}">
+        <button type="button" class="wf-icon-btn wf-strip-comments" x-on:click="maximized = false" x-show="commentCount > 0" aria-label="{{ __('workspaces.review.strip_comments') }}" title="{{ __('workspaces.review.strip_comments') }}">
             <x-wf.icon name="message" :size="17" />
             <span class="wf-strip-badge" x-text="commentCount"></span>
         </button>

@@ -31,6 +31,19 @@ teardown() {
     [ -z "$(git -C /workspace status --porcelain)" ]
 }
 
+@test "--run --only checks one gate and skips the others" {
+    printf '<?php echo "x";\n' > /workspace/artisan
+    run --separate-stderr bash "$SCRIPT" --run r1 --only pint
+    [ "$status" -eq 0 ]
+    # artisan exists but is not the chosen gate: skipped.
+    [ "$(printf '%s' "$output" | jq -r '.artisan')" = "skip" ]
+}
+
+@test "--run --only rejects unknown gates" {
+    run bash "$SCRIPT" --run r1 --only nope
+    [ "$status" -eq 2 ]
+}
+
 @test "--run rejects run ids that are not file-name safe" {
     run bash "$SCRIPT" --run '../etc'
     [ "$status" -eq 2 ]

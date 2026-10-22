@@ -11,7 +11,7 @@
      x-on:argos-gates-updated.window="$wire.$refresh()"
      @if ($gateRun?->status === \App\Enums\GateRunStatus::Running) wire:poll.10s @elseif ($prLoading) wire:poll.2s @endif>
 
-    <section class="wf-section" x-data="{ ...argosFold('env') }" :class="{ 'is-folded': !open }">
+    <section class="wf-section" id="ctx-env" x-data="{ ...argosFold('env') }" :class="{ 'is-folded': !open }">
         <h2 class="wf-section-h"><button type="button" class="wf-section-title wf-fold-btn" x-on:click="toggleFold()" :aria-expanded="open"><x-wf.icon name="chevron-right" :size="12" :stroke="2.4" class="wf-fold-chev" />{{ __('workspaces.focus.environment') }}</button></h2>
         <div class="wf-env-grid">
             <div class="wf-env wf-env-tile">
@@ -195,7 +195,7 @@
     @endif
 
 
-    <section class="wf-section" x-data="{ ...argosFold('gates') }" :class="{ 'is-folded': !open }">
+    <section class="wf-section" id="ctx-gates" x-data="{ ...argosFold('gates') }" :class="{ 'is-folded': !open }">
         <div class="wf-section-head">
             <h2 class="wf-section-h"><button type="button" class="wf-section-title wf-fold-btn" x-on:click="toggleFold()" :aria-expanded="open"><x-wf.icon name="chevron-right" :size="12" :stroke="2.4" class="wf-fold-chev" />{{ __('workspaces.focus.gates') }}</button></h2>
             @if ($canOperate && $running)

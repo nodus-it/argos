@@ -50,9 +50,14 @@
                             <p class="wf-note wf-muted"><span class="wf-spin"></span> {{ __('workspaces.gate_detail.running') }}</p>
                         @endif
 
-                        @if ($detail['canFix'])
+                        @if ($detail['canFix'] || $detail['canRerun'])
                             <div class="wf-gd-actions">
-                                @foreach ($row['failed'] as $failedGate)
+                                @if ($detail['canRerun'])
+                                    <button type="button" class="wf-btn" wire:click="rerunGate(@js($row['key']))" wire:loading.attr="disabled" wire:target="rerunGate">
+                                        <x-wf.icon name="refresh" :size="15" :stroke="2" /> {{ __('workspaces.gates.rerun_one') }}
+                                    </button>
+                                @endif
+                                @foreach ($detail['canFix'] ? $row['failed'] : [] as $failedGate)
                                     <button type="button" class="wf-btn wf-btn-primary" wire:click="sendGateFix(@js($failedGate))" wire:loading.attr="disabled" wire:target="sendGateFix">
                                         <x-wf.icon name="zap" :size="16" /> {{ __('workspaces.gates.send_fix') }}@if (count($row['failed']) > 1) ({{ $failedGate }})@endif
                                     </button>

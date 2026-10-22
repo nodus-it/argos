@@ -186,6 +186,9 @@
                     <p class="muted ws-hint">{{ __('workspaces.task.own_copy_hint') }}</p>
                     <div class="ws-form-actions">
                         <button type="submit" class="btn btn-primary btn-sm">{{ $newAuto ? __('workspaces.auto.start') : __('workspaces.task.create') }}</button>
+                        @if ($taskId !== null)
+                            <button type="button" class="btn btn-secondary btn-sm" wire:click="cancelCreating">{{ __('workspaces.review.cancel') }}</button>
+                        @endif
                     </div>
                 </form>
             @endif
@@ -474,14 +477,14 @@
                     <div class="wf-composer-bar">
                         <button type="button" class="wf-icon-btn wf-icon-btn-sm" x-on:click="$refs.file.click()" title="{{ __('workspaces.task.attach') }}" aria-label="{{ __('workspaces.task.attach') }}"><x-wf.icon name="paperclip" :size="17" /></button>
                         <input type="file" class="sr-only" tabindex="-1" aria-hidden="true" x-ref="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple x-on:change="attach($event.target.files); $event.target.value = ''">
-                        <select class="wf-pill" wire:change="setMode($event.target.value)" aria-label="{{ __('workspaces.chat.mode') }}">
+                        <select class="wf-pill" wire:change="setMode($event.target.value)" wire:key="mode-{{ $task->permission_mode->value }}-{{ $controlsVersion }}" aria-label="{{ __('workspaces.chat.mode') }}">
                             @foreach ($modes as $mode)
                                 @if ($mode !== PermissionMode::BypassPermissions || $isOwner)
                                     <option value="{{ $mode->value }}" @selected($task->permission_mode === $mode)>{{ $mode->label() }}</option>
                                 @endif
                             @endforeach
                         </select>
-                        <select class="wf-pill mono" wire:change="setModel($event.target.value)" aria-label="{{ __('workspaces.chat.model') }}">
+                        <select class="wf-pill mono" wire:change="setModel($event.target.value)" wire:key="model-{{ $task->model }}-{{ $controlsVersion }}" aria-label="{{ __('workspaces.chat.model') }}">
                             @foreach ($models as $model)
                                 <option value="{{ $model['value'] }}" title="{{ $model['description'] }}" @selected($task->model === $model['value'])>{{ $model['label'] }}</option>
                             @endforeach
@@ -493,7 +496,7 @@
                             <span class="wf-composer-note">
                                 {{ $staleComments->isNotEmpty()
                                     ? __('workspaces.review.collected_stale', ['active' => $activeComments->count(), 'stale' => $staleComments->count()])
-                                    : trans_choice('workspaces.review.collected', $activeComments->count(), ['count' => $activeComments->count()]) }}<span x-show="status === 'running' || status === 'waiting_input'"> · {{ __('workspaces.review.queued_hint') }}</span>
+                                    : trans_choice('workspaces.review.collected_drafts', $activeComments->count(), ['count' => $activeComments->count()]) }}<span x-show="status === 'running' || status === 'waiting_input'"> · {{ __('workspaces.review.queued_hint') }}</span>
                             </span>
                         @endif
                         <span class="wf-spacer"></span>
@@ -508,7 +511,10 @@
                         <button type="button" class="wf-btn wf-btn-soft wf-stop" wire:click="interrupt" x-show="status === 'running' || status === 'waiting_input'" x-cloak>
                             <x-wf.icon name="stop" :size="13" :stroke="2.6" /> {{ __('workspaces.task.stop') }}
                         </button>
-                        <button type="button" class="wf-send" wire:click="send" wire:loading.attr="disabled" wire:target="send" x-show="status !== 'running' && status !== 'waiting_input'" @if ($activeComments->isNotEmpty()) hidden @endif aria-label="{{ __('workspaces.chat.send') }}" title="{{ __('workspaces.chat.send') }}">
+                        <button type="button" class="wf-send" wire:click="send" wire:loading.attr="disabled" wire:target="send" @if ($activeComments->isNotEmpty()) hidden @endif
+                                :aria-label="(status === 'running' || status === 'waiting_input') ? @js(__('workspaces.chat.queue')) : @js(__('workspaces.chat.send'))"
+                                :title="(status === 'running' || status === 'waiting_input') ? @js(__('workspaces.chat.queue')) : @js(__('workspaces.chat.send'))"
+                                aria-label="{{ __('workspaces.chat.send') }}" title="{{ __('workspaces.chat.send') }}">
                             <x-wf.icon name="arrow-up" :size="18" :stroke="2.2" />
                         </button>
                     </div>

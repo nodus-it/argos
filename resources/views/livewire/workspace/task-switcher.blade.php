@@ -93,10 +93,15 @@
                             <span class="wf-unread" title="{{ __('workspaces.switcher.unread') }}">{{ $unread[$t->id] }}</span>
                         @endif
                         <span class="wf-pop-time">{{ $t->updated_at?->diffForHumans(short: true) }}</span>
-                        @if ($canWrite)
+                        @php $mayRename = $user->can('update', $t); $mayArchive = $user->can('archive', $t); @endphp
+                        @if ($mayRename || $mayArchive)
                             <span class="wf-pop-actions" x-on:click.stop>
-                                <button type="button" class="wf-icon-btn wf-icon-btn-xs" wire:click="startRename('{{ $t->id }}')" title="{{ __('workspaces.task.rename') }}" aria-label="{{ __('workspaces.task.rename') }}">@svg('heroicon-o-pencil')</button>
-                                <button type="button" class="wf-icon-btn wf-icon-btn-xs" wire:click="archive('{{ $t->id }}')" title="{{ __('workspaces.task.archive') }}" aria-label="{{ __('workspaces.task.archive') }}">@svg('heroicon-o-archive-box')</button>
+                                @if ($mayRename)
+                                    <button type="button" class="wf-icon-btn wf-icon-btn-xs" wire:click="startRename('{{ $t->id }}')" title="{{ __('workspaces.task.rename') }}" aria-label="{{ __('workspaces.task.rename') }}">@svg('heroicon-o-pencil')</button>
+                                @endif
+                                @if ($mayArchive)
+                                    <button type="button" class="wf-icon-btn wf-icon-btn-xs" wire:click="archive('{{ $t->id }}')" wire:confirm="{{ __('workspaces.task.archive_confirm', ['title' => $t->title]) }}" title="{{ __('workspaces.task.archive') }}" aria-label="{{ __('workspaces.task.archive') }}">@svg('heroicon-o-archive-box')</button>
+                                @endif
                             </span>
                         @endif
                     </div>
@@ -123,7 +128,7 @@
                     <div class="wf-pop-item is-compact is-archived" wire:key="ar-{{ $t->id }}" data-title="{{ mb_strtolower($t->title) }}" x-show="visible($el)">
                         <span class="wf-dot is-done" aria-hidden="true"></span>
                         <button type="button" class="wf-pop-text wf-pop-link" wire:click="select('{{ $t->id }}')" x-on:click="close()">{{ $t->title }}</button>
-                        @if ($canWrite)
+                        @if ($user->can('archive', $t))
                             <button type="button" class="wf-text-btn" wire:click="unarchive('{{ $t->id }}')">{{ __('workspaces.task.unarchive') }}</button>
                         @endif
                     </div>
@@ -132,7 +137,7 @@
         </div>
 
         <div class="wf-pop-foot">
-            @if ($canWrite)
+            @if ($canCreate)
                 <button type="button" class="wf-btn wf-btn-sm wf-btn-primary" x-on:click="close(); $dispatch('task-new')">
                     <x-wf.icon name="plus" :size="14" :stroke="2" /> {{ __('workspaces.task.new') }}
                 </button>
