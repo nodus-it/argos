@@ -167,6 +167,10 @@ return [
         'idle_minutes' => (int) $envOr('ARGOS_WORKSPACE_IDLE_MINUTES', 60),
         'cpus' => (string) $envOr('ARGOS_WORKSPACE_CPUS', '2'),
         'memory' => (string) $envOr('ARGOS_WORKSPACE_MEMORY', '4g'),
+        // Process limit per workspace container (fork bombs stay inside).
+        'pids_limit' => (int) $envOr('ARGOS_WORKSPACE_PIDS_LIMIT', 4096),
+        // Memory of each backing-service container (MySQL, Redis) of a workspace.
+        'sidecar_memory' => (string) $envOr('ARGOS_WORKSPACE_SIDECAR_MEMORY', '1g'),
         // Base URL the daemon uses to reach the manager on the argos_ws network.
         'internal_url' => rtrim((string) $envOr('ARGOS_INTERNAL_URL', 'http://nginx'), '/'),
         // Docker network shared by the manager and workspace containers.

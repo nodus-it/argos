@@ -58,6 +58,11 @@ class WorkerSidecarManager
                     '--network', $network,
                     '--network-alias', $alias,
                     '--restart', 'unless-stopped',
+                    // Databases switch users on start, so they keep their
+                    // capabilities — but gain no more, and stay bounded.
+                    '--security-opt', 'no-new-privileges',
+                    '--pids-limit', '512',
+                    '--memory', (string) config('argos.workspaces.sidecar_memory', '1g'),
                     '-v', $network.'_'.$alias.':'.$service->dataPath(),
                     ...$label,
                 ];

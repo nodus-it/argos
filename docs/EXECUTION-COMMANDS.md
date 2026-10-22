@@ -40,7 +40,8 @@ agent does. There are two execution contexts:
 
 ### How it is launched
 
-The manager prepares two volumes (the checkout and the agent state) and starts
+The manager prepares three volumes (the checkout, the agent state and the
+package caches) and starts
 one container from the workspace image — the worker image (stack + agent +
 gate helpers) plus the workspace daemon and OpenVSCode Server. The container
 runs as the non-root user `agent` (uid 1000) and has **no Docker socket**.
@@ -50,10 +51,12 @@ docker run -d --name argos-ws-<slug> --hostname argos-ws-<slug> --network argos_
   --restart unless-stopped --label argos.workspace=<slug> \
   --cpus <workspace cpu_limit | argos.workspaces.cpus> \
   --memory <workspace memory_limit_mb | argos.workspaces.memory> \
+  --cap-drop ALL --security-opt no-new-privileges \
+  --pids-limit <ARGOS_WORKSPACE_PIDS_LIMIT, default 4096> \
   -v ws_<slug>:/workspace \
   -v ws_<slug>_agents:/home/agent/.claude-agents \
-  -v composer_cache:/home/agent/.composer/cache \
-  -v npm_cache:/home/agent/.npm \
+  --mount type=volume,source=ws_<slug>_cache,target=/home/agent/.composer/cache,volume-subpath=composer \
+  --mount type=volume,source=ws_<slug>_cache,target=/home/agent/.npm,volume-subpath=npm \
   -e ARGOS_DAEMON_TOKEN=… -e ARGOS_EVENTS_URL=… -e ARGOS_REPO_CREDENTIAL_URL=… \
   -e ARGOS_DAEMON_PORT=7777 -e ARGOS_EDITOR_PORT=3000 \
   -e APP_KEY=<fixed dummy> \
@@ -63,6 +66,15 @@ docker run -d --name argos-ws-<slug> --hostname argos-ws-<slug> --network argos_
 ```
 
 Notes for auditing:
+
+- The container has no capabilities, cannot gain privileges through setuid
+  binaries and has a process limit. Package caches are per workspace, so a
+  package planted in one workspace's cache never reaches another's install.
+  The editor listens on loopback only; the daemon's editor gate lets through
+  only requests Traefik's code route vouches for.
+- Everything inside runs as `agent`: whoever can use the editor (workspace
+  admins and members) can read the daemon token and use the repository
+  credential of this workspace — give workspaces repository-scoped tokens.
 
 - No repository token and no Claude token are in the container environment.
   Git asks the Argos credential helper, which fetches the token from the

@@ -27,7 +27,7 @@ class WorkspaceContainerManager
     /** Create both volumes and hand them to the agent user. Idempotent. */
     public function prepareVolumes(Workspace $workspace): void
     {
-        foreach ([$workspace->volumeName(), $workspace->agentsVolumeName()] as $volume) {
+        foreach ([$workspace->volumeName(), $workspace->agentsVolumeName(), $workspace->cacheVolumeName()] as $volume) {
             $this->mustRun(['docker', 'volume', 'create', '--label', $this->label($workspace), $volume], 30);
         }
 
@@ -35,7 +35,8 @@ class WorkspaceContainerManager
             'docker', 'run', '--rm',
             '-v', $workspace->volumeName().':/workspace',
             '-v', $workspace->agentsVolumeName().':/agents',
-            'alpine:3.20', 'chown', self::AGENT_UID, '/workspace', '/agents',
+            '-v', $workspace->cacheVolumeName().':/cache',
+            'alpine:3.20', 'sh', '-c', 'mkdir -p /cache/composer /cache/npm && chown '.self::AGENT_UID.' /workspace /agents /cache /cache/composer /cache/npm',
         ], 120);
     }
 
@@ -57,10 +58,16 @@ class WorkspaceContainerManager
             // The workspace's own limits (settings → Resources) win over the installation default.
             '--cpus', $workspace->cpu_limit !== null ? (string) (float) $workspace->cpu_limit : (string) config('argos.workspaces.cpus', '2'),
             '--memory', $workspace->memory_limit_mb !== null ? $workspace->memory_limit_mb.'m' : (string) config('argos.workspaces.memory', '4g'),
+            // Agent code runs here: no capabilities, no privilege gain through
+            // setuid binaries, and a process limit against fork bombs.
+            '--cap-drop', 'ALL',
+            '--security-opt', 'no-new-privileges',
+            '--pids-limit', (string) (int) config('argos.workspaces.pids_limit', 4096),
             '-v', $workspace->volumeName().':/workspace',
             '-v', $workspace->agentsVolumeName().':/home/agent/.claude-agents',
-            '-v', 'composer_cache:/home/agent/.composer/cache',
-            '-v', 'npm_cache:/home/agent/.npm',
+            // The workspace's own package caches (see Workspace::cacheVolumeName()).
+            '--mount', 'type=volume,source='.$workspace->cacheVolumeName().',target=/home/agent/.composer/cache,volume-subpath=composer',
+            '--mount', 'type=volume,source='.$workspace->cacheVolumeName().',target=/home/agent/.npm,volume-subpath=npm',
             '-e', 'ARGOS_DAEMON_TOKEN='.$workspace->daemon_token,
             '-e', 'ARGOS_EVENTS_URL='.$internal.'/internal/workspaces/'.$workspace->id.'/events',
             '-e', 'ARGOS_REPO_CREDENTIAL_URL='.$internal.'/internal/workspaces/'.$workspace->id.'/repo-credential',
@@ -113,7 +120,7 @@ class WorkspaceContainerManager
 
     public function removeVolumesBySlug(string $slug): void
     {
-        $this->runQuietly(['docker', 'volume', 'rm', '-f', 'ws_'.$slug, 'ws_'.$slug.'_agents'], 60);
+        $this->runQuietly(['docker', 'volume', 'rm', '-f', 'ws_'.$slug, 'ws_'.$slug.'_agents', 'ws_'.$slug.'_cache'], 60);
     }
 
     public function isRunning(Workspace $workspace): bool

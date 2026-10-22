@@ -271,6 +271,16 @@ class Workspace extends Model implements HasApiTokensContract
         return 'ws_'.$this->slug.'_agents';
     }
 
+    /**
+     * Docker volume with this workspace's Composer and npm caches — never
+     * shared: a package planted in a shared cache would reach other
+     * workspaces' installs.
+     */
+    public function cacheVolumeName(): string
+    {
+        return 'ws_'.$this->slug.'_cache';
+    }
+
     public function containerName(): string
     {
         return 'argos-ws-'.$this->slug;

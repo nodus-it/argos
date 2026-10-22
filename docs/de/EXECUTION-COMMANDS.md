@@ -40,8 +40,8 @@ der Agent tut. Es gibt zwei Ausführungskontexte:
 
 ### Wie er gestartet wird
 
-Der Manager legt zwei Volumes an (den Checkout und den Agent-Zustand) und
-startet einen Container aus dem Workspace-Image — dem Worker-Image (Stack +
+Der Manager legt drei Volumes an (den Checkout, den Agent-Zustand und die
+Paket-Caches) und startet einen Container aus dem Workspace-Image — dem Worker-Image (Stack +
 Agent + Gate-Helfer) plus Workspace-Daemon und OpenVSCode Server. Der Container
 läuft als Nicht-Root-Benutzer `agent` (uid 1000) und hat **keinen
 Docker-Socket**.
@@ -51,10 +51,12 @@ docker run -d --name argos-ws-<slug> --hostname argos-ws-<slug> --network argos_
   --restart unless-stopped --label argos.workspace=<slug> \
   --cpus <workspace cpu_limit | argos.workspaces.cpus> \
   --memory <workspace memory_limit_mb | argos.workspaces.memory> \
+  --cap-drop ALL --security-opt no-new-privileges \
+  --pids-limit <ARGOS_WORKSPACE_PIDS_LIMIT, default 4096> \
   -v ws_<slug>:/workspace \
   -v ws_<slug>_agents:/home/agent/.claude-agents \
-  -v composer_cache:/home/agent/.composer/cache \
-  -v npm_cache:/home/agent/.npm \
+  --mount type=volume,source=ws_<slug>_cache,target=/home/agent/.composer/cache,volume-subpath=composer \
+  --mount type=volume,source=ws_<slug>_cache,target=/home/agent/.npm,volume-subpath=npm \
   -e ARGOS_DAEMON_TOKEN=… -e ARGOS_EVENTS_URL=… -e ARGOS_REPO_CREDENTIAL_URL=… \
   -e ARGOS_DAEMON_PORT=7777 -e ARGOS_EDITOR_PORT=3000 \
   -e APP_KEY=<fixed dummy> \
@@ -64,6 +66,17 @@ docker run -d --name argos-ws-<slug> --hostname argos-ws-<slug> --network argos_
 ```
 
 Hinweise für die Prüfung:
+
+- Der Container hat keine Capabilities, kann über setuid-Programme keine
+  Rechte gewinnen und hat ein Prozesslimit. Die Paket-Caches gehören je einem
+  Workspace, ein in einem Cache platziertes Paket erreicht also nie die
+  Installation eines anderen. Der Editor lauscht nur auf Loopback; das
+  Editor-Gate des Daemons lässt nur Anfragen durch, für die Traefiks
+  Code-Route bürgt.
+- Alles darin läuft als `agent`: Wer den Editor nutzen darf (Workspace-Admins
+  und Mitglieder), kann den Daemon-Token lesen und die Repository-Zugangsdaten
+  dieses Workspaces verwenden – gib Workspaces Tokens, die auf das Repository
+  beschränkt sind.
 
 - Weder Repository-Token noch Claude-Token stehen in der Container-Umgebung.
   Git fragt den Argos-Credential-Helper, der den Token bei Bedarf vom Manager

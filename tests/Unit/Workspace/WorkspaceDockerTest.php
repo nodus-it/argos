@@ -100,6 +100,10 @@ class WorkspaceDockerTest extends TestCase
         $this->assertStringContainsString('--cpus 3 --memory 6g', $joined);
         $this->assertStringContainsString('-v ws_login:/workspace', $joined);
         $this->assertStringContainsString('-v ws_login_agents:/home/agent/.claude-agents', $joined);
+        // Hardened, and package caches of its own — never shared with other workspaces.
+        $this->assertStringContainsString('--cap-drop ALL --security-opt no-new-privileges --pids-limit 4096', $joined);
+        $this->assertStringContainsString('source=ws_login_cache,target=/home/agent/.composer/cache,volume-subpath=composer', $joined);
+        $this->assertStringNotContainsString('composer_cache', $joined);
         $this->assertSame('daemon-secret', $env['ARGOS_DAEMON_TOKEN']);
         $this->assertSame("http://nginx/internal/workspaces/{$workspace->id}/events", $env['ARGOS_EVENTS_URL']);
         $this->assertSame("http://nginx/internal/workspaces/{$workspace->id}/repo-credential", $env['ARGOS_REPO_CREDENTIAL_URL']);
@@ -139,15 +143,15 @@ class WorkspaceDockerTest extends TestCase
         $this->assertSame(['docker', 'network', 'connect', 'ws_login_svc', 'argos-ws-login'], $manager->commands[2]);
     }
 
-    public function test_prepare_volumes_creates_and_chowns_both_volumes(): void
+    public function test_prepare_volumes_creates_and_chowns_the_volumes(): void
     {
         $manager = new RecordingContainerManager(app(WorkspaceDaemonClient::class));
         $manager->prepareVolumes($this->workspace());
 
         $this->assertSame('ws_login', end($manager->commands[0]));
         $this->assertSame('ws_login_agents', end($manager->commands[1]));
-        $this->assertContains('chown', $manager->commands[2]);
-        $this->assertContains('1000:1000', $manager->commands[2]);
+        $this->assertSame('ws_login_cache', end($manager->commands[2]));
+        $this->assertStringContainsString('chown 1000:1000', (string) end($manager->commands[3]));
     }
 
     public function test_wait_for_health_polls_until_the_daemon_answers(): void
