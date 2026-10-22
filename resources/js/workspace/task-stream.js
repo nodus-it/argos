@@ -99,7 +99,7 @@ export function argosTaskStream(config) {
                         persisted = true;
                         break;
                     default:
-                        if (event.event_id !== undefined || event.type === 'user.accepted' || event.type === 'session.started') {
+                        if (event.event_id !== undefined || event.type === 'user.accepted' || event.type === 'user.dropped' || event.type === 'session.started') {
                             persisted = true;
                         }
                 }

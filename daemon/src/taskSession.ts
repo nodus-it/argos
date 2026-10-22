@@ -175,10 +175,22 @@ export class TaskSession {
         for (const approvalId of this.approvals.cancelTask(this.taskId, 'Session closed')) {
             this.emit({ type: 'approval.cancelled', data: { approval_id: approvalId, reason: 'closed' } });
         }
-        this.queue.close();
+        this.dropQueued();
         this.query?.close();
         await this.loop;
         this.setState('closed');
+    }
+
+    /**
+     * End the input queue. Messages Claude never took are reported, so the
+     * manager can mark them undelivered instead of showing them as sent.
+     */
+    private dropQueued(): void {
+        const dropped = this.queue.drain().map((item) => item.clientMsgId);
+        this.queue.close();
+        if (dropped.length > 0) {
+            this.emit({ type: 'user.dropped', data: { client_msg_ids: dropped } });
+        }
     }
 
     private newQueue(): InputQueue<QueuedMessage> {
@@ -286,7 +298,7 @@ export class TaskSession {
         }
         this.emit({ type: 'error', data: { code: failure === null ? 'session_ended' : 'session_failed', message: detail.slice(0, 4000) } });
         // A closed session is never relaunched: the HTTP layer starts a new one.
-        this.queue.close();
+        this.dropQueued();
         this.setState('closed');
     }
 

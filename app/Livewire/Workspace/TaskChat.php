@@ -4,14 +4,13 @@ declare(strict_types=1);
 
 namespace App\Livewire\Workspace;
 
-use App\Livewire\Concerns\InteractsWithWorkspace;
-use App\Support\RequestedTask;
 use App\Enums\Capability;
 use App\Enums\PermissionMode;
 use App\Enums\ReviewCommentStatus;
 use App\Enums\TaskEventType;
 use App\Enums\WorkspaceStatus;
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
+use App\Livewire\Concerns\InteractsWithWorkspace;
 use App\Models\AgentCredential;
 use App\Models\Task;
 use App\Models\TaskApproval;
@@ -27,19 +26,20 @@ use App\Services\Workspace\ReviewCommentService;
 use App\Services\Workspace\TaskAccess;
 use App\Services\Workspace\TaskAttachmentService;
 use App\Services\Workspace\TaskCheckpointService;
-use App\Services\Workspace\TaskReadService;
-use App\Services\Workspace\TaskPreparer;
 use App\Services\Workspace\TaskComposer;
+use App\Services\Workspace\TaskPreparer;
+use App\Services\Workspace\TaskReadService;
 use App\Services\Workspace\TaskService;
 use App\Services\Workspace\WorkspaceDaemonClient;
 use App\Services\Workspace\WorkspaceException;
 use App\Services\Workspace\WorkspaceIssueService;
 use App\Services\Workspace\WorkspaceSetupService;
+use App\Support\RequestedTask;
 use App\Support\TaskTimeline;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -55,7 +55,6 @@ use Livewire\WithFileUploads;
 class TaskChat extends Component
 {
     use InteractsWithWorkspace;
-
     use WithFileUploads;
 
     private const PAGE = 200;
@@ -529,6 +528,16 @@ class TaskChat extends Component
         }
     }
 
+    /** Send a message again that the ended session never took. */
+    public function resend(int $eventId): void
+    {
+        $task = $this->activeTask();
+        $event = $task !== null ? TaskEvent::query()->where('task_id', $task->id)->find($eventId) : null;
+        if ($event !== null) {
+            $this->attempt(fn () => app(TaskService::class)->resend($task, $this->user(), $event));
+        }
+    }
+
     public function interrupt(): void
     {
         $task = $this->activeTask();
@@ -758,5 +767,4 @@ class TaskChat extends Component
     }
 
     /** Run an action and report failures; true when it went through. */
-
 }

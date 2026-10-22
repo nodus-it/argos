@@ -129,6 +129,8 @@ class TaskSessionReconciler
             return false;
         }
 
+        // What was handed over but never taken died with the session.
+        app(TaskService::class)->markUndelivered($task, null);
         if ($wasWorking) {
             $this->notices->systemNotice($task, 'session_lost');
             if ($task->auto_state !== null) {

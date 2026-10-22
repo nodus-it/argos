@@ -327,6 +327,43 @@ describe('TaskSession', () => {
         expect(ofType('error')[0]!.data.code).toBe('session_failed');
     });
 
+    it('reports messages Claude never took when the session ends', async () => {
+        let release: () => void = () => {};
+        const gate = new Promise<void>((r) => (release = r));
+        const failing: Script = async function* () {
+            await gate;
+            throw new Error('API Error: 529 overloaded');
+        };
+        const { session } = make(failing);
+        session.start();
+        session.send({ clientMsgId: 'm1', author: { id: 1, name: 'A' }, text: 'first' });
+        await waitFor(() => session.currentState === 'running');
+        session.send({ clientMsgId: 'm2', author: { id: 1, name: 'A' }, text: 'also this' });
+        release();
+
+        await waitFor(() => session.currentState === 'closed');
+        expect(ofType('user.dropped').map((e) => e.data.client_msg_ids)).toEqual([['m2']]);
+    });
+
+    it('reports queued messages when the session is stopped', async () => {
+        let release: () => void = () => {};
+        const gate = new Promise<void>((r) => (release = r));
+        const slow: Script = async function* (message) {
+            await gate;
+            yield assistantText('msg_1', `done ${textOfUserMessage(message)}`);
+        };
+        const { session } = make(slow);
+        session.start();
+        session.send({ clientMsgId: 'm1', author: { id: 1, name: 'A' }, text: 'first' });
+        await waitFor(() => session.currentState === 'running');
+        session.send({ clientMsgId: 'm2', author: { id: 1, name: 'A' }, text: 'second' });
+        const stopping = session.stop();
+        release();
+        await stopping;
+
+        expect(ofType('user.dropped').map((e) => e.data.client_msg_ids)).toEqual([['m2']]);
+    });
+
     it('forwards permission mode and model changes', async () => {
         const { session, queries } = make(echo);
         session.start();

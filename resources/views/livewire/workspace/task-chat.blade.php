@@ -229,7 +229,12 @@
                             @if (! empty($p['auto']))
                                 <span class="ag-pill-tag"><x-ag.icon name="zap" :size="11" :stroke="2" /> {{ __('workspaces.auto.automated') }}</span>
                             @endif
-                            @if (! empty($p['pending']))
+                            @if (! empty($p['undelivered']))
+                                <span class="ag-pill-tag is-warn" title="{{ __('workspaces.events.undelivered_hint') }}">{{ __('workspaces.events.undelivered') }}</span>
+                                @if ($canWrite)
+                                    <button type="button" class="ag-btn ag-btn-sm" wire:click="resend({{ $event->id }})" wire:loading.attr="disabled">{{ __('workspaces.events.resend') }}</button>
+                                @endif
+                            @elseif (! empty($p['pending']))
                                 <span class="ag-pill-tag is-warn">{{ __('workspaces.events.queued', ['position' => $queuePosition ?? 1]) }}</span>
                             @elseif (! isset($p['accepted_at']) && $busy)
                                 <span class="ag-pill-tag">{{ __('workspaces.task.queued') }}</span>

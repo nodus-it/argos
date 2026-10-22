@@ -415,6 +415,76 @@ class TaskService
         $this->workspaces->touch($task->workspace);
     }
 
+    /**
+     * Messages Claude never took (the session ended first): marked
+     * undelivered so the chat offers to send them again. Pass null for
+     * every message of the task that was handed over but never accepted.
+     * Returns how many were marked.
+     *
+     * @param  list<string>|null  $eventIds
+     */
+    public function markUndelivered(Task $task, ?array $eventIds): int
+    {
+        $events = TaskEvent::query()->where('task_id', $task->id)->where('type', TaskEventType::UserMessage->value)
+            ->when($eventIds !== null, fn ($q) => $q->whereKey(array_filter($eventIds, 'ctype_digit')))
+            ->when($eventIds === null, fn ($q) => $q->where('created_at', '>', now()->subDay()))
+            ->get()
+            ->filter(fn (TaskEvent $e): bool => ! isset($e->payload['accepted_at']) && empty($e->payload['pending']) && empty($e->payload['undelivered']));
+
+        foreach ($events as $event) {
+            $event->forceFill(['payload' => [...$event->payload, 'undelivered' => true]])->save();
+        }
+
+        return $events->count();
+    }
+
+    /** Send a message the ended session never took once more, as it was. */
+    public function resend(Task $task, User $by, TaskEvent $event): void
+    {
+        Gate::forUser($by)->authorize('prompt', $task);
+        if ($event->task_id !== $task->id || $event->type !== TaskEventType::UserMessage || empty($event->payload['undelivered'])) {
+            return;
+        }
+        if ($task->status->isFinished()) {
+            throw WorkspaceException::translated('workspaces.errors.task_finished');
+        }
+
+        $queued = false;
+        if (! $task->session_open) {
+            try {
+                $this->open($task);
+            } catch (SessionsFullException) {
+                $queued = true;
+            }
+        }
+
+        $payload = array_diff_key($event->payload, ['undelivered' => true]);
+        $event->forceFill(['payload' => $queued ? [...$payload, 'pending' => true] : $payload])->save();
+        if ($queued) {
+            $this->enqueue($task, $event, $by);
+
+            return;
+        }
+
+        try {
+            $this->deliver($task, $this->messagePayload(
+                $task,
+                $event,
+                ['id' => $event->author_user_id, 'name' => (string) ($event->payload['author_name'] ?? '')],
+                (string) ($event->payload['text'] ?? ''),
+                app(TaskAttachmentService::class)->load(is_array($event->payload['images'] ?? null) ? $event->payload['images'] : []),
+            ));
+        } catch (WorkspaceException $e) {
+            $event->forceFill(['payload' => [...$payload, 'undelivered' => true]])->save();
+
+            throw $e;
+        }
+
+        $this->restoreNoteDelivered($task);
+        $this->publisher->publish($task->workspace_id, $task->id, [['type' => 'user.delivered', 'event_id' => $event->id, 'data' => []]]);
+        $this->workspaces->touch($task->workspace);
+    }
+
     /** Place in the workspace's session queue (1 = next), null when not waiting. */
     public function queuePosition(Task $task): ?int
     {

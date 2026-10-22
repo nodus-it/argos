@@ -7,15 +7,19 @@ namespace Tests\Feature\Workspace;
 use App\Broadcasting\TaskStream;
 use App\Enums\ApprovalStatus;
 use App\Enums\PermissionMode;
+use App\Enums\TaskEventType;
 use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceStatus;
 use App\Livewire\Workspace\TaskChat;
 use App\Models\AgentCredential;
 use App\Models\Task;
 use App\Models\TaskApproval;
+use App\Models\TaskEvent;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceMember;
+use App\Services\Workspace\TaskEventIngestor;
+use App\Services\Workspace\TaskService;
 use App\Services\Workspace\WorkspaceDaemonClient;
 use App\Testing\FakeWorkspaceDaemon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -99,6 +103,29 @@ class TaskChatTest extends TestCase
         $this->assertTrue($task->fresh()->session_open);
     }
 
+    public function test_a_message_the_ended_session_never_took_can_be_sent_again(): void
+    {
+        $task = $this->createTask();
+        $this->chat($this->owner)->set('taskId', $task->id)->set('draft', 'Hi Claude')->call('send');
+        $message = TaskEvent::query()->where('task_id', $task->id)->where('type', TaskEventType::UserMessage->value)->latest('id')->firstOrFail();
+        $message->forceFill(['payload' => array_diff_key($message->payload, ['accepted_at' => true])])->save();
+
+        // The daemon reports it dropped when the session ended.
+        app(TaskEventIngestor::class)->ingest($this->workspace, [
+            ['task_id' => $task->id, 'seq' => $task->fresh()->last_seq + 1, 'type' => 'user.dropped', 'data' => ['client_msg_ids' => [(string) $message->id]]],
+        ]);
+        $this->assertTrue($message->fresh()->payload['undelivered']);
+
+        $this->chat($this->owner)->set('taskId', $task->id)
+            ->assertSee(__('workspaces.events.undelivered'))
+            ->assertSeeHtml('wire:click="resend('.$message->id.')"')
+            ->call('resend', $message->id)
+            ->assertDontSee(__('workspaces.events.undelivered'));
+
+        $this->assertArrayNotHasKey('undelivered', $message->fresh()->payload);
+        $this->assertArrayHasKey('accepted_at', $message->fresh()->payload);
+    }
+
     public function test_pair_programming_messages_carry_their_author(): void
     {
         $task = $this->createTask();
@@ -119,7 +146,7 @@ class TaskChatTest extends TestCase
     {
         $task = $this->createTask();
 
-        $this->assertStringContainsString('only when someone asks for one', app(\App\Services\Workspace\TaskService::class)->systemPrompt($task));
+        $this->assertStringContainsString('only when someone asks for one', app(TaskService::class)->systemPrompt($task));
     }
 
     public function test_approvals_are_decided_in_the_chat(): void

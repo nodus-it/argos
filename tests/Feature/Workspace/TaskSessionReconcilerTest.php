@@ -74,6 +74,18 @@ class TaskSessionReconcilerTest extends TestCase
         Queue::assertPushed(DrainSessionQueueJob::class);
     }
 
+    public function test_messages_the_lost_session_never_took_are_marked_undelivered(): void
+    {
+        $lost = $this->task(['session_status' => SessionStatus::Running]);
+        $taken = TaskEvent::query()->create(['task_id' => $lost->id, 'type' => TaskEventType::UserMessage, 'payload' => ['text' => 'a', 'accepted_at' => now()->toIso8601String()]]);
+        $waiting = TaskEvent::query()->create(['task_id' => $lost->id, 'type' => TaskEventType::UserMessage, 'payload' => ['text' => 'b']]);
+
+        $this->reconciler()->reconcile($this->workspace, ['tasks' => []]);
+
+        $this->assertArrayNotHasKey('undelivered', $taken->fresh()->payload);
+        $this->assertTrue($waiting->fresh()->payload['undelivered']);
+    }
+
     public function test_an_idle_lost_session_closes_quietly(): void
     {
         $idle = $this->task();

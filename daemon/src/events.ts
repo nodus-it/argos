@@ -11,6 +11,7 @@ export type DaemonEventType =
     | 'commands.updated'
     | 'status'
     | 'user.accepted'
+    | 'user.dropped'
     | 'assistant.delta'
     | 'thinking.delta'
     | 'assistant.message'

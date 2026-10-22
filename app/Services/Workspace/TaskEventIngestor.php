@@ -245,6 +245,11 @@ class TaskEventIngestor
 
                 return $broadcast;
 
+            case 'user.dropped':
+                $ids = array_values(array_map('strval', is_array($data['client_msg_ids'] ?? null) ? $data['client_msg_ids'] : []));
+
+                return app(TaskService::class)->markUndelivered($task, $ids) > 0 ? $broadcast : null;
+
             case 'assistant.message':
                 return $this->persist($task, TaskEventType::AssistantMessage, $data, $seq, $broadcast);
 
