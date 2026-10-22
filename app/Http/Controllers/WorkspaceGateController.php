@@ -39,7 +39,9 @@ class WorkspaceGateController extends Controller
 
         $cookie = (string) $request->cookies->get($tokens->cookieName($workspace), '');
         if ($cookie !== '') {
-            $cacheKey = 'ws-gate:'.$ability.':'.hash('sha256', $cookie);
+            // The workspace belongs in the key: a cookie signed for one
+            // workspace must never reuse another workspace's decision.
+            $cacheKey = 'ws-gate:'.$workspace->id.':'.$ability.':'.hash('sha256', $cookie);
             $allowed = Cache::remember($cacheKey, self::DECISION_TTL, function () use ($tokens, $workspace, $cookie, $workspaces, $ability): bool {
                 $userId = $tokens->verifyCookie($workspace, $cookie);
                 $user = $userId !== null ? User::query()->find($userId) : null;
@@ -76,7 +78,8 @@ class WorkspaceGateController extends Controller
     /** Trade the ticket for the access cookie and drop the ticket from the URL. */
     private function grant(Request $request, Workspace $workspace, User $user, WorkspaceAccessTokens $tokens, string $path): Response
     {
-        $secure = $request->header('X-Forwarded-Proto', 'http') === 'https';
+        // Behind a TLS proxy Traefik only sees http: the configured scheme decides.
+        $secure = config('argos.preview.scheme') === 'https';
         $host = (string) $request->header('X-Forwarded-Host');
 
         return redirect()->away(($secure ? 'https' : 'http').'://'.$host.$path)->withCookie(new Cookie(

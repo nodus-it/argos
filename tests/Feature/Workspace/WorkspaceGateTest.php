@@ -137,6 +137,17 @@ class WorkspaceGateTest extends TestCase
         $this->assertNull($this->tokens()->verifyTicket($this->workspace, $ticket));
     }
 
+    public function test_a_cached_decision_for_one_workspace_never_opens_another(): void
+    {
+        // The member may use the "login" editor (cached) but has no say in "victim".
+        $this->workspace->members()->where('user_id', $this->member->id)->update(['role' => WorkspaceRole::Admin]);
+        Workspace::factory()->create(['slug' => 'victim']);
+        $cookie = $this->tokens()->cookie($this->workspace, $this->member);
+
+        $this->gate(cookies: ['argos_ws_login' => $cookie])->assertNoContent();
+        $this->gate('code-victim.argos.test', ['Accept' => 'application/json'], ['argos_ws_victim' => $cookie])->assertUnauthorized();
+    }
+
     public function test_anonymous_requests_are_refused_or_sent_to_login(): void
     {
         $this->gate(headers: ['Accept' => 'application/json'])->assertUnauthorized();
@@ -189,6 +200,8 @@ class WorkspaceGateTest extends TestCase
         $this->assertSame(['X-Argos-Editor-Token' => 'editor-secret'], $route['middlewares']['code-login-token']['headers']['customRequestHeaders']);
         $this->assertSame('http://argos-ws-login:3000', $route['services']['code-login']['loadBalancer']['servers'][0]['url']);
         $this->assertStringEndsWith('/_argos/workspace-gate', $route['middlewares']['code-login-auth']['forwardAuth']['address']);
+        // A client's own X-Forwarded-Host must not choose the workspace the gate checks.
+        $this->assertFalse($route['middlewares']['code-login-auth']['forwardAuth']['trustForwardHeader']);
 
         $router->removeCodeRoute('login');
         $this->assertFileDoesNotExist($dir.'/code-login.yml');

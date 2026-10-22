@@ -146,7 +146,10 @@ class TraefikRouter
         return [
             'forwardAuth' => [
                 'address' => (string) config('argos.workspaces.gate_url', 'http://nginx:80/_argos/workspace-gate'),
-                'trustForwardHeader' => true,
+                // Traefik sets X-Forwarded-Host/-Proto/-Uri from the request it
+                // routes; a client's own X-Forwarded-Host must never pick the
+                // workspace the gate checks (the route still targets another).
+                'trustForwardHeader' => false,
             ],
         ];
     }
