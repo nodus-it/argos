@@ -11,11 +11,11 @@ Interactive workspaces: work with Claude the way you use Claude Code locally —
 in the browser, together. A **workspace is the project**, every conversation is
 a **task**. See [Workspaces](docs/WORKSPACES.md).
 
-- **Workspace = project, conversation = task (breaking, fresh start):** a workspace holds the repository with its stack, services, secrets, preview settings, limits and integrations; it is created by Argos admins only (in `/w`, in the administration or via `POST /api/v1/workspaces`) and has members with the roles admin / member / viewer. Projects, the old workspaces, threads, tasks and demos are deleted by the migration.
+- **Workspace = project, conversation = task (breaking, fresh start):** a workspace holds the repository with its stack, services, secrets, preview settings, limits and integrations; it is created by Argos admins only (in the app, via `POST /api/v1/workspaces`) and has members with the roles admin / member / viewer. Projects, the old workspaces, threads, tasks and demos are deleted by the migration.
 - **Tasks:** each task has an owner whose Claude subscription it runs on, invited collaborators, its own git worktree and branch (workspace branch pattern, `<ticket>-<title>` or `argos/<title>`), its own database and setup steps (`.argos/setup.sh`, else the Laravel defaults), gates, checkpoints, review and preview. Status groups waiting / running / ready / pull request open / done; a session queue when the workspace or subscription limit is reached; hand over, invite, follow-up task, cancel, archive, delete; finished tasks are cleaned up after the workspace's `cleanup_after_days` (the conversation stays).
 - **One container per workspace:** a long-lived container with the TypeScript workspace daemon, OpenVSCode Server and MySQL/Redis sidecars; the main clone lives in `/workspace/repo`, tasks in `/workspace/tasks/<slug>`. A guard asks before Claude touches files outside the task's worktree.
 - **In the browser:** live streaming, approvals and questions as cards for every member, presence and typing, images and `@file` mentions, Argos `/` commands plus the session's Claude Code commands, mode and model switch, Stop, checkpoints with *Reset to here*, a review mode with line comments, quality gates with logs and *send errors to Claude*.
-- **My work and the switcher:** `/w` opens *My work* — own and invited tasks across all workspaces, waiting first. The task switcher (⌘J) groups tasks by status, filters "mine + invited / all" and shows owners and ticket references.
+- **My work and the switcher:** The start page `/` is *My work* — own and invited tasks across all workspaces, waiting first. The task switcher (⌘J) groups tasks by status, filters "mine + invited / all" and shows owners and ticket references.
 - **Tickets:** pick, link or create a ticket for a task; the ticket hears when work starts, the plan waits, the pull request opens and the task is done or cancelled. Merged tasks close their ticket per integration (GitHub/GitLab via `Closes #`, Linear and own systems by Argos; can be switched off). New ticket comments appear in the task; the assignee follows the task owner; people consent to automatic tasks in their profile.
 - **Own ticket systems:** a *custom* integration takes tickets through the REST API (`ticket` on task creation, `POST /api/v1/tasks/{task}/ticket-comments`) and receives every event as a signed webhook.
 - **Pull requests:** the task sidebar shows the pull/merge request — state with *Mark ready*, checks with *Let Claude fix it* (the failed-check log goes to Claude), reviews and comments with *Hand the review to Claude*, a conflict / behind-base warning with *Rebase by Claude*, and per-task **auto-merge** through the provider's native function (GitHub, GitLab; not Bitbucket). Changes are announced in the chat and as notifications; merged finishes the task, closed cancels it. PRs sync every 3 minutes (`ARGOS_WORKSPACE_PR_SYNC_MINUTES`).
@@ -28,6 +28,30 @@ a **task**. See [Workspaces](docs/WORKSPACES.md).
 - **REST API and MCP (breaking):** `/api/v1/workspaces` (read; create with `workspaces:write` on an admin's API client), `/api/v1/workspaces/{ws}/tasks`, `/api/v1/tasks/{task}/…` (message, plan decision, pause / resume, ship, ticket comments); tasks report kind, pull request checks / review / conflicts and auto-merge. Abilities `workspaces:read`, `workspaces:write`, `tasks:read`, `tasks:write`; MCP tools `workspace_*` and `task_*`.
 - **Realtime and operations:** Laravel Reverb joins the stack (`reverb` service, `ARGOS_REVERB_APP_SECRET`); the `argos_ws` network connects the manager with workspace containers; idle stop and an orphan sweep for containers.
 - **Removed (breaking):** the phase worker and its task UI, the Codex agent, demo access modes (previews are members-only), the media library.
+
+### Upgrade notes
+
+Start from an empty database (the migration drops projects, threads and the old
+workspaces). Take the new `docker-compose.yml` with the release — the installer's
+update mode does — since it adds the `argos-fpm` volume (PHP-FPM now listens on a
+unix socket only) and points uploads and logs at the `argos-data` volume
+(`/data/files`, `/data/logs`). The app image runs **PHP 8.5**.
+
+New environment variables:
+
+| Variable | Required | Default | Purpose |
+|---|---|---|---|
+| `ARGOS_REVERB_APP_SECRET` | **yes** | — | Secret of the Reverb realtime server. Fresh installs and the installer's update mode generate it; add a random value by hand otherwise. |
+| `ARGOS_REVERB_APP_KEY` | no | `argos` | Reverb app key. |
+| `ARGOS_FEEDBACK_URL` | no | *(empty: upstream issue chooser)* | Where *Send feedback* leads; a GitHub/GitLab `…/issues/new` link is prefilled. |
+| `ARGOS_ACCESS_LINK_HOURS` | no | `72` | Validity of access links (set/reset a password without mail). |
+| `LOG_LEVEL` | no | `info` | Log level of app, queue, scheduler and Reverb (was `debug`). |
+| `ARGOS_WORKSPACE_COLLABORATION`, `ARGOS_WORKSPACE_MAX_ACTIVE`, `ARGOS_WORKSPACE_IDLE_MINUTES`, `ARGOS_WORKSPACE_CPUS`, `ARGOS_WORKSPACE_MEMORY`, `ARGOS_WORKSPACE_EDITOR_COOKIE_HOURS`, `ARGOS_WORKSPACE_PR_SYNC_MINUTES`, `ARGOS_WORKSPACE_UPLOAD_MAX_MB`, `ARGOS_OPENVSCODE_VERSION` | no | see [Configuration](docs/CONFIGURATION.md) | Workspace limits and timings. |
+| `ARGOS_AUTO_PLAN`, `ARGOS_AUTO_SHIP`, `ARGOS_AUTO_MAX_FIX_ROUNDS`, `ARGOS_AUTO_MAX_TURNS`, `ARGOS_AUTO_MAX_COST_USD`, `ARGOS_AUTO_MAX_MINUTES` | no | see [Configuration](docs/CONFIGURATION.md) | Defaults for automatic tasks. |
+
+No longer read: `ARGOS_MEM_LIMIT`, `ARGOS_CPU_LIMIT` (now `ARGOS_WORKSPACE_MEMORY` / `ARGOS_WORKSPACE_CPUS`), `ARGOS_PREVIEW_BASIC_PASSWORD`, `ARGOS_CONCEPT_MAX_TURNS_DEFAULT`, `ARGOS_MAX_TURNS_DEFAULT`, `MEDIA_DISK`, `SEED_CODEX_AUTH_JSON_B64` — remove them from `.env`.
+
+Colleagues join through **Administration → Users** with an access link (see [Adding colleagues](docs/SETUP.md#adding-colleagues)); the bootstrap admin `admin@argos.local` is only created on an empty user table.
 
 ## [0.3.0-beta.1] - 2026-06-19
 

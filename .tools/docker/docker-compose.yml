@@ -59,7 +59,6 @@ x-workspace-env: &workspace-env
   ARGOS_AUTO_MAX_TURNS:                "${ARGOS_AUTO_MAX_TURNS:-}"
   ARGOS_AUTO_MAX_COST_USD:             "${ARGOS_AUTO_MAX_COST_USD:-}"
   ARGOS_AUTO_MAX_MINUTES:              "${ARGOS_AUTO_MAX_MINUTES:-}"
-  ARGOS_AUTO_CLEANUP_DAYS:             "${ARGOS_AUTO_CLEANUP_DAYS:-}"
 
 # Live-Demo (P6) preview settings — shared verbatim by app + queue (the queue
 # worker runs DeployDemoJob, the app warms the runtime image). Listed via an
