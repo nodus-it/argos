@@ -718,11 +718,27 @@ a.wf-ref-chip:hover { text-decoration: underline; }
 .wf-branch-stats strong { color: var(--wf-text); font-weight: 600; }
 .wf-section-actions { display: inline-flex; align-items: center; gap: 10px; }
 .wf-env { padding: 8px 10px; }
-@media (min-width: 1101px) {
-  .wf-gates { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .wf-gates .wf-gate-item + .wf-gate-item { border-top: 0; }
-  .wf-gates .wf-gate-item:nth-child(n + 3) { border-top: 1px solid var(--wf-border); }
-  .wf-gates .wf-gate-item:nth-child(even) { border-left: 1px solid var(--wf-border); }
-  .wf-gates .wf-gate { padding: 7px 10px; min-height: 0; }
-  .wf-gates .wf-gate-chev { display: none; }
-}
+
+/* Environment: VS Code and preview side by side. */
+.wf-env-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.wf-env-tile { gap: 4px; padding: 10px; min-width: 0; }
+.wf-env-tile.is-wide { grid-column: 1 / -1; }
+.wf-env-tile .wf-env-row { gap: 6px; }
+.wf-env-tile .wf-env-name { font-size: 13.5px; }
+.wf-env-tile .wf-env-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wf-env-tile .wf-env-state { flex: 1; min-width: 0; }
+.wf-env-open { flex: none; }
+.wf-env-actions { display: inline-flex; align-items: center; gap: 0; margin-left: auto; }
+.wf-env-actions .wf-icon-btn-sm { width: 24px; height: 24px; }
+
+/* Branch & pull request in one section. */
+.wf-pr-sub { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; font-size: 12.5px; font-weight: 600; color: var(--wf-text); }
+.wf-pr-sub-title { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+
+/* Quality gates as chips that wrap. */
+.wf-gates.wf-card { display: flex; flex-wrap: wrap; gap: 6px; padding: 0; border: 0; background: none; }
+.wf-gates .wf-gate-item, .wf-gates .wf-gate-item + .wf-gate-item { border: 0; }
+.wf-gates .wf-gate { width: auto; min-height: 32px; padding: 5px 10px; gap: 6px; border: 1px solid var(--wf-border); border-radius: 999px; background: var(--wf-surface); font-size: 12.5px; }
+.wf-gates .wf-gate:hover { background: var(--wf-raised); }
+.wf-gates .wf-gate-chev { display: none; }
+.wf-gates .wf-gate-state:not(.is-fail):not(.is-running) { display: none; }

@@ -13,30 +13,32 @@
 
     <section class="wf-section" x-data="{ ...argosFold('env') }" :class="{ 'is-folded': !open }">
         <h2 class="wf-section-h"><button type="button" class="wf-section-title wf-fold-btn" x-on:click="toggleFold()" :aria-expanded="open"><x-wf.icon name="chevron-right" :size="12" :stroke="2.4" class="wf-fold-chev" />{{ __('workspaces.focus.environment') }}</button></h2>
-        <div class="wf-env">
-            <div class="wf-env-row">
-                <span class="wf-env-icon"><x-wf.icon name="code" :size="18" /></span>
-                <span class="wf-env-text">
+        <div class="wf-env-grid">
+            <div class="wf-env wf-env-tile">
+                <div class="wf-env-row">
+                    <span class="wf-env-icon"><x-wf.icon name="code" :size="16" /></span>
                     <span class="wf-env-name">VS Code</span>
+                    @if ($canEdit && $running)
+                        <a class="wf-btn wf-btn-sm wf-btn-soft wf-env-open" href="{{ route('workspaces.open', ['workspace' => $workspace, 'target' => 'code'] + ($task !== null ? ['task' => $task->id] : [])) }}" target="argos-code-{{ $workspace->slug }}">{{ __('workspaces.tabs.open') }}</a>
+                    @endif
+                </div>
+                <div class="wf-env-row">
                     @if (! $canEdit)
                         <span class="wf-env-state">{{ __('workspaces.focus.code_viewer') }}</span>
                     @else
                         <span @class(['wf-env-state', 'is-ok' => $running])>{{ $running ? __('workspaces.focus.code_ready') : __('workspaces.focus.code_off') }}</span>
                     @endif
-                </span>
-                @if ($canEdit && $running)
-                    <a class="wf-btn wf-btn-sm wf-btn-soft" href="{{ route('workspaces.open', ['workspace' => $workspace, 'target' => 'code'] + ($task !== null ? ['task' => $task->id] : [])) }}" target="argos-code-{{ $workspace->slug }}">{{ __('workspaces.tabs.open') }}</a>
-                @endif
+                </div>
             </div>
+            @if ($task !== null)
+                @livewire('workspace.preview-panel', ['workspaceId' => $workspace->id, 'taskId' => $task->id], key('preview-'.$task->id))
+            @endif
         </div>
-        @if ($task !== null)
-            @livewire('workspace.preview-panel', ['workspaceId' => $workspace->id, 'taskId' => $task->id], key('preview-'.$task->id))
-        @endif
     </section>
 
     @if ($task !== null)
-    <section class="wf-section" x-data="{ ...argosFold('branch') }" :class="{ 'is-folded': !open }">
-        <h2 class="wf-section-h"><button type="button" class="wf-section-title wf-fold-btn" x-on:click="toggleFold()" :aria-expanded="open"><x-wf.icon name="chevron-right" :size="12" :stroke="2.4" class="wf-fold-chev" />{{ __('workspaces.focus.branch') }}</button></h2>
+    <section class="wf-section wf-pr" x-data="{ ...argosFold('branch') }" :class="{ 'is-folded': !open }">
+        <h2 class="wf-section-h"><button type="button" class="wf-section-title wf-fold-btn" x-on:click="toggleFold()" :aria-expanded="open"><x-wf.icon name="chevron-right" :size="12" :stroke="2.4" class="wf-fold-chev" />{{ __('workspaces.focus.branch') }}@if ($task->pr_number !== null) & {{ __('workspaces.pr.title') }}@endif</button></h2>
         <div class="wf-card wf-branch">
             <span class="mono wf-branch-name" title="{{ $task->branch }} → {{ $task->base_branch }}">{{ $task->branch }} <span class="wf-muted">→ {{ $task->base_branch }}</span></span>
             <div class="wf-branch-stats">
@@ -55,19 +57,15 @@
                 </div>
             @endif
         </div>
-    </section>
-    @endif
-
-    @if ($task?->pr_number !== null)
-    @php
+        @if ($task->pr_number !== null)
+        @php
         $checks = $pr?->checks['state'] ?? ($task->pr_checks['state'] ?? 'none');
         $review = $pr?->reviewState ?? $task->pr_review_state;
         $prState = $pr?->state ?? $task->pr_state;
         $open = in_array($prState, ['open', 'draft'], true);
-    @endphp
-    <section class="wf-section wf-pr" data-testid="pr-section" x-data="{ ...argosFold('pr') }" :class="{ 'is-folded': !open }">
-        <div class="wf-section-head">
-            <h2 class="wf-section-h"><button type="button" class="wf-section-title wf-fold-btn" x-on:click="toggleFold()" :aria-expanded="open"><x-wf.icon name="chevron-right" :size="12" :stroke="2.4" class="wf-fold-chev" />{{ __('workspaces.pr.title') }} · #{{ $task->pr_number }}@if ($prState) · {{ __('workspaces.pr_state.'.$prState) }}@endif</button></h2>
+        @endphp
+        <div class="wf-pr-sub" data-testid="pr-section">
+            <span class="wf-pr-sub-title"><x-wf.icon name="git-pr" :size="13" :stroke="2" /> {{ __('workspaces.pr.title') }} #{{ $task->pr_number }}@if ($prState) · {{ __('workspaces.pr_state.'.$prState) }}@endif</span>
             <span class="wf-section-actions">
                 @if ($task->pr_url)<a class="wf-text-btn" href="{{ $task->pr_url }}" target="_blank" rel="noopener" title="{{ __('workspaces.pr.open_on_provider') }}">↗</a>@endif
                 <button type="button" class="wf-text-btn" wire:click="prRefresh" wire:loading.attr="disabled" title="{{ __('workspaces.pr.refresh') }}"><x-wf.icon name="refresh" :size="13" :stroke="2" label="{{ __('workspaces.pr.refresh') }}" /></button>
@@ -153,8 +151,10 @@
                 </div>
             @endif
         </div>
+        @endif
     </section>
     @endif
+
 
     <section class="wf-section" x-data="{ ...argosFold('gates') }" :class="{ 'is-folded': !open }">
         <div class="wf-section-head">
