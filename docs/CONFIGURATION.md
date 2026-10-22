@@ -123,7 +123,7 @@ prefix on them. A workspace opts in per service (Settings → Environment).
 
 Live previews of tasks, routed by Traefik under their own subdomain and
 guarded by the workspace gate (members only). On by default at the platform level, but the per-workspace toggle
-(*Enable live demo* / `live_demo_enabled`) is the real gate that opts each workspace in. See [Previews](LIVE-DEMOS.md).
+(*Enable live demo* / `live_demo_enabled`, on for new workspaces) is the real gate per workspace. See [Previews](LIVE-DEMOS.md).
 Base domain + scheme **derive from `APP_URL`** — override only for a demo
 domain different from the app. Requires wildcard DNS `*.<host>` resolving to
 this host (and the Traefik + `argos_edge` preview infra).

@@ -462,7 +462,7 @@ final class WorkspaceForm
                 Toggle::make('live_demo_enabled')
                     ->label(__('projects.fields.live_demo_label'))
                     ->helperText(__('projects.fields.live_demo_helper'))
-                    ->default(false)
+                    ->default(true)
                     ->live(),
 
                 Callout::make(__('projects.fields.live_demo_hint_heading'))

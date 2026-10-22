@@ -70,6 +70,13 @@ class WorkspaceServiceTest extends TestCase
         Event::assertDispatched(WorkspaceCreated::class);
     }
 
+    public function test_new_workspaces_have_previews_on(): void
+    {
+        $workspace = $this->service()->createWorkspace(User::factory()->create(['is_admin' => true]), $this->attributes());
+
+        $this->assertTrue($workspace->fresh()->live_demo_enabled);
+    }
+
     public function test_only_argos_admins_create_workspaces(): void
     {
         $this->expectException(AuthorizationException::class);

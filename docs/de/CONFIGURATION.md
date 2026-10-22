@@ -126,8 +126,8 @@ eigenen Redis-Präfix. Ein Workspace meldet sich pro Service an
 
 Live-Previews von Aufgaben, geroutet von Traefik unter ihrer eigenen
 Subdomain und geschützt durch das Workspace-Gate (nur Mitglieder). Standardmäßig auf Plattformebene aktiviert, aber der Toggle pro
-Workspace (*Live-Demo aktivieren* / `live_demo_enabled`) ist das eigentliche
-Gate, das jeden Workspace freischaltet. Siehe [Previews](LIVE-DEMOS.md).
+Workspace (*Live-Demo aktivieren* / `live_demo_enabled`, bei neuen Workspaces
+an) ist das eigentliche Gate pro Workspace. Siehe [Previews](LIVE-DEMOS.md).
 Basis-Domain + Schema **leiten sich aus `APP_URL` ab** —
 nur überschreiben für eine Demo-Domain, die sich von der App unterscheidet.
 Erfordert Wildcard-DNS `*.<host>`, das auf diesen Host auflöst (sowie die

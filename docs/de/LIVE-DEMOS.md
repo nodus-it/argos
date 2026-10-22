@@ -40,7 +40,7 @@ Eine Preview ist **kurzlebig** und gehört **zu einer Aufgabe**:
 Eine Aufgabe kann nur dann eine Preview starten, wenn **beides** zutrifft:
 
 1. **Die Live-Demo ist für den Workspace aktiviert** (Einstellungen → Umgebung
-   → *Live-Demo aktivieren*). Siehe
+   → *Live-Demo aktivieren*; bei neuen Workspaces an). Siehe
    [Workspace-Einstellungen](PROJECTS.md#live-demo).
 2. **Previews sind plattformweit aktiviert** (`ARGOS_PREVIEW_ENABLED`,
    standardmäßig an).
