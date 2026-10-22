@@ -14,6 +14,16 @@ export function isUsageLimitMessage(message: string): boolean {
     return LIMIT_PATTERN.test(message);
 }
 
+const AUTH_PATTERN = /authentication_error|oauth token (?:has )?expired|invalid (?:x-)?api.?key|invalid bearer token|token (?:has been )?revoked|please run \/login|api error: 401\b/i;
+
+/**
+ * Whether Claude refused the subscription token (expired, revoked, wrong):
+ * nothing works on this agent until its owner adds a new token.
+ */
+export function isAuthFailureMessage(message: string): boolean {
+    return AUTH_PATTERN.test(message);
+}
+
 /** Convert the SDK's `resetsAt` (epoch seconds) to ISO-8601. */
 export function resetsAtFromEpoch(resetsAt: number | undefined): string | null {
     if (resetsAt === undefined || !Number.isFinite(resetsAt) || resetsAt <= 0) {

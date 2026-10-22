@@ -6,10 +6,12 @@ namespace App\Services\Workspace;
 
 use App\Enums\TaskEventType;
 use App\Enums\TaskStatus;
+use App\Integrations\WorkspaceDaemon\DaemonTransportException;
 use App\Integrations\WorkspaceDaemon\WorkspaceDaemonTransport;
 use App\Models\Task;
 use App\Models\TaskEvent;
 use App\Models\User;
+use App\Services\Credentials\AgentCredentialService;
 use App\Services\Git\WorkspaceDiffService;
 use App\Services\GitProvider\GitServiceFactory;
 use App\Services\GitProvider\PullRequestInfo;
@@ -266,15 +268,23 @@ class WorkspaceShipService
             return [];
         }
 
-        $result = $api->oneshot([
-            'agent_id' => $agent->id,
-            'oauth_token' => $agent->oauthToken(),
-            // Alias: always the newest Haiku the subscription offers.
-            'model' => 'haiku',
-            'system_prompt' => (string) file_get_contents(base_path("worker/prompts/{$name}.system.md")),
-            'user_prompt' => $userPrompt,
-            'json_schema' => json_decode((string) file_get_contents(base_path("worker/schemas/{$name}.schema.json")), true),
-        ]);
+        try {
+            $result = $api->oneshot([
+                'agent_id' => $agent->id,
+                'oauth_token' => $agent->oauthToken(),
+                // Alias: always the newest Haiku the subscription offers.
+                'model' => 'haiku',
+                'system_prompt' => (string) file_get_contents(base_path("worker/prompts/{$name}.system.md")),
+                'user_prompt' => $userPrompt,
+                'json_schema' => json_decode((string) file_get_contents(base_path("worker/schemas/{$name}.schema.json")), true),
+            ]);
+        } catch (DaemonTransportException $e) {
+            if ($e->errorCode === 'agent_auth_failed') {
+                app(AgentCredentialService::class)->markExpired($agent);
+            }
+
+            throw $e;
+        }
 
         return is_array($result['structured']) ? $result['structured'] : [];
     }

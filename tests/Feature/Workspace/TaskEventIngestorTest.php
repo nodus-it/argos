@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Workspace;
 
 use App\Broadcasting\TaskStream;
+use App\Enums\AgentCredentialStatus;
 use App\Enums\ApprovalStatus;
 use App\Enums\SessionStatus;
 use App\Enums\TaskEventType;
@@ -166,5 +167,13 @@ class TaskEventIngestorTest extends TestCase
 
         $this->assertSame([$this->task->id => 1], $acks);
         $this->assertSame([], $this->types());
+    }
+
+    public function test_a_refused_token_marks_the_agent_expired(): void
+    {
+        $this->ingest([['error', ['code' => 'auth_failed', 'message' => 'API Error: 401 authentication_error']]]);
+
+        $this->assertSame(AgentCredentialStatus::Expired, $this->task->agentCredential->fresh()->status);
+        $this->assertSame('auth_failed', TaskEvent::query()->where('task_id', $this->task->id)->latest('id')->first()->payload['code']);
     }
 }

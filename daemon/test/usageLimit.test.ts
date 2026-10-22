@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { extractResetAt, isUsageLimitMessage, resetsAtFromEpoch } from '../src/usageLimit.js';
+import { extractResetAt, isAuthFailureMessage, isUsageLimitMessage, resetsAtFromEpoch } from '../src/usageLimit.js';
 
 describe('usage limit detection', () => {
     it.each([
@@ -32,5 +32,12 @@ describe('usage limit detection', () => {
     it('converts SDK epoch seconds', () => {
         expect(resetsAtFromEpoch(1_792_000_000)).toBe(new Date(1_792_000_000_000).toISOString().replace('.000', ''));
         expect(resetsAtFromEpoch(undefined)).toBeNull();
+    });
+
+    it('recognizes a refused subscription token', () => {
+        expect(isAuthFailureMessage('API Error: 401 {"type":"error","error":{"type":"authentication_error","message":"OAuth token has expired."}}')).toBe(true);
+        expect(isAuthFailureMessage('Invalid API key · Please run /login')).toBe(true);
+        expect(isAuthFailureMessage("You've hit your limit · resets 9pm (UTC)")).toBe(false);
+        expect(isAuthFailureMessage('ENOENT: no such file')).toBe(false);
     });
 });

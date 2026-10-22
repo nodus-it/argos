@@ -364,6 +364,18 @@ describe('TaskSession', () => {
         expect(ofType('user.dropped').map((e) => e.data.client_msg_ids)).toEqual([['m2']]);
     });
 
+    it('reports a refused token as auth_failed', async () => {
+        const refused: Script = async function* () {
+            throw new Error('API Error: 401 {"type":"error","error":{"type":"authentication_error","message":"OAuth token has expired."}}');
+        };
+        const { session } = make(refused);
+        session.start();
+        session.send({ clientMsgId: 'm1', author: { id: 1, name: 'A' }, text: 'go' });
+
+        await waitFor(() => session.currentState === 'closed');
+        expect(ofType('error')[0]!.data.code).toBe('auth_failed');
+    });
+
     it('forwards permission mode and model changes', async () => {
         const { session, queries } = make(echo);
         session.start();

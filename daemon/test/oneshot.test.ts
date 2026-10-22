@@ -51,6 +51,18 @@ describe('runOneshot', () => {
         expect(result.structured).toEqual({ subject: 'fix: y', body: 'b' });
     });
 
+    it('flags a refused subscription token so the manager can mark the agent', async () => {
+        const throwing: OneshotRunner = () =>
+            (async function* () {
+                throw new Error('API Error: 401 authentication_error: OAuth token has expired');
+            })();
+
+        await expect(runOneshot(throwing, params, env())).rejects.toMatchObject({ code: 'agent_auth_failed' });
+        await expect(
+            runOneshot(runnerReturning([{ type: 'result', subtype: 'error_during_execution', is_error: true, errors: ['Invalid API key · Please run /login'] }]), params, env()),
+        ).rejects.toMatchObject({ code: 'agent_auth_failed' });
+    });
+
     it('raises on error results or no result', async () => {
         await expect(runOneshot(runnerReturning([{ type: 'result', subtype: 'error_max_turns', is_error: true, errors: ['too long'] }]), params, env())).rejects.toBeInstanceOf(OneshotError);
         await expect(runOneshot(runnerReturning([]), params, env())).rejects.toThrow('no result');

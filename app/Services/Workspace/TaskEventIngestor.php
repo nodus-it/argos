@@ -15,6 +15,7 @@ use App\Models\Task;
 use App\Models\TaskApproval;
 use App\Models\TaskEvent;
 use App\Models\Workspace;
+use App\Services\Credentials\AgentCredentialService;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Throwable;
@@ -186,9 +187,12 @@ class TaskEventIngestor
                     : null,
                 'usage_limit' => $this->notifier->notify($workspace, $task, 'limit',
                     __('workspaces.notifications.limit', ['agent' => $task->agentCredential?->name ?? '']), $task->title),
-                'error' => ($data['code'] ?? '') === 'session_ended'
-                    ? null
-                    : $this->notifier->notify($workspace, $task, 'error', __('workspaces.notifications.error'), (string) ($data['message'] ?? '')),
+                'error' => match ($data['code'] ?? '') {
+                    'session_ended' => null,
+                    'auth_failed' => $this->notifier->notify($workspace, $task, 'error', __('workspaces.notifications.error'),
+                        __('workspaces.errors.agent_auth_failed', ['agent' => $task->agentCredential?->name ?? ''])),
+                    default => $this->notifier->notify($workspace, $task, 'error', __('workspaces.notifications.error'), (string) ($data['message'] ?? '')),
+                },
                 default => null,
             };
             $statusChanged = $statusChanged || $event['type'] === 'status';
@@ -300,6 +304,10 @@ class TaskEventIngestor
                 return $this->persist($task, TaskEventType::UsageLimit, $data, $seq, $broadcast);
 
             case 'error':
+                if (($data['code'] ?? '') === 'auth_failed' && $task->agentCredential instanceof AgentCredential) {
+                    app(AgentCredentialService::class)->markExpired($task->agentCredential);
+                }
+
                 return $this->persist($task, TaskEventType::Error, $data, $seq, $broadcast);
 
             case 'prepare.step':

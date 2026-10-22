@@ -7,7 +7,7 @@ import { guardDecision, type GuardMode } from './guard.js';
 import { InputQueue } from './inputQueue.js';
 import { taskEnv } from './layout.js';
 import { mapCommands, mapModels, Normalizer, type SdkMessageLike } from './normalize.js';
-import { extractResetAt, isUsageLimitMessage } from './usageLimit.js';
+import { extractResetAt, isAuthFailureMessage, isUsageLimitMessage } from './usageLimit.js';
 
 /** The parts of the SDK's `Query` the session relies on. */
 export interface QueryLike extends AsyncIterable<SdkMessageLike> {
@@ -296,7 +296,8 @@ export class TaskSession {
         if (isUsageLimitMessage(detail)) {
             this.emit({ type: 'usage_limit', data: { resets_at: extractResetAt(detail) } });
         }
-        this.emit({ type: 'error', data: { code: failure === null ? 'session_ended' : 'session_failed', message: detail.slice(0, 4000) } });
+        const code = failure === null ? 'session_ended' : isAuthFailureMessage(detail) ? 'auth_failed' : 'session_failed';
+        this.emit({ type: 'error', data: { code, message: detail.slice(0, 4000) } });
         // A closed session is never relaunched: the HTTP layer starts a new one.
         this.dropQueued();
         this.setState('closed');

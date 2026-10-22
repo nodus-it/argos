@@ -1,6 +1,7 @@
 import type { Options } from '@anthropic-ai/claude-agent-sdk';
 import { isolatedOptions, type SessionEnvironment } from './claudeEnv.js';
 import { CodedError } from './errors.js';
+import { isAuthFailureMessage } from './usageLimit.js';
 import type { SdkMessageLike } from './normalize.js';
 
 /** Runs a single, tool-less prompt (e.g. a commit message). */
@@ -23,7 +24,8 @@ export interface OneshotResult {
 
 export class OneshotError extends CodedError {
     constructor(message: string) {
-        super(502, 'oneshot_failed', message);
+        // A refused subscription token gets its own code: the manager marks the agent expired.
+        super(502, isAuthFailureMessage(message) ? 'agent_auth_failed' : 'oneshot_failed', message);
     }
 }
 
@@ -49,10 +51,14 @@ export async function runOneshot(
     }
 
     let result: SdkMessageLike | null = null;
-    for await (const message of runner({ prompt: params.userPrompt, options })) {
-        if (message.type === 'result') {
-            result = message;
+    try {
+        for await (const message of runner({ prompt: params.userPrompt, options })) {
+            if (message.type === 'result') {
+                result = message;
+            }
         }
+    } catch (error) {
+        throw new OneshotError(error instanceof Error ? error.message : String(error));
     }
 
     if (result === null) {

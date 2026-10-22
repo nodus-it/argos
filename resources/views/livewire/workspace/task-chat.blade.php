@@ -316,7 +316,13 @@
                                     @case (TaskEventType::Error)
                                         <div class="ag-note-row is-error" wire:key="ev-{{ $event->id }}">
                                             <x-ag.icon name="alert" :size="15" :stroke="2" />
-                                            <span>{{ $p['message'] ?? __('workspaces.events.error') }}</span>
+                                            @if (($p['code'] ?? '') === 'auth_failed')
+                                                {{-- Claude refused the subscription token: say what to do, not the raw API error. --}}
+                                                <span>{{ __('workspaces.errors.agent_auth_failed', ['agent' => $task->agentCredential?->name ?? '']) }}
+                                                    <a href="{{ \App\Filament\App\Clusters\Account\Resources\AgentCredentialResource::getUrl('index', panel: 'app') }}">{{ __('workspaces.notifications.agent_renew') }}</a></span>
+                                            @else
+                                                <span>{{ $p['message'] ?? __('workspaces.events.error') }}</span>
+                                            @endif
                                         </div>
                                         @break
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Filament\Admin\Resources;
 
+use App\Enums\AgentCredentialStatus;
 use App\Enums\AgentName;
 use App\Filament\App\Clusters\Account\Resources\AgentCredentialResource\Pages\CreateAgentCredential;
 use App\Filament\App\Clusters\Account\Resources\AgentCredentialResource\Pages\EditAgentCredential;
@@ -11,6 +12,7 @@ use App\Filament\App\Clusters\Account\Resources\AgentCredentialResource\Pages\Li
 use App\Models\AgentCredential;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Services\Credentials\AgentCredentialService;
 use App\Services\Credentials\CredentialVerification;
 use App\Services\Credentials\CredentialVerifier;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -92,5 +94,25 @@ class AgentCredentialScopingTest extends TestCase
         $agent->refresh();
         $this->assertSame($owner->id, $agent->user_id);
         $this->assertSame(3, $agent->max_concurrent_sessions);
+    }
+
+    public function test_a_refused_token_takes_the_agent_out_and_a_new_token_brings_it_back(): void
+    {
+        $me = User::factory()->create();
+        $agent = AgentCredential::factory()->ownedBy($me)->create(['credentials' => ['token' => 'oat-old']]);
+
+        app(AgentCredentialService::class)->markExpired($agent);
+        app(AgentCredentialService::class)->markExpired($agent);
+
+        $this->assertSame(AgentCredentialStatus::Expired, $agent->fresh()->status);
+        $this->assertSame(1, $me->notifications()->count());
+
+        $this->actingAs($me);
+        Livewire::test(EditAgentCredential::class, ['record' => $agent->getKey()])
+            ->fillForm(['credentials.token' => 'oat-new'])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $this->assertSame(AgentCredentialStatus::Active, $agent->fresh()->status);
     }
 }
