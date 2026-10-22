@@ -105,9 +105,18 @@ class ContextPanel extends Component
         $this->prAction(fn (PullRequestService $pr, Task $task) => $pr->fixChecks($task, $this->user()));
     }
 
-    public function prSendReview(): void
+    /** "Collect in my review": the pull request's comments join the person's own review. */
+    public function prCollect(): void
     {
-        $this->prAction(fn (PullRequestService $pr, Task $task) => $pr->sendReview($task, $this->user()));
+        $this->prAction(function (PullRequestService $pr, Task $task): void {
+            $result = $pr->collect($task, $this->user());
+            if ($result['general'] !== []) {
+                $this->dispatch('composer-append', text: PullRequestService::generalText($result['general']));
+            }
+            $this->dispatch('review-comments-changed');
+            Notification::make()->title(trans_choice('workspaces.review.collected_count', $result['collected'], ['count' => $result['collected']]))->success()->send();
+            $this->js("window.dispatchEvent(new CustomEvent('review-open', { detail: { file: null } }))");
+        });
     }
 
     public function prRebase(): void
@@ -170,6 +179,7 @@ class ContextPanel extends Component
             'running' => $workspace->status === WorkspaceStatus::Running,
             'pr' => $task?->pr_number !== null ? app(PullRequestService::class)->details($task) : null,
             'feedback' => $task?->pr_number !== null ? app(PullRequestService::class)->feedback($task) : ['reviews' => [], 'comments' => []],
+            'collectedIds' => $task?->pr_number !== null ? app(PullRequestService::class)->collectedIds($task, $this->user()) : [],
             'canShip' => $task !== null && $this->user()->can('ship', $task),
             // Bitbucket has no native auto-merge.
             'autoMergeSupported' => $workspace->platform !== GitProvider::Bitbucket,

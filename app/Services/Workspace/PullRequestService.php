@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Services\Workspace;
 
+use App\Enums\ReviewCommentStatus;
 use App\Enums\TaskStatus;
+use App\Models\ReviewComment;
 use App\Models\Task;
 use App\Models\User;
 use App\Services\GitProvider\GitServiceFactory;
@@ -197,14 +199,67 @@ class PullRequestService
         $this->tasks->send($task, $by, implode("\n", $lines));
     }
 
-    /** Hand one review comment to Claude (from the review mode). */
-    public function sendComment(Task $task, User $by, string $commentId): void
+    /**
+     * Take pull request comments over into the person's own review (all,
+     * or one): line comments become drafts at their line — collected with
+     * one's own and sent to Claude together. Comments already taken over
+     * are skipped; general comments (no line) come back for the composer.
+     *
+     * @return array{collected: int, general: list<array{id: string, author: string, body: string, path: ?string, line: ?int, url: ?string, created_at: ?string}>}
+     */
+    public function collect(Task $task, User $by, ?string $commentId = null): array
     {
         Gate::forUser($by)->authorize('prompt', $task);
-        $comment = collect($this->feedback($task)['comments'])->firstWhere('id', $commentId)
-            ?? throw WorkspaceException::translated('workspaces.pr.no_review');
+        $comments = collect($this->feedback($task)['comments'])
+            ->when($commentId !== null, fn ($c) => $c->where('id', $commentId))
+            ->reject(fn (array $c): bool => in_array($c['id'], $this->collectedIds($task, $by), true));
 
-        $this->tasks->send($task, $by, __('workspaces.pr.comment_prompt', ['url' => (string) ($comment['url'] ?? $task->pr_url)])."\n".self::commentLine($comment));
+        $daemon = app(WorkspaceDaemonClient::class)->for($task->workspace, 15);
+        $files = [];
+        $collected = 0;
+        foreach ($comments->filter(fn (array $c): bool => $c['path'] !== null && $c['line'] !== null) as $comment) {
+            try {
+                $files[$comment['path']] ??= self::numbered((string) $daemon->fileContent($task->slug, $comment['path'])['content']);
+            } catch (Throwable) {
+                $files[$comment['path']] = [];
+            }
+            app(ReviewCommentService::class)->add($task, $by, $comment['path'], 'new', (int) $comment['line'], (int) $comment['line'], $comment['body'], $files[$comment['path']],
+                ['id' => $comment['id'], 'author' => $comment['author'], 'url' => $comment['url']]);
+            $collected++;
+        }
+
+        return ['collected' => $collected, 'general' => $comments->filter(fn (array $c): bool => $c['path'] === null || $c['line'] === null)->values()->all()];
+    }
+
+    /**
+     * Ids of pull request comments the person already took over (drafts or sent).
+     *
+     * @return list<string>
+     */
+    public function collectedIds(Task $task, User $user): array
+    {
+        return ReviewComment::query()
+            ->where('task_id', $task->id)
+            ->where('user_id', $user->id)
+            ->whereNotNull('source_id')
+            ->where('status', '!=', ReviewCommentStatus::Discarded->value)
+            ->pluck('source_id')->all();
+    }
+
+    /** General comments as text for the composer (they have no line to sit on). */
+    public static function generalText(array $comments): string
+    {
+        return implode("\n", array_map(fn (array $c): string => __('workspaces.review.from_pr', ['name' => $c['author']]).' '.trim($c['body']), $comments));
+    }
+
+    /**
+     * @return array<int, string> line number => text
+     */
+    private static function numbered(string $content): array
+    {
+        $lines = explode("\n", $content);
+
+        return array_combine(range(1, count($lines)), $lines);
     }
 
     /** Marks comments Argos writes on pull requests, so they are not read back as review. */

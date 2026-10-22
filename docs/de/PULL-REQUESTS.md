@@ -63,10 +63,27 @@ die Aufgabe:
 ## Reviews und Review-Kommentare
 
 Die Zeile **Reviews** zeigt den Gesamtstand der Reviews: *freigegeben*,
-*Änderungen gewünscht*, *kommentiert* oder *Noch keine Reviews.* Gibt es
-Reviews oder Review-Kommentare, schreibt **Review an Claude geben** sie in die
-Aufgabe — jedes Review mit Autor oder Autorin, Zustand und Text, jeden
-Zeilen-Kommentar mit Autor oder Autorin, Datei und Zeile.
+*Änderungen gewünscht*, *kommentiert* oder *Noch keine Reviews.* Darunter
+klappt *N Review-Kommentare* auf, was im Review geschrieben wurde: Reviews mit
+Text, Zeilen-Kommentare (Datei und Zeile öffnen den Review-Modus) und
+allgemeine Kommentare, jeweils mit Link zum Anbieter. Argos' eigene
+Kommentare im Pull Request (gepushte Commits) bleiben außen vor.
+
+**In mein Review übernehmen** holt die Kommentare in dein eigenes Review, damit
+sie zusammen mit deinen eigenen Zeilen-Kommentaren in einer Nachricht an
+Claude gehen:
+
+- Zeilen-Kommentare werden Entwürfe an ihrer Zeile, markiert mit *(Name im
+  Pull Request)*. Im Review-Modus stehen sie im Diff wie deine eigenen
+  Kommentare — vor dem Senden kannst du sie bearbeiten oder verwerfen.
+- Allgemeine Kommentare (ohne Zeile) landen im Nachrichtentext im
+  Eingabefeld.
+- Ein Kommentar wird nur einmal übernommen; die Seitenleiste markiert ihn mit
+  *In deinem Review*.
+
+Im Review-Modus hat außerdem jeder Kommentar aus dem Pull Request einen eigenen
+Knopf **Ins Review übernehmen**. Kommentare zu Zeilen, die der Diff nicht
+zeigt, stehen oberhalb der Datei.
 
 ## Konflikte und ein weitergelaufener Basis-Branch
 

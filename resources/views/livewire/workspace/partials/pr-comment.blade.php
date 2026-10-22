@@ -10,7 +10,7 @@
             <span class="wf-spacer"></span>
             @if (! empty($prComment['url']))<a class="wf-link" href="{{ $prComment['url'] }}" target="_blank" rel="noopener" title="{{ __('workspaces.pr.open_on_provider') }}">↗</a>@endif
             @if ($canWrite)
-                <button type="button" class="wf-annot-btn" wire:click="sendPrComment(@js($prComment['id']))">{{ __('workspaces.pr.send_comment') }}</button>
+                <button type="button" class="wf-annot-btn" wire:click="collectPrComment(@js($prComment['id']))">{{ __('workspaces.review.collect') }}</button>
             @endif
         </div>
         <div class="wf-dnote-body wf-md ws-md prose">{{ \App\Support\TaskEventFormatter::markdown($prComment['body']) }}</div>

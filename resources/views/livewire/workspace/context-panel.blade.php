@@ -11,8 +11,8 @@
      x-on:argos-gates-updated.window="$wire.$refresh()"
      @if ($gateRun?->status === \App\Enums\GateRunStatus::Running) wire:poll.10s @endif>
 
-    <section class="wf-section">
-        <h2 class="wf-section-title">{{ __('workspaces.focus.environment') }}</h2>
+    <section class="wf-section" x-data="{ ...argosFold('env') }" :class="{ 'is-folded': !open }">
+        <h2 class="wf-section-h"><button type="button" class="wf-section-title wf-fold-btn" x-on:click="toggleFold()" :aria-expanded="open"><x-wf.icon name="chevron-right" :size="12" :stroke="2.4" class="wf-fold-chev" />{{ __('workspaces.focus.environment') }}</button></h2>
         <div class="wf-env">
             <div class="wf-env-row">
                 <span class="wf-env-icon"><x-wf.icon name="code" :size="18" /></span>
@@ -35,8 +35,8 @@
     </section>
 
     @if ($task !== null)
-    <section class="wf-section">
-        <h2 class="wf-section-title">{{ __('workspaces.focus.branch') }}</h2>
+    <section class="wf-section" x-data="{ ...argosFold('branch') }" :class="{ 'is-folded': !open }">
+        <h2 class="wf-section-h"><button type="button" class="wf-section-title wf-fold-btn" x-on:click="toggleFold()" :aria-expanded="open"><x-wf.icon name="chevron-right" :size="12" :stroke="2.4" class="wf-fold-chev" />{{ __('workspaces.focus.branch') }}</button></h2>
         <div class="wf-card wf-branch">
             <span class="mono wf-branch-name">{{ $task->branch }}</span>
             <span class="wf-muted">→ {{ $task->base_branch }} · {{ $workspace->name }}</span>
@@ -67,9 +67,9 @@
         $prState = $pr?->state ?? $task->pr_state;
         $open = in_array($prState, ['open', 'draft'], true);
     @endphp
-    <section class="wf-section wf-pr" data-testid="pr-section">
+    <section class="wf-section wf-pr" data-testid="pr-section" x-data="{ ...argosFold('pr') }" :class="{ 'is-folded': !open }">
         <div class="wf-section-head">
-            <h2 class="wf-section-title">{{ __('workspaces.pr.title') }} · #{{ $task->pr_number }}@if ($prState) · {{ __('workspaces.pr_state.'.$prState) }}@endif</h2>
+            <h2 class="wf-section-h"><button type="button" class="wf-section-title wf-fold-btn" x-on:click="toggleFold()" :aria-expanded="open"><x-wf.icon name="chevron-right" :size="12" :stroke="2.4" class="wf-fold-chev" />{{ __('workspaces.pr.title') }} · #{{ $task->pr_number }}@if ($prState) · {{ __('workspaces.pr_state.'.$prState) }}@endif</button></h2>
             <button type="button" class="wf-text-btn" wire:click="prRefresh" wire:loading.attr="disabled">{{ __('workspaces.pr.refresh') }}</button>
         </div>
         <div class="wf-card wf-pr-card">
@@ -92,7 +92,13 @@
                 <span class="wf-muted">{{ $review !== null ? __('workspaces.pr.review_state.'.$review) : __('workspaces.pr.no_reviews_yet') }}</span>
             </div>
             @if ($feedback['reviews'] !== [] || $feedback['comments'] !== [])
-                <ul class="wf-pr-feedback" data-testid="pr-feedback">
+                @php $feedbackCount = count($feedback['comments']) + collect($feedback['reviews'])->filter(fn ($r) => trim($r['body']) !== '')->count(); @endphp
+                <div x-data="{ ...argosFold('pr-feedback', false) }">
+                <button type="button" class="wf-text-btn wf-fold-btn" x-on:click="toggleFold()" :aria-expanded="open">
+                    <x-wf.icon name="chevron-right" :size="12" :stroke="2.4" class="wf-fold-chev" x-bind:class="{ 'is-open': open }" />
+                    {{ trans_choice('workspaces.pr.feedback_count', $feedbackCount, ['count' => $feedbackCount]) }}
+                </button>
+                <ul class="wf-pr-feedback" data-testid="pr-feedback" x-show="open" x-cloak>
                     @foreach ($feedback['reviews'] as $review)
                         @if (trim($review['body']) !== '')
                             <li class="wf-pr-fb">
@@ -111,13 +117,15 @@
                                     <span class="wf-muted">· {{ __('workspaces.pr.general_comment') }}</span>
                                 @endif
                                 @if (! empty($comment['url']))<a class="wf-link" href="{{ $comment['url'] }}" target="_blank" rel="noopener" title="{{ __('workspaces.pr.open_on_provider') }}">↗</a>@endif
+                                @if (in_array($comment['id'], $collectedIds, true))<span class="wf-pill-tag">{{ __('workspaces.review.collected') }}</span>@endif
                             </div>
                             <div class="wf-md ws-md prose wf-pr-fb-body">{{ \App\Support\TaskEventFormatter::markdown($comment['body']) }}</div>
                         </li>
                     @endforeach
                 </ul>
+                </div>
                 @if ($canOperate && $open)
-                    <button type="button" class="wf-btn wf-btn-sm wf-btn-soft" wire:click="prSendReview" wire:loading.attr="disabled">{{ __('workspaces.pr.send_review') }}</button>
+                    <button type="button" class="wf-btn wf-btn-sm wf-btn-soft" wire:click="prCollect" wire:loading.attr="disabled" title="{{ __('workspaces.review.collect_help') }}">{{ __('workspaces.review.collect_all') }}</button>
                 @endif
             @endif
 
@@ -147,9 +155,9 @@
     </section>
     @endif
 
-    <section class="wf-section">
+    <section class="wf-section" x-data="{ ...argosFold('gates') }" :class="{ 'is-folded': !open }">
         <div class="wf-section-head">
-            <h2 class="wf-section-title">{{ __('workspaces.focus.gates') }}</h2>
+            <h2 class="wf-section-h"><button type="button" class="wf-section-title wf-fold-btn" x-on:click="toggleFold()" :aria-expanded="open"><x-wf.icon name="chevron-right" :size="12" :stroke="2.4" class="wf-fold-chev" />{{ __('workspaces.focus.gates') }}</button></h2>
             @if ($canOperate && $running)
                 <button type="button" class="wf-text-btn" wire:click="runGates" wire:loading.attr="disabled" @disabled($gateRun?->status === \App\Enums\GateRunStatus::Running)>{{ __('workspaces.focus.check_all') }}</button>
             @endif
@@ -173,9 +181,9 @@
         @livewire('workspace.gate-detail', ['workspaceId' => $workspace->id], key('gate-detail-'.$workspace->id))
     </section>
 
-    <section class="wf-section" x-data="{ q: '', all: false }">
+    <section class="wf-section" x-data="{ ...argosFold('files'), q: '', all: false }" :class="{ 'is-folded': !open }">
         <div class="wf-section-head">
-            <h2 class="wf-section-title">{{ __('workspaces.focus.changed_files') }}@if ($files !== []) · {{ count($files) + count($generated) }}@endif</h2>
+            <h2 class="wf-section-h"><button type="button" class="wf-section-title wf-fold-btn" x-on:click="toggleFold()" :aria-expanded="open"><x-wf.icon name="chevron-right" :size="12" :stroke="2.4" class="wf-fold-chev" />{{ __('workspaces.focus.changed_files') }}@if ($files !== []) · {{ count($files) + count($generated) }}@endif</button></h2>
             @if (count($files) > 1)
                 <button type="button" class="wf-text-btn" x-on:click="window.dispatchEvent(new CustomEvent('review-open', { detail: { file: null } }))">{{ __('workspaces.tray.review') }}</button>
             @endif

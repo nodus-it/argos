@@ -25,6 +25,9 @@ use Illuminate\Support\Carbon;
  * @property string $anchor_hash
  * @property string $snippet
  * @property string $body
+ * @property string|null $source_id id of the pull request comment it was taken over from
+ * @property string|null $source_author who wrote it on the pull request
+ * @property string|null $source_url
  * @property ReviewCommentStatus $status
  * @property bool $outdated sent anyway although Claude changed the lines since
  * @property Carbon|null $sent_at
@@ -40,7 +43,7 @@ class ReviewComment extends Model
 
     use HasUlids;
 
-    protected $fillable = ['task_id', 'user_id', 'path', 'side', 'line_start', 'line_end', 'anchor_hash', 'snippet', 'body', 'status', 'outdated', 'sent_at'];
+    protected $fillable = ['task_id', 'user_id', 'path', 'side', 'line_start', 'line_end', 'anchor_hash', 'snippet', 'body', 'source_id', 'source_author', 'source_url', 'status', 'outdated', 'sent_at'];
 
     protected function casts(): array
     {

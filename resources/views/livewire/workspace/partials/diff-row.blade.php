@@ -48,6 +48,9 @@
                 <div class="wf-dnote-head">
                     <x-wf.avatar :user="$comment->user" />
                     <strong>{{ __('workspaces.events.you') }}</strong>
+                    @if ($comment->source_author !== null)
+                        <span class="wf-pill-tag" title="{{ $comment->source_url }}">{{ __('workspaces.review.from_pr', ['name' => $comment->source_author]) }}</span>
+                    @endif
                     <span class="wf-muted">{{ $comment->line_end > $comment->line_start ? $comment->location() : __('workspaces.review.in_draft') }}</span>
                     @if ($comment->status === \App\Enums\ReviewCommentStatus::Stale)
                         <span class="wf-tag is-warn">{{ __('workspaces.review.outdated') }}</span>

@@ -697,3 +697,15 @@ a.wf-ref-chip:hover { text-decoration: underline; }
 .wf-pr-fb-body > :last-child { margin-bottom: 0; }
 .wf-dnote.is-pr { border-left: 3px solid var(--wf-info); }
 .wf-dnote.is-pr .wf-dnote-body { white-space: normal; }
+
+/* Folding sidebar sections (argosFold). */
+.wf-section-h { margin: 0; }
+.wf-fold-btn { display: inline-flex; align-items: center; gap: 6px; padding: 0; border: 0; background: none; color: inherit; font-family: inherit; text-align: left; cursor: pointer; }
+.wf-section-title.wf-fold-btn { color: var(--wf-muted); }
+.wf-fold-chev { transition: transform .15s ease; transform: rotate(90deg); }
+.wf-section.is-folded .wf-fold-chev { transform: rotate(0deg); }
+.wf-section.is-folded > :not(.wf-section-head):not(.wf-section-h) { display: none !important; }
+.wf-section.is-folded > .wf-section-head > :not(.wf-section-h) { display: none !important; }
+.wf-pr-card .wf-fold-chev { transform: rotate(0deg); }
+.wf-pr-card .wf-fold-chev.is-open { transform: rotate(90deg); }
+.wf-pr-card .wf-fold-btn { font-size: 12.5px; color: var(--wf-text); }

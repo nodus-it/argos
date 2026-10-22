@@ -27,8 +27,9 @@ class ReviewCommentService
 
     /**
      * @param  array<int, string>  $lines  line number => text, of the side commented on (with context around the range)
+     * @param  array{id: string, author: string, url: ?string}|null  $source  the pull request comment it is taken over from
      */
-    public function add(Task $task, User $user, string $path, string $side, int $start, int $end, string $body, array $lines): ReviewComment
+    public function add(Task $task, User $user, string $path, string $side, int $start, int $end, string $body, array $lines, ?array $source = null): ReviewComment
     {
         Gate::forUser($user)->authorize('prompt', $task);
         [$start, $end] = [min($start, $end), max($start, $end)];
@@ -43,6 +44,9 @@ class ReviewCommentService
             'anchor_hash' => self::anchor($lines, $start, $end),
             'snippet' => self::snippet($lines, $start, $end),
             'body' => mb_substr(trim($body), 0, 10_000),
+            'source_id' => $source['id'] ?? null,
+            'source_author' => $source['author'] ?? null,
+            'source_url' => $source['url'] ?? null,
             'status' => ReviewCommentStatus::Draft,
         ]);
     }
@@ -212,7 +216,7 @@ class ReviewCommentService
                 $code = implode("\n", array_map(fn (string $l): string => '   '.$l, explode("\n", $comment->snippet)));
                 $entries[] = ($i + 1).'. '.$location."\n"
                     .'   ```'.self::language($comment->path)."\n".$code."\n   ```\n"
-                    .'   → '.str_replace("\n", "\n     ", $comment->body);
+                    .'   → '.($comment->source_author !== null ? __('workspaces.review.from_pr', ['name' => $comment->source_author]).' ' : '').str_replace("\n", "\n     ", $comment->body);
             }
             $parts[] = implode("\n", $entries);
         }

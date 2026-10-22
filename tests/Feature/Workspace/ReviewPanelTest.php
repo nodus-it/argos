@@ -195,7 +195,9 @@ class ReviewPanelTest extends TestCase
     public function test_pull_request_review_comments_show_at_their_lines(): void
     {
         $this->app->singleton(WorkspaceDaemonClient::class, FakeWorkspaceDaemon::class);
-        $this->mock(\App\Services\Workspace\PullRequestService::class)->shouldReceive('feedback')->andReturn(['reviews' => [], 'comments' => [
+        $pr = $this->mock(\App\Services\Workspace\PullRequestService::class);
+        $pr->shouldReceive('collectedIds')->andReturn([]);
+        $pr->shouldReceive('feedback')->andReturn(['reviews' => [], 'comments' => [
             ['id' => 'c1', 'author' => 'grace', 'body' => 'Say hello to everyone', 'path' => 'README.md', 'line' => 1, 'url' => 'https://x/c1', 'created_at' => null],
             ['id' => 'c2', 'author' => 'grace', 'body' => 'Old line remark', 'path' => 'README.md', 'line' => 99, 'url' => null, 'created_at' => null],
             ['id' => 'c3', 'author' => 'grace', 'body' => 'Other file', 'path' => 'app/Other.php', 'line' => 1, 'url' => null, 'created_at' => null],
@@ -210,6 +212,6 @@ class ReviewPanelTest extends TestCase
             ->assertSee(__('workspaces.review.pr_comments_outside'))
             ->assertSee('Old line remark')
             ->assertDontSee('Other file')
-            ->assertSee(__('workspaces.pr.send_comment'));
+            ->assertSee(__('workspaces.review.collect'));
     }
 }

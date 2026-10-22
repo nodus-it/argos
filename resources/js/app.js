@@ -1,7 +1,7 @@
 import Echo from 'laravel-echo';
 import Pusher from 'pusher-js';
 import { argosTaskStream } from './workspace/task-stream';
-import { argosReview, argosTaskSwitcher, argosWorkspaceFocus } from './workspace/focus';
+import { argosFold, argosReview, argosTaskSwitcher, argosWorkspaceFocus } from './workspace/focus';
 import { argosGateDetail } from './workspace/gate-log';
 import { listenForWorkspaceSignals } from './workspace/notifications';
 
@@ -11,6 +11,7 @@ window.argosWorkspaceFocus = argosWorkspaceFocus;
 window.argosTaskSwitcher = argosTaskSwitcher;
 window.argosReview = argosReview;
 window.argosGateDetail = argosGateDetail;
+window.argosFold = argosFold;
 
 /**
  * Realtime (Laravel Reverb). The server renders `window.ArgosRealtime` (see

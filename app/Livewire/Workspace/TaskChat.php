@@ -351,6 +351,13 @@ class TaskChat extends Component
         }
     }
 
+    /** Text handed to the composer (e.g. general pull request comments when collecting the review). */
+    #[On('composer-append')]
+    public function appendToDraft(string $text): void
+    {
+        $this->draft = trim($this->draft) === '' ? $text : rtrim($this->draft)."\n\n".$text;
+    }
+
     /** The review panel changed the collection. */
     #[On('review-comments-changed')]
     public function commentsChanged(): void {}

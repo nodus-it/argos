@@ -219,3 +219,32 @@ export function argosReview(labelTemplate) {
         },
     };
 }
+
+/**
+ * A sidebar section that folds (state per section, remembered in the
+ * browser). Spread into the section's x-data: `{ ...argosFold('pr') }`.
+ */
+export function argosFold(key, openByDefault = true) {
+    const storageKey = `argos-fold-${key}`;
+    let open = openByDefault;
+    try {
+        const stored = window.localStorage.getItem(storageKey);
+        if (stored !== null) {
+            open = stored === '1';
+        }
+    } catch {
+        // Storage blocked: fall back to the default.
+    }
+
+    return {
+        open,
+        toggleFold() {
+            this.open = !this.open;
+            try {
+                window.localStorage.setItem(storageKey, this.open ? '1' : '0');
+            } catch {
+                // Storage blocked: the state lasts until the next reload.
+            }
+        },
+    };
+}

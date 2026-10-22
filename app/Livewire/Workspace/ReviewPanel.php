@@ -101,8 +101,8 @@ class ReviewPanel extends Component
         $this->file = $path;
     }
 
-    /** "Hand to Claude" on a pull request review comment. */
-    public function sendPrComment(string $commentId): void
+    /** "Add to my review" on a pull request comment: it joins the collected comments. */
+    public function collectPrComment(string $commentId): void
     {
         $task = $this->taskId !== null ? $this->task($this->taskId) : null;
         if ($task === null) {
@@ -110,10 +110,15 @@ class ReviewPanel extends Component
         }
 
         try {
-            app(PullRequestService::class)->sendComment($task, $this->user(), $commentId);
-            Notification::make()->title(__('workspaces.review.sent_to_claude'))->success()->send();
+            $result = app(PullRequestService::class)->collect($task, $this->user(), $commentId);
+            if ($result['general'] !== []) {
+                $this->dispatch('composer-append', text: PullRequestService::generalText($result['general']));
+            }
+            $this->dispatch('review-comments-changed');
         } catch (WorkspaceException $e) {
             Notification::make()->title($e->getMessage())->warning()->send();
+        } catch (AuthorizationException) {
+            Notification::make()->title(__('workspaces.task.viewer_hint'))->warning()->send();
         }
     }
 
@@ -294,8 +299,10 @@ class ReviewPanel extends Component
         $here = $current !== null ? $comments->where('path', $current['path']) : collect();
 
         // What reviewers wrote on the pull request, at their lines of this file.
+        // Taken over ones show as the person's own drafts instead.
+        $collectedIds = $task !== null ? app(PullRequestService::class)->collectedIds($task, $this->user()) : [];
         $prComments = $task !== null && $current !== null
-            ? collect(app(PullRequestService::class)->feedback($task)['comments'])->where('path', $current['path'])
+            ? collect(app(PullRequestService::class)->feedback($task)['comments'])->where('path', $current['path'])->reject(fn (array $c): bool => in_array($c['id'], $collectedIds, true))
             : collect();
 
         $markdown = null;

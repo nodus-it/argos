@@ -293,17 +293,6 @@ class PullRequestServiceTest extends TestCase
         $this->assertSame(['1'], array_column($feedback['comments'], 'id'));
     }
 
-    public function test_one_review_comment_goes_to_claude(): void
-    {
-        $this->git->shouldReceive('pullRequestDetails')->andReturn($this->details([
-            'comments' => [['id' => '9', 'author' => 'grace', 'body' => 'Redirect home to /start', 'path' => 'routes/web.php', 'line' => 8, 'url' => 'https://x/c9', 'created_at' => null]],
-        ]));
-
-        $this->service()->sendComment($this->task, $this->owner, '9');
-
-        $this->assertStringContainsString('`routes/web.php:8`: Redirect home to /start', $this->sent[0]);
-    }
-
     public function test_the_sidebar_lists_the_review_comments(): void
     {
         $this->git->shouldReceive('pullRequestDetails')->andReturn($this->details([
@@ -316,6 +305,33 @@ class PullRequestServiceTest extends TestCase
             ->set('taskId', $this->task->id)
             ->assertSee('Name can be hardcoded.')
             ->assertSee('welcome.blade.php:7')
-            ->assertSee(__('workspaces.pr.send_review'));
+            ->assertSee(__('workspaces.review.collect_all'));
+    }
+
+    public function test_comments_are_collected_into_the_own_review_once(): void
+    {
+        $this->app->singleton(\App\Services\Workspace\WorkspaceDaemonClient::class, \App\Testing\FakeWorkspaceDaemon::class);
+        \App\Testing\FakeWorkspaceDaemon::$fileContents = ['routes/web.php' => "<?php\n\nuse Route;\n\nRoute::view('/', 'welcome');\n"];
+        $this->git->shouldReceive('pullRequestDetails')->andReturn($this->details([
+            'comments' => [
+                ['id' => 'c1', 'author' => 'grace', 'body' => 'Redirect home to /start', 'path' => 'routes/web.php', 'line' => 5, 'url' => 'https://x/c1', 'created_at' => null],
+                ['id' => 'c2', 'author' => 'grace', 'body' => 'Looks good overall', 'path' => null, 'line' => null, 'url' => null, 'created_at' => null],
+            ],
+        ]));
+
+        $result = $this->service()->collect($this->task, $this->owner);
+
+        $this->assertSame(1, $result['collected']);
+        $this->assertSame(['c2'], array_column($result['general'], 'id'));
+        $draft = \App\Models\ReviewComment::query()->sole();
+        $this->assertSame(['routes/web.php', 5, 'grace', 'c1'], [$draft->path, $draft->line_start, $draft->source_author, $draft->source_id]);
+        $this->assertStringContainsString("Route::view('/', 'welcome');", $draft->snippet);
+        $this->assertSame(['c1'], $this->service()->collectedIds($this->task, $this->owner));
+        // Taken over once only.
+        $this->assertSame(0, $this->service()->collect($this->task, $this->owner)['collected']);
+
+        $message = \App\Services\Workspace\ReviewCommentService::message(collect([$draft]), '');
+        $this->assertStringContainsString(__('workspaces.review.from_pr', ['name' => 'grace']).' Redirect home to /start', $message);
+        $this->assertStringContainsString('grace', PullRequestService::generalText($result['general']));
     }
 }

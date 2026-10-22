@@ -56,10 +56,23 @@ from the provider and posts it into the task with the request to fix it:
 ## Reviews and review comments
 
 The **Reviews** row shows the overall review state: *approved*, *changes
-requested*, *commented*, or *No reviews yet*. When there are reviews or
-review comments, **Hand the review to Claude** posts them into the task —
-each review with author, state and text, each line comment with author, file
-and line.
+requested*, *commented*, or *No reviews yet*. Below it, *N review comments*
+unfolds what reviewers wrote: reviews with text, line comments (the file and
+line open the review mode) and general comments, each linking to the
+provider. Argos' own pull request comments (pushed commits) are left out.
+
+**Collect in my review** takes the comments over into your own review, so
+they reach Claude together with your own line comments as one message:
+
+- Line comments become drafts at their line, marked *(name on the pull
+  request)*. In the review mode they sit in the diff like your own comments —
+  edit or discard them before sending.
+- General comments (no line) go into the message text in the composer.
+- A comment is taken over once; the sidebar marks it *In your review*.
+
+In the review mode each pull request comment also has **Add to my review**
+on its own. Comments on lines the diff does not show are listed above the
+file.
 
 ## Conflicts and a moved base branch
 
