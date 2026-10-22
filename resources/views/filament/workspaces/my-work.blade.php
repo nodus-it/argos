@@ -69,7 +69,7 @@
                             </div>
                             <div class="wf-mw-side">
                                 @if ($task->owner_user_id !== $user->id && $task->owner)
-                                    <span class="wf-avatar-xs" title="{{ __('workspaces.my_work.owner', ['name' => $task->owner->name]) }}" role="img" aria-label="{{ __('workspaces.my_work.owner', ['name' => $task->owner->name]) }}">{{ Initials::of($task->owner->name) }}</span>
+                                    <x-wf.avatar :user="$task->owner" title="{{ __('workspaces.my_work.owner', ['name' => $task->owner->name]) }}" role="img" aria-label="{{ __('workspaces.my_work.owner', ['name' => $task->owner->name]) }}" />
                                 @endif
                                 <time class="wf-mw-time" datetime="{{ $task->updated_at?->toIso8601String() }}">{{ $task->updated_at?->diffForHumans(short: true) }}</time>
                             </div>

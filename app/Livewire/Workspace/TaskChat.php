@@ -648,6 +648,8 @@ class TaskChat extends Component
             'task' => $task,
             'events' => $events,
             'timeline' => TaskTimeline::build($events, $toolResults, $approvals, $task !== null && $task->session_status->isBusy()),
+            // Who wrote the messages (profile pictures in the chat).
+            'authors' => User::query()->whereIn('id', $events->where('type', TaskEventType::UserMessage)->pluck('author_user_id')->filter()->unique())->get()->keyBy('id'),
             'hasOlder' => $hasOlder,
             'approvals' => $approvals,
             'canWrite' => $canWrite,

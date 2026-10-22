@@ -11,6 +11,7 @@ use App\Services\Credentials\CredentialVerifier;
 use App\Services\Credentials\ProviderCredentialService;
 use App\Services\OAuth\ProviderOAuthConfigService;
 use Filament\Schemas\Schema;
+use Livewire\WithFileUploads;
 use App\Enums\AgentCredentialStatus;
 use App\Enums\AgentName;
 use App\Enums\AuthMethod;
@@ -54,6 +55,7 @@ use Illuminate\Validation\Rules\Password;
 class Onboarding extends Page
 {
     use AdminOnly;
+    use WithFileUploads;
     use VerifiesCredentialOnSave;
 
     public const TOTAL_STEPS = 4;
@@ -140,6 +142,20 @@ class Onboarding extends Page
     }
 
     // ── Step 1: security (password) ─────────────────────────────────────────
+
+    /** Profile picture chosen in the account step (saved right away). */
+    public mixed $avatarUpload = null;
+
+    public function updatedAvatarUpload(): void
+    {
+        $this->validate(['avatarUpload' => ['image', 'mimes:jpg,jpeg,png,webp', 'max:4096']]);
+        /** @var User $user */
+        $user = Auth::user();
+        app(UserService::class)->setAvatar($user, $this->avatarUpload);
+        $this->avatarUpload = null;
+        Notification::make()->title(__('onboarding.notifications.avatar_saved'))->success()->send();
+    }
+
 
     public string $newPassword = '';
 

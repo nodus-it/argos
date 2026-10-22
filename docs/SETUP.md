@@ -181,9 +181,10 @@ Log in with the credentials from the installer summary:
 - **Password:** the generated `ADMIN_PASSWORD` from the summary (also in
   `.env`).
 
-An in-app **onboarding wizard** then walks you through the setup. Its first
-step is **Security**: set your own password right there to replace the
-generated default. The step is optional and skippable, but while you still
+An in-app **onboarding wizard** then walks you through the setup (pick its
+language at the top). Its first step is **Account**: upload a profile picture
+(shown next to your messages and tasks; also under **Profile**) and set your
+own password right there to replace the generated default. The step is optional and skippable, but while you still
 carry the default password a warning nudges you to change it (you can also
 change it anytime later under **Profile**). The wizard then walks you through
 pasting your Claude token — it becomes your **personal** agent (the one your

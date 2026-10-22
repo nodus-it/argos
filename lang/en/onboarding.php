@@ -14,7 +14,7 @@ return [
     'language' => 'Language',
 
     'steps' => [
-        'security' => 'Security',
+        'security' => 'Account',
         'agents' => 'Claude subscription',
         'repository' => 'Workspace',
         'done' => 'Done',
@@ -26,6 +26,7 @@ return [
         'empty_token' => 'Please enter a token',
         'invalid_token_title' => 'Token invalid',
         'invalid_token_body' => 'The entered token was rejected by the API.',
+        'avatar_saved' => 'Profile picture saved',
         'saved_title' => 'Token saved',
         'saved_unreachable_body' => 'Note: Token could not be verified against the API — connection not reachable.',
         'disconnected' => ':provider disconnected',
@@ -45,6 +46,7 @@ return [
         'new_placeholder' => 'At least 8 characters',
         'confirm_label' => 'Confirm password',
         'confirm_placeholder' => 'Repeat the password',
+        'avatar_button' => 'Upload picture',
         'save_button' => 'Update password',
         'optional_hint' => 'Optional — skip with “Continue” to set it up later under your profile.',
     ],

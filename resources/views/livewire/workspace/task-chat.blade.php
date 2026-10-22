@@ -214,9 +214,10 @@
                     <div @class(['wf-msg', 'ws-msg', 'is-other' => ! $mine && empty($p['auto']), 'is-author-'.((int) $event->author_user_id % 4) => ! $mine, 'is-latest' => $event->id === $latestHumanId]) wire:key="ev-{{ $event->id }}">
                         <div class="wf-msg-meta">
                             @if ($mine)
-                                <span title="{{ $event->created_at?->isoFormat('LLL') }}">{{ __('workspaces.events.you') }} · {{ $event->created_at?->format('H:i') }} · {{ $event->created_at?->diffForHumans() }}</span>
+                                <span class="wf-msg-author"><x-wf.avatar :user="$user" aria-hidden="true" />{{ __('workspaces.events.you') }}</span>
+                                <span title="{{ $event->created_at?->isoFormat('LLL') }}">· {{ $event->created_at?->format('H:i') }} · {{ $event->created_at?->diffForHumans() }}</span>
                             @else
-                                <span class="wf-msg-author"><span class="wf-avatar-xs" aria-hidden="true">{{ \App\Support\Initials::of((string) ($p['author_name'] ?? '?')) }}</span>{{ $p['author_name'] ?? '' }}</span>
+                                <span class="wf-msg-author"><x-wf.avatar :user="$authors[$event->author_user_id] ?? null" :name="$p['author_name'] ?? '?'" aria-hidden="true" />{{ $p['author_name'] ?? '' }}</span>
                                 <span title="{{ $event->created_at?->isoFormat('LLL') }}">· {{ $event->created_at?->format('H:i') }} · {{ $event->created_at?->diffForHumans() }}</span>
                             @endif
                             @if (! empty($p['auto']))

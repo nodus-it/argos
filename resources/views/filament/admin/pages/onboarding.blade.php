@@ -70,6 +70,24 @@
                         </div>
                     @endif
 
+                    {{-- Profile picture: shown next to your messages and tasks. --}}
+                    <div class="rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-4">
+                        <div class="flex flex-wrap items-center gap-4">
+                            <x-wf.avatar :user="auth()->user()" class="argos-onboarding-avatar" />
+                            <div class="flex-1 min-w-[12rem] space-y-1">
+                                <span class="block text-sm font-semibold text-gray-700 dark:text-gray-300">{{ __('common.profile.avatar_label') }}</span>
+                                <span class="block text-xs text-gray-500 dark:text-gray-400">{{ __('common.profile.avatar_help') }}</span>
+                                @error('avatarUpload') <span class="block text-xs text-danger-600">{{ $message }}</span> @enderror
+                            </div>
+                            <label class="inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-lg px-3 text-sm font-medium ring-1 ring-gray-300 dark:ring-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">
+                                <x-heroicon-o-arrow-up-tray class="h-4 w-4" />
+                                <span wire:loading.remove wire:target="avatarUpload">{{ __('onboarding.security.avatar_button') }}</span>
+                                <span wire:loading wire:target="avatarUpload">…</span>
+                                <input type="file" accept="image/png,image/jpeg,image/webp" class="sr-only" wire:model="avatarUpload">
+                            </label>
+                        </div>
+                    </div>
+
                     <div class="rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-4 space-y-3">
                         <div class="flex items-center gap-2">
                             <x-heroicon-o-lock-closed class="h-5 w-5 text-gray-400 flex-shrink-0" />

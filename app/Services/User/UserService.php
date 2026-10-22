@@ -7,7 +7,9 @@ namespace App\Services\User;
 use App\Models\User;
 use App\Services\EntityService;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 
 /**
@@ -87,6 +89,23 @@ class UserService extends EntityService
             $this->assertCanChangeAdmin($user, $isAdmin);
             $user->forceFill(['is_admin' => $isAdmin])->save();
         });
+    }
+
+    /**
+     * Set (or with null remove) a person's profile picture. A file path is
+     * one already on User::AVATAR_DISK (e.g. from the profile's upload
+     * field); an UploadedFile is stored first. The previous picture goes.
+     */
+    public function setAvatar(User $user, UploadedFile|string|null $avatar): void
+    {
+        $disk = Storage::disk(User::AVATAR_DISK);
+        $path = $avatar instanceof UploadedFile ? $avatar->store('avatars', User::AVATAR_DISK) : $avatar;
+        $previous = $user->avatar_path;
+
+        $user->forceFill(['avatar_path' => $path === false ? null : $path])->save();
+        if ($previous !== null && $previous !== $user->avatar_path) {
+            $disk->delete($previous);
+        }
     }
 
     /** The language a person sees Argos in (`en` or `de`). */

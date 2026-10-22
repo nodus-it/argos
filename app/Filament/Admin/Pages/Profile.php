@@ -6,12 +6,15 @@ namespace App\Filament\Admin\Pages;
 
 use App\Models\AgentCredential;
 use App\Models\User;
+use App\Services\User\UserService;
 use Filament\Auth\Pages\EditProfile;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
+use Illuminate\Database\Eloquent\Model;
 
 final class Profile extends EditProfile
 {
@@ -32,6 +35,16 @@ final class Profile extends EditProfile
                     ->icon('heroicon-o-user-circle')
                     ->aside()
                     ->components([
+                        FileUpload::make('avatar_path')
+                            ->label(__('common.profile.avatar_label'))
+                            ->helperText(__('common.profile.avatar_help'))
+                            ->avatar()
+                            ->image()
+                            ->imageEditor()
+                            ->disk(User::AVATAR_DISK)
+                            ->directory('avatars')
+                            ->visibility('private')
+                            ->maxSize(4096),
                         $this->getNameFormComponent(),
                         $this->getEmailFormComponent(),
                         Select::make('locale')
@@ -85,5 +98,21 @@ final class Profile extends EditProfile
                         $this->getCurrentPasswordFormComponent(),
                     ]),
             ]);
+    }
+
+    /**
+     * The picture goes through UserService (it removes the previous file);
+     * everything else is saved as before.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    protected function handleRecordUpdate(Model $record, array $data): Model
+    {
+        if ($record instanceof User && array_key_exists('avatar_path', $data)) {
+            app(UserService::class)->setAvatar($record, $data['avatar_path']);
+            unset($data['avatar_path']);
+        }
+
+        return parent::handleRecordUpdate($record, $data);
     }
 }

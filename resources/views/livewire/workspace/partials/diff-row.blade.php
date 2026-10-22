@@ -46,7 +46,7 @@
         <div @class(['wf-dnote-row', 'is-'.$entry['cell']['pos']]) wire:key="rc-{{ $comment->id }}">
             <div @class(['wf-dnote', 'is-stale' => $comment->status === \App\Enums\ReviewCommentStatus::Stale]) x-data="{ editing: false, body: @js($comment->body) }">
                 <div class="wf-dnote-head">
-                    <span class="wf-avatar-xs">{{ \App\Support\Initials::of($comment->user->name) }}</span>
+                    <x-wf.avatar :user="$comment->user" />
                     <strong>{{ __('workspaces.events.you') }}</strong>
                     <span class="wf-muted">{{ $comment->line_end > $comment->line_start ? $comment->location() : __('workspaces.review.in_draft') }}</span>
                     @if ($comment->status === \App\Enums\ReviewCommentStatus::Stale)

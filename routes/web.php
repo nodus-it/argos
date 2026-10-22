@@ -7,6 +7,7 @@ use App\Http\Controllers\Auth\ConnectedAccountController;
 use App\Http\Controllers\Auth\LinearConnectedAccountController;
 use App\Http\Controllers\SystemLogController;
 use App\Http\Controllers\TaskAttachmentController;
+use App\Http\Controllers\UserAvatarController;
 use App\Http\Controllers\Webhooks\IssueWebhookController;
 use App\Http\Controllers\WorkspaceGateController;
 use App\Http\Controllers\WorkspaceOpenController;
@@ -36,6 +37,9 @@ Route::post('/webhooks/issues/{kind}/{binding}', [IssueWebhookController::class,
 Route::middleware('auth')->group(function () {
     Route::get('/tasks/{task}/attachments/{file}', TaskAttachmentController::class)
         ->name('tasks.attachments');
+
+    Route::get('/users/{user}/avatar', UserAvatarController::class)
+        ->name('users.avatar');
 
     // Open a workspace host (editor/preview) with a fresh access ticket.
     Route::get('/workspaces/{workspace}/open/{target}', WorkspaceOpenController::class)

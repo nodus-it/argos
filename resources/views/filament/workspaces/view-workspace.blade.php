@@ -23,12 +23,10 @@
             {{-- Who the task belongs to, who works on it, what it refers to. --}}
             <div class="wf-task-meta wf-hide-narrow">
                 @if ($task->owner !== null)
-                    <span class="wf-avatar-xs is-owner" title="{{ __('workspaces.switcher.owner', ['name' => $task->owner->name]) }}" aria-label="{{ __('workspaces.switcher.owner', ['name' => $task->owner->name]) }}">{{ \App\Support\Initials::of($task->owner->name) }}</span>
+                    <x-wf.avatar :user="$task->owner" class="wf-avatar-xs is-owner" title="{{ __('workspaces.switcher.owner', ['name' => $task->owner->name]) }}" aria-label="{{ __('workspaces.switcher.owner', ['name' => $task->owner->name]) }}" />
                 @endif
                 @foreach ($task->collaborators as $collaborator)
-                    <span class="wf-avatar-xs" title="{{ __('workspaces.task_actions.collaborator', ['name' => $collaborator->name]) }}">
-                        {{ \App\Support\Initials::of($collaborator->name) }}
-                    </span>
+                    <x-wf.avatar :user="$collaborator" title="{{ __('workspaces.task_actions.collaborator', ['name' => $collaborator->name]) }}" />
                 @endforeach
                 @if ($canInvite)
                     <button type="button" class="wf-icon-btn wf-icon-btn-xs" wire:click="mountAction('invite')" aria-label="{{ __('workspaces.task_actions.invite') }}" title="{{ __('workspaces.task_actions.invite') }}">

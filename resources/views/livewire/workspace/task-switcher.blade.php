@@ -87,7 +87,7 @@
                             </span>
                         @endif
                         @if ($t->owner !== null && $t->owner_user_id !== $user->id)
-                            <span class="wf-avatar-xs" title="{{ __('workspaces.switcher.owner', ['name' => $t->owner->name]) }}" aria-label="{{ __('workspaces.switcher.owner', ['name' => $t->owner->name]) }}">{{ \App\Support\Initials::of($t->owner->name) }}</span>
+                            <x-wf.avatar :user="$t->owner" title="{{ __('workspaces.switcher.owner', ['name' => $t->owner->name]) }}" aria-label="{{ __('workspaces.switcher.owner', ['name' => $t->owner->name]) }}" />
                         @endif
                         @if (($unread[$t->id] ?? 0) > 0 && ! $isCurrent)
                             <span class="wf-unread" title="{{ __('workspaces.switcher.unread') }}">{{ $unread[$t->id] }}</span>

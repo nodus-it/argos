@@ -14,7 +14,7 @@ return [
     'language' => 'Sprache',
 
     'steps' => [
-        'security' => 'Sicherheit',
+        'security' => 'Konto',
         'agents' => 'Claude-Abo',
         'repository' => 'Workspace',
         'done' => 'Fertig',
@@ -26,6 +26,7 @@ return [
         'empty_token' => 'Bitte einen Token eingeben',
         'invalid_token_title' => 'Token ungültig',
         'invalid_token_body' => 'Der eingegebene Token wurde von der API abgelehnt.',
+        'avatar_saved' => 'Profilbild gespeichert',
         'saved_title' => 'Token gespeichert',
         'saved_unreachable_body' => 'Hinweis: Token konnte nicht gegen die API geprüft werden — Verbindung nicht erreichbar.',
         'disconnected' => ':provider getrennt',
@@ -45,6 +46,7 @@ return [
         'new_placeholder' => 'Mindestens 8 Zeichen',
         'confirm_label' => 'Passwort bestätigen',
         'confirm_placeholder' => 'Passwort wiederholen',
+        'avatar_button' => 'Bild hochladen',
         'save_button' => 'Passwort aktualisieren',
         'optional_hint' => 'Optional — mit „Weiter" überspringen und später im Profil festlegen.',
     ],

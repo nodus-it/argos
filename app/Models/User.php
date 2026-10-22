@@ -6,6 +6,7 @@ namespace App\Models;
 
 use Database\Factories\UserFactory;
 use Filament\Models\Contracts\FilamentUser;
+use Filament\Models\Contracts\HasAvatar;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -28,11 +29,15 @@ use Laravel\Passport\HasApiTokens;
  * @property array<string, bool>|null $notification_prefs
  * @property array<string, string>|null $ui_prefs
  * @property bool $auto_task_consent
+ * @property string|null $avatar_path profile picture on User::AVATAR_DISK
  */
-#[Fillable(['name', 'email', 'password', 'locale', 'notification_prefs', 'ui_prefs', 'auto_task_consent'])]
+#[Fillable(['name', 'email', 'password', 'locale', 'avatar_path', 'notification_prefs', 'ui_prefs', 'auto_task_consent'])]
 #[Hidden(['password', 'remember_token'])]
-class User extends Authenticatable implements FilamentUser, OAuthenticatable
+class User extends Authenticatable implements FilamentUser, HasAvatar, OAuthenticatable
 {
+    /** Where profile pictures live (private; served by UserAvatarController). */
+    public const AVATAR_DISK = 'local';
+
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, Notifiable;
 
@@ -114,5 +119,16 @@ class User extends Authenticatable implements FilamentUser, OAuthenticatable
     public function canAccessPanel(Panel $panel): bool
     {
         return $this->can('access-argos-panel');
+    }
+
+    /** The profile picture's URL, or null without one (initials are shown then). */
+    public function avatarUrl(): ?string
+    {
+        return $this->avatar_path === null ? null : route('users.avatar', ['user' => $this->id, 'v' => substr(md5($this->avatar_path), 0, 8)]);
+    }
+
+    public function getFilamentAvatarUrl(): ?string
+    {
+        return $this->avatarUrl();
     }
 }

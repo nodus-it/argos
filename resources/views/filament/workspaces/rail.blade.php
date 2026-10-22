@@ -36,7 +36,7 @@
     @livewire(\App\Livewire\Workspace\RailNotifications::class, ['lazy' => true])
     <x-filament::dropdown placement="right-end" class="wf-rail-user">
         <x-slot name="trigger">
-            <button type="button" class="wf-rail-avatar" aria-label="{{ __('workspaces.panel.signed_in_as', ['name' => $user->name]) }}" title="{{ $user->name }}">{{ \App\Support\Initials::of($user->name) }}</button>
+            <button type="button" @class(['wf-rail-avatar', 'has-image' => $user->avatarUrl() !== null]) aria-label="{{ __('workspaces.panel.signed_in_as', ['name' => $user->name]) }}" title="{{ $user->name }}">@if ($user->avatarUrl() !== null)<img src="{{ $user->avatarUrl() }}" alt="">@else{{ \App\Support\Initials::of($user->name) }}@endif</button>
         </x-slot>
         <x-filament::dropdown.header icon="heroicon-o-user">{{ $user->name }}</x-filament::dropdown.header>
         <x-filament::dropdown.list>

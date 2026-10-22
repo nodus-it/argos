@@ -190,7 +190,9 @@ Melde dich mit den Zugangsdaten aus der Installer-Zusammenfassung an:
   `.env`).
 
 Ein in der App integrierter **Onboarding-Assistent** führt dich anschließend
-durch die Einrichtung. Sein erster Schritt ist **Sicherheit**: Lege dort direkt
+durch die Einrichtung (seine Sprache wählst du oben). Sein erster Schritt ist
+**Konto**: Lade ein Profilbild hoch (es erscheint bei deinen Nachrichten und
+Aufgaben, später auch unter **Profil** änderbar) und lege dort direkt
 ein eigenes Passwort fest, um das generierte Standard-Passwort zu ersetzen. Der
 Schritt ist optional und überspringbar — solange du noch das Standard-Passwort
 nutzt, weist dich ein Hinweis darauf hin, es zu ändern (du kannst es auch
