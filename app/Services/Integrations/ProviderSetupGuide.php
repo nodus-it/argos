@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Integrations;
 
+use App\Support\RepoUrlBuilder;
 use App\Enums\IntegrationProvider;
 
 /**
@@ -91,7 +92,7 @@ final class ProviderSetupGuide
 
         return match ($provider) {
             IntegrationProvider::GitHub => 'https://github.com',
-            IntegrationProvider::GitLab => 'https://gitlab.com',
+            IntegrationProvider::GitLab => RepoUrlBuilder::DEFAULT_GITLAB_INSTANCE,
             IntegrationProvider::Bitbucket => 'https://bitbucket.org',
             IntegrationProvider::Linear => 'https://linear.app',
         };

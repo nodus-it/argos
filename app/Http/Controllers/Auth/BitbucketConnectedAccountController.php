@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Auth;
 
+use App\Http\Controllers\Auth\Concerns\ReturnsAfterConnect;
 use App\Http\Controllers\Auth\Concerns\ReverifiesConnectedAccount;
 use App\Http\Controllers\Controller;
 use App\Models\User;
@@ -17,17 +18,11 @@ use Laravel\Socialite\Two\User as SocialiteUser;
 
 final class BitbucketConnectedAccountController extends Controller
 {
-    use ReverifiesConnectedAccount;
-
-    private const RETURN_SESSION_KEY = 'oauth.bitbucket.return';
+    use ReturnsAfterConnect, ReverifiesConnectedAccount;
 
     public function redirect(Request $request): RedirectResponse
     {
-        if ($request->query('return') === 'onboarding') {
-            $request->session()->put(self::RETURN_SESSION_KEY, 'onboarding');
-        } else {
-            $request->session()->forget(self::RETURN_SESSION_KEY);
-        }
+        $this->rememberReturn($request, 'bitbucket');
 
         /** @var AbstractProvider $driver */
         $driver = Socialite::driver('bitbucket');
@@ -50,13 +45,7 @@ final class BitbucketConnectedAccountController extends Controller
         $account = $service->upsert($user, 'bitbucket', $service->socialiteAttributes($socialUser));
         $this->reverifyConnectedAccount($account);
 
-        $returnTo = $request->session()->pull(self::RETURN_SESSION_KEY);
-
-        if ($returnTo === 'onboarding') {
-            return redirect()->route('filament.app.pages.setup');
-        }
-
-        return redirect()->route('filament.app.account.pages.connections');
+        return $this->redirectAfterConnect($request, 'bitbucket');
     }
 
     public function disconnect(): RedirectResponse

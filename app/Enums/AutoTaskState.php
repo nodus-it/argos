@@ -45,4 +45,14 @@ enum AutoTaskState: string
     {
         return ! $this->isFinal() && $this !== self::Paused;
     }
+
+    /**
+     * States in which no automation drives the task (for queries).
+     *
+     * @return list<string>
+     */
+    public static function idleValues(): array
+    {
+        return array_values(array_map(fn (self $state): string => $state->value, array_filter(self::cases(), fn (self $state): bool => ! $state->isRunning())));
+    }
 }

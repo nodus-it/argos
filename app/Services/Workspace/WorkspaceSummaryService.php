@@ -67,7 +67,7 @@ class WorkspaceSummaryService
     {
         return Task::query()
             ->whereNull('archived_at')
-            ->whereNotIn('status', [TaskStatus::Done->value, TaskStatus::Cancelled->value])
+            ->whereNotIn('status', TaskStatus::finishedValues())
             ->where(fn (Builder $q) => $q->where('owner_user_id', $user->id)
                 ->orWhereHas('members', fn (Builder $m) => $m->where('user_id', $user->id)))
             ->when(! $user->isAdmin(), fn (Builder $q) => $q->whereHas('workspace.members', fn (Builder $m) => $m->where('user_id', $user->id)));

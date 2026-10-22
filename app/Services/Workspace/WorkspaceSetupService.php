@@ -193,7 +193,7 @@ class WorkspaceSetupService
         return Task::query()
             ->where('workspace_id', $workspace->id)
             ->where('kind', TaskKind::Setup->value)
-            ->whereNotIn('status', [TaskStatus::Done->value, TaskStatus::Cancelled->value])
+            ->whereNotIn('status', TaskStatus::finishedValues())
             ->whereNull('archived_at')
             ->latest()
             ->first();

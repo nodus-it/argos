@@ -28,4 +28,14 @@ enum TaskStatus: string
     {
         return $this === self::Done || $this === self::Cancelled;
     }
+
+    /**
+     * Finished states (for queries).
+     *
+     * @return list<string>
+     */
+    public static function finishedValues(): array
+    {
+        return array_values(array_map(fn (self $status): string => $status->value, array_filter(self::cases(), fn (self $status): bool => $status->isFinished())));
+    }
 }

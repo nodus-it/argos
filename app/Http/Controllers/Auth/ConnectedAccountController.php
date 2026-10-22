@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Auth;
 
+use App\Support\RepoUrlBuilder;
+use App\Http\Controllers\Auth\Concerns\ReturnsAfterConnect;
 use App\Http\Controllers\Auth\Concerns\ReverifiesConnectedAccount;
 use App\Http\Controllers\Controller;
 use App\Models\ProviderOAuthConfig;
@@ -18,11 +20,7 @@ use Laravel\Socialite\Two\User as SocialiteUser;
 
 final class ConnectedAccountController extends Controller
 {
-    use ReverifiesConnectedAccount;
-
-    private const GITHUB_RETURN_SESSION_KEY = 'oauth.github.return';
-
-    private const GITLAB_RETURN_SESSION_KEY = 'oauth.gitlab.return';
+    use ReturnsAfterConnect, ReverifiesConnectedAccount;
 
     private const GITLAB_INSTANCE_SESSION_KEY = 'oauth.gitlab.instance';
 
@@ -30,11 +28,7 @@ final class ConnectedAccountController extends Controller
 
     public function redirect(Request $request): RedirectResponse
     {
-        if ($request->query('return') === 'onboarding') {
-            $request->session()->put(self::GITHUB_RETURN_SESSION_KEY, 'onboarding');
-        } else {
-            $request->session()->forget(self::GITHUB_RETURN_SESSION_KEY);
-        }
+        $this->rememberReturn($request, 'github');
 
         /** @var AbstractProvider $driver */
         $driver = Socialite::driver('github');
@@ -57,13 +51,7 @@ final class ConnectedAccountController extends Controller
         $account = $service->upsert($user, 'github', $service->socialiteAttributes($socialUser));
         $this->reverifyConnectedAccount($account);
 
-        $returnTo = $request->session()->pull(self::GITHUB_RETURN_SESSION_KEY);
-
-        if ($returnTo === 'onboarding') {
-            return redirect()->route('filament.app.pages.setup');
-        }
-
-        return redirect()->route('filament.app.account.pages.connections');
+        return $this->redirectAfterConnect($request, 'github');
     }
 
     public function disconnect(): RedirectResponse
@@ -80,11 +68,7 @@ final class ConnectedAccountController extends Controller
 
     public function redirectGitlab(Request $request): RedirectResponse
     {
-        if ($request->query('return') === 'onboarding') {
-            $request->session()->put(self::GITLAB_RETURN_SESSION_KEY, 'onboarding');
-        } else {
-            $request->session()->forget(self::GITLAB_RETURN_SESSION_KEY);
-        }
+        $this->rememberReturn($request, 'gitlab');
 
         // Multi-instance: `?instance=<oauthConfigId>` selects a self-hosted
         // GitLab. Without it we use the public-instance config hydrated at boot.
@@ -118,13 +102,7 @@ final class ConnectedAccountController extends Controller
         $account = $service->upsert($user, 'gitlab', $service->socialiteAttributes($socialUser), $instanceUrl);
         $this->reverifyConnectedAccount($account);
 
-        $returnTo = $request->session()->pull(self::GITLAB_RETURN_SESSION_KEY);
-
-        if ($returnTo === 'onboarding') {
-            return redirect()->route('filament.app.pages.setup');
-        }
-
-        return redirect()->route('filament.app.account.pages.connections');
+        return $this->redirectAfterConnect($request, 'gitlab');
     }
 
     /**
@@ -173,13 +151,10 @@ final class ConnectedAccountController extends Controller
 
     private function pushGitlabConfig(string $clientId, string $clientSecret, string $instanceUrl): void
     {
-        $instance = $instanceUrl !== '' ? $instanceUrl : 'https://gitlab.com';
-
         config([
             'services.gitlab.client_id' => $clientId,
             'services.gitlab.client_secret' => $clientSecret,
-            // socialiteproviders/gitlab concatenates this verbatim — guarantee a trailing slash.
-            'services.gitlab.instance_uri' => rtrim($instance, '/').'/',
+            'services.gitlab.instance_uri' => RepoUrlBuilder::gitlabSocialiteUri($instanceUrl),
         ]);
     }
 

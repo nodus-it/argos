@@ -204,15 +204,7 @@ class TaskService
             return $event;
         }
 
-        $payload = [
-            'client_msg_id' => (string) $event->id,
-            'author' => ['id' => $author->id, 'name' => $author->name],
-            // After a restore Claude's context is out of date; say so once.
-            'text' => $task->restore_note !== null ? '['.$task->restore_note."]\n\n".$text : $text,
-        ];
-        if ($images !== []) {
-            $payload['images'] = array_map(fn (array $image): array => ['media_type' => $image['media_type'], 'data' => $image['data']], $images);
-        }
+        $payload = $this->messagePayload($task, $event, ['id' => $author->id, 'name' => $author->name], $text, array_map(fn (array $image): array => ['media_type' => $image['media_type'], 'data' => $image['data']], $images));
 
         try {
             $this->deliver($task, $payload);
@@ -222,9 +214,7 @@ class TaskService
             throw $e;
         }
 
-        if ($task->restore_note !== null) {
-            $task->forceFill(['restore_note' => null])->save();
-        }
+        $this->restoreNoteDelivered($task);
 
         $this->publisher->publish($task->workspace_id, $task->id, [[
             'type' => 'user.message',
@@ -422,6 +412,32 @@ class TaskService
         }
     }
 
+    /**
+     * What the daemon gets for a message. After a restore Claude's context
+     * is out of date: the first message says so.
+     *
+     * @param  array{id: int|null, name: string}  $author
+     * @param  list<array{media_type: string, data: string}>  $images
+     * @return array<string, mixed>
+     */
+    private function messagePayload(Task $task, TaskEvent $event, array $author, string $text, array $images): array
+    {
+        return [
+            'client_msg_id' => (string) $event->id,
+            'author' => $author,
+            'text' => $task->restore_note !== null ? '['.$task->restore_note."]\n\n".$text : $text,
+            ...($images !== [] ? ['images' => $images] : []),
+        ];
+    }
+
+    /** The note went out with a message — only once. */
+    private function restoreNoteDelivered(Task $task): void
+    {
+        if ($task->restore_note !== null) {
+            $task->forceFill(['restore_note' => null])->save();
+        }
+    }
+
     /** Send the messages that waited for a session, in order. */
     private function deliverPending(Task $task): void
     {
@@ -430,16 +446,13 @@ class TaskService
             ->filter(fn (TaskEvent $e): bool => ($e->payload['pending'] ?? false) === true);
 
         foreach ($pending as $event) {
-            $text = (string) ($event->payload['text'] ?? '');
-            $payload = [
-                'client_msg_id' => (string) $event->id,
-                'author' => ['id' => $event->author_user_id, 'name' => (string) ($event->payload['author_name'] ?? '')],
-                'text' => $task->restore_note !== null ? '['.$task->restore_note."]\n\n".$text : $text,
-            ];
-            $images = app(TaskAttachmentService::class)->load(is_array($event->payload['images'] ?? null) ? $event->payload['images'] : []);
-            if ($images !== []) {
-                $payload['images'] = $images;
-            }
+            $payload = $this->messagePayload(
+                $task,
+                $event,
+                ['id' => $event->author_user_id, 'name' => (string) ($event->payload['author_name'] ?? '')],
+                (string) ($event->payload['text'] ?? ''),
+                app(TaskAttachmentService::class)->load(is_array($event->payload['images'] ?? null) ? $event->payload['images'] : []),
+            );
 
             try {
                 $this->deliver($task, $payload);
@@ -451,9 +464,7 @@ class TaskService
             }
 
             $event->forceFill(['payload' => array_diff_key($event->payload, ['pending' => true])])->save();
-            if ($task->restore_note !== null) {
-                $task->forceFill(['restore_note' => null])->save();
-            }
+            $this->restoreNoteDelivered($task);
             $this->publisher->publish($task->workspace_id, $task->id, [[
                 'type' => 'user.delivered',
                 'event_id' => $event->id,
@@ -475,7 +486,7 @@ class TaskService
             ->when($scope === 'workspace', fn ($q) => $q->where('workspace_id', $for->workspace_id))
             ->when($scope !== 'workspace', fn ($q) => $q->where('agent_credential_id', $for->agent_credential_id))
             ->whereDoesntHave('approvals', fn ($q) => $q->where('status', ApprovalStatus::Pending->value))
-            ->where(fn ($q) => $q->whereNull('auto_state')->orWhereIn('auto_state', [AutoTaskState::Paused->value, AutoTaskState::Done->value, AutoTaskState::Failed->value, AutoTaskState::BudgetExceeded->value]))
+            ->where(fn ($q) => $q->whereNull('auto_state')->orWhereIn('auto_state', AutoTaskState::idleValues()))
             ->orderBy('updated_at')
             ->first();
         if ($candidate === null) {

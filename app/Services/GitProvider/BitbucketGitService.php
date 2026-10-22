@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\GitProvider;
 
+use App\Services\GitProvider\Concerns\BuildsSelectOptions;
 use App\Integrations\Bitbucket\BitbucketConnector;
 use App\Integrations\Bitbucket\Requests\CommentOnPullRequest;
 use App\Integrations\Bitbucket\Requests\CreatePullRequest;
@@ -25,7 +26,7 @@ use RuntimeException;
 
 class BitbucketGitService implements GitProviderContract
 {
-    use SummarizesPullRequests;
+    use BuildsSelectOptions, SummarizesPullRequests;
 
     private readonly BitbucketConnector $connector;
 
@@ -119,51 +120,7 @@ class BitbucketGitService implements GitProviderContract
             ->json();
     }
 
-    /**
-     * Returns repos as ['workspace/slug' => 'workspace/slug'] for Filament Select dropdowns.
-     *
-     * @return array<string, string>
-     */
-    public function getRepoOptions(): array
-    {
-        $repos = $this->listRepositories();
 
-        $options = [];
-        foreach ($repos as $repo) {
-            $fullName = $repo['full_name'] ?? null;
-            if (is_string($fullName) && $fullName !== '') {
-                $options[$fullName] = $fullName;
-            }
-        }
-
-        return $options;
-    }
-
-    /**
-     * Returns branches as ['branch' => 'branch'] for Filament Select dropdowns.
-     *
-     * @return array<string, string>
-     */
-    public function getBranchOptions(string $ownerRepo): array
-    {
-        [$owner, $repo] = explode('/', $ownerRepo, 2) + ['', ''];
-
-        if ($owner === '' || $repo === '') {
-            return [];
-        }
-
-        $branches = $this->listBranches($owner, $repo);
-
-        $options = [];
-        foreach ($branches as $branch) {
-            $name = $branch['name'] ?? null;
-            if (is_string($name) && $name !== '') {
-                $options[$name] = $name;
-            }
-        }
-
-        return $options;
-    }
 
     /**
      * Returns the default branch for a workspace/repo string, or null on failure.
@@ -463,5 +420,9 @@ class BitbucketGitService implements GitProviderContract
         }
 
         return (string) ($user['nickname'] ?? $user['display_name'] ?? $user['username'] ?? '');
+    }
+    protected function repositoryPathField(): string
+    {
+        return 'full_name';
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Support\RepoUrlBuilder;
 use App\Models\User;
 use App\Services\GitProvider\BitbucketGitService;
 use App\Services\GitProvider\GitHubGitService;
@@ -57,7 +58,7 @@ class AppServiceProvider extends ServiceProvider
                 'gitlab',
                 fn (string $token, string $instanceUrl): GitLabGitService => new GitLabGitService(
                     $token,
-                    $instanceUrl ?: 'https://gitlab.com',
+                    RepoUrlBuilder::gitlabInstance($instanceUrl),
                 ),
             );
 
@@ -83,7 +84,7 @@ class AppServiceProvider extends ServiceProvider
                 'gitlab',
                 fn (string $token, string $instanceUrl): GitLabIssueTracker => new GitLabIssueTracker(
                     $token,
-                    $instanceUrl ?: 'https://gitlab.com',
+                    RepoUrlBuilder::gitlabInstance($instanceUrl),
                 ),
             );
 

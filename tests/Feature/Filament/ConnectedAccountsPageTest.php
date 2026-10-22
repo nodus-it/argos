@@ -68,7 +68,7 @@ class ConnectedAccountsPageTest extends TestCase
         ]);
 
         Livewire::test(ConnectedAccounts::class)
-            ->call('disconnectGitHub')
+            ->call('disconnect', 'github')
             ->assertNotified();
 
         $this->assertDatabaseMissing(ConnectedAccount::class, [
@@ -85,7 +85,7 @@ class ConnectedAccountsPageTest extends TestCase
         ]);
 
         Livewire::test(ConnectedAccounts::class)
-            ->call('disconnectGitHub')
+            ->call('disconnect', 'github')
             ->assertNotified('GitHub connection disconnected');
     }
 
@@ -164,7 +164,7 @@ class ConnectedAccountsPageTest extends TestCase
         ]);
 
         Livewire::test(ConnectedAccounts::class)
-            ->call('disconnectGitLab')
+            ->call('disconnect', 'gitlab')
             ->assertNotified('GitLab connection disconnected');
 
         $this->assertDatabaseMissing(ConnectedAccount::class, [
@@ -224,7 +224,7 @@ class ConnectedAccountsPageTest extends TestCase
         ]);
 
         Livewire::test(ConnectedAccounts::class)
-            ->call('disconnectBitbucket')
+            ->call('disconnect', 'bitbucket')
             ->assertNotified('Bitbucket connection disconnected');
 
         $this->assertDatabaseMissing(ConnectedAccount::class, [
@@ -248,7 +248,7 @@ class ConnectedAccountsPageTest extends TestCase
         ]);
 
         Livewire::test(ConnectedAccounts::class)
-            ->call('disconnectBitbucket');
+            ->call('disconnect', 'bitbucket');
 
         $this->assertDatabaseMissing(ConnectedAccount::class, [
             'user_id' => $this->user->id,

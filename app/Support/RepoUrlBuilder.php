@@ -32,6 +32,36 @@ class RepoUrlBuilder
         };
     }
 
+    /** "owner/repo" (or a GitLab group path) of a repository URL; null without a path. */
+    public static function pathOf(string $url): ?string
+    {
+        $path = parse_url($url, PHP_URL_PATH);
+        if (! is_string($path) || $path === '') {
+            return null;
+        }
+        $path = rtrim($path, '/');
+        if (str_ends_with($path, '.git')) {
+            $path = substr($path, 0, -4);
+        }
+        $path = ltrim($path, '/');
+
+        return $path !== '' ? $path : null;
+    }
+
+    /** The instance a repository URL lives on ("https://gitlab.example.com"). */
+    public static function instanceOf(string $url): string
+    {
+        $parsed = parse_url($url);
+
+        return ($parsed['scheme'] ?? 'https').'://'.($parsed['host'] ?? parse_url(self::DEFAULT_GITLAB_INSTANCE, PHP_URL_HOST));
+    }
+
+    /** What socialiteproviders/gitlab expects: the instance with exactly one trailing slash. */
+    public static function gitlabSocialiteUri(?string $instanceUrl): string
+    {
+        return rtrim(self::gitlabInstance($instanceUrl), '/').'/';
+    }
+
     /** Resolve the GitLab host, defaulting to the public instance. */
     public static function gitlabInstance(?string $instanceUrl): string
     {

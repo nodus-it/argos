@@ -30,6 +30,7 @@ return [
         'badge_not_configured' => 'Not configured',
         'disconnect' => 'Disconnect',
         'not_connected_description' => 'Connect your GitHub account to select repos and branches directly.',
+        'github_not_connected_description' => 'Connect your GitHub account to select repos and branches directly.',
         'connect_github' => 'Connect with GitHub',
         'gitlab_not_connected_description' => 'Connect your GitLab account to select repos and branches directly.',
         'connect_gitlab' => 'Connect with GitLab',

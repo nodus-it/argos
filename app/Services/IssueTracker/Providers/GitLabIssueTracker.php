@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\IssueTracker\Providers;
 
+use App\Support\RepoUrlBuilder;
 use App\Integrations\GitLab\GitLabConnector;
 use App\Integrations\GitLab\Requests\CloseIssue;
 use App\Integrations\GitLab\Requests\CreateIssue;
@@ -26,7 +27,7 @@ class GitLabIssueTracker implements IssueTrackerContract
 {
     private readonly GitLabConnector $connector;
 
-    public function __construct(string $token, string $instanceUrl = 'https://gitlab.com')
+    public function __construct(string $token, string $instanceUrl = RepoUrlBuilder::DEFAULT_GITLAB_INSTANCE)
     {
         $this->connector = new GitLabConnector($token, $instanceUrl);
     }

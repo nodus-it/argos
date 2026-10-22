@@ -30,6 +30,7 @@ return [
         'badge_not_configured' => 'Nicht konfiguriert',
         'disconnect' => 'Trennen',
         'not_connected_description' => 'Verbinde deinen GitHub-Account, um Repos und Branches direkt auszuwählen.',
+        'github_not_connected_description' => 'Verbinde deinen GitHub-Account, um Repos und Branches direkt auszuwählen.',
         'connect_github' => 'Mit GitHub verbinden',
         'gitlab_not_connected_description' => 'Verbinde deinen GitLab-Account, um Repos und Branches direkt auszuwählen.',
         'connect_gitlab' => 'Mit GitLab verbinden',

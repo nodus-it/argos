@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\GitProvider;
 
+use App\Services\GitProvider\Concerns\BuildsSelectOptions;
 use App\Integrations\GitHub\GitHubConnector;
 use App\Integrations\GitHub\Requests\CommentOnPullRequest;
 use App\Integrations\GitHub\Requests\CreatePullRequest;
@@ -28,7 +29,7 @@ use RuntimeException;
 
 class GitHubGitService implements GitProviderContract
 {
-    use SummarizesPullRequests;
+    use BuildsSelectOptions, SummarizesPullRequests;
 
     /** Check-run conclusions that count as a failed check. */
     private const array FAILED_CONCLUSIONS = ['failure', 'timed_out', 'cancelled', 'action_required', 'startup_failure'];
@@ -177,51 +178,7 @@ class GitHubGitService implements GitProviderContract
             ->json();
     }
 
-    /**
-     * Returns repos as ['owner/repo' => 'owner/repo'] for use in Filament Select dropdowns.
-     *
-     * @return array<string, string>
-     */
-    public function getRepoOptions(): array
-    {
-        $repos = $this->listRepositories();
 
-        $options = [];
-        foreach ($repos as $repo) {
-            $fullName = $repo['full_name'] ?? null;
-            if (is_string($fullName) && $fullName !== '') {
-                $options[$fullName] = $fullName;
-            }
-        }
-
-        return $options;
-    }
-
-    /**
-     * Returns branches as ['branch' => 'branch'] for use in Filament Select dropdowns.
-     *
-     * @return array<string, string>
-     */
-    public function getBranchOptions(string $ownerRepo): array
-    {
-        [$owner, $repo] = explode('/', $ownerRepo, 2) + ['', ''];
-
-        if ($owner === '' || $repo === '') {
-            return [];
-        }
-
-        $branches = $this->listBranches($owner, $repo);
-
-        $options = [];
-        foreach ($branches as $branch) {
-            $name = $branch['name'] ?? null;
-            if (is_string($name) && $name !== '') {
-                $options[$name] = $name;
-            }
-        }
-
-        return $options;
-    }
 
     /**
      * @return array<string, mixed>
@@ -670,5 +627,9 @@ class GitHubGitService implements GitProviderContract
             'number' => $number,
             'errors' => $errors,
         ]));
+    }
+    protected function repositoryPathField(): string
+    {
+        return 'full_name';
     }
 }

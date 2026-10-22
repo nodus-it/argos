@@ -12,6 +12,7 @@ use App\Enums\WorkspaceSetupStatus;
 use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceStatus;
 use App\Services\OAuth\TokenRefresher;
+use App\Support\RepoUrlBuilder;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Collection;
@@ -318,12 +319,7 @@ class Workspace extends Model implements HasApiTokensContract
      */
     public function getOwnerRepo(): string
     {
-        $path = rtrim(parse_url($this->repo_url, PHP_URL_PATH) ?? '', '/');
-        if (str_ends_with($path, '.git')) {
-            $path = substr($path, 0, -4);
-        }
-
-        return ltrim($path, '/');
+        return RepoUrlBuilder::pathOf((string) $this->repo_url) ?? '';
     }
 
     /**

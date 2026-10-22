@@ -15,7 +15,6 @@ use App\Models\User;
 use App\Models\WorkerStack;
 use App\Models\Workspace;
 use App\Services\Git\RepositoryFetcher;
-use App\Services\GitProvider\GitServiceFactory;
 use App\Services\OAuth\ConnectedAccountService;
 use App\Services\OAuth\TokenRefresher;
 use App\Services\Workspace\AutoSettings;
@@ -23,7 +22,6 @@ use App\Support\DocLink;
 use App\Support\DocsLinkAction;
 use App\Support\RepoUrlBuilder;
 use App\Enums\WorkspaceSetupStatus;
-use App\Filament\App\Resources\WorkspaceResource;
 use App\Services\Workspace\WorkspaceException;
 use App\Services\Workspace\WorkspaceSetupService;
 use Filament\Actions\Action;
@@ -132,8 +130,8 @@ final class WorkspaceForm
     }
 
     /**
-     * Authentication: one section for GitHub/GitLab with a connected account,
-     * one for Bitbucket with one. Hidden without a connected account (PAT).
+     * Token or connected account — offered once the person has an account
+     * on the chosen platform (GitHub, GitLab or Bitbucket).
      *
      * @return list<Section>
      */
@@ -144,7 +142,7 @@ final class WorkspaceForm
                 ->description(__('workspace_form.sections.authentication_description'))
                 ->icon('heroicon-o-key')
                 ->aside()
-                ->visible(fn (Get $get): bool => self::hasOAuthAccount($get))
+                ->visible(fn (Get $get): bool => self::connectedAccountFor($get) !== null)
                 ->schema([
                     Select::make('auth_method')
                         ->label(__('workspace_form.fields.auth_method_label'))
@@ -157,10 +155,7 @@ final class WorkspaceForm
                         ->afterStateUpdated(function (Set $set, Get $get, ?string $state): void {
                             if ($state === 'oauth') {
                                 $set('token', null);
-                                $account = self::connectedAccountFor($get);
-                                if ($account !== null) {
-                                    $set('connected_account_id', $account->id);
-                                }
+                                $set('connected_account_id', self::connectedAccountFor($get)?->id);
                             } else {
                                 $set('connected_account_id', null);
                             }
@@ -168,73 +163,19 @@ final class WorkspaceForm
                         ->dehydrated(),
 
                     Select::make('connected_account_id')
-                        ->label(fn (Get $get): string => $get('platform') === 'gitlab'
-                            ? __('workspace_form.fields.gitlab_account_label')
-                            : __('workspace_form.fields.github_account_label'))
+                        ->label(fn (Get $get): string => __(match ($get('platform')) {
+                            'gitlab' => 'workspace_form.fields.gitlab_account_label',
+                            'bitbucket' => 'workspace_form.fields.bitbucket_account_label',
+                            default => 'workspace_form.fields.github_account_label',
+                        }))
                         ->options(function (Get $get): array {
                             /** @var User|null $user */
                             $user = Auth::user();
-                            if ($user === null) {
-                                return [];
-                            }
                             $provider = is_string($get('platform')) ? $get('platform') : 'github';
 
-                            return app(ConnectedAccountService::class)
+                            return $user === null ? [] : app(ConnectedAccountService::class)
                                 ->selectableFor($user, [$provider])
-                                ->mapWithKeys(fn (ConnectedAccount $account): array => [
-                                    $account->id => $account->name ?? $account->nickname ?? ucfirst($provider)." #{$account->id}",
-                                ])
-                                ->all();
-                        })
-                        ->visible(fn (Get $get): bool => $get('auth_method') === 'oauth')
-                        ->required(fn (Get $get): bool => $get('auth_method') === 'oauth')
-                        ->native(false)
-                        ->dehydrated(),
-                ]),
-
-            Section::make(__('workspace_form.sections.authentication'))
-                ->description(__('workspace_form.sections.authentication_description'))
-                ->icon('heroicon-o-key')
-                ->aside()
-                ->visible(fn (Get $get): bool => $get('platform') === 'bitbucket' && self::bitbucketAccount() !== null)
-                ->schema([
-                    Select::make('auth_method')
-                        ->label(__('workspace_form.fields.auth_method_label'))
-                        ->options([
-                            'pat' => __('workspace_form.fields.auth_method_pat'),
-                            'oauth' => __('workspace_form.fields.auth_method_oauth_bitbucket'),
-                        ])
-                        ->default('pat')
-                        ->required()
-                        ->live()
-                        ->native(false)
-                        ->afterStateUpdated(function (Set $set, ?string $state): void {
-                            if ($state === 'oauth') {
-                                $set('token', null);
-                                $account = self::bitbucketAccount();
-                                if ($account !== null) {
-                                    $set('connected_account_id', $account->id);
-                                }
-                            } else {
-                                $set('connected_account_id', null);
-                            }
-                        })
-                        ->dehydrated(),
-
-                    Select::make('connected_account_id')
-                        ->label(__('workspace_form.fields.bitbucket_account_label'))
-                        ->options(function (): array {
-                            /** @var User|null $user */
-                            $user = Auth::user();
-                            if ($user === null) {
-                                return [];
-                            }
-
-                            return app(ConnectedAccountService::class)
-                                ->selectableFor($user, ['bitbucket'])
-                                ->mapWithKeys(fn (ConnectedAccount $account): array => [
-                                    $account->id => $account->name ?? $account->nickname ?? "Bitbucket #{$account->id}",
-                                ])
+                                ->mapWithKeys(fn (ConnectedAccount $account): array => [$account->id => $account->name ?? $account->nickname ?? ucfirst($provider)." #{$account->id}"])
                                 ->all();
                         })
                         ->visible(fn (Get $get): bool => $get('auth_method') === 'oauth')
@@ -891,18 +832,7 @@ final class WorkspaceForm
      */
     public static function repoPathFromUrl(string $url): ?string
     {
-        $path = parse_url($url, PHP_URL_PATH);
-        if (! is_string($path) || $path === '') {
-            return null;
-        }
-
-        $path = rtrim($path, '/');
-        if (str_ends_with($path, '.git')) {
-            $path = substr($path, 0, -4);
-        }
-        $path = ltrim($path, '/');
-
-        return $path !== '' ? $path : null;
+        return RepoUrlBuilder::pathOf($url);
     }
 
     public static function setupStatusLabel(?WorkspaceSetupStatus $status): string
@@ -970,11 +900,11 @@ final class WorkspaceForm
         $platform = $get('platform');
         $oauthHint = '';
 
-        if ($platform === 'github' && self::githubAccount() !== null) {
+        if ($platform === 'github' && self::connectedAccountForPlatform('github') !== null) {
             $oauthHint = (string) __('workspace_form.fields.token_helper_oauth_available');
-        } elseif ($platform === 'gitlab' && self::gitlabAccount() !== null) {
+        } elseif ($platform === 'gitlab' && self::connectedAccountForPlatform('gitlab') !== null) {
             $oauthHint = (string) __('workspace_form.fields.token_helper_oauth_available');
-        } elseif ($platform === 'bitbucket' && self::bitbucketAccount() !== null) {
+        } elseif ($platform === 'bitbucket' && self::connectedAccountForPlatform('bitbucket') !== null) {
             $oauthHint = (string) __('workspace_form.fields.token_helper_bitbucket_oauth_available');
         } elseif ($platform === 'bitbucket') {
             $oauthHint = (string) __('workspace_form.fields.token_helper_bitbucket');
@@ -1022,44 +952,14 @@ final class WorkspaceForm
             return [];
         }
 
-        $instanceUrl = '';
-        if ($platform === 'gitlab') {
-            $parsed = parse_url($url);
-            $instanceUrl = ($parsed['scheme'] ?? 'https').'://'.($parsed['host'] ?? 'gitlab.com');
-        }
+        $instanceUrl = $platform === 'gitlab' ? RepoUrlBuilder::instanceOf($url) : '';
 
-        try {
-            return app(GitServiceFactory::class)->forPlatform($platform, $token, $instanceUrl)->getBranchOptions($ownerRepo);
-        } catch (\Throwable $e) {
-            report($e);
-
-            return [];
-        }
+        // Cached like the connected-account pickers (keyed by the token's hash, never the token).
+        return app(RepositoryFetcher::class)->branchOptions($platform, $token, $instanceUrl, $ownerRepo, 'workspace-form-branches:'.sha1($platform.'|'.$token.'|'.$url));
     }
 
-    private static function githubAccount(): ?ConnectedAccount
-    {
-        /** @var User|null $user */
-        $user = Auth::user();
 
-        return $user?->connectedAccount('github');
-    }
 
-    private static function gitlabAccount(): ?ConnectedAccount
-    {
-        /** @var User|null $user */
-        $user = Auth::user();
-
-        return $user?->connectedAccount('gitlab');
-    }
-
-    private static function bitbucketAccount(): ?ConnectedAccount
-    {
-        /** @var User|null $user */
-        $user = Auth::user();
-
-        return $user?->connectedAccount('bitbucket');
-    }
 
     private static function connectedAccountFor(Get $get): ?ConnectedAccount
     {
@@ -1074,12 +974,10 @@ final class WorkspaceForm
      */
     private static function connectedAccountForPlatform(string $platform): ?ConnectedAccount
     {
-        return match ($platform) {
-            'github' => self::githubAccount(),
-            'gitlab' => self::gitlabAccount(),
-            'bitbucket' => self::bitbucketAccount(),
-            default => null,
-        };
+        /** @var User|null $user */
+        $user = Auth::user();
+
+        return in_array($platform, ['github', 'gitlab', 'bitbucket'], true) ? $user?->connectedAccount($platform) : null;
     }
 
     /**
@@ -1184,21 +1082,15 @@ final class WorkspaceForm
         return is_string($platform) && $platform !== '';
     }
 
-    private static function hasOAuthAccount(Get $get): bool
-    {
-        return match ($get('platform')) {
-            'github' => self::githubAccount() !== null,
-            'gitlab' => self::gitlabAccount() !== null,
-            default => false,
-        };
-    }
 
     /** @return array<string, string> */
     private static function authMethodOptions(Get $get): array
     {
-        $oauthLabel = $get('platform') === 'gitlab'
-            ? __('workspace_form.fields.auth_method_oauth_gitlab')
-            : __('workspace_form.fields.auth_method_oauth');
+        $oauthLabel = __(match ($get('platform')) {
+            'gitlab' => 'workspace_form.fields.auth_method_oauth_gitlab',
+            'bitbucket' => 'workspace_form.fields.auth_method_oauth_bitbucket',
+            default => 'workspace_form.fields.auth_method_oauth',
+        });
 
         return [
             'pat' => (string) __('workspace_form.fields.auth_method_pat'),

@@ -44,24 +44,13 @@ class ConnectedAccounts extends Page
         return __('accounts.title');
     }
 
-    public function isGitHubConfigured(): bool
-    {
-        return filled(config('services.github.client_id'));
-    }
+    /** The providers this page connects, in display order. */
+    public const PROVIDERS = ['github', 'gitlab', 'bitbucket', 'linear'];
 
-    public function isGitLabConfigured(): bool
+    /** Whether an OAuth app is configured for the provider (else the page offers to create one). */
+    public function isConfigured(string $provider): bool
     {
-        return filled(config('services.gitlab.client_id'));
-    }
-
-    public function isBitbucketConfigured(): bool
-    {
-        return filled(config('services.bitbucket.client_id'));
-    }
-
-    public function isLinearConfigured(): bool
-    {
-        return filled(config('services.linear.client_id'));
+        return in_array($provider, self::PROVIDERS, true) && filled(config("services.{$provider}.client_id"));
     }
 
     /**
@@ -95,14 +84,14 @@ class ConnectedAccounts extends Page
 
         $actions = [];
 
-        if ($this->isGitHubConfigured() && ! $hasGitHub) {
+        if ($this->isConfigured('github') && ! $hasGitHub) {
             $actions[] = Action::make('connectGitHub')
                 ->label(__('accounts.actions.connect_github'))
                 ->icon('heroicon-o-arrow-right-circle')
                 ->url(route('auth.github.redirect'));
         }
 
-        if ($this->isGitLabConfigured() && ! $hasGitLab) {
+        if ($this->isConfigured('gitlab') && ! $hasGitLab) {
             $actions[] = Action::make('connectGitLab')
                 ->label(__('accounts.actions.connect_gitlab'))
                 ->icon('heroicon-o-arrow-right-circle')
@@ -127,14 +116,14 @@ class ConnectedAccounts extends Page
                 ->url(route('auth.gitlab.redirect', ['instance' => $config->id]));
         }
 
-        if ($this->isBitbucketConfigured() && ! $hasBitbucket) {
+        if ($this->isConfigured('bitbucket') && ! $hasBitbucket) {
             $actions[] = Action::make('connectBitbucket')
                 ->label(__('accounts.actions.connect_bitbucket'))
                 ->icon('heroicon-o-arrow-right-circle')
                 ->url(route('auth.bitbucket.redirect'));
         }
 
-        if ($this->isLinearConfigured() && ! $hasLinear) {
+        if ($this->isConfigured('linear') && ! $hasLinear) {
             $actions[] = Action::make('connectLinear')
                 ->label(__('accounts.actions.connect_linear'))
                 ->icon('heroicon-o-arrow-right-circle')
@@ -159,54 +148,17 @@ class ConnectedAccounts extends Page
             ->get();
     }
 
-    public function disconnectGitHub(): void
+    public function disconnect(string $provider): void
     {
+        if (! in_array($provider, self::PROVIDERS, true)) {
+            return;
+        }
         /** @var User $user */
         $user = Auth::user();
-
-        app(ConnectedAccountService::class)->disconnect($user, 'github');
-
-        Notification::make()
-            ->title(__('accounts.notifications.github_disconnected'))
-            ->success()
-            ->send();
-    }
-
-    public function disconnectGitLab(): void
-    {
-        /** @var User $user */
-        $user = Auth::user();
-
-        app(ConnectedAccountService::class)->disconnect($user, 'gitlab');
+        app(ConnectedAccountService::class)->disconnect($user, $provider);
 
         Notification::make()
-            ->title(__('accounts.notifications.gitlab_disconnected'))
-            ->success()
-            ->send();
-    }
-
-    public function disconnectBitbucket(): void
-    {
-        /** @var User $user */
-        $user = Auth::user();
-
-        app(ConnectedAccountService::class)->disconnect($user, 'bitbucket');
-
-        Notification::make()
-            ->title(__('accounts.notifications.bitbucket_disconnected'))
-            ->success()
-            ->send();
-    }
-
-    public function disconnectLinear(): void
-    {
-        /** @var User $user */
-        $user = Auth::user();
-
-        app(ConnectedAccountService::class)->disconnect($user, 'linear');
-
-        Notification::make()
-            ->title(__('accounts.notifications.linear_disconnected'))
+            ->title(__("accounts.notifications.{$provider}_disconnected"))
             ->success()
             ->send();
     }

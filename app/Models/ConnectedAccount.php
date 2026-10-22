@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Support\RepoUrlBuilder;
 use App\Enums\AuthMethod;
 use App\Enums\GitProvider;
 use App\Enums\TaskProviderKind;
@@ -87,7 +88,7 @@ class ConnectedAccount extends Model
         // '' is the public-instance sentinel (was null before the multi-instance
         // migration); both map to the public GitLab host.
         return ($this->instance_url === null || $this->instance_url === '')
-            ? 'https://gitlab.com'
+            ? RepoUrlBuilder::DEFAULT_GITLAB_INSTANCE
             : $this->instance_url;
     }
 

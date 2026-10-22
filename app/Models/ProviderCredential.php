@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Support\RepoUrlBuilder;
 use App\Enums\IntegrationProvider;
 use App\Enums\ProviderCredentialStatus;
 use Illuminate\Database\Eloquent\Collection;
@@ -73,7 +74,7 @@ class ProviderCredential extends Model
 
         return match ($this->provider) {
             IntegrationProvider::GitHub => 'https://github.com',
-            IntegrationProvider::GitLab => 'https://gitlab.com',
+            IntegrationProvider::GitLab => RepoUrlBuilder::DEFAULT_GITLAB_INSTANCE,
             IntegrationProvider::Bitbucket => 'https://bitbucket.org',
             IntegrationProvider::Linear => 'https://linear.app',
         };

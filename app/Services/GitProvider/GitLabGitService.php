@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\GitProvider;
 
+use App\Services\GitProvider\Concerns\BuildsSelectOptions;
+use App\Support\RepoUrlBuilder;
 use App\Integrations\GitLab\GitLabConnector;
 use App\Integrations\GitLab\Requests\CancelMergeWhenPipelineSucceeds;
 use App\Integrations\GitLab\Requests\CommentOnMergeRequest;
@@ -27,7 +29,7 @@ use RuntimeException;
 
 class GitLabGitService implements GitProviderContract
 {
-    use SummarizesPullRequests;
+    use BuildsSelectOptions, SummarizesPullRequests;
 
     /** Pipeline statuses that are still on their way to a result. */
     private const array RUNNING_PIPELINE_STATUSES = ['created', 'waiting_for_resource', 'preparing', 'pending', 'running', 'scheduled'];
@@ -37,7 +39,7 @@ class GitLabGitService implements GitProviderContract
 
     private readonly GitLabConnector $connector;
 
-    public function __construct(string $token, string $instanceUrl = 'https://gitlab.com')
+    public function __construct(string $token, string $instanceUrl = RepoUrlBuilder::DEFAULT_GITLAB_INSTANCE)
     {
         $this->connector = new GitLabConnector($token, $instanceUrl);
     }
@@ -159,51 +161,7 @@ class GitLabGitService implements GitProviderContract
             ->json();
     }
 
-    /**
-     * Returns projects as ['namespace/name' => 'namespace/name'] for use in Filament Select dropdowns.
-     *
-     * @return array<string, string>
-     */
-    public function getRepoOptions(): array
-    {
-        $projects = $this->listRepositories();
 
-        $options = [];
-        foreach ($projects as $project) {
-            $path = $project['path_with_namespace'] ?? null;
-            if (is_string($path) && $path !== '') {
-                $options[$path] = $path;
-            }
-        }
-
-        return $options;
-    }
-
-    /**
-     * Returns branches as ['branch' => 'branch'] for use in Filament Select dropdowns.
-     *
-     * @return array<string, string>
-     */
-    public function getBranchOptions(string $ownerRepo): array
-    {
-        [$owner, $repo] = explode('/', $ownerRepo, 2) + ['', ''];
-
-        if ($owner === '' || $repo === '') {
-            return [];
-        }
-
-        $branches = $this->listBranches($owner, $repo);
-
-        $options = [];
-        foreach ($branches as $branch) {
-            $name = $branch['name'] ?? null;
-            if (is_string($name) && $name !== '') {
-                $options[$name] = $name;
-            }
-        }
-
-        return $options;
-    }
 
     /**
      * @return array<string, mixed>
@@ -532,5 +490,9 @@ class GitLabGitService implements GitProviderContract
             'status' => $status,
             'error' => $error,
         ]));
+    }
+    protected function repositoryPathField(): string
+    {
+        return 'path_with_namespace';
     }
 }
