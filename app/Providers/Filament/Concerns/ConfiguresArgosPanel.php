@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers\Filament\Concerns;
 
-use App\Filament\Workspaces\Pages\Login;
+use App\Filament\App\Pages\Login;
 use App\Http\Middleware\RedirectToOnboarding;
 use App\Http\Middleware\SetUserLocale;
 use DutchCodingCompany\FilamentDeveloperLogins\FilamentDeveloperLoginsPlugin;

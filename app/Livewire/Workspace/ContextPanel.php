@@ -155,7 +155,7 @@ class ContextPanel extends Component
 
     public function placeholder(): string
     {
-        return '<div class="wf-context-inner"><span class="wf-spin"></span></div>';
+        return '<div class="ag-context-inner"><span class="ag-spin"></span></div>';
     }
 
     public function render(): View

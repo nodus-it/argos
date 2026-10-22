@@ -6,11 +6,11 @@ namespace Tests\Feature\Workspace;
 
 use App\Enums\AuthMethod;
 use App\Enums\IntegrationProvider;
-use App\Filament\Workspaces\Resources\WorkspaceResource;
-use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\CreateWorkspace;
-use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\EditWorkspaceSettings;
-use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ListWorkspaces;
-use App\Filament\Workspaces\Resources\WorkspaceResource\RelationManagers\TaskProviderBindingsRelationManager;
+use App\Filament\App\Resources\WorkspaceResource;
+use App\Filament\App\Resources\WorkspaceResource\Pages\CreateWorkspace;
+use App\Filament\App\Resources\WorkspaceResource\Pages\EditWorkspaceSettings;
+use App\Filament\App\Resources\WorkspaceResource\Pages\ListWorkspaces;
+use App\Filament\App\Resources\WorkspaceResource\RelationManagers\TaskProviderBindingsRelationManager;
 use App\Filament\Shared\WorkspaceForm;
 use App\Models\ConnectedAccount;
 use App\Models\ProviderCredential;
@@ -181,7 +181,7 @@ class WorkspaceFormTest extends TestCase
 
         $this->mock(\App\Services\Workspace\WorkspaceTeardown::class)->shouldReceive('purge')->once();
 
-        Livewire::test(\App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ViewWorkspace::class, ['record' => $workspace->getKey()])
+        Livewire::test(\App\Filament\App\Resources\WorkspaceResource\Pages\ViewWorkspace::class, ['record' => $workspace->getKey()])
             ->callAction('delete')
             ->assertRedirect(WorkspaceResource::getUrl('index'));
 

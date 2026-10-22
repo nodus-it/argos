@@ -6,9 +6,9 @@ namespace Tests\Feature\Workspace;
 
 use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceStatus;
-use App\Filament\Workspaces\Resources\WorkspaceResource;
-use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ListWorkspaces;
-use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ViewWorkspace;
+use App\Filament\App\Resources\WorkspaceResource;
+use App\Filament\App\Resources\WorkspaceResource\Pages\ListWorkspaces;
+use App\Filament\App\Resources\WorkspaceResource\Pages\ViewWorkspace;
 use App\Jobs\Workspace\ProvisionWorkspaceJob;
 use App\Livewire\Workspace\ContextPanel;
 use App\Models\User;
@@ -30,7 +30,7 @@ class WorkspaceResourceTest extends TestCase
     {
         parent::setUp();
         // Workspace pages live in the workspaces panel (/w).
-        Filament::setCurrentPanel('workspaces');
+        Filament::setCurrentPanel('app');
         Queue::fake();
         Workspace::factory()->create();
     }

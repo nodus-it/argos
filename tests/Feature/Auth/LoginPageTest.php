@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Auth;
 
-use App\Filament\Workspaces\Pages\Login;
+use App\Filament\App\Pages\Login;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;

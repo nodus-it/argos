@@ -39,11 +39,11 @@ arch('migrated entity services extend the base entity service')
     ->toExtend(EntityService::class);
 
 arch('migrated oauth-config create page routes writes through the base page')
-    ->expect('App\Filament\Workspaces\Clusters\System\Resources\ProviderOAuthConfigResource\Pages\CreateProviderOAuthConfig')
+    ->expect('App\Filament\App\Clusters\System\Resources\ProviderOAuthConfigResource\Pages\CreateProviderOAuthConfig')
     ->toExtend(CreateRecord::class);
 
 arch('migrated oauth-config edit page routes writes through the base page')
-    ->expect('App\Filament\Workspaces\Clusters\System\Resources\ProviderOAuthConfigResource\Pages\EditProviderOAuthConfig')
+    ->expect('App\Filament\App\Clusters\System\Resources\ProviderOAuthConfigResource\Pages\EditProviderOAuthConfig')
     ->toExtend(EditRecord::class);
 
 // --- R3' : no direct model mutations in the presentation layer --------------

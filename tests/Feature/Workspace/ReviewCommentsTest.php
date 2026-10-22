@@ -50,7 +50,7 @@ class ReviewCommentsTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        Filament::setCurrentPanel('workspaces');
+        Filament::setCurrentPanel('app');
         Event::fake([TaskStream::class, UserWorkspaceSignal::class]);
         $this->app->singleton(WorkspaceDaemonClient::class, FakeWorkspaceDaemon::class);
         FakeWorkspaceDaemon::$diff = self::DIFF;
@@ -82,7 +82,7 @@ class ReviewCommentsTest extends TestCase
             ->call('addComment', 'resources/views/welcome.blade.php', 'new', 2, 2, 'Reuse the nav partial')
             ->assertDispatched('review-comments-changed')
             ->assertSee('Reuse the nav partial')
-            ->assertSeeHtml('class="wf-dbadge"');
+            ->assertSeeHtml('class="ag-dbadge"');
 
         $comment = ReviewComment::query()->sole();
         $this->assertSame(ReviewCommentStatus::Draft, $comment->status);
@@ -120,7 +120,7 @@ class ReviewCommentsTest extends TestCase
         Livewire::withQueryParams(['task' => $this->task->id])->actingAs($this->editor)
             ->test(TaskChat::class, ['workspaceId' => $this->workspace->id])
             ->assertSee(trans_choice('workspaces.review.message_card', 2, ['count' => 2]))
-            ->assertSeeHtml('class="wf-review-msg-item"');
+            ->assertSeeHtml('class="ag-review-msg-item"');
     }
 
     public function test_the_chip_removes_a_comment_and_drafts_survive_a_reload(): void
@@ -144,7 +144,7 @@ class ReviewCommentsTest extends TestCase
         WorkspaceMember::query()->create(['workspace_id' => $this->workspace->id, 'user_id' => $viewer->id, 'role' => WorkspaceRole::Viewer]);
 
         $this->review($viewer)
-            ->assertDontSeeHtml('wf-dplus')
+            ->assertDontSeeHtml('ag-dplus')
             ->call('addComment', 'resources/views/welcome.blade.php', 'new', 2, 2, 'x');
         $this->assertSame(0, ReviewComment::query()->count());
     }

@@ -15,22 +15,22 @@ class RedirectToOnboarding
     public function handle(Request $request, Closure $next): Response
     {
         if ($request->routeIs(
-            'filament.workspaces.pages.setup',
+            'filament.app.pages.setup',
             // The in-app docs (setup/operations) must be reachable before the
             // first workspace exists, so onboarding can link into them.
-            'filament.workspaces.pages.docs',
-            'filament.workspaces.resources.workspaces.create',
+            'filament.app.pages.docs',
+            'filament.app.resources.workspaces.create',
             // My account: profile, own Claude subscriptions (agents are set
             // up before the first workspace exists — create and the post-save
             // edit route) and connected accounts.
-            'filament.workspaces.account',
-            'filament.workspaces.auth.profile',
-            'filament.workspaces.account.*',
+            'filament.app.account',
+            'filament.app.auth.profile',
+            'filament.app.account.*',
             // OAuth apps and Personal Access Tokens are set up before the first
             // workspace exists, so the onboarding flow can reach them too.
-            'filament.workspaces.system.resources.oauth-apps.*',
-            'filament.workspaces.system.resources.tokens.*',
-            'filament.workspaces.auth.logout',
+            'filament.app.system.resources.oauth-apps.*',
+            'filament.app.system.resources.tokens.*',
+            'filament.app.auth.logout',
         )) {
             return $next($request);
         }
@@ -45,6 +45,6 @@ class RedirectToOnboarding
             return $next($request);
         }
 
-        return redirect()->route('filament.workspaces.pages.setup');
+        return redirect()->route('filament.app.pages.setup');
     }
 }

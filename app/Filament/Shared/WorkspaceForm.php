@@ -23,7 +23,7 @@ use App\Support\DocLink;
 use App\Support\DocsLinkAction;
 use App\Support\RepoUrlBuilder;
 use App\Enums\WorkspaceSetupStatus;
-use App\Filament\Workspaces\Resources\WorkspaceResource;
+use App\Filament\App\Resources\WorkspaceResource;
 use App\Services\Workspace\WorkspaceException;
 use App\Services\Workspace\WorkspaceSetupService;
 use Filament\Actions\Action;
@@ -653,7 +653,7 @@ final class WorkspaceForm
                             ->visible(fn (?Workspace $record): bool => $record !== null && app(WorkspaceSetupService::class)->currentImage($record)?->build_log !== null)
                             ->modalHeading(__('workspaces.setup.image_log'))
                             ->modalSubmitAction(false)
-                            ->modalContent(fn (?Workspace $record): HtmlString => new HtmlString('<pre class="wf-log" style="max-height:60vh;overflow:auto;white-space:pre-wrap;font-size:12px">'.e(mb_substr((string) app(WorkspaceSetupService::class)->currentImage($record)?->build_log, -40_000)).'</pre>')),
+                            ->modalContent(fn (?Workspace $record): HtmlString => new HtmlString('<pre class="ag-log" style="max-height:60vh;overflow:auto;white-space:pre-wrap;font-size:12px">'.e(mb_substr((string) app(WorkspaceSetupService::class)->currentImage($record)?->build_log, -40_000)).'</pre>')),
                         Action::make('rebuildImage')
                             ->label(__('workspaces.setup.rebuild'))
                             ->link()

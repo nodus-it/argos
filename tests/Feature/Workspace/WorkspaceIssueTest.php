@@ -49,7 +49,7 @@ class WorkspaceIssueTest extends TestCase
     {
         parent::setUp();
         // Workspace pages live in the workspaces panel (/w).
-        Filament::setCurrentPanel('workspaces');
+        Filament::setCurrentPanel('app');
         Bus::fake([ProvisionWorkspaceJob::class]);
         Event::fake([TaskStream::class]);
         $this->app->singleton(WorkspaceDaemonClient::class, FakeWorkspaceDaemon::class);

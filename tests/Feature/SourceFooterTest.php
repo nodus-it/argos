@@ -17,7 +17,7 @@ class SourceFooterTest extends TestCase
     {
         config()->set('argos.source_url', 'https://github.com/example/argos-fork');
 
-        $response = $this->get(route('filament.workspaces.auth.login'));
+        $response = $this->get(route('filament.app.auth.login'));
 
         $response->assertOk();
         $response->assertSee('https://github.com/example/argos-fork', false);

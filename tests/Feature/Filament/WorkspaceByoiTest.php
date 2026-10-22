@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Filament;
 
-use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\CreateWorkspace;
+use App\Filament\App\Resources\WorkspaceResource\Pages\CreateWorkspace;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;

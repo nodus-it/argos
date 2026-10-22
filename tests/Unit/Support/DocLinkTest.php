@@ -14,7 +14,7 @@ class DocLinkTest extends TestCase
     public function test_url_points_at_the_docs_route(): void
     {
         $this->assertSame(
-            route('filament.workspaces.pages.docs', ['slug' => 'setup']),
+            route('filament.app.pages.docs', ['slug' => 'setup']),
             DocLink::url('setup'),
         );
     }
@@ -22,7 +22,7 @@ class DocLinkTest extends TestCase
     public function test_url_appends_an_anchor(): void
     {
         $this->assertSame(
-            route('filament.workspaces.pages.docs', ['slug' => 'setup']).'#reverse-proxy',
+            route('filament.app.pages.docs', ['slug' => 'setup']).'#reverse-proxy',
             DocLink::url('setup', 'reverse-proxy'),
         );
     }

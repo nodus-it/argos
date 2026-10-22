@@ -76,7 +76,7 @@ export function argosGateDetail() {
                 }
                 count++;
                 if (out.length < MATCH_LIMIT) {
-                    out.push('<span class="wf-gd-ln">' + (i + 1) + '</span>' + highlight(line, needle));
+                    out.push('<span class="ag-gd-ln">' + (i + 1) + '</span>' + highlight(line, needle));
                 }
             });
             this.count = count;

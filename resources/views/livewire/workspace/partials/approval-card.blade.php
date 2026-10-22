@@ -19,11 +19,11 @@
     $questions = $kind === ApprovalKind::Question && is_array($input['questions'] ?? null) ? $input['questions'] : [];
 @endphp
 
-<div @class(['ws-approval', 'wf-approval', 'is-pending' => $pending]) wire:key="approval-{{ $approval->id }}"
+<div @class(['ws-approval', 'ag-approval', 'is-pending' => $pending]) wire:key="approval-{{ $approval->id }}"
      x-data="{ reason: '', feedback: '', rejecting: false, nextMode: 'acceptEdits', answers: {}, other: {} }">
-    <div class="ws-approval-head wf-approval-head">
-        <span class="wf-approval-icon" aria-hidden="true">
-            @if ($kind === ApprovalKind::Plan) @svg('heroicon-o-map') @elseif ($kind === ApprovalKind::Question) @svg('heroicon-o-question-mark-circle') @else <x-wf.icon name="shield" :size="14" :stroke="2" /> @endif
+    <div class="ws-approval-head ag-approval-head">
+        <span class="ag-approval-icon" aria-hidden="true">
+            @if ($kind === ApprovalKind::Plan) @svg('heroicon-o-map') @elseif ($kind === ApprovalKind::Question) @svg('heroicon-o-question-mark-circle') @else <x-ag.icon name="shield" :size="14" :stroke="2" /> @endif
         </span>
         <span class="ws-approval-title">{{ $title }}</span>
         @unless ($pending)
@@ -59,9 +59,9 @@
     @else
         <div class="ws-approval-body">
             @if ($tool === 'Bash')
-                <div class="wf-approval-cmd mono">{{ $input['command'] ?? '' }}</div>
+                <div class="ag-approval-cmd mono">{{ $input['command'] ?? '' }}</div>
             @else
-                <div class="wf-approval-cmd mono">@if (! in_array($tool, ['Edit', 'MultiEdit', 'Write', 'NotebookEdit'], true)){{ $tool }} · @endif{{ Fmt::toolSummary($tool, $input) }}</div>
+                <div class="ag-approval-cmd mono">@if (! in_array($tool, ['Edit', 'MultiEdit', 'Write', 'NotebookEdit'], true)){{ $tool }} · @endif{{ Fmt::toolSummary($tool, $input) }}</div>
             @endif
             @php
                 $note = (string) (($p['description'] ?? '') !== '' ? $p['description'] : ($p['decision_reason'] ?? ''));
@@ -95,37 +95,37 @@
                                 </select>
                             </label>
                         @endif
-                        <button type="button" class="wf-btn wf-btn-ink" x-on:click="$wire.resolveApproval(@js($approval->id), 'allow', null, null, nextMode)">{{ __('workspaces.approval.accept_plan') }}</button>
-                        <button type="button" class="wf-btn" x-on:click="rejecting = true">{{ __('workspaces.approval.reject_plan') }}</button>
+                        <button type="button" class="ag-btn ag-btn-ink" x-on:click="$wire.resolveApproval(@js($approval->id), 'allow', null, null, nextMode)">{{ __('workspaces.approval.accept_plan') }}</button>
+                        <button type="button" class="ag-btn" x-on:click="rejecting = true">{{ __('workspaces.approval.reject_plan') }}</button>
                     </div>
                 </template>
                 <template x-if="rejecting">
                     <div class="ws-col">
                         <textarea class="respond-ta" rows="2" x-model="feedback" placeholder="{{ __('workspaces.approval.feedback') }}"></textarea>
                         <div class="ws-row">
-                            <button type="button" class="wf-btn wf-btn-ink" x-on:click="$wire.resolveApproval(@js($approval->id), 'deny', feedback)">{{ __('workspaces.approval.deny') }}</button>
-                            <button type="button" class="wf-btn" x-on:click="rejecting = false">{{ __('workspaces.review.cancel') }}</button>
+                            <button type="button" class="ag-btn ag-btn-ink" x-on:click="$wire.resolveApproval(@js($approval->id), 'deny', feedback)">{{ __('workspaces.approval.deny') }}</button>
+                            <button type="button" class="ag-btn" x-on:click="rejecting = false">{{ __('workspaces.review.cancel') }}</button>
                         </div>
                     </div>
                 </template>
             @elseif ($kind === ApprovalKind::Question)
                 <div class="ws-row">
-                    <button type="button" class="wf-btn wf-btn-ink" x-on:click="$wire.resolveApproval(@js($approval->id), 'allow', null, answers)">{{ __('workspaces.approval.answer') }}</button>
-                    <button type="button" class="wf-btn" x-on:click="$wire.resolveApproval(@js($approval->id), 'deny')">{{ __('workspaces.approval.deny') }}</button>
+                    <button type="button" class="ag-btn ag-btn-ink" x-on:click="$wire.resolveApproval(@js($approval->id), 'allow', null, answers)">{{ __('workspaces.approval.answer') }}</button>
+                    <button type="button" class="ag-btn" x-on:click="$wire.resolveApproval(@js($approval->id), 'deny')">{{ __('workspaces.approval.deny') }}</button>
                 </div>
             @else
-                <div class="wf-row" x-show="!rejecting">
-                    <button type="button" class="wf-btn wf-btn-ink" x-on:click="$wire.resolveApproval(@js($approval->id), 'allow')">{{ __('workspaces.approval.allow') }}</button>
+                <div class="ag-row" x-show="!rejecting">
+                    <button type="button" class="ag-btn ag-btn-ink" x-on:click="$wire.resolveApproval(@js($approval->id), 'allow')">{{ __('workspaces.approval.allow') }}</button>
                     @if ($canRemember)
-                        <button type="button" class="wf-btn" x-on:click="$wire.resolveApproval(@js($approval->id), 'always')">{{ __('workspaces.approval.always') }}</button>
+                        <button type="button" class="ag-btn" x-on:click="$wire.resolveApproval(@js($approval->id), 'always')">{{ __('workspaces.approval.always') }}</button>
                     @endif
-                    <button type="button" class="wf-btn" x-on:click="rejecting = true; $nextTick(() => $refs.reason.focus())">{{ __('workspaces.approval.deny') }}</button>
+                    <button type="button" class="ag-btn" x-on:click="rejecting = true; $nextTick(() => $refs.reason.focus())">{{ __('workspaces.approval.deny') }}</button>
                 </div>
-                <div class="wf-row" x-show="rejecting" x-cloak>
-                    <input type="text" class="wf-input" x-ref="reason" x-model="reason" placeholder="{{ __('workspaces.approval.reason') }}"
+                <div class="ag-row" x-show="rejecting" x-cloak>
+                    <input type="text" class="ag-input" x-ref="reason" x-model="reason" placeholder="{{ __('workspaces.approval.reason') }}"
                            x-on:keydown.enter.prevent="$wire.resolveApproval(@js($approval->id), 'deny', reason)">
-                    <button type="button" class="wf-btn wf-btn-ink" x-on:click="$wire.resolveApproval(@js($approval->id), 'deny', reason)">{{ __('workspaces.approval.deny') }}</button>
-                    <button type="button" class="wf-btn" x-on:click="rejecting = false">{{ __('workspaces.review.cancel') }}</button>
+                    <button type="button" class="ag-btn ag-btn-ink" x-on:click="$wire.resolveApproval(@js($approval->id), 'deny', reason)">{{ __('workspaces.approval.deny') }}</button>
+                    <button type="button" class="ag-btn" x-on:click="rejecting = false">{{ __('workspaces.review.cancel') }}</button>
                 </div>
             @endif
         </div>

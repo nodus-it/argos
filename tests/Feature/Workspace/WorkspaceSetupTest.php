@@ -13,7 +13,7 @@ use App\Enums\WorkerSource;
 use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceSetupStatus;
 use App\Enums\WorkspaceStatus;
-use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\EditWorkspaceSettings;
+use App\Filament\App\Resources\WorkspaceResource\Pages\EditWorkspaceSettings;
 use App\Jobs\Workspace\CheckWorkspaceSetupJob;
 use App\Livewire\Workspace\TaskChat;
 use App\Models\AgentCredential;
@@ -297,7 +297,7 @@ class WorkspaceSetupTest extends TestCase
 
     public function test_the_settings_show_the_setup_and_revise_it(): void
     {
-        Filament::setCurrentPanel('workspaces');
+        Filament::setCurrentPanel('app');
         $this->workspace->forceFill(['setup_status' => WorkspaceSetupStatus::Failed, 'setup_check' => [['step' => 'ship', 'ok' => true, 'log' => ''], ['step' => 'image', 'ok' => false, 'log' => 'x']]])->save();
 
         Livewire::actingAs($this->admin)

@@ -10,8 +10,8 @@ use App\Enums\SessionStatus;
 use App\Enums\TaskEventType;
 use App\Enums\TaskStatus;
 use App\Enums\WorkspaceRole;
-use App\Filament\Workspaces\Clusters\Account\Pages\Profile;
-use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ListWorkspaces;
+use App\Filament\App\Clusters\Account\Pages\Profile;
+use App\Filament\App\Resources\WorkspaceResource\Pages\ListWorkspaces;
 use App\Livewire\Workspace\TaskSwitcher;
 use App\Models\Demo;
 use App\Models\Task;
@@ -52,7 +52,7 @@ class WorkspaceOverviewTest extends TestCase
     {
         parent::setUp();
         // Workspace pages live in the workspaces panel (/w).
-        Filament::setCurrentPanel('workspaces');
+        Filament::setCurrentPanel('app');
         Event::fake([TaskStream::class, UserWorkspaceSignal::class]);
         // Filament's database notification is queued; assert what was sent.
         Notification::fake();
@@ -179,7 +179,7 @@ class WorkspaceOverviewTest extends TestCase
             ->actingAs($this->editor)
             ->test(TaskSwitcher::class, ['workspaceId' => $this->workspace->id])
             ->assertSee('Checkout')
-            ->assertSeeHtml('class="wf-unread"');
+            ->assertSeeHtml('class="ag-unread"');
 
         $chat->call('archive', $other->id)->assertDontSee('Checkout');
         $this->assertNotNull($other->fresh()->archived_at);

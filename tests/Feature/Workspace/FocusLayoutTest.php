@@ -12,7 +12,7 @@ use App\Enums\SessionStatus;
 use App\Enums\TaskEventType;
 use App\Enums\TaskStatus;
 use App\Enums\WorkspaceRole;
-use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ViewWorkspace;
+use App\Filament\App\Resources\WorkspaceResource\Pages\ViewWorkspace;
 use App\Livewire\Workspace\ChangeTray;
 use App\Livewire\Workspace\ContextPanel;
 use App\Livewire\Workspace\TaskChat;
@@ -46,7 +46,7 @@ class FocusLayoutTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        Filament::setCurrentPanel('workspaces');
+        Filament::setCurrentPanel('app');
         Event::fake([TaskStream::class, UserWorkspaceSignal::class]);
         $this->app->singleton(WorkspaceDaemonClient::class, FakeWorkspaceDaemon::class);
         Workspace::factory()->create();

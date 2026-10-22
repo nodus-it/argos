@@ -105,7 +105,7 @@ class WorkspaceGateController extends Controller
 
         // Top-level navigation: send the person to the Argos login and back.
         if (str_contains((string) $request->header('Accept', ''), 'text/html')) {
-            $loginUrl = rtrim((string) config('app.url'), '/').route('filament.workspaces.auth.login', [], false);
+            $loginUrl = rtrim((string) config('app.url'), '/').route('filament.app.auth.login', [], false);
 
             return redirect()->away($loginUrl);
         }

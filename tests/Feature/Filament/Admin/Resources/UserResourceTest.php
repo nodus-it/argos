@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Filament\Admin\Resources;
 
-use App\Filament\Workspaces\Clusters\System\Resources\UserResource\Pages\CreateUser;
-use App\Filament\Workspaces\Clusters\System\Resources\UserResource\Pages\EditUser;
-use App\Filament\Workspaces\Clusters\System\Resources\UserResource\Pages\ListUsers;
+use App\Filament\App\Clusters\System\Resources\UserResource\Pages\CreateUser;
+use App\Filament\App\Clusters\System\Resources\UserResource\Pages\EditUser;
+use App\Filament\App\Clusters\System\Resources\UserResource\Pages\ListUsers;
 use App\Models\User;
 use App\Services\User\UserService;
 use Filament\Actions\DeleteAction;
@@ -96,8 +96,8 @@ class UserResourceTest extends TestCase
     {
         $this->actingAs(User::factory()->create());
 
-        $this->get(route('filament.workspaces.system.resources.users.index'))->assertForbidden();
-        $this->get(route('filament.workspaces.system.resources.users.create'))->assertForbidden();
+        $this->get(route('filament.app.system.resources.users.index'))->assertForbidden();
+        $this->get(route('filament.app.system.resources.users.create'))->assertForbidden();
     }
 
     public function test_is_admin_is_not_mass_assignable(): void

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Users;
 
-use App\Filament\Workspaces\Pages\Onboarding;
-use App\Filament\Workspaces\Clusters\Account\Pages\Profile;
+use App\Filament\App\Pages\Onboarding;
+use App\Filament\App\Clusters\Account\Pages\Profile;
 use App\Models\User;
 use App\Services\User\UserService;
 use Illuminate\Foundation\Testing\RefreshDatabase;

@@ -18,7 +18,7 @@ abstract class TestCase extends BaseTestCase
         parent::setUp();
         $this->ensurePassportKeys();
         FakeWorkspaceDaemon::reset();
-        Filament::setCurrentPanel(Filament::getPanel('workspaces'));
+        Filament::setCurrentPanel(Filament::getPanel('app'));
     }
 
     /**

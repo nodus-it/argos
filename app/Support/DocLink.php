@@ -35,7 +35,7 @@ final class DocLink
     /** A URL to a documentation page, optionally to a heading anchor on it. */
     public static function url(string $slug, ?string $anchor = null): string
     {
-        $url = route('filament.workspaces.pages.docs', ['slug' => $slug]);
+        $url = route('filament.app.pages.docs', ['slug' => $slug]);
 
         return $anchor !== null && $anchor !== ''
             ? $url.'#'.$anchor

@@ -11,7 +11,7 @@ use App\Enums\TaskProviderSyncStatus;
 use App\Enums\TaskStatus;
 use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceStatus;
-use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ViewWorkspace;
+use App\Filament\App\Resources\WorkspaceResource\Pages\ViewWorkspace;
 use App\Livewire\Workspace\TaskChat;
 use App\Models\AgentCredential;
 use App\Models\Task;

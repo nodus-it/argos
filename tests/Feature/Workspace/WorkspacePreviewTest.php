@@ -7,7 +7,7 @@ namespace Tests\Feature\Workspace;
 use App\Enums\DemoStatus;
 use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceStatus;
-use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ViewWorkspace;
+use App\Filament\App\Resources\WorkspaceResource\Pages\ViewWorkspace;
 use App\Jobs\Workspace\DeployWorkspaceDemoJob;
 use App\Jobs\Workspace\RerunWorkspaceDemoCommandsJob;
 use App\Jobs\Workspace\StopWorkspaceDemoJob;
@@ -42,7 +42,7 @@ class WorkspacePreviewTest extends TestCase
     {
         parent::setUp();
         // Workspace pages live in the workspaces panel (/w).
-        Filament::setCurrentPanel('workspaces');
+        Filament::setCurrentPanel('app');
         Queue::fake();
         config(['argos.preview.enabled' => true]);
         $this->workspace = Workspace::factory()->create(['slug' => 'ws', 'live_demo_enabled' => true, 'status' => WorkspaceStatus::Running]);

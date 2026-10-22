@@ -6,8 +6,8 @@ namespace Tests\Feature\Filament\Admin\Resources;
 
 use App\Enums\AgentCredentialStatus;
 use App\Enums\AgentName;
-use App\Filament\Workspaces\Clusters\Account\Resources\AgentCredentialResource\Pages\CreateAgentCredential;
-use App\Filament\Workspaces\Clusters\Account\Resources\AgentCredentialResource\Pages\ListAgentCredentials;
+use App\Filament\App\Clusters\Account\Resources\AgentCredentialResource\Pages\CreateAgentCredential;
+use App\Filament\App\Clusters\Account\Resources\AgentCredentialResource\Pages\ListAgentCredentials;
 use App\Models\AgentCredential;
 use App\Models\User;
 use App\Services\Credentials\CredentialVerification;

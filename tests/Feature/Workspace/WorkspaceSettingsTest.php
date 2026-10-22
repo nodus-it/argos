@@ -8,13 +8,13 @@ use App\Enums\IntegrationProvider;
 use App\Enums\TaskProviderSyncStatus;
 use App\Enums\TaskProviderKind;
 use App\Enums\WorkspaceRole;
-use App\Filament\Workspaces\Resources\WorkspaceResource\RelationManagers\ApiTokensRelationManager;
-use App\Filament\Workspaces\Resources\WorkspaceResource\RelationManagers\TaskProviderBindingsRelationManager;
-use App\Filament\Workspaces\Resources\WorkspaceResource;
-use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\CreateWorkspace;
-use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\EditWorkspaceSettings;
-use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ListWorkspaces;
-use App\Filament\Workspaces\Resources\WorkspaceResource\RelationManagers\MembersRelationManager;
+use App\Filament\App\Resources\WorkspaceResource\RelationManagers\ApiTokensRelationManager;
+use App\Filament\App\Resources\WorkspaceResource\RelationManagers\TaskProviderBindingsRelationManager;
+use App\Filament\App\Resources\WorkspaceResource;
+use App\Filament\App\Resources\WorkspaceResource\Pages\CreateWorkspace;
+use App\Filament\App\Resources\WorkspaceResource\Pages\EditWorkspaceSettings;
+use App\Filament\App\Resources\WorkspaceResource\Pages\ListWorkspaces;
+use App\Filament\App\Resources\WorkspaceResource\RelationManagers\MembersRelationManager;
 use App\Models\ProviderCredential;
 use App\Models\TaskProviderBinding;
 use App\Models\User;
@@ -39,7 +39,7 @@ class WorkspaceSettingsTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        Filament::setCurrentPanel('workspaces');
+        Filament::setCurrentPanel('app');
         Queue::fake();
     }
 
@@ -61,7 +61,7 @@ class WorkspaceSettingsTest extends TestCase
         $workspace = Workspace::factory()->create();
 
         $this->assertSame(
-            route('filament.workspaces.resources.workspaces.settings', ['record' => $workspace]),
+            route('filament.app.resources.workspaces.settings', ['record' => $workspace]),
             WorkspaceResource::getUrl('settings', ['record' => $workspace]),
         );
         $this->assertStringEndsWith("/{$workspace->slug}/settings", WorkspaceResource::getUrl('settings', ['record' => $workspace]));

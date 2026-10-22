@@ -12,6 +12,6 @@ class RailNotifications extends DatabaseNotifications
 {
     public function getTrigger(): ?View
     {
-        return view('filament.workspaces.rail-bell');
+        return view('filament.app.rail-bell');
     }
 }

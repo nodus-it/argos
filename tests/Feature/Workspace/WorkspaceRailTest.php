@@ -10,8 +10,8 @@ use App\Enums\AutoTaskState;
 use App\Enums\SessionStatus;
 use App\Enums\TaskStatus;
 use App\Enums\WorkspaceRole;
-use App\Filament\Workspaces\Pages\MyWork;
-use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ViewWorkspace;
+use App\Filament\App\Pages\MyWork;
+use App\Filament\App\Resources\WorkspaceResource\Pages\ViewWorkspace;
 use App\Livewire\Workspace\RailWorkspaces;
 use App\Models\Task;
 use App\Models\TaskApproval;
@@ -34,7 +34,7 @@ class WorkspaceRailTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        Filament::setCurrentPanel('workspaces');
+        Filament::setCurrentPanel('app');
         Event::fake([TaskStream::class, UserWorkspaceSignal::class]);
     }
 
@@ -100,7 +100,7 @@ class WorkspaceRailTest extends TestCase
         $this->assertSame([$workspace->id => 2], $summary->waitingCountsFor($bob));
 
         Livewire::actingAs($me)->test(RailWorkspaces::class)
-            ->assertSeeHtml('<span class="wf-rail-count" aria-hidden="true">4</span>')
+            ->assertSeeHtml('<span class="ag-rail-count" aria-hidden="true">4</span>')
             ->assertSee(__('workspaces.rail.workspace_waiting', ['name' => 'Shop API', 'count' => 4]));
     }
 
@@ -112,7 +112,7 @@ class WorkspaceRailTest extends TestCase
 
         $html = $this->actingAs($me)->get(ViewWorkspace::getUrl(['record' => $workspace]))->assertOk()->getContent();
 
-        $this->assertMatchesRegularExpression('/class="wf-rail-btn wf-rail-abbr is-active"[^>]*aria-label="Shop API"[^>]*aria-current="page"/', (string) $html);
+        $this->assertMatchesRegularExpression('/class="ag-rail-btn ag-rail-abbr is-active"[^>]*aria-label="Shop API"[^>]*aria-current="page"/', (string) $html);
     }
 
     public function test_administration_only_for_argos_admins(): void
@@ -121,13 +121,13 @@ class WorkspaceRailTest extends TestCase
         $admin = User::factory()->admin()->create();
         // Past onboarding: a workspace exists.
         Workspace::factory()->create();
-        $url = MyWork::getUrl(panel: 'workspaces');
+        $url = MyWork::getUrl(panel: 'app');
 
         $this->actingAs($member)->get($url)->assertOk()
-            ->assertDontSee('wf-rail-admin', false)
+            ->assertDontSee('ag-rail-admin', false)
             ->assertSee(url('/account/profile'), false);
         $this->actingAs($admin)->get($url)->assertOk()
-            ->assertSee('wf-rail-admin', false)
+            ->assertSee('ag-rail-admin', false)
             ->assertSee(__('workspaces.panel.admin'));
     }
 
@@ -135,8 +135,8 @@ class WorkspaceRailTest extends TestCase
     {
         $me = User::factory()->create();
 
-        $this->actingAs($me)->get(MyWork::getUrl(panel: 'workspaces'))
-            ->assertSee('class="wf-rail-btn wf-rail-home is-active"', false)
-            ->assertSee(route('filament.workspaces.resources.workspaces.index'), false);
+        $this->actingAs($me)->get(MyWork::getUrl(panel: 'app'))
+            ->assertSee('class="ag-rail-btn ag-rail-home is-active"', false)
+            ->assertSee(route('filament.app.resources.workspaces.index'), false);
     }
 }

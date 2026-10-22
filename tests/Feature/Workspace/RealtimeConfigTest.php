@@ -18,10 +18,10 @@ class RealtimeConfigTest extends TestCase
         Workspace::factory()->create();
         $this->actingAs(User::factory()->create());
 
-        $this->get(route('filament.workspaces.pages.my-work'))->assertOk()->assertDontSee('window.ArgosRealtime', false);
+        $this->get(route('filament.app.pages.my-work'))->assertOk()->assertDontSee('window.ArgosRealtime', false);
 
         config(['broadcasting.default' => 'reverb', 'broadcasting.connections.reverb.key' => 'argos-key']);
-        $this->get(route('filament.workspaces.pages.my-work'))
+        $this->get(route('filament.app.pages.my-work'))
             ->assertOk()
             ->assertSee('window.ArgosRealtime', false)
             ->assertSee('"key":"argos-key"', false)

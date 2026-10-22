@@ -8,7 +8,7 @@ use App\Enums\AgentName;
 use App\Enums\AutoPlanMode;
 use App\Enums\AutoShipMode;
 use App\Enums\BackingService;
-use App\Filament\Workspaces\Resources\WorkspaceResource\RelationManagers\ApiTokensRelationManager;
+use App\Filament\App\Resources\WorkspaceResource\RelationManagers\ApiTokensRelationManager;
 use App\Services\Docs\DocManifest;
 use Tests\TestCase;
 

@@ -6,7 +6,7 @@ namespace Tests\Feature;
 
 use App\Enums\AgentName;
 use App\Enums\AutoTaskState;
-use App\Filament\Workspaces\Clusters\System\Widgets\StatsOverviewWidget;
+use App\Filament\App\Clusters\System\Widgets\StatsOverviewWidget;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\WorkerImageBuild;

@@ -21,13 +21,13 @@
     ];
 @endphp
 
-<div class="ws-chat wf-chat" x-data="window.argosTaskStream ? window.argosTaskStream(@js($streamConfig)) : {}" x-init="$nextTick(() => scrollDown?.())"
+<div class="ws-chat ag-chat" x-data="window.argosTaskStream ? window.argosTaskStream(@js($streamConfig)) : {}" x-init="$nextTick(() => scrollDown?.())"
      x-on:scroll-to-approval.window="setTimeout(() => $root.querySelector('.ws-approval.is-pending')?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 700)">
     @if ($refreshModels)
         {{-- No (or an old) model list for the agents in view: ask Claude Code once, off the first render. --}}
         <span hidden x-init="$wire.refreshModels()" wire:key="models-refresh"></span>
     @endif
-    <div class="wf-chat-main">
+    <div class="ag-chat-main">
         {{-- Auto-task state and who else is here (the task itself is picked in the header). --}}
         @if ($task?->auto_state)
             @php
@@ -35,21 +35,21 @@
                     ? ' · '.__('workspaces.auto.round', ['n' => (int) ($task->auto_counters['fix_rounds'] ?? 0), 'max' => (int) ($task->auto_config['max_fix_rounds'] ?? 0)])
                     : '';
             @endphp
-            <div class="wf-task-bar">
+            <div class="ag-task-bar">
                 <span class="ws-chip ws-auto-chip is-{{ $task->auto_state->color() }}" title="{{ $task->auto_message }}">
                     @svg('heroicon-s-bolt') {{ $task->auto_state->label() }}{{ $autoRounds }}
                 </span>
                 @if ($canWrite)
                     @if ($task->auto_state->isRunning())
-                        <button type="button" class="wf-icon-btn wf-icon-btn-sm" wire:click="pauseAuto" title="{{ __('workspaces.auto.pause') }}" aria-label="{{ __('workspaces.auto.pause') }}"><x-wf.icon name="pause" :size="15" :stroke="2" /></button>
+                        <button type="button" class="ag-icon-btn ag-icon-btn-sm" wire:click="pauseAuto" title="{{ __('workspaces.auto.pause') }}" aria-label="{{ __('workspaces.auto.pause') }}"><x-ag.icon name="pause" :size="15" :stroke="2" /></button>
                     @elseif ($task->auto_state !== AutoTaskState::Done)
-                        <button type="button" class="wf-icon-btn wf-icon-btn-sm" wire:click="resumeAuto" title="{{ __('workspaces.auto.resume') }}" aria-label="{{ __('workspaces.auto.resume') }}"><x-wf.icon name="play" :size="15" :stroke="2" /></button>
+                        <button type="button" class="ag-icon-btn ag-icon-btn-sm" wire:click="resumeAuto" title="{{ __('workspaces.auto.resume') }}" aria-label="{{ __('workspaces.auto.resume') }}"><x-ag.icon name="play" :size="15" :stroke="2" /></button>
                     @endif
                 @endif
             </div>
         @endif
-        <div class="wf-presence" x-show="members && members.length > 1" x-cloak>
-            <span class="wf-muted">{{ __('workspaces.task.present') }}</span>
+        <div class="ag-presence" x-show="members && members.length > 1" x-cloak>
+            <span class="ag-muted">{{ __('workspaces.task.present') }}</span>
             <template x-for="m in members" :key="m.id">
                 <span class="ws-avatar ws-avatar-sm" :title="m.name" x-text="initials(m.name)"></span>
             </template>
@@ -66,7 +66,7 @@
             @svg('heroicon-o-wrench-screwdriver')
             <span>{{ __('workspaces.setup.banner') }}@if ($task->workspace->setup_status) · <strong>{{ $task->workspace->setup_status->label() }}</strong>@endif</span>
             @if ($canWrite)
-                <button type="button" class="wf-btn wf-btn-sm wf-btn-primary" wire:click="testSetup" wire:loading.attr="disabled" title="{{ __('workspaces.setup.test_help') }}"
+                <button type="button" class="ag-btn ag-btn-sm ag-btn-primary" wire:click="testSetup" wire:loading.attr="disabled" title="{{ __('workspaces.setup.test_help') }}"
                         @disabled($task->workspace->setup_status === \App\Enums\WorkspaceSetupStatus::Testing)>{{ __('workspaces.setup.test') }}</button>
             @endif
         </div>
@@ -77,7 +77,7 @@
         <div class="card card-pad ws-new-task">
             @if ($agents->isEmpty())
                 <p class="muted">{{ __('workspaces.task.no_agent') }}</p>
-                <a class="btn btn-secondary btn-sm" href="{{ \App\Filament\Workspaces\Clusters\Account\Resources\AgentCredentialResource::getUrl('create', panel: 'workspaces') }}">{{ __('workspaces.task.add_agent') }}</a>
+                <a class="btn btn-secondary btn-sm" href="{{ \App\Filament\App\Clusters\Account\Resources\AgentCredentialResource::getUrl('create', panel: 'app') }}">{{ __('workspaces.task.add_agent') }}</a>
             @else
                 <form wire:submit="createTask" class="ws-form">
                     <label class="ws-inline ws-auto-toggle">
@@ -116,20 +116,20 @@
                         </div>
                     @endif
                     @if ($newParentId !== null)
-                        <p class="wf-new-follow"><x-wf.icon name="arrow-right" :size="13" :stroke="2" /> {{ __('workspaces.task.follow_up_hint') }}</p>
+                        <p class="ag-new-follow"><x-ag.icon name="arrow-right" :size="13" :stroke="2" /> {{ __('workspaces.task.follow_up_hint') }}</p>
                     @endif
                     @if ($issuesEnabled)
                         <div class="ws-field">
                             <span>{{ __('workspaces.task.ticket') }}</span>
                             @if ($chosenIssue !== null)
-                                <span class="wf-ref-chip wf-new-ticket">
-                                    <x-wf.icon name="link" :size="11" :stroke="2" /> {{ $chosenIssue }}
-                                    <button type="button" class="wf-text-btn" wire:click="chooseIssue(null)" aria-label="{{ __('workspaces.task.ticket_clear') }}"><x-wf.icon name="x" :size="12" :stroke="2" /></button>
+                                <span class="ag-ref-chip ag-new-ticket">
+                                    <x-ag.icon name="link" :size="11" :stroke="2" /> {{ $chosenIssue }}
+                                    <button type="button" class="ag-text-btn" wire:click="chooseIssue(null)" aria-label="{{ __('workspaces.task.ticket_clear') }}"><x-ag.icon name="x" :size="12" :stroke="2" /></button>
                                 </span>
                             @else
                                 <input type="search" class="ws-input" wire:model.live.debounce.300ms="newIssueQuery" placeholder="{{ __('workspaces.task.ticket_search') }}" autocomplete="off">
                                 @if ($issueResults !== [])
-                                    <ul class="wf-new-issues" role="listbox">
+                                    <ul class="ag-new-issues" role="listbox">
                                         @foreach ($issueResults as $number => $label)
                                             <li><button type="button" role="option" wire:click="chooseIssue(@js((string) $number))">{{ $label }}</button></li>
                                         @endforeach
@@ -205,9 +205,9 @@
     @else
         {{-- History: a person's messages; per Claude turn a head (duration,
              cost), compact step rows and the text/approvals in between. --}}
-        <div class="ws-feed wf-feed" x-ref="feed">
+        <div class="ws-feed ag-feed" x-ref="feed">
             @if ($hasOlder)
-                <button type="button" class="wf-btn wf-btn-sm ws-older" wire:click="loadOlder">{{ __('workspaces.task.load_older') }}</button>
+                <button type="button" class="ag-btn ag-btn-sm ws-older" wire:click="loadOlder">{{ __('workspaces.task.load_older') }}</button>
             @endif
 
             @php
@@ -220,33 +220,33 @@
                     @include('livewire.workspace.partials.notice', ['event' => $event, 'p' => $p])
                 @elseif ($block['kind'] === 'user')
                     @php $event = $block['event']; $p = $event->payload; $mine = $event->author_user_id === $user->id; @endphp
-                    <div @class(['wf-msg', 'ws-msg', 'is-other' => ! $mine && empty($p['auto']), 'is-author-'.((int) $event->author_user_id % 4) => ! $mine, 'is-latest' => $event->id === $latestHumanId]) wire:key="ev-{{ $event->id }}">
-                        <div class="wf-msg-meta">
+                    <div @class(['ag-msg', 'ws-msg', 'is-other' => ! $mine && empty($p['auto']), 'is-author-'.((int) $event->author_user_id % 4) => ! $mine, 'is-latest' => $event->id === $latestHumanId]) wire:key="ev-{{ $event->id }}">
+                        <div class="ag-msg-meta">
                             @if ($mine)
-                                <span class="wf-msg-author"><x-wf.avatar :user="$user" aria-hidden="true" />{{ __('workspaces.events.you') }}</span>
+                                <span class="ag-msg-author"><x-ag.avatar :user="$user" aria-hidden="true" />{{ __('workspaces.events.you') }}</span>
                                 <span title="{{ $event->created_at?->isoFormat('LLL') }}">· {{ $event->created_at?->format('H:i') }} · {{ $event->created_at?->diffForHumans() }}</span>
                             @else
-                                <span class="wf-msg-author"><x-wf.avatar :user="$authors[$event->author_user_id] ?? null" :name="$p['author_name'] ?? '?'" aria-hidden="true" />{{ $p['author_name'] ?? '' }}</span>
+                                <span class="ag-msg-author"><x-ag.avatar :user="$authors[$event->author_user_id] ?? null" :name="$p['author_name'] ?? '?'" aria-hidden="true" />{{ $p['author_name'] ?? '' }}</span>
                                 <span title="{{ $event->created_at?->isoFormat('LLL') }}">· {{ $event->created_at?->format('H:i') }} · {{ $event->created_at?->diffForHumans() }}</span>
                             @endif
                             @if (! empty($p['auto']))
-                                <span class="wf-pill-tag"><x-wf.icon name="zap" :size="11" :stroke="2" /> {{ __('workspaces.auto.automated') }}</span>
+                                <span class="ag-pill-tag"><x-ag.icon name="zap" :size="11" :stroke="2" /> {{ __('workspaces.auto.automated') }}</span>
                             @endif
                             @if (! empty($p['pending']))
-                                <span class="wf-pill-tag is-warn">{{ __('workspaces.events.queued', ['position' => $queuePosition ?? 1]) }}</span>
+                                <span class="ag-pill-tag is-warn">{{ __('workspaces.events.queued', ['position' => $queuePosition ?? 1]) }}</span>
                             @elseif (! isset($p['accepted_at']) && $busy)
-                                <span class="wf-pill-tag">{{ __('workspaces.task.queued') }}</span>
+                                <span class="ag-pill-tag">{{ __('workspaces.task.queued') }}</span>
                             @endif
                             @if ($canWrite && isset($checkpoints[$event->id]))
                                 <button type="button" class="ws-reset-btn" wire:click="previewRestore('{{ $checkpoints[$event->id] }}')" title="{{ __('workspaces.checkpoints.reset_here_hint') }}">
-                                    <x-wf.icon name="undo" :size="13" :stroke="2" /> <span>{{ __('workspaces.checkpoints.reset_here') }}</span>
+                                    <x-ag.icon name="undo" :size="13" :stroke="2" /> <span>{{ __('workspaces.checkpoints.reset_here') }}</span>
                                 </button>
                             @endif
                         </div>
                         @if (! empty($p['review']['comments']) || ! empty($p['review']['text']))
                             @include('livewire.workspace.partials.review-message', ['review' => $p['review']])
                         @else
-                            <div class="wf-msg-md wf-md ws-md prose">{{ Fmt::markdown((string) ($p['text'] ?? ''), breaks: true) }}</div>
+                            <div class="ag-msg-md ag-md ws-md prose">{{ Fmt::markdown((string) ($p['text'] ?? ''), breaks: true) }}</div>
                         @endif
                         @if (! empty($p['images']))
                             <div class="ws-images">
@@ -261,9 +261,9 @@
                     </div>
                 @else
                     @php $firstId = $block['items'][0]['event']->id ?? ($block['items'][0]['rows'][0]['id'] ?? $loop->index); @endphp
-                    <div class="wf-turn" wire:key="turn-{{ $firstId }}">
-                        <div class="wf-msg-meta">
-                            <span class="wf-claude-badge" aria-hidden="true">C</span>
+                    <div class="ag-turn" wire:key="turn-{{ $firstId }}">
+                        <div class="ag-msg-meta">
+                            <span class="ag-claude-badge" aria-hidden="true">C</span>
                             <span>{{ __('workspaces.events.claude') }}
                                 @if ($block['started_at'] !== null)<time title="{{ $block['started_at']->isoFormat('LLL') }}">· {{ $block['started_at']->format('H:i') }}</time>@endif
                                 @if ($block['running'])
@@ -279,7 +279,7 @@
                         @endphp
                         @if ($turnSteps->isNotEmpty())
                             {{-- Review mode shows the chat compact: steps fold into one line. --}}
-                            <div class="wf-turn-summary">{{ __('workspaces.review.turn_summary', ['steps' => trans_choice('workspaces.review.steps_count', $turnSteps->count(), ['count' => $turnSteps->count()]), 'files' => trans_choice('workspaces.tray.files', $turnFiles, ['count' => $turnFiles])]) }}</div>
+                            <div class="ag-turn-summary">{{ __('workspaces.review.turn_summary', ['steps' => trans_choice('workspaces.review.steps_count', $turnSteps->count(), ['count' => $turnSteps->count()]), 'files' => trans_choice('workspaces.tray.files', $turnFiles, ['count' => $turnFiles])]) }}</div>
                         @endif
                         @foreach ($block['items'] as $item)
                             @if ($item['kind'] === 'steps')
@@ -288,15 +288,15 @@
                                 @php $event = $item['event']; $p = $event->payload; @endphp
                                 @switch ($event->type)
                                     @case (TaskEventType::AssistantMessage)
-                                        <div class="wf-md ws-md prose" wire:key="ev-{{ $event->id }}">{{ Fmt::markdown((string) ($p['text'] ?? '')) }}</div>
+                                        <div class="ag-md ws-md prose" wire:key="ev-{{ $event->id }}">{{ Fmt::markdown((string) ($p['text'] ?? '')) }}</div>
                                         @break
 
                                     @case (TaskEventType::Thinking)
-                                        <div class="wf-think" wire:key="ev-{{ $event->id }}" x-data="{ open: false }">
-                                            <button type="button" class="wf-think-toggle" x-on:click="open = !open" :aria-expanded="open">
-                                                <x-wf.icon name="chevron-right" :size="13" :stroke="2" x-bind:class="{ 'is-open': open }" /> {{ __('workspaces.chat.thinking') }}
+                                        <div class="ag-think" wire:key="ev-{{ $event->id }}" x-data="{ open: false }">
+                                            <button type="button" class="ag-think-toggle" x-on:click="open = !open" :aria-expanded="open">
+                                                <x-ag.icon name="chevron-right" :size="13" :stroke="2" x-bind:class="{ 'is-open': open }" /> {{ __('workspaces.chat.thinking') }}
                                             </button>
-                                            <div class="wf-think-text" x-show="open" x-cloak>{{ $p['text'] ?? '' }}</div>
+                                            <div class="ag-think-text" x-show="open" x-cloak>{{ $p['text'] ?? '' }}</div>
                                         </div>
                                         @break
 
@@ -312,14 +312,14 @@
                                         @break
 
                                     @case (TaskEventType::Error)
-                                        <div class="wf-note-row is-error" wire:key="ev-{{ $event->id }}">
-                                            <x-wf.icon name="alert" :size="15" :stroke="2" />
+                                        <div class="ag-note-row is-error" wire:key="ev-{{ $event->id }}">
+                                            <x-ag.icon name="alert" :size="15" :stroke="2" />
                                             <span>{{ $p['message'] ?? __('workspaces.events.error') }}</span>
                                         </div>
                                         @break
 
                                     @case (TaskEventType::UsageLimit)
-                                        <div class="wf-note-row is-warn" wire:key="ev-{{ $event->id }}">
+                                        <div class="ag-note-row is-warn" wire:key="ev-{{ $event->id }}">
                                             @svg('heroicon-o-clock')
                                             <span>{{ __('workspaces.task.usage_limit', ['agent' => $task->agentCredential?->name ?? '', 'time' => isset($p['resets_at']) ? \Illuminate\Support\Carbon::parse($p['resets_at'])->diffForHumans() : __('workspaces.task.usage_limit_unknown')]) }}</span>
                                         </div>
@@ -330,7 +330,7 @@
                                         @break
 
                                     @case (TaskEventType::ApprovalResolved)
-                                        <div class="ws-notice wf-notice" wire:key="ev-{{ $event->id }}">{{ __('workspaces.approval.cancelled') }}</div>
+                                        <div class="ws-notice ag-notice" wire:key="ev-{{ $event->id }}">{{ __('workspaces.approval.cancelled') }}</div>
                                         @break
                                 @endswitch
                             @endif
@@ -341,16 +341,16 @@
 
             {{-- Live (not yet persisted) output, fed by the websocket. Before the
                  first event of a new turn arrives, it carries the turn head. --}}
-            <div class="wf-turn wf-turn-live" x-show="live || thinking || (status === 'running' && @js(($timeline[array_key_last($timeline) ?? 0]['kind'] ?? 'user') !== 'claude'))" x-cloak>
+            <div class="ag-turn ag-turn-live" x-show="live || thinking || (status === 'running' && @js(($timeline[array_key_last($timeline) ?? 0]['kind'] ?? 'user') !== 'claude'))" x-cloak>
                 @if (($timeline[array_key_last($timeline) ?? 0]['kind'] ?? 'user') !== 'claude')
-                    <div class="wf-msg-meta"><span class="wf-claude-badge" aria-hidden="true">C</span> <span>{{ __('workspaces.events.claude') }} · {{ __('workspaces.task.working') }}</span></div>
+                    <div class="ag-msg-meta"><span class="ag-claude-badge" aria-hidden="true">C</span> <span>{{ __('workspaces.events.claude') }} · {{ __('workspaces.task.working') }}</span></div>
                 @endif
-                <div class="wf-think-text" x-show="thinking && !live" x-text="thinking.slice(-400)"></div>
-                <div class="wf-msg-text" x-text="live"></div>
+                <div class="ag-think-text" x-show="thinking && !live" x-text="thinking.slice(-400)"></div>
+                <div class="ag-msg-text" x-text="live"></div>
             </div>
 
-            <div class="wf-working is-wait" x-show="status === 'waiting_input'" x-cloak>
-                <span class="wf-dot is-waiting" aria-hidden="true"></span> {{ __('workspaces.task.waiting') }}
+            <div class="ag-working is-wait" x-show="status === 'waiting_input'" x-cloak>
+                <span class="ag-dot is-waiting" aria-hidden="true"></span> {{ __('workspaces.task.waiting') }}
             </div>
         </div>
 
@@ -394,30 +394,30 @@
 
         {{-- Change tray + composer --}}
         @if ($canWrite)
-            <div class="wf-bottom">
+            <div class="ag-bottom">
                 @php
                     // What Claude does right now, always in sight above the composer.
                     $runningBlock = collect($timeline)->last(fn ($b) => $b['kind'] === 'claude' && $b['running']);
                     $lastStep = $runningBlock !== null ? collect($runningBlock['items'])->where('kind', 'steps')->flatMap(fn ($i) => $i['rows'])->last() : null;
                     $runningFor = $runningBlock !== null ? \App\Support\TaskTimeline::elapsed($runningBlock['started_at']) : 0;
                 @endphp
-                <div class="wf-working-bar" role="status" x-show="status === 'running'" x-cloak
+                <div class="ag-working-bar" role="status" x-show="status === 'running'" x-cloak
                      x-data="{ s: {{ $runningFor }}, t: null }"
                      x-effect="if (status === 'running') { t ??= setInterval(() => s++, 1000) } else { clearInterval(t); t = null; s = 0 }">
-                    <span class="wf-working-pulse" aria-hidden="true"></span>
-                    <span class="wf-working-text">{{ __('workspaces.chat.claude_working') }}@if ($lastStep !== null) · <span class="wf-working-step">{{ $lastStep['verb'] }} <span class="mono">{{ \Illuminate\Support\Str::limit($lastStep['target'], 80) }}</span></span>@endif</span>
-                    <span class="wf-working-time mono" x-text="s >= 60 ? Math.floor(s / 60) + ' min ' + (s % 60) + ' s' : s + ' s'"></span>
+                    <span class="ag-working-pulse" aria-hidden="true"></span>
+                    <span class="ag-working-text">{{ __('workspaces.chat.claude_working') }}@if ($lastStep !== null) · <span class="ag-working-step">{{ $lastStep['verb'] }} <span class="mono">{{ \Illuminate\Support\Str::limit($lastStep['target'], 80) }}</span></span>@endif</span>
+                    <span class="ag-working-time mono" x-text="s >= 60 ? Math.floor(s / 60) + ' min ' + (s % 60) + ' s' : s + ' s'"></span>
                 </div>
                 @if ($task !== null)
                     @livewire('workspace.change-tray', ['workspaceId' => $workspace->id, 'taskId' => $task->id], key('tray-'.$task->id))
                 @endif
-                <div @class(['ws-composer', 'wf-composer', 'has-review' => $reviewComments->isNotEmpty()])
+                <div @class(['ws-composer', 'ag-composer', 'has-review' => $reviewComments->isNotEmpty()])
                      x-on:dragover.prevent="dragging = true"
                      x-on:dragleave.prevent="dragging = false"
                      x-on:drop.prevent="dragging = false; attach($event.dataTransfer.files)"
                      :class="{ 'is-dragging': dragging }"
                      x-init="commands = @js($commands)">
-                    <div class="ws-typing wf-muted" x-show="typingText()" x-text="typingText()" x-cloak></div>
+                    <div class="ws-typing ag-muted" x-show="typingText()" x-text="typingText()" x-cloak></div>
 
                     @if ($uploads !== [])
                         <div class="ws-upload-previews">
@@ -428,27 +428,27 @@
                                     @else
                                         <span class="ws-upload-name mono">{{ $upload->getClientOriginalName() }}</span>
                                     @endif
-                                    <button type="button" wire:click="removeUpload({{ $i }})" aria-label="{{ __('workspaces.task.remove_image') }}" title="{{ __('workspaces.task.remove_image') }}"><x-wf.icon name="x" :size="12" :stroke="2" /></button>
+                                    <button type="button" wire:click="removeUpload({{ $i }})" aria-label="{{ __('workspaces.task.remove_image') }}" title="{{ __('workspaces.task.remove_image') }}"><x-ag.icon name="x" :size="12" :stroke="2" /></button>
                                 </span>
                             @endforeach
                         </div>
                     @endif
-                    @error('uploads.*') <p class="wf-note is-error">{{ $message }}</p> @enderror
-                    @error('uploads') <p class="wf-note is-error">{{ $message }}</p> @enderror
+                    @error('uploads.*') <p class="ag-note is-error">{{ $message }}</p> @enderror
+                    @error('uploads') <p class="ag-note is-error">{{ $message }}</p> @enderror
 
                     @php
                         $activeComments = $reviewComments->filter(fn ($c) => $c->status === \App\Enums\ReviewCommentStatus::Draft);
                         $staleComments = $reviewComments->filter(fn ($c) => $c->status === \App\Enums\ReviewCommentStatus::Stale);
                     @endphp
                     @if ($reviewComments->isNotEmpty())
-                        <div class="wf-chips">
+                        <div class="ag-chips">
                             @foreach ($reviewComments as $comment)
                                 @php $isStale = $staleComments->contains('id', $comment->id); @endphp
-                                <span @class(['wf-chip-ref', 'mono', 'is-stale' => $isStale]) wire:key="chip-{{ $comment->id }}" title="{{ $comment->body }}">
+                                <span @class(['ag-chip-ref', 'mono', 'is-stale' => $isStale]) wire:key="chip-{{ $comment->id }}" title="{{ $comment->body }}">
                                     {{ basename($comment->path) }}:{{ $comment->line_start }}{{ $comment->line_end > $comment->line_start ? '-'.$comment->line_end : '' }}
                                     <button type="button" wire:click="removeComment(@js($comment->id))" aria-label="{{ __('workspaces.review.remove_ref') }}">×</button>
                                 </span>
-                                @if ($isStale)<span class="wf-tag is-warn">{{ __('workspaces.review.outdated') }}</span>@endif
+                                @if ($isStale)<span class="ag-tag is-warn">{{ __('workspaces.review.outdated') }}</span>@endif
                             @endforeach
                         </div>
                     @endif
@@ -462,10 +462,10 @@
                                 </li>
                             </template>
                         </ul>
-                        <label class="sr-only" for="wf-composer-{{ $task->id }}">{{ __('workspaces.chat.placeholder') }}</label>
+                        <label class="sr-only" for="ag-composer-{{ $task->id }}">{{ __('workspaces.chat.placeholder') }}</label>
                         <textarea
-                            id="wf-composer-{{ $task->id }}"
-                            class="wf-ta"
+                            id="ag-composer-{{ $task->id }}"
+                            class="ag-ta"
                             rows="2"
                             x-ref="composer"
                             wire:model="draft"
@@ -477,54 +477,54 @@
                             x-on:blur="setTimeout(() => suggestions = [], 150)"
                         ></textarea>
                     </div>
-                    <div class="wf-composer-bar">
-                        <button type="button" class="wf-icon-btn wf-icon-btn-sm" x-on:click="$refs.file.click()" title="{{ __('workspaces.task.attach') }}" aria-label="{{ __('workspaces.task.attach') }}"><x-wf.icon name="paperclip" :size="17" /></button>
+                    <div class="ag-composer-bar">
+                        <button type="button" class="ag-icon-btn ag-icon-btn-sm" x-on:click="$refs.file.click()" title="{{ __('workspaces.task.attach') }}" aria-label="{{ __('workspaces.task.attach') }}"><x-ag.icon name="paperclip" :size="17" /></button>
                         <input type="file" class="sr-only" tabindex="-1" aria-hidden="true" x-ref="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple x-on:change="attach($event.target.files); $event.target.value = ''">
-                        <select class="wf-pill" wire:change="setMode($event.target.value)" wire:key="mode-{{ $task->permission_mode->value }}-{{ $controlsVersion }}" aria-label="{{ __('workspaces.chat.mode') }}">
+                        <select class="ag-pill" wire:change="setMode($event.target.value)" wire:key="mode-{{ $task->permission_mode->value }}-{{ $controlsVersion }}" aria-label="{{ __('workspaces.chat.mode') }}">
                             @foreach ($modes as $mode)
                                 @if ($mode !== PermissionMode::BypassPermissions || $isOwner)
                                     <option value="{{ $mode->value }}" @selected($task->permission_mode === $mode)>{{ $mode->label() }}</option>
                                 @endif
                             @endforeach
                         </select>
-                        <select class="wf-pill mono" wire:key="model-{{ $task->model }}-{{ $controlsVersion }}" aria-label="{{ __('workspaces.chat.model') }}"
+                        <select class="ag-pill mono" wire:key="model-{{ $task->model }}-{{ $controlsVersion }}" aria-label="{{ __('workspaces.chat.model') }}"
                                 x-on:change="const id = $event.target.value === '__custom' ? (prompt(@js(__('workspaces.models.custom_prompt')), '') ?? '').trim() : $event.target.value; id !== '' ? $wire.setModel(id) : $wire.$refresh()">
                             @include('livewire.workspace.partials.model-options', ['models' => $models, 'selected' => $task->model])
                         </select>
                         @if ($task->permission_mode === PermissionMode::BypassPermissions)
-                            <span class="wf-pill-tag is-danger" title="{{ __('workspaces.task.bypass_warning') }}"><x-wf.icon name="alert" :size="12" :stroke="2" /> {{ PermissionMode::BypassPermissions->label() }}</span>
+                            <span class="ag-pill-tag is-danger" title="{{ __('workspaces.task.bypass_warning') }}"><x-ag.icon name="alert" :size="12" :stroke="2" /> {{ PermissionMode::BypassPermissions->label() }}</span>
                         @endif
                         @if ($reviewComments->isNotEmpty())
-                            <span class="wf-composer-note">
+                            <span class="ag-composer-note">
                                 {{ $staleComments->isNotEmpty()
                                     ? __('workspaces.review.collected_stale', ['active' => $activeComments->count(), 'stale' => $staleComments->count()])
                                     : trans_choice('workspaces.review.collected_drafts', $activeComments->count(), ['count' => $activeComments->count()]) }}<span x-show="status === 'running' || status === 'waiting_input'"> · {{ __('workspaces.review.queued_hint') }}</span>
                             </span>
                         @endif
-                        <span class="wf-spacer"></span>
+                        <span class="ag-spacer"></span>
                         @if ((float) $task->cost_usd > 0)
-                            <span class="wf-cost" title="{{ __('workspaces.task.cost') }}">{{ \App\Support\CostFormatter::usd((float) $task->cost_usd) }}</span>
+                            <span class="ag-cost" title="{{ __('workspaces.task.cost') }}">{{ \App\Support\CostFormatter::usd((float) $task->cost_usd) }}</span>
                         @endif
                         @if ($activeComments->isNotEmpty())
-                            <button type="button" class="wf-btn wf-btn-primary wf-send-review" wire:click="send" wire:loading.attr="disabled" wire:target="send">
-                                {{ __('workspaces.review.send_review') }} <span class="wf-count">{{ $activeComments->count() }}</span>
+                            <button type="button" class="ag-btn ag-btn-primary ag-send-review" wire:click="send" wire:loading.attr="disabled" wire:target="send">
+                                {{ __('workspaces.review.send_review') }} <span class="ag-count">{{ $activeComments->count() }}</span>
                             </button>
                         @endif
-                        <button type="button" class="wf-btn wf-btn-soft wf-stop" wire:click="interrupt" x-show="status === 'running' || status === 'waiting_input'" x-cloak>
-                            <x-wf.icon name="stop" :size="13" :stroke="2.6" /> {{ __('workspaces.task.stop') }}
+                        <button type="button" class="ag-btn ag-btn-soft ag-stop" wire:click="interrupt" x-show="status === 'running' || status === 'waiting_input'" x-cloak>
+                            <x-ag.icon name="stop" :size="13" :stroke="2.6" /> {{ __('workspaces.task.stop') }}
                         </button>
-                        <button type="button" class="wf-send" wire:click="send" wire:loading.attr="disabled" wire:target="send" @if ($activeComments->isNotEmpty()) hidden @endif
+                        <button type="button" class="ag-send" wire:click="send" wire:loading.attr="disabled" wire:target="send" @if ($activeComments->isNotEmpty()) hidden @endif
                                 :aria-label="(status === 'running' || status === 'waiting_input') ? @js(__('workspaces.chat.queue')) : @js(__('workspaces.chat.send'))"
                                 :title="(status === 'running' || status === 'waiting_input') ? @js(__('workspaces.chat.queue')) : @js(__('workspaces.chat.send'))"
                                 aria-label="{{ __('workspaces.chat.send') }}" title="{{ __('workspaces.chat.send') }}">
-                            <x-wf.icon name="arrow-up" :size="18" :stroke="2.2" />
+                            <x-ag.icon name="arrow-up" :size="18" :stroke="2.2" />
                         </button>
                     </div>
                 </div>
             </div>
         @else
-            <div class="ws-viewer wf-muted wf-viewer">{{ __('workspaces.task.viewer_hint') }}</div>
+            <div class="ws-viewer ag-muted ag-viewer">{{ __('workspaces.task.viewer_hint') }}</div>
         @endif
     @endif
-    </div>{{-- .wf-chat-main --}}
+    </div>{{-- .ag-chat-main --}}
 </div>

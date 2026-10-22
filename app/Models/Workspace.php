@@ -177,7 +177,7 @@ class Workspace extends Model implements HasApiTokensContract
     /** Link to the workspace page, optionally opened on a task. */
     public function url(?Task $task = null): string
     {
-        return route('filament.workspaces.resources.workspaces.view', ['record' => $this->slug] + ($task !== null ? ['task' => $task->slug] : []));
+        return route('filament.app.resources.workspaces.view', ['record' => $this->slug] + ($task !== null ? ['task' => $task->slug] : []));
     }
 
     /** @return BelongsTo<User, $this> */

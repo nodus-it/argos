@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Filament;
 
-use App\Filament\Workspaces\Clusters\Account\Pages\Profile;
-use App\Filament\Workspaces\Clusters\Account\Resources\AgentCredentialResource;
+use App\Filament\App\Clusters\Account\Pages\Profile;
+use App\Filament\App\Clusters\Account\Resources\AgentCredentialResource;
 use App\Models\AgentCredential;
 use App\Models\User;
 use App\Models\Workspace;
@@ -92,8 +92,8 @@ class ProfilePageTest extends TestCase
             ->assertSee(__('common.profile.section_agents'))
             ->assertSee('My Max plan')
             ->assertSee($mine->status->label())
-            ->assertSee(AgentCredentialResource::getUrl('edit', ['record' => $mine], panel: 'workspaces'), false)
-            ->assertSee(AgentCredentialResource::getUrl('create', panel: 'workspaces'), false)
+            ->assertSee(AgentCredentialResource::getUrl('edit', ['record' => $mine], panel: 'app'), false)
+            ->assertSee(AgentCredentialResource::getUrl('create', panel: 'app'), false)
             ->assertDontSee('Someone else')
             ->assertDontSee('Shared team agent');
     }
@@ -108,17 +108,17 @@ class ProfilePageTest extends TestCase
         Workspace::factory()->create();
         $mine = AgentCredential::factory()->ownedBy($this->user)->create();
 
-        $this->get(AgentCredentialResource::getUrl('edit', ['record' => $mine], panel: 'workspaces'))->assertOk();
+        $this->get(AgentCredentialResource::getUrl('edit', ['record' => $mine], panel: 'app'))->assertOk();
     }
 
     public function test_profile_renders_inside_the_workspaces_panel(): void
     {
         Workspace::factory()->create();
-        Filament::setCurrentPanel('workspaces');
+        Filament::setCurrentPanel('app');
 
-        $this->get(Filament::getPanel('workspaces')->getProfileUrl())
+        $this->get(Filament::getPanel('app')->getProfileUrl())
             ->assertOk()
-            ->assertSee('wf-rail', false)
+            ->assertSee('ag-rail', false)
             ->assertSee(__('common.profile.section_auto'));
     }
 }

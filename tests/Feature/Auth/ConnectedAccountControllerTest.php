@@ -119,7 +119,7 @@ class ConnectedAccountControllerTest extends TestCase
 
         $response = $this->get(route('auth.github.callback'));
 
-        $response->assertRedirect(route('filament.workspaces.account.pages.connections'));
+        $response->assertRedirect(route('filament.app.account.pages.connections'));
     }
 
     public function test_redirect_with_onboarding_return_sets_session_marker(): void
@@ -147,7 +147,7 @@ class ConnectedAccountControllerTest extends TestCase
 
         $response = $this->get(route('auth.github.callback'));
 
-        $response->assertRedirect(route('filament.workspaces.pages.setup'));
+        $response->assertRedirect(route('filament.app.pages.setup'));
         $this->assertNull(session('oauth.github.return'));
     }
 
@@ -160,7 +160,7 @@ class ConnectedAccountControllerTest extends TestCase
 
         $response = $this->post(route('auth.github.disconnect'));
 
-        $response->assertRedirect(route('filament.workspaces.account.pages.connections'));
+        $response->assertRedirect(route('filament.app.account.pages.connections'));
         $this->assertDatabaseMissing(ConnectedAccount::class, [
             'user_id' => $this->user->id,
             'provider' => 'github',
@@ -191,7 +191,7 @@ class ConnectedAccountControllerTest extends TestCase
     {
         $response = $this->post(route('auth.github.disconnect'));
 
-        $response->assertRedirect(route('filament.workspaces.account.pages.connections'));
+        $response->assertRedirect(route('filament.app.account.pages.connections'));
         $this->assertDatabaseCount(ConnectedAccount::class, 0);
     }
 

@@ -10,8 +10,8 @@ use App\Enums\AutoTaskState;
 use App\Enums\SessionStatus;
 use App\Enums\TaskStatus;
 use App\Enums\WorkspaceRole;
-use App\Filament\Workspaces\Pages\MyWork;
-use App\Filament\Workspaces\Resources\WorkspaceResource;
+use App\Filament\App\Pages\MyWork;
+use App\Filament\App\Resources\WorkspaceResource;
 use App\Models\Task;
 use App\Models\TaskApproval;
 use App\Models\TaskMember;
@@ -38,7 +38,7 @@ class MyWorkTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        Filament::setCurrentPanel('workspaces');
+        Filament::setCurrentPanel('app');
         Event::fake([TaskStream::class, UserWorkspaceSignal::class]);
         $this->workspace = Workspace::factory()->create(['name' => 'Shop API']);
         $this->me = $this->member($this->workspace, 'Ada Lovelace');
@@ -61,19 +61,19 @@ class MyWorkTest extends TestCase
 
     public function test_w_lands_on_my_work(): void
     {
-        $this->actingAs($this->me)->get('/w')->assertRedirect(MyWork::getUrl(panel: 'workspaces'));
-        $this->assertSame(MyWork::getUrl(panel: 'workspaces'), Filament::getPanel('workspaces')->getHomeUrl());
+        $this->actingAs($this->me)->get('/w')->assertRedirect(MyWork::getUrl(panel: 'app'));
+        $this->assertSame(MyWork::getUrl(panel: 'app'), Filament::getPanel('app')->getHomeUrl());
     }
 
     public function test_page_renders_in_the_workspaces_panel_with_the_rail(): void
     {
         $this->task('Login form');
 
-        $this->actingAs($this->me)->get(MyWork::getUrl(panel: 'workspaces'))
+        $this->actingAs($this->me)->get(MyWork::getUrl(panel: 'app'))
             ->assertOk()
             ->assertSee(__('workspaces.my_work.title'))
             ->assertSee('Login form')
-            ->assertSee('wf-rail', false)
+            ->assertSee('ag-rail', false)
             ->assertSeeLivewire('workspace.rail-workspaces');
     }
 
@@ -158,18 +158,18 @@ class MyWorkTest extends TestCase
     {
         Livewire::actingAs($this->me)->test(MyWork::class)
             ->assertSee(__('workspaces.my_work.empty_title'))
-            ->assertSee(WorkspaceResource::getUrl('index', panel: 'workspaces'), false)
-            ->assertDontSee(\App\Filament\Workspaces\Resources\WorkspaceResource::getUrl('create', panel: 'workspaces'), false);
+            ->assertSee(WorkspaceResource::getUrl('index', panel: 'app'), false)
+            ->assertDontSee(\App\Filament\App\Resources\WorkspaceResource::getUrl('create', panel: 'app'), false);
 
         $admin = User::factory()->admin()->create();
         Livewire::actingAs($admin)->test(MyWork::class)
             ->assertSee(__('workspaces.my_work.empty_title'))
-            ->assertSee(\App\Filament\Workspaces\Resources\WorkspaceResource::getUrl('create', panel: 'workspaces'), false);
+            ->assertSee(\App\Filament\App\Resources\WorkspaceResource::getUrl('create', panel: 'app'), false);
     }
 
     public function test_page_is_live(): void
     {
-        $this->actingAs($this->me)->get(MyWork::getUrl(panel: 'workspaces'))
+        $this->actingAs($this->me)->get(MyWork::getUrl(panel: 'app'))
             ->assertSee('wire:poll.30s', false)
             ->assertSee('x-on:argos-workspace-signal.window', false);
     }

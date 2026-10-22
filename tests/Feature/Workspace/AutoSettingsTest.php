@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Workspace;
 
-use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\EditWorkspaceSettings;
+use App\Filament\App\Resources\WorkspaceResource\Pages\EditWorkspaceSettings;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Workspace\AutoSettings;

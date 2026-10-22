@@ -11,7 +11,7 @@ use App\Enums\TaskProviderKind;
 use App\Enums\TaskStatus;
 use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceStatus;
-use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ViewWorkspace;
+use App\Filament\App\Resources\WorkspaceResource\Pages\ViewWorkspace;
 use App\Integrations\WorkspaceDaemon\Requests\GitCommit;
 use App\Integrations\WorkspaceDaemon\Requests\GitDiff;
 use App\Integrations\WorkspaceDaemon\Requests\GitPush;
@@ -62,7 +62,7 @@ class WorkspaceShipTest extends TestCase
     {
         parent::setUp();
         // Workspace pages live in the workspaces panel (/w).
-        Filament::setCurrentPanel('workspaces');
+        Filament::setCurrentPanel('app');
         Event::fake([TaskStream::class]);
         $this->workspace = Workspace::factory()->create(['repo_url' => 'https://gitlab.com/acme/sub/widget', 'platform' => GitProvider::GitLab, 'token' => 'glpat-x', 'status' => WorkspaceStatus::Running]);
         $this->editor = User::factory()->create(['name' => 'Ada', 'email' => 'ada@example.com']);

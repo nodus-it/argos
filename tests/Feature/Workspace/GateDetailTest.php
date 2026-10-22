@@ -44,7 +44,7 @@ class GateDetailTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        Filament::setCurrentPanel('workspaces');
+        Filament::setCurrentPanel('app');
         Event::fake([TaskStream::class]);
         $this->app->singleton(WorkspaceDaemonClient::class, FakeWorkspaceDaemon::class);
         $this->workspace = Workspace::factory()->create(['status' => WorkspaceStatus::Running]);
@@ -94,7 +94,7 @@ class GateDetailTest extends TestCase
             ->assertSeeLivewire(GateDetail::class)
             ->assertSeeHtml("gate-detail-open', { taskId: '{$this->task->id}', gate: 'pint' }")
             ->assertSeeHtml("gate: 'phpstan'")
-            ->assertDontSeeHtml('wf-gate" disabled');
+            ->assertDontSeeHtml('ag-gate" disabled');
     }
 
     public function test_review_chips_open_the_detail(): void

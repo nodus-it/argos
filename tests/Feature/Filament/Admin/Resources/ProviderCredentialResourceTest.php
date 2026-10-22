@@ -6,9 +6,9 @@ namespace Tests\Feature\Filament\Admin\Resources;
 
 use App\Enums\IntegrationProvider;
 use App\Enums\ProviderCredentialStatus;
-use App\Filament\Workspaces\Clusters\System\Resources\ProviderCredentialResource\Pages\CreateProviderCredential;
-use App\Filament\Workspaces\Clusters\System\Resources\ProviderCredentialResource\Pages\EditProviderCredential;
-use App\Filament\Workspaces\Clusters\System\Resources\ProviderCredentialResource\Pages\ListProviderCredentials;
+use App\Filament\App\Clusters\System\Resources\ProviderCredentialResource\Pages\CreateProviderCredential;
+use App\Filament\App\Clusters\System\Resources\ProviderCredentialResource\Pages\EditProviderCredential;
+use App\Filament\App\Clusters\System\Resources\ProviderCredentialResource\Pages\ListProviderCredentials;
 use App\Models\ProviderCredential;
 use App\Models\User;
 use App\Services\Credentials\CredentialVerification;

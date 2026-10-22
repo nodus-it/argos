@@ -1087,12 +1087,12 @@ body,
 .ws-restore-diff{margin:0;padding:8px;max-height:45vh;overflow:auto;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:var(--t-xs);white-space:pre;}
 .ws-restore-card .t-warn{color:var(--wn-700);font-weight:500;}
 /* Workspaces panel: a compact page header so the work area gets the height. */
-.fi-panel-workspaces .fi-main{padding-top:12px;}
-.fi-panel-workspaces .fi-page-header-main-ctn{padding-top:4px;padding-bottom:0;row-gap:10px;}
-.fi-panel-workspaces .fi-page-main{row-gap:10px;}
-.fi-panel-workspaces .fi-header{gap:8px;}
-.fi-panel-workspaces .fi-header-heading{font-size:1.25rem;line-height:1.75rem;}
-.fi-panel-workspaces .fi-header-subheading{margin-top:2px;}
+.fi-panel-app .fi-main{padding-top:12px;}
+.fi-panel-app .fi-page-header-main-ctn{padding-top:4px;padding-bottom:0;row-gap:10px;}
+.fi-panel-app .fi-page-main{row-gap:10px;}
+.fi-panel-app .fi-header{gap:8px;}
+.fi-panel-app .fi-header-heading{font-size:1.25rem;line-height:1.75rem;}
+.fi-panel-app .fi-header-subheading{margin-top:2px;}
 .ws-avatar-sm{width:22px;height:22px;font-size:10px;}
 
 .ws-chip{display:inline-flex;align-items:center;gap:5px;padding:1px 8px;border-radius:99px;font-size:var(--t-xs);background:var(--surface-2);color:var(--text-2);border:1px solid var(--border);white-space:nowrap;}

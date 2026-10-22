@@ -7,7 +7,7 @@ namespace Tests\Feature\Workspace;
 use App\Broadcasting\TaskStream;
 use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceStatus;
-use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ViewWorkspace;
+use App\Filament\App\Resources\WorkspaceResource\Pages\ViewWorkspace;
 use App\Integrations\WorkspaceDaemon\Requests\GitChanges;
 use App\Integrations\WorkspaceDaemon\Requests\GitFetch;
 use App\Integrations\WorkspaceDaemon\Requests\GitStatus;
@@ -44,7 +44,7 @@ class ReviewPanelTest extends TestCase
     {
         parent::setUp();
         // Workspace pages live in the workspaces panel (/w).
-        Filament::setCurrentPanel('workspaces');
+        Filament::setCurrentPanel('app');
         Event::fake([TaskStream::class]);
         $this->workspace = Workspace::factory()->create(['status' => WorkspaceStatus::Running]);
         $this->editor = $this->member(WorkspaceRole::Member, 'Ada');
@@ -85,13 +85,13 @@ class ReviewPanelTest extends TestCase
             ->call('open')
             ->assertSee('README.md')
             // Markdown reads rendered first; the diff is one click away.
-            ->assertSeeHtml('class="wf-md-preview"')
+            ->assertSeeHtml('class="ag-md-preview"')
             ->assertSee(__('workspaces.review.rendered_hint'))
             ->call('setRendered', false)
             ->assertSee('Hello Argos')
-            ->assertSeeHtml('class="wf-drow"');
+            ->assertSeeHtml('class="ag-drow"');
 
-        $review->call('setView', 'unified')->assertSeeHtml('wf-urow');
+        $review->call('setView', 'unified')->assertSeeHtml('ag-urow');
         $this->assertSame('unified', $this->editor->fresh()->ui_prefs['diff_view']);
     }
 
@@ -183,7 +183,7 @@ class ReviewPanelTest extends TestCase
             ->assertSee('big.php')
             ->assertSee('line 400')
             ->assertDontSee('line 401')
-            ->assertSeeHtml('wf-diff-more')
+            ->assertSeeHtml('ag-diff-more')
             ->call('showMoreLines', 'big.php')
             ->assertSee('line 900')
             ->call('selectFile', 'composer.lock')

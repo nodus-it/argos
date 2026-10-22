@@ -9,7 +9,7 @@ use App\Enums\GateRunStatus;
 use App\Enums\TaskStatus;
 use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceStatus;
-use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ViewWorkspace;
+use App\Filament\App\Resources\WorkspaceResource\Pages\ViewWorkspace;
 use App\Livewire\Workspace\GateDetail;
 use App\Livewire\Workspace\TaskChat;
 use App\Livewire\Workspace\TaskSwitcher;
@@ -43,7 +43,7 @@ class TaskActionsTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        Filament::setCurrentPanel('workspaces');
+        Filament::setCurrentPanel('app');
         Event::fake([TaskStream::class]);
         $this->app->singleton(WorkspaceDaemonClient::class, FakeWorkspaceDaemon::class);
         $this->workspace = Workspace::factory()->create(['status' => WorkspaceStatus::Running, 'default_branch' => 'develop']);
@@ -189,10 +189,10 @@ class TaskActionsTest extends TestCase
         $task = $this->task($this->ada, ['pr_number' => 4, 'pr_url' => 'https://github.com/acme/widget/pull/4', 'pr_state' => 'open']);
 
         $html = $this->page($this->ada, $task)->html();
-        $header = substr($html, (int) strpos($html, 'wf-task-meta'), 3000);
+        $header = substr($html, (int) strpos($html, 'ag-task-meta'), 3000);
 
         // No PR chip (the sidebar has it), no commit/push (the action bar has them), invite only as "+".
-        $this->assertStringNotContainsString('is-pr', substr($header, 0, (int) strpos($header, 'wf-review-flag')));
+        $this->assertStringNotContainsString('is-pr', substr($header, 0, (int) strpos($header, 'ag-review-flag')));
         $this->assertStringContainsString("mountAction('invite')", $html);
         $this->page($this->ada, $task)->assertActionVisible('commit')->assertActionVisible('push');
     }
@@ -206,7 +206,7 @@ class TaskActionsTest extends TestCase
         // The fake has an uncommitted file and an unpushed commit: commit is the next step.
         Livewire::withoutLazyLoading()->actingAs($this->ada)
             ->test(\App\Livewire\Workspace\ChangeTray::class, ['workspaceId' => $this->workspace->id, 'taskId' => $task->id])
-            ->assertSeeHtmlInOrder(['wf-btn-primary', 'data-testid="tray-commit"', 'wf-btn-surface', 'data-testid="tray-push"'])
+            ->assertSeeHtmlInOrder(['ag-btn-primary', 'data-testid="tray-commit"', 'ag-btn-surface', 'data-testid="tray-push"'])
             ->assertSee(__('workspaces.ship.push_pr'))
             ->assertSee(__('workspaces.tray.todo.gates', ['gates' => 'Pest / PHPUnit']))
             ->assertSee(__('workspaces.tray.todo.gates_action'));
@@ -222,7 +222,7 @@ class TaskActionsTest extends TestCase
             ->test(TaskChat::class, ['workspaceId' => $this->workspace->id])
             ->html();
 
-        $this->assertSame(1, substr_count($html, 'wf-notice-avatar'));
+        $this->assertSame(1, substr_count($html, 'ag-notice-avatar'));
         $this->assertStringContainsString(__('workspaces.events.committed', ['name' => 'Bob', 'subject' => 'feat: x']), html_entity_decode($html));
     }
 }

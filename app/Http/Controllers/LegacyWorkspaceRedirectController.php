@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Filament\Workspaces\Resources\WorkspaceResource;
+use App\Filament\App\Resources\WorkspaceResource;
 use App\Models\Task;
 use App\Models\Workspace;
 use Illuminate\Http\RedirectResponse;
@@ -25,8 +25,8 @@ class LegacyWorkspaceRedirectController extends Controller
         $target = match (true) {
             $segments === [], $segments === ['my-work'] => url('/'),
             $segments === ['profile'] => url('/profile'),
-            $segments === ['workspaces'] => WorkspaceResource::getUrl('index', panel: 'workspaces'),
-            $segments === ['workspaces', 'create'] => WorkspaceResource::getUrl('create', panel: 'workspaces'),
+            $segments === ['workspaces'] => WorkspaceResource::getUrl('index', panel: 'app'),
+            $segments === ['workspaces', 'create'] => WorkspaceResource::getUrl('create', panel: 'app'),
             ($segments[0] ?? null) === 'workspaces' && isset($segments[1]) => $this->workspaceUrl($segments[1], $segments[2] ?? null, $request->query('task')),
             default => null,
         };
@@ -42,7 +42,7 @@ class LegacyWorkspaceRedirectController extends Controller
             return null;
         }
         if ($page === 'settings') {
-            return WorkspaceResource::getUrl('settings', ['record' => $workspace], panel: 'workspaces');
+            return WorkspaceResource::getUrl('settings', ['record' => $workspace], panel: 'app');
         }
         $task = is_string($taskKey) ? Task::query()->where('workspace_id', $workspace->id)->where(fn ($q) => $q->where('id', $taskKey)->orWhere('slug', $taskKey))->first() : null;
 

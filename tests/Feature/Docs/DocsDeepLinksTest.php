@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Docs;
 
-use App\Filament\Workspaces\Clusters\Account\Pages\ConnectedAccounts;
-use App\Filament\Workspaces\Pages\Onboarding;
-use App\Filament\Workspaces\Clusters\Account\Resources\AgentCredentialResource\Pages\ListAgentCredentials;
-use App\Filament\Workspaces\Clusters\System\Resources\ApiClientResource\Pages\ListApiClients;
-use App\Filament\Workspaces\Clusters\System\Resources\ProviderCredentialResource\Pages\ListProviderCredentials;
-use App\Filament\Workspaces\Clusters\System\Resources\ProviderOAuthConfigResource\Pages\ListProviderOAuthConfigs;
-use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\CreateWorkspace;
-use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ListWorkspaces;
+use App\Filament\App\Clusters\Account\Pages\ConnectedAccounts;
+use App\Filament\App\Pages\Onboarding;
+use App\Filament\App\Clusters\Account\Resources\AgentCredentialResource\Pages\ListAgentCredentials;
+use App\Filament\App\Clusters\System\Resources\ApiClientResource\Pages\ListApiClients;
+use App\Filament\App\Clusters\System\Resources\ProviderCredentialResource\Pages\ListProviderCredentials;
+use App\Filament\App\Clusters\System\Resources\ProviderOAuthConfigResource\Pages\ListProviderOAuthConfigs;
+use App\Filament\App\Resources\WorkspaceResource\Pages\CreateWorkspace;
+use App\Filament\App\Resources\WorkspaceResource\Pages\ListWorkspaces;
 use App\Models\User;
 use App\Support\DocLink;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -89,7 +89,7 @@ class DocsDeepLinksTest extends TestCase
 
     public function test_renamed_pages_keep_their_old_address(): void
     {
-        Livewire::test(\App\Filament\Workspaces\Pages\Documentation::class, ['slug' => 'projects'])
-            ->assertRedirect(\App\Filament\Workspaces\Pages\Documentation::getUrl(['slug' => 'workspace-settings']));
+        Livewire::test(\App\Filament\App\Pages\Documentation::class, ['slug' => 'projects'])
+            ->assertRedirect(\App\Filament\App\Pages\Documentation::getUrl(['slug' => 'workspace-settings']));
     }
 }

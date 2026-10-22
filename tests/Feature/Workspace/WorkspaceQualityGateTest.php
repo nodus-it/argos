@@ -9,7 +9,7 @@ use App\Enums\GateRunStatus;
 use App\Enums\TaskEventType;
 use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceStatus;
-use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ViewWorkspace;
+use App\Filament\App\Resources\WorkspaceResource\Pages\ViewWorkspace;
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
 use App\Livewire\Workspace\ContextPanel;
 use App\Livewire\Workspace\GateDetail;
@@ -47,7 +47,7 @@ class WorkspaceQualityGateTest extends TestCase
     {
         parent::setUp();
         // Workspace pages live in the workspaces panel (/w).
-        Filament::setCurrentPanel('workspaces');
+        Filament::setCurrentPanel('app');
         Event::fake([TaskStream::class]);
         $this->app->singleton(WorkspaceDaemonClient::class, FakeWorkspaceDaemon::class);
         $this->workspace = Workspace::factory()->create(['status' => WorkspaceStatus::Running]);

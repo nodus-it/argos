@@ -94,7 +94,7 @@ class TaskChatTest extends TestCase
             ->assertSet('draft', '')
             ->assertSee('Hi Claude')
             ->assertSee('Echo: [Ada]: Hi Claude', false)
-            ->assertSeeHtml('class="wf-claude-badge"');
+            ->assertSeeHtml('class="ag-claude-badge"');
 
         $this->assertTrue($task->fresh()->session_open);
     }
@@ -112,7 +112,7 @@ class TaskChatTest extends TestCase
             ->assertSee('Echo: [Bob]: from bob', false)
             // The newest message a person wrote stands out; the working bar is ready above the composer.
             ->assertSeeHtml('is-latest')
-            ->assertSeeHtml('wf-working-bar');
+            ->assertSeeHtml('ag-working-bar');
     }
 
     public function test_claude_is_told_not_to_write_concepts_unasked(): void

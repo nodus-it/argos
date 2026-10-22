@@ -1,9 +1,9 @@
 <?php
 
 use App\Providers\AppServiceProvider;
-use App\Providers\Filament\WorkspacesPanelProvider;
+use App\Providers\Filament\AppPanelProvider;
 
 return [
     AppServiceProvider::class,
-    WorkspacesPanelProvider::class,
+    AppPanelProvider::class,
 ];

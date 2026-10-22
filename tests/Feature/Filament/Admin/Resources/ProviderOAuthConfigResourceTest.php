@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Tests\Feature\Filament\Admin\Resources;
 
 use App\Enums\IntegrationProvider;
-use App\Filament\Workspaces\Clusters\System\Resources\ProviderOAuthConfigResource\Pages\CreateProviderOAuthConfig;
-use App\Filament\Workspaces\Clusters\System\Resources\ProviderOAuthConfigResource\Pages\ListProviderOAuthConfigs;
+use App\Filament\App\Clusters\System\Resources\ProviderOAuthConfigResource\Pages\CreateProviderOAuthConfig;
+use App\Filament\App\Clusters\System\Resources\ProviderOAuthConfigResource\Pages\ListProviderOAuthConfigs;
 use App\Models\ProviderOAuthConfig;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;

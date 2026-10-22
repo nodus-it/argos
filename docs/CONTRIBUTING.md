@@ -124,7 +124,7 @@ php artisan test:providers --reset  # clean up afterwards
 - Run `vendor/bin/pint --dirty` before finalising any change. Pint is the
   source of truth for style.
 - Filament resources follow the existing patterns under
-  `app/Filament/Workspaces/` (clusters `Account` and `System` for account and administration pages) — check sibling files before introducing a
+  `app/Filament/App/` (clusters `Account` and `System` for account and administration pages) — check sibling files before introducing a
   new structure.
 - Eloquent enums are preferred over string columns; new enums go under
   `app/Enums/`.
