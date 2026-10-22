@@ -28,7 +28,7 @@ return [
 
     'fields' => [
         'automation_user' => 'Automatik-Nutzer',
-        'automation_user_helper' => 'Automatische Aufgaben über Tokens dieses Workspaces und Issue-Trigger handeln für diese Person: Sie besitzt die Aufgabe, und sie läuft auf ihrem Claude-Abo.',
+        'automation_user_helper' => 'Automatische Aufgaben über Tokens dieses Workspaces und Issue-Trigger handeln für diese Person: Sie besitzt die Aufgabe, und sie läuft auf ihrem Claude-Abo. Du kannst nur dich selbst wählen – Argos-Admins können jede Person wählen.',
         'auto_plan' => 'Plan',
         'auto_ship' => 'Wenn fertig',
         'auto_max_fix_rounds' => 'Gate-Fix-Runden',

@@ -817,8 +817,9 @@ final class WorkspaceForm
 
     /**
      * Who may be the automation user: on the settings page of a workspace
-     * the people in it (an auto-task runs on that person's subscription);
-     * Argos admins may pick anyone.
+     * themselves (an auto-task runs on that person's subscription — nobody
+     * signs a colleague up for it) and keep the current one; Argos admins may
+     * pick anyone.
      *
      * @return array<int, string>
      */
@@ -827,8 +828,8 @@ final class WorkspaceForm
         /** @var User|null $user */
         $user = Auth::user();
         $query = User::query()->orderBy('name');
-        if ($record !== null && ! ($user?->isAdmin() ?? false)) {
-            $query->whereIn('id', $record->members()->select('user_id'));
+        if (! ($user?->isAdmin() ?? false)) {
+            $query->whereKey(array_filter([$user?->id, $record?->automation_user_id]));
         }
 
         return $query->pluck('name', 'id')->all();

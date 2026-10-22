@@ -13,6 +13,7 @@ use App\Filament\Support\Pages\EditRecord;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\EntityService;
+use App\Services\Workspace\WorkspaceException;
 use App\Services\Workspace\WorkspaceService;
 use App\Support\DocsLinkAction;
 use Filament\Actions\Action;
@@ -256,7 +257,13 @@ class EditWorkspaceSettings extends EditRecord
         /** @var Schema $schema */
         $schema = $this->getSchema($form);
         $data = WorkspaceForm::dehydrate($schema->getState());
-        $this->handleRecordUpdate($this->workspace(), Arr::only($data, self::FIELDS[$schema->getStatePath()]));
+        try {
+            $this->handleRecordUpdate($this->workspace(), Arr::only($data, self::FIELDS[$schema->getStatePath()]));
+        } catch (WorkspaceException $e) {
+            Notification::make()->danger()->title($e->getMessage())->send();
+
+            return;
+        }
 
         Notification::make()->success()->title(__('filament-panels::resources/pages/edit-record.notifications.saved.title'))->send();
     }

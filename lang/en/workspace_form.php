@@ -28,7 +28,7 @@ return [
 
     'fields' => [
         'automation_user' => 'Automation user',
-        'automation_user_helper' => 'Automatic tasks from this workspace\'s tokens and issue triggers act for this person: they own the task and it runs on their Claude subscription.',
+        'automation_user_helper' => 'Automatic tasks from this workspace\'s tokens and issue triggers act for this person: they own the task and it runs on their Claude subscription. You can only choose yourself — Argos admins can choose anyone.',
         'auto_plan' => 'Plan',
         'auto_ship' => 'When done',
         'auto_max_fix_rounds' => 'Gate fix rounds',

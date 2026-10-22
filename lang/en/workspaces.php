@@ -600,6 +600,7 @@ return [
         'transfer_needs_agent' => ':name has no usable Claude subscription to run the task on.',
         'preparing' => 'This task is still being prepared (working copy, database, setup). Try again in a moment.',
         'daemon_failed' => 'The workspace refused: :message',
+        'automation_user_self_only' => 'Automatic tasks run on the automation user\'s Claude subscription: you can only choose yourself. An Argos admin can choose someone else.',
         'discard_failed' => 'The workspace could not remove the task’s working copy. Try again in a moment — if it keeps failing, restart the workspace.',
         'discard_needs_running' => 'Start the workspace to delete the task — its working copy and database go with it.',
         'daemon_unreachable' => 'The workspace did not respond (:message). If it was just restarting, try again in a minute; otherwise stop and start it (⋯ in the workspace) — work in progress is kept.',

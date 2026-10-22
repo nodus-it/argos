@@ -94,6 +94,15 @@ class WorkspaceService extends EntityService
     public function updateSettings(Workspace $workspace, User $by, array $attributes): Workspace
     {
         Gate::forUser($by)->authorize('update', $workspace);
+        // Automatic tasks act for the automation user — as the owner, on
+        // their Claude subscription. Only that person themselves (or an Argos
+        // admin) may make someone the automation user.
+        if (array_key_exists('automation_user_id', $attributes)) {
+            $chosen = $attributes['automation_user_id'] !== null && $attributes['automation_user_id'] !== '' ? (int) $attributes['automation_user_id'] : null;
+            if ($chosen !== null && $chosen !== $workspace->automation_user_id && $chosen !== $by->id && ! $by->isAdmin()) {
+                throw WorkspaceException::translated('workspaces.errors.automation_user_self_only');
+            }
+        }
         $workspace->fill(Arr::except($attributes, ['slug', 'status', 'daemon_token', 'container_name', 'created_by', 'repo_url', 'platform']))->save();
 
         return $workspace;

@@ -20,7 +20,9 @@ use App\Models\TaskProviderBinding;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceMember;
+use App\Services\Workspace\WorkspaceException;
 use App\Services\Workspace\WorkspaceMemberService;
+use App\Services\Workspace\WorkspaceService;
 use Filament\Actions\CreateAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\Testing\TestAction;
@@ -380,5 +382,30 @@ class WorkspaceSettingsTest extends TestCase
 
         Livewire::actingAs($member)->test(ListWorkspaces::class)
             ->assertActionHidden(TestAction::make('settings')->table($theirs));
+    }
+
+    public function test_a_workspace_admin_cannot_make_a_colleague_the_automation_user(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $lead = User::factory()->create();
+        $colleague = User::factory()->create();
+        $members = app(WorkspaceMemberService::class);
+        $members->addAdmin($workspace, $lead);
+        $members->add($workspace, User::factory()->admin()->create(), $colleague, WorkspaceRole::Member);
+        $service = app(WorkspaceService::class);
+
+        try {
+            $service->updateSettings($workspace, $lead, ['automation_user_id' => $colleague->id]);
+            $this->fail('expected a WorkspaceException');
+        } catch (WorkspaceException) {
+        }
+        $this->assertNull($workspace->fresh()->automation_user_id);
+
+        $service->updateSettings($workspace, $lead, ['automation_user_id' => $lead->id]);
+        $this->assertSame($lead->id, $workspace->fresh()->automation_user_id);
+
+        // An Argos admin may choose anyone.
+        $service->updateSettings($workspace, User::factory()->admin()->create(), ['automation_user_id' => $colleague->id]);
+        $this->assertSame($colleague->id, $workspace->fresh()->automation_user_id);
     }
 }
