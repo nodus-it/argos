@@ -181,7 +181,8 @@ class DemoDeployerTest extends TestCase
 
         $fwd = $parsed['http']['middlewares']['demo-s-auth']['forwardAuth'];
         $this->assertSame('http://nginx:80/_argos/workspace-gate', $fwd['address']);
-        $this->assertTrue($fwd['trustForwardHeader']);
+        // Traefik sets the forwarded host itself: a client cannot pick the workspace the gate checks.
+        $this->assertFalse($fwd['trustForwardHeader']);
     }
 
     public function test_deploy_happy_path_marks_live_and_writes_route(): void

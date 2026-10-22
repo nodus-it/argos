@@ -208,13 +208,12 @@ services:
       - "--providers.file.directory=/etc/traefik/dynamic"
       - "--providers.file.watch=true"
       - "--entrypoints.web.address=:80"
-      # Trust + pass through X-Forwarded-* from an upstream TLS-terminating
-      # proxy (HAProxy/nginx/Caddy/another Traefik). Without this Traefik
-      # overwrites X-Forwarded-Proto with "http" for the :80 entrypoint, so
-      # Laravel (which trusts the proto header, see bootstrap/app.php) sees
-      # plain HTTP and emits http:// asset URLs → mixed-content blocked on an
-      # HTTPS site. Mirrors Laravel's trustProxies(at: '*') posture.
-      - "--entrypoints.web.forwardedHeaders.insecure=true"
+      # Pass X-Forwarded-* through only from the upstream TLS-terminating proxy
+      # (HAProxy/nginx/Caddy/another Traefik) — without it Laravel sees plain
+      # HTTP and emits http:// URLs on an HTTPS site. From anyone else Traefik
+      # replaces the headers, so clients cannot fake their IP (login rate
+      # limit) or host (reset links). Laravel trusts what Traefik forwards.
+      - "--entrypoints.web.forwardedHeaders.trustedIPs=${ARGOS_TRUSTED_PROXIES:-10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,127.0.0.1/32}"
     ports:
       - "${ARGOS_PORT:-8080}:80"
     volumes:

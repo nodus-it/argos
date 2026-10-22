@@ -221,9 +221,11 @@ option forwardfor
 http-request set-header X-Forwarded-Proto https if { ssl_fc }
 ```
 
-See the session/HTTPS variables (`SESSION_DOMAIN`, `SESSION_SECURE_COOKIE`) in
+Set `ARGOS_TRUSTED_PROXIES` to the address your proxy connects from (Traefik
+accepts its `X-Forwarded-*` headers only from there). The session variables
+(`SESSION_DOMAIN`, `SESSION_SECURE_COOKIE`) in
 [CONFIGURATION.md#sessions-reverse-proxy--https](CONFIGURATION.md#sessions-reverse-proxy--https)
-— both derive from `APP_URL` and rarely need setting.
+follow `APP_URL` and rarely need setting.
 
 ## OAuth (optional)
 

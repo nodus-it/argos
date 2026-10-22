@@ -56,7 +56,8 @@ Both values **derive from `APP_URL`** and rarely need setting:
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `SESSION_DOMAIN` | derived: `.<APP_URL host>` for a real domain, host-only for localhost/IP/`nip.io` | Cookie domain. The leading dot lets the session span preview subdomains (`demo-<workspace>-<task>.<host>`). Override only when demos live on a domain different from the app. |
+| `SESSION_DOMAIN` | *(empty: host-only)* | Cookie domain of the Argos session. Leave it empty: previews (`demo-…`) and editors (`code-…`) run repository code on subdomains and must not receive the session; they use their own per-host access cookie. |
+| `ARGOS_TRUSTED_PROXIES` | private ranges (`10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,127.0.0.1/32`) | Addresses whose `X-Forwarded-*` headers Traefik accepts — set it to your TLS proxy's address. Headers from anyone else are replaced, so clients cannot fake their IP (login rate limit) or host. |
 | `SESSION_SECURE_COOKIE` | derived: `true` when `APP_URL` is `https://` | Force `Secure` on the session cookie. Set explicitly only when terminating TLS at a proxy that rewrites the scheme. |
 | `SESSION_COOKIE` | `argos_session` | Name of the session cookie. Rarely changed. |
 

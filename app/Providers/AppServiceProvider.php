@@ -33,6 +33,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Passport\Passport;
 use PDO;
@@ -126,6 +127,15 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // Production URLs come from APP_URL, never from a forwarded host:
+        // links in mails and redirects cannot be pointed elsewhere.
+        if ($this->app->environment('production') && filled(config('app.url'))) {
+            URL::forceRootUrl((string) config('app.url'));
+            if (str_starts_with((string) config('app.url'), 'https://')) {
+                URL::forceScheme('https');
+            }
+        }
+
         Event::listen(SocialiteWasCalled::class, GitLabExtendSocialite::class.'@handle');
         Event::listen(SocialiteWasCalled::class, BitbucketExtendSocialite::class.'@handle');
 

@@ -1,20 +1,10 @@
 <?php
 
 // Closed-deployment app — driver choices are fixed, only credentials are ENV-driven.
-// Cookie domain + secure flag are derived from APP_URL so a single APP_URL is the
-// source of truth (no separate SESSION_DOMAIN / SESSION_SECURE_COOKIE needed).
+// The secure flag is derived from APP_URL so a single APP_URL is the source of
+// truth (no separate SESSION_SECURE_COOKIE needed).
 
 $appUrl = (string) env('APP_URL', 'http://localhost');
-$appHost = parse_url($appUrl, PHP_URL_HOST) ?: 'localhost';
-
-// A leading-dot cookie domain (.example.com) lets the Argos session span demo
-// subdomains (demo-ws-<slug>.example.com) — required for session-protected demos.
-// Only valid for a real registrable domain; bare localhost / IPs / *.nip.io
-// (dev) must stay host-only (null) or browsers reject the cookie.
-$bareHost = $appHost === 'localhost'
-    || filter_var($appHost, FILTER_VALIDATE_IP) !== false
-    || str_ends_with($appHost, '.nip.io')
-    || ! str_contains($appHost, '.');
 
 return [
 
@@ -48,7 +38,10 @@ return [
 
     'path' => '/',
 
-    'domain' => env('SESSION_DOMAIN') ?: ($bareHost ? null : '.'.$appHost),
+    // Host-only: previews (demo-…) and editors (code-…) run repository and
+    // agent code on subdomains and must never receive the Argos session. Their
+    // gate uses its own per-host cookie instead.
+    'domain' => env('SESSION_DOMAIN') ?: null,
 
     'secure' => env('SESSION_SECURE_COOKIE', str_starts_with($appUrl, 'https://')),
 

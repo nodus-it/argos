@@ -234,9 +234,11 @@ option forwardfor
 http-request set-header X-Forwarded-Proto https if { ssl_fc }
 ```
 
-Siehe die Session-/HTTPS-Variablen (`SESSION_DOMAIN`, `SESSION_SECURE_COOKIE`) in
+Setze `ARGOS_TRUSTED_PROXIES` auf die Adresse, von der dein Proxy verbindet
+(Traefik übernimmt `X-Forwarded-*`-Header nur von dort). Die Session-Variablen
+(`SESSION_DOMAIN`, `SESSION_SECURE_COOKIE`) in
 [CONFIGURATION.md#sessions-reverse-proxy-https](CONFIGURATION.md#sessions-reverse-proxy-https)
-— beide leiten sich von `APP_URL` ab und müssen selten gesetzt werden.
+folgen `APP_URL` und müssen selten gesetzt werden.
 
 ## OAuth (optional)
 
