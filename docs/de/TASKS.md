@@ -118,8 +118,8 @@ eine freie Session*) und die Zeit der letzten Aktivität.
   **Esc** schließt.
 - Fährst du über eine Aufgabe, kannst du sie umbenennen oder archivieren (nur
   bei Aufgaben, die du ändern darfst; Archivieren fragt vorher nach); unten
-  gibt es *Neue Aufgabe* und das **Archiv** mit archivierten Aufgaben zum
-  Wiederherstellen.
+  gibt es das **Archiv** mit archivierten Aufgaben zum Wiederherstellen. Das
+  **+** direkt neben dem Wechsler legt eine neue Aufgabe an.
 - Ungelesene Einträge erscheinen als Zähler; der Wechsler aktualisiert sich
   live.
 

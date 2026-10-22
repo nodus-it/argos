@@ -56,11 +56,6 @@
         <button type="button" class="wf-btn" x-show="review" x-cloak x-on:click="closeReview()">
             {{ __('workspaces.focus.close_review') }} <kbd class="wf-kbd">esc</kbd>
         </button>
-        @if ($canCreate)
-            <button type="button" class="wf-btn wf-hide-narrow" x-show="!review" x-on:click="$dispatch('task-new')">
-                <x-wf.icon name="plus" :size="16" :stroke="2" /> {{ __('workspaces.task.new') }}
-            </button>
-        @endif
         @if ($this->startAction->isVisible()) {{ $this->startAction }} @endif
         <x-filament-actions::group
             :actions="[

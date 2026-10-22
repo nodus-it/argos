@@ -124,6 +124,8 @@ class TaskActionsTest extends TestCase
         $this->assertStringContainsString("archive('{$mine->id}')", $html);
         $this->assertStringNotContainsString("archive('{$theirs->id}')", $html);
         $this->assertStringContainsString('wire:confirm', $html);
+        // "+" for a new task sits right next to the switcher.
+        $this->assertStringContainsString('data-testid="switcher-new-task"', $html);
     }
 
     public function test_commands_say_why_they_cannot_run(): void

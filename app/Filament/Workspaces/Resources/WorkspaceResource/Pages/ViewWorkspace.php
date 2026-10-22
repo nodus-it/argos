@@ -506,7 +506,6 @@ class ViewWorkspace extends ViewRecord
             'task' => $task,
             'canInvite' => $task !== null && (auth()->user()?->can('invite', $task) ?? false),
             'canOperate' => auth()->user()?->can('operate', $workspace) ?? false,
-            'canCreate' => auth()->user()?->can('create', [Task::class, $workspace]) ?? false,
             'running' => $workspace->status === WorkspaceStatus::Running,
             'transitional' => in_array($workspace->status, [WorkspaceStatus::Provisioning, WorkspaceStatus::Starting, WorkspaceStatus::Stopping], true),
         ];

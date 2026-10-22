@@ -131,7 +131,7 @@
 
 /* ---- Task switcher ---- */
 .wf-switcher { position: relative; display: flex; align-items: center; gap: 10px; min-width: 0; }
-.wf-switch-btn { display: inline-flex; align-items: center; gap: 10px; min-width: 0; height: 38px; padding: 0 10px 0 12px; border: 1px solid var(--wf-border); border-radius: 9px; background: var(--wf-surface); color: var(--wf-text); font: inherit; cursor: pointer; }
+.wf-switch-btn { display: inline-flex; align-items: center; gap: 10px; min-width: 0; height: 38px; padding: 0 10px 0 12px; border: 1px solid var(--wf-border); border-radius: 9px 0 0 9px; background: var(--wf-surface); color: var(--wf-text); font: inherit; cursor: pointer; }
 .wf-switch-btn:hover { border-color: var(--wf-muted); }
 .wf-switch-title { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 260px; }
 .wf-switch-count { font-size: 12px; color: var(--wf-muted); white-space: nowrap; }
@@ -830,3 +830,10 @@ a.wf-pr-person:hover strong, .wf-pr-title-link:hover, a.wf-pr-fb-time:hover, a.w
 .wf-tray-todo-label { flex: 1; min-width: 0; }
 .wf-only-narrow { display: none !important; }
 @media (max-width: 1100px) { .wf-only-narrow { display: inline-flex !important; } }
+
+/* "+" joined to the task switcher. */
+.wf-switch-add { display: inline-grid; place-items: center; flex: none; width: 38px; height: 38px; margin-left: -11px; border: 1px solid var(--wf-border); border-radius: 0 9px 9px 0; background: var(--wf-surface); color: var(--wf-text); cursor: pointer; }
+.wf-switch-add:hover { border-color: var(--wf-muted); background: var(--wf-raised); }
+.wf-switch-add:focus-visible { outline: 2px solid var(--wf-accent); outline-offset: 2px; }
+@media (max-width: 640px) { .wf-switch-add { width: 44px; height: 44px; } }
+.wf-switcher:not(:has(.wf-switch-add)) .wf-switch-btn { border-radius: 9px; }

@@ -154,10 +154,10 @@ Admin-Panel zeigt dasselbe Formular unter **Workspaces**.
 Eine Workspace-Seite hat drei Teile:
 
 - Einen **Kopf** mit dem Workspace, dem
-  [Aufgaben-Wechsler](TASKS.md#der-aufgaben-wechsler) (**⌘J** / **Ctrl+J**), einem
+  [Aufgaben-Wechsler](TASKS.md#der-aufgaben-wechsler) (**⌘J** / **Ctrl+J**; das **+** daneben legt eine neue Aufgabe an), einem
   Chip, wenn eine andere Aufgabe auf Freigabe wartet, der Person, der die
   aktuelle Aufgabe gehört, den Mitarbeitenden (mit Anwesenheit, **+** lädt
-  ein), dem Ticket, **Neue Aufgabe** und dem **⋯**-Menü (übergeben, Ticket
+  ein), dem Ticket und dem **⋯**-Menü (übergeben, Ticket
   verknüpfen oder anlegen, Folge-Aufgabe, Rebase, abbrechen, löschen,
   Einstellungen, Tastenkürzel, starten/stoppen). **Commit & PR** sitzt in der
   Aktionsleiste über dem Eingabefeld.

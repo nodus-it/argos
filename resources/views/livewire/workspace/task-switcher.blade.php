@@ -21,6 +21,13 @@
         <kbd class="wf-kbd wf-hide-narrow" x-text="isMac ? '⌘J' : 'Ctrl J'">⌘J</kbd>
         <x-wf.icon name="chevron-down" :size="16" :stroke="2" class="wf-muted" />
     </button>
+    @if ($canCreate)
+        {{-- New task, joined to the switcher. --}}
+        <button type="button" class="wf-switch-add" x-on:click="close(); $dispatch('task-new')"
+                title="{{ __('workspaces.task.new') }}" aria-label="{{ __('workspaces.task.new') }}" data-testid="switcher-new-task">
+            <x-wf.icon name="plus" :size="16" :stroke="2" />
+        </button>
+    @endif
 
     @if ($waitingElsewhere !== [])
         @php $first = $waitingElsewhere[0]['task']; @endphp
@@ -137,12 +144,6 @@
         </div>
 
         <div class="wf-pop-foot">
-            @if ($canCreate)
-                {{-- The header has "New task" on wide screens; here it is for narrow ones. --}}
-                <button type="button" class="wf-btn wf-btn-sm wf-btn-primary wf-only-narrow" x-on:click="close(); $dispatch('task-new')">
-                    <x-wf.icon name="plus" :size="14" :stroke="2" /> {{ __('workspaces.task.new') }}
-                </button>
-            @endif
             <span class="wf-spacer"></span>
             @if ($overview['archived'] > 0)
                 <button type="button" class="wf-text-btn wf-muted" wire:click="$toggle('showArchived')">{{ __('workspaces.switcher.archive') }} ({{ $overview['archived'] }})</button>

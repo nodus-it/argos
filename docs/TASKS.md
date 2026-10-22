@@ -110,8 +110,8 @@ changed, *Waiting for a free session*) and the time of the last activity.
 - The filter switches between **Mine + invited** and **All**.
 - Type to search by title; arrow keys and **Enter** switch, **Esc** closes.
 - Hover a task to rename or archive it (only on tasks you may change; archiving
-  asks first); the footer has *New task* and the **Archive** with archived
-  tasks to restore.
+  asks first); the footer has the **Archive** with archived tasks to restore.
+  The **+** right next to the switcher starts a new task.
 - Unread entries show as a counter; the switcher updates live.
 
 When **another** task waits for an approval, a chip *N waits for approval*
