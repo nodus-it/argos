@@ -675,13 +675,17 @@ class TaskService
     public function discard(Task $task, User $by): void
     {
         Gate::forUser($by)->authorize('delete', $task);
-        // Its worktree and database go first — a task deleted without them
-        // would leave both behind in the workspace.
-        if (! app(TaskCleanup::class)->cleanup($task)) {
+        // Its worktree and database go before the task — a task deleted
+        // without them would leave both behind in the workspace.
+        if ($task->workspace->status !== WorkspaceStatus::Running) {
             throw WorkspaceException::translated('workspaces.errors.discard_needs_running');
         }
+        // The daemon removes no worktree a session still works in: close it first.
         if ($task->session_open) {
             $this->close($task);
+        }
+        if (! app(TaskCleanup::class)->cleanup($task)) {
+            throw WorkspaceException::translated('workspaces.errors.discard_failed');
         }
         $task->delete();
     }

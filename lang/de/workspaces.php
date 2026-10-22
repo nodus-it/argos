@@ -598,6 +598,7 @@ return [
         'transfer_needs_agent' => ':name hat kein nutzbares Claude-Abo, auf dem die Aufgabe laufen kann.',
         'preparing' => 'Diese Aufgabe wird noch vorbereitet (Arbeitskopie, Datenbank, Setup). Versuch es gleich noch einmal.',
         'daemon_failed' => 'Der Workspace hat abgelehnt: :message',
+        'discard_failed' => 'Der Workspace konnte die Arbeitskopie der Aufgabe nicht entfernen. Versuch es gleich noch einmal – klappt es weiter nicht, starte den Workspace neu.',
         'discard_needs_running' => 'Starte den Workspace, um die Aufgabe zu löschen — ihre Arbeitskopie und Datenbank gehen mit.',
         'daemon_unreachable' => 'Der Workspace hat nicht geantwortet: :message',
         'bypass_owner_only' => 'Nur Admins des Workspaces dürfen Freigaben umgehen.',

@@ -6,27 +6,37 @@ namespace Tests\Feature\Workspace;
 
 use App\Broadcasting\TaskStream;
 use App\Enums\GateRunStatus;
+use App\Enums\SessionStatus;
+use App\Enums\TaskEventType;
 use App\Enums\TaskStatus;
 use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceStatus;
 use App\Filament\App\Resources\WorkspaceResource\Pages\ViewWorkspace;
+use App\Integrations\WorkspaceDaemon\DaemonTransportException;
+use App\Integrations\WorkspaceDaemon\WorkspaceDaemonTransport;
+use App\Livewire\Workspace\ChangeTray;
 use App\Livewire\Workspace\GateDetail;
 use App\Livewire\Workspace\TaskChat;
 use App\Livewire\Workspace\TaskSwitcher;
 use App\Models\AgentCredential;
 use App\Models\Task;
+use App\Models\TaskEvent;
 use App\Models\TaskMember;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceGateRun;
 use App\Models\WorkspaceMember;
+use App\Services\Workspace\TaskMembershipService;
+use App\Services\Workspace\TaskService;
 use App\Services\Workspace\WorkspaceDaemonClient;
+use App\Services\Workspace\WorkspaceException;
 use App\Services\Workspace\WorkspaceGateService;
 use App\Testing\FakeWorkspaceDaemon;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Livewire\Livewire;
+use Mockery\MockInterface;
 use Tests\TestCase;
 
 /** The cleaned-up task actions: menu, switcher, commands, gates, forms. */
@@ -104,12 +114,12 @@ class TaskActionsTest extends TestCase
         $task = $this->task($this->ada);
         $this->page($this->bob, $task)->assertActionHidden('deleteTask');
 
-        $tasks = \Mockery::mock(app(\App\Services\Workspace\TaskService::class));
-        $tasks->shouldReceive('discard')->once()->andThrow(new \App\Services\Workspace\WorkspaceException('Daemon down'));
-        $this->app->instance(\App\Services\Workspace\TaskService::class, $tasks);
+        $tasks = \Mockery::mock(app(TaskService::class));
+        $tasks->shouldReceive('discard')->once()->andThrow(new WorkspaceException('Daemon down'));
+        $this->app->instance(TaskService::class, $tasks);
         $this->page($this->ada, $task)->callAction('deleteTask')->assertNotDispatched('task-archived')->assertNotified('Daemon down');
 
-        $this->app->forgetInstance(\App\Services\Workspace\TaskService::class);
+        $this->app->forgetInstance(TaskService::class);
         $this->page($this->ada, $task)->callAction('deleteTask')->assertDispatched('task-archived');
         $this->assertNull(Task::query()->find($task->id));
     }
@@ -180,7 +190,7 @@ class TaskActionsTest extends TestCase
 
     public function test_unknown_gates_cannot_be_checked_alone(): void
     {
-        $this->expectException(\App\Services\Workspace\WorkspaceException::class);
+        $this->expectException(WorkspaceException::class);
         app(WorkspaceGateService::class)->run($this->task($this->ada), $this->ada, 'rm -rf');
     }
 
@@ -205,7 +215,7 @@ class TaskActionsTest extends TestCase
 
         // The fake has an uncommitted file and an unpushed commit: commit is the next step.
         Livewire::withoutLazyLoading()->actingAs($this->ada)
-            ->test(\App\Livewire\Workspace\ChangeTray::class, ['workspaceId' => $this->workspace->id, 'taskId' => $task->id])
+            ->test(ChangeTray::class, ['workspaceId' => $this->workspace->id, 'taskId' => $task->id])
             ->assertSeeHtmlInOrder(['ag-btn-primary', 'data-testid="tray-commit"', 'ag-btn-surface', 'data-testid="tray-push"'])
             ->assertSee(__('workspaces.ship.push_pr'))
             ->assertSee(__('workspaces.tray.todo.gates', ['gates' => 'Pest / PHPUnit']))
@@ -215,8 +225,8 @@ class TaskActionsTest extends TestCase
     public function test_what_a_person_did_carries_their_picture(): void
     {
         $task = $this->task($this->ada);
-        \App\Models\TaskEvent::query()->create(['task_id' => $task->id, 'type' => \App\Enums\TaskEventType::Notice, 'author_user_id' => $this->bob->id, 'payload' => ['kind' => 'committed', 'author_name' => 'Bob', 'subject' => 'feat: x']]);
-        \App\Models\TaskEvent::query()->create(['task_id' => $task->id, 'type' => \App\Enums\TaskEventType::Notice, 'payload' => ['kind' => 'pr_merged']]);
+        TaskEvent::query()->create(['task_id' => $task->id, 'type' => TaskEventType::Notice, 'author_user_id' => $this->bob->id, 'payload' => ['kind' => 'committed', 'author_name' => 'Bob', 'subject' => 'feat: x']]);
+        TaskEvent::query()->create(['task_id' => $task->id, 'type' => TaskEventType::Notice, 'payload' => ['kind' => 'pr_merged']]);
 
         $html = Livewire::withQueryParams(['task' => $task->id])->actingAs($this->ada)
             ->test(TaskChat::class, ['workspaceId' => $this->workspace->id])
@@ -232,7 +242,7 @@ class TaskActionsTest extends TestCase
         $carl = $this->member('Carl'); // no agent of his own
         $viewer = User::factory()->create(['name' => 'Vera']);
         WorkspaceMember::query()->create(['workspace_id' => $this->workspace->id, 'user_id' => $viewer->id, 'role' => WorkspaceRole::Viewer]);
-        $tasks = app(\App\Services\Workspace\TaskMembershipService::class);
+        $tasks = app(TaskMembershipService::class);
 
         $this->assertSame([$this->bob->id => 'Bob', $carl->id => 'Carl', $viewer->id => 'Vera'], $tasks->inviteCandidates($task));
         // Viewers may not own tasks, Carl has no agent to run it on.
@@ -245,21 +255,45 @@ class TaskActionsTest extends TestCase
         $this->workspace->forceFill(['status' => WorkspaceStatus::Stopped])->save();
 
         try {
-            app(\App\Services\Workspace\TaskService::class)->discard($task->fresh(), $this->ada);
+            app(TaskService::class)->discard($task->fresh(), $this->ada);
             $this->fail('expected a WorkspaceException');
-        } catch (\App\Services\Workspace\WorkspaceException $e) {
+        } catch (WorkspaceException $e) {
             $this->assertSame('discard_needs_running', $e->reason);
         }
         $this->assertNotNull(Task::query()->find($task->id));
     }
 
+    public function test_deleting_a_task_closes_its_session_before_removing_the_worktree(): void
+    {
+        $task = $this->task($this->ada);
+        $task->forceFill(['session_open' => true, 'session_status' => SessionStatus::Idle])->save();
+        $calls = [];
+        $this->mock(WorkspaceDaemonClient::class, function (MockInterface $mock) use (&$calls): void {
+            $api = \Mockery::mock(WorkspaceDaemonTransport::class);
+            $api->shouldReceive('stopTask')->andReturnUsing(function () use (&$calls): void {
+                $calls[] = 'stop';
+            });
+            $api->shouldReceive('removeWorktree')->andReturnUsing(function () use (&$calls): ?string {
+                $calls[] = 'remove';
+
+                return null;
+            });
+            $mock->shouldReceive('for')->andReturn($api);
+        });
+
+        app(TaskService::class)->discard($task->fresh(), $this->ada);
+
+        $this->assertSame(['stop', 'remove'], $calls);
+        $this->assertNull(Task::query()->find($task->id));
+    }
+
     public function test_daemon_failures_say_what_happened(): void
     {
-        $refused = \App\Services\Workspace\WorkspaceException::fromDaemon(new \App\Integrations\WorkspaceDaemon\DaemonTransportException('Worktree missing', 404, 'worktree_missing'));
+        $refused = WorkspaceException::fromDaemon(new DaemonTransportException('Worktree missing', 404, 'worktree_missing'));
         $this->assertSame(__('workspaces.errors.daemon_failed', ['message' => 'Worktree missing']), $refused->getMessage());
         $this->assertSame('worktree_missing', $refused->reason);
 
-        $silent = \App\Services\Workspace\WorkspaceException::fromDaemon(new \App\Integrations\WorkspaceDaemon\DaemonTransportException('Connection refused'));
+        $silent = WorkspaceException::fromDaemon(new DaemonTransportException('Connection refused'));
         $this->assertSame('daemon_unreachable', $silent->reason);
     }
 }

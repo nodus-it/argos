@@ -598,6 +598,7 @@ return [
         'transfer_needs_agent' => ':name has no usable Claude subscription to run the task on.',
         'preparing' => 'This task is still being prepared (working copy, database, setup). Try again in a moment.',
         'daemon_failed' => 'The workspace refused: :message',
+        'discard_failed' => 'The workspace could not remove the task’s working copy. Try again in a moment — if it keeps failing, restart the workspace.',
         'discard_needs_running' => 'Start the workspace to delete the task — its working copy and database go with it.',
         'daemon_unreachable' => 'The workspace did not respond: :message',
         'bypass_owner_only' => 'Only workspace admins may bypass permissions.',
