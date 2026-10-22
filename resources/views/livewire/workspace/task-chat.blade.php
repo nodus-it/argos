@@ -491,6 +491,15 @@
                                 x-on:change="const id = $event.target.value === '__custom' ? (prompt(@js(__('workspaces.models.custom_prompt')), '') ?? '').trim() : $event.target.value; id !== '' ? $wire.setModel(id) : $wire.$refresh()">
                             @include('livewire.workspace.partials.model-options', ['models' => $models, 'selected' => $task->model])
                         </select>
+                        @if ($efforts !== [])
+                            {{-- Claude Code's /effort, as far as the model offers it. --}}
+                            <select class="ag-pill" wire:change="setEffort($event.target.value)" wire:key="effort-{{ $task->effort }}-{{ $task->model }}-{{ $controlsVersion }}" aria-label="{{ __('workspaces.models.effort') }}" title="{{ __('workspaces.models.effort') }}">
+                                <option value="" @selected($task->effort === null)>{{ __('workspaces.models.effort_default') }}</option>
+                                @foreach ($efforts as $level)
+                                    <option value="{{ $level }}" @selected($task->effort === $level)>{{ __('workspaces.models.efforts.'.$level) }}</option>
+                                @endforeach
+                            </select>
+                        @endif
                         @if ($task->permission_mode === PermissionMode::BypassPermissions)
                             <span class="ag-pill-tag is-danger" title="{{ __('workspaces.task.bypass_warning') }}"><x-ag.icon name="alert" :size="12" :stroke="2" /> {{ PermissionMode::BypassPermissions->label() }}</span>
                         @endif

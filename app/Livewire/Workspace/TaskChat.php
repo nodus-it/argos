@@ -592,6 +592,15 @@ class TaskChat extends Component
         }
     }
 
+    /** The effort pill: '' is the model's default. */
+    public function setEffort(string $effort): void
+    {
+        $task = $this->activeTask();
+        if ($task !== null && ! $this->attempt(fn () => app(TaskService::class)->setEffort($task, $this->user(), $effort === '' ? null : $effort))) {
+            $this->controlsVersion++;
+        }
+    }
+
     /**
      * @param  array<string, mixed>|null  $answers  AskUserQuestion: question text → answer
      */
@@ -748,6 +757,7 @@ class TaskChat extends Component
             'isOwner' => $this->user()->isAdmin() || $role === WorkspaceRole::Admin,
             'agents' => $this->usableAgents(),
             'models' => app(ModelCatalog::class)->options($task?->agentCredential, $task?->model),
+            'efforts' => app(ModelCatalog::class)->effortLevels($task?->agentCredential, $task?->model),
             'newModels' => app(ModelCatalog::class)->options($this->usableAgents()->firstWhere('id', $this->newAgentId)),
             'refreshModels' => $workspace->status === WorkspaceStatus::Running && $this->modelAgents()->contains(fn (AgentCredential $agent): bool => app(ModelCatalog::class)->isStale($agent)),
             'issuesEnabled' => $this->creating && app(WorkspaceIssueService::class)->bindingFor($workspace) !== null,

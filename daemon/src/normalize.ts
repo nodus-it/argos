@@ -222,10 +222,20 @@ export function mapCommands(commands: unknown[]): { name: string; description: s
 }
 
 /** SDK ModelInfo rows → wire shape; `resolved_model` is what an alias points at. */
-export function mapModels(models: unknown[]): { value: string; display_name: string; description: string; resolved_model: string | null }[] {
+export function mapModels(models: unknown[]): { value: string; display_name: string; description: string; resolved_model: string | null; effort_levels: string[] }[] {
     return models
-        .filter((m): m is { value: string; displayName?: string; description?: string; resolvedModel?: string } => typeof m === 'object' && m !== null && typeof (m as { value?: unknown }).value === 'string')
-        .map((m) => ({ value: m.value, display_name: m.displayName ?? m.value, description: m.description ?? '', resolved_model: m.resolvedModel ?? null }));
+        .filter(
+            (m): m is { value: string; displayName?: string; description?: string; resolvedModel?: string; supportsEffort?: boolean; supportedEffortLevels?: unknown } =>
+                typeof m === 'object' && m !== null && typeof (m as { value?: unknown }).value === 'string',
+        )
+        .map((m) => ({
+            value: m.value,
+            display_name: m.displayName ?? m.value,
+            description: m.description ?? '',
+            resolved_model: m.resolvedModel ?? null,
+            // The /effort levels this model offers (none: no effort control).
+            effort_levels: m.supportsEffort === true && Array.isArray(m.supportedEffortLevels) ? m.supportedEffortLevels.filter((l): l is string => typeof l === 'string') : [],
+        }));
 }
 
 function blocksOf(content: unknown): ContentBlock[] {

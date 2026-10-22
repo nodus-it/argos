@@ -144,7 +144,10 @@ steps fold into *Show N more steps*.
   exact model (e.g. `claude-opus-5-5`), which stays when a newer one ships;
   *Other model ID …* takes any model id by hand. Argos asks Claude Code for the
   list as soon as the task is open (no message is sent) and again every 12
-  hours. The task's cost sits next to the send button.
+  hours.
+- **Effort** (the pill next to the model, like `/effort` in Claude Code) sets
+  how much Claude thinks: the model's default, or one of the levels the model
+  offers (low to max). Models without effort control show no pill. The task's cost sits next to the send button.
 - If a session ended (container restart, crash), **Resume session** continues
   the same Claude conversation.
 - Claude works in the task's worktree. Slash commands, skills and `CLAUDE.md`

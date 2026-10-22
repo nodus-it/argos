@@ -44,6 +44,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $auto_message
  * @property PermissionMode $permission_mode
  * @property string $model
+ * @property string|null $effort
  * @property string|null $claude_session_id
  * @property list<array{name: string, description: string, argument_hint: string}>|null $commands
  * @property int $last_seq
@@ -101,6 +102,7 @@ class Task extends Model implements DemoTarget
         'session_status',
         'permission_mode',
         'model',
+        'effort',
         'claude_session_id',
         'commands',
         'last_seq',

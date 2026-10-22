@@ -49,6 +49,12 @@ export class FakeQuery implements QueryLike {
         this.models.push(model);
     }
 
+    readonly flagSettings: unknown[] = [];
+
+    async applyFlagSettings(settings: unknown): Promise<void> {
+        this.flagSettings.push(settings);
+    }
+
     async supportedCommands(): Promise<unknown[]> {
         return [{ name: 'review', description: 'Review the diff', argumentHint: '[path]' }];
     }
@@ -56,7 +62,7 @@ export class FakeQuery implements QueryLike {
     async supportedModels(): Promise<unknown[]> {
         return [
             { value: 'default', displayName: 'Default (recommended)', description: 'Sonnet 5.5', resolvedModel: 'claude-sonnet-5-5' },
-            { value: 'opus', displayName: 'Opus', description: 'Most capable', resolvedModel: 'claude-opus-5-5' },
+            { value: 'opus', displayName: 'Opus', description: 'Most capable', resolvedModel: 'claude-opus-5-5', supportsEffort: true, supportedEffortLevels: ['low', 'high', 'max'] },
         ];
     }
 

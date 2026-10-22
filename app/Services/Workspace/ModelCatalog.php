@@ -30,6 +30,9 @@ class ModelCatalog
     /** Used when neither the caller nor the agent chose one. */
     public const DEFAULT = 'sonnet';
 
+    /** Claude Code's /effort levels, lowest first. */
+    public const EFFORT_LEVELS = ['low', 'medium', 'high', 'xhigh', 'max'];
+
     /** Ask Claude Code again after this long (new models ship now and then). */
     public const REFRESH_HOURS = 12;
 
@@ -77,6 +80,7 @@ class ModelCatalog
                 'label' => mb_substr((string) ($model['display_name'] ?? $model['value']), 0, 80),
                 'description' => mb_substr((string) ($model['description'] ?? ''), 0, 160),
                 'resolved' => is_string($resolved) && self::isValidId($resolved) ? $resolved : null,
+                'effort_levels' => array_values(array_intersect(self::EFFORT_LEVELS, is_array($model['effort_levels'] ?? null) ? $model['effort_levels'] : [])),
             ];
         }
         if ($clean !== []) {
@@ -129,6 +133,23 @@ class ModelCatalog
         }
 
         return $options;
+    }
+
+    /**
+     * The /effort levels the model offers (by alias or fixed id), as far as
+     * Claude Code reported them; empty: no effort control (or not known yet).
+     *
+     * @return list<string>
+     */
+    public function effortLevels(?AgentCredential $agent, ?string $model): array
+    {
+        foreach ($agent?->models ?? [] as $entry) {
+            if ($model !== null && ($entry['value'] === $model || $entry['resolved'] === $model)) {
+                return $entry['effort_levels'] ?? [];
+            }
+        }
+
+        return [];
     }
 
     /** How a model is shown: `claude-opus-5-5[1m]` → "Opus 5.5 (1M)"; null for aliases and unknown ids. */

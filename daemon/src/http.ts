@@ -45,12 +45,15 @@ const checkpointRefSchema = z.string().max(200);
 /** Task slugs (worktree folder names). */
 const slugSchema = z.string().regex(SLUG_PATTERN);
 
+const effortLevel = z.enum(['low', 'medium', 'high', 'xhigh', 'max']);
+
 const startSchema = z.object({
     worktree: slugSchema,
     guard: z.enum(['ask', 'deny']).default('ask'),
     agent_id: idSchema,
     oauth_token: z.string().min(1),
     model: z.string().min(1),
+    effort: effortLevel.nullish(),
     permission_mode: permissionMode,
     resume_session_id: z.string().min(1).nullish(),
     seq_offset: z.number().int().min(0).default(0),
@@ -494,6 +497,7 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
                 agentId: body.agent_id,
                 oauthToken: body.oauth_token,
                 model: body.model,
+                effort: body.effort ?? null,
                 permissionMode: body.permission_mode,
                 resumeSessionId: body.resume_session_id ?? null,
                 appendSystemPrompt: body.append_system_prompt,
@@ -549,6 +553,14 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
         const session = sessionFor(request);
         const { model } = z.object({ model: z.string().min(1) }).parse(request.body);
         await session.setModel(model);
+
+        return reply.code(202).send({});
+    });
+
+    app.post('/tasks/:id/effort', async (request, reply) => {
+        const session = sessionFor(request);
+        const { effort } = z.object({ effort: effortLevel.nullable() }).parse(request.body);
+        await session.setEffort(effort);
 
         return reply.code(202).send({});
     });

@@ -125,4 +125,37 @@ class ModelCatalogTest extends TestCase
         $this->travel(ModelCatalog::REFRESH_HOURS + 1)->hours();
         $this->assertTrue(app(ModelCatalog::class)->isStale($agent->fresh()));
     }
+
+    public function test_effort_follows_the_model_and_reaches_the_running_session(): void
+    {
+        $workspace = Workspace::factory()->create(['status' => \App\Enums\WorkspaceStatus::Running]);
+        $owner = \App\Models\User::factory()->create();
+        \App\Models\WorkspaceMember::query()->create(['workspace_id' => $workspace->id, 'user_id' => $owner->id, 'role' => \App\Enums\WorkspaceRole::Member]);
+        $agent = AgentCredential::factory()->ownedBy($owner)->create(['models_refreshed_at' => now(), 'models' => [
+            ['value' => 'opus', 'label' => 'Opus', 'description' => '', 'resolved' => 'claude-opus-5-5', 'effort_levels' => ['low', 'high', 'max']],
+            ['value' => 'haiku', 'label' => 'Haiku', 'description' => '', 'resolved' => 'claude-haiku-5-5', 'effort_levels' => []],
+        ]]);
+        $task = Task::factory()->ownedBy($owner)->create(['workspace_id' => $workspace->id, 'agent_credential_id' => $agent->id, 'model' => 'claude-opus-5-5', 'session_open' => true]);
+        $this->app->singleton(\App\Services\Workspace\WorkspaceDaemonClient::class, \App\Testing\FakeWorkspaceDaemon::class);
+        \Illuminate\Support\Facades\Event::fake([\App\Broadcasting\TaskStream::class]);
+
+        $chat = \Livewire\Livewire::withQueryParams(['task' => $task->id])->actingAs($owner)
+            ->test(\App\Livewire\Workspace\TaskChat::class, ['workspaceId' => $workspace->id])
+            ->assertSee(__('workspaces.models.efforts.max'))
+            ->assertDontSee(__('workspaces.models.efforts.medium'))
+            ->call('setEffort', 'high');
+
+        $this->assertSame('high', $task->fresh()->effort);
+        $this->assertSame([[$task->id, 'high']], \App\Testing\FakeWorkspaceDaemon::$efforts);
+        $notice = \App\Models\TaskEvent::query()->where('task_id', $task->id)->latest('id')->first();
+        $this->assertSame(['effort', 'high'], [$notice->payload['kind'], $notice->payload['effort']]);
+
+        $chat->call('setEffort', 'ultra')->assertNotified(__('workspaces.models.effort_invalid'));
+        $chat->call('setEffort', '');
+        $this->assertNull($task->fresh()->effort);
+
+        // A model without effort control: no pill.
+        $task->forceFill(['model' => 'haiku'])->save();
+        $chat->call('$refresh')->assertDontSee(__('workspaces.models.efforts.max'));
+    }
 }

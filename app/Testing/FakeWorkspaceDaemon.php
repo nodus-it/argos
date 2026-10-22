@@ -168,6 +168,14 @@ class FakeWorkspaceDaemon extends WorkspaceDaemonClient implements WorkspaceDaem
 
     public function setModel(string $taskId, string $model): void {}
 
+    /** Effort changes sent to running sessions. @var list<array{0: string, 1: ?string}> */
+    public static array $efforts = [];
+
+    public function setEffort(string $taskId, ?string $effort): void
+    {
+        self::$efforts[] = [$taskId, $effort];
+    }
+
     public function stopTask(string $taskId): void
     {
         $this->emit($taskId, [['status', ['state' => 'closed']]]);
@@ -185,6 +193,7 @@ class FakeWorkspaceDaemon extends WorkspaceDaemonClient implements WorkspaceDaem
         self::$setupCheck = ['setup' => 'ok', 'log' => "[setup] done\n"];
         self::$setupChecks = [];
         self::$models = self::MODELS;
+        self::$efforts = [];
         self::$modelRequests = [];
     }
 

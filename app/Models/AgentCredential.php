@@ -24,7 +24,7 @@ use Illuminate\Support\Carbon;
  * @property int|null $user_id
  * @property int $max_concurrent_sessions
  * @property string|null $default_model
- * @property list<array{value: string, label: string, description: string, resolved: string|null}>|null $models
+ * @property list<array{value: string, label: string, description: string, resolved: string|null, effort_levels?: list<string>}>|null $models
  * @property Carbon|null $models_refreshed_at
  * @property Carbon|null $usage_limited_until
  * @property-read User|null $user

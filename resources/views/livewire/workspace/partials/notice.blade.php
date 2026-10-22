@@ -11,6 +11,7 @@
         'interrupted' => __('workspaces.events.interrupted', ['name' => $p['author_name'] ?? '']),
         'permission_mode' => __('workspaces.events.permission_mode', ['name' => $p['author_name'] ?? '', 'mode' => \App\Enums\PermissionMode::tryFrom((string) ($p['mode'] ?? ''))?->label() ?? '']),
         'model' => __('workspaces.events.model', ['name' => $p['author_name'] ?? '', 'model' => $p['model'] ?? '']),
+        'effort' => __('workspaces.events.effort', ['name' => $p['author_name'] ?? '', 'effort' => __('workspaces.models.effort_names.'.($p['effort'] ?? 'default'))]),
         'shipped' => __('workspaces.events.shipped', ['name' => $p['author_name'] ?? '']),
         'committed' => __('workspaces.events.committed', ['name' => $p['author_name'] ?? '', 'subject' => $p['subject'] ?? '']),
         'restored' => __('workspaces.events.restored', ['name' => $p['author_name'] ?? '', 'excerpt' => $p['excerpt'] ?? '']),

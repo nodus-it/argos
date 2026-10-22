@@ -45,7 +45,7 @@ describe('listModels', () => {
             env(),
         );
 
-        expect(models).toEqual([{ value: 'opus', display_name: 'Opus', description: 'Opus 5.5 · Complex tasks', resolved_model: 'claude-opus-5-5' }]);
+        expect(models).toEqual([{ value: 'opus', display_name: 'Opus', description: 'Opus 5.5 · Complex tasks', resolved_model: 'claude-opus-5-5', effort_levels: [] }]);
         expect(seen.options?.env?.CLAUDE_CODE_OAUTH_TOKEN).toBe('oat');
         expect(seen.options?.env?.ANTHROPIC_API_KEY).toBeUndefined();
         expect(seen.options?.tools).toEqual([]);

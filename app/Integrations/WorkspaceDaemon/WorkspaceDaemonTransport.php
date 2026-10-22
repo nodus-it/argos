@@ -42,6 +42,9 @@ interface WorkspaceDaemonTransport
 
     public function setModel(string $taskId, string $model): void;
 
+    /** `/effort` for the running session; null: the model's default. */
+    public function setEffort(string $taskId, ?string $effort): void;
+
     public function stopTask(string $taskId): void;
 
     /**

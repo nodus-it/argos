@@ -139,6 +139,7 @@ class TaskService
                 'agent_id' => $agent->id,
                 'oauth_token' => (string) ($agent->credentials['token'] ?? ''),
                 'model' => $task->model,
+                'effort' => $task->effort,
                 'permission_mode' => $task->permission_mode->value,
                 'resume_session_id' => $task->claude_session_id,
                 'seq_offset' => $task->last_seq,
@@ -280,6 +281,21 @@ class TaskService
             $this->callDaemon(fn () => $this->daemon->for($task->workspace)->setModel($task->id, $model));
         }
         $this->notice($task, 'model', $by, ['model' => $model]);
+    }
+
+    /** Claude Code's /effort for the task; null goes back to the model's default. */
+    public function setEffort(Task $task, User $by, ?string $effort): void
+    {
+        Gate::forUser($by)->authorize('changeMode', $task);
+        if ($effort !== null && ! in_array($effort, ModelCatalog::EFFORT_LEVELS, true)) {
+            throw WorkspaceException::translated('workspaces.models.effort_invalid');
+        }
+
+        $task->forceFill(['effort' => $effort])->save();
+        if ($task->session_open) {
+            $this->callDaemon(fn () => $this->daemon->for($task->workspace)->setEffort($task->id, $effort));
+        }
+        $this->notice($task, 'effort', $by, ['effort' => $effort]);
     }
 
     /**

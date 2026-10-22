@@ -160,6 +160,10 @@ drei Schritte klappen zu *N weitere Schritte anzeigen* zusammen.
   Modell-ID von Hand. Argos fragt Claude Code nach der Liste, sobald die
   Aufgabe offen ist (es wird keine Nachricht geschickt), und danach alle 12
   Stunden erneut.
+- **Effort** (die Pille neben dem Modell, wie `/effort` in Claude Code) legt
+  fest, wie gründlich Claude nachdenkt: der Standard des Modells oder eine der
+  Stufen, die das Modell anbietet (niedrig bis maximal). Modelle ohne
+  Effort-Steuerung zeigen keine Pille.
   Die Kosten der Aufgabe stehen neben dem Senden-Knopf.
 - Ist eine Session beendet (Container-Neustart, Absturz), setzt **Session
   fortsetzen** dieselbe Claude-Unterhaltung fort.

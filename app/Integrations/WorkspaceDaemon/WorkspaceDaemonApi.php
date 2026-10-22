@@ -28,6 +28,7 @@ use App\Integrations\WorkspaceDaemon\Requests\RunGates;
 use App\Integrations\WorkspaceDaemon\Requests\ListModels;
 use App\Integrations\WorkspaceDaemon\Requests\RunOneshot;
 use App\Integrations\WorkspaceDaemon\Requests\SendMessage;
+use App\Integrations\WorkspaceDaemon\Requests\SetEffort;
 use App\Integrations\WorkspaceDaemon\Requests\SetModel;
 use App\Integrations\WorkspaceDaemon\Requests\SetPermissionMode;
 use App\Integrations\WorkspaceDaemon\Requests\StartTask;
@@ -107,6 +108,11 @@ class WorkspaceDaemonApi implements WorkspaceDaemonTransport
     public function setModel(string $taskId, string $model): void
     {
         $this->call(new SetModel($taskId, ['model' => $model]));
+    }
+
+    public function setEffort(string $taskId, ?string $effort): void
+    {
+        $this->call(new SetEffort($taskId, ['effort' => $effort]));
     }
 
     public function stopTask(string $taskId): void

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { Options, PermissionMode, PermissionResult, PermissionUpdate, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
+import type { Options, PermissionMode, PermissionResult, PermissionUpdate, SDKUserMessage, EffortLevel } from '@anthropic-ai/claude-agent-sdk';
 import { ApprovalRegistry } from './approvals.js';
 import { applyClaudeBin, claudeChildEnv, type SessionEnvironment } from './claudeEnv.js';
 import type { EventSink, PendingEvent, TaskState } from './events.js';
@@ -14,6 +14,8 @@ export interface QueryLike extends AsyncIterable<SdkMessageLike> {
     interrupt(): Promise<unknown>;
     setPermissionMode(mode: PermissionMode): Promise<void>;
     setModel(model?: string): Promise<void>;
+    /** Session-scoped settings, e.g. `{ effortLevel }` — what /effort changes. */
+    applyFlagSettings?(settings: { effortLevel?: EffortLevel | null }): Promise<void>;
     supportedCommands(): Promise<unknown[]>;
     /** Models the session may use (aliases resolve to the newest model). */
     supportedModels?(): Promise<unknown[]>;
@@ -33,6 +35,8 @@ export interface TaskStartParams {
     agentId: string;
     oauthToken: string;
     model: string;
+    /** Reasoning effort; null/absent: the model's default. */
+    effort?: EffortLevel | null;
     permissionMode: UserPermissionMode;
     resumeSessionId?: string | null;
     appendSystemPrompt?: string;
@@ -159,6 +163,12 @@ export class TaskSession {
         await this.query?.setModel(model);
     }
 
+    /** `/effort` for the running session; null goes back to the model's default. */
+    async setEffort(effort: EffortLevel | null): Promise<void> {
+        this.params = { ...this.params, effort };
+        await this.query?.applyFlagSettings?.({ effortLevel: effort });
+    }
+
     /** Close the session for good. */
     async stop(): Promise<void> {
         this.stopped = true;
@@ -207,6 +217,7 @@ export class TaskSession {
             permissionMode: this.params.permissionMode,
             allowDangerouslySkipPermissions: true,
             model: this.params.model,
+            ...(this.params.effort ? { effort: this.params.effort } : {}),
             settingSources: ['project', 'local'],
             systemPrompt: { type: 'preset', preset: 'claude_code', append: this.params.appendSystemPrompt ?? '' },
             canUseTool: (toolName, input, options) => this.canUseTool(toolName, input, options),

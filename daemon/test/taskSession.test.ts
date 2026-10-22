@@ -68,8 +68,8 @@ describe('TaskSession', () => {
             claude_session_id: 'session-1',
             commands: [{ name: 'review', description: 'Review the diff', argument_hint: '[path]' }],
             models: [
-                { value: 'default', display_name: 'Default (recommended)', description: 'Sonnet 5.5', resolved_model: 'claude-sonnet-5-5' },
-                { value: 'opus', display_name: 'Opus', description: 'Most capable', resolved_model: 'claude-opus-5-5' },
+                { value: 'default', display_name: 'Default (recommended)', description: 'Sonnet 5.5', resolved_model: 'claude-sonnet-5-5', effort_levels: [] },
+                { value: 'opus', display_name: 'Opus', description: 'Most capable', resolved_model: 'claude-opus-5-5', effort_levels: ['low', 'high', 'max'] },
             ],
         });
         expect(session.currentState).toBe('idle');
@@ -333,9 +333,26 @@ describe('TaskSession', () => {
         await waitFor(() => ofType('session.started').length === 1);
         await session.setPermissionMode('acceptEdits');
         await session.setModel('claude-opus-5-5');
+        await session.setEffort('high');
+        await session.setEffort(null);
         expect(queries[0]!.permissionModes).toEqual(['acceptEdits']);
         expect(queries[0]!.models).toEqual(['claude-opus-5-5']);
+        expect(queries[0]!.flagSettings).toEqual([{ effortLevel: 'high' }, { effortLevel: null }]);
         await session.stop();
+    });
+
+    it('starts with the chosen effort, or the model default without one', async () => {
+        const { session, queries } = make(echo, { effort: 'xhigh' });
+        session.start();
+        await waitFor(() => ofType('session.started').length === 1);
+        expect(queries[0]!.options.effort).toBe('xhigh');
+        await session.stop();
+
+        const plain = make(echo);
+        plain.session.start();
+        await waitFor(() => ofType('session.started').length === 2);
+        expect(plain.queries[0]!.options.effort).toBeUndefined();
+        await plain.session.stop();
     });
 
     it('builds image content blocks', async () => {
