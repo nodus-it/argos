@@ -11,7 +11,7 @@
 #   app       — Laravel app (PHP-FPM); runs migrations on boot, spawns worker
 #               containers via the docker socket, seeds Traefik + nginx config
 #   traefik   — single port-80 entry; file-provider routing (app + live demos)
-#   nginx     — serves static assets + proxies to app:9000, behind Traefik
+#   nginx     — serves static assets + proxies to the app's FPM socket, behind Traefik
 #   queue     — Laravel Horizon (same image as app, ARGOS_ROLE=queue)
 #   scheduler — Laravel scheduler (`schedule:work`, ARGOS_ROLE=scheduler)
 #   reverb    — Laravel Reverb websockets (live workspace tasks, ARGOS_ROLE=reverb)
@@ -152,6 +152,8 @@ services:
       # config without bind-mounts in the host install dir.
       - argos-public:/srv/argos-public
       - argos-nginx-config:/srv/argos-nginx
+      # PHP-FPM's unix socket, shared with nginx only (see php-fpm.conf).
+      - argos-fpm:/run/argos-fpm
     environment:
       <<: [*preview-env, *realtime-env, *workspace-env]
       ARGOS_ROLE:                        "app"
@@ -236,6 +238,7 @@ services:
       # bouncing through PHP-FPM, and picks up the baked site config.
       - argos-public:/app/public:ro
       - argos-nginx-config:/etc/nginx/conf.d:ro
+      - argos-fpm:/run/argos-fpm
 
   queue:
     networks:
@@ -370,3 +373,5 @@ volumes:
   # nginx-served assets + site config, populated by the app entrypoint.
   argos-public:
   argos-nginx-config:
+  # PHP-FPM unix socket (app ↔ nginx). Keeps FastCGI off every network.
+  argos-fpm:

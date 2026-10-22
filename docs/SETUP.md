@@ -132,7 +132,7 @@ is pulled; worker images are built on demand on the host.
 | `redis` | `redis:7-alpine` | Queue backend for Horizon. Data in the `argos-redis` volume. |
 | `app` | `ghcr.io/nodus-it/argos-app` | Web UI + [MCP server](SETUP-MCP.md) + REST API (PHP-FPM). Runs migrations on boot; mounts the Docker socket to start workspaces and previews. |
 | `traefik` | `traefik:v3.5` | The single port-80 entry point. Published on the host via `ARGOS_PORT`. Routes to nginx (and to live-demo containers). |
-| `nginx` | `nginx:1.27-alpine` | Serves static assets and proxies dynamic requests to `app:9000`. Sits behind Traefik. |
+| `nginx` | `nginx:1.27-alpine` | Serves static assets and proxies dynamic requests to the app's PHP-FPM socket. Sits behind Traefik. |
 | `queue` | `ghcr.io/nodus-it/argos-app` | Laravel Horizon worker — runs background jobs on Redis: workspace provisioning, task preparation, image builds, previews, automatic tasks, ticket webhooks. Same image as `app`. |
 | `scheduler` | `ghcr.io/nodus-it/argos-app` | Laravel scheduler (`schedule:work`) — dispatches recurring jobs (issue polling, pull-request and ticket-comment sync, idle stop, task cleanup). Same image as `app`. |
 | workspace containers | built from `argos-worker:<stack>-<hash>-<lib>-<agent>-<version>` | One container per running workspace, with a git worktree per task, started by the `app`/`queue` services. **All AI runs here** — the manager never touches Claude directly. The image is built on demand from the workspace's stack (built-in or `.argos/worker.dockerfile`) × the agent, plus the workspace daemon and VS Code. |

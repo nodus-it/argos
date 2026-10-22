@@ -79,9 +79,10 @@ CI runs `shellcheck` over `worker/lib/`, the workspace scripts
     containers (docker.sock GID mapping, composer sync, migrations gated
     via `ARGOS_ROLE`).
   - `.tools/docker/app/nginx.conf` — Nginx config for the Compose stack
-    (proxies to `app:9000`).
-  - `.tools/docker/app/php-fpm.conf` — PHP-FPM pool config, listens on
-    `0.0.0.0:9000`.
+    (proxies to the app's PHP-FPM unix socket).
+  - `.tools/docker/app/php-fpm.conf` — PHP-FPM pool config, listens on a
+    unix socket in the `argos-fpm` volume (shared with nginx only — never a
+    TCP port: the app sits on the workspace network).
   - `.tools/docker/worker/Dockerfile.compose` — worker image (stack + agent +
     gate helpers); `.tools/docker/worker/stacks/` — stack bases.
   - `.tools/docker/worker/workspace/` — workspace image (daemon, editor,
