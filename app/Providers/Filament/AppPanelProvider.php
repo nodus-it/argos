@@ -62,7 +62,7 @@ class AppPanelProvider extends PanelProvider
             // Filament seeds the collapsed-groups store in its sidebar, which
             // this panel does not render; the sub-navigation of /account and
             // /system needs it all the same.
-            ->renderHook(PanelsRenderHook::HEAD_START, fn (): string => '<script>try{const g=localStorage.getItem("collapsedGroups");if(g===null||g==="null"){localStorage.setItem("collapsedGroups","[]")}}catch(e){}</script>')
+            ->renderHook(PanelsRenderHook::HEAD_START, fn (): string => '<script>try{for(const k of ["collapsedGroups","filament:sidebar:collapsed_groups"]){const g=localStorage.getItem(k);if(g===null||g==="null"){localStorage.setItem(k,"[]")}}}catch(e){}</script>')
             ->renderHook(PanelsRenderHook::LAYOUT_START, fn (): string => view('filament.app.rail')->render())
             // Version, license and source (AGPL-3.0) under every page but the
             // full-screen workspace, which has them in the rail's user menu.

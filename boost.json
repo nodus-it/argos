@@ -17,6 +17,7 @@
         "socialite-development",
         "pest-testing",
         "tailwindcss-development",
+        "filament-development",
         "commit",
         "feature-retro",
         "review-learnings",
