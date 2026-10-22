@@ -354,13 +354,15 @@ class OnboardingPageTest extends TestCase
             'services.bitbucket.client_id' => null,
         ]);
 
-        // Regression: the deep links must resolve — the OAuth-config resource
-        // slug is pinned, otherwise route() throws RouteNotFoundException here.
+        // OAuth app and access token open as dialogs — the wizard never jumps
+        // into the administration.
         Livewire::test(Onboarding::class)
             ->assertSet('currentStep', 3)
             ->assertSuccessful()
-            ->assertSee(route('filament.admin.resources.provider-oauth-configs.create'))
-            ->assertSee(route('filament.admin.resources.provider-credentials.create'));
+            ->assertActionVisible('addOAuthApp')
+            ->assertActionVisible('addAccessToken')
+            ->assertDontSee(route('filament.admin.resources.provider-oauth-configs.create'))
+            ->assertDontSee(route('filament.admin.resources.provider-credentials.create'));
     }
 
     public function test_step2_offers_adding_more_oauth_apps_when_one_is_configured(): void
@@ -368,12 +370,43 @@ class OnboardingPageTest extends TestCase
         $this->configureClaudeAgent();
         config(['services.github.client_id' => 'cid', 'services.github.client_secret' => 'cs']);
 
-        // Even with GitHub configured, the "add another OAuth app" route must be
-        // reachable so further providers / self-hosted instances can be added.
+        // Even with GitHub configured, further OAuth apps (providers,
+        // self-hosted instances) can be added.
         Livewire::test(Onboarding::class)
             ->assertSet('currentStep', 3)
             ->assertSee('Connect with GitHub')
-            ->assertSee(route('filament.admin.resources.provider-oauth-configs.create'));
+            ->assertActionVisible('addOAuthApp')
+            ->assertSee(__('onboarding.repo.oauth_add_more'));
+    }
+
+    public function test_an_access_token_is_added_in_a_dialog_and_verified(): void
+    {
+        $this->configureClaudeAgent();
+        $this->mock(\App\Services\Credentials\CredentialVerifier::class)
+            ->shouldReceive('verifyProvider')->once()->with('github', 'test-pat', '')
+            ->andReturn(\App\Services\Credentials\CredentialVerification::valid());
+
+        Livewire::test(Onboarding::class)
+            ->callAction('addAccessToken', ['provider' => 'github', 'label' => 'Test', 'token' => 'test-pat', 'status' => 'active'])
+            ->assertHasNoActionErrors()
+            ->assertSet('currentStep', 3);
+
+        $credential = \App\Models\ProviderCredential::query()->sole();
+        $this->assertSame('Test', $credential->label);
+        $this->assertNotNull($credential->last_validated_at);
+    }
+
+    public function test_a_rejected_access_token_is_not_stored(): void
+    {
+        $this->configureClaudeAgent();
+        $this->mock(\App\Services\Credentials\CredentialVerifier::class)
+            ->shouldReceive('verifyProvider')->once()
+            ->andReturn(\App\Services\Credentials\CredentialVerification::rejected('Bad credentials'));
+
+        Livewire::test(Onboarding::class)
+            ->callAction('addAccessToken', ['provider' => 'github', 'label' => 'Test', 'token' => 'nope', 'status' => 'active']);
+
+        $this->assertSame(0, \App\Models\ProviderCredential::query()->count());
     }
 
     public function test_inline_create_with_oauth_account_creates_workspace(): void

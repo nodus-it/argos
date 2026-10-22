@@ -4,6 +4,13 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Pages;
 
+use App\Filament\Admin\Concerns\VerifiesCredentialOnSave;
+use App\Filament\Admin\Resources\ProviderCredentialResource;
+use App\Filament\Admin\Resources\ProviderOAuthConfigResource;
+use App\Services\Credentials\CredentialVerifier;
+use App\Services\Credentials\ProviderCredentialService;
+use App\Services\OAuth\ProviderOAuthConfigService;
+use Filament\Schemas\Schema;
 use App\Enums\AgentCredentialStatus;
 use App\Enums\AgentName;
 use App\Enums\AuthMethod;
@@ -47,6 +54,7 @@ use Illuminate\Validation\Rules\Password;
 class Onboarding extends Page
 {
     use AdminOnly;
+    use VerifiesCredentialOnSave;
 
     public const TOTAL_STEPS = 4;
 
@@ -88,6 +96,47 @@ class Onboarding extends Page
                 ->tooltip(__('onboarding.language')),
             DocsLinkAction::make('setup'),
         ];
+    }
+
+    /**
+     * "Add a token" in the workspace step: the access-token form in a modal,
+     * so the wizard never leaves for the administration. The token is
+     * verified against the provider before it is stored.
+     */
+    public function addAccessTokenAction(): Action
+    {
+        return Action::make('addAccessToken')
+            ->label(__('onboarding.repo.pat_link'))
+            ->icon('heroicon-o-plus')
+            ->link()
+            ->modalHeading(__('onboarding.repo.pat_card_title'))
+            ->modalWidth('2xl')
+            ->schema(fn (Schema $schema): Schema => ProviderCredentialResource::form($schema))
+            ->action(function (array $data): void {
+                $verification = app(CredentialVerifier::class)->verifyProvider(
+                    (string) ($data['provider'] ?? ''),
+                    (string) ($data['token'] ?? ''),
+                    (string) ($data['instance_url'] ?? ''),
+                );
+                app(ProviderCredentialService::class)->create($this->applyVerification($verification, $data));
+                $this->refreshState();
+            });
+    }
+
+    /** "Set up an OAuth app": the OAuth-app form in a modal, see addAccessTokenAction(). */
+    public function addOAuthAppAction(): Action
+    {
+        return Action::make('addOAuthApp')
+            ->label(fn (): string => $this->oauthTargets() === [] ? __('onboarding.repo.oauth_app_link') : __('onboarding.repo.oauth_add_more'))
+            ->icon('heroicon-o-plus')
+            ->link()
+            ->modalHeading(__('onboarding.repo.oauth_card_title'))
+            ->modalWidth('2xl')
+            ->schema(fn (Schema $schema): Schema => ProviderOAuthConfigResource::form($schema))
+            ->action(function (array $data): void {
+                app(ProviderOAuthConfigService::class)->create($data);
+                $this->refreshState();
+            });
     }
 
     // ── Step 1: security (password) ─────────────────────────────────────────

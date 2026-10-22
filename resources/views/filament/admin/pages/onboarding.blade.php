@@ -208,18 +208,9 @@
                                         @endforeach
 
                                         {{-- Always allow adding more OAuth apps (other providers / self-hosted instances). --}}
-                                        <a href="{{ route('filament.admin.resources.provider-oauth-configs.create', ['return' => 'onboarding']) }}"
-                                            class="inline-flex items-center gap-1 pt-1 text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline">
-                                            <x-heroicon-o-plus class="h-3.5 w-3.5" />{{ __('onboarding.repo.oauth_add_more') }}
-                                        </a>
+                                        <div class="pt-1">{{ $this->addOAuthAppAction }}</div>
                                     @else
-                                        <x-filament::button
-                                            tag="a"
-                                            href="{{ route('filament.admin.resources.provider-oauth-configs.create', ['return' => 'onboarding']) }}"
-                                            color="gray"
-                                            size="sm"
-                                            icon="heroicon-o-plus"
-                                        >{{ __('onboarding.repo.oauth_app_link') }}</x-filament::button>
+                                        <div>{{ $this->addOAuthAppAction }}</div>
                                         <p class="text-xs text-gray-400 dark:text-gray-500">{{ __('onboarding.repo.oauth_none') }}</p>
                                     @endif
                                 </div>
@@ -244,10 +235,7 @@
                                         </div>
                                     @endforeach
 
-                                    <a href="{{ route('filament.admin.resources.provider-credentials.create', ['return' => 'onboarding']) }}"
-                                        class="inline-flex items-center gap-1 {{ $patTargets !== [] ? 'pt-1 ' : '' }}text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline">
-                                        <x-heroicon-o-plus class="h-3.5 w-3.5" />{{ __('onboarding.repo.pat_link') }}
-                                    </a>
+                                    <div @class(['pt-1' => $patTargets !== []])>{{ $this->addAccessTokenAction }}</div>
                                 </div>
                             </div>
 
