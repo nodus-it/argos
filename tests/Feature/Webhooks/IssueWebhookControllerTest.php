@@ -116,6 +116,15 @@ class IssueWebhookControllerTest extends TestCase
         $response->assertStatus(400);
     }
 
+    public function test_a_binding_only_takes_webhooks_of_its_own_provider(): void
+    {
+        $data = ['action' => 'opened', 'id' => 1];
+
+        // Signed with the binding's secret, but sent to another provider's URL.
+        $this->sendWebhook('gitlab', $this->binding->id, $data, ['HTTP_X_GITLAB_TOKEN' => 'test-secret'])->assertNotFound();
+        Queue::assertNotPushed(ProcessIncomingIssueJob::class);
+    }
+
     public function test_duplicate_delivery_id_is_skipped(): void
     {
         $data = ['action' => 'opened', 'id' => 2];

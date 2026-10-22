@@ -32,6 +32,11 @@ final class IssueWebhookController extends Controller
         } catch (ModelNotFoundException) {
             return response('Not found', 404);
         }
+        // The URL's provider must be the binding's: a payload signed with the
+        // binding's secret is never parsed as another provider's format.
+        if ($taskProviderBinding->kind !== $providerKind) {
+            return response('Not found', 404);
+        }
 
         // For GitHub, filter out non-issue events early so GitHub doesn't retry
         $eventType = $this->extractEventType($request, $providerKind);
