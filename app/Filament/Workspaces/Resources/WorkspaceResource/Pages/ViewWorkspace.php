@@ -27,6 +27,7 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Support\HtmlString;
 use Livewire\Attributes\On;
 
 /**
@@ -41,6 +42,9 @@ class ViewWorkspace extends ViewRecord
 
     /** Shown in the commit and push dialogs (changes, commits, gates). */
     public string $shipSummary = '';
+
+    /** True while Claude drafts the text of the open commit or push dialog. */
+    public bool $shipDrafting = false;
 
     /** The task shown in the chat (ship, gates and rebase act on it). */
     public ?string $taskId = null;
@@ -157,21 +161,20 @@ class ViewWorkspace extends ViewRecord
             ->visible(fn (): bool => $this->canShip())
             ->modalHeading(__('workspaces.ship.commit_heading'))
             ->modalWidth('2xl')
+            // Opens at once; Claude's draft follows (loadShipDraft).
             ->fillForm(function (): array {
-                /** @var User $user */
-                $user = auth()->user();
                 $task = $this->requireTask();
                 try {
-                    $draft = app(WorkspaceShipService::class)->draft($task, $user);
+                    $files = app(WorkspaceShipService::class)->pending($task)['changed_files'];
                 } catch (\Throwable) {
-                    $draft = ['subject' => '', 'body' => '', 'changed_files' => 0, 'ahead' => 0];
+                    $files = 0;
                 }
-                $this->shipSummary = trans_choice('workspaces.ship.commit_summary', $draft['changed_files'], ['count' => $draft['changed_files']])
-                    .($draft['subject'] === '' ? ' '.__('workspaces.ship.no_draft') : '')
-                    .$this->gateNote($task);
+                $this->shipSummary = trans_choice('workspaces.ship.commit_summary', $files, ['count' => $files]).$this->gateNote($task);
+                $this->shipDrafting = true;
 
-                return ['subject' => $draft['subject'], 'body' => $draft['body'], 'then_push' => false];
+                return ['subject' => '', 'body' => '', 'then_push' => false];
             })
+            ->modalContent(fn (): HtmlString => $this->draftingHint())
             ->modalDescription(fn (): string => $this->shipSummary)
             ->schema([
                 TextInput::make('subject')
@@ -219,23 +222,21 @@ class ViewWorkspace extends ViewRecord
             ->modalHeading(fn (): string => __($opens() ? 'workspaces.ship.push_pr_heading' : 'workspaces.ship.push_heading'))
             ->modalWidth(fn (): string => $opens() ? '3xl' : 'md')
             ->fillForm(function () use ($opens): array {
-                /** @var User $user */
-                $user = auth()->user();
                 $task = $this->requireTask();
-                $service = app(WorkspaceShipService::class);
                 try {
-                    $pending = $service->pending($task);
+                    $pending = app(WorkspaceShipService::class)->pending($task);
                 } catch (\Throwable) {
                     $pending = ['changed_files' => 0, 'ahead' => 0];
                 }
-                $draft = $opens() ? $service->pullRequestDraft($task, $user) : ['title' => '', 'body' => ''];
                 $this->shipSummary = trans_choice('workspaces.ship.push_summary', $pending['ahead'], ['count' => $pending['ahead']])
                     .($pending['changed_files'] > 0 ? ' '.trans_choice('workspaces.ship.uncommitted_left', $pending['changed_files'], ['count' => $pending['changed_files']]) : '')
-                    .($opens() && $draft['title'] === '' ? ' '.__('workspaces.ship.no_pr_draft') : '')
                     .$this->gateNote($task);
+                // A new pull request opens at once; Claude's draft follows (loadShipDraft).
+                $this->shipDrafting = $opens();
 
-                return ['title' => $draft['title'] !== '' ? $draft['title'] : $task->title, 'body' => $draft['body'], 'draft' => false];
+                return ['title' => $task->title, 'body' => '', 'draft' => false];
             })
+            ->modalContent(fn (): HtmlString => $this->draftingHint())
             ->modalDescription(fn (): string => $this->shipSummary)
             ->schema([
                 TextInput::make('title')
@@ -264,6 +265,57 @@ class ViewWorkspace extends ViewRecord
                 $this->dispatch('argos-workspace-changed');
                 $this->refreshStatus();
             });
+    }
+
+    /**
+     * Fill the open commit or push dialog with Claude's draft — called by the
+     * dialog right after it opened, so it never waits for Claude. Fields the
+     * person already typed into stay as they are.
+     */
+    public function loadShipDraft(): void
+    {
+        $index = array_key_last($this->mountedActions ?? []);
+        $name = $index !== null ? ($this->mountedActions[$index]['name'] ?? null) : null;
+        $task = $this->task();
+        if (! $this->shipDrafting || ! in_array($name, ['commit', 'push'], true) || $task === null) {
+            $this->shipDrafting = false;
+
+            return;
+        }
+
+        /** @var User $user */
+        $user = auth()->user();
+        $service = app(WorkspaceShipService::class);
+        try {
+            $draft = $name === 'commit' ? $service->draft($task, $user) : $service->pullRequestDraft($task, $user);
+        } catch (\Throwable) {
+            $draft = [];
+        }
+        $this->shipDrafting = false;
+
+        $first = $name === 'commit' ? 'subject' : 'title';
+        if (trim((string) ($draft[$first] ?? '')) === '') {
+            $this->shipSummary .= ' '.__($name === 'commit' ? 'workspaces.ship.no_draft' : 'workspaces.ship.no_pr_draft');
+
+            return;
+        }
+        $data = $this->mountedActions[$index]['data'] ?? [];
+        $untouched = [$first => $name === 'commit' ? '' : $task->title, 'body' => ''];
+        foreach ($untouched as $field => $initial) {
+            if (trim((string) ($data[$field] ?? '')) === $initial) {
+                $this->mountedActions[$index]['data'][$field] = (string) $draft[$field];
+            }
+        }
+    }
+
+    /** "Claude drafts …" above the dialog's fields, which starts the draft when it appears. */
+    private function draftingHint(): HtmlString
+    {
+        if (! $this->shipDrafting) {
+            return new HtmlString('');
+        }
+
+        return new HtmlString('<p class="wf-note wf-muted" x-init="$wire.loadShipDraft()" data-testid="ship-drafting"><span class="wf-spin"></span> '.e(__('workspaces.ship.drafting')).'</p>');
     }
 
     private function canShip(): bool

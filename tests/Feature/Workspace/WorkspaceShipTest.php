@@ -346,7 +346,12 @@ class WorkspaceShipTest extends TestCase
             ->test(ViewWorkspace::class, ['record' => $this->workspace->getKey()])
             ->call('openShipDialog')
             ->assertActionMounted('commit')
-            ->assertActionDataSet(['subject' => 'feat: add login', 'body' => 'Adds the login.', 'then_push' => false])
+            // Opens without waiting for Claude; the draft follows.
+            ->assertActionDataSet(['subject' => '', 'then_push' => false])
+            ->assertSet('shipDrafting', true)
+            ->call('loadShipDraft')
+            ->assertSet('shipDrafting', false)
+            ->assertActionDataSet(['subject' => 'feat: add login', 'body' => 'Adds the login.'])
             ->setActionData(['then_push' => true])
             ->callMountedAction()
             ->assertNotified(__('workspaces.ship.committed'))
@@ -355,9 +360,19 @@ class WorkspaceShipTest extends TestCase
 
         // The pull request text is drafted from the whole branch (the fake answers with the commit shape).
         $this->git->shouldReceive('createPullRequest')->once()->withArgs(fn ($owner, $repo, $title) => $title === $this->task->title)->andReturn(['iid' => 9, 'web_url' => 'https://x/9', 'state' => 'opened']);
-        $page->assertActionDataSet(['draft' => false])->callMountedAction()->assertNotified();
+        $page->assertSet('shipDrafting', true)->call('loadShipDraft')->assertActionDataSet(['title' => $this->task->title, 'draft' => false])->callMountedAction()->assertNotified();
 
         $this->assertSame(9, $this->task->fresh()->pr_number);
+    }
+
+    public function test_text_typed_before_the_draft_arrives_is_kept(): void
+    {
+        Livewire::actingAs($this->editor)
+            ->test(ViewWorkspace::class, ['record' => $this->workspace->getKey()])
+            ->mountAction('commit')
+            ->setActionData(['subject' => 'fix: my own words'])
+            ->call('loadShipDraft')
+            ->assertActionDataSet(['subject' => 'fix: my own words', 'body' => 'Adds the login.']);
     }
 
     public function test_the_push_dialog_only_confirms_when_the_pull_request_is_open(): void

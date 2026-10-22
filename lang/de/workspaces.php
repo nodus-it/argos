@@ -299,6 +299,7 @@ return [
         'push_pr_heading' => 'Pushen und Pull Request öffnen',
         'push_summary' => '{0} Der Branch wird erneut gepusht.|{1} 1 Commit wird gepusht.|[2,*] :count Commits werden gepusht.',
         'uncommitted_left' => '{1} 1 geänderte Datei ist nicht committet und bleibt zurück.|[2,*] :count geänderte Dateien sind nicht committet und bleiben zurück.',
+        'drafting' => 'Claude schlägt den Text vor — du kannst schon tippen.',
         'no_pr_draft' => 'Es konnte keine Beschreibung vorgeschlagen werden — schreib selbst eine.',
         'pr_title' => 'Titel des Pull Requests',
         'pr_body' => 'Beschreibung',

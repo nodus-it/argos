@@ -299,6 +299,7 @@ return [
         'push_pr_heading' => 'Push and open the pull request',
         'push_summary' => '{0} The branch is pushed again.|{1} 1 commit is pushed.|[2,*] :count commits are pushed.',
         'uncommitted_left' => '{1} 1 changed file is not committed and stays behind.|[2,*] :count changed files are not committed and stay behind.',
+        'drafting' => 'Claude is drafting the text — you can start typing.',
         'no_pr_draft' => 'No description could be suggested — write one yourself.',
         'pr_title' => 'Pull request title',
         'pr_body' => 'Description',
