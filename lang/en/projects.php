@@ -26,7 +26,7 @@ return [
         'worker_description' => 'Stack the container of this workspace runs on.',
         'live_demo' => 'Live demo',
         'env_secrets' => 'Environment & secrets',
-        'env_secrets_description' => 'Project-specific secrets Argos stores encrypted and injects into the worker and the live demo — e.g. private Composer registries or extra env variables.',
+        'env_secrets_description' => 'Workspace secrets Argos stores encrypted and injects into the worker and the live demo — e.g. private Composer registries or extra env variables.',
         'authentication' => 'Authentication',
         'authentication_description' => 'How Argos accesses the repository — a connected account or a personal access token.',
         'repository' => 'Repository',

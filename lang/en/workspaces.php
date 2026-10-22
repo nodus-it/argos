@@ -208,7 +208,7 @@ return [
         'stopped_short' => 'Stopped',
         'none_short' => 'Not started',
         'disabled_platform' => 'Live previews are switched off on this installation (ARGOS_PREVIEW_ENABLED).',
-        'disabled_project' => 'Live previews are off for this project. Enable “Live demo” in the project settings.',
+        'disabled_project' => 'Live previews are off for this workspace. Switch on “Live demo” in the workspace settings under Environment.',
         'not_live' => 'The preview is not running.',
         'rebuild' => 'Rebuild',
         'rerun' => 'Re-run setup commands',

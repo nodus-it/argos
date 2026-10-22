@@ -208,7 +208,7 @@ return [
         'stopped_short' => 'Gestoppt',
         'none_short' => 'Nicht gestartet',
         'disabled_platform' => 'Live-Previews sind in dieser Installation abgeschaltet (ARGOS_PREVIEW_ENABLED).',
-        'disabled_project' => 'Live-Previews sind für dieses Projekt aus. Aktiviere „Live-Demo“ in den Projekteinstellungen.',
+        'disabled_project' => 'Live-Previews sind für diesen Workspace aus. Schalte „Live-Demo“ in den Workspace-Einstellungen unter Umgebung ein.',
         'not_live' => 'Die Preview läuft nicht.',
         'rebuild' => 'Neu bauen',
         'rerun' => 'Setup-Befehle erneut ausführen',

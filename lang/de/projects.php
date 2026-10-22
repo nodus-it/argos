@@ -26,7 +26,7 @@ return [
         'worker_description' => 'Stack, auf dem der Container dieses Workspaces läuft.',
         'live_demo' => 'Live-Demo',
         'env_secrets' => 'Environment & Secrets',
-        'env_secrets_description' => 'Projekt-spezifische Secrets, die Argos verschlüsselt speichert und in Worker und Live-Demo injiziert — z.B. private Composer-Registries oder zusätzliche Env-Variablen.',
+        'env_secrets_description' => 'Secrets des Workspaces, die Argos verschlüsselt speichert und in Worker und Live-Demo injiziert — z.B. private Composer-Registries oder zusätzliche Env-Variablen.',
         'authentication' => 'Authentifizierung',
         'authentication_description' => 'Wie Argos auf das Repository zugreift — verbundener Account oder Personal Access Token.',
         'repository' => 'Repository',
