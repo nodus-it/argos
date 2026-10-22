@@ -94,6 +94,14 @@ interface WorkspaceDaemonTransport
      */
     public function oneshot(array $payload): array;
 
+    /**
+     * The models the agent's subscription offers, as Claude Code's /model
+     * lists them — without sending a message.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function models(string $agentId, string $oauthToken): array;
+
     /** @return list<string> */
     public function files(string $worktree, string $query, int $limit = 20): array;
 

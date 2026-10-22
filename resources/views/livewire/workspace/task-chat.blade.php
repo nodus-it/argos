@@ -23,6 +23,10 @@
 
 <div class="ws-chat wf-chat" x-data="window.argosTaskStream ? window.argosTaskStream(@js($streamConfig)) : {}" x-init="$nextTick(() => scrollDown?.())"
      x-on:scroll-to-approval.window="setTimeout(() => $root.querySelector('.ws-approval.is-pending')?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 700)">
+    @if ($refreshModels)
+        {{-- No (or an old) model list for the agents in view: ask Claude Code once, off the first render. --}}
+        <span hidden x-init="$wire.refreshModels()" wire:key="models-refresh"></span>
+    @endif
     <div class="wf-chat-main">
         {{-- Auto-task state and who else is here (the task itself is picked in the header). --}}
         @if ($task?->auto_state)

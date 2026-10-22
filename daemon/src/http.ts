@@ -10,6 +10,7 @@ import { TaskSession, USER_PERMISSION_MODES, type QueryFactory, type SessionEnvi
 import { initWorkspace } from './workspaceInit.js';
 import * as gitOps from './gitOps.js';
 import { FileIndex, readWorkspaceFile } from './files.js';
+import { listModels } from './models.js';
 import { runOneshot, type OneshotRunner } from './oneshot.js';
 import { GATE_NAME_PATTERN, GateRunner, type GateScript } from './gates.js';
 import { CheckpointStore, parseRef, type Checkpoint } from './checkpoints.js';
@@ -109,6 +110,11 @@ const commitSchema = z.object({
     subject: z.string().min(1).max(200),
     body: z.string().max(10_000).default(''),
     author: z.object({ name: z.string().min(1).max(120), email: z.string().min(3).max(200) }),
+});
+
+const modelsSchema = z.object({
+    agent_id: idSchema,
+    oauth_token: z.string().min(1),
 });
 
 const oneshotSchema = z.object({
@@ -239,6 +245,13 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
     });
 
     app.get('/gates', async () => ({ running: gateRunner().running }));
+
+    /** The models the agent's subscription offers (Claude Code's /model), without sending a message. */
+    app.post('/models', async (request) => {
+        const body = modelsSchema.parse(request.body);
+
+        return { models: await listModels(deps.queryFactory, { agentId: body.agent_id, oauthToken: body.oauth_token }, deps.environment) };
+    });
 
     app.post('/oneshot', async (request) => {
         const body = oneshotSchema.parse(request.body);

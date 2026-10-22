@@ -5,6 +5,10 @@ declare(strict_types=1);
 namespace App\Services\Workspace;
 
 use App\Models\AgentCredential;
+use App\Models\Workspace;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * Which Claude models a task can pick — like Claude Code's `/model`. Claude
@@ -13,8 +17,10 @@ use App\Models\AgentCredential;
  * each with the concrete version it resolves to today. Argos keeps that list
  * per agent and offers both: the alias ("always the newest") and the fixed
  * version (`claude-opus-5-5`), which stays put when a newer model ships. Any
- * other valid model id can be entered by hand. Before an agent's first
- * session only the aliases are offered — never fixed ids that age.
+ * other valid model id can be entered by hand. The list is asked for as soon
+ * as the composer shows (without sending a message) and refreshed every
+ * session start and after REFRESH_HOURS; until then the aliases are offered —
+ * never fixed ids that age.
  */
 class ModelCatalog
 {
@@ -23,6 +29,37 @@ class ModelCatalog
 
     /** Used when neither the caller nor the agent chose one. */
     public const DEFAULT = 'sonnet';
+
+    /** Ask Claude Code again after this long (new models ship now and then). */
+    public const REFRESH_HOURS = 12;
+
+    public function __construct(private readonly WorkspaceDaemonClient $daemon) {}
+
+    /** No list yet, or an old one: the composer asks for a fresh one. */
+    public function isStale(?AgentCredential $agent): bool
+    {
+        return $agent !== null && ($agent->models === null || $agent->models_refreshed_at === null || $agent->models_refreshed_at->lt(now()->subHours(self::REFRESH_HOURS)));
+    }
+
+    /**
+     * Ask Claude Code in the workspace container which models the agent's
+     * subscription offers — no message is sent. Once per agent at a time;
+     * failures keep the list that is there.
+     */
+    public function refresh(AgentCredential $agent, Workspace $workspace): void
+    {
+        if (! Cache::add('workspaces:models-refresh:'.$agent->id, true, 300)) {
+            return;
+        }
+
+        try {
+            $this->record($agent, $this->daemon->for($workspace, 45)->models($agent->id, (string) ($agent->credentials['token'] ?? '')));
+        } catch (Throwable $e) {
+            Log::channel('argos')->info('Listing the models failed', ['agent' => $agent->id, 'error' => $e->getMessage()]);
+        } finally {
+            Cache::forget('workspaces:models-refresh:'.$agent->id);
+        }
+    }
 
     /**
      * @param  array<int, mixed>  $models  `session.started.models` from the daemon
@@ -42,8 +79,8 @@ class ModelCatalog
                 'resolved' => is_string($resolved) && self::isValidId($resolved) ? $resolved : null,
             ];
         }
-        if ($clean !== [] && $clean !== $agent->models) {
-            $agent->forceFill(['models' => $clean])->save();
+        if ($clean !== []) {
+            $agent->forceFill(['models' => $clean, 'models_refreshed_at' => now()])->save();
         }
     }
 
@@ -67,9 +104,11 @@ class ModelCatalog
         $pinned = [];
         foreach ($reported as $model) {
             $version = $model['resolved'] !== null ? self::versionLabel($model['resolved']) : null;
+            // Claude Code's own wording, except for its "Default (recommended)".
+            $label = $model['value'] === 'default' ? (string) __('workspaces.models.default') : $model['label'];
             $options[] = [
                 'value' => $model['value'],
-                'label' => $model['label'].($version !== null && ! str_contains($model['label'], $version) ? ' · '.$version : ''),
+                'label' => $label.($version !== null && ! str_contains($label, $version) ? ' · '.$version : ''),
                 'description' => $model['description'],
                 'group' => 'latest',
             ];

@@ -2,8 +2,11 @@
     /** @var \App\Models\TaskEvent $event */
     /** @var array<string, mixed> $p */
 @endphp
-{{-- A system notice (preparation, hand-over, PR changes, setup test, …). --}}
+{{-- A system notice (preparation, hand-over, PR changes, setup test, …);
+     what a person did carries their picture. --}}
+@php $noticeAuthor = $event->author_user_id !== null ? (($authors ?? collect())[$event->author_user_id] ?? null) : null; @endphp
 <div class="ws-notice wf-notice" wire:key="ev-{{ $event->id }}">
+    @if ($noticeAuthor !== null)<x-wf.avatar :user="$noticeAuthor" :class="'wf-avatar-xs wf-notice-avatar'" />@endif
     {{ match ($p['kind'] ?? '') {
         'interrupted' => __('workspaces.events.interrupted', ['name' => $p['author_name'] ?? '']),
         'permission_mode' => __('workspaces.events.permission_mode', ['name' => $p['author_name'] ?? '', 'mode' => \App\Enums\PermissionMode::tryFrom((string) ($p['mode'] ?? ''))?->label() ?? '']),

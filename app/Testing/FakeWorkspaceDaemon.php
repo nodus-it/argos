@@ -184,6 +184,8 @@ class FakeWorkspaceDaemon extends WorkspaceDaemonClient implements WorkspaceDaem
         self::$gateOutcome = 'fail';
         self::$setupCheck = ['setup' => 'ok', 'log' => "[setup] done\n"];
         self::$setupChecks = [];
+        self::$models = self::MODELS;
+        self::$modelRequests = [];
     }
 
     /** What the next preparations report: `ok`, `setup_failed` or `failed`. */
@@ -368,6 +370,24 @@ class FakeWorkspaceDaemon extends WorkspaceDaemonClient implements WorkspaceDaem
     }
 
     public function gitPush(string $worktree, string $branch): void {}
+
+    public const MODELS = [
+        ['value' => 'default', 'display_name' => 'Default (recommended)', 'description' => 'Sonnet 5.5 · Efficient for routine tasks', 'resolved_model' => 'claude-sonnet-5-5'],
+        ['value' => 'opus', 'display_name' => 'Opus', 'description' => 'Opus 5.5 · Best for everyday, complex tasks', 'resolved_model' => 'claude-opus-5-5'],
+    ];
+
+    /** What a subscription reports (tests replace it). @var list<array<string, mixed>> */
+    public static array $models = self::MODELS;
+
+    /** Agents whose models were asked for. @var list<string> */
+    public static array $modelRequests = [];
+
+    public function models(string $agentId, string $oauthToken): array
+    {
+        self::$modelRequests[] = $agentId;
+
+        return self::$models;
+    }
 
     public function oneshot(array $payload): array
     {

@@ -661,6 +661,7 @@ a.wf-ref-chip:hover { text-decoration: underline; }
 .wf-page { --wf-chat-w: 1080px; }
 
 /* System notices (preparation, hand-over, PR changes): readable, not whispered. */
+.wf-notice-avatar { vertical-align: middle; margin: -2px 8px 0 -4px; }
 .ws-notice.wf-notice { align-self: center; max-width: 100%; padding: 6px 12px; border: 1px solid var(--wf-border); border-radius: 8px; background: var(--wf-surface); color: var(--wf-text); font-size: 13px; font-style: normal; text-align: center; }
 
 /* Claude is working: a bar above the composer, always in sight. */

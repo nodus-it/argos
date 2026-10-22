@@ -211,4 +211,18 @@ class TaskActionsTest extends TestCase
             ->assertSee(__('workspaces.tray.todo.gates', ['gates' => 'Pest / PHPUnit']))
             ->assertSee(__('workspaces.tray.todo.gates_action'));
     }
+
+    public function test_what_a_person_did_carries_their_picture(): void
+    {
+        $task = $this->task($this->ada);
+        \App\Models\TaskEvent::query()->create(['task_id' => $task->id, 'type' => \App\Enums\TaskEventType::Notice, 'author_user_id' => $this->bob->id, 'payload' => ['kind' => 'committed', 'author_name' => 'Bob', 'subject' => 'feat: x']]);
+        \App\Models\TaskEvent::query()->create(['task_id' => $task->id, 'type' => \App\Enums\TaskEventType::Notice, 'payload' => ['kind' => 'pr_merged']]);
+
+        $html = Livewire::withQueryParams(['task' => $task->id])->actingAs($this->ada)
+            ->test(TaskChat::class, ['workspaceId' => $this->workspace->id])
+            ->html();
+
+        $this->assertSame(1, substr_count($html, 'wf-notice-avatar'));
+        $this->assertStringContainsString(__('workspaces.events.committed', ['name' => 'Bob', 'subject' => 'feat: x']), html_entity_decode($html));
+    }
 }

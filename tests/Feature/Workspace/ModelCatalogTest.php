@@ -95,4 +95,34 @@ class ModelCatalogTest extends TestCase
             $this->assertFalse(ModelCatalog::isValidId($bad), $bad);
         }
     }
+
+    public function test_the_composer_asks_for_the_models_once_without_sending_a_message(): void
+    {
+        $workspace = Workspace::factory()->create(['status' => \App\Enums\WorkspaceStatus::Running]);
+        $owner = \App\Models\User::factory()->create();
+        \App\Models\WorkspaceMember::query()->create(['workspace_id' => $workspace->id, 'user_id' => $owner->id, 'role' => \App\Enums\WorkspaceRole::Member]);
+        $agent = AgentCredential::factory()->ownedBy($owner)->create(['credentials' => ['token' => 'oat-a']]);
+        $task = Task::factory()->ownedBy($owner)->create(['workspace_id' => $workspace->id, 'agent_credential_id' => $agent->id, 'model' => 'sonnet']);
+        $this->app->singleton(\App\Services\Workspace\WorkspaceDaemonClient::class, \App\Testing\FakeWorkspaceDaemon::class);
+        \Illuminate\Support\Facades\Event::fake([\App\Broadcasting\TaskStream::class]);
+
+        $chat = \Livewire\Livewire::withQueryParams(['task' => $task->id])->actingAs($owner)
+            ->test(\App\Livewire\Workspace\TaskChat::class, ['workspaceId' => $workspace->id])
+            ->assertSeeHtml('$wire.refreshModels()')
+            ->call('refreshModels')
+            ->assertDontSeeHtml('$wire.refreshModels()')
+            ->assertSee('Default (recommended) · Sonnet 5.5')
+            ->assertSee('Opus 5.5');
+
+        $this->assertSame([$agent->id], \App\Testing\FakeWorkspaceDaemon::$modelRequests);
+        $this->assertNotNull($agent->fresh()->models_refreshed_at);
+        // Nothing went to Claude as a message.
+        $this->assertSame(0, \App\Models\TaskEvent::query()->where('task_id', $task->id)->count());
+
+        // Fresh: no second ask; after REFRESH_HOURS it asks again.
+        $chat->call('refreshModels');
+        $this->assertCount(1, \App\Testing\FakeWorkspaceDaemon::$modelRequests);
+        $this->travel(ModelCatalog::REFRESH_HOURS + 1)->hours();
+        $this->assertTrue(app(ModelCatalog::class)->isStale($agent->fresh()));
+    }
 }

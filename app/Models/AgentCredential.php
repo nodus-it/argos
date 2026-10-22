@@ -25,6 +25,7 @@ use Illuminate\Support\Carbon;
  * @property int $max_concurrent_sessions
  * @property string|null $default_model
  * @property list<array{value: string, label: string, description: string, resolved: string|null}>|null $models
+ * @property Carbon|null $models_refreshed_at
  * @property Carbon|null $usage_limited_until
  * @property-read User|null $user
  * @property Carbon|null $created_at
@@ -45,6 +46,7 @@ class AgentCredential extends Model
         'max_concurrent_sessions',
         'default_model',
         'models',
+        'models_refreshed_at',
         'usage_limited_until',
     ];
 
@@ -58,6 +60,7 @@ class AgentCredential extends Model
             'max_concurrent_sessions' => 'integer',
             'usage_limited_until' => 'datetime',
             'models' => 'array',
+            'models_refreshed_at' => 'datetime',
         ];
     }
 

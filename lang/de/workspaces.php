@@ -50,6 +50,7 @@ return [
     ],
     'models' => [
         'alias' => ':family (neuestes)',
+        'default' => 'Standard (empfohlen)',
         'group_latest' => 'Immer die neueste Version',
         'group_pinned' => 'Feste Version',
         'group_other' => 'Von Hand eingetragen',

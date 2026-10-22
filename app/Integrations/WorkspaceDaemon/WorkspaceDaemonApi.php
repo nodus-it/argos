@@ -25,6 +25,7 @@ use App\Integrations\WorkspaceDaemon\Requests\RemoveWorktree;
 use App\Integrations\WorkspaceDaemon\Requests\ResolveApproval;
 use App\Integrations\WorkspaceDaemon\Requests\RestoreCheckpoint;
 use App\Integrations\WorkspaceDaemon\Requests\RunGates;
+use App\Integrations\WorkspaceDaemon\Requests\ListModels;
 use App\Integrations\WorkspaceDaemon\Requests\RunOneshot;
 use App\Integrations\WorkspaceDaemon\Requests\SendMessage;
 use App\Integrations\WorkspaceDaemon\Requests\SetModel;
@@ -173,6 +174,13 @@ class WorkspaceDaemonApi implements WorkspaceDaemonTransport
         $result = $this->call(new RunOneshot($payload));
 
         return ['text' => (string) ($result['text'] ?? ''), 'structured' => $result['structured'] ?? null, 'cost_usd' => $result['cost_usd'] ?? 0];
+    }
+
+    public function models(string $agentId, string $oauthToken): array
+    {
+        $models = $this->call(new ListModels(['agent_id' => $agentId, 'oauth_token' => $oauthToken]))['models'] ?? [];
+
+        return is_array($models) ? array_values(array_filter($models, 'is_array')) : [];
     }
 
     public function files(string $worktree, string $query, int $limit = 20): array

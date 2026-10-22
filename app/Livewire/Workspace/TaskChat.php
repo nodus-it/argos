@@ -684,6 +684,34 @@ class TaskChat extends Component
     }
 
     /** @return Collection<int, AgentCredential> */
+    /** The composer asks once it shows (see task-chat.blade.php): fresh model lists, no message sent. */
+    public function refreshModels(): void
+    {
+        $workspace = $this->workspace();
+        if ($workspace->status !== WorkspaceStatus::Running) {
+            return;
+        }
+        $catalog = app(ModelCatalog::class);
+        foreach ($this->modelAgents() as $agent) {
+            if ($catalog->isStale($agent)) {
+                $catalog->refresh($agent, $workspace);
+            }
+        }
+    }
+
+    /**
+     * Agents whose models the composer offers: the task's and the one picked for a new task.
+     *
+     * @return Collection<int, AgentCredential>
+     */
+    private function modelAgents(): Collection
+    {
+        return collect([$this->activeTask()?->agentCredential, $this->usableAgents()->firstWhere('id', $this->newAgentId)])
+            ->filter()
+            ->unique('id')
+            ->values();
+    }
+
     public function usableAgents(): Collection
     {
         return app(AgentPool::class)->usableAgentsFor($this->user());
@@ -712,8 +740,8 @@ class TaskChat extends Component
             'task' => $task,
             'events' => $events,
             'timeline' => TaskTimeline::build($events, $toolResults, $approvals, $task !== null && $task->session_status->isBusy()),
-            // Who wrote the messages (profile pictures in the chat).
-            'authors' => User::query()->whereIn('id', $events->where('type', TaskEventType::UserMessage)->pluck('author_user_id')->filter()->unique())->get()->keyBy('id'),
+            // Who wrote the messages and caused the notices (profile pictures in the chat).
+            'authors' => User::query()->whereIn('id', $events->whereIn('type', [TaskEventType::UserMessage, TaskEventType::Notice])->pluck('author_user_id')->filter()->unique())->get()->keyBy('id'),
             'hasOlder' => $hasOlder,
             'approvals' => $approvals,
             'canWrite' => $canWrite,
@@ -721,6 +749,7 @@ class TaskChat extends Component
             'agents' => $this->usableAgents(),
             'models' => app(ModelCatalog::class)->options($task?->agentCredential, $task?->model),
             'newModels' => app(ModelCatalog::class)->options($this->usableAgents()->firstWhere('id', $this->newAgentId)),
+            'refreshModels' => $workspace->status === WorkspaceStatus::Running && $this->modelAgents()->contains(fn (AgentCredential $agent): bool => app(ModelCatalog::class)->isStale($agent)),
             'issuesEnabled' => $this->creating && app(WorkspaceIssueService::class)->bindingFor($workspace) !== null,
             'issueResults' => $this->creating && $this->newIssueQuery !== '' ? $this->issueOptions($this->newIssueQuery) : [],
             'chosenIssue' => $this->creating && $this->newIssue !== null ? ($this->issueOptions($this->newIssue, 200)[$this->newIssue] ?? '#'.$this->newIssue) : null,
