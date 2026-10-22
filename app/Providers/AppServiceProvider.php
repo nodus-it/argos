@@ -23,6 +23,7 @@ use App\Workers\Agents\AgentRegistry;
 use App\Workers\Agents\ClaudeCodeRunner;
 use App\Workers\Builtin\BuiltinSync;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Events\MigrationsEnded;
 use Illuminate\Http\Request;
 use Illuminate\Queue\Events\JobFailed;
@@ -178,6 +179,13 @@ class AppServiceProvider extends ServiceProvider
 
         // Workspace daemons report many small event batches; cap each
         // workspace separately so one busy daemon cannot starve the others.
+        // REST API and MCP: per caller (API client, workspace token or user), else per address.
+        RateLimiter::for('api', function (Request $request): Limit {
+            $caller = $request->user();
+
+            return Limit::perMinute(120)->by($caller instanceof Model ? $caller::class.':'.$caller->getKey() : 'ip:'.$request->ip());
+        });
+        RateLimiter::for('oauth-registration', fn (Request $request): Limit => Limit::perMinute(20)->by('ip:'.$request->ip()));
         RateLimiter::for('workspace-daemon', fn (Request $request): Limit => Limit::perMinute(600)->by('ws:'.$request->route('workspace')));
 
         // Platform administration (users, worker stacks, OAuth apps, settings,

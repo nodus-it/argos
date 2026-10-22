@@ -50,7 +50,10 @@ return [
      */
     'feedback_url' => env('ARGOS_FEEDBACK_URL', ''),
     'config_dir' => env('ARGOS_CONFIG_DIR', (getenv('HOME') ?: ($_SERVER['HOME'] ?? posix_getpwuid(posix_getuid())['dir'])).'/.config/argos'),
-    'admin_password' => env('ADMIN_PASSWORD') ?: '12345',
+    // Password of the first administrator on a fresh installation. Only dev
+    // and tests fall back to a known one; production must set ADMIN_PASSWORD
+    // (the installer generates it).
+    'admin_password' => env('ADMIN_PASSWORD') ?: (in_array(env('APP_ENV', 'production'), ['local', 'testing'], true) ? '12345' : null),
     /*
      * Local one-click developer login (filament-developer-logins). Only ever
      * active in the `local` environment — the panel (ConfiguresArgosPanel) gates the

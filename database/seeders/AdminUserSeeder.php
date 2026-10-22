@@ -7,6 +7,7 @@ namespace Database\Seeders;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use RuntimeException;
 
 /**
  * The first administrator of a fresh installation. Runs on every container
@@ -21,11 +22,15 @@ final class AdminUserSeeder extends Seeder
         if (User::query()->exists()) {
             return;
         }
+        $password = (string) config('argos.admin_password');
+        if ($password === '') {
+            throw new RuntimeException('ADMIN_PASSWORD is not set: Argos creates no administrator with a known password.');
+        }
 
         $admin = User::query()->create([
             'email' => 'admin@argos.local',
             'name' => 'Argos Admin',
-            'password' => Hash::make((string) config('argos.admin_password')),
+            'password' => Hash::make($password),
         ]);
 
         // is_admin is not mass-assignable; the seeded account is the admin.

@@ -44,7 +44,7 @@ Referenz für den Betrieb mit jeder ENV-Variable, die Argos tatsächlich liest.
 | `APP_DEBUG` | `false` | Aktiviert detaillierte Fehlerseiten. **Niemals in der Produktion aktivieren.** |
 | `APP_URL` | `http://localhost` | Basis-URL der Argos-Instanz und die **einzige Quelle der Wahrheit** für Host + Schema. OAuth-Callbacks, die Domain des Session-Cookies und die Live-Demo-Subdomains leiten sich alle daraus ab. **Muss mit der öffentlichen URL übereinstimmen.** |
 | `APP_LOCALE` | `en` | Standard-UI-Sprache (`en` oder `de`). |
-| `ADMIN_PASSWORD` | `12345` | Passwort für das automatisch erstellte Admin-Konto. **Vor dem Veröffentlichen der Instanz ändern.** |
+| `ADMIN_PASSWORD` | *(erforderlich; der Installer erzeugt es – `12345` nur in der lokalen Entwicklung)* | Passwort des Admins, der auf einer leeren Installation angelegt wird (`admin@argos.local`). Fehlt es, legt eine frische Produktivinstallation keinen an. |
 | `ARGOS_CONFIG_DIR` | `~/.config/argos` (Compose: `/data/config`) | Verzeichnis für persistierte Konfiguration / den Standard-SQLite-Pfad innerhalb des Managers. |
 | `ARGOS_SOURCE_URL` | `https://github.com/nodus-it/argos` | In der UI angezeigte Source-Offer-URL gemäß AGPL-3.0 §13. **Forks müssen dies überschreiben** mit ihrer eigenen Source-URL. |
 | `ARGOS_FEEDBACK_URL` | *(leer)* | Wohin *Feedback senden* im Benutzermenü führt – etwa euer eigener Tracker oder Chat-Kanal für eine Beta. Ein GitHub- oder GitLab-Link `…/issues/new` wird mit Version und Seite vorbefüllt. Leer: die Issue-Auswahl des Upstream-Projekts. |

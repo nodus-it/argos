@@ -31,4 +31,12 @@ class AdminUserSeederTest extends TestCase
 
         $this->assertFalse(User::query()->where('email', 'admin@argos.local')->exists());
     }
+
+    public function test_production_never_falls_back_to_a_known_password(): void
+    {
+        config(['argos.admin_password' => null]);
+
+        $this->expectException(\RuntimeException::class);
+        $this->seed(AdminUserSeeder::class);
+    }
 }

@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Route;
 | are bound either to an API client (acts as its user) or a workspace
 | (workspace-scoped, acts as its automation user).
 */
-Route::prefix('v1')->middleware('auth:sanctum')->group(function (): void {
+Route::prefix('v1')->middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
     Route::middleware('abilities:workspaces:read')->group(function (): void {
         Route::get('workspaces', [WorkspaceController::class, 'index']);
         Route::get('workspaces/{workspace}', [WorkspaceController::class, 'show']);

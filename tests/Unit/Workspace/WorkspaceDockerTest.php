@@ -200,4 +200,18 @@ class WorkspaceDockerTest extends TestCase
         $this->assertContains('docker volume rm -f ws_login_svc_redis', $flat);
         $this->assertContains('docker network rm ws_login_svc', $flat);
     }
+
+    public function test_a_timed_out_docker_command_never_reveals_its_secrets(): void
+    {
+        $manager = app(WorkspaceContainerManager::class);
+        $mustRun = \Closure::bind(fn (array $cmd, int $timeout) => $this->mustRun($cmd, $timeout), $manager, WorkspaceContainerManager::class);
+
+        try {
+            $mustRun(['sh', '-c', 'sleep 3', 'ARGOS_DAEMON_TOKEN=top-secret'], 1);
+            $this->fail('expected a RuntimeException');
+        } catch (\RuntimeException $e) {
+            $this->assertStringNotContainsString('top-secret', $e->getMessage());
+            $this->assertStringContainsString('timed out', $e->getMessage());
+        }
+    }
 }

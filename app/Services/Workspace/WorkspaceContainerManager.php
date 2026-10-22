@@ -10,6 +10,7 @@ use App\Services\Worker\WorkerSidecarManager;
 use App\Services\Worker\WorkerSidecars;
 use App\Services\Workspace\Environment\EnvironmentResolver;
 use RuntimeException;
+use Symfony\Component\Process\Exception\ProcessTimedOutException;
 use Symfony\Component\Process\Process;
 
 /**
@@ -187,7 +188,12 @@ class WorkspaceContainerManager
     {
         $process = $this->newProcess($cmd);
         $process->setTimeout($timeout);
-        $process->run();
+        try {
+            $process->run();
+        } catch (ProcessTimedOutException) {
+            // Its message is the whole command line — with the secrets passed as -e.
+            throw new RuntimeException('docker '.($cmd[1] ?? '').' timed out after '.$timeout.' s');
+        }
 
         if (! $process->isSuccessful()) {
             throw new RuntimeException('docker '.($cmd[1] ?? '').' failed (exit '.$process->getExitCode()."):\n".$process->getErrorOutput());

@@ -8,6 +8,7 @@ use App\Enums\BackingService;
 use App\Models\Workspace;
 use App\Services\Workspace\Environment\BackingServiceResolver;
 use RuntimeException;
+use Symfony\Component\Process\Exception\ProcessTimedOutException;
 use Symfony\Component\Process\Process;
 use Throwable;
 
@@ -210,7 +211,12 @@ class WorkerSidecarManager
     {
         $process = $this->newProcess($cmd);
         $process->setTimeout($timeout);
-        $process->run();
+        try {
+            $process->run();
+        } catch (ProcessTimedOutException) {
+            // Its message is the whole command line — with the secrets passed as -e.
+            throw new RuntimeException('docker '.($cmd[1] ?? '').' timed out after '.$timeout.' s');
+        }
 
         if (! $process->isSuccessful()) {
             throw new RuntimeException(

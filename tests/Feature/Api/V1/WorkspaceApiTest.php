@@ -253,4 +253,14 @@ class WorkspaceApiTest extends TestCase
             ->assertJsonPath('data.pull_request.review', 'approved')
             ->assertJsonPath('data.pull_request.conflicts', true);
     }
+
+    public function test_the_api_is_rate_limited(): void
+    {
+        $token = $this->clientToken();
+        for ($i = 0; $i < 120; $i++) {
+            $this->withToken($token)->getJson('/api/v1/workspaces')->assertOk();
+        }
+
+        $this->withToken($token)->getJson('/api/v1/workspaces')->assertStatus(429);
+    }
 }
