@@ -37,7 +37,7 @@ hosts the agent sessions there.
 ### Prerequisites
 
 - Docker + Compose v2
-- PHP 8.4
+- PHP 8.5
 - Composer 2
 - Node 22+
 

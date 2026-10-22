@@ -1,9 +1,9 @@
 # syntax=docker/dockerfile:1.7
 
 # ============================================================
-# base: PHP 8.4-FPM + system tools
+# base: PHP 8.5-FPM + system tools
 # ============================================================
-FROM php:8.4-fpm-bookworm AS base
+FROM php:8.5-fpm-bookworm AS base
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -49,7 +49,7 @@ RUN set -eux; \
     npm --version; \
     docker compose version
 
-# PHP extensions
+# PHP extensions (OPcache is built into PHP 8.5 — nothing to install)
 RUN set -eux; \
     docker-php-ext-configure intl; \
     docker-php-ext-configure gd --with-freetype --with-jpeg; \
@@ -62,9 +62,7 @@ RUN set -eux; \
         exif \
         gd \
         pcntl \
-        posix \
-        opcache; \
-    docker-php-ext-enable opcache
+        posix
 
 COPY --from=composer:latest /usr/bin/composer /usr/local/bin/composer
 
