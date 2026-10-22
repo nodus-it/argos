@@ -27,11 +27,11 @@ return [
         'saved_title' => 'Token gespeichert',
         'saved_unreachable_body' => 'Hinweis: Token konnte nicht gegen die API geprüft werden — Verbindung nicht erreichbar.',
         'disconnected' => ':provider getrennt',
-        'need_agent' => 'Bitte zuerst mindestens einen Agenten authentifizieren',
+        'need_agent' => 'Hinterlege zuerst dein Claude-Abo',
         'repo_incomplete' => 'Bitte Repository und Branch wählen',
         'name_taken_title' => 'Name bereits vergeben',
-        'name_taken_body' => 'Ein Projekt mit diesem Namen existiert bereits — bitte einen anderen wählen.',
-        'project_created' => 'Projekt angelegt',
+        'name_taken_body' => 'Ein Workspace mit diesem Namen existiert bereits — bitte einen anderen wählen.',
+        'project_created' => 'Workspace angelegt',
     ],
 
     'security' => [
@@ -48,9 +48,9 @@ return [
     ],
 
     'agents' => [
-        'heading' => 'Welchen Agenten möchtest du nutzen?',
-        'description' => 'Authentifiziere mindestens einen Coding-Agenten. Weitere kannst du später ergänzen oder ändern.',
-        'gate_hint' => 'Mindestens ein Agent erforderlich',
+        'heading' => 'Dein Claude-Abo',
+        'description' => 'Aufgaben laufen auf dem Abo der Person, der sie gehören. Hinterlege deins — auch die Einrichtung des ersten Workspaces läuft darauf. Andere Mitglieder hinterlegen ihres im Profil; geteilte Agenten für Automatik findest du unter Agent-Credentials.',
+        'gate_hint' => 'Dein Claude-Abo wird benötigt',
         'claude_label' => 'Claude Code',
         'claude_hint' => 'Token via <code class="text-xs">claude setup-token</code> erzeugen und unten einfügen.',
     ],
@@ -70,8 +70,8 @@ return [
     ],
 
     'repo' => [
-        'heading' => 'Repository verbinden',
-        'description' => 'Autorisiere einen Git-Host und wähle dann das Repository, an dem Argos arbeiten soll.',
+        'heading' => 'Ersten Workspace anlegen',
+        'description' => 'Autorisiere einen Git-Host und wähle dann das Repository. Ein Workspace ist das Projekt: Repository, Umgebung, Mitglieder und seine Aufgaben.',
         'authorize_heading' => '1 · Zugang autorisieren',
         'oauth_card_title' => 'OAuth',
         'oauth_card_desc' => 'Mit einem Klick verbinden — danach Repos und Branches bequem per Dropdown wählen.',
@@ -93,14 +93,14 @@ return [
         'no_repos' => 'Keine Repositories für diese Quelle gefunden.',
         'branch_label' => 'Standard-Branch',
         'branch_placeholder' => 'Branch wählen…',
-        'name_label' => 'Projektname',
-        'create_button' => 'Projekt anlegen',
+        'name_label' => 'Workspace-Name',
+        'create_button' => 'Workspace anlegen',
     ],
 
     'done' => [
         'heading' => 'Argos ist startklar',
-        'description' => 'Dein erstes Projekt ist verbunden. Lege eine Aufgabe an, damit ein Agent aus einem Plan einen Pull Request macht.',
+        'description' => 'Dein erster Workspace steht. Argos prüft jetzt das Repository: Fehlen Preview-Vertrag, Setup-Befehle oder ein passender Stack, startet eine Einrichtungs-Aufgabe auf deinem Abo — öffne den Workspace, um sie zu verfolgen, und starte dann deine erste Aufgabe.',
         'create_workspace' => 'Ersten Workspace öffnen',
-        'view_project' => 'Projekt ansehen',
+        'view_project' => 'Workspace-Einstellungen',
     ],
 ];

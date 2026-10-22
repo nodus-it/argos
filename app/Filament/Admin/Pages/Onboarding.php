@@ -20,6 +20,7 @@ use App\Services\Credentials\AgentCredentialService;
 use App\Services\Git\RepositoryFetcher;
 use App\Services\OAuth\ConnectedAccountService;
 use App\Services\OAuth\TokenRefresher;
+use App\Services\Workspace\AgentPool;
 use App\Services\Workspace\WorkspaceService;
 use App\Support\DocsLinkAction;
 use App\Support\RepoUrlBuilder;
@@ -32,15 +33,14 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rules\Password;
 
 /**
- * Guided four-step setup wizard: secure the account, authenticate an agent,
- * connect & authorize a repository, done. The active step is state-driven so it
+ * Guided four-step setup wizard: secure the account, add your own Claude
+ * subscription (a personal agent), create the first workspace, done. The active step is state-driven so it
  * survives the external OAuth round-trip (the provider callback redirects back
  * here and we resume on the repository step once an agent is configured).
  *
  * The first step (security) is optional and skippable — it exists so the first
  * user, who logs in with the seeded default password, can change it right where
- * the onboarding redirect strands them (the profile page is not on the
- * RedirectToOnboarding whitelist while no workspace exists).
+ * the onboarding redirect strands them.
  */
 class Onboarding extends Page
 {
@@ -106,11 +106,11 @@ class Onboarding extends Page
 
     public ?string $selectedBranch = null;
 
-    public string $projectName = '';
+    public string $workspaceName = '';
 
     // ── Step 4: done ────────────────────────────────────────────────────────
 
-    public ?string $createdProfileId = null;
+    public ?string $createdWorkspaceId = null;
 
     public static function getNavigationIcon(): string
     {
@@ -162,14 +162,17 @@ class Onboarding extends Page
         }
     }
 
+    /**
+     * Set up when the admin has a Claude agent they may use — the one the
+     * setup task of their first workspace runs on (AgentPool, like
+     * WorkspaceSetupService::start). Other people's personal agents do not count.
+     */
     private function detectTokenSource(): string
     {
-        $hasCredential = AgentCredential::query()
-            ->where('agent_name', AgentName::ClaudeCode->value)
-            ->where('status', AgentCredentialStatus::Active->value)
-            ->exists();
+        /** @var User|null $user */
+        $user = Auth::user();
 
-        return $hasCredential ? 'agent_credential' : 'none';
+        return $user !== null && app(AgentPool::class)->usableAgentsFor($user)->isNotEmpty() ? 'agent_credential' : 'none';
     }
 
     // ── Step navigation ──────────────────────────────────────────────────────
@@ -182,7 +185,7 @@ class Onboarding extends Page
             return 2;
         }
 
-        if ($this->createdProfileId === null) {
+        if ($this->createdWorkspaceId === null) {
             return 3;
         }
 
@@ -358,10 +361,13 @@ class Onboarding extends Page
             return;
         }
 
+        // The admin's own subscription (a personal agent, as in the profile):
+        // their tasks and the first workspace's setup task run on it.
         app(AgentCredentialService::class)->upsert(
             [
                 'agent_name' => AgentName::ClaudeCode->value,
                 'name' => self::ONBOARDING_CREDENTIAL_NAME,
+                'user_id' => Auth::id(),
             ],
             [
                 'credentials' => ['token' => $token],
@@ -665,7 +671,7 @@ class Onboarding extends Page
         if (is_string($this->selectedRepo) && $this->selectedRepo !== '') {
             // Default the project name to the repo's short name.
             $parts = explode('/', $this->selectedRepo);
-            $this->projectName = (string) end($parts);
+            $this->workspaceName = (string) end($parts);
 
             $source = $this->resolveRepoSource();
             if ($source !== null) {
@@ -686,10 +692,10 @@ class Onboarding extends Page
     {
         $this->selectedRepo = null;
         $this->selectedBranch = null;
-        $this->projectName = '';
+        $this->workspaceName = '';
     }
 
-    public function createProject(): void
+    public function createWorkspace(): void
     {
         $source = $this->resolveRepoSource();
 
@@ -699,7 +705,7 @@ class Onboarding extends Page
             return;
         }
 
-        $name = trim($this->projectName);
+        $name = trim($this->workspaceName);
         $branch = is_string($this->selectedBranch) ? trim($this->selectedBranch) : '';
 
         if ($name === '' || $branch === '') {
@@ -720,7 +726,8 @@ class Onboarding extends Page
 
         /** @var User $user */
         $user = auth()->user();
-        $profile = app(WorkspaceService::class)->createWorkspace($user, [
+        // The repo inspection (and a setup task when something is missing) follows.
+        $workspace = app(WorkspaceService::class)->createWorkspace($user, [
             'name' => $name,
             'repo_url' => RepoUrlBuilder::build($source['platform'], $this->selectedRepo, $source['instance_url']),
             'platform' => $source['platform'],
@@ -730,7 +737,7 @@ class Onboarding extends Page
             'token' => $source['credential_id'] !== null ? $source['token'] : null,
         ]);
 
-        $this->createdProfileId = $profile->id;
+        $this->createdWorkspaceId = $workspace->id;
         $this->currentStep = 4;
 
         Notification::make()->title(__('onboarding.notifications.project_created'))->success()->send();

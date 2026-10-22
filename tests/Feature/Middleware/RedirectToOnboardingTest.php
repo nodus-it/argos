@@ -58,8 +58,8 @@ class RedirectToOnboardingTest extends TestCase
 
     public function test_agent_credential_create_page_is_not_redirected(): void
     {
-        // Onboarding's Codex setup links to this route — the middleware must
-        // let it through even though no workspace exists yet.
+        // Shared agents are managed here — the middleware must let it
+        // through even though no workspace exists yet.
         $response = $this->get(route('filament.admin.resources.agent-credentials.create'));
 
         $response->assertOk();
@@ -70,5 +70,11 @@ class RedirectToOnboardingTest extends TestCase
         $response = $this->get(route('filament.admin.resources.agent-credentials.index'));
 
         $response->assertOk();
+    }
+
+    public function test_the_profile_with_your_own_agents_is_reachable_before_the_first_workspace(): void
+    {
+        $this->get(route('filament.workspaces.auth.profile'))->assertOk();
+        $this->get(route('filament.admin.auth.profile'))->assertOk();
     }
 }

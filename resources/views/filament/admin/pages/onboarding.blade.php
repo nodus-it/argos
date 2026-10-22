@@ -322,7 +322,7 @@
                                     </div>
                                     <div>
                                         <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{{ __('onboarding.repo.name_label') }}</label>
-                                        <input wire:model="projectName" type="text"
+                                        <input wire:model="workspaceName" type="text"
                                             class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" />
                                     </div>
                                 </div>
@@ -336,7 +336,7 @@
                         {{ __('onboarding.nav.back') }}
                     </x-filament::button>
                     <x-filament::button
-                        wire:click="createProject"
+                        wire:click="createWorkspace"
                         icon="heroicon-o-rocket-launch"
                         :disabled="! is_string($selectedRepo) || $selectedRepo === '' || ! is_string($selectedBranch) || $selectedBranch === ''"
                     >
@@ -354,11 +354,11 @@
                     <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ __('onboarding.done.heading') }}</h2>
                     <p class="text-sm text-gray-500 dark:text-gray-400 max-w-md mx-auto">{{ __('onboarding.done.description') }}</p>
                     <div class="flex items-center justify-center gap-3 pt-2">
-                        @if ($createdProfileId)
-                            <x-filament::button tag="a" href="{{ \App\Filament\Workspaces\Resources\WorkspaceResource::getUrl('view', ['record' => $createdProfileId], panel: 'workspaces') }}" icon="heroicon-o-arrow-right">
+                        @if ($createdWorkspaceId)
+                            <x-filament::button tag="a" href="{{ \App\Filament\Workspaces\Resources\WorkspaceResource::getUrl('view', ['record' => $createdWorkspaceId], panel: 'workspaces') }}" icon="heroicon-o-arrow-right">
                                 {{ __('onboarding.done.create_workspace') }}
                             </x-filament::button>
-                            <x-filament::button tag="a" color="gray" href="{{ route('filament.admin.resources.workspaces.edit', ['record' => $createdProfileId]) }}">
+                            <x-filament::button tag="a" color="gray" href="{{ route('filament.workspaces.resources.workspaces.settings', ['record' => $createdWorkspaceId]) }}">
                                 {{ __('onboarding.done.view_project') }}
                             </x-filament::button>
                         @endif

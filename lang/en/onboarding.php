@@ -27,11 +27,11 @@ return [
         'saved_title' => 'Token saved',
         'saved_unreachable_body' => 'Note: Token could not be verified against the API — connection not reachable.',
         'disconnected' => ':provider disconnected',
-        'need_agent' => 'Authenticate at least one agent first',
+        'need_agent' => 'Add your Claude subscription first',
         'repo_incomplete' => 'Please pick a repository and branch',
         'name_taken_title' => 'Name already in use',
-        'name_taken_body' => 'A project with this name already exists — choose a different one.',
-        'project_created' => 'Project created',
+        'name_taken_body' => 'A workspace with this name already exists — choose a different one.',
+        'project_created' => 'Workspace created',
     ],
 
     'security' => [
@@ -48,9 +48,9 @@ return [
     ],
 
     'agents' => [
-        'heading' => 'Which agent do you want to use?',
-        'description' => 'Authenticate at least one coding agent. You can add or change agents later.',
-        'gate_hint' => 'At least one agent required',
+        'heading' => 'Your Claude subscription',
+        'description' => 'Tasks run on the subscription of the person who owns them. Add yours — the first workspace\'s setup runs on it too. Other members add their own in their profile; shared agents for automation are under Agent credentials.',
+        'gate_hint' => 'Your Claude subscription is required',
         'claude_label' => 'Claude Code',
         'claude_hint' => 'Generate a token with <code class="text-xs">claude setup-token</code> and paste it below.',
     ],
@@ -70,8 +70,8 @@ return [
     ],
 
     'repo' => [
-        'heading' => 'Connect a repository',
-        'description' => 'Authorize a Git host, then pick the repository Argos should work on.',
+        'heading' => 'Create the first workspace',
+        'description' => 'Authorize a Git host, then pick the repository. A workspace is the project: repository, environment, members and its tasks.',
         'authorize_heading' => '1 · Authorize access',
         'oauth_card_title' => 'OAuth',
         'oauth_card_desc' => 'Connect in one click — then pick repos and branches from dropdowns.',
@@ -93,14 +93,14 @@ return [
         'no_repos' => 'No repositories found for this source.',
         'branch_label' => 'Default branch',
         'branch_placeholder' => 'Choose a branch…',
-        'name_label' => 'Project name',
-        'create_button' => 'Create project',
+        'name_label' => 'Workspace name',
+        'create_button' => 'Create workspace',
     ],
 
     'done' => [
         'heading' => 'Argos is ready',
-        'description' => 'Your first project is connected. Open a workspace to work on it with Claude, or start an automatic run that ends in a pull request.',
+        'description' => 'Your first workspace exists. Argos is checking the repository now: if the preview contract, the setup steps or a fitting stack are missing, a setup task starts on your subscription — open the workspace to follow it, then start your first task.',
         'create_workspace' => 'Open first workspace',
-        'view_project' => 'View project',
+        'view_project' => 'Workspace settings',
     ],
 ];

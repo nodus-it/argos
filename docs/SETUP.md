@@ -186,8 +186,10 @@ step is **Security**: set your own password right there to replace the
 generated default. The step is optional and skippable, but while you still
 carry the default password a warning nudges you to change it (you can also
 change it anytime later under **Profile**). The wizard then walks you through
-pasting your Claude token and creating your first workspace from a
-repository. Argos then inspects the repository and, if something is missing,
+pasting your Claude token — it becomes your **personal** agent (the one your
+tasks run on; other people add theirs under **Profile → My Claude subscriptions**, shared
+agents live under **Worker → Agent credentials**) — and creating your first
+workspace from a repository. Argos then inspects the repository and, if something is missing,
 starts a [setup task](PREPARE-PROJECT.md#the-setup-task) on your subscription.
 To make a repository "Argos-ready" by hand, see
 [Preparing a Repository](PREPARE-PROJECT.md).

@@ -181,6 +181,17 @@ class OnboardingPageTest extends TestCase
             ->first();
         $this->assertNotNull($cred);
         $this->assertSame('sk-ant-oat01-fake', $cred->credentials['token']);
+        // The admin's own subscription — their first workspace's setup task runs on it.
+        $this->assertSame(auth()->id(), $cred->user_id);
+    }
+
+    public function test_another_persons_agent_does_not_unlock_the_wizard(): void
+    {
+        AgentCredential::factory()->ownedBy(User::factory()->create())->create(['agent_name' => AgentName::ClaudeCode, 'status' => AgentCredentialStatus::Active]);
+
+        Livewire::test(Onboarding::class)
+            ->assertSet('tokenSource', 'none')
+            ->assertSet('currentStep', 1);
     }
 
     public function test_save_claude_token_rejects_invalid_token(): void
@@ -331,7 +342,7 @@ class OnboardingPageTest extends TestCase
     public function test_create_project_not_in_header_actions(): void
     {
         Livewire::test(Onboarding::class)
-            ->assertActionDoesNotExist('createProject');
+            ->assertActionDoesNotExist('createWorkspace');
     }
 
     public function test_step2_renders_with_credential_setup_links_when_no_oauth_configured(): void
@@ -394,8 +405,8 @@ class OnboardingPageTest extends TestCase
             ->set('repoSource', "oauth:{$account->id}")
             ->set('selectedRepo', 'acme/widget')
             ->set('selectedBranch', 'main')
-            ->set('projectName', 'widget')
-            ->call('createProject')
+            ->set('workspaceName', 'widget')
+            ->call('createWorkspace')
             ->assertSet('currentStep', 4)
             ->assertSee(__('onboarding.done.create_workspace'))
             ->assertSee('/w/workspaces/'.Workspace::query()->where('name', 'widget')->value('id'));
@@ -432,8 +443,8 @@ class OnboardingPageTest extends TestCase
             ->set('repoSource', "pat:{$credential->id}")
             ->set('selectedRepo', 'acme/gadget')
             ->set('selectedBranch', 'main')
-            ->set('projectName', 'gadget')
-            ->call('createProject')
+            ->set('workspaceName', 'gadget')
+            ->call('createWorkspace')
             ->assertSet('currentStep', 4);
 
         $workspace = Workspace::query()->where('name', 'gadget')->first();
@@ -458,8 +469,8 @@ class OnboardingPageTest extends TestCase
             ->set('repoSource', "pat:{$credential->id}")
             ->set('selectedRepo', 'acme/widget')
             ->set('selectedBranch', 'main')
-            ->set('projectName', 'widget')
-            ->call('createProject')
+            ->set('workspaceName', 'widget')
+            ->call('createWorkspace')
             ->assertSet('currentStep', 3);
 
         $this->assertSame(1, Workspace::query()->where('name', 'widget')->count());

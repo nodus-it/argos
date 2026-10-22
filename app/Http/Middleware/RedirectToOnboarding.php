@@ -20,6 +20,10 @@ class RedirectToOnboarding
             // first workspace exists, so onboarding can link into them.
             'filament.admin.pages.docs',
             'filament.admin.resources.workspaces.create',
+            'filament.workspaces.resources.workspaces.create',
+            // Your own Claude subscription lives in the profile.
+            'filament.admin.auth.profile',
+            'filament.workspaces.auth.profile',
             // Agents are set up before the first workspace exists — both
             // create and the post-save edit route must be reachable.
             'filament.admin.resources.agent-credentials.*',
@@ -38,7 +42,7 @@ class RedirectToOnboarding
         }
 
         // Onboarding is admin-only; other users land on the (empty) dashboard
-        // until an administrator has set up the first project.
+        // until an administrator has set up the first workspace.
         if (! Gate::allows('administer-argos')) {
             return $next($request);
         }

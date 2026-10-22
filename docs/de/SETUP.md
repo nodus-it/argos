@@ -195,8 +195,11 @@ ein eigenes Passwort fest, um das generierte Standard-Passwort zu ersetzen. Der
 Schritt ist optional und überspringbar — solange du noch das Standard-Passwort
 nutzt, weist dich ein Hinweis darauf hin, es zu ändern (du kannst es auch
 jederzeit später unter **Profil** ändern). Der Assistent führt dich danach
-durch das Einfügen deines Claude-Tokens und das Anlegen deines ersten
-Workspaces aus einem Repository. Argos untersucht dann das Repository und
+durch das Einfügen deines Claude-Tokens — daraus wird dein **persönlicher**
+Agent, auf dem deine Aufgaben laufen; andere hinterlegen ihren unter
+**Profil → Meine Claude-Abos**, geteilte Agenten liegen unter **Worker →
+Agent-Credentials** — und das Anlegen deines ersten Workspaces aus einem
+Repository. Argos untersucht dann das Repository und
 startet, falls etwas fehlt, eine
 [Einrichtungsaufgabe](PREPARE-PROJECT.md#die-einrichtungs-aufgabe) auf deinem Abo. Um ein
 Repository von Hand "Argos-ready" zu machen, siehe
