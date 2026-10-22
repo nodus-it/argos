@@ -674,7 +674,10 @@ a.wf-ref-chip:hover { text-decoration: underline; }
 .wf-step-time { margin-left: auto; padding-left: 8px; color: var(--wf-muted); font-size: 11px; white-space: nowrap; }
 
 /* The newest message a person wrote. */
-.wf-msg.is-latest { padding: 10px 14px; margin-inline: -14px; border-left: 3px solid var(--wf-accent, var(--wf-info)); border-radius: 0 8px 8px 0; background: var(--wf-surface); }
+/* People's messages: always a quiet card; Claude writes on the background. The newest
+   message a person wrote carries an accent edge. */
+.wf-msg.ws-msg { padding: 10px 14px; border: 1px solid var(--wf-border); border-radius: 10px; background: var(--wf-surface); }
+.wf-msg.is-latest { border-left: 3px solid var(--wf-accent); padding-left: 12px; }
 
 /* Review: Markdown files rendered (concepts, docs). */
 .wf-md-preview { flex: 1; min-height: 0; overflow: auto; padding: 20px 28px 32px; }
