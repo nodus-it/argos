@@ -81,6 +81,10 @@ class DemoDeployer
                 $composeYaml = str_replace(self::DEMO_IMAGE_PLACEHOLDER, $this->imageBuilder->ensure(), $composeYaml);
             }
 
+            // Repository content, started over the host's Docker socket: only a
+            // safe subset of compose passes, hardened (see DemoComposeGuard).
+            $composeYaml = app(DemoComposeGuard::class)->harden($composeYaml);
+
             $entry = $this->parseEntry($settings);
 
             $router = app(TraefikRouter::class);

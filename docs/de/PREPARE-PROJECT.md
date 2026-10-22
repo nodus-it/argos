@@ -315,6 +315,16 @@ für die Compose-Datei:
 - Der Entry-Service liefert HTTP auf dem angegebenen `entry.port` aus.
 - Cache die Konfiguration **nicht** (`config:cache`) in den Boot-Befehlen —
   Laravel muss die Env-Variablen, die Argos injiziert, weiter lesen.
+- Argos startet den Stack auf dem Docker des Hosts und akzeptiert deshalb pro
+  Service nur eine sichere Auswahl: `image`, `command`, `entrypoint`,
+  `environment`, `working_dir`, `user`, `depends_on`, `healthcheck`,
+  `networks`, `volumes`, `tmpfs`, `restart`, `expose`, `stop_grace_period`,
+  `stop_signal`, `init`, `hostname`. Volumes müssen **benannte** Volumes
+  sein, die unter `volumes:` deklariert sind (keine Host-Pfade, keine
+  Treiber-Optionen); Netzwerke müssen unter `networks:` deklariert sein (nicht
+  extern). `build`, `privileged`, Capabilities, Devices, `network_mode`, `pid`,
+  `env_file` und `ports` werden mit klarer Meldung abgelehnt. Jeder Service
+  läuft mit `no-new-privileges` und einem Prozesslimit.
 
 `.argos/demo.compose.yml`:
 
