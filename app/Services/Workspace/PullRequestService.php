@@ -266,28 +266,6 @@ class PullRequestService
             ->all();
     }
 
-    /** Hand the reviews and review comments to Claude. */
-    public function sendReview(Task $task, User $by): void
-    {
-        Gate::forUser($by)->authorize('prompt', $task);
-        $feedback = $this->feedback($task, wait: true);
-        if ($feedback['reviews'] === [] && $feedback['comments'] === []) {
-            throw WorkspaceException::translated('workspaces.pr.no_review');
-        }
-
-        $lines = [__('workspaces.pr.review_prompt', ['url' => (string) $task->pr_url])];
-        foreach ($feedback['reviews'] as $review) {
-            if (trim($review['body']) !== '') {
-                $lines[] = "- **{$review['author']}** ({$review['state']}): ".trim($review['body']);
-            }
-        }
-        foreach ($feedback['comments'] as $comment) {
-            $lines[] = self::commentLine($comment);
-        }
-
-        $this->tasks->send($task, $by, implode("\n", $lines));
-    }
-
     /**
      * Take pull request comments over into the person's own review (all,
      * or one): line comments become drafts at their line — collected with
@@ -365,14 +343,6 @@ class PullRequestService
         // Shipping notes from before the marker, in either language.
         return str_contains($body, self::ARGOS_MARKER)
             || preg_match('/^(New commits pushed by|Neue Commits von) /', trim($body)) === 1;
-    }
-
-    /** @param  array{author: string, body: string, path: ?string, line: ?int}  $comment */
-    private static function commentLine(array $comment): string
-    {
-        $where = $comment['path'] !== null ? ' `'.$comment['path'].($comment['line'] !== null ? ':'.$comment['line'] : '').'`' : '';
-
-        return "- **{$comment['author']}**{$where}: ".trim($comment['body']);
     }
 
     /** The base moved on or there are conflicts: Claude rebases the branch. */

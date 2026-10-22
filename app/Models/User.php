@@ -94,22 +94,6 @@ class User extends Authenticatable implements FilamentUser, HasAvatar, OAuthenti
         return $this->belongsToMany(Workspace::class, 'workspace_members')->withPivot('role')->withTimestamps();
     }
 
-    /** @return HasMany<Task, $this> */
-    public function ownedTasks(): HasMany
-    {
-        return $this->hasMany(Task::class, 'owner_user_id');
-    }
-
-    /**
-     * Tasks this person was invited to.
-     *
-     * @return BelongsToMany<Task, $this>
-     */
-    public function collaboratingTasks(): BelongsToMany
-    {
-        return $this->belongsToMany(Task::class, 'task_members')->withTimestamps();
-    }
-
     public function connectedAccount(string $provider): ?ConnectedAccount
     {
         /** @var ConnectedAccount|null */

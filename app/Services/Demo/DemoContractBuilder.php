@@ -21,7 +21,7 @@ class DemoContractBuilder
     /**
      * @return array{0: string, 1: string} [composeYaml, settingsYaml]
      */
-    public function buildDefault(Workspace $profile): array
+    public function buildDefault(Workspace $workspace): array
     {
         $dir = resource_path('stubs/demo/laravel');
         $settingsYaml = (string) file_get_contents($dir.'/demo.yml');
@@ -31,22 +31,22 @@ class DemoContractBuilder
             $compose = [];
         }
 
-        $this->applyMysqlCredentials($compose, $profile);
-        $this->applyRedis($compose, $profile);
+        $this->applyMysqlCredentials($compose, $workspace);
+        $this->applyRedis($compose, $workspace);
 
         return [Yaml::dump($compose, 8, 2), $settingsYaml];
     }
 
     /**
-     * Override the demo DB credentials with the profile's configured ones (if
+     * Override the demo DB credentials with the workspace's configured ones (if
      * any), keeping the stub defaults otherwise — so a name the project
      * hardcodes is honoured in both the worker and the demo.
      *
      * @param  array<string, mixed>  $compose
      */
-    private function applyMysqlCredentials(array &$compose, Workspace $profile): void
+    private function applyMysqlCredentials(array &$compose, Workspace $workspace): void
     {
-        $config = $profile->worker_service_config['mysql'] ?? null;
+        $config = $workspace->worker_service_config['mysql'] ?? null;
         if (! is_array($config)) {
             return;
         }
@@ -76,9 +76,9 @@ class DemoContractBuilder
      *
      * @param  array<string, mixed>  $compose
      */
-    private function applyRedis(array &$compose, Workspace $profile): void
+    private function applyRedis(array &$compose, Workspace $workspace): void
     {
-        if (! in_array(BackingService::Redis, $profile->backingServices(), true)) {
+        if (! in_array(BackingService::Redis, $workspace->backingServices(), true)) {
             return;
         }
 

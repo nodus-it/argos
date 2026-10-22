@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace Tests\Unit\Services\Project;
+namespace Tests\Unit\Services\Workspace\Environment;
 
 use App\Models\Workspace;
-use App\Services\Project\ProjectEnvironmentResolver;
+use App\Services\Workspace\Environment\EnvironmentResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
-class ProjectEnvironmentResolverTest extends TestCase
+class EnvironmentResolverTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -18,7 +18,7 @@ class ProjectEnvironmentResolverTest extends TestCase
      */
     private function resolve(Workspace $profile): array
     {
-        return app(ProjectEnvironmentResolver::class)->resolve($profile);
+        return app(EnvironmentResolver::class)->resolve($profile);
     }
 
     public function test_empty_profile_yields_no_env(): void

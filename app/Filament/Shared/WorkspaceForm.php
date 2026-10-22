@@ -718,39 +718,6 @@ final class WorkspaceForm
     }
 
     /**
-     * Form data for an existing workspace: derives the OAuth picker values
-     * from the persisted repo_url + default_branch and adds the (hidden)
-     * repository token. Used by the admin edit page.
-     *
-     * @param  array<string, mixed>  $data
-     * @return array<string, mixed>
-     */
-    public static function fillFromRecord(Workspace $record, array $data): array
-    {
-        if (! isset($data['auth_method']) || $data['auth_method'] === '') {
-            $data['auth_method'] = 'pat';
-        }
-
-        // The token is $hidden on the model (kept out of serialisation), so
-        // the default fill misses it.
-        $data['token'] = $record->token;
-
-        $url = $data['repo_url'] ?? null;
-        if (is_string($url) && $url !== '') {
-            $repoPath = self::repoPathFromUrl($url);
-            if ($repoPath !== null) {
-                $data['oauth_repo'] = $repoPath;
-            }
-        }
-
-        if (isset($data['default_branch']) && is_string($data['default_branch'])) {
-            $data['oauth_branch'] = $data['default_branch'];
-        }
-
-        return $data;
-    }
-
-    /**
      * Prepare submitted form data for the service: OAuth pickers → columns,
      * auto settings cleaned.
      *
@@ -958,9 +925,6 @@ final class WorkspaceForm
         return app(RepositoryFetcher::class)->branchOptions($platform, $token, $instanceUrl, $ownerRepo, 'workspace-form-branches:'.sha1($platform.'|'.$token.'|'.$url));
     }
 
-
-
-
     private static function connectedAccountFor(Get $get): ?ConnectedAccount
     {
         $platform = $get('platform');
@@ -1081,7 +1045,6 @@ final class WorkspaceForm
 
         return is_string($platform) && $platform !== '';
     }
-
 
     /** @return array<string, string> */
     private static function authMethodOptions(Get $get): array

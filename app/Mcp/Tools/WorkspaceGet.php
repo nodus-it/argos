@@ -23,7 +23,7 @@ class WorkspaceGet extends Tool
     public function schema(JsonSchema $schema): array
     {
         return [
-            'workspace' => $schema->string()->description('Workspace id (ULID) or name')->required(),
+            'workspace' => $schema->string()->description('Workspace address name (e.g. "shop-api"), id (ULID) or name')->required(),
         ];
     }
 

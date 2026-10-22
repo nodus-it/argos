@@ -13,14 +13,14 @@ class GitServiceFactory
 {
     public function __construct(private readonly GitProviderRegistry $registry) {}
 
-    public function forWorkspace(Workspace $profile): GitServiceContract
+    public function forWorkspace(Workspace $workspace): GitServiceContract
     {
-        $token = $profile->resolveToken();
-        $instanceUrl = $profile->platform === GitProviderEnum::GitLab
-            ? $this->extractInstanceUrl($profile->repo_url)
+        $token = $workspace->resolveToken();
+        $instanceUrl = $workspace->platform === GitProviderEnum::GitLab
+            ? $this->extractInstanceUrl($workspace->repo_url)
             : '';
 
-        return $this->registry->make($profile->platform->value, $token, $instanceUrl);
+        return $this->registry->make($workspace->platform->value, $token, $instanceUrl);
     }
 
     /**

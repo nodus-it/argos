@@ -6,7 +6,7 @@ namespace App\Services\Worker;
 
 use App\Enums\BackingService;
 use App\Models\Workspace;
-use App\Services\Project\BackingServiceResolver;
+use App\Services\Workspace\Environment\BackingServiceResolver;
 use RuntimeException;
 use Symfony\Component\Process\Process;
 use Throwable;
@@ -30,13 +30,12 @@ class WorkerSidecarManager
      */
     public function startForWorkspace(Workspace $workspace): WorkerSidecars
     {
-        $profile = $workspace;
-        $services = $profile->backingServices();
+        $services = $workspace->backingServices();
         if ($services === []) {
             return new WorkerSidecars;
         }
 
-        $coordinates = app(BackingServiceResolver::class)->coordinates($profile);
+        $coordinates = app(BackingServiceResolver::class)->coordinates($workspace);
         $network = $this->workspaceNetworkName($workspace);
         $label = ['--label', self::WORKSPACE_LABEL.'='.$workspace->slug];
 

@@ -16,8 +16,6 @@ use App\Enums\AgentCredentialStatus;
 use App\Enums\AgentName;
 use App\Enums\AuthMethod;
 use App\Filament\Concerns\AdminOnly;
-use App\Models\AgentCredential;
-use App\Models\ConnectedAccount;
 use App\Models\ProviderCredential;
 use App\Models\ProviderOAuthConfig;
 use App\Models\User;
@@ -160,7 +158,6 @@ class Onboarding extends Page
         Notification::make()->title(__('onboarding.notifications.avatar_saved'))->success()->send();
     }
 
-
     public string $newPassword = '';
 
     public string $newPasswordConfirmation = '';
@@ -176,9 +173,6 @@ class Onboarding extends Page
     public string $claudeToken = '';
 
     // ── Step 3: repository ──────────────────────────────────────────────────
-
-    /** @var array<string, array{configured: bool, connected: bool}> */
-    public array $oauthState = [];
 
     /** Selected token source for the repo picker: '' | "oauth:{id}" | "pat:{ulid}". */
     public string $repoSource = '';
@@ -197,7 +191,6 @@ class Onboarding extends Page
     {
         return 'heroicon-o-rocket-launch';
     }
-
 
     public static function getNavigationLabel(): string
     {
@@ -242,17 +235,6 @@ class Onboarding extends Page
     private function refreshState(): void
     {
         $this->tokenSource = $this->detectTokenSource();
-
-        /** @var User|null $user */
-        $user = Auth::user();
-
-        $this->oauthState = [];
-        foreach (self::OAUTH_PROVIDERS as $provider => $configKey) {
-            $this->oauthState[$provider] = [
-                'configured' => filled(config($configKey)),
-                'connected' => $user !== null && $user->connectedAccount($provider) !== null,
-            ];
-        }
     }
 
     /**
@@ -410,28 +392,6 @@ class Onboarding extends Page
 
     // ── Step 2: agent actions ────────────────────────────────────────────────
 
-    public function disconnectProvider(string $provider): void
-    {
-        if (! array_key_exists($provider, self::OAUTH_PROVIDERS)) {
-            return;
-        }
-
-        /** @var User|null $user */
-        $user = Auth::user();
-        if ($user === null) {
-            return;
-        }
-
-        app(ConnectedAccountService::class)->disconnect($user, $provider);
-        $this->resetRepoSelection();
-        $this->refreshState();
-
-        Notification::make()
-            ->title(__('onboarding.notifications.disconnected', ['provider' => __('onboarding.providers.'.$provider)]))
-            ->success()
-            ->send();
-    }
-
     public function saveClaudeToken(): void
     {
         $token = trim($this->claudeToken);
@@ -489,11 +449,6 @@ class Onboarding extends Page
     }
 
     // ── Step 3: repository source + picker ────────────────────────────────────
-
-    public function hasAnyOAuthConfigured(): bool
-    {
-        return $this->oauthTargets() !== [];
-    }
 
     /**
      * OAuth connect options for the repository step — built from the DB-stored

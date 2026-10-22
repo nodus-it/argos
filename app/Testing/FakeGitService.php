@@ -24,11 +24,6 @@ class FakeGitService implements GitProviderContract
         private readonly string $label = 'Fake Provider',
     ) {}
 
-    public function getProviderKey(): string
-    {
-        return $this->providerKey;
-    }
-
     public function label(): string
     {
         return $this->label;
@@ -115,19 +110,6 @@ class FakeGitService implements GitProviderContract
         string $body,
     ): array {
         return ['id' => 1, 'body' => $body];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    public function updatePullRequest(
-        string $owner,
-        string $repo,
-        int|string $pullRequestId,
-        string $title,
-        string $body,
-    ): array {
-        return ['number' => $pullRequestId, 'title' => $title, 'body' => $body];
     }
 
     /**

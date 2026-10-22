@@ -321,7 +321,7 @@ class WorkspaceShipTest extends TestCase
         $this->task->forceFill(['pr_number' => 5, 'pr_url' => 'https://x/5', 'pr_state' => 'open', 'status' => TaskStatus::PrOpen])->save();
         $this->git->shouldReceive('pullRequestDetails')->once()->andReturn(new PullRequestDetails('closed', 'https://x/5'));
 
-        $this->service()->syncPullRequest($this->task);
+        app(\App\Services\Workspace\PullRequestService::class)->refresh($this->task);
 
         $task = $this->task->fresh();
         $this->assertSame('closed', $task->pr_state);
@@ -334,7 +334,7 @@ class WorkspaceShipTest extends TestCase
         $this->task->forceFill(['pr_number' => 5, 'pr_url' => 'https://x/5', 'pr_state' => 'draft', 'status' => TaskStatus::PrOpen])->save();
         $this->git->shouldReceive('pullRequestDetails')->once()->andReturn(new PullRequestDetails('open', 'https://x/5'));
 
-        $this->service()->syncPullRequest($this->task);
+        app(\App\Services\Workspace\PullRequestService::class)->refresh($this->task);
 
         $task = $this->task->fresh();
         $this->assertSame('open', $task->pr_state);

@@ -54,7 +54,7 @@ export interface EventBatch {
 export type EventSink = (event: PendingEvent) => void;
 
 /** Upper bound for tool input/output payloads relayed to the manager. */
-export const MAX_TOOL_PAYLOAD_BYTES = 64 * 1024;
+const MAX_TOOL_PAYLOAD_BYTES = 64 * 1024;
 
 /**
  * Truncate a string to at most `maxBytes` UTF-8 bytes without splitting a

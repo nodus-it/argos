@@ -31,7 +31,7 @@ trait InteractsWithWorkspaces
     /** By id or exact name, among the workspaces the user may view. */
     protected function findWorkspace(string $reference): ?Workspace
     {
-        $workspace = Workspace::query()->whereKey($reference)->orWhere('name', $reference)->latest()->first();
+        $workspace = Workspace::query()->whereKey($reference)->orWhere('slug', $reference)->orWhere('name', $reference)->latest()->first();
 
         return $workspace !== null && $this->user()->can('view', $workspace) ? $workspace : null;
     }

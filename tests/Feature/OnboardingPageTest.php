@@ -283,7 +283,7 @@ class OnboardingPageTest extends TestCase
         config(['services.github.client_id' => 'cid', 'services.github.client_secret' => 'cs']);
 
         Livewire::test(Onboarding::class)
-            ->call('disconnectProvider', 'github');
+            ->call('disconnectTarget', 'github', '');
 
         $this->assertSame(0, $user->connectedAccounts()->where('provider', 'github')->count());
     }

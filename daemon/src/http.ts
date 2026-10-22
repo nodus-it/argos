@@ -19,7 +19,7 @@ import { prepareWorktree, removeWorktree, SETUP_TIMEOUT_MS, writeEnv, type Setup
 import { join } from 'node:path';
 
 /** The daemon's version, from package.json (one directory above src/ and dist/). */
-export const DAEMON_VERSION = (JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string }).version;
+const DAEMON_VERSION = (JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string }).version;
 
 export interface AppDependencies {
     daemonToken: string;
@@ -252,7 +252,6 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
         return reply.code(202).send({});
     });
 
-    app.get('/gates', async () => ({ running: gateRunner().running }));
 
     /** The models the agent's subscription offers (Claude Code's /model), without sending a message. */
     app.post('/models', async (request) => {

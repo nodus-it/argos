@@ -240,12 +240,6 @@ class WorkspaceShipService
         return (string) $task->pr_url;
     }
 
-    /** Refresh the PR state from the provider (see PullRequestService::refresh). */
-    public function syncPullRequest(Task $task): void
-    {
-        app(PullRequestService::class)->refresh($task);
-    }
-
     /**
      * Nothing new to ship: with a PR there is no new commit to push; without
      * one, the branch carries no change against the base.

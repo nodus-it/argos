@@ -6,7 +6,7 @@ import { truncateUtf8 } from './events.js';
 import { git, GitError } from './git.js';
 import { ID_CHARS, ID_PATTERN } from './ids.js';
 
-export const CHECKPOINT_PREFIX = 'refs/argos/checkpoints';
+const CHECKPOINT_PREFIX = 'refs/argos/checkpoints';
 
 /** Checkpoints kept per task; older refs are deleted. */
 export const MAX_CHECKPOINTS = 200;

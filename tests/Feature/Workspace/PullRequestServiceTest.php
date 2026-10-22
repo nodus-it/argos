@@ -229,20 +229,6 @@ class PullRequestServiceTest extends TestCase
         $this->service()->fixChecks($this->task, $this->owner);
     }
 
-    public function test_send_review_hands_reviews_and_comments_to_claude(): void
-    {
-        $this->git->shouldReceive('pullRequestDetails')->once()->andReturn($this->details([
-            'reviewState' => 'changes_requested',
-            'reviews' => [['author' => 'grace', 'state' => 'changes_requested', 'body' => 'Please add a test.', 'submitted_at' => null]],
-            'comments' => [['id' => '1', 'author' => 'grace', 'body' => 'Typo here', 'path' => 'app/Login.php', 'line' => 12, 'url' => null, 'created_at' => null]],
-        ]));
-
-        $this->service()->sendReview($this->task, $this->owner);
-
-        $this->assertStringContainsString('Please add a test.', $this->sent[0]);
-        $this->assertStringContainsString('`app/Login.php:12`: Typo here', $this->sent[0]);
-    }
-
     public function test_the_context_panel_shows_the_pull_request(): void
     {
         $this->task->forceFill(['pr_state' => 'draft'])->save();

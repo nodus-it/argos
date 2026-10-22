@@ -21,7 +21,6 @@ use App\Integrations\GitHub\Requests\ListCheckRuns;
 use App\Integrations\GitHub\Requests\ListPullRequestReviewComments;
 use App\Integrations\GitHub\Requests\ListPullRequestReviews;
 use App\Integrations\GitHub\Requests\ListRepositories;
-use App\Integrations\GitHub\Requests\UpdatePullRequest;
 use App\Services\GitProvider\Concerns\SummarizesPullRequests;
 use App\Services\GitProvider\Contracts\GitProviderContract;
 use Illuminate\Support\Facades\Log;
@@ -39,11 +38,6 @@ class GitHubGitService implements GitProviderContract
     public function __construct(string $token)
     {
         $this->connector = new GitHubConnector($token);
-    }
-
-    public function getProviderKey(): string
-    {
-        return 'github';
     }
 
     public function label(): string
@@ -164,21 +158,6 @@ class GitHubGitService implements GitProviderContract
             ->throw()
             ->json();
     }
-
-    public function updatePullRequest(
-        string $owner,
-        string $repo,
-        int|string $pullRequestId,
-        string $title,
-        string $body,
-    ): array {
-        return $this->connector
-            ->send(new UpdatePullRequest($owner, $repo, $pullRequestId, $title, $body))
-            ->throw()
-            ->json();
-    }
-
-
 
     /**
      * @return array<string, mixed>

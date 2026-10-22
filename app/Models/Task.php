@@ -290,12 +290,6 @@ class Task extends Model implements DemoTarget
         return $this->demos()->latest()->first();
     }
 
-    /** @return HasMany<WorkspaceGateRun, $this> */
-    public function gateRuns(): HasMany
-    {
-        return $this->hasMany(WorkspaceGateRun::class);
-    }
-
     /**
      * Preview host label: `demo-<workspace>-<task>`, shortened so it stays a
      * valid DNS label.

@@ -86,9 +86,9 @@ class TaskCheckpointTest extends TestCase
         $first = $this->sendMessage('one');
         $second = $this->sendMessage('two');
 
-        $this->assertSame(1, $this->service()->forMessage($first)?->n);
-        $this->assertSame(2, $this->service()->forMessage($second)?->n);
-        $this->assertSame('refs/argos/checkpoints/'.$this->task->id.'/2', $this->service()->forMessage($second)?->ref);
+        $this->assertSame(1, $this->checkpointOf($first)?->n);
+        $this->assertSame(2, $this->checkpointOf($second)?->n);
+        $this->assertSame('refs/argos/checkpoints/'.$this->task->id.'/2', $this->checkpointOf($second)?->ref);
     }
 
     public function test_checkpoint_events_are_idempotent_and_validated(): void
@@ -117,7 +117,7 @@ class TaskCheckpointTest extends TestCase
     public function test_reset_to_here_previews_restores_and_tells_claude(): void
     {
         $message = $this->sendMessage('change the readme');
-        $checkpoint = $this->service()->forMessage($message);
+        $checkpoint = $this->checkpointOf($message);
 
         $chat = $this->chat()->set('taskId', $this->task->id)
             ->assertSee(__('workspaces.checkpoints.reset_here'))
@@ -145,7 +145,7 @@ class TaskCheckpointTest extends TestCase
 
     public function test_restoring_is_refused_while_claude_works(): void
     {
-        $checkpoint = $this->service()->forMessage($this->sendMessage('one'));
+        $checkpoint = $this->checkpointOf($this->sendMessage('one'));
         $this->task->forceFill(['session_status' => SessionStatus::Running])->save();
 
         $this->expectException(WorkspaceException::class);
@@ -154,7 +154,7 @@ class TaskCheckpointTest extends TestCase
 
     public function test_a_daemon_side_409_is_reported_as_busy(): void
     {
-        $checkpoint = $this->service()->forMessage($this->sendMessage('one'));
+        $checkpoint = $this->checkpointOf($this->sendMessage('one'));
         $this->app->forgetInstance(WorkspaceDaemonClient::class);
         $this->app->singleton(WorkspaceDaemonClient::class, WorkspaceDaemonClient::class);
         Saloon::fake([RestoreCheckpoint::class => MockResponse::make(['error' => ['code' => 'task_running', 'message' => 'busy']], 409)]);
@@ -169,7 +169,7 @@ class TaskCheckpointTest extends TestCase
 
     public function test_commits_since_the_checkpoint_are_flagged(): void
     {
-        $checkpoint = $this->service()->forMessage($this->sendMessage('one'));
+        $checkpoint = $this->checkpointOf($this->sendMessage('one'));
         $checkpoint->forceFill(['head_sha' => str_repeat('1', 40)])->save();
 
         $this->assertTrue($this->service()->preview($checkpoint, $this->owner)['commits_since']);
@@ -177,7 +177,7 @@ class TaskCheckpointTest extends TestCase
 
     public function test_viewers_cannot_reset(): void
     {
-        $checkpoint = $this->service()->forMessage($this->sendMessage('one'));
+        $checkpoint = $this->checkpointOf($this->sendMessage('one'));
         $viewer = $this->member(WorkspaceRole::Viewer, 'Vi');
 
         $this->chat($viewer)->set('taskId', $this->task->id)->assertDontSee(__('workspaces.checkpoints.reset_here'));
@@ -195,5 +195,11 @@ class TaskCheckpointTest extends TestCase
         $this->assertNull($checkpoint->task_event_id);
         $this->assertSame(0, TaskEvent::query()->where('type', TaskEventType::UserMessage->value)->count());
         $this->chat()->set('taskId', $this->task->id)->assertSee('before refactor');
+    }
+
+    /** The checkpoint taken before a message (the first, when Claude made several). */
+    private function checkpointOf(TaskEvent $message): ?\App\Models\TaskCheckpoint
+    {
+        return \App\Models\TaskCheckpoint::query()->where('task_event_id', $message->id)->orderBy('n')->first();
     }
 }

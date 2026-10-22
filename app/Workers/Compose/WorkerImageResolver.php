@@ -56,13 +56,13 @@ class WorkerImageResolver
      * (BYOI read at `$ref`) with Claude Code, the agent the workspace daemon
      * hosts.
      */
-    public function resolveForWorkspace(Workspace $profile, string $ref): ResolvedWorkerImage
+    public function resolveForWorkspace(Workspace $workspace, string $ref): ResolvedWorkerImage
     {
         $agentName = AgentName::ClaudeCode;
 
-        $stack = $profile->worker_source === WorkerSource::Byoi
-            ? $this->resolveByoiStack($profile, $ref, $agentName)
-            : ($profile->workerStack ?? $this->defaultStack());
+        $stack = $workspace->worker_source === WorkerSource::Byoi
+            ? $this->resolveByoiStack($workspace, $ref, $agentName)
+            : ($workspace->workerStack ?? $this->defaultStack());
 
         return $this->resolveFor($stack, $agentName);
     }
@@ -71,15 +71,15 @@ class WorkerImageResolver
      * The image a repo's `.argos/worker.dockerfile` at `$ref` describes, or
      * null when the repo has none there (the setup check of a branch).
      */
-    public function resolveRepoImage(Workspace $profile, string $ref): ?ResolvedWorkerImage
+    public function resolveRepoImage(Workspace $workspace, string $ref): ?ResolvedWorkerImage
     {
-        $dockerfile = app(GitServiceFactory::class)->forWorkspace($profile)
-            ->getFileContents($profile->getOwnerRepo(), self::BYOI_DOCKERFILE_PATH, $ref);
+        $dockerfile = app(GitServiceFactory::class)->forWorkspace($workspace)
+            ->getFileContents($workspace->getOwnerRepo(), self::BYOI_DOCKERFILE_PATH, $ref);
         if ($dockerfile === null || trim($dockerfile) === '') {
             return null;
         }
 
-        return $this->resolveFor($this->resolveByoiStack($profile, $ref, AgentName::ClaudeCode), AgentName::ClaudeCode);
+        return $this->resolveFor($this->resolveByoiStack($workspace, $ref, AgentName::ClaudeCode), AgentName::ClaudeCode);
     }
 
     /** Repo-relative path of a BYOI stack-base recipe. */
@@ -91,17 +91,17 @@ class WorkerImageResolver
      * tracking) applies unchanged. The file is read via the provider API at the
      * workspace's base branch — before any image (and thus any clone) exists.
      */
-    private function resolveByoiStack(Workspace $profile, string $ref, AgentName $agentName): WorkerStack
+    private function resolveByoiStack(Workspace $workspace, string $ref, AgentName $agentName): WorkerStack
     {
 
         $dockerfile = app(GitServiceFactory::class)
-            ->forWorkspace($profile)
-            ->getFileContents($profile->getOwnerRepo(), self::BYOI_DOCKERFILE_PATH, $ref);
+            ->forWorkspace($workspace)
+            ->getFileContents($workspace->getOwnerRepo(), self::BYOI_DOCKERFILE_PATH, $ref);
 
         if ($dockerfile === null || trim($dockerfile) === '') {
             throw new RuntimeException(sprintf(
                 "BYOI is enabled for '%s' but '%s' was not found on '%s'.",
-                $profile->name,
+                $workspace->name,
                 self::BYOI_DOCKERFILE_PATH,
                 $ref,
             ));
@@ -110,9 +110,9 @@ class WorkerImageResolver
         $agent = $agentName->spec();
 
         return WorkerStack::query()->updateOrCreate(
-            ['name' => "byoi-{$profile->id}"],
+            ['name' => "byoi-{$workspace->id}"],
             [
-                'label' => "BYOI · {$profile->name}",
+                'label' => "BYOI · {$workspace->name}",
                 'is_builtin' => false,
                 'base_image' => $this->parseBaseImage($dockerfile),
                 'dockerfile_body' => $dockerfile,

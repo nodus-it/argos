@@ -6,7 +6,7 @@ namespace App\Console\Commands;
 
 use App\Services\GitProvider\PullRequestDetails;
 use App\Models\Task;
-use App\Services\Workspace\WorkspaceShipService;
+use App\Services\Workspace\PullRequestService;
 use Illuminate\Console\Command;
 
 /**
@@ -19,13 +19,13 @@ class SyncTaskPullRequestsCommand extends Command
 
     protected $description = 'Refresh the pull request state of tasks with an open pull request.';
 
-    public function handle(WorkspaceShipService $ship): int
+    public function handle(PullRequestService $pullRequests): int
     {
         Task::query()
             ->with('workspace')
             ->whereNotNull('pr_number')
             ->whereIn('pr_state', PullRequestDetails::OPEN_STATES)
-            ->each(fn (Task $task) => $ship->syncPullRequest($task));
+            ->each(fn (Task $task) => $pullRequests->refresh($task));
 
         return self::SUCCESS;
     }

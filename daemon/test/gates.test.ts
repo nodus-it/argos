@@ -298,7 +298,6 @@ describe('quality gates over HTTP', () => {
         const prompt = await app.inject({ method: 'GET', url: '/worktrees/fix-login/gates/fix-prompt?gate=pest&run_id=r1', headers: auth });
         expect(prompt.json()).toEqual({ prompt: '# Quality-Gate-Fix: pest\n' });
         expect(calls).toContainEqual(['--dir', worktree.path, '--fix-prompt', 'pest', 'r1']);
-        expect((await app.inject({ method: 'GET', url: '/gates', headers: auth })).json()).toEqual({ running: null });
 
         mkdirSync(join(worktree.path, '.agent', 'logs'), { recursive: true });
         writeFileSync(join(worktree.path, '.agent', 'logs', 'pest.r1.log'), 'line 1\nFAILED LoginTest\n');
@@ -315,7 +314,6 @@ describe('quality gates over HTTP', () => {
         const { app, outbox } = make();
 
         expect((await app.inject({ method: 'POST', url: '/worktrees/fix-login/gates/run', headers: auth, payload: { run_id: 'r1' } })).statusCode).toBe(501);
-        expect((await app.inject({ method: 'GET', url: '/gates', headers: auth })).statusCode).toBe(501);
         outbox.stop();
     }, 20_000);
 });

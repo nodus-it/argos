@@ -50,7 +50,7 @@ class DemoDeployer
      */
     public function deploy(DemoTarget $target): Demo
     {
-        $profile = $target->demoWorkspace();
+        $workspace = $target->demoWorkspace();
         $slug = $target->demoSlug();
         $project = $slug;
 
@@ -69,7 +69,7 @@ class DemoDeployer
 
         $log = '';
         try {
-            [$composeYaml, $settings] = $this->readContract($profile, $this->contractRef($target));
+            [$composeYaml, $settings] = $this->readContract($workspace, $this->contractRef($target));
 
             // Resolve the built-in runtime-image placeholder to the content-
             // hashed, build-on-demand tag whenever a contract references it. The
@@ -141,9 +141,9 @@ class DemoDeployer
             throw new RuntimeException('No live demo to re-run the setup commands in.');
         }
 
-        $profile = $target->demoWorkspace();
+        $workspace = $target->demoWorkspace();
 
-        [, $settings] = $this->readContract($profile, $this->contractRef($target));
+        [, $settings] = $this->readContract($workspace, $this->contractRef($target));
         $entry = $this->parseEntry($settings);
 
         $log = "\n[rerun ".now()->toIso8601String()."]\n";
@@ -256,10 +256,10 @@ class DemoDeployer
      *
      * @return array{0: string, 1: array<string, mixed>} [composeYaml, settings]
      */
-    private function readContract(Workspace $profile, string $ref): array
+    private function readContract(Workspace $workspace, string $ref): array
     {
-        $service = $this->gitFactory->forWorkspace($profile);
-        $ownerRepo = $profile->getOwnerRepo();
+        $service = $this->gitFactory->forWorkspace($workspace);
+        $ownerRepo = $workspace->getOwnerRepo();
 
         $composeYaml = $service->getFileContents($ownerRepo, DemoConfigLocator::COMPOSE_PATH, $ref);
         $settingsYaml = $service->getFileContents($ownerRepo, DemoConfigLocator::SETTINGS_PATH, $ref);
@@ -267,7 +267,7 @@ class DemoDeployer
         if ($composeYaml === null && $settingsYaml === null) {
             // No contract at all → built-in default runtime, unified with the
             // project's backing-service config (creds + Redis toggle).
-            [$composeYaml, $settingsYaml] = $this->defaultContract($profile);
+            [$composeYaml, $settingsYaml] = $this->defaultContract($workspace);
         } elseif ($composeYaml === null || $settingsYaml === null) {
             // A half-written contract is a mistake the author must see, not a
             // silent fall-through to the generic demo.
@@ -306,9 +306,9 @@ class DemoDeployer
      *
      * @return array{0: string, 1: string} [composeYaml, settingsYaml]
      */
-    private function defaultContract(Workspace $profile): array
+    private function defaultContract(Workspace $workspace): array
     {
-        return app(DemoContractBuilder::class)->buildDefault($profile);
+        return app(DemoContractBuilder::class)->buildDefault($workspace);
     }
 
     /**

@@ -80,21 +80,4 @@ class GitHubGitServiceTest extends TestCase
         });
     }
 
-    public function test_update_pull_request_patches_title_and_body(): void
-    {
-        Saloon::fake([
-            UpdatePullRequest::class => MockResponse::make(['number' => 42]),
-        ]);
-
-        (new GitHubGitService('tok'))->updatePullRequest('acme', 'widget', 42, 'new title', 'new body');
-
-        Saloon::assertSent(function (Request $request): bool {
-            $body = $request instanceof UpdatePullRequest ? $request->body()->all() : [];
-
-            return $request instanceof UpdatePullRequest
-                && $request->resolveEndpoint() === '/repos/acme/widget/pulls/42'
-                && ($body['title'] ?? null) === 'new title'
-                && ($body['body'] ?? null) === 'new body';
-        });
-    }
 }

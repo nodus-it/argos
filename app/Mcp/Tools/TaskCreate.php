@@ -24,7 +24,7 @@ class TaskCreate extends Tool
     public function schema(JsonSchema $schema): array
     {
         return [
-            'workspace' => $schema->string()->description('Workspace id (ULID) or exact name')->required(),
+            'workspace' => $schema->string()->description('Workspace address name (e.g. "shop-api"), id (ULID) or exact name')->required(),
             'prompt' => $schema->string()->description('What to implement (Markdown).')->required(),
             'title' => $schema->string()->description('Short title (defaults to the ticket title or the start of the prompt)')->nullable(),
             'issue' => $schema->string()->description('Ticket number of the workspace\'s tracker to link')->nullable(),

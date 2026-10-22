@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Demo;
 
-use App\Services\Project\ProjectEnvironmentResolver;
+use App\Services\Workspace\Environment\EnvironmentResolver;
 use Illuminate\Encryption\Encrypter;
 use Symfony\Component\Yaml\Yaml;
 
@@ -34,7 +34,7 @@ class DemoComposeBuilder
         // API keys, …) so the demo's `composer install` + boot see the same env
         // as the worker. Argos-owned keys below win via array_merge order, so
         // the project can't override APP_URL / APP_KEY / SESSION_COOKIE here.
-        $projectEnv = app(ProjectEnvironmentResolver::class)->resolve($target->demoWorkspace());
+        $projectEnv = app(EnvironmentResolver::class)->resolve($target->demoWorkspace());
 
         $override = [
             'services' => [

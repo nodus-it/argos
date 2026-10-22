@@ -15,9 +15,9 @@ use App\Models\Workspace;
 class RepoTokenResolver
 {
     /** PAT or (refreshed) OAuth token of the project. */
-    public function token(Workspace $profile): string
+    public function token(Workspace $workspace): string
     {
-        return $profile->resolveToken();
+        return $workspace->resolveToken();
     }
 
     /**
@@ -28,9 +28,9 @@ class RepoTokenResolver
      *
      * @return array{username: string, password: string}
      */
-    public function gitCredential(Workspace $profile): array
+    public function gitCredential(Workspace $workspace): array
     {
-        $token = $this->token($profile);
+        $token = $this->token($workspace);
 
         if (str_contains($token, ':')) {
             [$username, $password] = explode(':', $token, 2);
@@ -38,7 +38,7 @@ class RepoTokenResolver
             return ['username' => $username, 'password' => $password];
         }
 
-        $username = $profile->platform === GitProvider::Bitbucket ? 'x-token-auth' : 'oauth2';
+        $username = $workspace->platform === GitProvider::Bitbucket ? 'x-token-auth' : 'oauth2';
 
         return ['username' => $username, 'password' => $token];
     }

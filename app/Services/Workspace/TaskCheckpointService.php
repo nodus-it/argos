@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services\Workspace;
 
-use App\Integrations\WorkspaceDaemon\DaemonTransportException;
 use App\Models\Task;
 use App\Models\TaskCheckpoint;
 use App\Models\TaskEvent;
@@ -60,12 +59,6 @@ class TaskCheckpointService
         TaskCheckpoint::query()->where('task_id', $task->id)->where('n', '<=', $n - self::MAX_PER_TASK)->delete();
 
         return $checkpoint;
-    }
-
-    /** The checkpoint taken right before a user message was processed. */
-    public function forMessage(TaskEvent $message): ?TaskCheckpoint
-    {
-        return TaskCheckpoint::query()->where('task_event_id', $message->id)->orderBy('n')->first();
     }
 
     /**

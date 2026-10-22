@@ -17,7 +17,6 @@ use App\Integrations\Bitbucket\Requests\ListPullRequestComments;
 use App\Integrations\Bitbucket\Requests\ListPullRequestStatuses;
 use App\Integrations\Bitbucket\Requests\ListUserWorkspaces;
 use App\Integrations\Bitbucket\Requests\ListWorkspaceRepositories;
-use App\Integrations\Bitbucket\Requests\UpdatePullRequest;
 use App\Integrations\Bitbucket\Requests\UpdatePullRequestAttributes;
 use App\Services\GitProvider\Concerns\SummarizesPullRequests;
 use App\Services\GitProvider\Contracts\GitProviderContract;
@@ -34,11 +33,6 @@ class BitbucketGitService implements GitProviderContract
     {
         // Auth (Basic vs. Bearer) is resolved by the connector from the token shape.
         $this->connector = new BitbucketConnector($token);
-    }
-
-    public function getProviderKey(): string
-    {
-        return 'bitbucket';
     }
 
     public function label(): string
@@ -106,21 +100,6 @@ class BitbucketGitService implements GitProviderContract
             ->throw()
             ->json();
     }
-
-    public function updatePullRequest(
-        string $owner,
-        string $repo,
-        int|string $pullRequestId,
-        string $title,
-        string $body,
-    ): array {
-        return $this->connector
-            ->send(new UpdatePullRequest($owner, $repo, $pullRequestId, $title, $body))
-            ->throw()
-            ->json();
-    }
-
-
 
     /**
      * Returns the default branch for a workspace/repo string, or null on failure.

@@ -20,7 +20,6 @@ use App\Integrations\GitLab\Requests\ListFailedPipelineJobs;
 use App\Integrations\GitLab\Requests\ListMergeRequestDiscussions;
 use App\Integrations\GitLab\Requests\ListProjects;
 use App\Integrations\GitLab\Requests\MergeWhenPipelineSucceeds;
-use App\Integrations\GitLab\Requests\UpdateMergeRequest;
 use App\Integrations\GitLab\Requests\UpdateMergeRequestAttributes;
 use App\Services\GitProvider\Concerns\SummarizesPullRequests;
 use App\Services\GitProvider\Contracts\GitProviderContract;
@@ -42,11 +41,6 @@ class GitLabGitService implements GitProviderContract
     public function __construct(string $token, string $instanceUrl = RepoUrlBuilder::DEFAULT_GITLAB_INSTANCE)
     {
         $this->connector = new GitLabConnector($token, $instanceUrl);
-    }
-
-    public function getProviderKey(): string
-    {
-        return 'gitlab';
     }
 
     public function label(): string
@@ -147,21 +141,6 @@ class GitLabGitService implements GitProviderContract
             ->throw()
             ->json();
     }
-
-    public function updatePullRequest(
-        string $owner,
-        string $repo,
-        int|string $pullRequestId,
-        string $title,
-        string $body,
-    ): array {
-        return $this->connector
-            ->send(new UpdateMergeRequest($owner, $repo, $pullRequestId, $title, $body))
-            ->throw()
-            ->json();
-    }
-
-
 
     /**
      * @return array<string, mixed>

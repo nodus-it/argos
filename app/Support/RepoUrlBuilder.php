@@ -5,11 +5,9 @@ declare(strict_types=1);
 namespace App\Support;
 
 /**
- * Builds canonical clone URLs for an "owner/repo" (or GitLab nested
- * "group/sub/repo") path on a git platform. Single source of truth for the
- * host-per-platform mapping that the onboarding wizard and the repo-profile
- * resource both need — callers only resolve the GitLab instance URL (from a
- * string or a connected account) and pass it in.
+ * Repository URLs in one place: the clone URL of an "owner/repo" (or GitLab
+ * "group/sub/repo") path per platform, the path and instance of a URL, and
+ * the public GitLab host every GitLab default falls back to.
  */
 class RepoUrlBuilder
 {

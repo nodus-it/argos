@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace App\Services\Project;
+namespace App\Services\Workspace\Environment;
 
 use App\Models\Workspace;
 
 /**
- * Resolves the project-level environment Argos injects into BOTH the worker
+ * Resolves the workspace environment Argos injects into BOTH the worker
  * (dependency install + quality gates) and the live demo. Two sources are
  * merged into one flat NAME => value map:
  *
@@ -20,7 +20,7 @@ use App\Models\Workspace;
  * Argos-owned keys are dropped so a project secret can never clobber
  * REPO_TOKEN, the agent credential, APP_KEY, the demo's APP_URL, etc.
  */
-class ProjectEnvironmentResolver
+class EnvironmentResolver
 {
     /**
      * Env names Argos sets itself for the worker and/or the demo. A project's
@@ -42,18 +42,18 @@ class ProjectEnvironmentResolver
     /**
      * @return array<string, string>
      */
-    public function resolve(Workspace $profile): array
+    public function resolve(Workspace $workspace): array
     {
         $env = [];
 
-        $composerAuth = $this->composerAuth($profile->composer_registries ?? []);
+        $composerAuth = $this->composerAuth($workspace->composer_registries ?? []);
         if ($composerAuth !== null) {
             $env['COMPOSER_AUTH'] = $composerAuth;
         }
 
         // Raw secrets layer on top — a hand-written COMPOSER_AUTH overrides the
         // generated one on purpose (the documented escape hatch).
-        foreach ($profile->worker_env ?? [] as $row) {
+        foreach ($workspace->worker_env ?? [] as $row) {
             $name = trim((string) ($row['name'] ?? ''));
             if ($name === '') {
                 continue;
@@ -64,7 +64,7 @@ class ProjectEnvironmentResolver
         // Expand backing-service placeholders (`${mysql.host}`, …) in the values
         // so a project with non-standard env names bridges to the sidecars
         // without hardcoding internal hosts/credentials.
-        $placeholders = app(BackingServiceResolver::class)->placeholders($profile);
+        $placeholders = app(BackingServiceResolver::class)->placeholders($workspace);
         if ($placeholders !== []) {
             foreach ($env as $key => $value) {
                 $env[$key] = strtr($value, $placeholders);

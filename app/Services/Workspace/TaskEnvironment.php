@@ -6,7 +6,7 @@ namespace App\Services\Workspace;
 
 use App\Enums\BackingService;
 use App\Models\Task;
-use App\Services\Project\BackingServiceResolver;
+use App\Services\Workspace\Environment\BackingServiceResolver;
 
 /**
  * The values that set a task apart from its siblings in the same container:

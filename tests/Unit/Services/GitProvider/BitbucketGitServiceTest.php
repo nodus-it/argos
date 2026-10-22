@@ -192,22 +192,4 @@ class BitbucketGitServiceTest extends TestCase
         });
     }
 
-    public function test_update_pull_request_puts_title_and_description(): void
-    {
-        Saloon::fake([
-            'https://api.bitbucket.org/2.0/repositories/acme/widget/pullrequests/3' => MockResponse::make(['id' => 3]),
-        ]);
-
-        (new BitbucketGitService('user:pass'))->updatePullRequest('acme', 'widget', 3, 'new title', 'new body');
-
-        Saloon::assertSent(function (Request $request, $response): bool {
-            $body = $request instanceof UpdatePullRequest ? $request->body()->all() : [];
-
-            return $request instanceof UpdatePullRequest
-                && $response->getPendingRequest()->getMethod()->value === 'PUT'
-                && str_ends_with($request->resolveEndpoint(), '/pullrequests/3')
-                && ($body['title'] ?? null) === 'new title'
-                && ($body['description'] ?? null) === 'new body';
-        });
-    }
 }

@@ -97,16 +97,6 @@ class AgentCredential extends Model
     }
 
     /**
-     * Shared agents only (no owner).
-     *
-     * @param  Builder<AgentCredential>  $query
-     */
-    public function scopeShared(Builder $query): void
-    {
-        $query->whereNull('user_id');
-    }
-
-    /**
      * Agents a user may run tasks on: their own plus shared ones.
      *
      * @param  Builder<AgentCredential>  $query

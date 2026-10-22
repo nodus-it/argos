@@ -77,7 +77,7 @@ export function score(path: string, needle: string): number {
 }
 
 /** Largest file the review reads in full (unchanged-lines expansion). */
-export const MAX_READ_BYTES = 1_000_000;
+const MAX_READ_BYTES = 1_000_000;
 
 /**
  * Read a text file of the working tree for the review (expanding unchanged

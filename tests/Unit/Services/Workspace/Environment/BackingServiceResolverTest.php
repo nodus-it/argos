@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Tests\Unit\Services\Project;
+namespace Tests\Unit\Services\Workspace\Environment;
 
 use App\Models\Workspace;
-use App\Services\Project\BackingServiceResolver;
+use App\Services\Workspace\Environment\BackingServiceResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 

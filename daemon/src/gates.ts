@@ -34,7 +34,7 @@ const BASELINE_TIMEOUT_MS = 30 * 60_000;
 /** How much of a log travels in events and answers. */
 export const LOG_TAIL_BYTES = 8 * 1024;
 /** Cap of a full gate log served to the UI; longer logs keep their end. */
-export const FULL_LOG_BYTES = 2 * 1024 * 1024;
+const FULL_LOG_BYTES = 2 * 1024 * 1024;
 const GATE_RESULTS = new Set(['pass', 'fail', 'skip']);
 const BASELINE_FILES = ['pest-baseline.xml', 'phpstan-baseline.json'];
 const COMMIT_PATTERN = /^[0-9a-f]{40}$/;

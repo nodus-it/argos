@@ -6,7 +6,7 @@ namespace App\Services\Workspace;
 
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
 use App\Models\Workspace;
-use App\Services\Project\ProjectEnvironmentResolver;
+use App\Services\Workspace\Environment\EnvironmentResolver;
 use App\Services\Worker\WorkerSidecarManager;
 use App\Services\Worker\WorkerSidecars;
 use RuntimeException;
@@ -75,7 +75,7 @@ class WorkspaceContainerManager
             $cmd[] = '-e';
             $cmd[] = "{$key}={$value}";
         }
-        foreach (app(ProjectEnvironmentResolver::class)->resolve($workspace) as $key => $value) {
+        foreach (app(EnvironmentResolver::class)->resolve($workspace) as $key => $value) {
             $cmd[] = '-e';
             $cmd[] = "{$key}={$value}";
         }

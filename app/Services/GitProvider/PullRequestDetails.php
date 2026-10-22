@@ -108,11 +108,6 @@ final readonly class PullRequestDetails
         return $this->checks['state'] === 'failure';
     }
 
-    public function checksPending(): bool
-    {
-        return $this->checks['state'] === 'pending';
-    }
-
     /**
      * @return array{state: string, url: ?string, head_sha: ?string, conflicts: bool, behind_base: ?bool, checks: Checks, review_state: ?string, reviews: list<Review>, comments: list<Comment>, auto_merge: bool}
      */

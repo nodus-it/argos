@@ -114,9 +114,11 @@ class TaskHousekeepingTest extends TestCase
         $this->task('no-pr');
 
         $synced = [];
-        $this->mock(WorkspaceShipService::class, function (MockInterface $mock) use (&$synced): void {
-            $mock->shouldReceive('syncPullRequest')->andReturnUsing(function (Task $task) use (&$synced): void {
+        $this->mock(\App\Services\Workspace\PullRequestService::class, function (MockInterface $mock) use (&$synced): void {
+            $mock->shouldReceive('refresh')->andReturnUsing(function (Task $task) use (&$synced): ?\App\Services\GitProvider\PullRequestDetails {
                 $synced[] = $task->id;
+
+                return null;
             });
         });
 
