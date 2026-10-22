@@ -76,6 +76,14 @@ interface GitServiceContract
     ): array;
 
     /**
+     * The open pull request whose head is `$headBranch`, as the provider's raw
+     * payload (the shape createPullRequest() returns) — null when none.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function findOpenPullRequest(string $owner, string $repo, string $headBranch): ?array;
+
+    /**
      * Raw API representation of a pull/merge request (GitHub `number`,
      * GitLab `iid`, Bitbucket `id`). Read through PullRequestInfo for a
      * provider-neutral view of number, URL and state.

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Services\GitProvider;
 
 use App\Integrations\Bitbucket\Requests\CommentOnPullRequest;
-use App\Integrations\Bitbucket\Requests\UpdatePullRequest;
+use App\Integrations\Bitbucket\Requests\FindOpenPullRequest;
 use App\Services\GitProvider\BitbucketGitService;
 use Saloon\Http\Faking\MockResponse;
 use Saloon\Http\Request;
@@ -192,4 +192,16 @@ class BitbucketGitServiceTest extends TestCase
         });
     }
 
+    public function test_find_open_pull_request_looks_up_the_branch(): void
+    {
+        Saloon::fake([FindOpenPullRequest::class => MockResponse::make(['values' => [['id' => 7, 'state' => 'OPEN']]])]);
+
+        $found = (new BitbucketGitService('user:app_password'))->findOpenPullRequest('acme', 'widget', 'argos/login');
+
+        $this->assertSame(7, $found['id'] ?? null);
+        Saloon::assertSent(fn (Request $request): bool => $request instanceof FindOpenPullRequest && $request->query()->all() === ['q' => 'source.branch.name="argos/login" AND state="OPEN"', 'pagelen' => 1]);
+
+        Saloon::fake([FindOpenPullRequest::class => MockResponse::make(['values' => []])]);
+        $this->assertNull((new BitbucketGitService('user:app_password'))->findOpenPullRequest('acme', 'widget', 'argos/login'));
+    }
 }

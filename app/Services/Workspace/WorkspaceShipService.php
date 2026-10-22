@@ -229,7 +229,18 @@ class WorkspaceShipService
         try {
             $service = $this->git->forWorkspace($workspace);
             if ($task->pr_number === null) {
-                $raw = $service->createPullRequest($owner, $repo, $title, $this->pullRequestBody($task, $body, $by), (string) $task->branch, $task->base_branch, ['draft' => $draft]);
+                try {
+                    $raw = $service->createPullRequest($owner, $repo, $title, $this->pullRequestBody($task, $body, $by), (string) $task->branch, $task->base_branch, ['draft' => $draft]);
+                } catch (Throwable $e) {
+                    // The branch may have a pull request already (opened by hand, or
+                    // by an earlier attempt that never got recorded): adopt it.
+                    try {
+                        $existing = $service->findOpenPullRequest($owner, $repo, (string) $task->branch);
+                    } catch (Throwable) {
+                        $existing = null;
+                    }
+                    $raw = $existing ?? throw $e;
+                }
                 $info = PullRequestInfo::from($workspace->platform, $raw);
                 $task->forceFill([
                     'pr_url' => $info->url,

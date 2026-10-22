@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Services\GitProvider;
 
-use App\Services\GitProvider\Concerns\BuildsSelectOptions;
 use App\Integrations\Bitbucket\BitbucketConnector;
 use App\Integrations\Bitbucket\Requests\CommentOnPullRequest;
 use App\Integrations\Bitbucket\Requests\CreatePullRequest;
+use App\Integrations\Bitbucket\Requests\FindOpenPullRequest;
 use App\Integrations\Bitbucket\Requests\GetPullRequest;
 use App\Integrations\Bitbucket\Requests\GetPullRequestDiffstat;
 use App\Integrations\Bitbucket\Requests\GetRepository;
@@ -18,6 +18,7 @@ use App\Integrations\Bitbucket\Requests\ListPullRequestStatuses;
 use App\Integrations\Bitbucket\Requests\ListUserWorkspaces;
 use App\Integrations\Bitbucket\Requests\ListWorkspaceRepositories;
 use App\Integrations\Bitbucket\Requests\UpdatePullRequestAttributes;
+use App\Services\GitProvider\Concerns\BuildsSelectOptions;
 use App\Services\GitProvider\Concerns\SummarizesPullRequests;
 use App\Services\GitProvider\Contracts\GitProviderContract;
 use Illuminate\Support\Facades\Log;
@@ -160,6 +161,14 @@ class BitbucketGitService implements GitProviderContract
     /**
      * @return array<string, mixed>
      */
+    public function findOpenPullRequest(string $owner, string $repo, string $headBranch): ?array
+    {
+        $list = $this->connector->send(new FindOpenPullRequest($owner, $repo, $headBranch))->throw()->json();
+        $first = is_array($list['values'] ?? null) ? ($list['values'][0] ?? null) : null;
+
+        return is_array($first) ? $first : null;
+    }
+
     public function getPullRequest(string $owner, string $repo, int|string $pullRequestId): array
     {
         return $this->connector
@@ -400,6 +409,7 @@ class BitbucketGitService implements GitProviderContract
 
         return (string) ($user['nickname'] ?? $user['display_name'] ?? $user['username'] ?? '');
     }
+
     protected function repositoryPathField(): string
     {
         return 'full_name';

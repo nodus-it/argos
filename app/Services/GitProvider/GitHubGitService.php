@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Services\GitProvider;
 
-use App\Services\GitProvider\Concerns\BuildsSelectOptions;
 use App\Integrations\GitHub\GitHubConnector;
 use App\Integrations\GitHub\Requests\CommentOnPullRequest;
 use App\Integrations\GitHub\Requests\CreatePullRequest;
+use App\Integrations\GitHub\Requests\FindOpenPullRequest;
 use App\Integrations\GitHub\Requests\GetActionsJobLogs;
 use App\Integrations\GitHub\Requests\GetCombinedStatus;
 use App\Integrations\GitHub\Requests\GetFileContents;
@@ -21,6 +21,7 @@ use App\Integrations\GitHub\Requests\ListCheckRuns;
 use App\Integrations\GitHub\Requests\ListPullRequestReviewComments;
 use App\Integrations\GitHub\Requests\ListPullRequestReviews;
 use App\Integrations\GitHub\Requests\ListRepositories;
+use App\Services\GitProvider\Concerns\BuildsSelectOptions;
 use App\Services\GitProvider\Concerns\SummarizesPullRequests;
 use App\Services\GitProvider\Contracts\GitProviderContract;
 use Illuminate\Support\Facades\Log;
@@ -162,6 +163,14 @@ class GitHubGitService implements GitProviderContract
     /**
      * @return array<string, mixed>
      */
+    public function findOpenPullRequest(string $owner, string $repo, string $headBranch): ?array
+    {
+        $list = $this->connector->send(new FindOpenPullRequest($owner, $repo, $headBranch))->throw()->json();
+        $first = is_array($list) ? ($list[0] ?? null) : null;
+
+        return is_array($first) ? $first : null;
+    }
+
     public function getPullRequest(string $owner, string $repo, int|string $pullRequestId): array
     {
         return $this->connector
@@ -607,6 +616,7 @@ class GitHubGitService implements GitProviderContract
             'errors' => $errors,
         ]));
     }
+
     protected function repositoryPathField(): string
     {
         return 'full_name';

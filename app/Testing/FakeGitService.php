@@ -100,6 +100,11 @@ class FakeGitService implements GitProviderContract
         ];
     }
 
+    public function findOpenPullRequest(string $owner, string $repo, string $headBranch): ?array
+    {
+        return null;
+    }
+
     /**
      * @return array<string, mixed>
      */

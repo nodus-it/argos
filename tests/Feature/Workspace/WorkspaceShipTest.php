@@ -214,6 +214,18 @@ class WorkspaceShipTest extends TestCase
         $this->assertSame('shipped', $notice->payload['kind']);
     }
 
+    public function test_ship_adopts_a_pull_request_the_branch_already_has(): void
+    {
+        $this->git->shouldReceive('createPullRequest')->once()->andThrow(new \RuntimeException('422 A pull request already exists'));
+        $this->git->shouldReceive('findOpenPullRequest')->once()->with('acme/sub', 'widget', 'ws/login')
+            ->andReturn(['iid' => 11, 'web_url' => 'https://gitlab.com/acme/sub/widget/-/merge_requests/11', 'state' => 'opened']);
+
+        $url = $this->service()->ship($this->task, $this->editor, 'feat: add login', 'Adds the login.');
+
+        $this->assertSame('https://gitlab.com/acme/sub/widget/-/merge_requests/11', $url);
+        $this->assertSame(11, $this->task->fresh()->pr_number);
+    }
+
     public function test_only_the_owner_and_collaborators_may_ship_a_task(): void
     {
         $other = User::factory()->create();
@@ -226,6 +238,7 @@ class WorkspaceShipTest extends TestCase
     public function test_a_provider_failure_after_the_push_is_a_workspace_exception(): void
     {
         $this->git->shouldReceive('createPullRequest')->once()->andThrow(new \RuntimeException('422 head branch missing'));
+        $this->git->shouldReceive('findOpenPullRequest')->once()->andReturnNull();
 
         try {
             $this->service()->ship($this->task, $this->editor, 'feat: add login', '');

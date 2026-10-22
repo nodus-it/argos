@@ -4,12 +4,11 @@ declare(strict_types=1);
 
 namespace App\Services\GitProvider;
 
-use App\Services\GitProvider\Concerns\BuildsSelectOptions;
-use App\Support\RepoUrlBuilder;
 use App\Integrations\GitLab\GitLabConnector;
 use App\Integrations\GitLab\Requests\CancelMergeWhenPipelineSucceeds;
 use App\Integrations\GitLab\Requests\CommentOnMergeRequest;
 use App\Integrations\GitLab\Requests\CreateMergeRequest;
+use App\Integrations\GitLab\Requests\FindOpenMergeRequest;
 use App\Integrations\GitLab\Requests\GetJobTrace;
 use App\Integrations\GitLab\Requests\GetMergeRequest;
 use App\Integrations\GitLab\Requests\GetMergeRequestApprovals;
@@ -21,8 +20,10 @@ use App\Integrations\GitLab\Requests\ListMergeRequestDiscussions;
 use App\Integrations\GitLab\Requests\ListProjects;
 use App\Integrations\GitLab\Requests\MergeWhenPipelineSucceeds;
 use App\Integrations\GitLab\Requests\UpdateMergeRequestAttributes;
+use App\Services\GitProvider\Concerns\BuildsSelectOptions;
 use App\Services\GitProvider\Concerns\SummarizesPullRequests;
 use App\Services\GitProvider\Contracts\GitProviderContract;
+use App\Support\RepoUrlBuilder;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
@@ -145,6 +146,14 @@ class GitLabGitService implements GitProviderContract
     /**
      * @return array<string, mixed>
      */
+    public function findOpenPullRequest(string $owner, string $repo, string $headBranch): ?array
+    {
+        $list = $this->connector->send(new FindOpenMergeRequest($owner, $repo, $headBranch))->throw()->json();
+        $first = is_array($list) ? ($list[0] ?? null) : null;
+
+        return is_array($first) ? $first : null;
+    }
+
     public function getPullRequest(string $owner, string $repo, int|string $pullRequestId): array
     {
         return $this->connector
@@ -470,6 +479,7 @@ class GitLabGitService implements GitProviderContract
             'error' => $error,
         ]));
     }
+
     protected function repositoryPathField(): string
     {
         return 'path_with_namespace';
