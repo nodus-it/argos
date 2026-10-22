@@ -209,7 +209,10 @@
                 $latestHumanId = collect($timeline)->filter(fn ($b) => $b['kind'] === 'user' && empty($b['event']->payload['auto']))->last()['event']->id ?? null;
             @endphp
             @foreach ($timeline as $block)
-                @if ($block['kind'] === 'user')
+                @if ($block['kind'] === 'notice')
+                    @php $event = $block['event']; $p = $event->payload; @endphp
+                    @include('livewire.workspace.partials.notice', ['event' => $event, 'p' => $p])
+                @elseif ($block['kind'] === 'user')
                     @php $event = $block['event']; $p = $event->payload; $mine = $event->author_user_id === $user->id; @endphp
                     <div @class(['wf-msg', 'ws-msg', 'is-other' => ! $mine && empty($p['auto']), 'is-author-'.((int) $event->author_user_id % 4) => ! $mine, 'is-latest' => $event->id === $latestHumanId]) wire:key="ev-{{ $event->id }}">
                         <div class="wf-msg-meta">
@@ -313,63 +316,7 @@
                                         @break
 
                                     @case (TaskEventType::Notice)
-                                        <div class="ws-notice wf-notice" wire:key="ev-{{ $event->id }}">
-                                            {{ match ($p['kind'] ?? '') {
-                                                'interrupted' => __('workspaces.events.interrupted', ['name' => $p['author_name'] ?? '']),
-                                                'permission_mode' => __('workspaces.events.permission_mode', ['name' => $p['author_name'] ?? '', 'mode' => PermissionMode::tryFrom((string) ($p['mode'] ?? ''))?->label() ?? '']),
-                                                'model' => __('workspaces.events.model', ['name' => $p['author_name'] ?? '', 'model' => $p['model'] ?? '']),
-                                                'shipped' => __('workspaces.events.shipped', ['name' => $p['author_name'] ?? '']),
-                                                'restored' => __('workspaces.events.restored', ['name' => $p['author_name'] ?? '', 'excerpt' => $p['excerpt'] ?? '']),
-                                                'checkpoint' => __('workspaces.events.checkpoint', ['name' => $p['author_name'] ?? '', 'label' => ($p['label'] ?? '') !== '' ? $p['label'] : '—']),
-                                                'prepare_step' => in_array($p['step'] ?? '', ['worktree', 'setup'], true) ? __('workspaces.events.prepare_step.'.$p['step']) : '',
-                                                'prepared' => ($p['setup'] ?? '') === 'failed' ? __('workspaces.events.prepared_setup_failed') : __('workspaces.events.prepared'),
-                                                'prepare_failed' => __('workspaces.events.prepare_failed', ['message' => $p['message'] ?? '']),
-                                                'invited' => __('workspaces.events.invited', ['name' => $p['author_name'] ?? '', 'member' => $p['member_name'] ?? '']),
-                                                'uninvited' => __('workspaces.events.uninvited', ['name' => $p['author_name'] ?? '', 'member' => $p['member_name'] ?? '']),
-                                                'transferred' => __('workspaces.events.transferred', ['name' => $p['author_name'] ?? '', 'owner' => $p['owner_name'] ?? '']),
-                                                'cancelled' => __('workspaces.events.cancelled', ['name' => $p['author_name'] ?? '']),
-                                                'ticket_linked' => __('workspaces.events.ticket_linked', ['name' => $p['author_name'] ?? '', 'ticket' => $p['ticket'] ?? '']),
-                                                'ticket_created' => __('workspaces.events.ticket_created', ['name' => $p['author_name'] ?? '', 'ticket' => $p['ticket'] ?? '']),
-                                                'ticket_comment' => __('workspaces.events.ticket_comment', ['name' => $p['author_name'] ?? '']),
-                                                'pr_ready', 'auto_merge_on', 'auto_merge_off' => __('workspaces.events.'.$p['kind'], ['name' => $p['author_name'] ?? '']),
-                                                'auto_merge_unavailable', 'pr_checks_failed', 'pr_checks_passed', 'pr_changes_requested', 'pr_approved', 'pr_merged', 'pr_closed' => __('workspaces.events.'.$p['kind']),
-                                                'setup_testing', 'setup_passed', 'setup_failed' => __('workspaces.events.'.$p['kind']),
-                                                default => '',
-                                            } }}
-                                            @if (in_array($p['kind'] ?? '', ['setup_passed', 'setup_failed'], true) && ! empty($p['steps']))
-                                                <ul class="wf-setup-steps">
-                                                    @foreach ($p['steps'] as $step)
-                                                        <li @class(['is-ok' => $step['ok'], 'is-fail' => ! $step['ok']])>{{ $step['ok'] ? '✓' : '✗' }} {{ __('workspaces.setup.steps.'.$step['step']) }}</li>
-                                                    @endforeach
-                                                </ul>
-                                            @endif
-                                            @if (($p['kind'] ?? '') === 'prepare_failed' && $canWrite && $task->status === \App\Enums\TaskStatus::Preparing)
-                                                <button type="button" class="wf-link" wire:click="retryPreparation">{{ __('workspaces.events.prepare_retry') }}</button>
-                                            @endif
-                                            @if (($p['kind'] ?? '') === 'ticket_comment')
-                                                <blockquote class="wf-ticket-comment">{{ $p['body'] ?? '' }}@if (! empty($p['url'])) <a class="wf-link" href="{{ $p['url'] }}" target="_blank" rel="noopener">↗</a>@endif</blockquote>
-                                            @endif
-                                            @if (str_starts_with((string) ($p['kind'] ?? ''), 'pr_') && ! empty($p['url']))
-                                                <a class="wf-link" href="{{ $p['url'] }}" target="_blank" rel="noopener">↗</a>
-                                            @endif
-                                            @if (($p['kind'] ?? '') === 'ticket_created' && ! empty($p['url']))
-                                                <a class="wf-link" href="{{ $p['url'] }}" target="_blank" rel="noopener">{{ $p['url'] }}</a>
-                                            @endif
-                                            @if (($p['kind'] ?? '') === 'prepared' && ($p['log'] ?? '') !== '')
-                                                <details class="wf-notice-log">
-                                                    <summary>{{ __('workspaces.events.prepared_log') }}</summary>
-                                                    <pre class="wf-log mono">{{ $p['log'] }}</pre>
-                                                </details>
-                                            @endif
-                                            @if (in_array($p['kind'] ?? '', ['restored', 'checkpoint'], true) && $canWrite && ! empty($p['checkpoint_id']))
-                                                <button type="button" class="wf-link" wire:click="previewRestore('{{ $p['checkpoint_id'] }}')">
-                                                    {{ ($p['kind'] ?? '') === 'restored' ? __('workspaces.checkpoints.undo_restore') : __('workspaces.checkpoints.reset_here') }}
-                                                </button>
-                                            @endif
-                                            @if (($p['kind'] ?? '') === 'shipped' && ($p['url'] ?? '') !== '')
-                                                <a class="wf-link" href="{{ $p['url'] }}" target="_blank" rel="noopener">{{ $p['url'] }}</a>
-                                            @endif
-                                        </div>
+                                        @include('livewire.workspace.partials.notice', ['event' => $event, 'p' => $p])
                                         @break
 
                                     @case (TaskEventType::ApprovalResolved)
@@ -384,8 +331,8 @@
 
             {{-- Live (not yet persisted) output, fed by the websocket. Before the
                  first event of a new turn arrives, it carries the turn head. --}}
-            <div class="wf-turn wf-turn-live" x-show="live || thinking || (status === 'running' && @js(($timeline[array_key_last($timeline) ?? 0]['kind'] ?? 'user') === 'user'))" x-cloak>
-                @if (($timeline[array_key_last($timeline) ?? 0]['kind'] ?? 'user') === 'user')
+            <div class="wf-turn wf-turn-live" x-show="live || thinking || (status === 'running' && @js(($timeline[array_key_last($timeline) ?? 0]['kind'] ?? 'user') !== 'claude'))" x-cloak>
+                @if (($timeline[array_key_last($timeline) ?? 0]['kind'] ?? 'user') !== 'claude')
                     <div class="wf-msg-meta"><span class="wf-claude-badge" aria-hidden="true">C</span> <span>{{ __('workspaces.events.claude') }} · {{ __('workspaces.task.working') }}</span></div>
                 @endif
                 <div class="wf-think-text" x-show="thinking && !live" x-text="thinking.slice(-400)"></div>

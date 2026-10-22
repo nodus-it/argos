@@ -59,6 +59,13 @@ final class TaskTimeline
             if (in_array($event->type, [TaskEventType::ToolResult, TaskEventType::StatusChanged], true)) {
                 continue;
             }
+            // Outside a Claude turn (preparation, hand-over, PR changes) a
+            // notice stands on its own, without a Claude head.
+            if ($event->type === TaskEventType::Notice && $turn === null) {
+                $blocks[] = ['kind' => 'notice', 'event' => $event];
+
+                continue;
+            }
 
             $turn ??= ['kind' => 'claude', 'started_at' => $event->created_at, 'duration_ms' => null, 'cost' => null, 'running' => false, 'items' => [], 'steps' => [], 'step_count' => 0];
 

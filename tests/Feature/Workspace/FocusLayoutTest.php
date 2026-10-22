@@ -217,6 +217,8 @@ class FocusLayoutTest extends TestCase
         [$edit, $bash] = $turn['items'][0]['rows'];
         $this->assertSame([__('workspaces.steps.edited'), 'routes/web.php', 2, 1], [$edit['verb'], $edit['target'], $edit['add'], $edit['del']]);
         $this->assertSame([__('workspaces.steps.ran'), '2 routes', 'ok'], [$bash['verb'], $bash['detail'], $bash['state']]);
+        // Notices outside a Claude turn stand on their own.
+        $this->assertNotContains('notice', array_column($blocks, 'kind'));
         // Every step carries the time Claude took it.
         $this->assertMatchesRegularExpression('/^\d{2}:\d{2}:\d{2}$/', (string) $edit['at']);
     }
@@ -241,5 +243,22 @@ class FocusLayoutTest extends TestCase
         $this->assertSame(__('workspaces.tray.gates_failed', ['gates' => 'PHPStan']), ChangeTray::gateSummary($run));
         $run->update(['status' => GateRunStatus::Passed, 'gates' => ['phpstan' => 'pass']]);
         $this->assertSame(__('workspaces.tray.gates_green'), ChangeTray::gateSummary($run->fresh()));
+    }
+
+    public function test_notices_before_claude_works_stand_without_a_claude_head(): void
+    {
+        $task = Task::factory()->create(['workspace_id' => $this->workspace->id]);
+        $notice = fn (string $kind) => TaskEvent::query()->create(['task_id' => $task->id, 'type' => TaskEventType::Notice, 'payload' => ['kind' => $kind]]);
+        $notice('prepare_step');
+        $notice('prepared');
+        TaskEvent::query()->create(['task_id' => $task->id, 'type' => TaskEventType::UserMessage, 'author_user_id' => $this->owner->id, 'payload' => ['text' => 'Hi']]);
+        TaskEvent::query()->create(['task_id' => $task->id, 'type' => TaskEventType::AssistantMessage, 'payload' => ['text' => 'Hello']]);
+        TaskEvent::query()->create(['task_id' => $task->id, 'type' => TaskEventType::TurnCompleted, 'payload' => []]);
+        $notice('shipped');
+
+        $events = TaskEvent::query()->where('task_id', $task->id)->orderBy('id')->get();
+        $blocks = TaskTimeline::build($events, collect(), collect(), false);
+
+        $this->assertSame(['notice', 'notice', 'user', 'claude', 'notice'], array_column($blocks, 'kind'));
     }
 }
