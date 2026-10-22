@@ -491,9 +491,8 @@ class OnboardingPageTest extends TestCase
     public function test_the_language_is_chosen_first_and_saved_on_the_account(): void
     {
         Livewire::test(Onboarding::class)
-            ->assertSee('Deutsch')
-            ->assertSee('English')
-            ->call('setLocale', 'de')
+            ->assertActionVisible('localeDe')
+            ->callAction('localeDe')
             ->assertRedirect(Onboarding::getUrl());
 
         $this->assertSame('de', auth()->user()->fresh()->locale);

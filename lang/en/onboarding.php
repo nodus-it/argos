@@ -15,7 +15,7 @@ return [
 
     'steps' => [
         'security' => 'Security',
-        'agents' => 'Agents',
+        'agents' => 'Claude subscription',
         'repository' => 'Workspace',
         'done' => 'Done',
     ],

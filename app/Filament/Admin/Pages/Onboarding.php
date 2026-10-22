@@ -26,6 +26,7 @@ use App\Services\Workspace\WorkspaceService;
 use App\Support\DocsLinkAction;
 use App\Support\RepoUrlBuilder;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Auth;
@@ -75,6 +76,16 @@ class Onboarding extends Page
         // Contextual help: the setup docs are reachable here even pre-onboarding
         // (Documentation page is on the RedirectToOnboarding whitelist).
         return [
+            // Language first: switching reloads the wizard in it.
+            ActionGroup::make([
+                Action::make('localeDe')->label('Deutsch')->action(fn () => $this->setLocale('de')),
+                Action::make('localeEn')->label('English')->action(fn () => $this->setLocale('en')),
+            ])
+                ->label(app()->getLocale() === 'de' ? 'Deutsch' : 'English')
+                ->icon('heroicon-o-language')
+                ->color('gray')
+                ->button()
+                ->tooltip(__('onboarding.language')),
             DocsLinkAction::make('setup'),
         ];
     }

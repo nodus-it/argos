@@ -32,6 +32,18 @@
   --color-accent-800: #7c3727;
   --color-accent-900: #682f23;
   --color-accent-950: #3a1610;
+  /* primary-* (used by custom panel views) is the same terracotta. */
+  --color-primary-50:  #fbf3ef;
+  --color-primary-100: #f6e4da;
+  --color-primary-200: #eec7b4;
+  --color-primary-300: #e3a486;
+  --color-primary-400: #d9805f;
+  --color-primary-500: #cf6446;
+  --color-primary-600: #bb5034;
+  --color-primary-700: #9a402b;
+  --color-primary-800: #7c3727;
+  --color-primary-900: #682f23;
+  --color-primary-950: #3a1610;
 
   /* ---- Neutral · warm sand ---- */
   --color-neutral-0:   #fffefb;
