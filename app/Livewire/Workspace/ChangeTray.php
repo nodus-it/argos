@@ -4,18 +4,19 @@ declare(strict_types=1);
 
 namespace App\Livewire\Workspace;
 
-use App\Services\GitProvider\PullRequestDetails;
-use App\Support\GateRows;
-use App\Livewire\Concerns\InteractsWithWorkspace;
 use App\Enums\GateRunStatus;
 use App\Enums\WorkspaceStatus;
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
+use App\Livewire\Concerns\InteractsWithWorkspace;
 use App\Models\Task;
 use App\Models\WorkspaceGateRun;
 use App\Services\Git\WorkspaceDiffService;
+use App\Services\GitProvider\PullRequestDetails;
+use App\Services\Workspace\PullRequestFeedbackService;
 use App\Services\Workspace\PullRequestService;
 use App\Services\Workspace\WorkspaceGateService;
 use App\Support\GateAnnotations;
+use App\Support\GateRows;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Lazy;
 use Livewire\Attributes\Locked;
@@ -112,7 +113,7 @@ class ChangeTray extends Component
             if ($pr->needsRebase() && $canOperate) {
                 $todos[] = ['kind' => 'warn', 'label' => $pr->conflicts ? __('workspaces.tray.todo.conflicts', ['branch' => $task->base_branch]) : __('workspaces.tray.todo.behind', ['branch' => $task->base_branch]), 'action' => __('workspaces.pr.rebase'), 'event' => 'pr-rebase'];
             }
-            $new = count(app(PullRequestService::class)->uncollectedComments($task, $this->user()));
+            $new = count(app(PullRequestFeedbackService::class)->uncollectedComments($task, $this->user()));
             if ($new > 0 && $canOperate) {
                 $todos[] = ['kind' => 'info', 'label' => trans_choice('workspaces.tray.todo.comments', $new, ['count' => $new]), 'action' => __('workspaces.review.collect_all'), 'event' => 'pr-collect'];
             }
@@ -150,5 +151,4 @@ class ChangeTray extends Component
     {
         return $this->findTaskOrFail($this->taskId);
     }
-
 }

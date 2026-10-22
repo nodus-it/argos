@@ -4,16 +4,17 @@ declare(strict_types=1);
 
 namespace App\Livewire\Workspace;
 
-use App\Support\GateRows;
-use App\Livewire\Concerns\InteractsWithWorkspace;
-use App\Support\RequestedTask;
 use App\Enums\GitProvider;
 use App\Enums\WorkspaceStatus;
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
+use App\Livewire\Concerns\InteractsWithWorkspace;
 use App\Models\Task;
 use App\Services\Git\WorkspaceDiffService;
+use App\Services\Workspace\PullRequestFeedbackService;
 use App\Services\Workspace\PullRequestService;
 use App\Services\Workspace\WorkspaceGateService;
+use App\Support\GateRows;
+use App\Support\RequestedTask;
 use App\Support\TaskRefs;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\View\View;
@@ -99,9 +100,9 @@ class ContextPanel extends Component
     public function prCollect(): void
     {
         $this->prAction(function (PullRequestService $pr, Task $task): void {
-            $result = $pr->collect($task, $this->user());
+            $result = app(PullRequestFeedbackService::class)->collect($task, $this->user());
             if ($result['general'] !== []) {
-                $this->dispatch('composer-append', text: PullRequestService::generalText($result['general']));
+                $this->dispatch('composer-append', text: PullRequestFeedbackService::generalText($result['general']));
             }
             $this->dispatch('review-comments-changed');
             Notification::make()->title(trans_choice('workspaces.review.collected_count', $result['collected'], ['count' => $result['collected']]))->success()->send();
@@ -165,8 +166,8 @@ class ContextPanel extends Component
             'pr' => $task?->pr_number !== null ? app(PullRequestService::class)->details($task) : null,
             // First load of the pull request details runs in the background: poll until it is there.
             'prLoading' => $task?->pr_number !== null && ! app(PullRequestService::class)->hasDetails($task),
-            'feedback' => $task?->pr_number !== null ? app(PullRequestService::class)->feedback($task) : ['reviews' => [], 'comments' => [], 'reviewers' => []],
-            'collectedIds' => $task?->pr_number !== null ? app(PullRequestService::class)->collectedIds($task, $this->user()) : [],
+            'feedback' => $task?->pr_number !== null ? app(PullRequestFeedbackService::class)->feedback($task) : ['reviews' => [], 'comments' => [], 'reviewers' => []],
+            'collectedIds' => $task?->pr_number !== null ? app(PullRequestFeedbackService::class)->collectedIds($task, $this->user()) : [],
             'canShip' => $task !== null && $this->user()->can('ship', $task),
             // Bitbucket has no native auto-merge.
             'autoMergeSupported' => $workspace->platform !== GitProvider::Bitbucket,
@@ -196,6 +197,4 @@ class ContextPanel extends Component
     {
         return $this->findTask($this->taskId);
     }
-
-
 }

@@ -4,20 +4,20 @@ declare(strict_types=1);
 
 namespace App\Livewire\Workspace;
 
-use App\Support\GateRows;
-use App\Livewire\Concerns\InteractsWithWorkspace;
-use App\Support\RequestedTask;
 use App\Enums\WorkspaceStatus;
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
+use App\Livewire\Concerns\InteractsWithWorkspace;
 use App\Models\ReviewComment;
 use App\Models\Task;
 use App\Services\Git\WorkspaceDiffService;
+use App\Services\Workspace\PullRequestFeedbackService;
 use App\Services\Workspace\ReviewCommentService;
 use App\Services\Workspace\ReviewService;
 use App\Services\Workspace\WorkspaceDaemonClient;
 use App\Services\Workspace\WorkspaceGateService;
-use App\Services\Workspace\PullRequestService;
 use App\Support\GateAnnotations;
+use App\Support\GateRows;
+use App\Support\RequestedTask;
 use App\Support\ReviewDiff;
 use App\Support\TaskEventFormatter;
 use Filament\Notifications\Notification;
@@ -109,9 +109,9 @@ class ReviewPanel extends Component
         }
 
         $this->attempt(function () use ($task, $commentId): void {
-            $result = app(PullRequestService::class)->collect($task, $this->user(), $commentId);
+            $result = app(PullRequestFeedbackService::class)->collect($task, $this->user(), $commentId);
             if ($result['general'] !== []) {
-                $this->dispatch('composer-append', text: PullRequestService::generalText($result['general']));
+                $this->dispatch('composer-append', text: PullRequestFeedbackService::generalText($result['general']));
             }
             $this->dispatch('review-comments-changed');
         }, warn: true);
@@ -296,7 +296,7 @@ class ReviewPanel extends Component
         // What reviewers wrote on the pull request, at their lines of this file.
         // Taken over ones show as the person's own drafts instead.
         $prComments = $task !== null && $current !== null
-            ? collect(app(PullRequestService::class)->uncollectedComments($task, $this->user()))->where('path', $current['path'])
+            ? collect(app(PullRequestFeedbackService::class)->uncollectedComments($task, $this->user()))->where('path', $current['path'])
             : collect();
 
         $markdown = null;
@@ -483,11 +483,9 @@ class ReviewPanel extends Component
         return array_key_exists($id, $this->tasks) ? $this->tasks[$id] : $this->tasks[$id] = $this->findTask($id);
     }
 
-
     /** A file of the task's working copy — read once per request (anchoring and Markdown both need it). */
     private function fileContent(Task $task, string $path): string
     {
         return $this->files[$task->id.':'.$path] ??= (string) app(WorkspaceDaemonClient::class)->for($this->workspace(), 15)->fileContent($task->slug, $path)['content'];
     }
-
 }

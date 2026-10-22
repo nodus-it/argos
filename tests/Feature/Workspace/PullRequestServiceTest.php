@@ -12,6 +12,8 @@ use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceStatus;
 use App\Livewire\Workspace\ContextPanel;
 use App\Models\AgentCredential;
+use App\Models\ConnectedAccount;
+use App\Models\ReviewComment;
 use App\Models\Task;
 use App\Models\TaskEvent;
 use App\Models\User;
@@ -20,10 +22,15 @@ use App\Models\WorkspaceMember;
 use App\Services\GitProvider\Contracts\GitServiceContract;
 use App\Services\GitProvider\GitServiceFactory;
 use App\Services\GitProvider\PullRequestDetails;
+use App\Services\Workspace\PullRequestFeedbackService;
 use App\Services\Workspace\PullRequestService;
+use App\Services\Workspace\ReviewCommentService;
 use App\Services\Workspace\TaskService;
+use App\Services\Workspace\WorkspaceDaemonClient;
 use App\Services\Workspace\WorkspaceException;
+use App\Testing\FakeWorkspaceDaemon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
 use Livewire\Livewire;
 use Mockery;
@@ -273,7 +280,7 @@ class PullRequestServiceTest extends TestCase
             ],
         ]));
 
-        $feedback = $this->service()->feedback($this->task);
+        $feedback = app(PullRequestFeedbackService::class)->feedback($this->task);
 
         $this->assertSame([], $feedback['reviews']);
         $this->assertSame(['1'], array_column($feedback['comments'], 'id'));
@@ -282,14 +289,14 @@ class PullRequestServiceTest extends TestCase
     public function test_reviewers_are_matched_to_argos_people(): void
     {
         $grace = User::factory()->create(['name' => 'Grace Hopper']);
-        \App\Models\ConnectedAccount::factory()->create(['user_id' => $grace->id, 'provider' => 'github', 'nickname' => 'grace']);
+        ConnectedAccount::factory()->create(['user_id' => $grace->id, 'provider' => 'github', 'nickname' => 'grace']);
         $this->git->shouldReceive('pullRequestDetails')->andReturn($this->details([
             'reviewState' => 'approved',
             'reviews' => [['author' => 'grace', 'avatar' => 'https://avatars.example/grace', 'state' => 'approved', 'body' => 'Looks good', 'submitted_at' => '2026-10-22T08:00:00Z']],
             'comments' => [['id' => '1', 'author' => 'octo', 'avatar' => 'https://avatars.example/octo', 'profile' => 'https://github.com/octo', 'body' => 'Typo', 'path' => 'a.php', 'line' => 3, 'url' => 'https://github.com/c/1', 'created_at' => '2026-10-22T08:05:00Z']],
         ]));
 
-        $feedback = $this->service()->feedback($this->task);
+        $feedback = app(PullRequestFeedbackService::class)->feedback($this->task);
 
         $this->assertTrue($feedback['reviewers'][0]['user']?->is($grace));
         $this->assertNull($feedback['comments'][0]['user']);
@@ -322,8 +329,8 @@ class PullRequestServiceTest extends TestCase
 
     public function test_comments_are_collected_into_the_own_review_once(): void
     {
-        $this->app->singleton(\App\Services\Workspace\WorkspaceDaemonClient::class, \App\Testing\FakeWorkspaceDaemon::class);
-        \App\Testing\FakeWorkspaceDaemon::$fileContents = ['routes/web.php' => "<?php\n\nuse Route;\n\nRoute::view('/', 'welcome');\n"];
+        $this->app->singleton(WorkspaceDaemonClient::class, FakeWorkspaceDaemon::class);
+        FakeWorkspaceDaemon::$fileContents = ['routes/web.php' => "<?php\n\nuse Route;\n\nRoute::view('/', 'welcome');\n"];
         $this->git->shouldReceive('pullRequestDetails')->andReturn($this->details([
             'comments' => [
                 ['id' => 'c1', 'author' => 'grace', 'body' => 'Redirect home to /start', 'path' => 'routes/web.php', 'line' => 5, 'url' => 'https://x/c1', 'created_at' => null],
@@ -331,20 +338,20 @@ class PullRequestServiceTest extends TestCase
             ],
         ]));
 
-        $result = $this->service()->collect($this->task, $this->owner);
+        $result = app(PullRequestFeedbackService::class)->collect($this->task, $this->owner);
 
         $this->assertSame(1, $result['collected']);
         $this->assertSame(['c2'], array_column($result['general'], 'id'));
-        $draft = \App\Models\ReviewComment::query()->sole();
+        $draft = ReviewComment::query()->sole();
         $this->assertSame(['routes/web.php', 5, 'grace', 'c1'], [$draft->path, $draft->line_start, $draft->source_author, $draft->source_id]);
         $this->assertStringContainsString("Route::view('/', 'welcome');", $draft->snippet);
-        $this->assertSame(['c1'], $this->service()->collectedIds($this->task, $this->owner));
+        $this->assertSame(['c1'], app(PullRequestFeedbackService::class)->collectedIds($this->task, $this->owner));
         // Taken over once only.
-        $this->assertSame(0, $this->service()->collect($this->task, $this->owner)['collected']);
+        $this->assertSame(0, app(PullRequestFeedbackService::class)->collect($this->task, $this->owner)['collected']);
 
-        $message = \App\Services\Workspace\ReviewCommentService::message(collect([$draft]), '');
+        $message = ReviewCommentService::message(collect([$draft]), '');
         $this->assertStringContainsString(__('workspaces.review.from_pr', ['name' => 'grace']).' Redirect home to /start', $message);
-        $this->assertStringContainsString('grace', PullRequestService::generalText($result['general']));
+        $this->assertStringContainsString('grace', PullRequestFeedbackService::generalText($result['general']));
     }
 
     public function test_details_are_cached_and_refreshed_in_the_background(): void
@@ -353,12 +360,12 @@ class PullRequestServiceTest extends TestCase
 
         $first = $this->service()->details($this->task);
         $second = $this->service()->details($this->task);
-        $this->service()->feedback($this->task);
+        app(PullRequestFeedbackService::class)->feedback($this->task);
 
         // One provider call for all three; the cache holds plain arrays.
         $this->assertSame('approved', $first?->reviewState);
         $this->assertSame('approved', $second?->reviewState);
-        $this->assertIsArray(\Illuminate\Support\Facades\Cache::get('task-pr:'.$this->task->id));
+        $this->assertIsArray(Cache::get('task-pr:'.$this->task->id));
         $this->assertTrue($this->service()->hasDetails($this->task));
     }
 }

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
-use App\Support\RepoUrlBuilder;
 use App\Models\User;
 use App\Services\GitProvider\BitbucketGitService;
 use App\Services\GitProvider\GitHubGitService;
@@ -16,7 +15,10 @@ use App\Services\IssueTracker\Providers\GitHubIssueTracker;
 use App\Services\IssueTracker\Providers\GitLabIssueTracker;
 use App\Services\IssueTracker\Providers\LinearIssueTracker;
 use App\Services\OAuth\OAuthConfigHydrator;
+use App\Services\Workspace\PullRequestFeedbackService;
+use App\Services\Workspace\PullRequestService;
 use App\Services\Workspace\WorkspaceMemberService;
+use App\Support\RepoUrlBuilder;
 use App\Workers\Agents\AgentRegistry;
 use App\Workers\Agents\ClaudeCodeRunner;
 use App\Workers\Builtin\BuiltinSync;
@@ -43,8 +45,9 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        // Request-scoped: the pull request feedback is memoized per request.
-        $this->app->scoped(\App\Services\Workspace\PullRequestService::class);
+        // Request-scoped: pull request details and feedback are read once per request.
+        $this->app->scoped(PullRequestService::class);
+        $this->app->scoped(PullRequestFeedbackService::class);
 
         $this->app->singleton(GitProviderRegistry::class, function (): GitProviderRegistry {
             $registry = new GitProviderRegistry;
