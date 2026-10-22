@@ -20,6 +20,7 @@ use App\Services\Credentials\AgentCredentialService;
 use App\Services\Git\RepositoryFetcher;
 use App\Services\OAuth\ConnectedAccountService;
 use App\Services\OAuth\TokenRefresher;
+use App\Services\User\UserService;
 use App\Services\Workspace\AgentPool;
 use App\Services\Workspace\WorkspaceService;
 use App\Support\DocsLinkAction;
@@ -135,6 +136,22 @@ class Onboarding extends Page
     public function getTitle(): string
     {
         return __('onboarding.title');
+    }
+
+    /** @return array<string> */
+    public function getPageClasses(): array
+    {
+        // Hides the panel navigation while the wizard runs (resources/css/app.css).
+        return ['argos-onboarding'];
+    }
+
+    /** The language picker at the top: saved on the account, the wizard reloads in it. */
+    public function setLocale(string $locale): void
+    {
+        /** @var User $user */
+        $user = Auth::user();
+        app(UserService::class)->setLocale($user, $locale);
+        $this->redirect(self::getUrl());
     }
 
     public function mount(): void

@@ -11,10 +11,12 @@ return [
         'back' => 'Zurück',
     ],
 
+    'language' => 'Sprache',
+
     'steps' => [
         'security' => 'Sicherheit',
         'agents' => 'Agenten',
-        'repository' => 'Repository',
+        'repository' => 'Workspace',
         'done' => 'Fertig',
     ],
 

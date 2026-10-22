@@ -89,6 +89,14 @@ class UserService extends EntityService
         });
     }
 
+    /** The language a person sees Argos in (`en` or `de`). */
+    public function setLocale(User $user, string $locale): void
+    {
+        if (in_array($locale, ['en', 'de'], true)) {
+            $user->forceFill(['locale' => $locale])->save();
+        }
+    }
+
     private function assertCanChangeAdmin(User $user, bool $isAdmin): void
     {
         if ($isAdmin || ! $user->isAdmin()) {

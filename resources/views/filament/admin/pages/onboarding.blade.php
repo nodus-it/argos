@@ -8,6 +8,18 @@
 
     <div class="max-w-6xl mx-auto w-full space-y-8">
 
+        {{-- ── Language, first of all ───────────────────────────────────── --}}
+        <div class="flex items-center justify-end gap-2 text-sm" role="group" aria-label="{{ __('onboarding.language') }}">
+            <span class="text-gray-500 dark:text-gray-400">{{ __('onboarding.language') }}</span>
+            @foreach (['de' => 'Deutsch', 'en' => 'English'] as $code => $label)
+                <button type="button" wire:click="setLocale('{{ $code }}')" @class([
+                    'rounded-md px-3 py-1.5 font-medium ring-1 transition min-h-[36px]',
+                    'bg-primary-600 text-white ring-primary-600' => app()->getLocale() === $code,
+                    'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 ring-gray-300 dark:ring-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800' => app()->getLocale() !== $code,
+                ]) aria-pressed="{{ app()->getLocale() === $code ? 'true' : 'false' }}">{{ $label }}</button>
+            @endforeach
+        </div>
+
         {{-- ── Stepper header ──────────────────────────────────────────── --}}
         <nav class="flex items-center justify-between" aria-label="Progress">
             @foreach ($this->steps() as $step)

@@ -1108,3 +1108,9 @@ body,
 .ws-auto-note{margin:8px 12px 0;}
 
 @import './workspace.css';
+
+/* Onboarding wizard: no panel navigation while the first setup runs. */
+.fi-body:has(.argos-onboarding) .fi-sidebar,
+.fi-body:has(.argos-onboarding) .fi-sidebar-close-overlay,
+.fi-body:has(.argos-onboarding) .fi-topbar-open-sidebar-btn,
+.fi-body:has(.argos-onboarding) .fi-topbar-close-sidebar-btn { display: none !important; }

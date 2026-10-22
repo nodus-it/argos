@@ -487,4 +487,20 @@ class OnboardingPageTest extends TestCase
     {
         $this->assertTrue(Onboarding::shouldRegisterNavigation());
     }
+
+    public function test_the_language_is_chosen_first_and_saved_on_the_account(): void
+    {
+        Livewire::test(Onboarding::class)
+            ->assertSee('Deutsch')
+            ->assertSee('English')
+            ->call('setLocale', 'de')
+            ->assertRedirect(Onboarding::getUrl());
+
+        $this->assertSame('de', auth()->user()->fresh()->locale);
+    }
+
+    public function test_the_wizard_hides_the_panel_navigation(): void
+    {
+        $this->get(Onboarding::getUrl())->assertOk()->assertSee('argos-onboarding');
+    }
 }
