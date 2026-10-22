@@ -295,6 +295,8 @@ return [
         'closed' => 'geschlossen',
     ],
     'review' => [
+        'message_card' => '{1} Review · 1 Kommentar|[0,*] Review · :count Kommentare',
+        'show_code' => 'Code',
         'collect_help' => 'Übernimmt Zeilen-Kommentare als Entwürfe an ihre Zeilen und allgemeine in die Nachricht — sie gehen zusammen mit deinen eigenen Kommentaren an Claude.',
         'from_pr' => '(:name im Pull Request)',
         'collect' => 'Ins Review übernehmen',
@@ -662,6 +664,7 @@ return [
         ],
     ],
     'pr' => [
+        'loading' => 'Reviews und Checks werden geladen …',
         'feedback_count' => '{1} 1 Review-Kommentar|[0,*] :count Review-Kommentare',
         'comment_prompt' => 'Bitte arbeite diesen Review-Kommentar des Pull Requests ein (:url):',
         'feedback_title' => 'Review-Kommentare',

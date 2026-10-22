@@ -9,7 +9,7 @@
      x-on:argos-turn-completed.window="$wire.$refresh()"
      x-on:argos-workspace-changed.window="$wire.$refresh()"
      x-on:argos-gates-updated.window="$wire.$refresh()"
-     @if ($gateRun?->status === \App\Enums\GateRunStatus::Running) wire:poll.10s @endif>
+     @if ($gateRun?->status === \App\Enums\GateRunStatus::Running) wire:poll.10s @elseif ($prLoading) wire:poll.2s @endif>
 
     <section class="wf-section" x-data="{ ...argosFold('env') }" :class="{ 'is-folded': !open }">
         <h2 class="wf-section-h"><button type="button" class="wf-section-title wf-fold-btn" x-on:click="toggleFold()" :aria-expanded="open"><x-wf.icon name="chevron-right" :size="12" :stroke="2.4" class="wf-fold-chev" />{{ __('workspaces.focus.environment') }}</button></h2>
@@ -86,6 +86,9 @@
             </span>
         </div>
         <div class="wf-card wf-pr-card">
+            @if ($prLoading)
+                <p class="wf-muted wf-note"><span class="wf-spin"></span> {{ __('workspaces.pr.loading') }}</p>
+            @endif
             <div class="wf-pr-row">
                 <span @class(['wf-pr-icon', 'is-pass' => $checks === 'success', 'is-fail' => $checks === 'failure', 'is-running' => $checks === 'pending']) aria-hidden="true">@if ($checkIcon)<x-wf.icon :name="$checkIcon" :size="12" :stroke="2.6" />@endif</span>
                 <span class="wf-gate-name">{{ __('workspaces.pr.checks') }}</span>

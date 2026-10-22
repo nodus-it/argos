@@ -360,4 +360,19 @@ class PullRequestServiceTest extends TestCase
         $this->assertStringContainsString(__('workspaces.review.from_pr', ['name' => 'grace']).' Redirect home to /start', $message);
         $this->assertStringContainsString('grace', PullRequestService::generalText($result['general']));
     }
+
+    public function test_details_are_cached_and_refreshed_in_the_background(): void
+    {
+        $this->git->shouldReceive('pullRequestDetails')->once()->andReturn($this->details(['reviewState' => 'approved']));
+
+        $first = $this->service()->details($this->task);
+        $second = $this->service()->details($this->task);
+        $this->service()->feedback($this->task);
+
+        // One provider call for all three; the cache holds plain arrays.
+        $this->assertSame('approved', $first?->reviewState);
+        $this->assertSame('approved', $second?->reviewState);
+        $this->assertIsArray(\Illuminate\Support\Facades\Cache::get('task-pr:'.$this->task->id));
+        $this->assertTrue($this->service()->hasDetails($this->task));
+    }
 }

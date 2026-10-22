@@ -41,10 +41,14 @@ final class TaskEventFormatter
         return Str::limit(preg_replace('/\s+/', ' ', $text) ?? $text, 140);
     }
 
-    /** Markdown as HTML; links leave Argos in a new tab, bare URLs become links. */
-    public static function markdown(string $text): HtmlString
+    /**
+     * Markdown as HTML; links leave Argos in a new tab, bare URLs become
+     * links. `$breaks` keeps single line breaks (what people type in chat).
+     */
+    public static function markdown(string $text, bool $breaks = false): HtmlString
     {
         return new HtmlString(Str::markdown($text, [
+            'renderer' => ['soft_break' => $breaks ? "<br>\n" : "\n"],
             'html_input' => 'escape',
             'allow_unsafe_links' => false,
             'max_nesting_level' => 20,

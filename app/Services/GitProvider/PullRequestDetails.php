@@ -49,6 +49,28 @@ final readonly class PullRequestDetails
         public bool $autoMerge = false,
     ) {}
 
+    /**
+     * Back from toArray() (the cache stores arrays: Argos' cache does not
+     * unserialize objects).
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public static function fromArray(array $data): self
+    {
+        return new self(
+            state: (string) ($data['state'] ?? self::STATE_OPEN),
+            url: $data['url'] ?? null,
+            headSha: $data['head_sha'] ?? null,
+            conflicts: (bool) ($data['conflicts'] ?? false),
+            behindBase: $data['behind_base'] ?? null,
+            checks: $data['checks'] ?? ['state' => 'none', 'url' => null, 'failed' => []],
+            reviewState: $data['review_state'] ?? null,
+            reviews: $data['reviews'] ?? [],
+            comments: $data['comments'] ?? [],
+            autoMerge: (bool) ($data['auto_merge'] ?? false),
+        );
+    }
+
     /** An open PR with nothing known about it — a safe placeholder. */
     public static function empty(): self
     {

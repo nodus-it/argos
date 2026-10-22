@@ -162,8 +162,9 @@ class TaskService
      * removed again, so history only shows delivered or waiting ones.
      *
      * @param  list<array{media_type: string, data: string, path?: string}>  $images
+     * @param  array<string, mixed>  $display  how the chat shows the message (e.g. `review`: the collected comments as a card); Claude gets `$text`
      */
-    public function send(Task $task, User $author, string $text, array $images = [], bool $automated = false): TaskEvent
+    public function send(Task $task, User $author, string $text, array $images = [], bool $automated = false, array $display = []): TaskEvent
     {
         Gate::forUser($author)->authorize('prompt', $task);
         if ($task->status->isFinished()) {
@@ -192,7 +193,7 @@ class TaskService
                 'text' => $text,
                 'author_name' => $author->name,
                 'images' => array_map(fn (array $image): array => ['media_type' => $image['media_type'], 'path' => $image['path'] ?? null], $images),
-            ] + ($automated ? ['auto' => true] : []) + ($queued ? ['pending' => true] : []),
+            ] + ($automated ? ['auto' => true] : []) + ($queued ? ['pending' => true] : []) + $display,
         ]);
 
         if ($queued) {

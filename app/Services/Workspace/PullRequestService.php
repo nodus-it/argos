@@ -6,6 +6,7 @@ namespace App\Services\Workspace;
 
 use App\Enums\ReviewCommentStatus;
 use App\Enums\TaskStatus;
+use App\Jobs\Workspace\RefreshPullRequestJob;
 use App\Models\ConnectedAccount;
 use App\Models\ReviewComment;
 use App\Models\Task;
@@ -29,8 +30,11 @@ use Throwable;
  */
 class PullRequestService
 {
-    /** Details (reviews, comments) are cached this long for the sidebar. */
-    private const DETAILS_SECONDS = 60;
+    /** Details younger than this are fresh; older ones are shown and refreshed in the background. */
+    private const FRESH_SECONDS = 60;
+
+    /** How long details are kept at all (the scheduled sync renews them). */
+    private const KEEP_SECONDS = 3600;
 
     public function __construct(
         private readonly GitServiceFactory $git,
@@ -57,7 +61,8 @@ class PullRequestService
 
             return null;
         }
-        Cache::put($this->cacheKey($task), $details, self::DETAILS_SECONDS);
+        Cache::put($this->cacheKey($task), ['at' => time(), 'details' => $details->toArray()], self::KEEP_SECONDS);
+        Cache::forget('task-pr-refreshing:'.$task->id);
 
         $before = ['checks' => $task->pr_checks['state'] ?? null, 'review' => $task->pr_review_state, 'state' => $task->pr_state];
         $task->forceFill([
@@ -88,12 +93,47 @@ class PullRequestService
         return $details;
     }
 
-    /** Cached details for the sidebar (refreshing when there are none). */
-    public function details(Task $task): ?PullRequestDetails
+    /**
+     * Cached details. Stale ones come back right away and are refreshed in
+     * the background; without any, `$wait` fetches them now, otherwise the
+     * background refresh fills them in (the sidebar shows the stored summary
+     * meanwhile and polls).
+     */
+    public function details(Task $task, bool $wait = false): ?PullRequestDetails
     {
+        if ($task->pr_number === null) {
+            return null;
+        }
+        $cached = Cache::get($this->cacheKey($task));
+        if (is_array($cached) && is_array($cached['details'] ?? null)) {
+            if (time() - (int) ($cached['at'] ?? 0) > self::FRESH_SECONDS) {
+                $this->refreshLater($task);
+            }
+
+            return PullRequestDetails::fromArray($cached['details']);
+        }
+        if ($wait) {
+            return $this->refresh($task);
+        }
+        $this->refreshLater($task);
+        // A synchronous queue (tests, small setups) has the details by now.
         $cached = Cache::get($this->cacheKey($task));
 
-        return $cached instanceof PullRequestDetails ? $cached : $this->refresh($task);
+        return is_array($cached) && is_array($cached['details'] ?? null) ? PullRequestDetails::fromArray($cached['details']) : null;
+    }
+
+    /** Whether details are loaded (else the sidebar polls until they are). */
+    public function hasDetails(Task $task): bool
+    {
+        return is_array(Cache::get($this->cacheKey($task)));
+    }
+
+    /** One background refresh at a time per task. */
+    private function refreshLater(Task $task): void
+    {
+        if (Cache::add('task-pr-refreshing:'.$task->id, true, 30)) {
+            RefreshPullRequestJob::dispatch($task->id);
+        }
     }
 
     /** Take the draft out of draft state. */
@@ -165,9 +205,9 @@ class PullRequestService
      *
      * @return array{reviews: list<array{author: string, avatar?: ?string, profile?: ?string, url?: ?string, state: string, body: string, submitted_at: ?string, user: ?User}>, comments: list<array{id: string, author: string, avatar?: ?string, profile?: ?string, body: string, path: ?string, line: ?int, url: ?string, created_at: ?string, user: ?User}>, reviewers: list<array{author: string, avatar?: ?string, profile?: ?string, url?: ?string, state: string, body: string, submitted_at: ?string, user: ?User}>}
      */
-    public function feedback(Task $task): array
+    public function feedback(Task $task, bool $wait = false): array
     {
-        $details = $task->pr_number !== null ? $this->details($task) : null;
+        $details = $task->pr_number !== null ? $this->details($task, $wait) : null;
         if ($details === null) {
             return ['reviews' => [], 'comments' => [], 'reviewers' => []];
         }
@@ -217,7 +257,7 @@ class PullRequestService
     public function sendReview(Task $task, User $by): void
     {
         Gate::forUser($by)->authorize('prompt', $task);
-        $feedback = $this->feedback($task);
+        $feedback = $this->feedback($task, wait: true);
         if ($feedback['reviews'] === [] && $feedback['comments'] === []) {
             throw WorkspaceException::translated('workspaces.pr.no_review');
         }
@@ -246,7 +286,7 @@ class PullRequestService
     public function collect(Task $task, User $by, ?string $commentId = null): array
     {
         Gate::forUser($by)->authorize('prompt', $task);
-        $comments = collect($this->feedback($task)['comments'])
+        $comments = collect($this->feedback($task, wait: true)['comments'])
             ->when($commentId !== null, fn ($c) => $c->where('id', $commentId))
             ->reject(fn (array $c): bool => in_array($c['id'], $this->collectedIds($task, $by), true));
 

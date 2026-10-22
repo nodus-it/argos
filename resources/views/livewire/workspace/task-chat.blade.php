@@ -237,7 +237,11 @@
                                 </button>
                             @endif
                         </div>
-                        <div class="wf-msg-text">{{ $p['text'] ?? '' }}</div>
+                        @if (! empty($p['review']['comments']) || ! empty($p['review']['text']))
+                            @include('livewire.workspace.partials.review-message', ['review' => $p['review']])
+                        @else
+                            <div class="wf-msg-md wf-md ws-md prose">{{ Fmt::markdown((string) ($p['text'] ?? ''), breaks: true) }}</div>
+                        @endif
                         @if (! empty($p['images']))
                             <div class="ws-images">
                                 @foreach ($p['images'] as $image)

@@ -178,6 +178,8 @@ class ContextPanel extends Component
             'canEdit' => $this->user()->can('editor', $workspace),
             'running' => $workspace->status === WorkspaceStatus::Running,
             'pr' => $task?->pr_number !== null ? app(PullRequestService::class)->details($task) : null,
+            // First load of the pull request details runs in the background: poll until it is there.
+            'prLoading' => $task?->pr_number !== null && ! app(PullRequestService::class)->hasDetails($task),
             'feedback' => $task?->pr_number !== null ? app(PullRequestService::class)->feedback($task) : ['reviews' => [], 'comments' => [], 'reviewers' => []],
             'collectedIds' => $task?->pr_number !== null ? app(PullRequestService::class)->collectedIds($task, $this->user()) : [],
             'canShip' => $task !== null && $this->user()->can('ship', $task),

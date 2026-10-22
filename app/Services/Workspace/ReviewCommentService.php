@@ -193,7 +193,21 @@ class ReviewCommentService
             return 0;
         }
 
-        $this->tasks->send($task, $user, self::message($comments, $text));
+        $this->tasks->send($task, $user, self::message($comments, $text), display: ['review' => [
+            'comments' => $comments->values()->map(fn (ReviewComment $c): array => [
+                'path' => $c->path,
+                'line_start' => $c->line_start,
+                'line_end' => $c->line_end,
+                'side' => $c->side,
+                'body' => $c->body,
+                'snippet' => $c->snippet,
+                'outdated' => $c->status === ReviewCommentStatus::Stale || $c->outdated,
+                'source_author' => $c->source_author,
+                'source_avatar' => $c->source_avatar,
+                'source_url' => $c->source_url,
+            ])->all(),
+            'text' => trim($text),
+        ]]);
         ReviewComment::query()->whereKey($comments->pluck('id'))->update(['status' => ReviewCommentStatus::Sent->value, 'sent_at' => now()]);
 
         return $comments->count();

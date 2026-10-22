@@ -6,6 +6,7 @@ namespace App\Services\Git;
 
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
 use App\Integrations\WorkspaceDaemon\WorkspaceDaemonTransport;
+use App\Jobs\Workspace\FetchWorkspaceRemoteJob;
 use App\Models\Task;
 use App\Models\Workspace;
 use App\Services\Workspace\WorkspaceDaemonClient;
@@ -65,17 +66,15 @@ class WorkspaceDiffService
         });
     }
 
+    /**
+     * Keep origin/<base> current without making anyone wait: at most once a
+     * minute a background job fetches; the diff uses what is there now.
+     */
     private function fetchThrottled(Workspace $workspace, WorkspaceDaemonTransport $api): void
     {
-        Cache::remember('ws-fetch:'.$workspace->id, self::FETCH_THROTTLE, function () use ($api): bool {
-            try {
-                $api->gitFetch();
-            } catch (\Throwable) {
-                // Offline remote: diff against what we have.
-            }
-
-            return true;
-        });
+        if (Cache::add('ws-fetch:'.$workspace->id, true, self::FETCH_THROTTLE)) {
+            FetchWorkspaceRemoteJob::dispatch($workspace->id);
+        }
     }
 
     /**

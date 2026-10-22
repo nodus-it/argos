@@ -295,6 +295,8 @@ return [
         'closed' => 'closed',
     ],
     'review' => [
+        'message_card' => '{1} Review · 1 comment|[0,*] Review · :count comments',
+        'show_code' => 'Code',
         'collect_help' => 'Takes the line comments over as drafts at their lines and general ones into the message — they go to Claude together with your own comments.',
         'from_pr' => '(:name on the pull request)',
         'collect' => 'Add to my review',
@@ -662,6 +664,7 @@ return [
         ],
     ],
     'pr' => [
+        'loading' => 'Loading reviews and checks …',
         'feedback_count' => '{1} 1 review comment|[0,*] :count review comments',
         'comment_prompt' => 'Please work in this review comment of the pull request (:url):',
         'feedback_title' => 'Review comments',

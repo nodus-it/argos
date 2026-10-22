@@ -112,6 +112,15 @@ class ReviewCommentsTest extends TestCase
         $this->assertStringContainsString('2. resources/views/welcome.blade.php:2 '.__('workspaces.review.removed_line'), $message);
         $this->assertStringEndsWith("\n\nAlso make the button smaller.", $message);
         $this->assertSame(2, ReviewComment::query()->where('status', ReviewCommentStatus::Sent->value)->count());
+
+        // The chat shows it as a review card; Claude got the text above.
+        $payload = TaskEvent::query()->where('task_id', $this->task->id)->where('type', TaskEventType::UserMessage->value)->sole()->payload;
+        $this->assertSame(['Reuse the nav partial', 'Keep the dashboard link'], array_column($payload['review']['comments'], 'body'));
+        $this->assertSame('Also make the button smaller.', $payload['review']['text']);
+        Livewire::withQueryParams(['task' => $this->task->id])->actingAs($this->editor)
+            ->test(TaskChat::class, ['workspaceId' => $this->workspace->id])
+            ->assertSee(trans_choice('workspaces.review.message_card', 2, ['count' => 2]))
+            ->assertSeeHtml('class="wf-review-msg-item"');
     }
 
     public function test_the_chip_removes_a_comment_and_drafts_survive_a_reload(): void
