@@ -50,12 +50,13 @@ describe('editor gate', () => {
 
     it('forwards WebSocket upgrades only with the token', async () => {
         const { gate, seen } = await pair();
-        const upgrade = (token: string | null): Promise<string> =>
+        const upgrade = (token: string | null, origin?: string): Promise<string> =>
             new Promise((resolve) => {
                 const socket = connect(gate, '127.0.0.1', () => {
                     socket.write(
                         'GET /socket HTTP/1.1\r\nHost: x\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n' +
                             (token !== null ? `X-Argos-Editor-Token: ${token}\r\n` : '') +
+                            (origin !== undefined ? `Origin: ${origin}\r\n` : '') +
                             '\r\n',
                     );
                 });
@@ -65,6 +66,7 @@ describe('editor gate', () => {
             });
 
         expect(await upgrade(null)).toContain('403');
+        expect(await upgrade('secret', 'http://demo-shop-task.argos.test')).toContain('403');
         const answer = await upgrade('secret');
         expect(answer).toContain('101 Switching Protocols');
         expect(answer).toContain('hello');

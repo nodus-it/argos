@@ -25,6 +25,23 @@ function authorized(request: IncomingMessage, expected: Buffer): boolean {
     return actual.length === expected.length && timingSafeEqual(actual, expected);
 }
 
+/**
+ * A page of another host (a preview of repository code on a sibling
+ * subdomain counts as the same site) must not drive the editor: a WebSocket
+ * or a state-changing request is only taken from the editor's own origin.
+ */
+function sameOrigin(request: IncomingMessage): boolean {
+    const origin = request.headers.origin;
+    if (origin === undefined) {
+        return true;
+    }
+    try {
+        return new URL(origin).host === request.headers.host;
+    } catch {
+        return false;
+    }
+}
+
 /** Request headers for the editor: the token stays at the gate. */
 function forwardHeaders(request: IncomingMessage): IncomingMessage['headers'] {
     const headers = { ...request.headers };
@@ -44,7 +61,8 @@ export function startEditorGate(options: { token: string; port: number; editorPo
     const expected = Buffer.from(options.token);
 
     const server = createServer((request, response) => {
-        if (!authorized(request, expected)) {
+        const safe = request.method === 'GET' || request.method === 'HEAD' || request.method === 'OPTIONS';
+        if (!authorized(request, expected) || (!safe && !sameOrigin(request))) {
             response.writeHead(403).end();
 
             return;
@@ -66,7 +84,7 @@ export function startEditorGate(options: { token: string; port: number; editorPo
     });
 
     server.on('upgrade', (request: IncomingMessage, socket: Duplex, head: Buffer) => {
-        if (!authorized(request, expected)) {
+        if (!authorized(request, expected) || !sameOrigin(request)) {
             socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');
 
             return;
