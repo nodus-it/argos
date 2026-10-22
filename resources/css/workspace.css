@@ -558,6 +558,13 @@ a.ag-ref-chip:hover { text-decoration: underline; }
 .ag-mw-empty-icon { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--ag-accent-soft); color: var(--ag-accent-ink); }
 .ag-mw-empty-title { margin: 6px 0 0; font-size: 16px; font-weight: 600; color: var(--ag-text); }
 .ag-mw-empty-text { margin: 0; max-width: 440px; font-size: 13.5px; color: var(--ag-muted); }
+.ag-mw-steps { margin-top: 28px; padding: 24px; border: 1px dashed var(--ag-border); border-radius: 12px; }
+.ag-mw-steps-list { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 16px; }
+.ag-mw-steps-list li { display: flex; gap: 12px; align-items: flex-start; }
+.ag-mw-steps-list p { margin: 2px 0 8px; font-size: 13.5px; color: var(--ag-muted); max-width: 560px; }
+.ag-mw-steps-list li.is-done strong { color: var(--ag-muted); text-decoration: line-through; }
+.ag-mw-step-mark { flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 600; background: var(--ag-accent-soft); color: var(--ag-accent-ink); }
+.ag-mw-steps-list li.is-done .ag-mw-step-mark { background: var(--ag-ok-soft); color: var(--ag-ok); }
 .ag-mw-empty-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 10px; }
 @media (max-width: 640px) {
   .ag-mywork { padding: 20px 16px 32px; }

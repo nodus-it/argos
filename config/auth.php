@@ -41,6 +41,17 @@ return [
         ],
     ],
 
+    // Access links (set or reset a password) come from an administrator, not
+    // from mail: they must survive until the colleague opens them.
+    'passwords' => [
+        'users' => [
+            'provider' => 'users',
+            'table' => 'password_reset_tokens',
+            'expire' => max(1, (int) env('ARGOS_ACCESS_LINK_HOURS', 72)) * 60,
+            'throttle' => 60,
+        ],
+    ],
+
     'password_timeout' => 10800,
 
 ];

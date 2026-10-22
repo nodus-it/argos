@@ -17,4 +17,14 @@ class CreateUser extends CreateRecord
     {
         return app(UserService::class);
     }
+
+    protected function getCreatedNotificationTitle(): ?string
+    {
+        return __('users.access_link.created');
+    }
+
+    protected function getRedirectUrl(): string
+    {
+        return UserResource::getUrl('index');
+    }
 }

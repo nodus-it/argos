@@ -4,16 +4,18 @@ declare(strict_types=1);
 
 namespace App\Filament\App\Clusters\System\Resources;
 
-use App\Filament\Concerns\AdminOnly;
 use App\Filament\App\Clusters\System;
 use App\Filament\App\Clusters\System\Resources\UserResource\Pages\CreateUser;
 use App\Filament\App\Clusters\System\Resources\UserResource\Pages\EditUser;
 use App\Filament\App\Clusters\System\Resources\UserResource\Pages\ListUsers;
+use App\Filament\Concerns\AdminOnly;
 use App\Models\User;
 use App\Services\User\UserService;
+use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
@@ -54,8 +56,6 @@ class UserResource extends Resource
         return 'heroicon-o-users';
     }
 
-
-
     public static function getModelLabel(): string
     {
         return __('users.label');
@@ -89,8 +89,7 @@ class UserResource extends Resource
                         ->helperText(fn (?User $record): string => $record === null ? __('users.fields.password_help_create') : __('users.fields.password_help_edit'))
                         ->password()
                         ->revealable()
-                        ->minLength(8)
-                        ->required(fn (?User $record): bool => $record === null),
+                        ->minLength(8),
 
                     Select::make('locale')
                         ->label(__('users.fields.locale'))
@@ -126,10 +125,34 @@ class UserResource extends Resource
                     ->visibleFrom('md'),
             ])
             ->recordActions([
+                self::accessLinkAction(),
                 EditAction::make(),
                 self::deleteAction(),
             ])
             ->defaultSort('name');
+    }
+
+    /**
+     * A fresh access link inside a ready-to-send welcome message (opening
+     * the dialog creates the link; it voids an older one).
+     */
+    public static function accessLinkAction(): Action
+    {
+        return Action::make('accessLink')
+            ->label(__('users.access_link.action'))
+            ->icon('heroicon-o-key')
+            ->modalHeading(fn (User $record): string => __('users.access_link.heading', ['name' => $record->name]))
+            ->modalDescription(fn (User $record): string => __('users.access_link.description', ['name' => $record->name, 'hours' => max(1, (int) config('auth.passwords.users.expire') / 60)]))
+            ->fillForm(fn (User $record): array => ['text' => app(UserService::class)->welcomeText($record, app(UserService::class)->accessLink($record))])
+            ->schema([
+                Textarea::make('text')
+                    ->label(__('users.access_link.text'))
+                    ->rows(12)
+                    ->readOnly()
+                    ->extraInputAttributes(['onclick' => 'this.select()']),
+            ])
+            ->modalSubmitAction(false)
+            ->modalCancelActionLabel(__('filament-actions::view.single.modal.actions.close.label'));
     }
 
     /** Deletes through UserService so the last admin can never be removed. */

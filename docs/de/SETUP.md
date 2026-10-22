@@ -294,6 +294,24 @@ docker compose exec app php artisan argos:user:admin someone@example.com
 
 Beim Upgrade erhält das erste bestehende Benutzerkonto die Administrator-Rolle.
 
+### Kolleg:innen hinzufügen
+
+Eine Selbstregistrierung gibt es nicht. So kommt jemand dazu:
+
+1. **Administration → Benutzer → Neu**: Name und E-Mail; das Passwort leer
+   lassen.
+2. Auf das **Schlüssel-Symbol** (*Zugangslink*) neben der Person klicken und
+   ihr die angezeigte Willkommensnachricht schicken (Chat oder Mail). Über den
+   Link setzt sie ihr Passwort selbst; er funktioniert einmal und läuft nach
+   `ARGOS_ACCESS_LINK_HOURS` ab (Standard 72). Ein neuer Link macht den alten
+   ungültig – so auch bei vergessenem Passwort: Argos verschickt Reset-Links
+   nur, wenn Mail eingerichtet ist.
+3. Die Person als Mitglied zu einem Workspace hinzufügen (**Workspace →
+   Einstellungen → Mitglieder**).
+
+Beim ersten Anmelden führt *Meine Arbeit* durch den Rest: Claude-Abo
+hinterlegen und eine Aufgabe starten.
+
 ## Workspaces
 
 [Workspaces](WORKSPACES.md) brauchen zusätzlich zum oben beschriebenen Stack:

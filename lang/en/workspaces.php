@@ -653,6 +653,12 @@ return [
         'log_tail' => 'Only the end of the log is available (the working copy cannot be reached).',
         'more_matches' => 'Showing the first :count matching lines.',
     ],
+    'empty' => [
+        'admin_heading' => 'No workspaces yet',
+        'admin_text' => 'Create a workspace for a repository, then add your colleagues as members.',
+        'member_heading' => 'You are not in a workspace yet',
+        'member_text' => 'An Argos administrator adds people to workspaces — ask them to add you.',
+    ],
     'my_work' => [
         'title' => 'My work',
         'subtitle' => 'Your tasks and the ones you were invited to, across all workspaces.',
@@ -660,6 +666,18 @@ return [
         'open_workspaces' => 'Open the workspaces',
         'empty_title' => 'Nothing on your plate',
         'empty_hint' => 'Tasks you start or are invited to show up here — waiting ones first. Open a workspace to start a task.',
+        'steps' => [
+            'title' => 'Welcome to Argos — three steps to your first task',
+            'agent' => 'Add your Claude subscription',
+            'agent_hint' => 'Tasks run on your own Claude subscription. Create a token with “claude setup-token” in your terminal and add it here.',
+            'agent_action' => 'Add Claude subscription',
+            'workspace' => 'Get added to a workspace',
+            'workspace_hint' => 'A workspace holds a repository. Ask an Argos administrator to add you as a member.',
+            'workspace_hint_named' => 'A workspace holds a repository. Ask an Argos administrator (:names) to add you as a member.',
+            'task' => 'Start a task',
+            'task_hint' => 'Open the workspace, start a task and describe what Claude should do — you can pair with colleagues in it.',
+            'docs' => 'How tasks work',
+        ],
         'owner' => 'Owner: :name',
         'ready_more' => '{1} :count more ready task in its workspace|[2,*] :count more ready tasks in their workspaces',
         'groups' => [

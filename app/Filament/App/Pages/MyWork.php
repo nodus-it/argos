@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\Filament\App\Pages;
 
+use App\Filament\App\Clusters\Account\Resources\AgentCredentialResource;
 use App\Filament\App\Resources\WorkspaceResource;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Services\User\FirstSteps;
 use App\Services\Workspace\MyWorkOverview;
+use App\Support\DocLink;
 use Filament\Pages\Page;
 use Filament\Panel;
 use Illuminate\Contracts\Support\Htmlable;
@@ -42,7 +45,6 @@ class MyWork extends Page
         return __('workspaces.my_work.title');
     }
 
-
     /** @return array<string, mixed> */
     protected function getViewData(): array
     {
@@ -61,6 +63,9 @@ class MyWork extends Page
             'readyMore' => $overview['ready_more'],
             'workspacesUrl' => WorkspaceResource::getUrl('index', panel: 'app'),
             'createUrl' => $user->can('create', Workspace::class) ? WorkspaceResource::getUrl('create', panel: 'app') : null,
+            'firstSteps' => app(FirstSteps::class)->for($user),
+            'agentsUrl' => AgentCredentialResource::getUrl('index', panel: 'app'),
+            'docsUrl' => DocLink::url('tasks'),
         ];
     }
 }

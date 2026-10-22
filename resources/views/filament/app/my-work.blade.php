@@ -21,7 +21,37 @@
         </a>
     </header>
 
-    @if ($total === 0)
+    @if ($total === 0 && (! $firstSteps['agent'] || ! $firstSteps['workspace']))
+        {{-- A new person: what is missing before the first task. --}}
+        <section class="ag-mw-steps" aria-labelledby="ag-mw-steps-title" data-testid="first-steps">
+            <h2 class="ag-mw-empty-title" id="ag-mw-steps-title">{{ __('workspaces.my_work.steps.title') }}</h2>
+            <ol class="ag-mw-steps-list">
+                <li @class(['is-done' => $firstSteps['agent']])>
+                    <span class="ag-mw-step-mark" aria-hidden="true">@if ($firstSteps['agent'])<x-ag.icon name="check" :size="14" :stroke="2.5" />@else 1 @endif</span>
+                    <div>
+                        <strong>{{ __('workspaces.my_work.steps.agent') }}</strong>
+                        <p>{{ __('workspaces.my_work.steps.agent_hint') }}</p>
+                        @unless ($firstSteps['agent'])<a class="ag-btn ag-btn-primary" href="{{ $agentsUrl }}">{{ __('workspaces.my_work.steps.agent_action') }}</a>@endunless
+                    </div>
+                </li>
+                <li @class(['is-done' => $firstSteps['workspace']])>
+                    <span class="ag-mw-step-mark" aria-hidden="true">@if ($firstSteps['workspace'])<x-ag.icon name="check" :size="14" :stroke="2.5" />@else 2 @endif</span>
+                    <div>
+                        <strong>{{ __('workspaces.my_work.steps.workspace') }}</strong>
+                        <p>{{ $firstSteps['admins'] !== [] ? __('workspaces.my_work.steps.workspace_hint_named', ['names' => implode(', ', $firstSteps['admins'])]) : __('workspaces.my_work.steps.workspace_hint') }}</p>
+                    </div>
+                </li>
+                <li>
+                    <span class="ag-mw-step-mark" aria-hidden="true">3</span>
+                    <div>
+                        <strong>{{ __('workspaces.my_work.steps.task') }}</strong>
+                        <p>{{ __('workspaces.my_work.steps.task_hint') }}</p>
+                        <a class="ag-btn" href="{{ $docsUrl }}">{{ __('workspaces.my_work.steps.docs') }}</a>
+                    </div>
+                </li>
+            </ol>
+        </section>
+    @elseif ($total === 0)
         <div class="ag-mw-empty">
             <span class="ag-mw-empty-icon" aria-hidden="true"><x-ag.icon name="check" :size="22" :stroke="2" /></span>
             <h2 class="ag-mw-empty-title">{{ __('workspaces.my_work.empty_title') }}</h2>

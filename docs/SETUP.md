@@ -276,6 +276,23 @@ docker compose exec app php artisan argos:user:admin someone@example.com
 
 On upgrade, the first existing user becomes an administrator.
 
+### Adding colleagues
+
+There is no self-registration. To bring someone in:
+
+1. **Administration → Users → New user**: name and email; leave the password
+   empty.
+2. Click the **key icon** (*Access link*) next to the person and send them the
+   welcome message it shows (chat or mail). The link lets them set their own
+   password; it works once and expires after `ARGOS_ACCESS_LINK_HOURS`
+   (default 72). A new link voids the old one — use it as well when someone
+   forgot their password: Argos only mails reset links when mail is
+   configured.
+3. Add them as a member of a workspace (**workspace → Settings → Members**).
+
+On first sign-in, *My work* walks them through the rest: adding their Claude
+subscription and starting a task.
+
 ## Workspaces
 
 [Workspaces](WORKSPACES.md) need, on top of the stack described above:

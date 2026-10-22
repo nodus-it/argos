@@ -12,6 +12,8 @@ use App\Enums\TaskStatus;
 use App\Enums\WorkspaceRole;
 use App\Filament\App\Pages\MyWork;
 use App\Filament\App\Resources\WorkspaceResource;
+use App\Filament\App\Resources\WorkspaceResource\Pages\ListWorkspaces;
+use App\Models\AgentCredential;
 use App\Models\Task;
 use App\Models\TaskApproval;
 use App\Models\TaskMember;
@@ -156,15 +158,39 @@ class MyWorkTest extends TestCase
 
     public function test_empty_state_points_members_to_the_workspaces_and_admins_to_creating_one(): void
     {
+        AgentCredential::factory()->ownedBy($this->me)->create();
         Livewire::actingAs($this->me)->test(MyWork::class)
             ->assertSee(__('workspaces.my_work.empty_title'))
             ->assertSee(WorkspaceResource::getUrl('index', panel: 'app'), false)
-            ->assertDontSee(\App\Filament\App\Resources\WorkspaceResource::getUrl('create', panel: 'app'), false);
+            ->assertDontSee(WorkspaceResource::getUrl('create', panel: 'app'), false);
 
         $admin = User::factory()->admin()->create();
+        AgentCredential::factory()->ownedBy($admin)->create();
         Livewire::actingAs($admin)->test(MyWork::class)
             ->assertSee(__('workspaces.my_work.empty_title'))
-            ->assertSee(\App\Filament\App\Resources\WorkspaceResource::getUrl('create', panel: 'app'), false);
+            ->assertSee(WorkspaceResource::getUrl('create', panel: 'app'), false);
+    }
+
+    public function test_a_new_person_sees_the_first_steps(): void
+    {
+        $newcomer = User::factory()->create(['locale' => 'en']);
+        User::factory()->admin()->create(['name' => 'Grace Admin']);
+
+        Livewire::actingAs($newcomer)->test(MyWork::class)
+            ->assertSeeHtml('data-testid="first-steps"')
+            ->assertSee(__('workspaces.my_work.steps.agent_action'))
+            ->assertSee(__('workspaces.my_work.steps.workspace_hint_named', ['names' => 'Grace Admin']));
+
+        // With a subscription and a workspace there is nothing left to set up.
+        AgentCredential::factory()->ownedBy($this->me)->create();
+        Livewire::actingAs($this->me)->test(MyWork::class)->assertDontSeeHtml('data-testid="first-steps"');
+    }
+
+    public function test_the_workspace_list_tells_a_member_without_workspace_whom_to_ask(): void
+    {
+        Livewire::actingAs(User::factory()->create(['locale' => 'en']))
+            ->test(ListWorkspaces::class)
+            ->assertSee(__('workspaces.empty.member_heading'));
     }
 
     public function test_page_is_live(): void

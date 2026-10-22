@@ -7,11 +7,14 @@ namespace Tests\Feature\Filament\Admin\Resources;
 use App\Filament\App\Clusters\System\Resources\UserResource\Pages\CreateUser;
 use App\Filament\App\Clusters\System\Resources\UserResource\Pages\EditUser;
 use App\Filament\App\Clusters\System\Resources\UserResource\Pages\ListUsers;
+use App\Filament\App\Pages\Auth\RequestAccessLink;
 use App\Models\User;
 use App\Services\User\UserService;
 use Filament\Actions\DeleteAction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password;
 use Livewire\Livewire;
 use RuntimeException;
 use Tests\TestCase;
@@ -105,5 +108,40 @@ class UserResourceTest extends TestCase
         $user = User::query()->create(['name' => 'X', 'email' => 'x@example.com', 'password' => 'secret-pass', 'is_admin' => true]);
 
         $this->assertFalse($user->fresh()->isAdmin());
+    }
+
+    public function test_a_user_created_without_password_gets_an_access_link_to_set_one(): void
+    {
+        Livewire::test(CreateUser::class)
+            ->fillForm(['name' => 'New Colleague', 'email' => 'new@example.com', 'locale' => 'en'])
+            ->call('create')
+            ->assertHasNoFormErrors();
+        $user = User::query()->where('email', 'new@example.com')->firstOrFail();
+
+        $text = Livewire::test(ListUsers::class)
+            ->mountTableAction('accessLink', $user)
+            ->assertTableActionDataSet(fn (array $data): bool => str_contains($data['text'], 'New Colleague'))
+            ->instance()->mountedActions[0]['data']['text'] ?? '';
+
+        $this->assertMatchesRegularExpression('#/password-reset/reset\?[^\s]*token=([^&\s]+)#', $text);
+        preg_match('#token=([^&\s]+)#', $text, $m);
+        $this->assertTrue(Password::broker('users')->tokenExists($user, urldecode($m[1])));
+        $this->assertStringContainsString('claude setup-token', $text);
+    }
+
+    public function test_forgot_password_says_to_ask_an_admin_when_no_mail_goes_out(): void
+    {
+        auth()->logout();
+        config(['mail.default' => 'log']);
+        $user = User::factory()->create(['email' => 'someone@example.com']);
+
+        Livewire::test(RequestAccessLink::class)
+            ->assertSee(__('users.access_link.no_mail'))
+            ->assertDontSee(__('filament-panels::auth/pages/password-reset/request-password-reset.form.actions.request.label'))
+            ->set('data.email', 'someone@example.com')
+            ->call('request')
+            ->assertNotified(__('users.access_link.no_mail'));
+
+        $this->assertFalse(DB::table('password_reset_tokens')->where('email', $user->email)->exists());
     }
 }

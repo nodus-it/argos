@@ -6,10 +6,15 @@ namespace App\Services\User;
 
 use App\Models\User;
 use App\Services\EntityService;
+use Filament\Facades\Filament;
+use Illuminate\Auth\Passwords\PasswordBroker;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use LogicException;
 use RuntimeException;
 
 /**
@@ -31,6 +36,10 @@ class UserService extends EntityService
     {
         $isAdmin = (bool) ($data['is_admin'] ?? false);
         unset($data['is_admin']);
+        // No password given: the person sets one through an access link.
+        if (($data['password'] ?? '') === '') {
+            $data['password'] = Str::password(40);
+        }
 
         return DB::transaction(function () use ($data, $isAdmin): User {
             $user = new User;
@@ -64,6 +73,35 @@ class UserService extends EntityService
 
             return $record;
         });
+    }
+
+    /**
+     * A link that lets the person set a (new) password — handed over by an
+     * administrator, so it works without mail. Valid for
+     * ARGOS_ACCESS_LINK_HOURS; a newer link or a password change voids it.
+     */
+    public function accessLink(User $user): string
+    {
+        $broker = Password::broker('users');
+        if (! $broker instanceof PasswordBroker) {
+            throw new LogicException('The users password broker cannot create tokens.');
+        }
+        $token = $broker->createToken($user);
+
+        return Filament::getPanel('app')->getResetPasswordUrl($token, $user);
+    }
+
+    /** A ready-to-send welcome message with the access link and the first steps. */
+    public function welcomeText(User $user, string $link): string
+    {
+        return __('users.access_link.welcome', [
+            'name' => $user->name,
+            'app' => (string) config('app.name', 'Argos'),
+            'url' => rtrim((string) config('app.url'), '/'),
+            'link' => $link,
+            'email' => $user->email,
+            'hours' => max(1, (int) config('auth.passwords.users.expire', 4320) / 60),
+        ], $user->locale ?: null);
     }
 
     public function delete(Model $record): void

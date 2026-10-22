@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers\Filament\Concerns;
 
+use App\Filament\App\Pages\Auth\RequestAccessLink;
 use App\Filament\App\Pages\Login;
 use App\Http\Middleware\RedirectToOnboarding;
 use App\Http\Middleware\SetUserLocale;
@@ -53,6 +54,8 @@ trait ConfiguresArgosPanel
             ->databaseNotifications()
             ->databaseNotificationsPolling('30s')
             ->login(Login::class)
+            // Access links from an administrator (System → Users) land on the reset page.
+            ->passwordReset(RequestAccessLink::class)
             ->plugins([
                 // One-click developer login on the login screen. Hard-gated to
                 // the local environment — never renders in staging/production.

@@ -78,6 +78,9 @@ class WorkspaceResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            // Only administrators create workspaces: a member without one learns whom to ask.
+            ->emptyStateHeading(fn (): string => Gate::allows('administer-argos') ? __('workspaces.empty.admin_heading') : __('workspaces.empty.member_heading'))
+            ->emptyStateDescription(fn (): string => Gate::allows('administer-argos') ? __('workspaces.empty.admin_text') : __('workspaces.empty.member_text'))
             ->columns([
                 TextColumn::make('name')
                     ->label(__('workspaces.fields.name'))
