@@ -161,7 +161,7 @@ Connected Account). A copied token does not follow later changes of the
 stored credential — renew it in the workspace's settings (General →
 **Repository access**).
 
-For the workspace form, see [Workspace Settings](PROJECTS.md).
+For the workspace form, see [Workspace Settings](WORKSPACE-SETTINGS.md).
 
 ## How an issue tracker uses a credential
 

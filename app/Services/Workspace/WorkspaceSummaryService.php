@@ -42,25 +42,6 @@ class WorkspaceSummaryService
     }
 
     /**
-     * The user's workspaces, those waiting for them first, then working ones,
-     * then by recent activity.
-     *
-     * @return Collection<int, array{workspace: Workspace, summary: array<string, mixed>}>
-     */
-    public function overviewFor(User $user, int $limit = 12): Collection
-    {
-        return $user->workspaces()->latest('last_activity_at')->limit(50)->get()
-            ->map(fn (Workspace $workspace): array => ['workspace' => $workspace, 'summary' => $this->for($workspace, $user)])
-            ->sortBy(fn (array $row): array => [
-                $row['summary']['waiting_for_me'] ? 0 : 1,
-                $row['summary']['working'] > 0 ? 0 : 1,
-                -($row['workspace']->last_activity_at?->getTimestamp() ?? 0),
-            ])
-            ->take($limit)
-            ->values();
-    }
-
-    /**
      * Workspaces the user can open, in rail order (by name, ignoring case): Argos admins see
      * every workspace, everybody else the ones they are a member of.
      *

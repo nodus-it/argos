@@ -8,13 +8,6 @@ return [
     'model_label' => 'Workspace',
     'model_label_plural' => 'Workspaces',
 
-    'tabs' => [
-        'automation' => 'Automatik',
-        'basics' => 'Allgemein',
-        'worker' => 'Worker',
-        'repository' => 'Repository',
-    ],
-
     'sections' => [
         'automation' => 'Automatik',
         'automation_description' => 'Standards für automatische Aufgaben in diesem Workspace: Aus der UI, per API, MCP oder aus einem Issue gestartet, planen sie, setzen um, prüfen die Quality-Gates und liefern aus — ohne Menschen. Jeder Lauf kann sie überschreiben. Leere Felder nehmen die Standards der Installation.',
@@ -111,11 +104,6 @@ return [
         'repo_url' => 'Repo-URL',
         'default_branch' => 'Default Branch',
         'token' => 'Token (PAT)',
-    ],
-
-    'columns' => [
-        'tasks' => 'Aufgaben',
-        'branch' => 'Branch',
     ],
 
     'platform_hints' => [

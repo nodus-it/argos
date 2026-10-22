@@ -81,7 +81,7 @@ other, as they would in a shared repository.
    inspects it, picks a stack and — if something is missing — starts a
    [setup task](PREPARE-PROJECT.md#the-setup-task) that writes `.argos/`. Add
    the people who work in it. See [Workspaces](WORKSPACES.md) and
-   [Workspace Settings](PROJECTS.md).
+   [Workspace Settings](WORKSPACE-SETTINGS.md).
 3. **Start a task.** Describe what you want, optionally pick a
    [ticket](TICKETS.md). Argos creates the task's branch, worktree and database
    and runs the setup steps; then Claude starts. See [Tasks](TASKS.md).

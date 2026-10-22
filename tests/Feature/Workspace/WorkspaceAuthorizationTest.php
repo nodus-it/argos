@@ -143,12 +143,10 @@ class WorkspaceAuthorizationTest extends TestCase
         $this->assertTrue(User::factory()->admin()->create()->can('update', $foreign));
     }
 
-    public function test_workspaces_can_be_disabled_platform_wide(): void
+    public function test_only_argos_admins_create_workspaces(): void
     {
-        config(['argos.workspaces.enabled' => false]);
-        $user = User::factory()->create();
-
-        $this->assertFalse($user->can('create', Workspace::class));
-        $this->assertFalse($user->can('viewAny', Workspace::class));
+        $this->assertFalse(User::factory()->create()->can('create', Workspace::class));
+        $this->assertTrue(User::factory()->admin()->create()->can('create', Workspace::class));
+        $this->assertTrue(User::factory()->create()->can('viewAny', Workspace::class));
     }
 }

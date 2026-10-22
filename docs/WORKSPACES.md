@@ -120,7 +120,7 @@ Only **Argos administrators** create workspaces:
 The form starts with the **platform** (GitHub, GitLab, Bitbucket), then the
 access (a connected OAuth account or a Personal Access Token), the repository
 and its default branch, and the name. The other tabs (environment, resources,
-automation) can be filled now or later — see [Workspace Settings](PROJECTS.md).
+automation) can be filled now or later — see [Workspace Settings](WORKSPACE-SETTINGS.md).
 The creator becomes the workspace's first admin; add further members in the
 settings afterwards.
 
@@ -155,7 +155,7 @@ the workspace header or at `/{workspace}/settings`. The tabs:
 | Automation | Automation user, plan mode, ship mode, gate fix rounds, budgets |
 | Members | People and their roles |
 
-Every field is described in [Workspace Settings](PROJECTS.md).
+Every field is described in [Workspace Settings](WORKSPACE-SETTINGS.md).
 
 ## The workspace page
 
@@ -241,7 +241,6 @@ pushed are lost.
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `ARGOS_WORKSPACES_ENABLED` | `true` | Master switch for workspaces. |
 | `ARGOS_WORKSPACE_COLLABORATION` | `true` | Whether workspaces may have members besides the creator, and tasks collaborators. |
 | `ARGOS_WORKSPACE_MAX_ACTIVE` | `5` | Workspaces running at the same time. |
 | `ARGOS_WORKSPACE_IDLE_MINUTES` | `60` | Idle time before a workspace is stopped (`0` disables). |

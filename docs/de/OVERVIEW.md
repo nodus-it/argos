@@ -86,7 +86,7 @@ einem gemeinsamen Repository.
    untersucht es, wählt einen Stack und startet — wenn etwas fehlt — eine
    [Einrichtungs-Aufgabe](PREPARE-PROJECT.md#die-einrichtungs-aufgabe), die `.argos/`
    schreibt. Füge die Personen hinzu, die darin arbeiten. Siehe
-   [Workspaces](WORKSPACES.md) und [Workspace-Einstellungen](PROJECTS.md).
+   [Workspaces](WORKSPACES.md) und [Workspace-Einstellungen](WORKSPACE-SETTINGS.md).
 3. **Eine Aufgabe starten.** Beschreibe, was du möchtest, und wähle optional
    ein [Ticket](TICKETS.md). Argos legt Branch, Worktree und Datenbank der
    Aufgabe an und führt die Einrichtungsschritte aus; dann startet Claude. Siehe

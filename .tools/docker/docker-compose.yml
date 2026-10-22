@@ -44,7 +44,6 @@ name: argos
 # by default so config/argos.php applies its defaults; app, queue (provisioning,
 # PR sync) and scheduler (idle stop) must agree, hence one anchor.
 x-workspace-env: &workspace-env
-  ARGOS_WORKSPACES_ENABLED:            "${ARGOS_WORKSPACES_ENABLED:-}"
   ARGOS_WORKSPACE_COLLABORATION:       "${ARGOS_WORKSPACE_COLLABORATION:-}"
   ARGOS_WORKSPACE_MAX_ACTIVE:          "${ARGOS_WORKSPACE_MAX_ACTIVE:-}"
   ARGOS_WORKSPACE_IDLE_MINUTES:        "${ARGOS_WORKSPACE_IDLE_MINUTES:-}"

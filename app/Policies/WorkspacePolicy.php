@@ -21,7 +21,7 @@ class WorkspacePolicy
 
     public function viewAny(User $user): bool
     {
-        return (bool) config('argos.workspaces.enabled', true);
+        return true;
     }
 
     public function view(User $user, Workspace $workspace): bool
@@ -31,7 +31,7 @@ class WorkspacePolicy
 
     public function create(User $user): bool
     {
-        return (bool) config('argos.workspaces.enabled', true) && $user->isAdmin();
+        return $user->isAdmin();
     }
 
     /** Settings, secrets, integrations. */

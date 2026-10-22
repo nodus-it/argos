@@ -39,7 +39,7 @@ A task can start a preview only when **both** are true:
 
 1. **Live demo is enabled for the workspace** (Settings → Environment →
    *Enable live demo*; on for new workspaces). See
-   [Workspace Settings](PROJECTS.md#live-demo).
+   [Workspace Settings](WORKSPACE-SETTINGS.md#live-demo).
 2. **Previews are enabled platform-wide** (`ARGOS_PREVIEW_ENABLED`, on by
    default).
 

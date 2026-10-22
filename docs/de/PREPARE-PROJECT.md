@@ -229,7 +229,7 @@ Datenbanknamen pro Aufgabe setzt Argos.
 Für **abweichende** Env-Namen nutzt du die Platzhalter in den Werten deiner
 Umgebungsvariablen: `${mysql.host}`, `${mysql.port}`, `${mysql.database}`,
 `${mysql.username}`, `${mysql.password}`, `${redis.host}`, `${redis.port}` —
-siehe [Workspace-Einstellungen](PROJECTS.md#environment-variablen-und-platzhalter).
+siehe [Workspace-Einstellungen](WORKSPACE-SETTINGS.md#environment-variablen-und-platzhalter).
 
 Du brauchst einen anderen Service (Postgres, …)? Lass ihn in deinem eigenen
 Image oder im Preview-Vertrag laufen.

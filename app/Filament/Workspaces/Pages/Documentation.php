@@ -49,6 +49,12 @@ class Documentation extends Page
         $slug ??= $manifest->defaultSlug();
 
         $entry = $slug !== null ? $manifest->find($slug) : null;
+        $renamed = $entry === null && $slug !== null ? config('docs.aliases.'.$slug) : null;
+        if (is_string($renamed)) {
+            $this->redirect(static::getUrl(['slug' => $renamed]));
+
+            return;
+        }
         abort_if($entry === null, 404);
 
         $rendered = app(DocsRenderer::class)->render($entry['file']);

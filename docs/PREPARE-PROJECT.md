@@ -218,7 +218,7 @@ credentials can be overridden in the form (defaults `argos` / `argos` /
 For **non-standard** env names use the placeholders in the values of your
 environment variables: `${mysql.host}`, `${mysql.port}`, `${mysql.database}`,
 `${mysql.username}`, `${mysql.password}`, `${redis.host}`, `${redis.port}` —
-see [Workspace Settings](PROJECTS.md#environment-variables-and-placeholders).
+see [Workspace Settings](WORKSPACE-SETTINGS.md#environment-variables-and-placeholders).
 
 Need another service (Postgres, …)? Run it inside your own image or the
 preview contract.

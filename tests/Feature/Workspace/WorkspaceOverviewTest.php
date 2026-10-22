@@ -170,18 +170,6 @@ class WorkspaceOverviewTest extends TestCase
         $this->assertSame(1, $summary['previews']);
     }
 
-    public function test_overview_lists_waiting_workspaces_first(): void
-    {
-        $quiet = Workspace::factory()->create(['last_activity_at' => now()]);
-        WorkspaceMember::query()->create(['workspace_id' => $quiet->id, 'user_id' => $this->editor->id, 'role' => WorkspaceRole::Member]);
-        $this->workspace->forceFill(['last_activity_at' => now()->subDay()])->save();
-        TaskApproval::factory()->create(['task_id' => $this->task->id]);
-
-        $rows = app(WorkspaceSummaryService::class)->overviewFor($this->editor);
-
-        $this->assertSame([$this->workspace->id, $quiet->id], $rows->map(fn ($r) => $r['workspace']->id)->all());
-    }
-
     public function test_switcher_shows_unread_tasks_and_archiving_hides_them(): void
     {
         $other = Task::factory()->ownedBy($this->editor)->create(['workspace_id' => $this->workspace->id, 'title' => 'Checkout']);

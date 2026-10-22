@@ -29,6 +29,11 @@ return [
     // up-to-date copy of every manifest page.
     'translations' => ['de'],
 
+    // Old slug => new slug: links from before a page was renamed still land.
+    'aliases' => [
+        'projects' => 'workspace-settings',
+    ],
+
     'sections' => [
         [
             'title' => 'Introduction',
@@ -48,7 +53,7 @@ return [
             'pages' => [
                 ['slug' => 'workspaces', 'title' => 'Workspaces', 'file' => 'WORKSPACES.md'],
                 // Slug kept from the former "Projects" page (deep links); the workspace is the project now.
-                ['slug' => 'projects', 'title' => 'Workspace Settings', 'file' => 'PROJECTS.md'],
+                ['slug' => 'workspace-settings', 'title' => 'Workspace Settings', 'file' => 'WORKSPACE-SETTINGS.md'],
                 ['slug' => 'tasks', 'title' => 'Tasks', 'file' => 'TASKS.md'],
                 ['slug' => 'pull-requests', 'title' => 'Pull Requests', 'file' => 'PULL-REQUESTS.md'],
                 ['slug' => 'tickets', 'title' => 'Tickets', 'file' => 'TICKETS.md'],

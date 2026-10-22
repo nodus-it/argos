@@ -130,7 +130,7 @@ Das Formular beginnt mit der **Plattform** (GitHub, GitLab, Bitbucket), dann
 folgen der Zugang (ein verbundenes OAuth-Konto oder ein Personal Access Token),
 das Repository und sein Default-Branch sowie der Name. Die übrigen Tabs
 (Umgebung, Ressourcen, Automatik) kannst du jetzt oder später ausfüllen —
-siehe [Workspace-Einstellungen](PROJECTS.md). Wer den Workspace anlegt, wird
+siehe [Workspace-Einstellungen](WORKSPACE-SETTINGS.md). Wer den Workspace anlegt, wird
 sein erster Admin; weitere Mitglieder fügst du danach in den Einstellungen
 hinzu.
 
@@ -167,7 +167,7 @@ den Kopf des Workspaces oder unter `/{workspace}/settings`. Die Tabs:
 | Automatik | Automatik-Nutzer, Plan-Modus, Auslieferungs-Modus, Gate-Fix-Runden, Budgets |
 | Mitglieder | Personen und ihre Rollen |
 
-Jedes Feld ist unter [Workspace-Einstellungen](PROJECTS.md) beschrieben.
+Jedes Feld ist unter [Workspace-Einstellungen](WORKSPACE-SETTINGS.md) beschrieben.
 
 ## Die Workspace-Seite
 
@@ -262,7 +262,6 @@ Commits, die nie gepusht wurden, gehen verloren.
 
 | Variable | Standard | Zweck |
 |---|---|---|
-| `ARGOS_WORKSPACES_ENABLED` | `true` | Hauptschalter für Workspaces. |
 | `ARGOS_WORKSPACE_COLLABORATION` | `true` | Ob Workspaces außer der anlegenden Person weitere Mitglieder und Aufgaben Mitarbeitende haben dürfen. |
 | `ARGOS_WORKSPACE_MAX_ACTIVE` | `5` | Gleichzeitig laufende Workspaces. |
 | `ARGOS_WORKSPACE_IDLE_MINUTES` | `60` | Leerlaufzeit, bevor ein Workspace gestoppt wird (`0` deaktiviert). |

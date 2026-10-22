@@ -150,8 +150,6 @@ return [
      * workspace daemon (daemon/) and OpenVSCode Server. See docs/WORKSPACES.md.
      */
     'workspaces' => [
-        // Master switch for the workspace UI, jobs and routes.
-        'enabled' => filter_var($envOr('ARGOS_WORKSPACES_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
         // Value behind the `workspace-collaboration` gate (pair programming:
         // members besides the owner). Redefine the gate for finer control.
         'collaboration' => filter_var($envOr('ARGOS_WORKSPACE_COLLABORATION', true), FILTER_VALIDATE_BOOLEAN),

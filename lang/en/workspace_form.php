@@ -8,13 +8,6 @@ return [
     'model_label' => 'Workspace',
     'model_label_plural' => 'Workspaces',
 
-    'tabs' => [
-        'automation' => 'Automation',
-        'basics' => 'General',
-        'worker' => 'Worker',
-        'repository' => 'Repository',
-    ],
-
     'sections' => [
         'automation' => 'Automation',
         'automation_description' => 'Defaults for automatic tasks in this workspace: started from the UI, the API, MCP or an issue, they plan, implement, check the quality gates and ship without a human. Each run can override them. Empty fields use the installation defaults.',
@@ -111,11 +104,6 @@ return [
         'repo_url' => 'Repo URL',
         'default_branch' => 'Default Branch',
         'token' => 'Token (PAT)',
-    ],
-
-    'columns' => [
-        'tasks' => 'Tasks',
-        'branch' => 'Branch',
     ],
 
     'platform_hints' => [

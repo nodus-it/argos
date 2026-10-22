@@ -54,7 +54,7 @@ class DocCoverageTest extends TestCase
     public function test_projects_doc_documents_every_backing_service(): void
     {
         foreach (BackingService::cases() as $service) {
-            $this->assertDocMentions('PROJECTS.md', $service->value, 'Backing service');
+            $this->assertDocMentions('WORKSPACE-SETTINGS.md', $service->value, 'Backing service');
         }
     }
 

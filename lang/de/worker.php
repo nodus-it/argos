@@ -4,19 +4,6 @@ declare(strict_types=1);
 
 return [
 
-    'agents' => [
-        'label' => 'Agent',
-        'plural' => 'Agents',
-        'fields' => [
-            'name' => 'Slug',
-            'label' => 'Anzeigename',
-            'npm_pkg' => 'npm-Paket',
-            'pinned_version' => 'Pin',
-            'requires_stack_capabilities' => 'Erforderliche Stack-Capabilities',
-            'config_schema' => 'Config-Schema',
-        ],
-    ],
-
     'credentials' => [
         'label' => 'Claude-Abo',
         'plural' => 'Claude-Abos',

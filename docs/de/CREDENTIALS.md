@@ -174,7 +174,7 @@ kopierter Token folgt späteren Änderungen der gespeicherten Zugangsdaten nicht
 erneuere ihn in den Einstellungen des Workspaces (Allgemein → **Zugang zum
 Repository**).
 
-Zum Workspace-Formular siehe [Workspace-Einstellungen](PROJECTS.md).
+Zum Workspace-Formular siehe [Workspace-Einstellungen](WORKSPACE-SETTINGS.md).
 
 ## Wie ein Issue-Tracker Zugangsdaten nutzt
 

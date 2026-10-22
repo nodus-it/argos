@@ -66,7 +66,7 @@ class CreateWorkspace extends CreateRecord
     protected function getHeaderActions(): array
     {
         return [
-            DocsLinkAction::make('projects'),
+            DocsLinkAction::make('workspace-settings'),
         ];
     }
 }

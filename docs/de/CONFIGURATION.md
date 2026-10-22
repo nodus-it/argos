@@ -155,11 +155,10 @@ Netz `argos_ws`. Der Editor liegt unter `code-<workspace>.<base_domain>`, die
 Preview einer Aufgabe unter `demo-<workspace>-<task>.<base_domain>`. Limits pro
 Workspace (parallele Sessions und Previews, CPU, Speicher, Aufräumen) legst du
 in den Workspace-Einstellungen fest (siehe
-[Workspace-Einstellungen](PROJECTS.md#ressourcen)).
+[Workspace-Einstellungen](WORKSPACE-SETTINGS.md#ressourcen)).
 
 | Variable | Standard | Zweck |
 |---|---|---|
-| `ARGOS_WORKSPACES_ENABLED` | `true` | Hauptschalter für die Workspace-Oberfläche, Jobs und Routen. |
 | `ARGOS_WORKSPACE_COLLABORATION` | `true` | Ob Workspaces außer der Person, die sie angelegt hat, weitere Mitglieder und Aufgaben weitere Mitwirkende haben dürfen. Steht hinter dem Gate `workspace-collaboration`. |
 | `ARGOS_WORKSPACE_MAX_ACTIVE` | `5` | Gleichzeitig laufende Workspace-Container. Ein Start darüber hinaus wird abgelehnt — laufende Workspaces werden nie verdrängt. `0` hebt das Limit auf. |
 | `ARGOS_WORKSPACE_IDLE_MINUTES` | `60` | Einen laufenden Workspace nach so vielen Minuten ohne Aktivität stoppen (nie, solange eine Aufgabe vorbereitet wird, in der Warteschlange steht, arbeitet, auf eine Entscheidung wartet oder automatisch läuft). `0` deaktiviert. |

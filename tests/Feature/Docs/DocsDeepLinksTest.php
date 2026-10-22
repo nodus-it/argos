@@ -75,7 +75,7 @@ class DocsDeepLinksTest extends TestCase
     {
         Livewire::test(CreateWorkspace::class)
             ->assertSuccessful()
-            ->assertSee(DocLink::url('projects'), escape: false);
+            ->assertSee(DocLink::url('workspace-settings'), escape: false);
     }
 
     public function test_connected_accounts_links_to_in_app_docs_not_github(): void
@@ -85,5 +85,11 @@ class DocsDeepLinksTest extends TestCase
             ->assertSee(DocLink::url('github'), escape: false)
             // The previously-external GitHub blob link is gone (internalized).
             ->assertDontSee('github.com/nodus-it/argos/blob', escape: false);
+    }
+
+    public function test_renamed_pages_keep_their_old_address(): void
+    {
+        Livewire::test(\App\Filament\Workspaces\Pages\Documentation::class, ['slug' => 'projects'])
+            ->assertRedirect(\App\Filament\Workspaces\Pages\Documentation::getUrl(['slug' => 'workspace-settings']));
     }
 }

@@ -92,7 +92,7 @@
                         </label>
                         <div class="ws-auto-grid">
                             <label class="ws-field">
-                                <span>{{ __('projects.fields.auto_plan') }}</span>
+                                <span>{{ __('workspace_form.fields.auto_plan') }}</span>
                                 <select class="ws-select" wire:model="newPlan">
                                     <option value="">{{ __('workspaces.auto.project_default', ['value' => \App\Enums\AutoPlanMode::from($autoDefaults['plan'])->label()]) }}</option>
                                     @foreach (\App\Enums\AutoPlanMode::cases() as $m)
@@ -101,7 +101,7 @@
                                 </select>
                             </label>
                             <label class="ws-field">
-                                <span>{{ __('projects.fields.auto_ship') }}</span>
+                                <span>{{ __('workspace_form.fields.auto_ship') }}</span>
                                 <select class="ws-select" wire:model="newShip">
                                     <option value="">{{ __('workspaces.auto.project_default', ['value' => \App\Enums\AutoShipMode::from($autoDefaults['ship'])->label()]) }}</option>
                                     @foreach (\App\Enums\AutoShipMode::cases() as $m)
@@ -110,7 +110,7 @@
                                 </select>
                             </label>
                             <label class="ws-field">
-                                <span>{{ __('projects.fields.auto_max_fix_rounds') }}</span>
+                                <span>{{ __('workspace_form.fields.auto_max_fix_rounds') }}</span>
                                 <input type="number" class="ws-input" wire:model="newMaxFixRounds" min="0" max="20" placeholder="{{ $autoDefaults['max_fix_rounds'] }}">
                             </label>
                         </div>
