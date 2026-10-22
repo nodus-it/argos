@@ -139,7 +139,7 @@ class WorkspaceShipService
                 // Never throws: tracker failures are only logged.
                 app(IssueRunReporter::class)->pullRequest($task, (string) $info->url);
             } else {
-                $service->commentOnPullRequest($owner, $repo, $task->pr_number, __('workspaces.ship.pr_comment', ['subject' => $subject, 'name' => $by->name]));
+                $service->commentOnPullRequest($owner, $repo, $task->pr_number, __('workspaces.ship.pr_comment', ['subject' => $subject, 'name' => $by->name])."\n\n".PullRequestService::ARGOS_MARKER);
             }
         } catch (Throwable $e) {
             Log::channel('argos')->warning('Pull request step of ship failed', ['task' => $task->id, 'error' => $e->getMessage()]);

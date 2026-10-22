@@ -275,4 +275,47 @@ class PullRequestServiceTest extends TestCase
 
         $this->assertContains('auto_merge_on', $this->notices());
     }
+
+    public function test_feedback_leaves_out_argos_own_comments(): void
+    {
+        $this->git->shouldReceive('pullRequestDetails')->andReturn($this->details([
+            'reviews' => [['author' => 'grace', 'state' => 'commented', 'body' => '', 'submitted_at' => null]],
+            'comments' => [
+                ['id' => '1', 'author' => 'grace', 'body' => 'Name can be hardcoded.', 'path' => 'resources/views/welcome.blade.php', 'line' => 7, 'url' => 'https://x/c1', 'created_at' => null],
+                ['id' => '2', 'author' => 'bot', 'body' => "Neue Commits von Ada gepusht:\n\n- feat: x", 'path' => null, 'line' => null, 'url' => null, 'created_at' => null],
+                ['id' => '3', 'author' => 'bot', 'body' => "New commits pushed by Ada:\n\n- feat: y\n\n".PullRequestService::ARGOS_MARKER, 'path' => null, 'line' => null, 'url' => null, 'created_at' => null],
+            ],
+        ]));
+
+        $feedback = $this->service()->feedback($this->task);
+
+        $this->assertSame([], $feedback['reviews']);
+        $this->assertSame(['1'], array_column($feedback['comments'], 'id'));
+    }
+
+    public function test_one_review_comment_goes_to_claude(): void
+    {
+        $this->git->shouldReceive('pullRequestDetails')->andReturn($this->details([
+            'comments' => [['id' => '9', 'author' => 'grace', 'body' => 'Redirect home to /start', 'path' => 'routes/web.php', 'line' => 8, 'url' => 'https://x/c9', 'created_at' => null]],
+        ]));
+
+        $this->service()->sendComment($this->task, $this->owner, '9');
+
+        $this->assertStringContainsString('`routes/web.php:8`: Redirect home to /start', $this->sent[0]);
+    }
+
+    public function test_the_sidebar_lists_the_review_comments(): void
+    {
+        $this->git->shouldReceive('pullRequestDetails')->andReturn($this->details([
+            'reviewState' => 'commented',
+            'comments' => [['id' => '1', 'author' => 'grace', 'body' => 'Name can be hardcoded.', 'path' => 'resources/views/welcome.blade.php', 'line' => 7, 'url' => 'https://x/c1', 'created_at' => null]],
+        ]));
+
+        Livewire::actingAs($this->owner)
+            ->test(ContextPanel::class, ['workspaceId' => $this->workspace->id])
+            ->set('taskId', $this->task->id)
+            ->assertSee('Name can be hardcoded.')
+            ->assertSee('welcome.blade.php:7')
+            ->assertSee(__('workspaces.pr.send_review'));
+    }
 }

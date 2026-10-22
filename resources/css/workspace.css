@@ -686,3 +686,14 @@ a.wf-ref-chip:hover { text-decoration: underline; }
 .wf-avatar-xs.has-image, .wf-rail-avatar.has-image { overflow: hidden; padding: 0; background: var(--wf-raised); }
 .wf-avatar-xs.has-image img, .wf-rail-avatar.has-image img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; }
 .wf-msg-author .wf-avatar-xs { width: 22px; height: 22px; }
+
+/* Pull request feedback in the sidebar and inline in the review. */
+.wf-pr-feedback { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow: auto; }
+.wf-pr-fb { padding: 8px 10px; border: 1px solid var(--wf-border); border-radius: 8px; background: var(--wf-surface); }
+.wf-pr-fb-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12.5px; }
+.wf-pr-fb-where { font-size: 12px; }
+.wf-pr-fb-body { margin-top: 4px; font-size: 13px; }
+.wf-pr-fb-body > :first-child { margin-top: 0; }
+.wf-pr-fb-body > :last-child { margin-bottom: 0; }
+.wf-dnote.is-pr { border-left: 3px solid var(--wf-info); }
+.wf-dnote.is-pr .wf-dnote-body { white-space: normal; }

@@ -169,6 +169,7 @@ class ContextPanel extends Component
             'canEdit' => $this->user()->can('editor', $workspace),
             'running' => $workspace->status === WorkspaceStatus::Running,
             'pr' => $task?->pr_number !== null ? app(PullRequestService::class)->details($task) : null,
+            'feedback' => $task?->pr_number !== null ? app(PullRequestService::class)->feedback($task) : ['reviews' => [], 'comments' => []],
             'canShip' => $task !== null && $this->user()->can('ship', $task),
             // Bitbucket has no native auto-merge.
             'autoMergeSupported' => $workspace->platform !== GitProvider::Bitbucket,

@@ -89,6 +89,11 @@
             </div>
         @endforeach
     @endif
+    @if ($cell['side'] === 'new' && $cell['num'] !== null && isset($prCommentsAt[$cell['num']]))
+        @foreach ($prCommentsAt[$cell['num']] as $prComment)
+            @include('livewire.workspace.partials.pr-comment', ['prComment' => $prComment, 'pos' => $cell['pos']])
+        @endforeach
+    @endif
     @if ($canWrite && $cell['num'] !== null && $cell['commentable'])
         <template x-if="draft && draft.side === @js($cell['side']) && draft.end === {{ $cell['num'] }}">
             <div @class(['wf-dnote-row', 'is-'.$cell['pos']])>

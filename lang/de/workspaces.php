@@ -295,6 +295,9 @@ return [
         'closed' => 'geschlossen',
     ],
     'review' => [
+        'pr_comment' => 'Review-Kommentar',
+        'pr_comments_outside' => 'Review-Kommentare zu Zeilen außerhalb des Diffs',
+        'sent_to_claude' => 'An Claude gegeben',
         'markdown_view' => 'Markdown-Ansicht',
         'rendered' => 'Gerendert',
         'diff' => 'Diff',
@@ -653,6 +656,11 @@ return [
         ],
     ],
     'pr' => [
+        'comment_prompt' => 'Bitte arbeite diesen Review-Kommentar des Pull Requests ein (:url):',
+        'feedback_title' => 'Review-Kommentare',
+        'general_comment' => 'zum Pull Request',
+        'send_comment' => 'An Claude geben',
+        'open_on_provider' => 'Beim Anbieter öffnen',
         'title' => 'Pull Request',
         'ready' => 'Als bereit markieren',
         'refresh' => 'Aktualisieren',

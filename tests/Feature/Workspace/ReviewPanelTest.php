@@ -191,4 +191,25 @@ class ReviewPanelTest extends TestCase
             ->call('loadGeneratedDiff', 'composer.lock')
             ->assertDontSee(__('workspaces.review.generated_hidden'));
     }
+
+    public function test_pull_request_review_comments_show_at_their_lines(): void
+    {
+        $this->app->singleton(WorkspaceDaemonClient::class, FakeWorkspaceDaemon::class);
+        $this->mock(\App\Services\Workspace\PullRequestService::class)->shouldReceive('feedback')->andReturn(['reviews' => [], 'comments' => [
+            ['id' => 'c1', 'author' => 'grace', 'body' => 'Say hello to everyone', 'path' => 'README.md', 'line' => 1, 'url' => 'https://x/c1', 'created_at' => null],
+            ['id' => 'c2', 'author' => 'grace', 'body' => 'Old line remark', 'path' => 'README.md', 'line' => 99, 'url' => null, 'created_at' => null],
+            ['id' => 'c3', 'author' => 'grace', 'body' => 'Other file', 'path' => 'app/Other.php', 'line' => 1, 'url' => null, 'created_at' => null],
+        ]]);
+
+        Livewire::actingAs($this->editor)
+            ->test(ReviewPanel::class, ['workspaceId' => $this->workspace->id])
+            ->call('open', 'README.md')
+            ->call('setRendered', false)
+            ->assertSee('Say hello to everyone')
+            ->assertSeeHtml('wire:key="prc-c1"')
+            ->assertSee(__('workspaces.review.pr_comments_outside'))
+            ->assertSee('Old line remark')
+            ->assertDontSee('Other file')
+            ->assertSee(__('workspaces.pr.send_comment'));
+    }
 }

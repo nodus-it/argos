@@ -110,6 +110,14 @@
                     <span class="wf-live-text" x-text="changeText(@js(__('workspaces.review.live_change', ['file' => '__F__', 'add' => '__A__', 'del' => '__D__'])))"></span>
                     <button type="button" class="wf-live-btn" x-on:click="showChange(@js($current['path']))">{{ __('workspaces.review.show_change') }}</button>
                 </div>
+                @if ($prCommentsOutside->isNotEmpty())
+                    <div class="wf-findings" data-testid="pr-comments-outside">
+                        <div class="wf-findings-title wf-muted">{{ __('workspaces.review.pr_comments_outside') }}</div>
+                        @foreach ($prCommentsOutside as $prComment)
+                            @include('livewire.workspace.partials.pr-comment', ['prComment' => $prComment, 'pos' => 'unified'])
+                        @endforeach
+                    </div>
+                @endif
                 @if ($pintFlagged || $outsideFindings->isNotEmpty())
                     <div class="wf-findings">
                         @if ($pintFlagged)

@@ -91,8 +91,34 @@
                 <span class="wf-gate-name">{{ __('workspaces.pr.reviews') }}</span>
                 <span class="wf-muted">{{ $review !== null ? __('workspaces.pr.review_state.'.$review) : __('workspaces.pr.no_reviews_yet') }}</span>
             </div>
-            @if ($pr !== null && ($pr->reviews !== [] || $pr->comments !== []) && $canOperate && $open)
-                <button type="button" class="wf-btn wf-btn-sm wf-btn-soft" wire:click="prSendReview" wire:loading.attr="disabled">{{ __('workspaces.pr.send_review') }}</button>
+            @if ($feedback['reviews'] !== [] || $feedback['comments'] !== [])
+                <ul class="wf-pr-feedback" data-testid="pr-feedback">
+                    @foreach ($feedback['reviews'] as $review)
+                        @if (trim($review['body']) !== '')
+                            <li class="wf-pr-fb">
+                                <div class="wf-pr-fb-head"><strong>{{ $review['author'] }}</strong> <span class="wf-muted">· {{ __('workspaces.pr.review_state.'.$review['state']) }}</span></div>
+                                <div class="wf-md ws-md prose wf-pr-fb-body">{{ \App\Support\TaskEventFormatter::markdown($review['body']) }}</div>
+                            </li>
+                        @endif
+                    @endforeach
+                    @foreach ($feedback['comments'] as $comment)
+                        <li class="wf-pr-fb">
+                            <div class="wf-pr-fb-head">
+                                <strong>{{ $comment['author'] }}</strong>
+                                @if ($comment['path'] !== null)
+                                    <button type="button" class="wf-link mono wf-pr-fb-where" x-on:click="$dispatch('review-open', { file: @js($comment['path']) })">{{ basename($comment['path']).($comment['line'] !== null ? ':'.$comment['line'] : '') }}</button>
+                                @else
+                                    <span class="wf-muted">· {{ __('workspaces.pr.general_comment') }}</span>
+                                @endif
+                                @if (! empty($comment['url']))<a class="wf-link" href="{{ $comment['url'] }}" target="_blank" rel="noopener" title="{{ __('workspaces.pr.open_on_provider') }}">↗</a>@endif
+                            </div>
+                            <div class="wf-md ws-md prose wf-pr-fb-body">{{ \App\Support\TaskEventFormatter::markdown($comment['body']) }}</div>
+                        </li>
+                    @endforeach
+                </ul>
+                @if ($canOperate && $open)
+                    <button type="button" class="wf-btn wf-btn-sm wf-btn-soft" wire:click="prSendReview" wire:loading.attr="disabled">{{ __('workspaces.pr.send_review') }}</button>
+                @endif
             @endif
 
             @if ($pr?->conflicts ?? $task->pr_conflicts)

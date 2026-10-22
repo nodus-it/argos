@@ -156,27 +156,73 @@ class PullRequestService
         $this->tasks->send($task, $by, __('workspaces.pr.fix_prompt', ['url' => (string) ($task->pr_checks['url'] ?? $task->pr_url)])."\n\n```\n".mb_strcut($log, -20_000)."\n```");
     }
 
+    /**
+     * What people wrote on the pull request: reviews with text and comments,
+     * without Argos' own comments (pushed commits, issue links).
+     *
+     * @return array{reviews: list<array{author: string, state: string, body: string, submitted_at: ?string}>, comments: list<array{id: string, author: string, body: string, path: ?string, line: ?int, url: ?string, created_at: ?string}>}
+     */
+    public function feedback(Task $task): array
+    {
+        $details = $task->pr_number !== null ? $this->details($task) : null;
+        if ($details === null) {
+            return ['reviews' => [], 'comments' => []];
+        }
+
+        return [
+            'reviews' => array_values(array_filter($details->reviews, fn (array $r): bool => trim($r['body']) !== '' || in_array($r['state'], ['approved', 'changes_requested'], true))),
+            'comments' => array_values(array_filter($details->comments, fn (array $c): bool => ! self::fromArgos($c['body']))),
+        ];
+    }
+
     /** Hand the reviews and review comments to Claude. */
     public function sendReview(Task $task, User $by): void
     {
         Gate::forUser($by)->authorize('prompt', $task);
-        $details = $this->details($task);
-        if ($details === null || ($details->reviews === [] && $details->comments === [])) {
+        $feedback = $this->feedback($task);
+        if ($feedback['reviews'] === [] && $feedback['comments'] === []) {
             throw WorkspaceException::translated('workspaces.pr.no_review');
         }
 
         $lines = [__('workspaces.pr.review_prompt', ['url' => (string) $task->pr_url])];
-        foreach ($details->reviews as $review) {
+        foreach ($feedback['reviews'] as $review) {
             if (trim($review['body']) !== '') {
                 $lines[] = "- **{$review['author']}** ({$review['state']}): ".trim($review['body']);
             }
         }
-        foreach ($details->comments as $comment) {
-            $where = $comment['path'] !== null ? ' `'.$comment['path'].($comment['line'] !== null ? ':'.$comment['line'] : '').'`' : '';
-            $lines[] = "- **{$comment['author']}**{$where}: ".trim($comment['body']);
+        foreach ($feedback['comments'] as $comment) {
+            $lines[] = self::commentLine($comment);
         }
 
         $this->tasks->send($task, $by, implode("\n", $lines));
+    }
+
+    /** Hand one review comment to Claude (from the review mode). */
+    public function sendComment(Task $task, User $by, string $commentId): void
+    {
+        Gate::forUser($by)->authorize('prompt', $task);
+        $comment = collect($this->feedback($task)['comments'])->firstWhere('id', $commentId)
+            ?? throw WorkspaceException::translated('workspaces.pr.no_review');
+
+        $this->tasks->send($task, $by, __('workspaces.pr.comment_prompt', ['url' => (string) ($comment['url'] ?? $task->pr_url)])."\n".self::commentLine($comment));
+    }
+
+    /** Marks comments Argos writes on pull requests, so they are not read back as review. */
+    public const ARGOS_MARKER = '<!-- argos -->';
+
+    private static function fromArgos(string $body): bool
+    {
+        // Shipping notes from before the marker, in either language.
+        return str_contains($body, self::ARGOS_MARKER)
+            || preg_match('/^(New commits pushed by|Neue Commits von) /', trim($body)) === 1;
+    }
+
+    /** @param  array{author: string, body: string, path: ?string, line: ?int}  $comment */
+    private static function commentLine(array $comment): string
+    {
+        $where = $comment['path'] !== null ? ' `'.$comment['path'].($comment['line'] !== null ? ':'.$comment['line'] : '').'`' : '';
+
+        return "- **{$comment['author']}**{$where}: ".trim($comment['body']);
     }
 
     /** The base moved on or there are conflicts: Claude rebases the branch. */

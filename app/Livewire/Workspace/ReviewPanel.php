@@ -15,6 +15,8 @@ use App\Services\Workspace\ReviewCommentService;
 use App\Services\Workspace\ReviewService;
 use App\Services\Workspace\WorkspaceDaemonClient;
 use App\Services\Workspace\WorkspaceGateService;
+use App\Services\Workspace\PullRequestService;
+use App\Services\Workspace\WorkspaceException;
 use App\Support\GateAnnotations;
 use App\Support\ReviewDiff;
 use App\Support\TaskEventFormatter;
@@ -97,6 +99,22 @@ class ReviewPanel extends Component
     public function selectFile(string $path): void
     {
         $this->file = $path;
+    }
+
+    /** "Hand to Claude" on a pull request review comment. */
+    public function sendPrComment(string $commentId): void
+    {
+        $task = $this->taskId !== null ? $this->task($this->taskId) : null;
+        if ($task === null) {
+            return;
+        }
+
+        try {
+            app(PullRequestService::class)->sendComment($task, $this->user(), $commentId);
+            Notification::make()->title(__('workspaces.review.sent_to_claude'))->success()->send();
+        } catch (WorkspaceException $e) {
+            Notification::make()->title($e->getMessage())->warning()->send();
+        }
     }
 
     public function setRendered(bool $rendered): void
@@ -275,6 +293,11 @@ class ReviewPanel extends Component
         $numbers = $comments->values()->mapWithKeys(fn (ReviewComment $c, int $i): array => [$c->id => $i + 1]);
         $here = $current !== null ? $comments->where('path', $current['path']) : collect();
 
+        // What reviewers wrote on the pull request, at their lines of this file.
+        $prComments = $task !== null && $current !== null
+            ? collect(app(PullRequestService::class)->feedback($task)['comments'])->where('path', $current['path'])
+            : collect();
+
         $markdown = null;
         if ($current !== null && $task !== null && $this->rendered && self::isMarkdown($current['path']) && $current['status'] !== 'D') {
             try {
@@ -286,6 +309,8 @@ class ReviewPanel extends Component
 
         return view('livewire.workspace.review-panel', [
             'active' => true,
+            'prCommentsAt' => $prComments->filter(fn (array $c): bool => $c['line'] !== null && in_array($c['line'], $shown, true))->groupBy('line'),
+            'prCommentsOutside' => $prComments->reject(fn (array $c): bool => $c['line'] !== null && in_array($c['line'], $shown, true))->values(),
             'isMarkdown' => $current !== null && self::isMarkdown($current['path']),
             'markdown' => $markdown,
             'canWrite' => $task !== null && $this->user()->can('review', $task),

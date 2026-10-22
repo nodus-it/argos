@@ -295,6 +295,9 @@ return [
         'closed' => 'closed',
     ],
     'review' => [
+        'pr_comment' => 'review comment',
+        'pr_comments_outside' => 'Review comments on lines the diff does not show',
+        'sent_to_claude' => 'Handed to Claude',
         'markdown_view' => 'Markdown view',
         'rendered' => 'Rendered',
         'diff' => 'Diff',
@@ -653,6 +656,11 @@ return [
         ],
     ],
     'pr' => [
+        'comment_prompt' => 'Please work in this review comment of the pull request (:url):',
+        'feedback_title' => 'Review comments',
+        'general_comment' => 'on the pull request',
+        'send_comment' => 'Hand to Claude',
+        'open_on_provider' => 'Open on the provider',
         'title' => 'Pull request',
         'ready' => 'Ready for review',
         'refresh' => 'Refresh',
