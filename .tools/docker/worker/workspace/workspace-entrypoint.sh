@@ -12,9 +12,12 @@ export ARGOS_CLAUDE_BIN="$CLAUDE_BIN"
 "$NODE_BIN" /opt/argos/daemon/dist/main.js &
 daemon_pid=$!
 
+# The editor listens on loopback only; the daemon's editor gate is its door to
+# the network and lets through only requests Traefik's code route vouches for
+# (other workspaces share the Docker network).
 /opt/openvscode-server/bin/openvscode-server \
-    --host 0.0.0.0 \
-    --port "${ARGOS_EDITOR_PORT:-3000}" \
+    --host 127.0.0.1 \
+    --port "${ARGOS_EDITOR_INTERNAL_PORT:-3001}" \
     --without-connection-token \
     --default-folder /workspace/repo \
     --telemetry-level off &

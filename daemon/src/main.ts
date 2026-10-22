@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path';
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import { managerCredentialFetcher, RepoCredentialCache, startCredentialServer } from './credentials.js';
 import { scriptRunner } from './gates.js';
+import { editorToken, startEditorGate } from './editorGate.js';
 import { buildApp } from './http.js';
 import { cacheEnv, layoutFor } from './layout.js';
 import { setupRunner } from './worktrees.js';
@@ -88,6 +89,11 @@ async function main(): Promise<void> {
 
     const credentials = new RepoCredentialCache(managerCredentialFetcher(credentialUrl, daemonToken));
     const credentialServer = await startCredentialServer(credentials, credentialPort);
+    const editorGate = await startEditorGate({
+        token: editorToken(daemonToken),
+        port: Number(process.env.ARGOS_EDITOR_PORT ?? '3000'),
+        editorPort: Number(process.env.ARGOS_EDITOR_INTERNAL_PORT ?? '3001'),
+    });
 
     await app.listen({ host: '0.0.0.0', port });
     console.log(`[argos-daemon] listening on :${port}`);
@@ -102,6 +108,7 @@ async function main(): Promise<void> {
         await outbox.flush().catch(() => {});
         outbox.stop();
         credentialServer.close();
+        editorGate.close();
         await app.close();
         process.exit(0);
     };

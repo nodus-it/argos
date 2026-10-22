@@ -8,8 +8,8 @@ use App\Enums\AuthMethod;
 use App\Enums\BackingService;
 use App\Enums\GitProvider;
 use App\Enums\WorkerSource;
-use App\Enums\WorkspaceSetupStatus;
 use App\Enums\WorkspaceRole;
+use App\Enums\WorkspaceSetupStatus;
 use App\Enums\WorkspaceStatus;
 use App\Services\OAuth\TokenRefresher;
 use App\Support\RepoUrlBuilder;
@@ -247,6 +247,16 @@ class Workspace extends Model implements HasApiTokensContract
             : $this->members()->where('user_id', $user->id)->first();
 
         return $member?->role;
+    }
+
+    /**
+     * The secret Traefik's code route hands the daemon's editor gate. Derived
+     * from the daemon token (the daemon computes the same), so a route file
+     * opens only the editor, never the daemon API.
+     */
+    public function editorToken(): string
+    {
+        return hash_hmac('sha256', 'argos-editor', $this->daemon_token);
     }
 
     /** Docker volume holding the main clone and the task worktrees. */

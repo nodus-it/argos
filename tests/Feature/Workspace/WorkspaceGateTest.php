@@ -179,17 +179,27 @@ class WorkspaceGateTest extends TestCase
         config(['argos.preview.traefik_dir' => $dir]);
         $router = app(TraefikRouter::class);
 
-        $url = $router->writeCodeRoute('login', 3000);
+        $url = $router->writeCodeRoute('login', 'editor-secret', 3000);
 
         $this->assertSame('https://code-login.argos.test', $url);
         $route = Yaml::parseFile($dir.'/code-login.yml')['http'];
         $this->assertSame('Host(`code-login.argos.test`)', $route['routers']['code-login']['rule']);
-        $this->assertSame(['code-login-auth'], $route['routers']['code-login']['middlewares']);
+        // The gate runs first; only then does the route vouch for the request with the editor token.
+        $this->assertSame(['code-login-auth', 'code-login-token'], $route['routers']['code-login']['middlewares']);
+        $this->assertSame(['X-Argos-Editor-Token' => 'editor-secret'], $route['middlewares']['code-login-token']['headers']['customRequestHeaders']);
         $this->assertSame('http://argos-ws-login:3000', $route['services']['code-login']['loadBalancer']['servers'][0]['url']);
         $this->assertStringEndsWith('/_argos/workspace-gate', $route['middlewares']['code-login-auth']['forwardAuth']['address']);
 
         $router->removeCodeRoute('login');
         $this->assertFileDoesNotExist($dir.'/code-login.yml');
         @rmdir($dir);
+    }
+
+    public function test_the_editor_token_matches_the_daemons_derivation(): void
+    {
+        // daemon/test/editorGate.test.ts pins the same vector for editorToken().
+        $workspace = new Workspace(['daemon_token' => 'daemon-token-x']);
+
+        $this->assertSame('6111190285ab17fd32d8200df7fc30f000c81cc35bdef7c7bb07e917978232d9', $workspace->editorToken());
     }
 }

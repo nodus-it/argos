@@ -78,10 +78,12 @@ class TraefikRouter
     /**
      * Route `code-<slug>.<base>` to the workspace's OpenVSCode Server, guarded
      * by forwardAuth against the workspace gate (membership check — the
-     * editor is a shell into the container, it is never public). Returns the
-     * editor URL.
+     * editor is a shell into the container, it is never public). Behind the
+     * gate the route adds the workspace's editor token, which the daemon's
+     * editor gate requires — so other workspaces on the Docker network can't
+     * reach the editor around Traefik. Returns the editor URL.
      */
-    public function writeCodeRoute(string $workspaceSlug, int $port = 3000): string
+    public function writeCodeRoute(string $workspaceSlug, string $editorToken, int $port = 3000): string
     {
         $key = self::codeKey($workspaceSlug);
         $host = $key.'.'.config('argos.preview.base_domain', '127.0.0.1.nip.io');
@@ -91,12 +93,15 @@ class TraefikRouter
                 'rule' => "Host(`{$host}`)",
                 'entryPoints' => ['web'],
                 'service' => $key,
-                'middlewares' => [$key.'-auth'],
+                'middlewares' => [$key.'-auth', $key.'-token'],
             ]],
             'services' => [$key => [
                 'loadBalancer' => ['servers' => [['url' => 'http://argos-ws-'.$workspaceSlug.':'.$port]]],
             ]],
-            'middlewares' => [$key.'-auth' => $this->gateMiddleware()],
+            'middlewares' => [
+                $key.'-auth' => $this->gateMiddleware(),
+                $key.'-token' => ['headers' => ['customRequestHeaders' => ['X-Argos-Editor-Token' => $editorToken]]],
+            ],
         ]);
 
         return $this->urlForSlug($key);

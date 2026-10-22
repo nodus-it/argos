@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\Workspace;
 
-use App\Enums\WorkspaceStatus;
 use App\Enums\TaskStatus;
+use App\Enums\WorkspaceStatus;
 use App\Events\Workspace\WorkspaceStarted;
 use App\Events\Workspace\WorkspaceStopped;
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
@@ -52,7 +52,7 @@ class WorkspaceProvisioner
             $sidecars = $this->sidecars->startForWorkspace($workspace);
             $this->containers->run($workspace, $image, $sidecars);
             $this->containers->waitForHealth($workspace);
-            $this->router->writeCodeRoute($workspace->slug, (int) config('argos.workspaces.editor_port', 3000));
+            $this->router->writeCodeRoute($workspace->slug, $workspace->editorToken(), (int) config('argos.workspaces.editor_port', 3000));
 
             $creator = $workspace->creator;
             $this->daemon->for($workspace, 600)->initWorkspace([
