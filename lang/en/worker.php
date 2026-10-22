@@ -18,8 +18,8 @@ return [
     ],
 
     'credentials' => [
-        'label' => 'Agent credential',
-        'plural' => 'Agent credentials',
+        'label' => 'Claude subscription',
+        'plural' => 'Claude subscriptions',
         'sections' => [
             'identity' => 'Identity',
             'identity_description' => 'Which agent this account is for, a display name, and the status.',

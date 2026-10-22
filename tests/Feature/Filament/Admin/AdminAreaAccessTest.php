@@ -17,12 +17,12 @@ class AdminAreaAccessTest extends TestCase
     private function adminRoutes(): array
     {
         return [
-            'filament.admin.resources.provider-o-auth-configs.index',
-            'filament.admin.resources.api-clients.index',
-            'filament.admin.resources.provider-credentials.index',
-            'filament.admin.resources.users.index',
-            'filament.admin.pages.settings',
-            'filament.admin.pages.onboarding',
+            'filament.workspaces.system.resources.oauth-apps.index',
+            'filament.workspaces.system.resources.api-clients.index',
+            'filament.workspaces.system.resources.tokens.index',
+            'filament.workspaces.system.resources.users.index',
+            'filament.workspaces.system.pages.overview',
+            'filament.workspaces.pages.setup',
         ];
     }
 
@@ -48,18 +48,18 @@ class AdminAreaAccessTest extends TestCase
         Workspace::factory()->create();
         $this->actingAs(User::factory()->create());
 
-        $this->get(route('filament.admin.resources.workspaces.index'))->assertOk();
-        $this->get(route('filament.admin.resources.agent-credentials.index'))->assertOk();
+        $this->get(route('filament.workspaces.resources.workspaces.index'))->assertOk();
+        $this->get(route('filament.workspaces.account.resources.agents.index'))->assertOk();
         // Creating a workspace is reserved to Argos admins.
-        $this->get(route('filament.admin.resources.workspaces.create'))->assertForbidden();
+        $this->get(route('filament.workspaces.resources.workspaces.create'))->assertForbidden();
     }
 
     public function test_only_admins_are_sent_to_onboarding_before_the_first_workspace(): void
     {
         $this->actingAs(User::factory()->create());
-        $this->get(route('filament.admin.pages.dashboard'))->assertOk();
+        $this->get(route('filament.workspaces.pages.my-work'))->assertOk();
 
         $this->actingAs(User::factory()->admin()->create());
-        $this->get(route('filament.admin.pages.dashboard'))->assertRedirect(route('filament.admin.pages.onboarding'));
+        $this->get(route('filament.workspaces.pages.my-work'))->assertRedirect(route('filament.workspaces.pages.setup'));
     }
 }

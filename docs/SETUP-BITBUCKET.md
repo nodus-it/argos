@@ -57,8 +57,8 @@ OAuth configuration.
 
 ### Step 2: Create the workspace in Argos
 
-As an Argos administrator, choose **New workspace** (in `/w`, or under
-**Workspaces** in the admin panel):
+As an Argos administrator, choose **New workspace** (on the workspace list,
+or directly at `/new`):
 
 - **Platform**: Bitbucket
 - **Repo URL**: `https://bitbucket.org/<workspace>/<repository>`
@@ -113,7 +113,7 @@ UI flow is described in
 
 ### Step 2: Add the OAuth App in Argos
 
-1. Open **Configuration → OAuth Apps** in the Argos admin.
+1. Open **Administration → OAuth apps** (`${APP_URL}/system/oauth-apps`).
 2. Add an app for **Bitbucket**, paste its **Key** (client ID) and **Secret**
    (client secret), and enable it.
 3. The **callback URL** shown in the form is read-only and derived from
@@ -125,7 +125,7 @@ effect immediately, without a restart.
 
 ### Step 3: Connect your account
 
-1. Go to **Connected Accounts** in the Argos admin panel.
+1. Go to **My account → Connected accounts** (`/account/connections`).
 2. Click **Connect Bitbucket**.
 3. Authorize the OAuth consumer in Bitbucket.
 4. When creating a workspace, select **Bitbucket** as the platform and choose
@@ -141,6 +141,6 @@ effect immediately, without a restart.
 | 403 on issues endpoint | Issue tracker is disabled for the repository (issues are returned as an empty list) |
 | 401 on push | Token missing Repositories Write permission, or token pasted with an accidental username prefix |
 | PR creation returns 409 | A PR for this branch already exists — Argos will find and report the existing URL |
-| OAuth redirect fails | The callback URL registered in the OAuth consumer must exactly match `${APP_URL}/auth/bitbucket/callback` — verify `APP_URL` and that the OAuth app is enabled under **Configuration → OAuth Apps** |
+| OAuth redirect fails | The callback URL registered in the OAuth consumer must exactly match `${APP_URL}/auth/bitbucket/callback` — verify `APP_URL` and that the OAuth app is enabled under **Administration → OAuth apps** |
 | Expecting a Bitbucket issue to start an automatic task | Not supported — Bitbucket is a code provider only. Use [GitHub/GitLab/Linear](SETUP-TASK-PROVIDERS.md) or an [own ticket system](TICKETS.md#own-ticket-systems) |
 | "Merge automatically" cannot be switched on | Bitbucket has no native auto-merge; merge in Bitbucket |

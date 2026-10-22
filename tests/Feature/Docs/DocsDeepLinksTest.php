@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Docs;
 
-use App\Filament\Admin\Pages\ConnectedAccounts;
-use App\Filament\Admin\Pages\Onboarding;
-use App\Filament\Admin\Resources\AgentCredentialResource\Pages\ListAgentCredentials;
-use App\Filament\Admin\Resources\ApiClientResource\Pages\ListApiClients;
-use App\Filament\Admin\Resources\ProviderCredentialResource\Pages\ListProviderCredentials;
-use App\Filament\Admin\Resources\ProviderOAuthConfigResource\Pages\ListProviderOAuthConfigs;
-use App\Filament\Admin\Resources\WorkspaceResource\Pages\CreateWorkspace;
-use App\Filament\Admin\Resources\WorkspaceResource\Pages\ListWorkspaces;
+use App\Filament\Workspaces\Clusters\Account\Pages\ConnectedAccounts;
+use App\Filament\Workspaces\Pages\Onboarding;
+use App\Filament\Workspaces\Clusters\Account\Resources\AgentCredentialResource\Pages\ListAgentCredentials;
+use App\Filament\Workspaces\Clusters\System\Resources\ApiClientResource\Pages\ListApiClients;
+use App\Filament\Workspaces\Clusters\System\Resources\ProviderCredentialResource\Pages\ListProviderCredentials;
+use App\Filament\Workspaces\Clusters\System\Resources\ProviderOAuthConfigResource\Pages\ListProviderOAuthConfigs;
+use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\CreateWorkspace;
+use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ListWorkspaces;
 use App\Models\User;
 use App\Support\DocLink;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -58,7 +58,7 @@ class DocsDeepLinksTest extends TestCase
     public function test_section_landings_link_to_their_doc(): void
     {
         $landings = [
-            [ListWorkspaces::class, 'projects'],
+            [ListWorkspaces::class, 'workspaces'],
             [ListAgentCredentials::class, 'agents'],
             [ListProviderCredentials::class, 'credentials'],
             [ListApiClients::class, 'rest-api'],

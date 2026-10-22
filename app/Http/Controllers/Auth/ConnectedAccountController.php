@@ -60,10 +60,10 @@ final class ConnectedAccountController extends Controller
         $returnTo = $request->session()->pull(self::GITHUB_RETURN_SESSION_KEY);
 
         if ($returnTo === 'onboarding') {
-            return redirect()->route('filament.admin.pages.onboarding');
+            return redirect()->route('filament.workspaces.pages.setup');
         }
 
-        return redirect()->route('filament.admin.pages.connected-accounts');
+        return redirect()->route('filament.workspaces.account.pages.connections');
     }
 
     public function disconnect(): RedirectResponse
@@ -73,7 +73,7 @@ final class ConnectedAccountController extends Controller
 
         app(ConnectedAccountService::class)->disconnect($user, 'github');
 
-        return redirect()->route('filament.admin.pages.connected-accounts');
+        return redirect()->route('filament.workspaces.account.pages.connections');
     }
 
     // ── GitLab ────────────────────────────────────────────────────────────────
@@ -121,10 +121,10 @@ final class ConnectedAccountController extends Controller
         $returnTo = $request->session()->pull(self::GITLAB_RETURN_SESSION_KEY);
 
         if ($returnTo === 'onboarding') {
-            return redirect()->route('filament.admin.pages.onboarding');
+            return redirect()->route('filament.workspaces.pages.setup');
         }
 
-        return redirect()->route('filament.admin.pages.connected-accounts');
+        return redirect()->route('filament.workspaces.account.pages.connections');
     }
 
     /**
@@ -190,6 +190,6 @@ final class ConnectedAccountController extends Controller
 
         app(ConnectedAccountService::class)->disconnect($user, 'gitlab');
 
-        return redirect()->route('filament.admin.pages.connected-accounts');
+        return redirect()->route('filament.workspaces.account.pages.connections');
     }
 }

@@ -84,7 +84,7 @@ Berechtigungen; siehe [SETUP-LINEAR.md](SETUP-LINEAR.md).
 ## Eine Integration anlegen
 
 1. Öffne die **Einstellungen → Integrationen** des Workspaces
-   (Workspace-Admins) oder den Workspace im Admin-Panel.
+   (Workspace-Admins und Argos-Admins).
 2. Wähle unter **Issue-Tracker** die Aktion **Erstellen**.
 3. Fülle die Felder aus:
 

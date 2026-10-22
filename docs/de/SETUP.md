@@ -177,10 +177,10 @@ verbirgt das meiste davon), danach verwenden spätere Starts das gecachte Image.
 
 ## Erste Anmeldung und Onboarding
 
-Öffne die Admin-UI:
+Öffne die App:
 
 - `http://localhost:8080` (oder `${APP_URL}`) — die App; `/` ist deine Arbeit.
-  Die Administration liegt unter `/admin`.
+  Die Administration liegt unter `/system`, die Anmeldung unter `/login`.
 
 Melde dich mit den Zugangsdaten aus der Installer-Zusammenfassung an:
 
@@ -188,18 +188,18 @@ Melde dich mit den Zugangsdaten aus der Installer-Zusammenfassung an:
 - **Passwort:** das generierte `ADMIN_PASSWORD` aus der Zusammenfassung (auch in
   `.env`).
 
-Ein in der App integrierter **Onboarding-Assistent** führt dich anschließend
+Ein in der App integrierter **Onboarding-Assistent** (`/setup`) führt dich anschließend
 durch die Einrichtung (seine Sprache wählst du oben). Sein erster Schritt ist
 **Konto**: Lade ein Profilbild hoch (es erscheint bei deinen Nachrichten und
-Aufgaben, später auch unter **Profil** änderbar) und lege dort direkt
+Aufgaben, später auch unter **Mein Konto → Profil** änderbar) und lege dort direkt
 ein eigenes Passwort fest, um das generierte Standard-Passwort zu ersetzen. Der
 Schritt ist optional und überspringbar — solange du noch das Standard-Passwort
 nutzt, weist dich ein Hinweis darauf hin, es zu ändern (du kannst es auch
-jederzeit später unter **Profil** ändern). Der Assistent führt dich danach
+jederzeit später unter **Mein Konto → Profil** ändern). Der Assistent führt dich danach
 durch das Einfügen deines Claude-Tokens — daraus wird dein **persönlicher**
 Agent, auf dem deine Aufgaben laufen; andere hinterlegen ihren unter
-**Profil → Meine Claude-Abos**, geteilte Agenten liegen unter **Worker →
-Agent-Credentials** — und das Anlegen deines ersten Workspaces aus einem
+**Mein Konto → Claude-Abos**, wo Argos-Admins auch die geteilten Agenten
+sehen — und das Anlegen deines ersten Workspaces aus einem
 Repository. Argos untersucht dann das Repository und
 startet, falls etwas fehlt, eine
 [Einrichtungsaufgabe](PREPARE-PROJECT.md#die-einrichtungs-aufgabe) auf deinem Abo. Um ein
@@ -248,8 +248,8 @@ folgendes ermöglicht:
 - Authentifizierung pro Person (jede Person verbindet ihre eigenen Konten)
 - Unterstützung für selbst gehostetes GitLab ohne Token-Verwaltung pro Workspace
 
-OAuth-Client-Zugangsdaten werden vollständig in der UI verwaltet (Konfiguration →
-OAuth-Apps) und in der Datenbank gespeichert — es gibt keinen ENV-Pfad. Siehe:
+OAuth-Client-Zugangsdaten werden vollständig in der UI verwaltet (Administration →
+OAuth-Apps, `/system/oauth-apps`) und in der Datenbank gespeichert — es gibt keinen ENV-Pfad. Siehe:
 
 - [OAuth-Überblick](OAUTH.md) — wenn du dir nicht sicher bist, welchen Modus du
   wählen sollst
@@ -268,8 +268,8 @@ des Repositorys; alles andere kommt aus dem eigenen `.argos/worker.dockerfile`
 des Repositorys. Einen Stack-Editor gibt es nicht. Siehe
 [Stacks und Images](WORKER-STACKS.md).
 
-Agenten (Claude-Abos) verwaltest du in der Admin-UI unter
-**Worker → Agent-Credentials**; alle Nutzenden können eigene hinzufügen. Siehe
+Agenten (Claude-Abos) verwaltest du unter **Mein Konto → Claude-Abos**
+(`/account/agents`); alle Nutzenden können eigene hinzufügen. Siehe
 [Agenten](AGENTS.md).
 
 Um ein Repository auf Argos zuzuschneiden — Einrichtungsschritte
@@ -280,9 +280,9 @@ Preview-Vertrag (`.argos/demo.*`) — siehe
 ## Nutzende und Admins
 
 Das bei der Installation angelegte Admin-Konto hat die Rolle
-**Argos-Administrator**. Wer sie hat, verwaltet Benutzerkonten
-(*Konfiguration → Benutzer*), Agenten, OAuth-Apps, Zugangstoken, API-Clients
-und Einstellungen, legt Workspaces an und darf in jedem Workspace alles. Alle
+**Argos-Administrator**. Wer sie hat, verwaltet unter **Administration**
+(`/system`) Benutzerkonten, Access-Tokens, OAuth-Apps und API-Clients, sieht
+alle Agenten, legt Workspaces an und darf in jedem Workspace alles. Alle
 anderen arbeiten in den Workspaces, in denen sie Mitglied sind — als Admin,
 Mitglied oder Leser (siehe [Workspaces → Rollen](WORKSPACES.md#rollen)) — mit
 ihren eigenen Agenten. Die Administrator-Rolle lässt sich über die
@@ -311,7 +311,7 @@ Workspace-Daemon + VS Code); das dauert einige Minuten.
 ## Vorbelegen des Claude-Tokens
 
 Der Token liegt **pro Agent in der Datenbank**. Der normale Weg ist der
-Onboarding-Schritt in der App oder **Worker → Agent-Credentials** im Admin —
+Onboarding-Schritt in der App oder **Mein Konto → Claude-Abos** —
 eine DB-Zugangsinformation gewinnt immer (es gibt keinen
 `CLAUDE_CODE_OAUTH_TOKEN`-Env-Var-Pfad).
 
@@ -322,7 +322,7 @@ Team-Plan):
 claude setup-token
 ```
 
-Füge ihn in das Onboarding / die Agent-Credentials ein. Tokens laufen nach einigen
+Füge ihn in das Onboarding / unter Claude-Abos ein. Tokens laufen nach einigen
 Wochen ab — erneuere sie in der UI und führe `claude setup-token` erneut aus.
 
 Für ein unbeaufsichtigtes Local-Dev-Seeding kannst du stattdessen den rohen Token

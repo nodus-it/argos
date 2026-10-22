@@ -17,7 +17,7 @@ class SourceFooterTest extends TestCase
     {
         config()->set('argos.source_url', 'https://github.com/example/argos-fork');
 
-        $response = $this->get(route('filament.admin.auth.login'));
+        $response = $this->get(route('filament.workspaces.auth.login'));
 
         $response->assertOk();
         $response->assertSee('https://github.com/example/argos-fork', false);
@@ -30,7 +30,7 @@ class SourceFooterTest extends TestCase
         Workspace::factory()->create();
         $this->actingAs(User::factory()->create());
 
-        $response = $this->get('/admin');
+        $response = $this->get('/');
 
         $response->assertOk();
         $response->assertSee('https://github.com/example/argos-fork', false);

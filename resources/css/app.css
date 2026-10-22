@@ -1129,3 +1129,14 @@ body,
 
 .argos-onboarding-avatar { width: 56px; height: 56px; border-radius: 50%; display: inline-grid; place-items: center; overflow: hidden; background: #1f1b16; color: #fff; font: 600 18px/1 var(--font-sans, sans-serif); flex: none; }
 .argos-onboarding-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+/* Account (/account) and administration (/system): a slim side navigation,
+   the content takes the rest (wide tables scroll inside it, not the page). */
+.fi-page-sub-navigation-sidebar-ctn {
+    width: 13rem;
+    flex-shrink: 0;
+}
+.fi-page-has-sub-navigation .fi-page-main > .fi-page-content {
+    min-width: 0;
+    flex: 1;
+}

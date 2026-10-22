@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers\Filament\Concerns;
 
-use App\Filament\Admin\Pages\Login;
-use App\Filament\Admin\Pages\Profile;
+use App\Filament\Workspaces\Pages\Login;
 use App\Http\Middleware\RedirectToOnboarding;
 use App\Http\Middleware\SetUserLocale;
 use DutchCodingCompany\FilamentDeveloperLogins\FilamentDeveloperLoginsPlugin;
@@ -54,7 +53,6 @@ trait ConfiguresArgosPanel
             ->databaseNotifications()
             ->databaseNotificationsPolling('30s')
             ->login(Login::class)
-            ->profile(Profile::class)
             ->plugins([
                 // One-click developer login on the login screen. Hard-gated to
                 // the local environment — never renders in staging/production.

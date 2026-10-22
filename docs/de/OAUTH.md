@@ -5,7 +5,7 @@ Argos unterstützt zwei Wege, sich gegenüber deinem Git-Host zu authentifiziere
 1. **Personal Access Token (PAT)** — füge pro Workspace einen Token ein.
    Funktioniert sofort, ohne serverseitige Konfiguration.
 2. **OAuth** — registriere eine OAuth-App beim Provider, trage deren
-   Client-ID/Secret in der Argos-Oberfläche ein (Konfiguration → OAuth-Apps) und
+   Client-ID/Secret in der Argos-Oberfläche ein (Administration → OAuth-Apps) und
    lass alle Nutzenden ihre eigenen Accounts verbinden.
 
 ## Welche Variante sollte ich wählen?
@@ -61,7 +61,7 @@ OAuth-Apps werden **in der Oberfläche** verwaltet — es gibt keine
 `*_CLIENT_ID` / `*_CLIENT_SECRET` Umgebungsvariablen. Nachdem du die OAuth-App
 auf der Provider-Seite erstellt hast:
 
-1. Öffne **Konfiguration → OAuth-Apps** in der Argos-Administration.
+1. Öffne **Administration → OAuth-Apps** (`${APP_URL}/system/oauth-apps`).
 2. Füge eine App für den Provider hinzu, trage deren **Client-ID** und
    **Client-Secret** ein und aktiviere sie. Für selbst gehostetes GitLab setze
    die Instanz-URL an der App selbst (keine `GITLAB_INSTANCE_URL`
@@ -78,7 +78,7 @@ und sind ohne Neustart wirksam. Siehe die
 
 ## Nachdem OAuth konfiguriert ist
 
-Die Seite **Verknüpfte Accounts** in der Argos-Navigation zeigt für jeden
+Die Seite **Mein Konto → Verknüpfte Accounts** (`/account/connections`) zeigt für jeden
 konfigurierten Provider eine Verbinden-Schaltfläche (z. B. „Mit GitHub
 verbinden“). Sobald die Verbindung besteht, erhält das Feld
 **Authentifizierung** im Workspace-Formular eine „OAuth“-Option, die Repos und
@@ -97,6 +97,6 @@ Push nie mit einem Token beginnen, der gleich abläuft.
 Wenn eine Aktualisierung fehlschlägt (widerrufener Token, Provider-4xx,
 fehlender `refresh_token`), schlägt der Git-Vorgang (oder der Start des
 Workspaces) mit einer Meldung fehl, die dich auffordert, den Account neu zu
-verbinden. Verbinde den Account auf der Seite **Verknüpfte Accounts** neu, um
+verbinden. Verbinde den Account unter **Mein Konto → Verknüpfte Accounts** neu, um
 ein frisches Paar aus Token und Refresh-Token zu erzeugen, und versuche es dann
 erneut.

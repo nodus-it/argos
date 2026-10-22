@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 use App\Events\DomainEvent;
-use App\Filament\Admin\Support\Pages\CreateRecord;
-use App\Filament\Admin\Support\Pages\EditRecord;
+use App\Filament\Support\Pages\CreateRecord;
+use App\Filament\Support\Pages\EditRecord;
 use App\Services\EntityService;
 use App\Support\Dto;
 
@@ -39,11 +39,11 @@ arch('migrated entity services extend the base entity service')
     ->toExtend(EntityService::class);
 
 arch('migrated oauth-config create page routes writes through the base page')
-    ->expect('App\Filament\Admin\Resources\ProviderOAuthConfigResource\Pages\CreateProviderOAuthConfig')
+    ->expect('App\Filament\Workspaces\Clusters\System\Resources\ProviderOAuthConfigResource\Pages\CreateProviderOAuthConfig')
     ->toExtend(CreateRecord::class);
 
 arch('migrated oauth-config edit page routes writes through the base page')
-    ->expect('App\Filament\Admin\Resources\ProviderOAuthConfigResource\Pages\EditProviderOAuthConfig')
+    ->expect('App\Filament\Workspaces\Clusters\System\Resources\ProviderOAuthConfigResource\Pages\EditProviderOAuthConfig')
     ->toExtend(EditRecord::class);
 
 // --- R3' : no direct model mutations in the presentation layer --------------
@@ -64,8 +64,8 @@ function presentationSourceFiles(): array
 {
     $root = dirname(__DIR__, 2);
     $exempt = [
-        'app/Filament/Admin/Support/Pages/CreateRecord.php',
-        'app/Filament/Admin/Support/Pages/EditRecord.php',
+        'app/Filament/Support/Pages/CreateRecord.php',
+        'app/Filament/Support/Pages/EditRecord.php',
     ];
 
     $files = [];

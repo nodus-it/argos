@@ -53,7 +53,7 @@ return [
 
     'agents' => [
         'heading' => 'Your Claude subscription',
-        'description' => 'Tasks run on the subscription of the person who owns them. Add yours — the first workspace\'s setup runs on it too. Other members add their own in their profile; shared agents for automation are under Agent credentials.',
+        'description' => 'Tasks run on the subscription of the person who owns them. Add yours — the first workspace\'s setup runs on it too. Other members add their own under My account; shared agents for automation are there too (Claude subscriptions).',
         'gate_hint' => 'Your Claude subscription is required',
         'claude_label' => 'Claude Code',
         'claude_hint' => 'Generate a token with <code class="text-xs">claude setup-token</code> and paste it below.',

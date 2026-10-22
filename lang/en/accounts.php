@@ -3,8 +3,6 @@
 declare(strict_types=1);
 
 return [
-    'navigation_group' => 'Configuration',
-    'navigation_label' => 'Connected Accounts',
     'title' => 'Connected Accounts',
 
     'actions' => [

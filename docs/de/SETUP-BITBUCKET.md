@@ -59,8 +59,8 @@ serverseitige OAuth-Konfiguration.
 
 ### Schritt 2: Workspace in Argos anlegen
 
-Wähle als Argos-Administrator **Neuer Workspace** (in `/w` oder im Admin-Panel
-unter **Workspaces**):
+Wähle als Argos-Administrator **Neuer Workspace** (in der Workspace-Liste oder
+direkt unter `/new`):
 
 - **Plattform**: Bitbucket
 - **Repo-URL**: `https://bitbucket.org/<workspace>/<repository>`
@@ -116,7 +116,7 @@ vollständige UI-Ablauf ist beschrieben unter
 
 ### Schritt 2: Die OAuth-App in Argos hinzufügen
 
-1. Öffne **Konfiguration → OAuth-Apps** in der Argos-Administration.
+1. Öffne **Administration → OAuth-Apps** (`${APP_URL}/system/oauth-apps`).
 2. Füge eine App für **Bitbucket** hinzu, trage deren **Key** (Client-ID) und
    **Secret** (Client-Secret) ein und aktiviere sie.
 3. Die im Formular angezeigte **Callback-URL** ist schreibgeschützt und wird aus
@@ -129,7 +129,7 @@ und sind sofort wirksam, ohne Neustart.
 
 ### Schritt 3: Dein Konto verbinden
 
-1. Gehe zu **Verknüpfte Accounts** im Argos-Admin-Panel.
+1. Gehe zu **Mein Konto → Verknüpfte Accounts** (`/account/connections`).
 2. Klicke auf **Mit Bitbucket verbinden**.
 3. Autorisiere den OAuth Consumer in Bitbucket.
 4. Wähle beim Anlegen eines Workspaces **Bitbucket** als Plattform und **OAuth**
@@ -145,6 +145,6 @@ und sind sofort wirksam, ohne Neustart.
 | 403 am Issues-Endpoint | Der Issue-Tracker ist für das Repository deaktiviert (Issues werden als leere Liste zurückgegeben) |
 | 401 beim Push | Dem Token fehlt die Repositories-Write-Berechtigung, oder das Token wurde versehentlich mit einem Benutzername-Präfix eingefügt |
 | PR-Erstellung liefert 409 | Ein PR für diesen Branch existiert bereits — Argos findet die bestehende URL und meldet sie |
-| OAuth-Redirect schlägt fehl | Die im OAuth Consumer registrierte Callback URL muss exakt mit `${APP_URL}/auth/bitbucket/callback` übereinstimmen — überprüfe `APP_URL` und ob die OAuth-App unter **Konfiguration → OAuth-Apps** aktiviert ist |
+| OAuth-Redirect schlägt fehl | Die im OAuth Consumer registrierte Callback URL muss exakt mit `${APP_URL}/auth/bitbucket/callback` übereinstimmen — überprüfe `APP_URL` und ob die OAuth-App unter **Administration → OAuth-Apps** aktiviert ist |
 | Du erwartest, dass ein Bitbucket-Issue eine automatische Aufgabe startet | Nicht unterstützt — Bitbucket ist ausschließlich ein Code-Provider. Verwende [GitHub/GitLab/Linear](SETUP-TASK-PROVIDERS.md) oder ein [eigenes Ticket-System](TICKETS.md#eigene-ticket-systeme) |
 | „Automatisch mergen“ lässt sich nicht einschalten | Bitbucket hat kein natives Auto-Merge; merge in Bitbucket |

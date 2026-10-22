@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Workspace;
 
-use App\Filament\Admin\Resources\WorkspaceResource\Pages\EditWorkspace;
+use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\EditWorkspaceSettings;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Workspace\AutoSettings;
@@ -58,17 +58,17 @@ class AutoSettingsTest extends TestCase
         Saloon::fake(['api.github.com/repos/test-org/test-repo/branches*' => MockResponse::make([['name' => 'main']])]);
         $workspace = Workspace::factory()->create(['default_branch' => 'main']);
 
-        Livewire::test(EditWorkspace::class, ['record' => $workspace->getKey()])
-            ->fillForm(['auto_settings' => ['plan' => 'approve', 'ship' => 'none', 'max_fix_rounds' => 2, 'max_turns' => null, 'max_cost_usd' => null, 'max_minutes' => 45]])
-            ->call('save')
-            ->assertHasNoFormErrors();
+        Livewire::test(EditWorkspaceSettings::class, ['record' => $workspace->getKey()])
+            ->fillForm(['auto_settings' => ['plan' => 'approve', 'ship' => 'none', 'max_fix_rounds' => 2, 'max_turns' => null, 'max_cost_usd' => null, 'max_minutes' => 45]], 'automationForm')
+            ->call('saveAutomation')
+            ->assertHasNoFormErrors([], 'automationForm');
 
         $this->assertSame(['plan' => 'approve', 'ship' => 'none', 'max_fix_rounds' => 2, 'max_minutes' => 45], $workspace->fresh()->auto_settings);
 
-        Livewire::test(EditWorkspace::class, ['record' => $workspace->getKey()])
-            ->fillForm(['auto_settings' => ['plan' => null, 'ship' => null, 'max_fix_rounds' => null, 'max_turns' => null, 'max_cost_usd' => null, 'max_minutes' => null]])
-            ->call('save')
-            ->assertHasNoFormErrors();
+        Livewire::test(EditWorkspaceSettings::class, ['record' => $workspace->getKey()])
+            ->fillForm(['auto_settings' => ['plan' => null, 'ship' => null, 'max_fix_rounds' => null, 'max_turns' => null, 'max_cost_usd' => null, 'max_minutes' => null]], 'automationForm')
+            ->call('saveAutomation')
+            ->assertHasNoFormErrors([], 'automationForm');
 
         $this->assertNull($workspace->fresh()->auto_settings);
     }

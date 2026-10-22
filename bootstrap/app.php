@@ -38,7 +38,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // where the session cookie lives (see RedirectToCanonicalHost).
         $middleware->append(RedirectToCanonicalHost::class);
 
-        $middleware->redirectGuestsTo(fn () => route('filament.admin.auth.login'));
+        $middleware->redirectGuestsTo(fn () => route('filament.workspaces.auth.login'));
 
         // REST API always speaks JSON — so an unauthenticated request answers
         // 401 instead of redirecting (302) to the Filament login.

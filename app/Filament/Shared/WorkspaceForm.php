@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Shared;
 
+use App\Enums\AuthMethod;
 use App\Enums\AutoPlanMode;
 use App\Enums\AutoShipMode;
 use App\Enums\BackingService;
@@ -381,6 +382,62 @@ final class WorkspaceForm
                     ->helperText(__('workspaces.settings.fields.default_branch_helper'))
                     ->required()
                     ->maxLength(255),
+            ]);
+    }
+
+    /**
+     * Repository access of an existing workspace (settings): renew an expired
+     * token or switch between a token and a connected account. The token
+     * never reaches the browser; left empty, the stored one stays.
+     */
+    public static function accessSection(): Section
+    {
+        $accounts = function (?Workspace $record): array {
+            /** @var User|null $user */
+            $user = Auth::user();
+            $provider = $record?->platform?->value;
+            if ($user === null || $provider === null) {
+                return [];
+            }
+
+            return app(ConnectedAccountService::class)
+                ->selectableFor($user, [$provider])
+                ->mapWithKeys(fn (ConnectedAccount $account): array => [
+                    $account->id => $account->name ?? $account->nickname ?? ucfirst($provider)." #{$account->id}",
+                ])
+                ->all();
+        };
+
+        return Section::make(__('workspaces.settings.access.title'))
+            ->description(__('workspaces.settings.access.description'))
+            ->icon('heroicon-o-key')
+            ->aside()
+            ->schema([
+                Select::make('auth_method')
+                    ->label(__('projects.fields.auth_method_label'))
+                    ->hintAction(DocsLinkAction::make('credentials'))
+                    ->options(fn (?Workspace $record): array => [
+                        'pat' => (string) __('projects.fields.auth_method_pat'),
+                        ...($accounts($record) !== [] || $record?->auth_method === AuthMethod::OAuth ? ['oauth' => (string) __('workspaces.settings.access.oauth')] : []),
+                    ])
+                    ->required()
+                    ->live()
+                    ->native(false),
+                Select::make('connected_account_id')
+                    ->label(__('workspaces.settings.access.account'))
+                    ->options($accounts)
+                    ->visible(fn (Get $get): bool => $get('auth_method') === 'oauth')
+                    ->required(fn (Get $get): bool => $get('auth_method') === 'oauth')
+                    ->native(false),
+                TextInput::make('token')
+                    ->label(__('projects.fields.token_label'))
+                    ->password()
+                    ->revealable()
+                    ->maxLength(500)
+                    ->visible(fn (Get $get): bool => $get('auth_method') === 'pat')
+                    // Switching from an account to a token needs one; otherwise empty keeps the stored token.
+                    ->required(fn (Get $get, ?Workspace $record): bool => $get('auth_method') === 'pat' && $record?->auth_method !== AuthMethod::Pat)
+                    ->helperText(__('workspaces.settings.access.token_helper')),
             ]);
     }
 

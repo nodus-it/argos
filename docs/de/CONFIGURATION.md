@@ -213,7 +213,7 @@ siehe [OAuth & Credentials](#oauth-credentials-ui-verwaltet).
 ## OAuth & Credentials (UI-verwaltet)
 
 OAuth-Apps für GitHub / GitLab / Bitbucket / Linear werden **in der UI
-verwaltet** (Konfiguration → OAuth-Apps) und in der Datenbank gespeichert — es
+verwaltet** (Administration → OAuth-Apps, `/system/oauth-apps`) und in der Datenbank gespeichert — es
 gibt **keine** `*_CLIENT_ID`- / `*_CLIENT_SECRET`-Umgebungsvariablen.
 Selbst-gehostete GitLab-Instanzen werden pro App über das Feld `instance_url`
 konfiguriert.
@@ -225,8 +225,9 @@ registriere diese URL in der OAuth-App des Providers. Siehe
 [Bitbucket](SETUP-BITBUCKET.md), [Linear](SETUP-LINEAR.md)).
 
 Die **Claude-Agent-Zugangsdaten** sind ebenfalls **keine**
-Umgebungsvariablen — füge sie im Onboarding-Wizard oder auf der Seite
-*Agent-Credentials* hinzu, wo sie in der Datenbank gespeichert werden.
+Umgebungsvariablen — füge sie im Einrichtungs-Assistenten oder unter **Mein
+Konto → Claude-Abos** (`/account/agents`) hinzu, wo sie in der Datenbank
+gespeichert werden.
 
 > Die `SEED_*`-Variablen (z. B. `SEED_USER_EMAIL`, `SEED_REPO_URL`,
 > `SEED_CLAUDE_OAUTH_TOKEN`) sind **nur für

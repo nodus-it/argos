@@ -9,9 +9,8 @@ the repository side (`.argos/`, the setup task) see
 
 **Where:** workspace admins (and Argos administrators) open **Workspace
 settings** from the workspace header, at `/{workspace}/settings`. Each
-tab has its own **Save** button. Argos administrators find the same form in
-the admin panel under **Workspaces** (with the issue trackers and API tokens
-below the form). New workspaces are created by Argos administrators only — see
+tab has its own **Save** button. New workspaces are created by Argos
+administrators only (at `/new`) — see
 [Creating a workspace](WORKSPACES.md#creating-a-workspace).
 
 - [Creating: platform, access, repository](#creating-platform-access-repository)
@@ -31,9 +30,10 @@ below the form). New workspaces are created by Argos administrators only — see
 
 These fields are set when the workspace is created. Platform and repository
 are fixed afterwards (changing them would orphan every task branch and pull
-request) — on the `/w` settings page and in the admin panel's edit form. The
-admin panel's edit form can still renew the access, e.g. replace an expired
-token.
+request); the settings page shows them read-only. Its **Repository access**
+section (General tab) renews the access: a new personal access token (left
+empty, the stored one stays — it is never shown again) or a switch to your
+connected account and back.
 
 - **Platform** — GitHub, GitLab (including self-hosted) or Bitbucket. Until you
   pick one, the rest of the form stays locked. A hint links the platform guide
@@ -61,6 +61,7 @@ requests for **every** task of the workspace.
 |---|---|
 | Name | Display name of the workspace. |
 | Repository | Address and platform, read-only. |
+| Repository access | Personal access token (empty keeps the stored one) or your connected account; its own **Save**. |
 | Default branch | New tasks branch off it and their pull requests target it (unless a task picks another base). |
 | Branch pattern | How task branches are named. Placeholders: `{ticket}` (the ticket key, or `argos` without a ticket) and `{title}` (the task title as a slug). Empty: `{ticket}-{title}` with a ticket, `argos/{title}` without. Allowed characters: letters, digits, `. _ / - { }`; max. 60. A taken name gets a number. |
 

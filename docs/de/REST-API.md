@@ -27,8 +27,8 @@ tragen **Abilities**, die die Endpunkte freischalten.
 
 | Art | Angelegt unter | Reichweite | Handelt für |
 |---|---|---|---|
-| **API-Client-Token** | Admin-Panel → **Konfiguration → API-Clients** → ein Client → *API-Tokens* | Jeder Workspace, den die Person unter **Handelt als** des Clients sehen darf (ein Argos-Admin sieht alle) | Die Person unter **Handelt als** des Clients |
-| **Workspace-Token** | **Einstellungen → Integrationen → API-Tokens** des Workspaces (Workspace-Admins) oder der Workspace im Admin-Panel | Nur dieser Workspace — andere Workspaces und deren Aufgaben antworten mit `404` | Der **Automatik-Nutzer** des Workspaces (Einstellungen → Automatik) |
+| **API-Client-Token** | **Administration → API-Clients** (`/system/api-clients`) → ein Client → *API-Tokens* | Jeder Workspace, den die Person unter **Handelt als** des Clients sehen darf (ein Argos-Admin sieht alle) | Die Person unter **Handelt als** des Clients |
+| **Workspace-Token** | **Einstellungen → Integrationen → API-Tokens** des Workspaces (Workspace-Admins und Argos-Admins) | Nur dieser Workspace — andere Workspaces und deren Aufgaben antworten mit `404` | Der **Automatik-Nutzer** des Workspaces (Einstellungen → Automatik) |
 
 Das Klartext-Token wird bei der Erstellung **einmalig** angezeigt; gespeichert
 wird nur sein Hash.

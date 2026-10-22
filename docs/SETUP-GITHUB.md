@@ -33,8 +33,8 @@ workspace form.
 
 ### Step 2: Create the workspace in Argos
 
-As an Argos administrator, choose **New workspace** (in `/w`, or under
-**Workspaces** in the admin panel):
+As an Argos administrator, choose **New workspace** (on the workspace list,
+or directly at `/new`):
 
 - **Platform**: GitHub
 - **Authentication**: Personal Access Token (PAT)
@@ -76,7 +76,7 @@ flow is described in
 
 ### Step 2: Add the OAuth App in Argos
 
-1. Open **Configuration → OAuth Apps** in the Argos admin.
+1. Open **Administration → OAuth apps** (`${APP_URL}/system/oauth-apps`).
 2. Add an app for **GitHub**, paste its **Client ID** and **Client secret**,
    and enable it.
 3. The **callback URL** shown in the form is read-only and derived from
@@ -96,9 +96,9 @@ provides.
 ### Step 3: Connect your account
 
 1. Sign in to Argos.
-2. Go to **Connected Accounts** in the navigation.
+2. Go to **My account → Connected accounts** (`/account/connections`).
 3. Click **Connect GitHub** — you are redirected to GitHub to authorize the
-   app. After authorizing, you are returned to the Connected Accounts page.
+   app. After authorizing, you are returned to the Connected accounts page.
 4. When creating a workspace, select **GitHub** as the platform and choose
    **OAuth** as the authentication method — the repo and branch dropdowns
    appear, populated from your connected account.
@@ -125,8 +125,7 @@ workspace (one per GitHub repository).
 ### Step 2: Create the integration
 
 1. Open the workspace's **Settings → Integrations** → **Issue trackers** →
-   **New** (workspace admins; Argos administrators also find it on the
-   workspace in the admin panel).
+   **New** (workspace admins and Argos administrators).
 2. Set **Provider** to `GitHub` and choose the **Access** (OAuth account or
    stored PAT).
 3. Pick the **Project / Team** — the repository in `owner/repo` format. Use
@@ -200,5 +199,5 @@ For the shared details, see [Issue Triggers](SETUP-TASK-PROVIDERS.md) and
 | 403 when pushing to `.github/workflows/*` | PAT missing the `workflow` scope. |
 | OAuth redirect fails with "redirect_uri mismatch" | The Authorization callback URL on the GitHub OAuth App must exactly match `${APP_URL}/auth/github/callback` — including scheme. Verify `APP_URL`. |
 | OAuth callback returns 500 | `APP_URL` not set or doesn't match the public URL — Laravel can't generate the correct callback. |
-| "Connect GitHub" rejected right after authorizing | The OAuth App in **Configuration → OAuth Apps** is disabled or has the wrong client ID/secret. Re-check and enable it. |
+| "Connect GitHub" rejected right after authorizing | The OAuth App under **Administration → OAuth apps** is disabled or has the wrong client ID/secret. Re-check and enable it. |
 | PR creation returns 422 with "A pull request already exists" | Argos detects this and reports the existing PR URL — no action needed. |

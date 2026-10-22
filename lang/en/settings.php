@@ -3,10 +3,6 @@
 declare(strict_types=1);
 
 return [
-    'navigation_group' => 'Configuration',
-    'navigation_label' => 'Settings',
-    'title' => 'Settings',
-
     'blade' => [
         'logs_section' => 'Logs',
         'logs_description' => 'Manager log (PHP side): workspace jobs, errors, job dispatches.',

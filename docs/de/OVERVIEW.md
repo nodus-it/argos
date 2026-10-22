@@ -46,8 +46,10 @@ Zwei Dinge unterscheiden Argos davon, eine API in einer Schleife aufzurufen:
 ### Der Manager — die App, die du nutzt
 
 Der Manager ist die Webanwendung, in die du dich einloggst: Deine Arbeit liegt
-unter `${APP_URL}/w`, die Verwaltung (Personen, Agenten, OAuth-Apps,
-Zugangsdaten, API-Clients, Einstellungen, Docs) unter `${APP_URL}/admin`. Der
+unter `${APP_URL}/`, dein Konto (Profil, Claude-Abos, verknüpfte Accounts)
+unter `${APP_URL}/account`, die Administration (Benutzer, Access-Tokens,
+OAuth-Apps, API-Clients, Systemübersicht) unter `${APP_URL}/system` und die
+Dokumentation unter `${APP_URL}/docs`. Der
 Manager hält alle deine Daten — Aufgaben, Entscheidungen, Einstellungen — und
 entscheidet, *was* passieren darf. **Er führt die KI nie selbst aus**; er hat
 keine eigene Claude-Session.

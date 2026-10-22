@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Workspaces\Resources\WorkspaceResource\Pages;
 
-use App\Filament\Admin\Support\Pages\CreateRecord;
+use App\Filament\Support\Pages\CreateRecord;
 use App\Filament\Shared\WorkspaceForm;
 use App\Filament\Workspaces\Resources\WorkspaceResource;
 use App\Models\User;

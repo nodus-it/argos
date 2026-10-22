@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Filament;
 
-use App\Filament\Admin\Pages\Profile;
-use App\Filament\Admin\Resources\AgentCredentialResource;
+use App\Filament\Workspaces\Clusters\Account\Pages\Profile;
+use App\Filament\Workspaces\Clusters\Account\Resources\AgentCredentialResource;
 use App\Models\AgentCredential;
 use App\Models\User;
 use App\Models\Workspace;
@@ -92,8 +92,8 @@ class ProfilePageTest extends TestCase
             ->assertSee(__('common.profile.section_agents'))
             ->assertSee('My Max plan')
             ->assertSee($mine->status->label())
-            ->assertSee(AgentCredentialResource::getUrl('edit', ['record' => $mine], panel: 'admin'), false)
-            ->assertSee(AgentCredentialResource::getUrl('create', panel: 'admin'), false)
+            ->assertSee(AgentCredentialResource::getUrl('edit', ['record' => $mine], panel: 'workspaces'), false)
+            ->assertSee(AgentCredentialResource::getUrl('create', panel: 'workspaces'), false)
             ->assertDontSee('Someone else')
             ->assertDontSee('Shared team agent');
     }
@@ -108,7 +108,7 @@ class ProfilePageTest extends TestCase
         Workspace::factory()->create();
         $mine = AgentCredential::factory()->ownedBy($this->user)->create();
 
-        $this->get(AgentCredentialResource::getUrl('edit', ['record' => $mine], panel: 'admin'))->assertOk();
+        $this->get(AgentCredentialResource::getUrl('edit', ['record' => $mine], panel: 'workspaces'))->assertOk();
     }
 
     public function test_profile_renders_inside_the_workspaces_panel(): void

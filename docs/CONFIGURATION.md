@@ -208,7 +208,7 @@ connections themselves are UI/DB-managed — see
 ## OAuth & credentials (UI-managed)
 
 OAuth apps for GitHub / GitLab / Bitbucket / Linear are **managed in the UI**
-(Configuration → OAuth Apps) and stored in the database — there are **no**
+(Administration → OAuth apps, `/system/oauth-apps`) and stored in the database — there are **no**
 `*_CLIENT_ID` / `*_CLIENT_SECRET` environment variables. Self-hosted GitLab
 instances are configured per app via the `instance_url` field.
 
@@ -218,8 +218,8 @@ per-provider setup guides ([GitHub](SETUP-GITHUB.md), [GitLab](SETUP-GITLAB.md),
 [Bitbucket](SETUP-BITBUCKET.md), [Linear](SETUP-LINEAR.md)).
 
 The **Claude agent credentials** are likewise **not** environment variables —
-add them in the onboarding wizard or on the Agents page, where they are stored
-in the database.
+add them in the setup wizard or under **My account → Claude subscriptions**
+(`/account/agents`), where they are stored in the database.
 
 > The `SEED_*` variables (e.g. `SEED_USER_EMAIL`, `SEED_REPO_URL`,
 > `SEED_CLAUDE_OAUTH_TOKEN`) are **dev-only seeding

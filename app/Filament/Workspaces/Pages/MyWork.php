@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Filament\Workspaces\Pages;
 
 use App\Enums\TaskProviderKind;
-use App\Filament\Admin\Resources\WorkspaceResource as AdminWorkspaceResource;
 use App\Filament\Workspaces\Resources\WorkspaceResource;
 use App\Models\User;
 use App\Models\Workspace;
@@ -77,7 +76,7 @@ class MyWork extends Page
             ],
             'readyMore' => $overview['ready_more'],
             'workspacesUrl' => WorkspaceResource::getUrl('index', panel: 'workspaces'),
-            'createUrl' => $user->can('create', Workspace::class) ? AdminWorkspaceResource::getUrl('create', panel: 'admin') : null,
+            'createUrl' => $user->can('create', Workspace::class) ? WorkspaceResource::getUrl('create', panel: 'workspaces') : null,
         ];
     }
 }

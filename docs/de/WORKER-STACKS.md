@@ -123,5 +123,6 @@ Einstellungen → Umgebung → **Einrichtung** zeigt den aktuellen Image-Build d
 Workspaces (Zustand und Alter), sein **Build-Log** (Stack-Build,
 Worker-Schicht und Smoke-Test) und **Neu bauen**. Ein fehlgeschlagenes
 **Einrichtung testen** zeigt das Build-Log des Repository-Images in der
-Einrichtungs-Aufgabe. Eine globale Liste der Image-Builds im Admin-Panel gibt
-es nicht.
+Einrichtungs-Aufgabe. Eine globale Liste der Image-Builds gibt es nicht;
+**Administration → Übersicht** (`/system/overview`) zählt nur veraltete
+Worker-Images.

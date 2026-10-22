@@ -43,8 +43,10 @@ Two things make Argos different from calling an API in a loop:
 ### The Manager — the app you use
 
 The Manager is the web application you log into: your work lives at
-`${APP_URL}/w`, administration (users, agents, OAuth apps, credentials, API
-clients, settings, docs) at `${APP_URL}/admin`. The Manager holds all your data
+`${APP_URL}/`, your account (profile, Claude subscriptions, connected accounts)
+at `${APP_URL}/account`, administration (users, access tokens, OAuth apps, API
+clients, system overview) at `${APP_URL}/system` and the documentation at
+`${APP_URL}/docs`. The Manager holds all your data
 — tasks, decisions, settings — and decides *what* may happen. **It never runs
 the AI itself**; it has no Claude session of its own.
 

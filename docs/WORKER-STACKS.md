@@ -113,5 +113,6 @@ it from its next start.
 Settings → Environment → **Setup** shows the current image build of the
 workspace (state and age), its **Build log** (stack build, worker layer and
 smoke test) and **Rebuild**. A failed **Test setup** shows the build log of
-the repository's image in the setup task. There is no global image-build list
-in the admin panel.
+the repository's image in the setup task. There is no global image-build list;
+**Administration → Overview** (`/system/overview`) only counts outdated worker
+images.

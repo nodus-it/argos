@@ -10,7 +10,6 @@ use App\Enums\AutoTaskState;
 use App\Enums\SessionStatus;
 use App\Enums\TaskStatus;
 use App\Enums\WorkspaceRole;
-use App\Filament\Admin\Resources\WorkspaceResource as AdminWorkspaceResource;
 use App\Filament\Workspaces\Pages\MyWork;
 use App\Filament\Workspaces\Resources\WorkspaceResource;
 use App\Models\Task;
@@ -160,12 +159,12 @@ class MyWorkTest extends TestCase
         Livewire::actingAs($this->me)->test(MyWork::class)
             ->assertSee(__('workspaces.my_work.empty_title'))
             ->assertSee(WorkspaceResource::getUrl('index', panel: 'workspaces'), false)
-            ->assertDontSee(AdminWorkspaceResource::getUrl('create', panel: 'admin'), false);
+            ->assertDontSee(\App\Filament\Workspaces\Resources\WorkspaceResource::getUrl('create', panel: 'workspaces'), false);
 
         $admin = User::factory()->admin()->create();
         Livewire::actingAs($admin)->test(MyWork::class)
             ->assertSee(__('workspaces.my_work.empty_title'))
-            ->assertSee(AdminWorkspaceResource::getUrl('create', panel: 'admin'), false);
+            ->assertSee(\App\Filament\Workspaces\Resources\WorkspaceResource::getUrl('create', panel: 'workspaces'), false);
     }
 
     public function test_page_is_live(): void

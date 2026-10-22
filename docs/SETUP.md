@@ -170,10 +170,10 @@ cached image.
 
 ## First login and onboarding
 
-Open the admin UI:
+Open the app:
 
 - `http://localhost:8080` (or `${APP_URL}`) — the app; `/` is your work.
-  Administration is at `/admin`.
+  Administration is at `/system`, the sign-in page at `/login`.
 
 Log in with the credentials from the installer summary:
 
@@ -181,15 +181,15 @@ Log in with the credentials from the installer summary:
 - **Password:** the generated `ADMIN_PASSWORD` from the summary (also in
   `.env`).
 
-An in-app **onboarding wizard** then walks you through the setup (pick its
+An in-app **onboarding wizard** (`/setup`) then walks you through the setup (pick its
 language at the top). Its first step is **Account**: upload a profile picture
-(shown next to your messages and tasks; also under **Profile**) and set your
+(shown next to your messages and tasks; also under **My account → Profile**) and set your
 own password right there to replace the generated default. The step is optional and skippable, but while you still
 carry the default password a warning nudges you to change it (you can also
-change it anytime later under **Profile**). The wizard then walks you through
+change it anytime later under **My account → Profile**). The wizard then walks you through
 pasting your Claude token — it becomes your **personal** agent (the one your
-tasks run on; other people add theirs under **Profile → My Claude subscriptions**, shared
-agents live under **Worker → Agent credentials**) — and creating your first
+tasks run on; other people add theirs under **My account → Claude
+subscriptions**, where administrators also see the shared agents) — and creating your first
 workspace from a repository. Argos then inspects the repository and, if something is missing,
 starts a [setup task](PREPARE-PROJECT.md#the-setup-task) on your subscription.
 To make a repository "Argos-ready" by hand, see
@@ -234,8 +234,8 @@ workspace and you're done. **OAuth** is the optional upgrade that enables:
 - Per-user authentication (each user connects their own accounts)
 - Self-hosted GitLab support without per-workspace token management
 
-OAuth client credentials are managed entirely in the UI (Configuration → OAuth
-Apps) and stored in the database — there is no ENV path. See:
+OAuth client credentials are managed entirely in the UI (Administration → OAuth
+apps, `/system/oauth-apps`) and stored in the database — there is no ENV path. See:
 
 - [OAuth Overview](OAUTH.md) — when you're not sure which mode to pick
 - [GitHub Setup](SETUP-GITHUB.md)
@@ -252,8 +252,9 @@ and picks one per workspace from the repository; anything else comes from the
 repository's own `.argos/worker.dockerfile`. There is no stack editor. See
 [Stacks and Images](WORKER-STACKS.md).
 
-Agents (Claude subscriptions) are managed under **Worker → Agents** in the
-admin UI; every user can add their own. See [Agents](AGENTS.md).
+Agents (Claude subscriptions) are managed under **My account → Claude
+subscriptions** (`/account/agents`); every user can add their own. See
+[Agents](AGENTS.md).
 
 To tailor a repository to Argos — setup steps (`.argos/setup.sh`), a custom
 image (`.argos/worker.dockerfile`) or a preview contract (`.argos/demo.*`) —
@@ -262,8 +263,8 @@ see [Preparing a Repository](PREPARE-PROJECT.md).
 ## Users and administrators
 
 The admin account created on install is an **Argos administrator**.
-Administrators manage users (*Configuration → Users*), agents, OAuth apps,
-access tokens, API clients and settings, create workspaces and may do
+Administrators manage users, access tokens, OAuth apps and API clients under
+**Administration** (`/system`), see all agents, create workspaces and may do
 everything in every workspace. Other users work in the workspaces they are
 members of — as admin, member or viewer (see
 [Workspaces → Roles](WORKSPACES.md#roles)) — with their own agents. To restore
@@ -291,7 +292,7 @@ daemon + VS Code), which takes a few minutes.
 ## Pre-seeding the Claude token
 
 The token lives **per agent in the database**. The normal path is the in-app
-onboarding step, or **Worker → Agent Credentials** in the admin — a DB
+onboarding step, or **My account → Claude subscriptions** — a DB
 credential always wins (there is no `CLAUDE_CODE_OAUTH_TOKEN` env-var path).
 
 Generate a token with the Claude Code CLI (signed in to your Pro / Max / Team
@@ -301,7 +302,7 @@ plan):
 claude setup-token
 ```
 
-Paste it into onboarding / Agent Credentials. Tokens expire after a few weeks —
+Paste it into onboarding / Claude subscriptions. Tokens expire after a few weeks —
 refresh them in the UI and re-run `claude setup-token`.
 
 For an unattended local-dev seed you can instead drop the raw token into a file

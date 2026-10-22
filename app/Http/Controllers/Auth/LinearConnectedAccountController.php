@@ -92,10 +92,10 @@ final class LinearConnectedAccountController extends Controller
         $returnTo = $request->session()->pull(self::RETURN_SESSION_KEY);
 
         if ($returnTo === 'onboarding') {
-            return redirect()->route('filament.admin.pages.onboarding');
+            return redirect()->route('filament.workspaces.pages.setup');
         }
 
-        return redirect()->route('filament.admin.pages.connected-accounts');
+        return redirect()->route('filament.workspaces.account.pages.connections');
     }
 
     public function disconnect(): RedirectResponse
@@ -105,6 +105,6 @@ final class LinearConnectedAccountController extends Controller
 
         app(ConnectedAccountService::class)->disconnect($user, 'linear');
 
-        return redirect()->route('filament.admin.pages.connected-accounts');
+        return redirect()->route('filament.workspaces.account.pages.connections');
     }
 }

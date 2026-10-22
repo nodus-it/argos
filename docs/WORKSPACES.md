@@ -53,7 +53,7 @@ Every workspace and task has a readable address made from its name:
 A workspace's address comes from its name when it is created; a name already
 taken gets a number (`shop-api-2`). Names the app uses itself (`docs`,
 `account`, `system`, `api`, `login`, …) get one too. Links from before
-(`/w/workspaces/…?task=…`) still lead to the right place.
+(`/w/workspaces/…?task=…`, `/admin/…`) still lead to the right place.
 
 The rail:
 
@@ -64,12 +64,16 @@ The rail:
   request.
 - **Workspaces** as short names, each with a badge counting the tasks that
   wait for you there; *All workspaces* opens the list.
-- **Administration** (`/admin`) — only for Argos administrators.
-- The notification bell and your **profile** (your Claude subscriptions,
-  notifications, language, consent to automatic tasks, light/dark theme, sign
-  out).
+- **Administration** (`/system`, the gear icon) — only for Argos
+  administrators: overview, users, access tokens, OAuth apps, API clients.
+- The notification bell and your **avatar** with the user menu: **My account**
+  (`/account` — profile with name, avatar, language, notifications, consent to
+  automatic tasks and password; your Claude subscriptions; connected
+  accounts), **Documentation** (`/docs`), **Administration** (administrators),
+  light/dark theme, **Feedback**, source code and version, sign out.
 
-One login covers the app and `/admin`. On phones the rail moves to the bottom.
+One login (`/login`) covers the whole app. On phones the rail moves to the
+bottom.
 
 ## Roles
 
@@ -108,8 +112,7 @@ continue.
 Only **Argos administrators** create workspaces:
 
 - with **New workspace** on the workspace list (`/new`),
-- in the admin panel under **Workspaces → New**,
-- in the onboarding wizard (its repository step), or
+- in the setup wizard (`/setup`, its repository step), or
 - through the REST API: `POST /api/v1/workspaces` with a `workspaces:write`
   token of an API client that runs as an administrator (see
   [REST API](REST-API.md#create-a-workspace)).
@@ -152,8 +155,7 @@ the workspace header or at `/{workspace}/settings`. The tabs:
 | Automation | Automation user, plan mode, ship mode, gate fix rounds, budgets |
 | Members | People and their roles |
 
-Every field is described in [Workspace Settings](PROJECTS.md). The admin panel
-shows the same form under **Workspaces**.
+Every field is described in [Workspace Settings](PROJECTS.md).
 
 ## The workspace page
 

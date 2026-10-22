@@ -141,6 +141,6 @@ class DocsRenderer
             return $url;
         }
 
-        return route('filament.admin.pages.docs', ['slug' => $slug]).($m[2] ?? '');
+        return route('filament.workspaces.pages.docs', ['slug' => $slug]).($m[2] ?? '');
     }
 }

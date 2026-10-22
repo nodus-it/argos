@@ -18,8 +18,8 @@ return [
     ],
 
     'credentials' => [
-        'label' => 'Agent-Credential',
-        'plural' => 'Agent-Credentials',
+        'label' => 'Claude-Abo',
+        'plural' => 'Claude-Abos',
         'sections' => [
             'identity' => 'Identität',
             'identity_description' => 'Für welchen Agenten dieses Konto gilt, ein Anzeigename und der Status.',

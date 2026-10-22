@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Filament\Admin\Widgets\StatsOverviewWidget;
+use App\Filament\Workspaces\Clusters\System\Widgets\StatsOverviewWidget;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;

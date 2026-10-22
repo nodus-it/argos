@@ -74,11 +74,11 @@ for that provider is needed.
 
 ## Adding a credential
 
-Provider credentials are managed in the admin panel under the **Configuration**
-navigation group, on the **Access Tokens** page:
+Provider credentials are managed by Argos administrators under
+**Administration → Access tokens**:
 
 ```
-${APP_URL}/admin/provider-credentials
+${APP_URL}/system/tokens
 ```
 
 You can also create one during onboarding — in the authorize/repository step,
@@ -158,7 +158,8 @@ is then copied into the workspace. That access clones, pushes the task
 branches and opens and reads the pull requests of **every** task in the
 workspace (OAuth workspaces resolve — and refresh — the token from their
 Connected Account). A copied token does not follow later changes of the
-stored credential — update it in the workspace (admin panel → Workspaces).
+stored credential — renew it in the workspace's settings (General →
+**Repository access**).
 
 For the workspace form, see [Workspace Settings](PROJECTS.md).
 

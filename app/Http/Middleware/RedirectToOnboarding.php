@@ -15,23 +15,21 @@ class RedirectToOnboarding
     public function handle(Request $request, Closure $next): Response
     {
         if ($request->routeIs(
-            'filament.admin.pages.onboarding',
+            'filament.workspaces.pages.setup',
             // The in-app docs (setup/operations) must be reachable before the
             // first workspace exists, so onboarding can link into them.
-            'filament.admin.pages.docs',
-            'filament.admin.resources.workspaces.create',
+            'filament.workspaces.pages.docs',
             'filament.workspaces.resources.workspaces.create',
-            // Your own Claude subscription lives in the profile.
-            'filament.admin.auth.profile',
+            // My account: profile, own Claude subscriptions (agents are set
+            // up before the first workspace exists — create and the post-save
+            // edit route) and connected accounts.
+            'filament.workspaces.account',
             'filament.workspaces.auth.profile',
-            // Agents are set up before the first workspace exists — both
-            // create and the post-save edit route must be reachable.
-            'filament.admin.resources.agent-credentials.*',
+            'filament.workspaces.account.*',
             // OAuth apps and Personal Access Tokens are set up before the first
             // workspace exists, so the onboarding flow can reach them too.
-            'filament.admin.resources.provider-oauth-configs.*',
-            'filament.admin.resources.provider-credentials.*',
-            'filament.admin.auth.logout',
+            'filament.workspaces.system.resources.oauth-apps.*',
+            'filament.workspaces.system.resources.tokens.*',
             'filament.workspaces.auth.logout',
         )) {
             return $next($request);
@@ -47,6 +45,6 @@ class RedirectToOnboarding
             return $next($request);
         }
 
-        return redirect()->route('filament.admin.pages.onboarding');
+        return redirect()->route('filament.workspaces.pages.setup');
     }
 }

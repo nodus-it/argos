@@ -19,7 +19,7 @@ class FeedbackButtonTest extends TestCase
         Workspace::factory()->create();
         $this->actingAs(User::factory()->create());
 
-        $response = $this->get('/admin');
+        $response = $this->get('/');
 
         $response->assertOk();
         $response->assertSee('https://github.com/example/argos-fork/issues/new/choose', false);
@@ -32,7 +32,7 @@ class FeedbackButtonTest extends TestCase
         Workspace::factory()->create();
         $this->actingAs(User::factory()->create());
 
-        $response = $this->get('/admin');
+        $response = $this->get('/');
 
         $response->assertOk();
         $response->assertDontSee('fi-argos-feedback-btn', false);

@@ -7,7 +7,7 @@ namespace Tests\Feature;
 use App\Enums\AgentCredentialStatus;
 use App\Enums\AgentName;
 use App\Enums\IntegrationProvider;
-use App\Filament\Admin\Pages\Onboarding;
+use App\Filament\Workspaces\Pages\Onboarding;
 use App\Models\AgentCredential;
 use App\Models\ProviderCredential;
 use App\Models\ProviderOAuthConfig;
@@ -361,8 +361,8 @@ class OnboardingPageTest extends TestCase
             ->assertSuccessful()
             ->assertActionVisible('addOAuthApp')
             ->assertActionVisible('addAccessToken')
-            ->assertDontSee(route('filament.admin.resources.provider-oauth-configs.create'))
-            ->assertDontSee(route('filament.admin.resources.provider-credentials.create'));
+            ->assertDontSee(route('filament.workspaces.system.resources.oauth-apps.create'))
+            ->assertDontSee(route('filament.workspaces.system.resources.tokens.create'));
     }
 
     public function test_step2_offers_adding_more_oauth_apps_when_one_is_configured(): void

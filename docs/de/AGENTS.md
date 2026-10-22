@@ -53,8 +53,8 @@ So bekommst du einen Token:
 1. Führe `claude setup-token` in einem Terminal aus, in dem die Claude-CLI
    angemeldet ist.
 2. Kopiere den ausgegebenen Token.
-3. Füge ihn in Argos ein (beim Onboarding oder auf der Seite
-   *Agent-Credentials*).
+3. Füge ihn in Argos ein (im Einrichtungs-Assistenten oder unter **Mein Konto
+   → Claude-Abos**).
 
 Beim Speichern prüft Argos den Token gegen die Anthropic-API. Ist die API
 nicht erreichbar, wird der Token trotzdem gespeichert, aber als ungeprüft
@@ -81,7 +81,7 @@ Team-Abo) und wählen, welchen eine Aufgabe nutzt.
 
 ## Zugangsdaten beim Onboarding hinzufügen
 
-Der Agent-Schritt des Onboarding-Assistenten (`${APP_URL}/admin/onboarding`)
+Der Agent-Schritt des Einrichtungs-Assistenten (`${APP_URL}/setup`)
 fragt nach einem Claude-Token. Ohne authentifizierten Agenten geht es nicht
 weiter zur Repository-Anbindung. Füge die Ausgabe von `claude setup-token`
 ein; Argos prüft sie und speichert sie als geteilten Agenten namens „Default“.
@@ -90,8 +90,8 @@ Den vollständigen Ersteinrichtungs-Ablauf beschreibt [SETUP.md](SETUP.md).
 
 ## Zugangsdaten später verwalten
 
-Nach dem Onboarding verwaltest du Agenten auf der Seite **Agent-Credentials**
-(`${APP_URL}/admin/agent-credentials`). Dort kannst du:
+Nach dem Onboarding verwaltest du Agenten unter **Mein Konto → Claude-Abos**
+(`${APP_URL}/account/agents`). Dort kannst du:
 
 - neue Agenten anlegen,
 - Name, Token, Status, Besitzer oder Limits eines Agenten bearbeiten,
@@ -113,9 +113,10 @@ Jeder Agent hat einen von drei Status:
 Ein Agent ist entweder **persönlich** (er hat einen Besitzer und läuft auf dem
 Abo dieser Person) oder **geteilt** (ohne Besitzer).
 
-- Alle Nutzenden können unter *Agent-Credentials* einen **eigenen**
+- Alle Nutzenden können unter *Mein Konto → Claude-Abos* einen **eigenen**
   Claude-Agenten anlegen — mit der Ausgabe von `claude setup-token`; das Profil
-  unter `/w` listet sie ebenfalls auf. Alle sehen nur ihre eigenen Agenten.
+  (`/account/profile`) listet sie ebenfalls auf. Alle sehen nur ihre eigenen
+  Agenten.
 - Admins sehen alle Agenten und können einen Besitzer zuweisen oder das Feld
   für einen geteilten Agenten leer lassen.
 - Eine **Aufgabe** läuft auf dem Agenten, den die Person, der sie gehört, beim

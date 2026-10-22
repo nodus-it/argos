@@ -125,7 +125,7 @@ class WorkspaceRailTest extends TestCase
 
         $this->actingAs($member)->get($url)->assertOk()
             ->assertDontSee('wf-rail-admin', false)
-            ->assertSee(url('/profile'), false);
+            ->assertSee(url('/account/profile'), false);
         $this->actingAs($admin)->get($url)->assertOk()
             ->assertSee('wf-rail-admin', false)
             ->assertSee(__('workspaces.panel.admin'));

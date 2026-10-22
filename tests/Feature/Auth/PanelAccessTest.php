@@ -12,7 +12,7 @@ uses(RefreshDatabase::class);
 it('grants panel access to any authenticated user by default', function (): void {
     $user = User::factory()->create();
 
-    expect($user->canAccessPanel(Filament::getPanel('admin')))->toBeTrue();
+    expect($user->canAccessPanel(Filament::getPanel('workspaces')))->toBeTrue();
 });
 
 it('routes panel access through the access-argos-panel gate', function (): void {
@@ -22,5 +22,5 @@ it('routes panel access through the access-argos-panel gate', function (): void 
 
     $user = User::factory()->create();
 
-    expect($user->canAccessPanel(Filament::getPanel('admin')))->toBeFalse();
+    expect($user->canAccessPanel(Filament::getPanel('workspaces')))->toBeFalse();
 });

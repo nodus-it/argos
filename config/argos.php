@@ -47,7 +47,7 @@ return [
     'admin_password' => env('ADMIN_PASSWORD') ?: '12345',
     /*
      * Local one-click developer login (filament-developer-logins). Only ever
-     * active in the `local` environment — the AdminPanelProvider gates the
+     * active in the `local` environment — the panel (ConfiguresArgosPanel) gates the
      * plugin on app()->environment('local'), so this email is meaningless in
      * staging/production. Matches the demo seeders' admin so the button works
      * out of the box after a dev reset.

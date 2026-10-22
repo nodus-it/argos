@@ -34,8 +34,8 @@ fügst den Token lediglich im Workspace-Formular ein.
 
 ### Schritt 2: Workspace in Argos anlegen
 
-Wähle als Argos-Administrator **Neuer Workspace** (in `/w` oder im Admin-Panel
-unter **Workspaces**):
+Wähle als Argos-Administrator **Neuer Workspace** (in der Workspace-Liste oder
+direkt unter `/new`):
 
 - **Plattform**: GitHub
 - **Authentifizierung**: Personal Access Token (PAT)
@@ -77,7 +77,7 @@ die du setzen müsstest. Der vollständige UI-Ablauf ist beschrieben unter
 
 ### Schritt 2: OAuth-App in Argos hinzufügen
 
-1. Öffne **Konfiguration → OAuth-Apps** in der Argos-Administration.
+1. Öffne **Administration → OAuth-Apps** (`${APP_URL}/system/oauth-apps`).
 2. Füge eine App für **GitHub** hinzu, trage ihre **Client-ID** und ihr
    **Client-Secret** ein und aktiviere sie.
 3. Die im Formular angezeigte **Callback-URL** ist schreibgeschützt und wird
@@ -98,7 +98,7 @@ klassischer PAT mit `repo` bietet.
 ### Schritt 3: Konto verbinden
 
 1. Melde dich bei Argos an.
-2. Gehe in der Navigation zu **Verknüpfte Accounts**.
+2. Gehe zu **Mein Konto → Verknüpfte Accounts** (`/account/connections`).
 3. Klicke auf **Mit GitHub verbinden** — du wirst zu GitHub weitergeleitet, um
    die App zu autorisieren. Nach der Autorisierung kehrst du zur Seite
    Verknüpfte Accounts zurück.
@@ -128,8 +128,7 @@ Integration liegt am Workspace (eine pro GitHub-Repository).
 ### Schritt 2: Integration anlegen
 
 1. Öffne im Workspace **Einstellungen → Integrationen** → **Issue-Tracker** →
-   **Neu** (Workspace-Admins; Argos-Administratoren finden es auch am Workspace
-   im Admin-Panel).
+   **Neu** (Workspace-Admins und Argos-Administratoren).
 2. Setze **Provider** auf `GitHub` und wähle den **Zugang** (OAuth-Account oder
    gespeichertes PAT).
 3. Wähle **Projekt / Team** — das Repository im Format `owner/repo`. Nimm das
@@ -207,5 +206,5 @@ Für die gemeinsamen Details siehe [Issue-Trigger](SETUP-TASK-PROVIDERS.md) und
 | 403 beim Pushen nach `.github/workflows/*` | PAT fehlt der `workflow`-Scope. |
 | OAuth-Redirect schlägt mit "redirect_uri mismatch" fehl | Die Authorization callback URL der GitHub-OAuth-App muss exakt mit `${APP_URL}/auth/github/callback` übereinstimmen — einschließlich Schema. Prüfe `APP_URL`. |
 | OAuth-Callback liefert 500 | `APP_URL` nicht gesetzt oder stimmt nicht mit der öffentlichen URL überein — Laravel kann den korrekten Callback nicht erzeugen. |
-| "Mit GitHub verbinden" direkt nach dem Autorisieren abgelehnt | Die OAuth-App unter **Konfiguration → OAuth-Apps** ist deaktiviert oder hat die falsche Client-ID / das falsche Secret. Prüfe sie erneut und aktiviere sie. |
+| "Mit GitHub verbinden" direkt nach dem Autorisieren abgelehnt | Die OAuth-App unter **Administration → OAuth-Apps** ist deaktiviert oder hat die falsche Client-ID / das falsche Secret. Prüfe sie erneut und aktiviere sie. |
 | PR-Erstellung liefert 422 mit "A pull request already exists" | Argos erkennt dies und meldet die URL des bestehenden PRs — keine Aktion erforderlich. |

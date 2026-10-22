@@ -110,7 +110,7 @@ CI runs `shellcheck` over `worker/lib/`, the workspace scripts
 - Every new function in `worker/lib/` needs a docstring.
 - User-facing docs (setup, configuration, provider howtos) live in `docs/`,
   **English only**. They are one source, two surfaces: readable on GitHub and
-  rendered in-app by the Documentation viewer (`/admin/docs`).
+  rendered in-app by the Documentation viewer (`/docs`).
 - The in-app viewer shows the **curated** set listed in `config/docs.php`
   (operator/user docs). Contributor/architecture docs (`CONTRIBUTING.md`,
   `PROVIDER-TEST-SETUP.md`, `docs/backlog/…`) stay repo-only — keep them out of

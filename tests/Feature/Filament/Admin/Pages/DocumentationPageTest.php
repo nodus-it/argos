@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Filament\Admin\Pages;
 
-use App\Filament\Admin\Pages\Documentation;
+use App\Filament\Workspaces\Pages\Documentation;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Docs\DocManifest;
@@ -27,7 +27,7 @@ class DocumentationPageTest extends TestCase
 
     public function test_default_route_renders_the_first_manifest_page(): void
     {
-        $this->get(route('filament.admin.pages.docs'))
+        $this->get(route('filament.workspaces.pages.docs'))
             ->assertSuccessful()
             ->assertSee('Getting Started')    // sidebar section
             ->assertSee('How Argos Works');   // OVERVIEW.md H1 → page title (default landing)
@@ -35,7 +35,7 @@ class DocumentationPageTest extends TestCase
 
     public function test_a_specific_slug_renders(): void
     {
-        $this->get(route('filament.admin.pages.docs', ['slug' => 'configuration']))
+        $this->get(route('filament.workspaces.pages.docs', ['slug' => 'configuration']))
             ->assertSuccessful()
             ->assertSee('Configuration Reference');
     }
@@ -47,14 +47,14 @@ class DocumentationPageTest extends TestCase
     public function test_every_manifest_page_renders(): void
     {
         foreach (app(DocManifest::class)->pages() as $page) {
-            $this->get(route('filament.admin.pages.docs', ['slug' => $page['slug']]))
+            $this->get(route('filament.workspaces.pages.docs', ['slug' => $page['slug']]))
                 ->assertSuccessful();
         }
     }
 
     public function test_unknown_slug_is_404(): void
     {
-        $this->get(route('filament.admin.pages.docs', ['slug' => 'nope']))
+        $this->get(route('filament.workspaces.pages.docs', ['slug' => 'nope']))
             ->assertNotFound();
     }
 
@@ -71,7 +71,7 @@ class DocumentationPageTest extends TestCase
         // rather than bouncing to the onboarding page (which would be a 302).
         Workspace::query()->delete();
 
-        $this->get(route('filament.admin.pages.docs', ['slug' => 'setup']))
+        $this->get(route('filament.workspaces.pages.docs', ['slug' => 'setup']))
             ->assertSuccessful()
             ->assertSee('Setup Guide');
     }
@@ -80,6 +80,6 @@ class DocumentationPageTest extends TestCase
     {
         auth()->logout();
 
-        $this->get(route('filament.admin.pages.docs'))->assertRedirect();
+        $this->get(route('filament.workspaces.pages.docs'))->assertRedirect();
     }
 }

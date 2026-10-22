@@ -53,10 +53,10 @@ final class BitbucketConnectedAccountController extends Controller
         $returnTo = $request->session()->pull(self::RETURN_SESSION_KEY);
 
         if ($returnTo === 'onboarding') {
-            return redirect()->route('filament.admin.pages.onboarding');
+            return redirect()->route('filament.workspaces.pages.setup');
         }
 
-        return redirect()->route('filament.admin.pages.connected-accounts');
+        return redirect()->route('filament.workspaces.account.pages.connections');
     }
 
     public function disconnect(): RedirectResponse
@@ -66,6 +66,6 @@ final class BitbucketConnectedAccountController extends Controller
 
         app(ConnectedAccountService::class)->disconnect($user, 'bitbucket');
 
-        return redirect()->route('filament.admin.pages.connected-accounts');
+        return redirect()->route('filament.workspaces.account.pages.connections');
     }
 }

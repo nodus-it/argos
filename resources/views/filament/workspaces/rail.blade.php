@@ -30,7 +30,7 @@
     </a>
     <span class="wf-rail-spacer"></span>
     @if ($user->isAdmin())
-        <a href="{{ url('/admin') }}" class="wf-rail-btn wf-rail-admin" aria-label="{{ __('workspaces.panel.admin') }}" title="{{ __('workspaces.panel.admin') }}">
+        <a href="{{ \App\Filament\Workspaces\Clusters\System::getUrl(panel: 'workspaces') }}" @class(['wf-rail-btn', 'wf-rail-admin', 'is-active' => request()->routeIs('filament.workspaces.system*')]) aria-label="{{ __('workspaces.panel.admin') }}" title="{{ __('workspaces.panel.admin') }}">
             <x-wf.icon name="settings" :size="20" />
         </a>
     @endif
@@ -43,11 +43,14 @@
         <x-filament::dropdown.list>
             @if (filament()->hasProfile())
                 <x-filament::dropdown.list.item :href="filament()->getProfileUrl()" tag="a" icon="heroicon-o-user-circle">
-                    {{ __('workspaces.panel.profile') }}
+                    {{ __('account.title') }}
                 </x-filament::dropdown.list.item>
             @endif
+            <x-filament::dropdown.list.item :href="\App\Filament\Workspaces\Pages\Documentation::getUrl(panel: 'workspaces')" tag="a" icon="heroicon-o-book-open">
+                {{ __('system.docs') }}
+            </x-filament::dropdown.list.item>
             @if ($user->isAdmin())
-                <x-filament::dropdown.list.item :href="url('/admin')" tag="a" icon="heroicon-o-cog-6-tooth">
+                <x-filament::dropdown.list.item :href="\App\Filament\Workspaces\Clusters\System::getUrl(panel: 'workspaces')" tag="a" icon="heroicon-o-cog-6-tooth">
                     {{ __('workspaces.panel.admin') }}
                 </x-filament::dropdown.list.item>
             @endif
@@ -55,6 +58,18 @@
         <x-filament::dropdown.list>
             <x-filament-panels::theme-switcher />
         </x-filament::dropdown.list>
+        @php $sourceUrl = rtrim((string) config('argos.source_url'), '/'); @endphp
+        @if ($sourceUrl !== '')
+            {{-- AGPL-3.0 §13: the source stays one click away on every page. --}}
+            <x-filament::dropdown.list>
+                <x-filament::dropdown.list.item :href="$sourceUrl.'/issues/new/choose'" tag="a" target="_blank" icon="heroicon-o-chat-bubble-left-ellipsis" class="fi-argos-feedback-btn">
+                    {{ __('common.feedback_button.tooltip') }}
+                </x-filament::dropdown.list.item>
+                <x-filament::dropdown.list.item :href="$sourceUrl" tag="a" target="_blank" icon="heroicon-o-code-bracket">
+                    {{ __('common.source_link_label') }} · v{{ config('argos.version') }} · AGPL-3.0
+                </x-filament::dropdown.list.item>
+            </x-filament::dropdown.list>
+        @endif
         <x-filament::dropdown.list>
             <x-filament::dropdown.list.item :action="filament()->getLogoutUrl()" method="post" tag="form" icon="heroicon-o-arrow-left-on-rectangle">
                 {{ __('filament-panels::layout.actions.logout.label') }}

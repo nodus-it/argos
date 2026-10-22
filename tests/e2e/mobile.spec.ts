@@ -21,19 +21,18 @@ import {
  * stack — no tokens or worker needed, same as the rest of the gemockt suite.
  */
 
-// List + admin masks that must stay overflow-free on a phone. Mirrors the
-// desktop settings-walk plus the in-app docs viewer (concept overlap D).
+// Lists, account and administration masks that must stay overflow-free on a
+// phone, plus the in-app docs viewer (concept overlap D).
 const MASKS: { label: string; path: string }[] = [
-  { label: 'Dashboard', path: '/admin' },
-  { label: 'Workspaces (admin)', path: '/admin/workspaces' },
-  { label: 'API clients', path: '/admin/api-clients' },
-  { label: 'Agent credentials', path: '/admin/agent-credentials' },
-  { label: 'Connected accounts', path: '/admin/connected-accounts' },
-  { label: 'Settings', path: '/admin/settings' },
-  { label: 'Documentation', path: '/admin/docs' },
-  { label: 'Workspaces', path: '/workspaces' },
   { label: 'My work', path: '/' },
-  { label: 'Users', path: '/admin/users' },
+  { label: 'Workspaces', path: '/workspaces' },
+  { label: 'Profile', path: '/account/profile' },
+  { label: 'Claude subscriptions', path: '/account/agents' },
+  { label: 'Connected accounts', path: '/account/connections' },
+  { label: 'Administration', path: '/system/overview' },
+  { label: 'Users', path: '/system/users' },
+  { label: 'API clients', path: '/system/api-clients' },
+  { label: 'Documentation', path: '/docs' },
   // Forms must not break on mobile (Filament stacks grids to 1 column below lg).
   { label: 'Create workspace', path: '/new' },
 ];

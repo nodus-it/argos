@@ -62,7 +62,7 @@ class DocsRendererTest extends TestCase
         $doc = $this->render('See [setup](SETUP.md#reverse-proxy).');
 
         $this->assertStringContainsString(
-            route('filament.admin.pages.docs', ['slug' => 'setup']).'#reverse-proxy',
+            route('filament.workspaces.pages.docs', ['slug' => 'setup']).'#reverse-proxy',
             $doc->html,
         );
     }

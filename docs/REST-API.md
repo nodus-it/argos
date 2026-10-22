@@ -26,8 +26,8 @@ that gate the endpoints.
 
 | Kind | Created at | Reach | Acts for |
 |---|---|---|---|
-| **API client token** | Admin panel → **Configuration → API Clients** → a client → *API tokens* | Every workspace the client's **Runs as** user can see (an Argos administrator sees all) | The client's **Runs as** user |
-| **Workspace token** | Workspace **Settings → Integrations → API tokens** (workspace admins), or the workspace in the admin panel | Only that workspace — other workspaces and their tasks answer `404` | The workspace's **automation user** (Settings → Automation) |
+| **API client token** | **Administration → API clients** (`/system/api-clients`) → a client → *API tokens* | Every workspace the client's **Runs as** user can see (an Argos administrator sees all) | The client's **Runs as** user |
+| **Workspace token** | Workspace **Settings → Integrations → API tokens** (workspace admins and Argos administrators) | Only that workspace — other workspaces and their tasks answer `404` | The workspace's **automation user** (Settings → Automation) |
 
 The plaintext token is shown **once** on creation; only its hash is stored.
 

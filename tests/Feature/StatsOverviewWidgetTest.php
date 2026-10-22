@@ -6,7 +6,7 @@ namespace Tests\Feature;
 
 use App\Enums\AgentName;
 use App\Enums\AutoTaskState;
-use App\Filament\Admin\Widgets\StatsOverviewWidget;
+use App\Filament\Workspaces\Clusters\System\Widgets\StatsOverviewWidget;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\WorkerImageBuild;
@@ -31,7 +31,7 @@ class StatsOverviewWidgetTest extends TestCase
         Livewire::test(StatsOverviewWidget::class)
             ->assertSuccessful()
             ->assertSee('Running Workspaces')
-            ->assertSee('Automatic Runs')
+            ->assertSee('Automatic tasks')
             ->assertSee('Waiting for you')
             ->assertSee('Worker Updates');
     }
@@ -95,8 +95,8 @@ class StatsOverviewWidgetTest extends TestCase
         Task::factory()->create(); // manual task
 
         Livewire::test(StatsOverviewWidget::class)
-            ->assertSee('Automatic Runs')
-            ->assertSee('2 runs in progress');
+            ->assertSee('Automatic tasks')
+            ->assertSee('2 automatic tasks at work');
     }
 
     public function test_waiting_for_input_counts_plan_approvals_and_paused_runs(): void
@@ -109,7 +109,7 @@ class StatsOverviewWidgetTest extends TestCase
 
         $this->assertSame(2, $stats[2]->getValue());
         Livewire::test(StatsOverviewWidget::class)
-            ->assertSee('Plan approval or paused run');
+            ->assertSee('Plan approval or paused automatic task');
     }
 
     public function test_zero_states_render_calm_messages(): void

@@ -5,7 +5,7 @@ Argos supports two ways of authenticating against your Git host:
 1. **Personal Access Token (PAT)** — paste a token per workspace. Works
    immediately, no server-side configuration.
 2. **OAuth** — register an OAuth App on the provider, add its client ID/secret
-   in the Argos UI (Configuration → OAuth Apps), and let users connect their
+   in the Argos UI (Administration → OAuth apps), and let users connect their
    own accounts.
 
 ## Which one should I pick?
@@ -58,7 +58,7 @@ OAuth apps are managed **in the UI** — there are no `*_CLIENT_ID` /
 `*_CLIENT_SECRET` environment variables. After creating the OAuth App on the
 provider side:
 
-1. Open **Configuration → OAuth Apps** in the Argos admin.
+1. Open **Administration → OAuth apps** (`${APP_URL}/system/oauth-apps`).
 2. Add an app for the provider, paste its **client ID** and **client secret**,
    and enable it. For self-hosted GitLab, set the instance URL on the app
    itself (no `GITLAB_INSTANCE_URL` environment variable needed).
@@ -72,7 +72,7 @@ environment variables that *are* still ENV-based.
 
 ## After OAuth is configured
 
-The **Connected Accounts** page in the Argos navigation shows a "Connect"
+The **My account → Connected accounts** page (`/account/connections`) shows a "Connect"
 button for each configured provider. Once connected, the **Authentication**
 field in the workspace form gains an "OAuth" option that pulls repos and
 branches from the connected account.
@@ -88,5 +88,5 @@ so a clone, fetch or push never starts with a token about to expire.
 
 If a refresh fails (revoked token, provider 4xx, missing `refresh_token`), the
 git operation (or the workspace start) fails with a message asking you to
-reconnect the account. Reconnect the account on the **Connected Accounts** page
+reconnect the account. Reconnect the account under **My account → Connected accounts**
 to mint a fresh token + refresh token pair, then try again.

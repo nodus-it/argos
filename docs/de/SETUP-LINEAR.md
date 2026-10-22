@@ -72,8 +72,8 @@ Starte den Manager neu, damit er die neuen Variablen übernimmt.
 
 ### 3. Das Konto verbinden
 
-1. Gehe im Admin-Panel zu **Verknüpfte Accounts** (oder durchlaufe den
-   Onboarding-Flow) und starte die Linear-Verbindung.
+1. Gehe zu **Mein Konto → Verknüpfte Accounts** (`/account/connections`) oder
+   durchlaufe den Einrichtungs-Assistenten und starte die Linear-Verbindung.
 2. Argos leitet dich zu `https://linear.app/oauth/authorize` weiter, um die
    Anwendung zu autorisieren; bestätige die angeforderten Scopes.
 3. Du wirst zurück zu Argos geleitet und das Linear-Konto wird als verbunden
@@ -99,7 +99,7 @@ eine Instanz, die nur eine Person betreibt.
 1. Gehe in Linear zu **Settings** → **API** → **Personal API keys**
    (`https://linear.app/settings/api`) und erstelle einen Key. Er beginnt mit
    `lin_api_`.
-2. Öffne im Argos-Admin-Panel **Access-Tokens** (Provider-Zugangsdaten) →
+2. Öffne in Argos **Administration → Access-Tokens** (`/system/tokens`) →
    erstelle Zugangsdaten mit **Plattform** = `Linear` und füge den Key ein. Die
    Inline-Hilfe nennt als vorgeschlagenen Scope `read, write`.
 

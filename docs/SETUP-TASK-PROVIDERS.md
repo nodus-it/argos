@@ -75,8 +75,8 @@ organisation member with sufficient permissions; see
 
 ## Creating an integration
 
-1. Open the workspace's **Settings → Integrations** (workspace admins), or the
-   workspace in the admin panel.
+1. Open the workspace's **Settings → Integrations** (workspace admins and
+   Argos administrators).
 2. Under **Issue trackers** choose **New**.
 3. Fill in the fields:
 

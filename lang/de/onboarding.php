@@ -53,7 +53,7 @@ return [
 
     'agents' => [
         'heading' => 'Dein Claude-Abo',
-        'description' => 'Aufgaben laufen auf dem Abo der Person, der sie gehören. Hinterlege deins — auch die Einrichtung des ersten Workspaces läuft darauf. Andere Mitglieder hinterlegen ihres im Profil; geteilte Agenten für Automatik findest du unter Agent-Credentials.',
+        'description' => 'Aufgaben laufen auf dem Abo der Person, der sie gehören. Hinterlege deins — auch die Einrichtung des ersten Workspaces läuft darauf. Andere Mitglieder hinterlegen ihres unter Mein Konto; geteilte Agenten für Automatik liegen ebenfalls dort (Claude-Abos).',
         'gate_hint' => 'Dein Claude-Abo wird benötigt',
         'claude_label' => 'Claude Code',
         'claude_hint' => 'Token via <code class="text-xs">claude setup-token</code> erzeugen und unten einfügen.',

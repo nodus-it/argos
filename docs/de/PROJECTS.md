@@ -10,9 +10,8 @@ Einrichtungs-Aufgabe) unter [Ein Repository vorbereiten](PREPARE-PROJECT.md).
 **Wo:** Workspace-Admins (und Argos-Admins) öffnen die
 **Workspace-Einstellungen** über den Kopf des Workspaces, unter
 `/{workspace}/settings`. Jeder Tab hat seinen eigenen
-**Speichern**-Button. Argos-Admins finden dasselbe Formular im Admin-Panel
-unter **Workspaces** (mit den Issue-Trackern und API-Tokens unter dem
-Formular). Neue Workspaces legen nur Argos-Admins an — siehe
+**Speichern**-Button. Neue Workspaces legen nur Argos-Admins an (unter
+`/new`) — siehe
 [Einen Workspace anlegen](WORKSPACES.md#einen-workspace-anlegen).
 
 - [Anlegen: Plattform, Zugang, Repository](#anlegen-plattform-zugang-repository)
@@ -32,9 +31,11 @@ Formular). Neue Workspaces legen nur Argos-Admins an — siehe
 
 Diese Felder werden beim Anlegen des Workspaces gesetzt. Plattform und
 Repository stehen danach fest (sie zu ändern würde jeden Aufgaben-Branch und
-Pull Request verwaisen lassen) — auf der Einstellungsseite in `/w` und im
-Bearbeitungsformular im Admin-Panel. Dort lässt sich der Zugang weiterhin
-erneuern, z. B. ein abgelaufener Token ersetzen.
+Pull Request verwaisen lassen); die Einstellungsseite zeigt sie nur lesend an.
+Ihr Abschnitt **Zugang zum Repository** (Tab Allgemein) erneuert den Zugang:
+ein neues Personal Access Token (leer gelassen bleibt das gespeicherte — es
+wird nie wieder angezeigt) oder der Wechsel zu deinem verknüpften Account und
+zurück.
 
 - **Plattform** — GitHub, GitLab (einschließlich selbst gehosteter Instanzen)
   oder Bitbucket. Bis du eine auswählst, bleibt der Rest des Formulars
@@ -66,6 +67,7 @@ Aufgaben-Branches zu pushen und Pull Requests zu öffnen.
 |---|---|
 | Name | Anzeigename des Workspaces. |
 | Repository | Adresse und Plattform, schreibgeschützt. |
+| Zugang zum Repository | Personal Access Token (leer behält das gespeicherte) oder dein verknüpfter Account; eigenes **Speichern**. |
 | Default Branch | Neue Aufgaben zweigen davon ab, und ihre Pull Requests zielen darauf (sofern eine Aufgabe keine andere Basis wählt). |
 | Branch-Muster | Wie Aufgaben-Branches heißen. Platzhalter: `{ticket}` (der Ticket-Schlüssel, oder `argos` ohne Ticket) und `{title}` (der Titel der Aufgabe als Slug). Leer: `{ticket}-{title}` mit Ticket, `argos/{title}` ohne. Erlaubte Zeichen: Buchstaben, Ziffern, `. _ / - { }`; max. 60. Ein vergebener Name bekommt eine Nummer. |
 

@@ -60,7 +60,7 @@ composer run dev
 That spins up the compose stack (db + redis + app + nginx + queue + scheduler)
 **and** runs the Vite watcher locally. Jobs run on Laravel Horizon (Redis), so
 the `redis` service is part of the stack — no separate install needed. Open
-<http://localhost:8080/admin>.
+<http://localhost:8080>.
 
 Useful sub-commands:
 
@@ -124,7 +124,7 @@ php artisan test:providers --reset  # clean up afterwards
 - Run `vendor/bin/pint --dirty` before finalising any change. Pint is the
   source of truth for style.
 - Filament resources follow the existing patterns under
-  `app/Filament/Admin/Resources/` — check sibling files before introducing a
+  `app/Filament/Workspaces/` (clusters `Account` and `System` for account and administration pages) — check sibling files before introducing a
   new structure.
 - Eloquent enums are preferred over string columns; new enums go under
   `app/Enums/`.

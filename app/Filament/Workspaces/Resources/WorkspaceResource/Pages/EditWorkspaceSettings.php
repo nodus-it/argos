@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Filament\Workspaces\Resources\WorkspaceResource\Pages;
 
-use App\Filament\Admin\RelationManagers\ApiTokensRelationManager;
-use App\Filament\Admin\Resources\WorkspaceResource\RelationManagers\TaskProviderBindingsRelationManager;
-use App\Filament\Admin\Support\Pages\EditRecord;
+use App\Filament\Workspaces\Resources\WorkspaceResource\RelationManagers\ApiTokensRelationManager;
+use App\Filament\Workspaces\Resources\WorkspaceResource\RelationManagers\TaskProviderBindingsRelationManager;
+use App\Filament\Support\Pages\EditRecord;
 use App\Filament\Shared\WorkspaceForm;
 use App\Filament\Workspaces\Resources\WorkspaceResource;
 use App\Filament\Workspaces\Resources\WorkspaceResource\RelationManagers\MembersRelationManager;
@@ -46,10 +46,15 @@ class EditWorkspaceSettings extends EditRecord
     /** Fields per settings form (state path => columns). */
     private const FIELDS = [
         'data' => ['name', 'branch_pattern', 'default_branch'],
+        // The token itself is never filled into the browser.
+        'access' => ['auth_method', 'connected_account_id'],
         'environment' => ['worker_source', 'worker_stack_id', 'worker_services', 'worker_service_config', 'live_demo_enabled', 'composer_registries', 'worker_env'],
         'resources' => ['max_sessions', 'max_previews', 'cpu_limit', 'memory_limit_mb', 'cleanup_after_days'],
         'automation' => ['automation_user_id', 'auto_settings'],
     ];
+
+    /** @var array<string, mixed>|null */
+    public ?array $access = [];
 
     /** @var array<string, mixed>|null */
     public ?array $environment = [];
@@ -101,6 +106,11 @@ class EditWorkspaceSettings extends EditRecord
         ]);
     }
 
+    public function accessForm(Schema $schema): Schema
+    {
+        return $this->settingsSchema($schema, 'access')->components([WorkspaceForm::accessSection()]);
+    }
+
     public function environmentForm(Schema $schema): Schema
     {
         return $this->settingsSchema($schema, 'environment')->components([
@@ -136,7 +146,7 @@ class EditWorkspaceSettings extends EditRecord
                     Tab::make(__('workspaces.settings.tabs.general'))
                         ->key('general')
                         ->icon('heroicon-o-folder')
-                        ->schema([$this->formComponent('form', 'save')]),
+                        ->schema([$this->formComponent('form', 'save'), $this->formComponent('accessForm', 'saveAccess')]),
                     Tab::make(__('workspaces.settings.tabs.environment'))
                         ->key('environment')
                         ->icon('heroicon-o-cpu-chip')
@@ -164,6 +174,25 @@ class EditWorkspaceSettings extends EditRecord
         ]);
     }
 
+    /** Renew the repository access: a new token, or a connected account instead. */
+    public function saveAccess(): void
+    {
+        $this->authorizeAccess();
+
+        /** @var Schema $schema */
+        $schema = $this->getSchema('accessForm');
+        $data = $schema->getState();
+        $attributes = ($data['auth_method'] ?? null) === 'oauth'
+            ? ['auth_method' => 'oauth', 'connected_account_id' => $data['connected_account_id'] ?? null, 'token' => null]
+            : ['auth_method' => 'pat', 'connected_account_id' => null, ...(filled($data['token'] ?? null) ? ['token' => (string) $data['token']] : [])];
+        /** @var User $user */
+        $user = auth()->user();
+        app(WorkspaceService::class)->updateSettings($this->workspace(), $user, $attributes);
+        $schema->fill([...Arr::only($attributes, self::FIELDS['access']), 'token' => null]);
+
+        Notification::make()->success()->title(__('filament-panels::resources/pages/edit-record.notifications.saved.title'))->send();
+    }
+
     public function saveEnvironment(): void
     {
         $this->saveSettingsForm('environmentForm');
@@ -186,7 +215,7 @@ class EditWorkspaceSettings extends EditRecord
 
         $attributes = $this->workspace()->attributesToArray();
         $this->form->fill(Arr::only($attributes, self::FIELDS['data']));
-        foreach (['environment', 'resources', 'automation'] as $form) {
+        foreach (['access', 'environment', 'resources', 'automation'] as $form) {
             $this->getSchema($form.'Form')?->fill(Arr::only($attributes, self::FIELDS[$form]));
         }
 

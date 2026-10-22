@@ -29,8 +29,8 @@ workspace form.
 
 ### Step 2: Create the workspace in Argos
 
-As an Argos administrator, choose **New workspace** (in `/w`, or under
-**Workspaces** in the admin panel):
+As an Argos administrator, choose **New workspace** (on the workspace list,
+or directly at `/new`):
 
 - **Platform**: GitLab
 - **Authentication**: Personal Access Token (PAT)
@@ -82,7 +82,7 @@ still `read_user`, `api`.
 
 ### Step 2: Add the OAuth App in Argos
 
-1. Open **Configuration → OAuth Apps** in the Argos admin.
+1. Open **Administration → OAuth apps** (`${APP_URL}/system/oauth-apps`).
 2. Add an app for **GitLab**, paste its **Application ID** (client ID) and
    **Secret** (client secret), and enable it.
 3. For a self-hosted instance, set the **Instance URL** field on the app
@@ -100,9 +100,9 @@ side by side — for example one for gitlab.com and one per self-hosted instance
 ### Step 3: Connect your account
 
 1. Sign in to Argos.
-2. Go to **Connected Accounts** in the navigation.
+2. Go to **My account → Connected accounts** (`/account/connections`).
 3. Click **Connect with GitLab** — you are redirected to GitLab to authorize
-   the app. After authorizing, you are returned to the Connected Accounts page.
+   the app. After authorizing, you are returned to the Connected accounts page.
 4. When creating a workspace, select **GitLab** as the platform and choose
    **OAuth** as the authentication method — the repo and branch dropdowns
    appear, populated from your connected account.
@@ -133,8 +133,7 @@ integration lives on the workspace (one per GitLab project).
 ### Step 2: Create the integration
 
 1. Open the workspace's **Settings → Integrations** → **Issue trackers** →
-   **New** (workspace admins; Argos administrators also find it on the
-   workspace in the admin panel).
+   **New** (workspace admins and Argos administrators).
 2. Fill in the fields:
 
 | Field | Description |
@@ -226,4 +225,4 @@ For the shared details, see [Issue Triggers](SETUP-TASK-PROVIDERS.md) and
 | 403 during webhook setup | The connected account's token lacks the `api` scope. Reconnect or recreate the token with `api`. |
 | OAuth redirect fails with "redirect_uri mismatch" | The Redirect URI on the GitLab OAuth app must exactly match `${APP_URL}/auth/gitlab/callback`, including the scheme. Verify `APP_URL`. |
 | OAuth callback returns 500 | `APP_URL` not set or not matching the public URL — Laravel cannot generate the correct callback. |
-| Self-hosted OAuth hits gitlab.com instead of your instance | The **Instance URL** field on the OAuth App in Argos is empty or wrong. Set it to your instance URL (no trailing slash) under **Configuration → OAuth Apps**. |
+| Self-hosted OAuth hits gitlab.com instead of your instance | The **Instance URL** field on the OAuth App in Argos is empty or wrong. Set it to your instance URL (no trailing slash) under **Administration → OAuth apps**. |

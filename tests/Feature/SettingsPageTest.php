@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Filament\Admin\Pages\Settings;
+use App\Filament\Workspaces\Clusters\System\Pages\Settings;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -24,7 +24,7 @@ class SettingsPageTest extends TestCase
     {
         Livewire::test(Settings::class)
             ->assertSuccessful()
-            ->assertSee(__('settings.title'));
+            ->assertSee(__('system.overview'));
     }
 
     public function test_settings_page_offers_the_application_log_download(): void

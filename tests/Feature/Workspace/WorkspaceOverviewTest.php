@@ -10,9 +10,7 @@ use App\Enums\SessionStatus;
 use App\Enums\TaskEventType;
 use App\Enums\TaskStatus;
 use App\Enums\WorkspaceRole;
-use App\Filament\Admin\Pages\Dashboard;
-use App\Filament\Admin\Pages\Profile;
-use App\Filament\Admin\Widgets\MyWorkspacesWidget;
+use App\Filament\Workspaces\Clusters\Account\Pages\Profile;
 use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\ListWorkspaces;
 use App\Livewire\Workspace\TaskSwitcher;
 use App\Models\Demo;
@@ -203,16 +201,6 @@ class WorkspaceOverviewTest extends TestCase
 
         $chat->call('startRename', $this->task->id)->set('renameTitle', 'Login v2')->call('rename');
         $this->assertSame('Login v2', $this->task->fresh()->title);
-    }
-
-    public function test_dashboard_shows_my_workspaces_widget_for_members(): void
-    {
-        $this->actingAs($this->editor);
-        Livewire::test(Dashboard::class)->assertSeeLivewire(MyWorkspacesWidget::class);
-        Livewire::test(MyWorkspacesWidget::class)->assertSee($this->workspace->name);
-
-        $this->actingAs(User::factory()->create());
-        $this->assertFalse(MyWorkspacesWidget::canView());
     }
 
     public function test_profile_saves_notification_preferences(): void

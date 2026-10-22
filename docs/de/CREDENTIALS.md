@@ -81,11 +81,11 @@ benötigt wird.
 
 ## Zugangsdaten hinzufügen
 
-Provider-Zugangsdaten werden im Admin-Panel unter der Navigationsgruppe
-**Konfiguration** auf der Seite **Access-Tokens** verwaltet:
+Provider-Zugangsdaten verwalten Argos-Admins unter
+**Administration → Access-Tokens**:
 
 ```
-${APP_URL}/admin/provider-credentials
+${APP_URL}/system/tokens
 ```
 
 Du kannst sie auch während des Onboardings anlegen — im
@@ -170,8 +170,9 @@ Access-Tokens wählen, dessen Token dann in den Workspace kopiert wird. Über
 diesen Zugang klont Argos, pusht die Branches der Aufgaben und öffnet und liest
 die Pull Requests **aller** Aufgaben im Workspace (OAuth-Workspaces lösen den
 Token stattdessen aus ihrem verbundenen Konto auf — und erneuern ihn). Ein
-kopierter Token folgt späteren Änderungen der gespeicherten Zugangsdaten nicht
-— aktualisiere ihn im Workspace (Admin-Panel → Workspaces).
+kopierter Token folgt späteren Änderungen der gespeicherten Zugangsdaten nicht —
+erneuere ihn in den Einstellungen des Workspaces (Allgemein → **Zugang zum
+Repository**).
 
 Zum Workspace-Formular siehe [Workspace-Einstellungen](PROJECTS.md).
 

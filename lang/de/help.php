@@ -9,7 +9,7 @@ return [
     'platform' => [
         'github' => [
             'title' => 'GitHub-Setup',
-            'body' => 'Du brauchst nur ein Personal Access Token mit `repo`-Scope. Token läuft ab? Einfach neu erstellen und im Projekt aktualisieren.',
+            'body' => 'Du brauchst nur ein Personal Access Token mit `repo`-Scope. Token läuft ab? Einfach neu erstellen und im Workspace aktualisieren.',
             'link_label' => 'Token erstellen',
             'link_url' => ':github_pat',
             'doc_label' => 'Vollständige Anleitung',
@@ -44,13 +44,13 @@ return [
         ],
         'not_configured' => [
             'title' => 'OAuth nicht eingerichtet',
-            'body' => 'Du kannst Projekte trotzdem per Personal Access Token anlegen. OAuth aktiviert Repo-/Branch-Dropdowns und Multi-User-Setups.',
+            'body' => 'Du kannst Workspaces trotzdem per Personal Access Token anlegen. OAuth aktiviert Repo-/Branch-Dropdowns und Multi-User-Setups.',
             'doc_label' => 'Wann lohnt sich OAuth?',
             'doc_url' => ':oauth',
         ],
         'overview' => [
             'title' => 'Was bringt mir OAuth?',
-            'body' => 'Verbundene Accounts ersetzen Personal Access Tokens auf Projekt-Ebene. Du wählst Repos und Branches aus Dropdowns statt URLs einzutippen, und jeder User kann eigene Accounts verbinden.',
+            'body' => 'Verbundene Accounts ersetzen Personal Access Tokens auf Workspace-Ebene. Du wählst Repos und Branches aus Dropdowns statt URLs einzutippen, und jeder User kann eigene Accounts verbinden.',
             'doc_label' => 'OAuth-Übersicht',
             'doc_url' => ':oauth',
         ],

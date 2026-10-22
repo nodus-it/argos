@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Http\Controllers\Auth\BitbucketConnectedAccountController;
 use App\Http\Controllers\Auth\ConnectedAccountController;
 use App\Http\Controllers\Auth\LinearConnectedAccountController;
+use App\Http\Controllers\LegacyAdminRedirectController;
 use App\Http\Controllers\LegacyWorkspaceRedirectController;
 use App\Http\Controllers\SystemLogController;
 use App\Http\Controllers\TaskAttachmentController;
@@ -13,6 +14,12 @@ use App\Http\Controllers\Webhooks\IssueWebhookController;
 use App\Http\Controllers\WorkspaceGateController;
 use App\Http\Controllers\WorkspaceOpenController;
 use Illuminate\Support\Facades\Route;
+
+// The admin panel is gone: its pages live under /account, /system, /docs
+// and /setup now.
+Route::get('/admin/{path?}', LegacyAdminRedirectController::class)
+    ->where('path', '.*')
+    ->name('admin.legacy');
 
 // The workspace app sits at the root (`/`, `/{workspace}/{task}`); links
 // from before still point at /w/… — they keep working.

@@ -57,8 +57,8 @@ ihrem Namen:
 Die Adresse eines Workspaces entsteht beim Anlegen aus seinem Namen; ist der
 Name schon vergeben, kommt eine Zahl dazu (`shop-api-2`). Namen, die die App
 selbst nutzt (`docs`, `account`, `system`, `api`, `login`, …), bekommen
-ebenfalls eine. Links von früher (`/w/workspaces/…?task=…`) führen weiterhin
-an die richtige Stelle.
+ebenfalls eine. Links von früher (`/w/workspaces/…?task=…`, `/admin/…`)
+führen weiterhin an die richtige Stelle.
 
 Die Leiste:
 
@@ -69,13 +69,17 @@ Die Leiste:
   und Pull Request.
 - **Workspaces** als Kurznamen, jeweils mit einem Badge, das die Aufgaben
   zählt, die dort auf dich warten; *Alle Workspaces* öffnet die Liste.
-- **Verwaltung** (`/admin`) — nur für Argos-Admins.
-- Die Benachrichtigungsglocke und dein **Profil** (deine Claude-Abos,
-  Benachrichtigungen, Sprache, Zustimmung zu automatischen Aufgaben,
-  helles/dunkles Design, Abmelden).
+- **Administration** (`/system`, das Zahnrad) — nur für Argos-Admins:
+  Übersicht, Benutzer, Access-Tokens, OAuth-Apps, API-Clients.
+- Die Benachrichtigungsglocke und dein **Avatar** mit dem Benutzermenü: **Mein
+  Konto** (`/account` — Profil mit Name, Avatar, Sprache, Benachrichtigungen,
+  Zustimmung zu automatischen Aufgaben und Passwort; deine Claude-Abos;
+  verknüpfte Accounts), **Dokumentation** (`/docs`), **Administration**
+  (Argos-Admins), helles/dunkles Design, **Feedback**, Quellcode und Version,
+  Abmelden.
 
-Ein Login gilt für die App und `/admin`. Auf Smartphones wandert die Leiste nach
-unten.
+Ein Login (`/login`) gilt für die ganze App. Auf Smartphones wandert die
+Leiste nach unten.
 
 ## Rollen
 
@@ -117,8 +121,7 @@ soll.
 Nur **Argos-Admins** legen Workspaces an:
 
 - mit **Neuer Workspace** in der Workspace-Liste (`/new`),
-- im Admin-Panel unter **Workspaces → Erstellen**,
-- im Onboarding-Assistenten (in seinem Repository-Schritt) oder
+- im Einrichtungs-Assistenten (`/setup`, in seinem Repository-Schritt) oder
 - über die REST-API: `POST /api/v1/workspaces` mit einem
   `workspaces:write`-Token eines API-Clients, der als Admin läuft (siehe
   [REST-API](REST-API.md#einen-workspace-anlegen)).
@@ -164,8 +167,7 @@ den Kopf des Workspaces oder unter `/{workspace}/settings`. Die Tabs:
 | Automatik | Automatik-Nutzer, Plan-Modus, Auslieferungs-Modus, Gate-Fix-Runden, Budgets |
 | Mitglieder | Personen und ihre Rollen |
 
-Jedes Feld ist unter [Workspace-Einstellungen](PROJECTS.md) beschrieben. Das
-Admin-Panel zeigt dasselbe Formular unter **Workspaces**.
+Jedes Feld ist unter [Workspace-Einstellungen](PROJECTS.md) beschrieben.
 
 ## Die Workspace-Seite
 

@@ -49,7 +49,8 @@ To get a token:
 
 1. Run `claude setup-token` in a terminal where the Claude CLI is logged in.
 2. Copy the token it prints.
-3. Paste it into Argos (during onboarding or on the Agents page).
+3. Paste it into Argos (in the setup wizard or under **My account → Claude
+   subscriptions**).
 
 When you save the token, Argos validates it against the Anthropic API before
 accepting it; if the API is unreachable the token is still saved but marked as
@@ -75,7 +76,7 @@ subscription) and choose which one a task uses.
 
 ## Adding a credential during onboarding
 
-The agent step of the onboarding wizard (`${APP_URL}/admin/onboarding`) asks
+The agent step of the setup wizard (`${APP_URL}/setup`) asks
 for a Claude token. You must authenticate the agent before you can continue to
 connect a repository. Paste the output of `claude setup-token`; Argos
 validates it and saves it as a shared agent named "Default".
@@ -84,8 +85,8 @@ See [SETUP.md](SETUP.md) for the full first-run walkthrough.
 
 ## Managing credentials later
 
-After onboarding, manage agents on the **Agents** page
-(`${APP_URL}/admin/agent-credentials`). There you can:
+After onboarding, manage agents under **My account → Claude subscriptions**
+(`${APP_URL}/account/agents`). There you can:
 
 - Add new agents.
 - Edit the name, token, status, owner or limits of an existing agent.
@@ -107,9 +108,9 @@ Each agent carries one of three statuses:
 An agent is either **personal** (it has an owner and runs on that person's
 subscription) or **shared** (no owner).
 
-- Every user can add their **own** Claude agent under *Agents* — paste the
-  output of `claude setup-token`; the profile in `/w` lists them too. Users
-  only see their own agents.
+- Every user can add their **own** Claude agent under *My account → Claude
+  subscriptions* — paste the output of `claude setup-token`; the profile
+  (`/account/profile`) lists them too. Users only see their own agents.
 - Administrators see all agents and can assign an owner, or leave it empty for
   a shared agent.
 - A **task** runs on the agent its owner picked when creating it — one of

@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Tests\Feature\Filament\Admin\Resources;
 
 use App\Enums\AgentName;
-use App\Filament\Admin\Resources\AgentCredentialResource\Pages\CreateAgentCredential;
-use App\Filament\Admin\Resources\AgentCredentialResource\Pages\EditAgentCredential;
-use App\Filament\Admin\Resources\AgentCredentialResource\Pages\ListAgentCredentials;
+use App\Filament\Workspaces\Clusters\Account\Resources\AgentCredentialResource\Pages\CreateAgentCredential;
+use App\Filament\Workspaces\Clusters\Account\Resources\AgentCredentialResource\Pages\EditAgentCredential;
+use App\Filament\Workspaces\Clusters\Account\Resources\AgentCredentialResource\Pages\ListAgentCredentials;
 use App\Models\AgentCredential;
 use App\Models\User;
 use App\Models\Workspace;
@@ -43,7 +43,7 @@ class AgentCredentialScopingTest extends TestCase
             ->assertCanSeeTableRecords([$own])
             ->assertCanNotSeeTableRecords([$shared, $foreign]);
 
-        $this->get(route('filament.admin.resources.agent-credentials.edit', $foreign))->assertNotFound();
+        $this->get(route('filament.workspaces.account.resources.agents.edit', $foreign))->assertNotFound();
     }
 
     public function test_admins_see_every_agent(): void

@@ -21,7 +21,7 @@ return [
         'platform' => 'Platform',
         'platform_description' => 'Choose a platform — the remaining fields will be unlocked afterwards.',
         'general' => 'General',
-        'general_description' => 'The project display name.',
+        'general_description' => 'The workspace display name.',
         'worker' => 'Worker',
         'worker_description' => 'Stack the container of this workspace runs on.',
         'live_demo' => 'Live demo',
@@ -49,7 +49,7 @@ return [
         'platform_github' => 'GitHub',
         'platform_gitlab' => 'GitLab',
         'platform_bitbucket' => 'Bitbucket',
-        'project_name' => 'Project Name',
+        'project_name' => 'Workspace name',
         'worker_source_label' => 'Image source',
         'worker_source_helper' => 'Where the worker base image comes from.',
         'worker_source_standard' => 'Registered stack',
@@ -102,7 +102,7 @@ return [
     ],
 
     'infolist' => [
-        'project_name' => 'Project Name',
+        'project_name' => 'Workspace name',
         'platform' => 'Platform',
         'authentication' => 'Authentication',
         'worker_stack' => 'Worker Stack',

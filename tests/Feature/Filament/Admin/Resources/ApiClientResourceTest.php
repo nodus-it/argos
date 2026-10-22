@@ -4,13 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Filament\Admin\Resources;
 
-use App\Filament\Admin\RelationManagers\ApiTokensRelationManager;
-use App\Filament\Admin\Resources\ApiClientResource;
-use App\Filament\Admin\Resources\ApiClientResource\Pages\CreateApiClient;
-use App\Filament\Admin\Resources\ApiClientResource\Pages\EditApiClient;
-use App\Filament\Admin\Resources\ApiClientResource\Pages\ListApiClients;
-use App\Filament\Admin\Resources\WorkspaceResource;
-use App\Filament\Admin\Resources\WorkspaceResource\Pages\EditWorkspace;
+use App\Filament\Workspaces\Resources\WorkspaceResource\RelationManagers\ApiTokensRelationManager;
+use App\Filament\Workspaces\Clusters\System\Resources\ApiClientResource;
+use App\Filament\Workspaces\Clusters\System\Resources\ApiClientResource\Pages\CreateApiClient;
+use App\Filament\Workspaces\Clusters\System\Resources\ApiClientResource\Pages\EditApiClient;
+use App\Filament\Workspaces\Clusters\System\Resources\ApiClientResource\Pages\ListApiClients;
+use App\Filament\Workspaces\Resources\WorkspaceResource\Pages\EditWorkspaceSettings;
 use App\Models\ApiClient;
 use App\Models\User;
 use App\Models\Workspace;
@@ -64,14 +63,10 @@ class ApiClientResourceTest extends TestCase
     {
         $workspace = Workspace::factory()->create();
 
-        $this->assertContains(
-            ApiTokensRelationManager::class,
-            WorkspaceResource::getRelations(),
-        );
-
-        Livewire::test(EditWorkspace::class, ['record' => $workspace->getKey()])
+        // The workspace settings embed it in the Integrations tab.
+        Livewire::test(EditWorkspaceSettings::class, ['record' => $workspace->getKey()])
             ->assertSuccessful()
-            ->assertSee(__('api_tokens.title'));
+            ->assertSeeLivewire(ApiTokensRelationManager::class);
     }
 
     public function test_mints_and_revokes_a_token_via_the_relation_manager(): void

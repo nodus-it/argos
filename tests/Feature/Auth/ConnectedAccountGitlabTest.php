@@ -159,7 +159,7 @@ class ConnectedAccountGitlabTest extends TestCase
 
         $response = $this->get(route('auth.gitlab.callback'));
 
-        $response->assertRedirect(route('filament.admin.pages.connected-accounts'));
+        $response->assertRedirect(route('filament.workspaces.account.pages.connections'));
     }
 
     public function test_callback_redirects_to_onboarding_when_marker_set(): void
@@ -171,7 +171,7 @@ class ConnectedAccountGitlabTest extends TestCase
 
         $response = $this->get(route('auth.gitlab.callback'));
 
-        $response->assertRedirect(route('filament.admin.pages.onboarding'));
+        $response->assertRedirect(route('filament.workspaces.pages.setup'));
         $this->assertNull(session('oauth.gitlab.return'));
     }
 
@@ -184,7 +184,7 @@ class ConnectedAccountGitlabTest extends TestCase
 
         $response = $this->post(route('auth.gitlab.disconnect'));
 
-        $response->assertRedirect(route('filament.admin.pages.connected-accounts'));
+        $response->assertRedirect(route('filament.workspaces.account.pages.connections'));
         $this->assertDatabaseMissing(ConnectedAccount::class, [
             'user_id' => $this->user->id,
             'provider' => 'gitlab',
@@ -210,7 +210,7 @@ class ConnectedAccountGitlabTest extends TestCase
     {
         $response = $this->post(route('auth.gitlab.disconnect'));
 
-        $response->assertRedirect(route('filament.admin.pages.connected-accounts'));
+        $response->assertRedirect(route('filament.workspaces.account.pages.connections'));
         $this->assertDatabaseCount(ConnectedAccount::class, 0);
     }
 

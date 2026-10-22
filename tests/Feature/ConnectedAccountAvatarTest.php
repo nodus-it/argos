@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Filament\Admin\Pages\ConnectedAccounts;
+use App\Filament\Workspaces\Clusters\Account\Pages\ConnectedAccounts;
 use App\Models\ConnectedAccount;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
