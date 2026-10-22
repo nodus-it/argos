@@ -33,6 +33,7 @@ return [
     'source_footer' => 'Argos :version is free software, licensed under :license. :source.',
     'source_link_label' => 'View source code',
 
+    'outbound_refused' => 'Argos does not call :url (:reason): internal addresses and Argos\' own services are off limits.',
     'feedback_button' => [
         'label' => 'Feedback',
         'tooltip' => 'Report a bug or send feedback',

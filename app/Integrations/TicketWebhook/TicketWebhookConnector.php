@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Integrations\TicketWebhook;
 
+use App\Support\OutboundUrlGuard;
 use Saloon\Http\Connector;
+use Saloon\Http\PendingRequest;
 use Saloon\Traits\Plugins\AlwaysThrowOnErrors;
 
 /**
@@ -21,6 +23,12 @@ class TicketWebhookConnector extends Connector
     public function resolveBaseUrl(): string
     {
         return $this->url;
+    }
+
+    /** The URL is configured by people: never let it reach Argos' own services. */
+    public function boot(PendingRequest $pendingRequest): void
+    {
+        OutboundUrlGuard::assertAllowed($pendingRequest->getUrl());
     }
 
     /** @return array<string, int> */
