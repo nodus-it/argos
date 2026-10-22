@@ -45,6 +45,20 @@ class UserAvatarTest extends TestCase
         $this->assertNull($user->fresh()->avatarUrl());
     }
 
+    public function test_no_svg_and_no_foreign_file_is_ever_served_as_a_picture(): void
+    {
+        $user = User::factory()->create();
+        Storage::disk(User::AVATAR_DISK)->put('avatars/evil.svg', '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>');
+        $user->forceFill(['avatar_path' => 'avatars/evil.svg'])->save();
+
+        $this->actingAs(User::factory()->create())->get((string) $user->fresh()->avatarUrl())->assertNotFound();
+
+        // A tampered form path never points the picture at another file on the disk.
+        Storage::disk(User::AVATAR_DISK)->put('workspace-uploads/ws/task/secret.png', 'x');
+        app(UserService::class)->setAvatar($user->fresh(), 'workspace-uploads/ws/task/secret.png');
+        $this->assertSame('avatars/evil.svg', $user->fresh()->avatar_path);
+    }
+
     public function test_pictures_are_for_signed_in_people_only(): void
     {
         $user = User::factory()->create();

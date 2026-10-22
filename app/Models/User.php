@@ -38,6 +38,9 @@ class User extends Authenticatable implements FilamentUser, HasAvatar, OAuthenti
     /** Where profile pictures live (private; served by UserAvatarController). */
     public const AVATAR_DISK = 'local';
 
+    /** Picture types accepted and served (no SVG: it can carry script). */
+    public const AVATAR_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
+
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, Notifiable;
 

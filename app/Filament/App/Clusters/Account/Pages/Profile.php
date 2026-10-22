@@ -81,6 +81,8 @@ final class Profile extends EditProfile
                             ->helperText(__('common.profile.avatar_help'))
                             ->avatar()
                             ->image()
+                            // Raster formats only: an SVG could carry script.
+                            ->acceptedFileTypes(User::AVATAR_TYPES)
                             ->imageEditor()
                             ->disk(User::AVATAR_DISK)
                             ->directory('avatars')

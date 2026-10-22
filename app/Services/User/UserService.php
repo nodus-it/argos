@@ -138,6 +138,11 @@ class UserService extends EntityService
     {
         $disk = Storage::disk(User::AVATAR_DISK);
         $path = $avatar instanceof UploadedFile ? $avatar->store('avatars', User::AVATAR_DISK) : $avatar;
+        // A path from the form must be one of the uploaded pictures — never
+        // another file on the disk (task attachments live there too).
+        if (is_string($path) && preg_match('#^avatars/[A-Za-z0-9._-]+$#', $path) !== 1) {
+            return;
+        }
         $previous = $user->avatar_path;
 
         $user->forceFill(['avatar_path' => $path === false ? null : $path])->save();
