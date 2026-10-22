@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Filament\App\Pages;
 
-use App\Enums\TaskProviderKind;
 use App\Filament\App\Resources\WorkspaceResource;
 use App\Models\User;
 use App\Models\Workspace;
@@ -43,21 +42,6 @@ class MyWork extends Page
         return __('workspaces.my_work.title');
     }
 
-    /**
-     * Ticket chip text: the tracker's key ("ENG-118") or "<provider> #<number>".
-     *
-     * @param  array<string, mixed>  $ref
-     */
-    public static function ticketLabel(array $ref): string
-    {
-        $key = (string) ($ref['key'] ?? '');
-        if ($key !== '') {
-            return $key;
-        }
-        $provider = TaskProviderKind::tryFrom((string) ($ref['provider'] ?? ''))?->label() ?? (string) ($ref['provider'] ?? '');
-
-        return trim($provider.' #'.(string) ($ref['number'] ?? ''));
-    }
 
     /** @return array<string, mixed> */
     protected function getViewData(): array

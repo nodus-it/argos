@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
+use App\Enums\Concerns\ProvidesOptions;
 /** Lifecycle of a workspace container (see WorkspaceService). */
 enum WorkspaceStatus: string
 {
+    use ProvidesOptions;
+
     case Provisioning = 'provisioning';
     case Starting = 'starting';
     case Running = 'running';

@@ -101,8 +101,7 @@ class TaskController extends Controller
         $request->validate(['draft' => ['nullable', 'boolean']]);
 
         return $this->domain(function () use ($task, $actor, $ship, $request): JsonResponse {
-            $draft = $ship->draft($task, $actor);
-            $url = $ship->ship($task, $actor, $draft['subject'] !== '' ? $draft['subject'] : $task->title, $draft['body'], (bool) $request->boolean('draft'));
+            $url = $ship->shipWithDraft($task, $actor, (bool) $request->boolean('draft'));
 
             return new JsonResponse(['pull_request_url' => $url]);
         });

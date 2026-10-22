@@ -6,7 +6,6 @@ namespace App\Services\IssueTracker;
 
 use App\Enums\TaskStatus;
 use App\Models\Task;
-use App\Models\TaskProviderBinding;
 use App\Services\Workspace\TaskService;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -28,7 +27,7 @@ class TicketCommentSync
     public function sync(Task $task): int
     {
         $ref = $task->external_ref;
-        $binding = is_string($ref['binding_id'] ?? null) ? TaskProviderBinding::query()->find($ref['binding_id']) : null;
+        $binding = $task->ticketBinding();
         if ($ref === null || $binding === null || ! $this->registry->has($binding->kind) || ! in_array($task->status, [TaskStatus::Active, TaskStatus::PrOpen], true)) {
             return 0;
         }

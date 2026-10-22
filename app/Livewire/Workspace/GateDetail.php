@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Workspace;
 
+use App\Support\GateRows;
 use App\Livewire\Concerns\InteractsWithWorkspace;
 use App\Enums\GateRunStatus;
 use App\Enums\WorkspaceStatus;
@@ -37,7 +38,7 @@ class GateDetail extends Component
 
     public ?string $taskId = null;
 
-    /** Row key (ContextPanel::GATE_ROWS key or a gate name); null = closed. */
+    /** Row key (GateRows::ROWS key or a gate name); null = closed. */
     public ?string $gate = null;
 
     public function mount(string $workspaceId): void
@@ -109,7 +110,7 @@ class GateDetail extends Component
 
         $service = app(WorkspaceGateService::class);
         $run = $service->latest($task);
-        $row = collect(ContextPanel::gateRows($run))->firstWhere('key', $this->gate)
+        $row = collect(GateRows::of($run))->firstWhere('key', $this->gate)
             ?? ['key' => $this->gate, 'label' => ucfirst(str_replace('_', ' ', (string) $this->gate)), 'keys' => [(string) $this->gate], 'state' => 'open', 'failed' => [], 'log' => ''];
         $ran = $run !== null && $row['state'] !== 'running'
             ? array_values(array_filter($row['keys'], fn (string $k): bool => in_array($run->gates[$k] ?? null, ['pass', 'fail'], true)))

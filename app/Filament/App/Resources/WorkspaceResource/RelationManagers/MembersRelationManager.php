@@ -125,7 +125,7 @@ class MembersRelationManager extends RelationManager
     {
         return Select::make('role')
             ->label(__('workspaces.members.role'))
-            ->options(collect(WorkspaceRole::cases())->mapWithKeys(fn (WorkspaceRole $r): array => [$r->value => $r->label()])->all())
+            ->options(WorkspaceRole::options())
             ->required()
             ->native(false);
     }

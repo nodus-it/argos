@@ -58,7 +58,7 @@
                                     <span class="ag-mw-ws">{{ $task->workspace->name }}</span>
                                     <span class="ag-mw-state is-{{ $state->color() }}">{{ $state->label() }}</span>
                                     @if ($ref !== null)
-                                        <a class="ag-mw-chip is-ticket" href="{{ $ref['url'] ?? '#' }}" target="_blank" rel="noopener" title="{{ $ref['title'] ?? '' }}">{{ MyWork::ticketLabel($ref) }}</a>
+                                        <a class="ag-mw-chip is-ticket" href="{{ $ref['url'] ?? '#' }}" target="_blank" rel="noopener" title="{{ $ref['title'] ?? '' }}">{{ \App\Support\TaskRefs::label($ref) }}</a>
                                     @endif
                                     @if ($task->pr_number !== null)
                                         <a class="ag-mw-chip is-pr is-{{ $task->pr_state ?? 'open' }}" href="{{ $task->pr_url ?? '#' }}" target="_blank" rel="noopener">

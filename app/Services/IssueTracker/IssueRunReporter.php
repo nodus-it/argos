@@ -8,7 +8,6 @@ use App\Enums\AutoTaskState;
 use App\Enums\TaskProviderKind;
 use App\Enums\TaskStatus;
 use App\Jobs\SendTicketWebhookJob;
-use App\Models\ConnectedAccount;
 use App\Models\ExternalIssueLink;
 use App\Models\Task;
 use App\Models\TaskProviderBinding;
@@ -143,16 +142,14 @@ class IssueRunReporter
             return $user->email;
         }
         $provider = $kind->providerKey();
-        $account = $provider !== null ? ConnectedAccount::query()->where('user_id', $user->id)->where('provider', $provider)->first() : null;
+        $account = $provider !== null ? $user->connectedAccount($provider) : null;
 
         return $account?->nickname !== null && $account->nickname !== '' ? $account->nickname : null;
     }
 
     private function binding(Task $task): ?TaskProviderBinding
     {
-        $id = $task->external_ref['binding_id'] ?? null;
-
-        return is_string($id) ? TaskProviderBinding::query()->find($id) : null;
+        return $task->ticketBinding();
     }
 
     /**

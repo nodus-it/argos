@@ -243,7 +243,7 @@ class BitbucketGitService implements GitProviderContract
             state: $state,
             url: $this->stringOrNull($pr['links']['html']['href'] ?? null),
             headSha: $this->stringOrNull($pr['source']['commit']['hash'] ?? null),
-            conflicts: in_array($state, ['open', 'draft'], true) && $this->hasConflicts($owner, $repo, $number),
+            conflicts: PullRequestDetails::isOpenState($state) && $this->hasConflicts($owner, $repo, $number),
             // Bitbucket does not report whether the destination moved on.
             behindBase: null,
             checks: $this->checks($owner, $repo, $number),

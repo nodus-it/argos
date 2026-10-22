@@ -6,7 +6,6 @@ namespace App\Services\Workspace;
 
 use App\Enums\AutoTaskState;
 use App\Enums\BackingService;
-use App\Enums\TaskEventType;
 use App\Enums\TaskKind;
 use App\Enums\TaskStatus;
 use App\Enums\WorkspaceStatus;
@@ -14,7 +13,6 @@ use App\Integrations\WorkspaceDaemon\DaemonTransportException;
 use App\Jobs\Workspace\AdvanceAutoTaskJob;
 use App\Jobs\Workspace\PrepareTaskJob;
 use App\Models\Task;
-use App\Models\TaskEvent;
 use App\Models\User;
 use App\Services\Worker\WorkerSidecarManager;
 use Illuminate\Support\Facades\Gate;
@@ -36,7 +34,6 @@ class TaskPreparer
         private readonly WorkerSidecarManager $sidecars,
         private readonly TaskEnvironment $environment,
         private readonly WorkspaceService $workspaces,
-        private readonly TaskStreamPublisher $publisher,
     ) {}
 
     /**
@@ -148,15 +145,7 @@ class TaskPreparer
     private function failed(Task $task, string $code, string $message): void
     {
         Log::channel('argos')->warning('Task preparation failed', ['task' => $task->id, 'code' => $code, 'error' => $message]);
-        $event = TaskEvent::query()->create([
-            'task_id' => $task->id,
-            'type' => TaskEventType::Notice,
-            'payload' => ['kind' => 'prepare_failed', 'message' => mb_substr($message, 0, 2000)],
-        ]);
-        $this->publisher->publish($task->workspace_id, $task->id, [[
-            'type' => 'notice',
-            'event_id' => $event->id,
-            'data' => ['kind' => 'prepare_failed'],
-        ]]);
+        // Resolved lazily: TaskService depends on the preparer's peers.
+        app(TaskService::class)->systemNotice($task, 'prepare_failed', ['message' => mb_substr($message, 0, 2000)]);
     }
 }

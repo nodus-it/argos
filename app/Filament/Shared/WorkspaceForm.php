@@ -747,12 +747,12 @@ final class WorkspaceForm
                     ->nullable(),
                 Select::make('auto_settings.plan')
                     ->label(__('workspace_form.fields.auto_plan'))
-                    ->options(collect(AutoPlanMode::cases())->mapWithKeys(fn (AutoPlanMode $m): array => [$m->value => $m->label()])->all())
+                    ->options(AutoPlanMode::options())
                     ->placeholder(fn (): string => __('workspace_form.fields.auto_default', ['value' => AutoPlanMode::from((string) config('argos.workspaces.auto.plan'))->label()]))
                     ->native(false),
                 Select::make('auto_settings.ship')
                     ->label(__('workspace_form.fields.auto_ship'))
-                    ->options(collect(AutoShipMode::cases())->mapWithKeys(fn (AutoShipMode $m): array => [$m->value => $m->label()])->all())
+                    ->options(AutoShipMode::options())
                     ->placeholder(fn (): string => __('workspace_form.fields.auto_default', ['value' => AutoShipMode::from((string) config('argos.workspaces.auto.ship'))->label()]))
                     ->native(false),
                 TextInput::make('auto_settings.max_fix_rounds')

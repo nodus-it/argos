@@ -31,7 +31,8 @@ export const GATE_NAME_PATTERN = /^[a-z_]{1,32}$/;
 
 const RUN_TIMEOUT_MS = 30 * 60_000;
 const BASELINE_TIMEOUT_MS = 30 * 60_000;
-const LOG_TAIL_BYTES = 8 * 1024;
+/** How much of a log travels in events and answers. */
+export const LOG_TAIL_BYTES = 8 * 1024;
 /** Cap of a full gate log served to the UI; longer logs keep their end. */
 export const FULL_LOG_BYTES = 2 * 1024 * 1024;
 const GATE_RESULTS = new Set(['pass', 'fail', 'skip']);
@@ -269,6 +270,7 @@ async function readTail(path: string, bytes: number): Promise<string> {
     }
 }
 
-function tail(text: string, chars: number): string {
+/** The last `chars` characters of a log. */
+export function tail(text: string, chars: number = LOG_TAIL_BYTES): string {
     return text.length > chars ? text.slice(-chars) : text;
 }

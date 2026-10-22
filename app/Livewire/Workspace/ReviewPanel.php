@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Livewire\Workspace;
 
+use App\Support\GateRows;
 use App\Livewire\Concerns\InteractsWithWorkspace;
 use App\Support\RequestedTask;
 use App\Enums\WorkspaceStatus;
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
 use App\Models\ReviewComment;
 use App\Models\Task;
-use App\Models\Workspace;
 use App\Services\Git\WorkspaceDiffService;
 use App\Services\Workspace\ReviewCommentService;
 use App\Services\Workspace\ReviewService;
@@ -331,7 +331,7 @@ class ReviewPanel extends Component
             'additions' => array_sum(array_column($files, 'additions')),
             'deletions' => array_sum(array_column($files, 'deletions')),
             'gates' => array_values(array_filter(
-                ContextPanel::gateRows($gateRun),
+                GateRows::of($gateRun),
                 fn (array $row): bool => in_array($row['state'], ['pass', 'fail', 'running'], true),
             )),
             'gateCounts' => ['phpstan' => array_sum(array_map('count', $annotations['phpstan'])), 'pint' => count($annotations['pint'])],

@@ -74,6 +74,12 @@ class AgentCredential extends Model
         return $this->belongsTo(User::class);
     }
 
+    /** The Claude OAuth token the workspace daemon starts sessions with ('' when missing). */
+    public function oauthToken(): string
+    {
+        return (string) ($this->credentials['token'] ?? '');
+    }
+
     /** @return HasMany<Task, $this> */
     public function tasks(): HasMany
     {

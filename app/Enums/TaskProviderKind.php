@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
+use App\Enums\Concerns\ProvidesOptions;
 enum TaskProviderKind: string
 {
+    use ProvidesOptions;
+
     case GitHub = 'github';
     case GitLab = 'gitlab';
     case Linear = 'linear';

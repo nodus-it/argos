@@ -99,7 +99,7 @@ class TaskToolsTest extends TestCase
     public function test_task_ship_ships_the_task_and_returns_the_pull_request(): void
     {
         $task = Task::factory()->ownedBy($this->user)->create(['workspace_id' => $this->workspace->id, 'title' => 'Dark mode']);
-        $ship = Mockery::mock(WorkspaceShipService::class);
+        $ship = Mockery::mock(WorkspaceShipService::class)->makePartial();
         $ship->shouldReceive('draft')->once()->withArgs(fn (Task $t, User $by): bool => $t->is($task) && $by->is($this->user))
             ->andReturn(['subject' => '', 'body' => 'Body']);
         $ship->shouldReceive('ship')->once()
@@ -116,7 +116,7 @@ class TaskToolsTest extends TestCase
     public function test_task_ship_reports_a_refusal_as_a_tool_error(): void
     {
         $task = Task::factory()->create(['workspace_id' => $this->workspace->id]);
-        $ship = Mockery::mock(WorkspaceShipService::class);
+        $ship = Mockery::mock(WorkspaceShipService::class)->makePartial();
         $ship->shouldReceive('draft')->andThrow(new AuthorizationException('This action is unauthorized.'));
         $this->app->instance(WorkspaceShipService::class, $ship);
 

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Filament\App\Resources\WorkspaceResource\Pages;
 
-use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceStatus;
 use App\Filament\App\Resources\WorkspaceResource;
 use App\Models\Task;
@@ -15,7 +14,6 @@ use App\Services\Workspace\TaskService;
 use App\Services\Workspace\WorkspaceException;
 use App\Services\Workspace\WorkspaceGateService;
 use App\Services\Workspace\WorkspaceIssueService;
-use App\Services\Workspace\WorkspaceMemberService;
 use App\Services\Workspace\WorkspaceService;
 use App\Services\Workspace\WorkspaceShipService;
 use App\Support\RequestedTask;
@@ -383,7 +381,7 @@ class ViewWorkspace extends ViewRecord
         }
         $details = app(PullRequestService::class)->details($task);
 
-        return $details !== null && ($details->conflicts || $details->behindBase === true);
+        return $details?->needsRebase() ?? false;
     }
 
     /** Workspace settings (repository, environment, resources, integrations, members). */

@@ -62,7 +62,7 @@
         $checks = $pr?->checks['state'] ?? ($task->pr_checks['state'] ?? 'none');
         $review = $pr?->reviewState ?? $task->pr_review_state;
         $prState = $pr?->state ?? $task->pr_state;
-        $open = in_array($prState, ['open', 'draft'], true);
+        $open = \App\Services\GitProvider\PullRequestDetails::isOpenState($prState);
         @endphp
         @php
             $platform = $workspace->platform;

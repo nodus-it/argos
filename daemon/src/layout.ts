@@ -1,3 +1,4 @@
+import { STRIPPED_ENV } from './claudeEnv.js';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { CodedError } from './errors.js';
@@ -51,7 +52,8 @@ export function cacheEnv(layout: Layout): Record<string, string> {
 }
 
 /** Keys a task's values may never override (tokens, the agent's config, the process basics). */
-const RESERVED_ENV = new Set(['CLAUDE_CODE_OAUTH_TOKEN', 'CLAUDE_CONFIG_DIR', 'ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'PATH', 'HOME', 'USER', 'SHELL', 'NODE_OPTIONS']);
+/** A task's values never set the secrets claude children are stripped of, nor the process basics. */
+const RESERVED_ENV = new Set<string>([...STRIPPED_ENV, 'PATH', 'HOME', 'USER', 'SHELL', 'NODE_OPTIONS']);
 
 /** Where a worktree keeps the task's environment values (see taskEnv()). */
 export function taskEnvFile(dir: string): string {

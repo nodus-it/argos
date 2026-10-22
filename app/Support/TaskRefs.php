@@ -15,11 +15,16 @@ final class TaskRefs
 {
     public static function ticketLabel(Task $task): ?string
     {
-        $ref = $task->external_ref;
-        if ($ref === null) {
-            return null;
-        }
+        return $task->external_ref !== null ? self::label($task->external_ref) : null;
+    }
 
+    /**
+     * The label for a stored ticket reference ("ENG-118", "GitHub #12").
+     *
+     * @param  array<string, mixed>  $ref
+     */
+    public static function label(array $ref): string
+    {
         $kind = TaskProviderKind::tryFrom((string) ($ref['provider'] ?? ''));
         $key = (string) ($ref['key'] ?? '');
 

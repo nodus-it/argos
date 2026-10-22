@@ -6,7 +6,6 @@ namespace App\Services\Workspace;
 
 use App\Enums\TaskEventType;
 use App\Enums\TaskStatus;
-use App\Integrations\WorkspaceDaemon\DaemonTransportException;
 use App\Integrations\WorkspaceDaemon\WorkspaceDaemonTransport;
 use App\Models\Task;
 use App\Models\TaskEvent;
@@ -178,6 +177,19 @@ class WorkspaceShipService
         return $this->pushAndOpen($task, $by, $api, $subject, $body, $draft, $pullRequest);
     }
 
+    /**
+     * Ship with Claude's drafted message (the task title when there is none)
+     * — what the API, MCP and automatic runs do.
+     *
+     * @param  string  $note  appended to the body (e.g. the gate result)
+     */
+    public function shipWithDraft(Task $task, User $by, bool $draft = false, bool $pullRequest = true, string $note = ''): string
+    {
+        $message = $this->draft($task, $by);
+
+        return $this->ship($task, $by, $message['subject'] !== '' ? $message['subject'] : $task->title, trim($message['body']."\n\n".$note), $draft, $pullRequest);
+    }
+
     private function pushAndOpen(Task $task, User $by, WorkspaceDaemonTransport $api, string $title, string $body, bool $draft, bool $pullRequest): string
     {
         $workspace = $task->workspace;
@@ -262,7 +274,7 @@ class WorkspaceShipService
 
         $result = $api->oneshot([
             'agent_id' => $agent->id,
-            'oauth_token' => (string) ($agent->credentials['token'] ?? ''),
+            'oauth_token' => $agent->oauthToken(),
             // Alias: always the newest Haiku the subscription offers.
             'model' => 'haiku',
             'system_prompt' => (string) file_get_contents(base_path("worker/prompts/{$name}.system.md")),

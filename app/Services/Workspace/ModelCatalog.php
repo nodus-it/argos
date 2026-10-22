@@ -56,7 +56,7 @@ class ModelCatalog
         }
 
         try {
-            $this->record($agent, $this->daemon->for($workspace, 45)->models($agent->id, (string) ($agent->credentials['token'] ?? '')));
+            $this->record($agent, $this->daemon->for($workspace, 45)->models($agent->id, $agent->oauthToken()));
         } catch (Throwable $e) {
             Log::channel('argos')->info('Listing the models failed', ['agent' => $agent->id, 'error' => $e->getMessage()]);
         } finally {

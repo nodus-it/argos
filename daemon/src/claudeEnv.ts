@@ -38,6 +38,23 @@ export function claudeChildEnv(environment: SessionEnvironment, agentId: string,
     return env;
 }
 
+/**
+ * Options for a one-off claude run on an agent's subscription with nothing
+ * of the project: no tools, no settings files, no stored session.
+ */
+export function isolatedOptions(environment: SessionEnvironment, agentId: string, oauthToken: string): Options {
+    const options: Options = {
+        cwd: environment.workspaceDir,
+        tools: [],
+        settingSources: [],
+        persistSession: false,
+        env: claudeChildEnv(environment, agentId, oauthToken),
+    };
+    applyClaudeBin(options, environment);
+
+    return options;
+}
+
 /** Point the SDK at a configured `claude` binary, if any. */
 export function applyClaudeBin(options: Options, environment: SessionEnvironment): void {
     if (environment.claudeBin !== undefined && environment.claudeBin !== '') {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Services\GitProvider\PullRequestDetails;
 use App\Enums\AutoTaskState;
 use App\Enums\PermissionMode;
 use App\Enums\SessionStatus;
@@ -166,6 +167,20 @@ class Task extends Model implements DemoTarget
     }
 
     /** Link to the task in its workspace. */
+    /** The tracker binding the task's ticket came from (null without a ticket or when it was removed). */
+    public function ticketBinding(): ?TaskProviderBinding
+    {
+        $id = $this->external_ref['binding_id'] ?? null;
+
+        return is_string($id) ? TaskProviderBinding::query()->find($id) : null;
+    }
+
+    /** A pull request that can still change (open or draft). */
+    public function hasOpenPullRequest(): bool
+    {
+        return $this->pr_number !== null && PullRequestDetails::isOpenState($this->pr_state);
+    }
+
     public function url(): string
     {
         return $this->workspace->url($this);

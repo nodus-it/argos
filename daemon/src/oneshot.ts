@@ -1,5 +1,5 @@
 import type { Options } from '@anthropic-ai/claude-agent-sdk';
-import { applyClaudeBin, claudeChildEnv, type SessionEnvironment } from './claudeEnv.js';
+import { isolatedOptions, type SessionEnvironment } from './claudeEnv.js';
 import { CodedError } from './errors.js';
 import type { SdkMessageLike } from './normalize.js';
 
@@ -37,23 +37,16 @@ export async function runOneshot(
     params: OneshotParams,
     environment: SessionEnvironment,
 ): Promise<OneshotResult> {
-    const env = claudeChildEnv(environment, params.agentId, params.oauthToken);
-
     const options: Options = {
-        cwd: environment.workspaceDir,
+        ...isolatedOptions(environment, params.agentId, params.oauthToken),
         model: params.model,
         systemPrompt: params.systemPrompt,
-        tools: [],
-        settingSources: [],
         // Structured output may take an extra internal turn.
         maxTurns: 3,
-        persistSession: false,
-        env,
     };
     if (params.jsonSchema !== undefined) {
         options.outputFormat = { type: 'json_schema', schema: params.jsonSchema };
     }
-    applyClaudeBin(options, environment);
 
     let result: SdkMessageLike | null = null;
     for await (const message of runner({ prompt: params.userPrompt, options })) {

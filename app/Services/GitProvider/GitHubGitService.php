@@ -249,7 +249,7 @@ class GitHubGitService implements GitProviderContract
             state: $state,
             url: $url,
             headSha: $headSha,
-            conflicts: in_array($state, ['open', 'draft'], true)
+            conflicts: PullRequestDetails::isOpenState($state)
                 && (($pr['mergeable'] ?? null) === false || $mergeableState === 'dirty'),
             behindBase: match ($mergeableState) {
                 'behind' => true,
@@ -290,7 +290,7 @@ class GitHubGitService implements GitProviderContract
             return true;
         }
 
-        if (! in_array($this->pullRequestState($pr), ['open', 'draft'], true)) {
+        if (! PullRequestDetails::isOpenState($this->pullRequestState($pr))) {
             $this->logAutoMerge('GitHub auto-merge skipped: pull request is not open', $owner, $repo, $number);
 
             return false;

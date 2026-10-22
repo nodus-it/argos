@@ -231,7 +231,7 @@ class WorkspaceIssueService
     public function comment(Task $task, string $body): ?string
     {
         $issue = $task->external_ref;
-        $binding = $issue !== null ? TaskProviderBinding::query()->find($issue['binding_id'] ?? null) : null;
+        $binding = $task->ticketBinding();
         if ($issue === null || $binding === null || ! $this->registry->has($binding->kind)) {
             return null;
         }
@@ -258,7 +258,7 @@ class WorkspaceIssueService
             return null;
         }
 
-        $closes = TaskProviderBinding::query()->whereKey($issue['binding_id'] ?? null)->value('close_on_merge') ?? true;
+        $closes = $task->ticketBinding()?->close_on_merge ?? true;
 
         // An issue in another repository than the pull request's needs its path.
         $issueRepo = trim(($issue['owner'] ?? '').'/'.($issue['project'] ?? ''), '/');

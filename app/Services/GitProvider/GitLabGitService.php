@@ -235,7 +235,7 @@ class GitLabGitService implements GitProviderContract
             state: $state,
             url: $url,
             headSha: $this->stringOrNull($mr['sha'] ?? null),
-            conflicts: in_array($state, ['open', 'draft'], true)
+            conflicts: PullRequestDetails::isOpenState($state)
                 && (($mr['has_conflicts'] ?? false) === true || ($mr['detailed_merge_status'] ?? null) === 'conflict'),
             behindBase: match (true) {
                 is_int($diverged) => $diverged > 0,

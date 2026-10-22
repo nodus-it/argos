@@ -4,15 +4,13 @@ declare(strict_types=1);
 
 namespace App\Livewire\Workspace;
 
+use App\Support\GateRows;
 use App\Livewire\Concerns\InteractsWithWorkspace;
 use App\Support\RequestedTask;
-use App\Enums\GateRunStatus;
 use App\Enums\GitProvider;
 use App\Enums\WorkspaceStatus;
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
 use App\Models\Task;
-use App\Models\Workspace;
-use App\Models\WorkspaceGateRun;
 use App\Services\Git\WorkspaceDiffService;
 use App\Services\Workspace\PullRequestService;
 use App\Services\Workspace\WorkspaceGateService;
@@ -35,14 +33,6 @@ use Livewire\Component;
 class ContextPanel extends Component
 {
     use InteractsWithWorkspace;
-
-    /** The four gates the sidebar always lists, with the run keys behind each row. */
-    public const GATE_ROWS = [
-        'pint' => ['label' => 'Pint', 'keys' => ['pint']],
-        'pest' => ['label' => 'Pest / PHPUnit', 'keys' => ['pest', 'phpunit']],
-        'phpstan' => ['label' => 'PHPStan', 'keys' => ['phpstan']],
-        'artisan' => ['label' => 'Artisan', 'keys' => ['artisan']],
-    ];
 
     #[Locked]
     public string $workspaceId;
@@ -168,7 +158,7 @@ class ContextPanel extends Component
             'files' => self::changedFiles(array_values(array_filter($diff['files'] ?? [], fn (array $f): bool => ! $f['generated']))),
             'generated' => array_values(array_filter($diff['files'] ?? [], fn (array $f): bool => $f['generated'])),
             'gateRun' => $gateRun,
-            'gates' => self::gateRows($gateRun),
+            'gates' => GateRows::of($gateRun),
             'canOperate' => $task !== null && $this->user()->can('prompt', $task),
             'canEdit' => $this->user()->can('editor', $workspace),
             'running' => $workspace->status === WorkspaceStatus::Running,
@@ -200,53 +190,6 @@ class ContextPanel extends Component
             'additions' => (int) ($file['additions'] ?? 0),
             'deletions' => (int) ($file['deletions'] ?? 0),
         ], $files);
-    }
-
-    /**
-     * Gate rows with a state: open, running, pass, fail or skip. Gates outside
-     * the four fixed rows appear once they ran.
-     *
-     * @return list<array{key: string, label: string, keys: list<string>, state: string, failed: list<string>, log: string}>
-     */
-    public static function gateRows(?WorkspaceGateRun $run): array
-    {
-        $results = $run?->gates ?? [];
-        $runningNow = $run?->status === GateRunStatus::Running;
-        $rows = [];
-        $covered = [];
-
-        foreach (self::GATE_ROWS as $key => $row) {
-            $found = array_values(array_filter(array_map(fn (string $k): ?string => $results[$k] ?? null, $row['keys'])));
-            $covered = [...$covered, ...$row['keys']];
-            $failed = array_values(array_filter($row['keys'], fn (string $k): bool => ($results[$k] ?? null) === 'fail'));
-            $rows[] = ['key' => $key, 'label' => $row['label'], 'keys' => $row['keys'], 'state' => self::state($found, $runningNow), 'failed' => $failed, 'log' => self::logOf($run, $failed)];
-        }
-        foreach ($results as $key => $result) {
-            if (! in_array($key, $covered, true) && $result !== 'skip') {
-                $failed = $result === 'fail' ? [$key] : [];
-                $rows[] = ['key' => $key, 'label' => ucfirst(str_replace('_', ' ', $key)), 'keys' => [$key], 'state' => $result, 'failed' => $failed, 'log' => self::logOf($run, $failed)];
-            }
-        }
-
-        return $rows;
-    }
-
-    /** @param  list<string>  $keys */
-    private static function logOf(?WorkspaceGateRun $run, array $keys): string
-    {
-        return implode("\n", array_filter(array_map(fn (string $k): string => (string) ($run?->logs[$k] ?? ''), $keys)));
-    }
-
-    /** @param  list<string>  $results */
-    private static function state(array $results, bool $running): string
-    {
-        return match (true) {
-            $running => 'running',
-            in_array('fail', $results, true) => 'fail',
-            in_array('pass', $results, true) => 'pass',
-            $results !== [] => 'skip',
-            default => 'open',
-        };
     }
 
     private function task(): ?Task

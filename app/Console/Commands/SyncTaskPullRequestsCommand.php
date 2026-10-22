@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Services\GitProvider\PullRequestDetails;
 use App\Models\Task;
 use App\Services\Workspace\WorkspaceShipService;
 use Illuminate\Console\Command;
@@ -23,7 +24,7 @@ class SyncTaskPullRequestsCommand extends Command
         Task::query()
             ->with('workspace')
             ->whereNotNull('pr_number')
-            ->whereIn('pr_state', ['open', 'draft'])
+            ->whereIn('pr_state', PullRequestDetails::OPEN_STATES)
             ->each(fn (Task $task) => $ship->syncPullRequest($task));
 
         return self::SUCCESS;

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
+use App\Enums\Concerns\ProvidesOptions;
 /**
  * A person's role in a workspace. Admins manage settings, secrets, members
  * and the setup; members create tasks; viewers read (and work in tasks they
@@ -11,6 +12,8 @@ namespace App\Enums;
  */
 enum WorkspaceRole: string
 {
+    use ProvidesOptions;
+
     case Admin = 'admin';
     case Member = 'member';
     case Viewer = 'viewer';

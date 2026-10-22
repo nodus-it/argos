@@ -1,5 +1,5 @@
-import type { Options, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
-import { applyClaudeBin, claudeChildEnv, type SessionEnvironment } from './claudeEnv.js';
+import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
+import { isolatedOptions, type SessionEnvironment } from './claudeEnv.js';
 import { CodedError } from './errors.js';
 import { mapModels } from './normalize.js';
 import type { QueryFactory } from './taskSession.js';
@@ -32,16 +32,7 @@ export async function listModels(
         await idle;
     }
 
-    const options: Options = {
-        cwd: environment.workspaceDir,
-        tools: [],
-        settingSources: [],
-        persistSession: false,
-        env: claudeChildEnv(environment, params.agentId, params.oauthToken),
-    };
-    applyClaudeBin(options, environment);
-
-    const query = factory({ prompt: silence(), options });
+    const query = factory({ prompt: silence(), options: isolatedOptions(environment, params.agentId, params.oauthToken) });
     let timer: NodeJS.Timeout | undefined;
     try {
         if (query.supportedModels === undefined) {

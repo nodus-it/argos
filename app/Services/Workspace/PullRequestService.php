@@ -309,7 +309,7 @@ class PullRequestService
         $collected = 0;
         foreach ($comments->filter(fn (array $c): bool => $c['path'] !== null && $c['line'] !== null) as $comment) {
             try {
-                $files[$comment['path']] ??= self::numbered((string) $daemon->fileContent($task->slug, $comment['path'])['content']);
+                $files[$comment['path']] ??= ReviewCommentService::numbered((string) $daemon->fileContent($task->slug, $comment['path'])['content']);
             } catch (Throwable) {
                 $files[$comment['path']] = [];
             }
@@ -357,13 +357,6 @@ class PullRequestService
     /**
      * @return array<int, string> line number => text
      */
-    private static function numbered(string $content): array
-    {
-        $lines = explode("\n", $content);
-
-        return array_combine(range(1, count($lines)), $lines);
-    }
-
     /** Marks comments Argos writes on pull requests, so they are not read back as review. */
     public const ARGOS_MARKER = '<!-- argos -->';
 

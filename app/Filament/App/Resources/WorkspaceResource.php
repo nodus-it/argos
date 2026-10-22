@@ -125,7 +125,7 @@ class WorkspaceResource extends Resource
             ->filters([
                 SelectFilter::make('status')
                     ->label(__('workspaces.fields.status'))
-                    ->options(collect(WorkspaceStatus::cases())->mapWithKeys(fn (WorkspaceStatus $s): array => [$s->value => $s->label()])->all()),
+                    ->options(WorkspaceStatus::options()),
                 Filter::make('waiting_for_me')
                     ->label(__('workspaces.overview.waiting_for_you'))
                     ->query(fn (Builder $query): Builder => $query

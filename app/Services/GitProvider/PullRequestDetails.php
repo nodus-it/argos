@@ -26,6 +26,9 @@ final readonly class PullRequestDetails
 
     public const string STATE_CLOSED = 'closed';
 
+    /** States in which the pull request can still change. */
+    public const array OPEN_STATES = [self::STATE_OPEN, self::STATE_DRAFT];
+
     /**
      * @param  'draft'|'open'|'merged'|'closed'  $state
      * @param  bool  $conflicts  the PR cannot be merged because of merge conflicts
@@ -85,7 +88,19 @@ final readonly class PullRequestDetails
     /** Draft or open: the PR can still change. */
     public function isOpen(): bool
     {
-        return $this->state === self::STATE_OPEN || $this->state === self::STATE_DRAFT;
+        return self::isOpenState($this->state);
+    }
+
+    /** Draft and open pull requests can still change (also for the state stored on a task). */
+    public static function isOpenState(?string $state): bool
+    {
+        return in_array($state, self::OPEN_STATES, true);
+    }
+
+    /** Conflicts, or the base branch moved on: Claude should rebase. */
+    public function needsRebase(): bool
+    {
+        return $this->conflicts || $this->behindBase === true;
     }
 
     public function checksFailed(): bool

@@ -63,9 +63,7 @@ class TaskProviderBindingsRelationManager extends RelationManager
         return $schema->components([
             Select::make('kind')
                 ->label(__('task_providers.form.provider'))
-                ->options(collect(TaskProviderKind::cases())
-                    ->mapWithKeys(fn (TaskProviderKind $k): array => [$k->value => $k->label()])
-                    ->all())
+                ->options(TaskProviderKind::options())
                 ->required()
                 ->live()
                 ->afterStateUpdated(fn (Set $set): mixed => $set('external_project_ref', null))
@@ -74,9 +72,7 @@ class TaskProviderBindingsRelationManager extends RelationManager
             Select::make('mode')
                 ->visible(fn (Get $get): bool => ! self::isCustom($get))
                 ->label(__('task_providers.form.mode'))
-                ->options(collect(TaskProviderMode::cases())
-                    ->mapWithKeys(fn (TaskProviderMode $m): array => [$m->value => $m->label()])
-                    ->all())
+                ->options(TaskProviderMode::options())
                 ->required()
                 ->native(false),
 

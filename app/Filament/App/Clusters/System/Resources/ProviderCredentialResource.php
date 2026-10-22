@@ -82,7 +82,7 @@ class ProviderCredentialResource extends Resource
                     // pre-filled "create token" link below.
                     Select::make('provider')
                         ->label(__('credentials.pat.fields.provider'))
-                        ->options(self::providerOptions())
+                        ->options(IntegrationProvider::options())
                         ->required()
                         ->live()
                         ->native(false),
@@ -169,7 +169,7 @@ class ProviderCredentialResource extends Resource
             ])
             ->filters([
                 SelectFilter::make('provider')
-                    ->options(self::providerOptions()),
+                    ->options(IntegrationProvider::options()),
                 SelectFilter::make('status')
                     ->options(ProviderCredentialStatus::class),
             ])
@@ -238,18 +238,6 @@ class ProviderCredentialResource extends Resource
         ]);
     }
 
-    /**
-     * @return array<string, string>
-     */
-    public static function providerOptions(): array
-    {
-        $opts = [];
-        foreach (IntegrationProvider::cases() as $provider) {
-            $opts[$provider->value] = $provider->label();
-        }
-
-        return $opts;
-    }
 
     public static function getPages(): array
     {

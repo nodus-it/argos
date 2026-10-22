@@ -1,5 +1,5 @@
+import { existsSync, readFileSync } from 'node:fs';
 import { timingSafeEqual } from 'node:crypto';
-import { readFileSync } from 'node:fs';
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { ApprovalRegistry } from './approvals.js';
@@ -12,11 +12,10 @@ import * as gitOps from './gitOps.js';
 import { FileIndex, readWorkspaceFile } from './files.js';
 import { listModels } from './models.js';
 import { runOneshot, type OneshotRunner } from './oneshot.js';
-import { GATE_NAME_PATTERN, GateRunner, type GateScript } from './gates.js';
+import { GATE_NAME_PATTERN, GateRunner, tail, type GateScript } from './gates.js';
 import { CheckpointStore, parseRef, type Checkpoint } from './checkpoints.js';
 import { layoutFor, saveTaskEnv, SLUG_PATTERN, worktreeDir, type Layout } from './layout.js';
 import { prepareWorktree, removeWorktree, SETUP_TIMEOUT_MS, writeEnv, type SetupScript } from './worktrees.js';
-import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 /** The daemon's version, from package.json (one directory above src/ and dist/). */
@@ -47,6 +46,12 @@ const slugSchema = z.string().regex(SLUG_PATTERN);
 
 const effortLevel = z.enum(['low', 'medium', 'high', 'xhigh', 'max']);
 
+/** `.env` values of a task (names in upper case). */
+const envSchema = z.record(z.string().regex(/^[A-Z][A-Z0-9_]*$/), z.string().max(4000)).default({});
+
+/** Author and committer of commits. */
+const authorSchema = z.object({ name: z.string().min(1).max(120), email: z.string().min(3).max(200) });
+
 const startSchema = z.object({
     worktree: slugSchema,
     guard: z.enum(['ask', 'deny']).default('ask'),
@@ -59,7 +64,7 @@ const startSchema = z.object({
     seq_offset: z.number().int().min(0).default(0),
     append_system_prompt: z.string().default(''),
     /** Who Claude's commits in this task are by (the task's owner). */
-    git_author: z.object({ name: z.string().min(1).max(120), email: z.string().min(3).max(200) }).nullish(),
+    git_author: authorSchema.nullish(),
 });
 
 const messageSchema = z.object({
@@ -93,9 +98,9 @@ const refSchema = z.string().min(1).max(255).regex(/^[A-Za-z0-9._\/-]+$/).refine
 
 const prepareSchema = z.object({
     task_id: idSchema,
-    branch: z.string().min(1).max(255).regex(/^[A-Za-z0-9._\/-]+$/).refine((ref) => !ref.startsWith('-') && !ref.includes('..'), 'invalid branch'),
-    base_branch: z.string().min(1).max(255).regex(/^[A-Za-z0-9._\/-]+$/).refine((ref) => !ref.startsWith('-') && !ref.includes('..'), 'invalid branch'),
-    env: z.record(z.string().regex(/^[A-Z][A-Z0-9_]*$/), z.string().max(4000)).default({}),
+    branch: refSchema,
+    base_branch: refSchema,
+    env: envSchema,
     seq_offset: z.number().int().min(0).default(0),
     /** Branch of a workspace setup that is not merged yet: its setup steps apply. */
     setup_ref: refSchema.optional(),
@@ -103,7 +108,7 @@ const prepareSchema = z.object({
 
 const setupCheckSchema = z.object({
     ref: refSchema,
-    env: z.record(z.string().regex(/^[A-Z][A-Z0-9_]*$/), z.string().max(4000)).default({}),
+    env: envSchema,
 });
 
 /** Worktree the setup check uses; never a task's. */
@@ -112,7 +117,7 @@ const SETUP_CHECK_SLUG = 'argos-setup-check';
 const commitSchema = z.object({
     subject: z.string().min(1).max(200),
     body: z.string().max(10_000).default(''),
-    author: z.object({ name: z.string().min(1).max(120), email: z.string().min(3).max(200) }),
+    author: authorSchema,
 });
 
 const modelsSchema = z.object({
@@ -303,7 +308,7 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
                     const scriptEnv = body.setup_ref !== undefined ? { ...body.env, ARGOS_SETUP_REF: body.setup_ref } : body.env;
                     const result = await deps.setupScript(worktree.path, scriptEnv, SETUP_TIMEOUT_MS);
                     setup = result.code === 0 ? 'ok' : 'failed';
-                    log = result.output.length > 8192 ? result.output.slice(-8192) : result.output;
+                    log = tail(result.output);
                 }
                 emit('prepare.completed', { path: worktree.path, base_commit: worktree.baseCommit, created: worktree.created, setup, log });
                 if (gates !== null) {
@@ -342,7 +347,7 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
             writeEnv(worktree.path, body.env);
             const result = await deps.setupScript(worktree.path, body.env, SETUP_TIMEOUT_MS);
 
-            return { setup: result.code === 0 ? 'ok' : 'failed', log: result.output.length > 8192 ? result.output.slice(-8192) : result.output };
+            return { setup: result.code === 0 ? 'ok' : 'failed', log: tail(result.output) };
         } finally {
             await removeWorktree(layout, SETUP_CHECK_SLUG);
             preparing.delete(SETUP_CHECK_SLUG);
@@ -452,7 +457,7 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
             run_id: idSchema,
             base_commit: z.string().regex(/^[0-9a-f]{40}$/).nullish(),
             // Re-check one gate only (the others come back as skip).
-            only: z.string().regex(/^[a-z_]{1,32}$/).nullish(),
+            only: z.string().regex(GATE_NAME_PATTERN).nullish(),
         }).parse(request.body);
         void gateRunner().start(body.run_id, dir, body.base_commit ?? null, body.only ?? null);
 

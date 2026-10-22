@@ -36,9 +36,7 @@ class TaskShip extends Tool
         }
 
         return $this->attempt(function () use ($request, $task): Response {
-            $ship = app(WorkspaceShipService::class);
-            $draft = $ship->draft($task, $this->user());
-            $url = $ship->ship($task, $this->user(), $draft['subject'] !== '' ? $draft['subject'] : $task->title, $draft['body'], (bool) $request->get('draft'));
+            $url = app(WorkspaceShipService::class)->shipWithDraft($task, $this->user(), (bool) $request->get('draft'));
 
             return Response::text('Shipped: '.$url);
         });

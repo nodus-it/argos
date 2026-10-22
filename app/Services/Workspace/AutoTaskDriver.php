@@ -310,12 +310,8 @@ class AutoTaskDriver
 
         $actor = $this->actor($task);
         $mode = AutoShipMode::tryFrom((string) ($task->auto_config['ship'] ?? '')) ?? AutoShipMode::PullRequest;
-        $draft = $this->ship->draft($task, $actor);
-        $subject = $draft['subject'] !== '' ? $draft['subject'] : $task->title;
-        $body = trim($draft['body']."\n\n".$this->gateNote($task));
-
         try {
-            $url = $this->ship->ship($task, $actor, $subject, $body, $mode === AutoShipMode::DraftPullRequest, $mode !== AutoShipMode::None);
+            $url = $this->ship->shipWithDraft($task, $actor, $mode === AutoShipMode::DraftPullRequest, $mode !== AutoShipMode::None, $this->gateNote($task));
         } catch (WorkspaceException $e) {
             if ($e->reason !== 'nothing') {
                 throw $e;

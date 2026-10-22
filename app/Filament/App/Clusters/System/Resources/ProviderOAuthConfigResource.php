@@ -82,7 +82,7 @@ class ProviderOAuthConfigResource extends Resource
                 ->schema([
                     Select::make('provider')
                         ->label(__('credentials.oauth.fields.provider'))
-                        ->options(self::providerOptions())
+                        ->options(IntegrationProvider::options())
                         ->required()
                         ->live()
                         ->native(false)
@@ -177,7 +177,7 @@ class ProviderOAuthConfigResource extends Resource
             ])
             ->filters([
                 SelectFilter::make('provider')
-                    ->options(self::providerOptions()),
+                    ->options(IntegrationProvider::options()),
             ])
             ->recordActions([
                 EditAction::make(),
@@ -234,18 +234,6 @@ class ProviderOAuthConfigResource extends Resource
         ]);
     }
 
-    /**
-     * @return array<string, string>
-     */
-    public static function providerOptions(): array
-    {
-        $opts = [];
-        foreach (IntegrationProvider::cases() as $provider) {
-            $opts[$provider->value] = $provider->label();
-        }
-
-        return $opts;
-    }
 
     public static function getPages(): array
     {

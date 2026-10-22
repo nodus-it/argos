@@ -15,7 +15,6 @@ use App\Enums\TaskEventType;
 use App\Enums\TaskKind;
 use App\Enums\TaskOrigin;
 use App\Enums\TaskStatus;
-use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceStatus;
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
 use App\Jobs\Workspace\DrainSessionQueueJob;
@@ -137,7 +136,7 @@ class TaskService
                 // Nobody answers in an automatic run: file tools outside the task's folder are refused.
                 'guard' => $task->auto_state?->isRunning() === true ? 'deny' : 'ask',
                 'agent_id' => $agent->id,
-                'oauth_token' => (string) ($agent->credentials['token'] ?? ''),
+                'oauth_token' => $agent->oauthToken(),
                 'model' => $task->model,
                 'effort' => $task->effort,
                 'permission_mode' => $task->permission_mode->value,
@@ -722,16 +721,8 @@ class TaskService
     public function ticketComment(Task $task, string $author, string $body, ?string $url = null): void
     {
         $text = mb_strimwidth(trim($body), 0, 2000, '…');
-        $event = TaskEvent::query()->create([
-            'task_id' => $task->id,
-            'type' => TaskEventType::Notice,
-            'payload' => ['kind' => 'ticket_comment', 'author_name' => $author, 'body' => $text, 'url' => $url],
-        ]);
-        $this->publisher->publish($task->workspace_id, $task->id, [[
-            'type' => 'notice',
-            'event_id' => $event->id,
-            'data' => ['kind' => 'ticket_comment'],
-        ]]);
+        // The author is a tracker login, not an Argos user: a system notice that names them.
+        $this->systemNotice($task, 'ticket_comment', ['author_name' => $author, 'body' => $text, 'url' => $url]);
         app(WorkspaceNotifier::class)->notify($task->workspace, $task, 'ticket', __('workspaces.notifications.ticket_comment', ['name' => $author]), mb_strimwidth($text, 0, 200, '…'));
     }
 
@@ -789,16 +780,7 @@ class TaskService
      */
     public function systemNotice(Task $task, string $kind, array $extra = []): void
     {
-        $event = TaskEvent::query()->create([
-            'task_id' => $task->id,
-            'type' => TaskEventType::Notice,
-            'payload' => ['kind' => $kind, ...$extra],
-        ]);
-        $this->publisher->publish($task->workspace_id, $task->id, [[
-            'type' => 'notice',
-            'event_id' => $event->id,
-            'data' => ['kind' => $kind],
-        ]]);
+        $this->recordNotice($task, $kind, null, $extra);
     }
 
     /**
@@ -809,17 +791,29 @@ class TaskService
      */
     public function notice(Task $task, string $kind, User $by, array $extra = []): void
     {
+        $this->recordNotice($task, $kind, $by, $extra);
+    }
+
+    /**
+     * Store a notice in the history and tell the open pages (they re-render
+     * it from the history; a system notice sends only its kind).
+     *
+     * @param  array<string, mixed>  $extra
+     */
+    private function recordNotice(Task $task, string $kind, ?User $by, array $extra): void
+    {
+        $payload = ['kind' => $kind, ...($by !== null ? ['author_name' => $by->name] : []), ...$extra];
         $event = TaskEvent::query()->create([
             'task_id' => $task->id,
             'type' => TaskEventType::Notice,
-            'author_user_id' => $by->id,
-            'payload' => ['kind' => $kind, 'author_name' => $by->name, ...$extra],
+            'author_user_id' => $by?->id,
+            'payload' => $payload,
         ]);
 
         $this->publisher->publish($task->workspace_id, $task->id, [[
             'type' => 'notice',
             'event_id' => $event->id,
-            'data' => ['kind' => $kind, 'author_name' => $by->name, ...$extra],
+            'data' => $by !== null ? $payload : ['kind' => $kind],
         ]]);
     }
 

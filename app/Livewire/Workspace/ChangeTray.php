@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Livewire\Workspace;
 
+use App\Services\GitProvider\PullRequestDetails;
+use App\Support\GateRows;
 use App\Livewire\Concerns\InteractsWithWorkspace;
 use App\Enums\GateRunStatus;
 use App\Enums\WorkspaceStatus;
@@ -79,7 +81,7 @@ class ChangeTray extends Component
             'canShip' => $canShip,
             'canPush' => $canShip && $push,
             'uncommitted' => $uncommitted,
-            'hasPr' => $task->pr_number !== null && in_array($task->pr_state, ['open', 'draft'], true),
+            'hasPr' => $task->hasOpenPullRequest(),
             'count' => count($files),
             'additions' => array_sum(array_column($files, 'additions')),
             'deletions' => array_sum(array_column($files, 'deletions')),
@@ -96,18 +98,18 @@ class ChangeTray extends Component
     private function todos(Task $task, ?WorkspaceGateRun $run, bool $canOperate, bool $canShip): array
     {
         $todos = [];
-        $failed = array_values(array_filter(ContextPanel::gateRows($run), fn (array $row): bool => $row['state'] === 'fail'));
+        $failed = GateRows::failed($run);
         if ($failed !== [] && $run?->status !== GateRunStatus::Running) {
             $todos[] = ['kind' => 'fail', 'label' => __('workspaces.tray.todo.gates', ['gates' => implode(', ', array_column($failed, 'label'))]), 'action' => __('workspaces.tray.todo.gates_action'), 'gate' => $failed[0]['key']];
         }
 
         $pr = $task->pr_number !== null ? app(PullRequestService::class)->details($task) : null;
-        $open = in_array($pr?->state ?? $task->pr_state, ['open', 'draft'], true);
+        $open = PullRequestDetails::isOpenState($pr?->state ?? $task->pr_state);
         if ($pr !== null && $open) {
             if ($pr->checksFailed() && $canOperate) {
                 $todos[] = ['kind' => 'fail', 'label' => __('workspaces.tray.todo.pipeline'), 'action' => __('workspaces.pr.fix_checks'), 'event' => 'pr-fix-checks'];
             }
-            if (($pr->conflicts || $pr->behindBase === true) && $canOperate) {
+            if ($pr->needsRebase() && $canOperate) {
                 $todos[] = ['kind' => 'warn', 'label' => $pr->conflicts ? __('workspaces.tray.todo.conflicts', ['branch' => $task->base_branch]) : __('workspaces.tray.todo.behind', ['branch' => $task->base_branch]), 'action' => __('workspaces.pr.rebase'), 'event' => 'pr-rebase'];
             }
             $new = count(app(PullRequestService::class)->uncollectedComments($task, $this->user()));
@@ -131,7 +133,7 @@ class ChangeTray extends Component
         if ($run->status === GateRunStatus::Running) {
             return __('workspaces.tray.gates_running');
         }
-        $failed = array_values(array_filter(ContextPanel::gateRows($run), fn (array $row): bool => $row['state'] === 'fail'));
+        $failed = GateRows::failed($run);
         if ($failed === []) {
             return __('workspaces.tray.gates_green');
         }
