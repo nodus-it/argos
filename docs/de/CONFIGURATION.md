@@ -48,7 +48,7 @@ Referenz für den Betrieb mit jeder ENV-Variable, die Argos tatsächlich liest.
 | `ARGOS_CONFIG_DIR` | `~/.config/argos` (Compose: `/data/config`) | Verzeichnis für persistierte Konfiguration / den Standard-SQLite-Pfad innerhalb des Managers. |
 | `ARGOS_SOURCE_URL` | `https://github.com/nodus-it/argos` | In der UI angezeigte Source-Offer-URL gemäß AGPL-3.0 §13. **Forks müssen dies überschreiben** mit ihrer eigenen Source-URL. |
 | `ARGOS_FEEDBACK_URL` | *(leer)* | Wohin *Feedback senden* im Benutzermenü führt – etwa euer eigener Tracker oder Chat-Kanal für eine Beta. Ein GitHub- oder GitLab-Link `…/issues/new` wird mit Version und Seite vorbefüllt. Leer: die Issue-Auswahl des Upstream-Projekts. |
-| `ARGOS_ACCESS_LINK_HOURS` | `72` | Wie lange ein Zugangslink (Passwort setzen oder zurücksetzen, siehe [Kolleg:innen hinzufügen](SETUP.md#kolleginnen-hinzufügen)) gültig bleibt. |
+| `ARGOS_ACCESS_LINK_HOURS` | `72` | Wie lange ein Zugangslink (Passwort setzen oder zurücksetzen, siehe [Kolleg:innen hinzufügen](SETUP.md)) gültig bleibt. |
 | `ARGOS_VERSION` | – | Überschreibt den eingebackenen App-Versionsstring. CI backt einen `stage-…`-Wert in Stage-Images; für Releases nicht setzen. |
 
 ## Sessions (Reverse Proxy / HTTPS)
