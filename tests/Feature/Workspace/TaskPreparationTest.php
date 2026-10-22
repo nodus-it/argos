@@ -239,6 +239,25 @@ class TaskPreparationTest extends TestCase
         $this->assertNull($task->fresh()->db_name);
     }
 
+    public function test_a_workspace_without_services_sends_an_empty_env_object(): void
+    {
+        $this->app->forgetInstance(WorkspaceDaemonClient::class);
+        $this->app->offsetUnset(WorkspaceDaemonClient::class);
+        $body = null;
+        Saloon::fake([PrepareWorktree::class => function (PendingRequest $request) use (&$body) {
+            $body = (string) $request->body();
+
+            return MockResponse::make(['status' => 'preparing'], 202);
+        }]);
+        $task = $this->preparingTask();
+        $task->workspace->forceFill(['worker_services' => []])->save();
+
+        $this->assertTrue($this->prepare($task->fresh()));
+
+        // The daemon expects an object; PHP would send an empty array as [].
+        $this->assertStringContainsString('"env":{}', (string) $body);
+    }
+
     public function test_an_unreachable_daemon_is_reported_as_a_failed_preparation(): void
     {
         $this->app->forgetInstance(WorkspaceDaemonClient::class);

@@ -92,6 +92,9 @@ class WorkspaceDaemonApi implements WorkspaceDaemonTransport
      */
     public function resolveApproval(string $taskId, string $approvalId, array $payload): void
     {
+        if (($payload['updated_input'] ?? null) === []) {
+            $payload['updated_input'] = (object) [];
+        }
         $this->call(new ResolveApproval($taskId, $approvalId, $payload));
     }
 
@@ -112,7 +115,8 @@ class WorkspaceDaemonApi implements WorkspaceDaemonTransport
 
     public function prepareWorktree(string $worktree, array $payload): void
     {
-        $this->call(new PrepareWorktree($worktree, $payload));
+        // An empty env must reach the daemon as {} — PHP encodes [] as a list.
+        $this->call(new PrepareWorktree($worktree, ['env' => (object) ($payload['env'] ?? [])] + $payload));
     }
 
     public function setupCheck(string $ref, array $env): array
