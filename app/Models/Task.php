@@ -175,6 +175,12 @@ class Task extends Model implements DemoTarget
         return is_string($id) ? TaskProviderBinding::query()->find($id) : null;
     }
 
+    /** The session ended although the task was used: Claude can pick the conversation up again. */
+    public function isResumable(): bool
+    {
+        return ! $this->session_open && in_array($this->session_status, [SessionStatus::Closed, SessionStatus::Error], true) && $this->claude_session_id !== null;
+    }
+
     /** A pull request that can still change (open or draft). */
     public function hasOpenPullRequest(): bool
     {

@@ -288,6 +288,41 @@ class TaskService
     }
 
     /**
+     * A decision from the approval card: "always" allows and remembers,
+     * question answers ride along with an allow, an automatic run's plan
+     * goes to its driver, and accepting a plan (ExitPlanMode) switches to
+     * the chosen mode. False when someone else decided first.
+     *
+     * @param  array<string, mixed>|null  $answers  AskUserQuestion: question text => answer
+     */
+    public function decideApproval(TaskApproval $approval, User $by, string $decision, ?string $message = null, ?array $answers = null, ?PermissionMode $nextMode = null): bool
+    {
+        if (! in_array($decision, ['allow', 'always', 'deny'], true)) {
+            return false;
+        }
+        $remember = $decision === 'always';
+        $allow = $decision !== 'deny';
+        $message = $message !== '' ? $message : null;
+
+        if ($approval->kind === ApprovalKind::Plan && $approval->task->auto_state === AutoTaskState::AwaitingPlanApproval) {
+            // Resolved lazily: the driver depends on this service.
+            app(AutoTaskDriver::class)->decidePlan($approval->task, $by, $allow, $message);
+
+            return true;
+        }
+
+        $updatedInput = $answers !== null && $allow ? [...(array) ($approval->request['input'] ?? []), 'answers' => $answers] : null;
+        if (! $this->resolveApproval($approval, $by, $allow ? 'allow' : 'deny', $updatedInput, $message, $remember)) {
+            return false;
+        }
+        if ($allow && $nextMode !== null && $approval->tool_name === 'ExitPlanMode') {
+            $this->setPermissionMode($approval->task, $by, $nextMode);
+        }
+
+        return true;
+    }
+
+    /**
      * Answer a pending approval. The first decision wins; returns false when
      * someone else already decided.
      *

@@ -6,12 +6,9 @@ namespace App\Livewire\Workspace;
 
 use App\Livewire\Concerns\InteractsWithWorkspace;
 use App\Support\RequestedTask;
-use App\Enums\ApprovalKind;
-use App\Enums\AutoTaskState;
 use App\Enums\Capability;
 use App\Enums\PermissionMode;
 use App\Enums\ReviewCommentStatus;
-use App\Enums\SessionStatus;
 use App\Enums\TaskEventType;
 use App\Enums\WorkspaceStatus;
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
@@ -32,8 +29,8 @@ use App\Services\Workspace\TaskAttachmentService;
 use App\Services\Workspace\TaskCheckpointService;
 use App\Services\Workspace\TaskReadService;
 use App\Services\Workspace\TaskPreparer;
+use App\Services\Workspace\TaskComposer;
 use App\Services\Workspace\TaskService;
-use App\Services\Workspace\TaskTicketService;
 use App\Services\Workspace\WorkspaceDaemonClient;
 use App\Services\Workspace\WorkspaceException;
 use App\Services\Workspace\WorkspaceIssueService;
@@ -248,53 +245,27 @@ class TaskChat extends Component
                 return;
             }
         }
-        $options = array_filter([
-            'base_branch' => trim($this->newBaseBranch) !== '' ? trim($this->newBaseBranch) : null,
-            'external_ref' => $issue,
-            'parent_task_id' => $this->newParentId,
-            'auto_merge' => $this->newAutoMerge ?: null,
-        ], fn ($value): bool => $value !== null);
-
-        if ($this->newAuto) {
-            $this->attempt(function () use ($agent, $options): void {
-                $task = app(AutoTaskDriver::class)->start(
-                    $this->workspace(),
-                    $this->user(),
-                    $agent,
-                    trim($this->newPrompt),
-                    trim($this->newTitle) !== '' ? trim($this->newTitle) : null,
-                    $this->newModel,
-                    ['plan' => $this->newPlan, 'ship' => $this->newShip, 'max_fix_rounds' => $this->newMaxFixRounds],
-                    $options,
-                );
-                $this->taskId = $task->id;
-                $this->creating = false;
-                $this->reset('newTitle', 'newPrompt', 'newAuto', 'newPlan', 'newShip', 'newMaxFixRounds', 'newIssue', 'newIssueQuery', 'newBaseBranch', 'newParentId', 'newAutoMerge');
-                $this->announceTask();
-            });
-
-            return;
-        }
-
-        $this->attempt(function () use ($agent, $options): void {
-            $task = app(TaskService::class)->create(
-                $this->workspace(),
-                $this->user(),
-                $agent,
-                trim($this->newTitle) !== '' ? trim($this->newTitle) : __('workspaces.task.title_default').' '.($this->tasks()->count() + 1),
-                $this->newModel,
-                PermissionMode::from($this->newMode),
-                options: $options,
-            );
-            $this->taskId = $task->id;
+        $this->attempt(function () use ($agent, $issue): void {
+            $started = app(TaskComposer::class)->start($this->workspace(), $this->user(), $agent, [
+                'title' => $this->newTitle,
+                'prompt' => $this->newPrompt,
+                'model' => $this->newModel,
+                'mode' => $this->newMode,
+                'base_branch' => $this->newBaseBranch,
+                'issue' => $issue,
+                'parent_id' => $this->newParentId,
+                'auto_merge' => $this->newAutoMerge,
+                'auto' => $this->newAuto,
+                'plan' => $this->newPlan,
+                'ship' => $this->newShip,
+                'max_fix_rounds' => $this->newMaxFixRounds,
+            ]);
+            $this->taskId = $started['task']->id;
             $this->creating = false;
-            $this->newTitle = '';
-            $this->announceTask();
             // Started from an issue or as a follow-up: prefill, never send — the person reviews it.
-            $this->draft = $task->parent_task_id !== null
-                ? app(TaskTicketService::class)->followUpBrief($task)
-                : app(WorkspaceIssueService::class)->composerDraft($task);
-            $this->reset('newIssue', 'newIssueQuery', 'newBaseBranch', 'newParentId', 'newAutoMerge');
+            $this->draft = $started['draft'];
+            $this->reset('newTitle', 'newPrompt', 'newAuto', 'newPlan', 'newShip', 'newMaxFixRounds', 'newIssue', 'newIssueQuery', 'newBaseBranch', 'newParentId', 'newAutoMerge');
+            $this->announceTask();
         });
     }
 
@@ -609,35 +580,13 @@ class TaskChat extends Component
     public function resolveApproval(string $approvalId, string $decision, ?string $message = null, ?array $answers = null, ?string $nextMode = null): void
     {
         $approval = TaskApproval::query()->with('task.workspace')->find($approvalId);
-        if ($approval === null || $approval->task->workspace_id !== $this->workspaceId || ! in_array($decision, ['allow', 'always', 'deny'], true)) {
-            return;
-        }
-        $remember = $decision === 'always';
-        $decision = $remember ? 'allow' : $decision;
-
-        $updatedInput = null;
-        if ($answers !== null && $decision === 'allow') {
-            $updatedInput = [...(array) ($approval->request['input'] ?? []), 'answers' => $answers];
-        }
-
-        // An auto-task's plan: the driver decides and continues the run.
-        if ($approval->kind === ApprovalKind::Plan && $approval->task->auto_state === AutoTaskState::AwaitingPlanApproval) {
-            $this->attempt(fn () => app(AutoTaskDriver::class)->decidePlan($approval->task, $this->user(), $decision === 'allow', $message));
-
+        if ($approval === null || $approval->task->workspace_id !== $this->workspaceId) {
             return;
         }
 
-        $this->attempt(function () use ($approval, $decision, $message, $updatedInput, $nextMode, $remember): void {
-            $won = app(TaskService::class)->resolveApproval($approval, $this->user(), $decision, $updatedInput, $message !== '' ? $message : null, $remember);
-            if (! $won) {
+        $this->attempt(function () use ($approval, $decision, $message, $answers, $nextMode): void {
+            if (! app(TaskService::class)->decideApproval($approval, $this->user(), $decision, $message, $answers, PermissionMode::tryFrom((string) $nextMode))) {
                 Notification::make()->title(__('workspaces.approval.taken'))->warning()->send();
-
-                return;
-            }
-            // Accepting a plan leaves plan mode for the chosen next mode.
-            $mode = PermissionMode::tryFrom((string) $nextMode);
-            if ($decision === 'allow' && $mode !== null && $approval->tool_name === 'ExitPlanMode') {
-                app(TaskService::class)->setPermissionMode($approval->task, $this->user(), $mode);
             }
         });
     }
@@ -808,12 +757,6 @@ class TaskChat extends Component
         return [$rows->take($this->limit)->reverse()->values(), $hasOlder];
     }
 
-
     /** Run an action and report failures; true when it went through. */
 
-    /** Session closed although the task was used: offer to resume. */
-    public static function canResume(Task $task): bool
-    {
-        return ! $task->session_open && in_array($task->session_status, [SessionStatus::Closed, SessionStatus::Error], true) && $task->claude_session_id !== null;
-    }
 }

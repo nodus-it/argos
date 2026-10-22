@@ -4,7 +4,6 @@
     use App\Enums\AutoTaskState;
     use App\Enums\PermissionMode;
     use App\Enums\TaskEventType;
-    use App\Livewire\Workspace\TaskChat;
     use App\Support\TaskEventFormatter as Fmt;
 
     /** @var \App\Models\Workspace $workspace */
@@ -352,7 +351,7 @@
             </div>
         </div>
 
-        @if (TaskChat::canResume($task) && $canWrite)
+        @if ($task->isResumable() && $canWrite)
             <div class="ws-alert ws-alert-warn">
                 <span>{{ __('workspaces.task.session_ended') }}</span>
                 <button type="button" class="btn btn-secondary btn-sm" wire:click="resume">{{ __('workspaces.task.resume') }}</button>
