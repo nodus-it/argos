@@ -59,6 +59,7 @@ Route::middleware('auth')->group(function () {
         ->whereIn('target', ['code', 'preview'])
         ->name('workspaces.open');
     Route::get('/system/log/download', SystemLogController::class)
+        ->middleware('can:administer-argos')
         ->name('system.log.download');
 });
 

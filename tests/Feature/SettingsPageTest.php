@@ -7,6 +7,7 @@ namespace Tests\Feature;
 use App\Filament\App\Clusters\System\Pages\Settings;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -33,5 +34,15 @@ class SettingsPageTest extends TestCase
             ->assertSuccessful()
             ->assertSee(__('settings.blade.logs_download'))
             ->assertSee(route('system.log.download'), escape: false);
+    }
+
+    public function test_only_operators_reach_the_log_and_horizon(): void
+    {
+        $member = User::factory()->create();
+
+        $this->actingAs($member)->get(route('system.log.download'))->assertForbidden();
+        $this->actingAs($member)->get('/horizon/api/stats')->assertForbidden();
+        $this->assertFalse(Gate::forUser($member)->allows('viewHorizon'));
+        $this->assertTrue(Gate::forUser(User::factory()->admin()->create())->allows('viewHorizon'));
     }
 }
