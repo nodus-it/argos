@@ -1,6 +1,5 @@
 @php
-    $sourceUrl = rtrim((string) config('argos.source_url'), '/');
-    $issueUrl = $sourceUrl !== '' ? $sourceUrl.'/issues/new/choose' : null;
+    $issueUrl = \App\Support\FeedbackLink::url(request()->fullUrl());
 @endphp
 
 @if (filled($issueUrl))

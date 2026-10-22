@@ -46,6 +46,8 @@ ENV var Argos actually reads.
 | `ADMIN_PASSWORD` | `12345` | Password for the auto-created admin user. **Change before exposing the instance.** |
 | `ARGOS_CONFIG_DIR` | `~/.config/argos` (compose: `/data/config`) | Directory for persisted config / the default SQLite path inside the manager. |
 | `ARGOS_SOURCE_URL` | `https://github.com/nodus-it/argos` | AGPL-3.0 §13 source-offer URL surfaced in the UI. **Forks must override this** with their own source URL. |
+| `ARGOS_FEEDBACK_URL` | *(empty)* | Where *Send feedback* in the user menu leads — e.g. your own tracker or chat channel for a beta. A GitHub or GitLab `…/issues/new` link is prefilled with version and page. Empty: the upstream issue chooser. |
+| `ARGOS_ACCESS_LINK_HOURS` | `72` | How long an access link (set or reset a password, see [Adding colleagues](SETUP.md#adding-colleagues)) stays valid. |
 | `ARGOS_VERSION` | – | Overrides the baked-in app version string. CI bakes a `stage-…` value into stage images; leave unset for releases. |
 
 ## Sessions (reverse proxy / HTTPS)

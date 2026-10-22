@@ -162,6 +162,8 @@ services:
       APP_URL:                           "${APP_URL:-http://localhost:${ARGOS_PORT:-8080}}"
       APP_KEY:                           "${APP_KEY:-}"
       ADMIN_PASSWORD:                    "${ADMIN_PASSWORD:-}"
+      ARGOS_FEEDBACK_URL:                "${ARGOS_FEEDBACK_URL:-}"
+      ARGOS_ACCESS_LINK_HOURS:           "${ARGOS_ACCESS_LINK_HOURS:-72}"
       # Browser-E2E only: boots E2eFakeServiceProvider (offline fakes for the
       # workspace runtime + external validations). Empty by default; double-
       # gated in AppServiceProvider (set AND not-production), so production is

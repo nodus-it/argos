@@ -62,7 +62,7 @@
         @if ($sourceUrl !== '')
             {{-- AGPL-3.0 §13: the source stays one click away on every page. --}}
             <x-filament::dropdown.list>
-                <x-filament::dropdown.list.item :href="$sourceUrl.'/issues/new/choose'" tag="a" target="_blank" icon="heroicon-o-chat-bubble-left-ellipsis" class="fi-argos-feedback-btn">
+                <x-filament::dropdown.list.item :href="\App\Support\FeedbackLink::url(request()->fullUrl())" tag="a" target="_blank" icon="heroicon-o-chat-bubble-left-ellipsis" class="fi-argos-feedback-btn">
                     {{ __('common.feedback_button.tooltip') }}
                 </x-filament::dropdown.list.item>
                 <x-filament::dropdown.list.item :href="$sourceUrl" tag="a" target="_blank" icon="heroicon-o-code-bracket">

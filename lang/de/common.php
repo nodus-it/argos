@@ -36,5 +36,6 @@ return [
     'feedback_button' => [
         'label' => 'Feedback',
         'tooltip' => 'Bug melden oder Feedback geben',
+        'prefill' => "**Was ist passiert?**\n\n\n**Was hättest du erwartet?**\n\n\n---\nArgos :version · :page",
     ],
 ];

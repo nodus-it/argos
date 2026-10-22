@@ -43,6 +43,12 @@ return [
      * ARGOS_SOURCE_URL.
      */
     'source_url' => env('ARGOS_SOURCE_URL', 'https://github.com/nodus-it/argos'),
+    /*
+     * Where "Send feedback" leads (a beta's own tracker or chat channel).
+     * Empty: the upstream issue chooser. A GitHub/GitLab ".../issues/new"
+     * link is prefilled with version and page.
+     */
+    'feedback_url' => env('ARGOS_FEEDBACK_URL', ''),
     'config_dir' => env('ARGOS_CONFIG_DIR', (getenv('HOME') ?: ($_SERVER['HOME'] ?? posix_getpwuid(posix_getuid())['dir'])).'/.config/argos'),
     'admin_password' => env('ADMIN_PASSWORD') ?: '12345',
     /*
