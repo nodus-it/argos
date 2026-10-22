@@ -142,6 +142,7 @@ const oneshotSchema = z.object({
 export function buildApp(deps: AppDependencies): { app: FastifyInstance; sessions: Map<string, TaskSession> } {
     const app = Fastify({ logger: false, bodyLimit: 40 * 1024 * 1024 });
     const sessions = new Map<string, TaskSession>();
+    const sessionsIn = (dir: string): TaskSession[] => [...sessions.values()].filter((s) => s.cwd === dir);
     const approvals = new ApprovalRegistry();
     const layout: Layout = layoutFor(deps.environment.workspaceDir);
     const gates = deps.gateScript === undefined ? null : new GateRunner(deps.gateScript, (event) => deps.outbox.push(null, event), layout);
@@ -356,7 +357,8 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
     app.delete('/worktrees/:slug', async (request, reply) => {
         const slug = slugSchema.parse((request.params as { slug?: string }).slug);
         const dir = worktreeDir(layout, slug);
-        if ([...sessions.values()].some((s) => s.cwd === dir && s.currentState !== 'closed')) {
+        // Removing the worktree pulls it from under any open session, even an idle one.
+        if (sessionsIn(dir).some((s) => s.currentState !== 'closed')) {
             throw new CodedError(409, 'task_running', 'A session still works in this task');
         }
         await removeWorktree(layout, slug);
@@ -438,10 +440,7 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
         const { ref } = z.object({ ref: checkpointRefSchema }).parse(request.body);
         const { taskId } = parseRef(ref);
         // A restore rewrites this task's working tree: its session must be quiet.
-        const busy = [...sessions.values()].find(
-            (s) => s.cwd === dir && (s.currentState === 'running' || s.currentState === 'starting' || s.currentState === 'waiting_input'),
-        );
-        if (busy !== undefined) {
+        if (sessionsIn(dir).some((s) => s.currentState !== 'idle' && s.currentState !== 'closed')) {
             throw new CodedError(409, 'task_running', 'Claude is working in this task; interrupt it first');
         }
         const result = await checkpointsFor(dir).restore(ref);
