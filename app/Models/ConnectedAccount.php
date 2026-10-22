@@ -159,11 +159,9 @@ class ConnectedAccount extends Model
      * die Menge leer (kein Schaden), nach Re-Connect werden die Bindungen
      * zurückgesetzt — Poll / Write-back laufen ohne erneutes Seeden wieder.
      *
-     * Annahme single-tenant: Weder Workspace noch TaskProviderBinding haben
-     * eine eigene `user_id`. `unique(user_id, provider)` auf
-     * `connected_accounts` garantiert aber genau einen aktiven Account pro
-     * Plattform — alle verwaisten (oauth, NULL)-Ressourcen gehörten also
-     * zwangsläufig dem gerade gelöschten Account.
+     * Nur Ressourcen der Person, die sich gerade verbindet: Workspaces, die
+     * sie angelegt hat, und deren Ticket-Integrationen. Fremde Workspaces
+     * bekommen nie still den Token eines anderen Menschen.
      *
      * @return int Anzahl re-attachter Workspaces + Bindings
      */
@@ -177,6 +175,7 @@ class ConnectedAccount extends Model
                 ->where('platform', $gitProvider)
                 ->where('auth_method', AuthMethod::OAuth)
                 ->whereNull('connected_account_id')
+                ->where('created_by', $this->user_id)
                 ->update(['connected_account_id' => $this->id]);
         }
 
@@ -185,6 +184,7 @@ class ConnectedAccount extends Model
             $count += TaskProviderBinding::query()
                 ->where('kind', $issueKind)
                 ->whereNull('connected_account_id')
+                ->whereIn('workspace_id', Workspace::query()->select('id')->where('created_by', $this->user_id))
                 ->update(['connected_account_id' => $this->id]);
         }
 

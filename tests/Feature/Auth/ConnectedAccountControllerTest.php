@@ -171,6 +171,7 @@ class ConnectedAccountControllerTest extends TestCase
     {
         // Connected before, then disconnected → the workspace points to NULL
         $orphan = Workspace::factory()->create([
+            'created_by' => $this->user->id,
             'platform' => 'github',
             'auth_method' => 'oauth',
             'connected_account_id' => null,

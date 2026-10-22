@@ -25,12 +25,14 @@ class ConnectedAccountTest extends TestCase
         ]);
 
         $orphanBb = Workspace::factory()->create([
+            'created_by' => $user->id,
             'platform' => 'bitbucket',
             'auth_method' => 'oauth',
             'connected_account_id' => null,
             'repo_url' => 'https://bitbucket.org/ws/repo',
         ]);
         $orphanGh = Workspace::factory()->create([
+            'created_by' => $user->id,
             'platform' => 'github',
             'auth_method' => 'oauth',
             'connected_account_id' => null,
@@ -103,11 +105,14 @@ class ConnectedAccountTest extends TestCase
             'provider' => 'github',
         ]);
 
+        $own = Workspace::factory()->create(['created_by' => $user->id]);
         $ghBinding = TaskProviderBinding::factory()->create([
+            'workspace_id' => $own->id,
             'kind' => TaskProviderKind::GitHub,
             'connected_account_id' => null,
         ]);
         $linearBinding = TaskProviderBinding::factory()->create([
+            'workspace_id' => $own->id,
             'kind' => TaskProviderKind::Linear,
             'connected_account_id' => null,
         ]);
@@ -128,6 +133,7 @@ class ConnectedAccountTest extends TestCase
         ]);
 
         $binding = TaskProviderBinding::factory()->create([
+            'workspace_id' => Workspace::factory()->create(['created_by' => $user->id])->id,
             'kind' => TaskProviderKind::Linear,
             'connected_account_id' => null,
         ]);
@@ -137,5 +143,18 @@ class ConnectedAccountTest extends TestCase
 
         $this->assertSame(1, $count);
         $this->assertSame($account->id, $binding->fresh()->connected_account_id);
+    }
+
+    public function test_relink_never_hands_a_foreign_workspace_the_new_token(): void
+    {
+        $owner = User::factory()->create();
+        $foreign = Workspace::factory()->create(['created_by' => $owner->id, 'platform' => 'github', 'auth_method' => 'oauth', 'connected_account_id' => null]);
+        $binding = TaskProviderBinding::factory()->create(['workspace_id' => $foreign->id, 'kind' => TaskProviderKind::GitHub, 'connected_account_id' => null]);
+
+        $someoneElse = ConnectedAccount::factory()->create(['user_id' => User::factory()->create()->id, 'provider' => 'github']);
+
+        $this->assertSame(0, $someoneElse->relinkOrphanedResources());
+        $this->assertNull($foreign->fresh()->connected_account_id);
+        $this->assertNull($binding->fresh()->connected_account_id);
     }
 }
