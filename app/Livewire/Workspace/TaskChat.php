@@ -14,7 +14,6 @@ use App\Enums\ReviewCommentStatus;
 use App\Enums\SessionStatus;
 use App\Enums\TaskEventType;
 use App\Enums\WorkspaceStatus;
-use App\Enums\WorkspaceRole;
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
 use App\Models\AgentCredential;
 use App\Models\Task;
@@ -34,6 +33,7 @@ use App\Services\Workspace\TaskCheckpointService;
 use App\Services\Workspace\TaskReadService;
 use App\Services\Workspace\TaskPreparer;
 use App\Services\Workspace\TaskService;
+use App\Services\Workspace\TaskTicketService;
 use App\Services\Workspace\WorkspaceDaemonClient;
 use App\Services\Workspace\WorkspaceException;
 use App\Services\Workspace\WorkspaceIssueService;
@@ -292,7 +292,7 @@ class TaskChat extends Component
             $this->announceTask();
             // Started from an issue or as a follow-up: prefill, never send — the person reviews it.
             $this->draft = $task->parent_task_id !== null
-                ? app(TaskService::class)->followUpBrief($task)
+                ? app(TaskTicketService::class)->followUpBrief($task)
                 : app(WorkspaceIssueService::class)->composerDraft($task);
             $this->reset('newIssue', 'newIssueQuery', 'newBaseBranch', 'newParentId', 'newAutoMerge');
         });

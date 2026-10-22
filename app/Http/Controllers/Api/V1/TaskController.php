@@ -14,6 +14,7 @@ use App\Models\Workspace;
 use App\Services\Workspace\AutoRunService;
 use App\Services\Workspace\AutoTaskDriver;
 use App\Services\Workspace\TaskService;
+use App\Services\Workspace\TaskTicketService;
 use App\Services\Workspace\WorkspaceIssueService;
 use App\Services\Workspace\WorkspaceShipService;
 use Illuminate\Http\JsonResponse;
@@ -77,17 +78,17 @@ class TaskController extends Controller
     }
 
     /** A comment on the task's ticket in an own system: shown as a hint in the task. */
-    public function ticketComment(Request $request, Task $task, TaskService $tasks): JsonResponse
+    public function ticketComment(Request $request, Task $task, TaskTicketService $tickets): JsonResponse
     {
         $this->assertWorkspaceVisible($request, $task->workspace);
         $actor = $this->actor($request);
         $request->validate(['author' => ['required', 'string', 'max:120'], 'body' => ['required', 'string', 'max:20000'], 'url' => ['nullable', 'url', 'max:2000']]);
 
-        return $this->domain(function () use ($request, $task, $actor, $tasks): JsonResponse {
+        return $this->domain(function () use ($request, $task, $actor, $tickets): JsonResponse {
             if (! $actor->can('view', $task)) {
                 abort(404);
             }
-            $tasks->ticketComment($task, (string) $request->input('author'), (string) $request->input('body'), $request->input('url'));
+            $tickets->ticketComment($task, (string) $request->input('author'), (string) $request->input('body'), $request->input('url'));
 
             return new JsonResponse([], 202);
         });

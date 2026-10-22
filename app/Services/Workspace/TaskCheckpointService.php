@@ -23,7 +23,7 @@ class TaskCheckpointService
 
     public function __construct(
         private readonly WorkspaceDaemonClient $daemon,
-        private readonly TaskService $tasks,
+        private readonly TaskNoticeService $notices,
     ) {}
 
     /**
@@ -91,7 +91,7 @@ class TaskCheckpointService
 
         $message = $checkpoint->taskEvent;
         $excerpt = $message !== null ? mb_strimwidth((string) ($message->payload['text'] ?? ''), 0, 80, '…') : (string) $checkpoint->label;
-        $this->tasks->notice($task, 'restored', $by, ['excerpt' => $excerpt, 'checkpoint_id' => $before?->id]);
+        $this->notices->notice($task, 'restored', $by, ['excerpt' => $excerpt, 'checkpoint_id' => $before?->id]);
 
         $task->forceFill(['restore_note' => __('workspaces.checkpoints.agent_note', [
             'name' => $by->name,
@@ -107,7 +107,7 @@ class TaskCheckpointService
         $raw = $this->call(fn () => $this->daemon->for($task->workspace)->createCheckpoint($task->slug, $task->id, $label));
         $checkpoint = $this->record($task, $raw) ?? throw WorkspaceException::translated('workspaces.checkpoints.failed');
 
-        $this->tasks->notice($task, 'checkpoint', $by, ['label' => $label, 'checkpoint_id' => $checkpoint->id]);
+        $this->notices->notice($task, 'checkpoint', $by, ['label' => $label, 'checkpoint_id' => $checkpoint->id]);
 
         return $checkpoint;
     }

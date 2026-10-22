@@ -77,16 +77,16 @@ class TaskCollaborationTest extends TestCase
         $task = $this->task();
         $this->assertFalse($this->bob->can('prompt', $task));
 
-        $this->service()->invite($task, $this->ada, $this->bob);
+        app(\App\Services\Workspace\TaskMembershipService::class)->invite($task, $this->ada, $this->bob);
 
         $this->assertTrue($this->bob->fresh()->can('prompt', $task->fresh()));
         $this->assertContains('invited', $this->noticeKinds($task));
         $this->assertDatabaseHas('notifications', ['notifiable_id' => $this->bob->id]);
 
         // Again is a no-op; removing takes the right back.
-        $this->service()->invite($task, $this->ada, $this->bob);
+        app(\App\Services\Workspace\TaskMembershipService::class)->invite($task, $this->ada, $this->bob);
         $this->assertSame(1, $task->members()->count());
-        $this->service()->uninvite($task, $this->ada, $this->bob);
+        app(\App\Services\Workspace\TaskMembershipService::class)->uninvite($task, $this->ada, $this->bob);
         $this->assertFalse($this->bob->can('prompt', $task->fresh()));
     }
 
@@ -97,12 +97,12 @@ class TaskCollaborationTest extends TestCase
 
         $this->expectException(AuthorizationException::class);
         try {
-            $this->service()->invite($task, $this->ada, $stranger);
+            app(\App\Services\Workspace\TaskMembershipService::class)->invite($task, $this->ada, $stranger);
             $this->fail('expected a refusal');
         } catch (WorkspaceException) {
             // not a member
         }
-        $this->service()->invite($task, $this->bob, $this->bob);
+        app(\App\Services\Workspace\TaskMembershipService::class)->invite($task, $this->bob, $this->bob);
     }
 
     public function test_inviting_sits_behind_the_collaboration_gate(): void
@@ -111,7 +111,7 @@ class TaskCollaborationTest extends TestCase
         $task = $this->task();
 
         $this->expectException(WorkspaceException::class);
-        $this->service()->invite($task, $this->ada, $this->bob);
+        app(\App\Services\Workspace\TaskMembershipService::class)->invite($task, $this->ada, $this->bob);
     }
 
     public function test_handing_over_moves_the_task_to_the_new_owners_subscription(): void
@@ -121,7 +121,7 @@ class TaskCollaborationTest extends TestCase
         $this->service()->send($task, $this->ada, 'start');
         $this->assertTrue($task->fresh()->session_open);
 
-        $this->service()->transfer($task->fresh(), $this->ada, $this->bob);
+        app(\App\Services\Workspace\TaskMembershipService::class)->transfer($task->fresh(), $this->ada, $this->bob);
 
         $task->refresh();
         $this->assertSame($this->bob->id, $task->owner_user_id);
@@ -142,7 +142,7 @@ class TaskCollaborationTest extends TestCase
 
         foreach ([$viewer, $this->bob] as $newOwner) {
             try {
-                $this->service()->transfer($task, $this->ada, $newOwner);
+                app(\App\Services\Workspace\TaskMembershipService::class)->transfer($task, $this->ada, $newOwner);
                 $this->fail('expected a refusal for '.$newOwner->name);
             } catch (WorkspaceException) {
                 $this->assertSame($this->ada->id, $task->fresh()->owner_user_id);
@@ -194,7 +194,7 @@ class TaskCollaborationTest extends TestCase
         $this->assertSame('42', $follow->external_ref['number']);
         $this->assertStringStartsWith('github-42-', (string) $follow->branch);
         $this->assertNotSame($task->branch, $follow->branch);
-        $brief = $this->service()->followUpBrief($follow);
+        $brief = app(\App\Services\Workspace\TaskTicketService::class)->followUpBrief($follow);
         $this->assertStringContainsString('https://github.com/acme/widget/pull/7', $brief);
         $this->assertStringContainsString('Login works now.', $brief);
     }

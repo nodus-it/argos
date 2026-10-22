@@ -37,7 +37,7 @@ class WorkspaceShipService
         private readonly WorkspaceDaemonClient $daemon,
         private readonly AgentPool $pool,
         private readonly GitServiceFactory $git,
-        private readonly TaskService $tasks,
+        private readonly TaskNoticeService $notices,
         private readonly WorkspaceNotifier $notifier,
         private readonly WorkspaceIssueService $issues,
     ) {}
@@ -130,7 +130,7 @@ class WorkspaceShipService
             throw WorkspaceException::translated('workspaces.ship.nothing_to_commit');
         }
         app(WorkspaceDiffService::class)->forget($task);
-        $this->tasks->notice($task, 'committed', $by, ['subject' => $subject]);
+        $this->notices->notice($task, 'committed', $by, ['subject' => $subject]);
 
         return $commit['sha'];
     }
@@ -234,7 +234,7 @@ class WorkspaceShipService
 
         $task->forceFill(['shipped_at' => now()])->save();
         app(PullRequestService::class)->applyAutoMerge($task);
-        $this->tasks->notice($task, 'shipped', $by, ['url' => (string) $task->pr_url]);
+        $this->notices->notice($task, 'shipped', $by, ['url' => (string) $task->pr_url]);
         $this->notifier->notify($workspace, $task, 'ship', __('workspaces.notifications.ship', ['name' => $by->name]), (string) $task->pr_url, $by->id);
 
         return (string) $task->pr_url;

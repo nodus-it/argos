@@ -15,7 +15,7 @@ use App\Models\Workspace;
 use App\Services\IssueTracker\DTO\ExternalIssue;
 use App\Services\Workspace\AgentPool;
 use App\Services\Workspace\AutoRunService;
-use App\Services\Workspace\TaskService;
+use App\Services\Workspace\TaskMembershipService;
 use App\Services\Workspace\WorkspaceException;
 use App\Services\Workspace\WorkspaceIssueService;
 use Illuminate\Support\Facades\Log;
@@ -28,7 +28,7 @@ final class IssueIngestService
         private readonly AutoRunService $runs,
         private readonly WorkspaceIssueService $issues,
         private readonly AgentPool $pool,
-        private readonly TaskService $tasks,
+        private readonly TaskMembershipService $members,
     ) {}
 
     /** The Argos person behind the issue's assignee (connected account login, or e-mail for Linear). */
@@ -115,7 +115,7 @@ final class IssueIngestService
         }
 
         if ($assignee !== null && $assignee->id !== $actor->id && $workspace->roleOf($assignee) !== null) {
-            rescue(fn () => $this->tasks->invite($task, $actor, $assignee), report: false);
+            rescue(fn () => $this->members->invite($task, $actor, $assignee), report: false);
         }
 
         $link->task_id = $task->id;

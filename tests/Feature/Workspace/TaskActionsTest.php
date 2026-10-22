@@ -232,7 +232,7 @@ class TaskActionsTest extends TestCase
         $carl = $this->member('Carl'); // no agent of his own
         $viewer = User::factory()->create(['name' => 'Vera']);
         WorkspaceMember::query()->create(['workspace_id' => $this->workspace->id, 'user_id' => $viewer->id, 'role' => WorkspaceRole::Viewer]);
-        $tasks = app(\App\Services\Workspace\TaskService::class);
+        $tasks = app(\App\Services\Workspace\TaskMembershipService::class);
 
         $this->assertSame([$this->bob->id => 'Bob', $carl->id => 'Carl', $viewer->id => 'Vera'], $tasks->inviteCandidates($task));
         // Viewers may not own tasks, Carl has no agent to run it on.

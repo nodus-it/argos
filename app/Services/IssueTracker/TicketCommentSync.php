@@ -6,13 +6,13 @@ namespace App\Services\IssueTracker;
 
 use App\Enums\TaskStatus;
 use App\Models\Task;
-use App\Services\Workspace\TaskService;
+use App\Services\Workspace\TaskTicketService;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
  * New comments on the tickets of open tasks become hints in the task (see
- * TaskService::ticketComment). The first look only remembers where the
+ * TaskTicketService::ticketComment). The first look only remembers where the
  * conversation stands; Argos' own comments (they link the task) are
  * skipped.
  */
@@ -20,7 +20,7 @@ class TicketCommentSync
 {
     public function __construct(
         private readonly IssueTrackerRegistry $registry,
-        private readonly TaskService $tasks,
+        private readonly TaskTicketService $tickets,
     ) {}
 
     /** @return int hints added */
@@ -58,7 +58,7 @@ class TicketCommentSync
             if (str_contains((string) $comment['body'], $task->url())) {
                 continue;
             }
-            $this->tasks->ticketComment($task, (string) $comment['author'], (string) $comment['body'], $comment['url'] ?? null);
+            $this->tickets->ticketComment($task, (string) $comment['author'], (string) $comment['body'], $comment['url'] ?? null);
             $added++;
         }
 

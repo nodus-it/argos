@@ -10,7 +10,9 @@ use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Workspace\PullRequestService;
+use App\Services\Workspace\TaskMembershipService;
 use App\Services\Workspace\TaskService;
+use App\Services\Workspace\TaskTicketService;
 use App\Services\Workspace\WorkspaceException;
 use App\Services\Workspace\WorkspaceGateService;
 use App\Services\Workspace\WorkspaceIssueService;
@@ -405,13 +407,13 @@ class ViewWorkspace extends ViewRecord
             ->schema([
                 Select::make('user_id')
                     ->label(__('workspaces.members.user'))
-                    ->options(fn (): array => app(TaskService::class)->inviteCandidates($this->requireTask()))
+                    ->options(fn (): array => app(TaskMembershipService::class)->inviteCandidates($this->requireTask()))
                     ->searchable()
                     ->required(),
             ])
             ->action(function (array $data): void {
                 $member = User::query()->findOrFail($data['user_id']);
-                $this->taskAction(fn (Task $task, User $user) => app(TaskService::class)->invite($task, $user, $member), __('workspaces.task_actions.invited', ['name' => $member->name]));
+                $this->taskAction(fn (Task $task, User $user) => app(TaskMembershipService::class)->invite($task, $user, $member), __('workspaces.task_actions.invited', ['name' => $member->name]));
             });
     }
 
@@ -428,7 +430,7 @@ class ViewWorkspace extends ViewRecord
             ->visible(fn (): bool => ($task = $this->task()) !== null && (auth()->user()?->can('invite', $task) ?? false))
             ->action(function (array $arguments): void {
                 $member = User::query()->findOrFail($arguments['user'] ?? 0);
-                $this->taskAction(fn (Task $task, User $user) => app(TaskService::class)->uninvite($task, $user, $member));
+                $this->taskAction(fn (Task $task, User $user) => app(TaskMembershipService::class)->uninvite($task, $user, $member));
             });
     }
 
@@ -443,13 +445,13 @@ class ViewWorkspace extends ViewRecord
             ->schema([
                 Select::make('user_id')
                     ->label(__('workspaces.task_actions.new_owner'))
-                    ->options(fn (): array => app(TaskService::class)->transferCandidates($this->requireTask()))
+                    ->options(fn (): array => app(TaskMembershipService::class)->transferCandidates($this->requireTask()))
                     ->searchable()
                     ->required(),
             ])
             ->action(function (array $data): void {
                 $newOwner = User::query()->findOrFail($data['user_id']);
-                $this->taskAction(fn (Task $task, User $user) => app(TaskService::class)->transfer($task, $user, $newOwner), __('workspaces.task_actions.transferred', ['name' => $newOwner->name]));
+                $this->taskAction(fn (Task $task, User $user) => app(TaskMembershipService::class)->transfer($task, $user, $newOwner), __('workspaces.task_actions.transferred', ['name' => $newOwner->name]));
             });
     }
 
@@ -468,7 +470,7 @@ class ViewWorkspace extends ViewRecord
                     ->getOptionLabelUsing(fn (?string $value): ?string => $value === null ? null : (app(WorkspaceIssueService::class)->search($this->workspace(), $value, 200)[$value] ?? '#'.$value))
                     ->required(),
             ])
-            ->action(fn (array $data) => $this->taskAction(fn (Task $task, User $user) => app(TaskService::class)->linkTicket($task, $user, (string) $data['number']), __('workspaces.task_actions.ticket_linked')));
+            ->action(fn (array $data) => $this->taskAction(fn (Task $task, User $user) => app(TaskTicketService::class)->linkTicket($task, $user, (string) $data['number']), __('workspaces.task_actions.ticket_linked')));
     }
 
     /** Open an issue in the workspace's tracker for the current task. */
@@ -483,7 +485,7 @@ class ViewWorkspace extends ViewRecord
                 TextInput::make('title')->label(__('workspaces.task_actions.ticket_title'))->required()->maxLength(255),
                 Textarea::make('body')->label(__('workspaces.task_actions.ticket_body'))->rows(6),
             ])
-            ->action(fn (array $data) => $this->taskAction(fn (Task $task, User $user) => app(TaskService::class)->createTicket($task, $user, (string) $data['title'], (string) ($data['body'] ?? '')), __('workspaces.task_actions.ticket_created')));
+            ->action(fn (array $data) => $this->taskAction(fn (Task $task, User $user) => app(TaskTicketService::class)->createTicket($task, $user, (string) $data['title'], (string) ($data['body'] ?? '')), __('workspaces.task_actions.ticket_created')));
     }
 
     /** A task without a ticket, a tracker to put one in, and the right to change the task. */

@@ -39,6 +39,7 @@ class PullRequestService
     public function __construct(
         private readonly GitServiceFactory $git,
         private readonly TaskService $tasks,
+        private readonly TaskNoticeService $notices,
         private readonly WorkspaceNotifier $notifier,
     ) {}
 
@@ -150,7 +151,7 @@ class PullRequestService
     {
         Gate::forUser($by)->authorize('ship', $task);
         $this->provider($task, fn ($git, string $owner, string $repo) => $git->markPullRequestReady($owner, $repo, (int) $task->pr_number));
-        $this->tasks->notice($task, 'pr_ready', $by);
+        $this->notices->notice($task, 'pr_ready', $by);
         $this->refresh($task);
     }
 
@@ -175,7 +176,7 @@ class PullRequestService
             throw WorkspaceException::translated($on ? 'workspaces.pr.auto_merge_unavailable' : 'workspaces.pr.auto_merge_failed');
         }
         $task->forceFill(['auto_merge' => $on])->save();
-        $this->tasks->notice($task, $on ? 'auto_merge_on' : 'auto_merge_off', $by);
+        $this->notices->notice($task, $on ? 'auto_merge_on' : 'auto_merge_off', $by);
         Cache::forget($this->cacheKey($task));
     }
 
@@ -192,7 +193,7 @@ class PullRequestService
         }
         if ($done !== true) {
             $task->forceFill(['auto_merge' => false])->save();
-            $this->tasks->systemNotice($task, 'auto_merge_unavailable');
+            $this->notices->systemNotice($task, 'auto_merge_unavailable');
         }
     }
 
@@ -365,7 +366,7 @@ class PullRequestService
             'pr_closed' => $details->state === 'closed' && $before['state'] !== 'closed',
         ];
         foreach (array_keys(array_filter($changes)) as $kind) {
-            $this->tasks->systemNotice($task, $kind, ['url' => $kind === 'pr_checks_failed' ? $details->checks['url'] : $details->url]);
+            $this->notices->systemNotice($task, $kind, ['url' => $kind === 'pr_checks_failed' ? $details->checks['url'] : $details->url]);
             $this->notifier->notify($task->workspace, $task, 'ship', __('workspaces.pr.notifications.'.$kind), $task->title);
         }
     }

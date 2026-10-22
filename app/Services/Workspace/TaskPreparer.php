@@ -145,7 +145,6 @@ class TaskPreparer
     private function failed(Task $task, string $code, string $message): void
     {
         Log::channel('argos')->warning('Task preparation failed', ['task' => $task->id, 'code' => $code, 'error' => $message]);
-        // Resolved lazily: TaskService depends on the preparer's peers.
-        app(TaskService::class)->systemNotice($task, 'prepare_failed', ['message' => mb_substr($message, 0, 2000)]);
+        app(TaskNoticeService::class)->systemNotice($task, 'prepare_failed', ['message' => mb_substr($message, 0, 2000)]);
     }
 }

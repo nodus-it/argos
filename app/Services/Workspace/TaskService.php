@@ -7,7 +7,6 @@ namespace App\Services\Workspace;
 use App\Enums\AgentName;
 use App\Enums\ApprovalKind;
 use App\Enums\ApprovalStatus;
-use App\Enums\Capability;
 use App\Enums\AutoTaskState;
 use App\Enums\PermissionMode;
 use App\Enums\SessionStatus;
@@ -23,18 +22,18 @@ use App\Models\AgentCredential;
 use App\Models\Task;
 use App\Models\TaskApproval;
 use App\Models\TaskEvent;
-use App\Models\TaskMember;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\IssueTracker\IssueRunReporter;
-use App\Support\TaskRefs;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
- * Everything humans do in a task: open the session, write, interrupt,
- * switch mode or model, answer approvals, close. Authorization is checked
+ * A task's life and its Claude session: create, open, write, interrupt,
+ * switch mode, model or effort, answer approvals, queue, close, cancel,
+ * archive and delete. People (TaskMembershipService), the ticket
+ * (TaskTicketService) and notices (TaskNoticeService) have their own. Authorization is checked
  * here (policies), so every entry point — UI, API, MCP — gets the same rules.
  */
 class TaskService
@@ -45,6 +44,7 @@ class TaskService
         private readonly WorkspaceService $workspaces,
         private readonly TaskStreamPublisher $publisher,
         private readonly TaskNamer $namer,
+        private readonly TaskNoticeService $notices,
     ) {}
 
     /**
@@ -234,7 +234,7 @@ class TaskService
         }
 
         WorkspaceException::wrapDaemon(fn () => $this->daemon->for($task->workspace)->interrupt($task->id));
-        $this->notice($task, 'interrupted', $by);
+        $this->notices->notice($task, 'interrupted', $by);
     }
 
     public function setPermissionMode(Task $task, User $by, PermissionMode $mode): void
@@ -246,7 +246,7 @@ class TaskService
         if ($task->session_open) {
             WorkspaceException::wrapDaemon(fn () => $this->daemon->for($task->workspace)->setPermissionMode($task->id, $mode->value));
         }
-        $this->notice($task, 'permission_mode', $by, ['mode' => $mode->value]);
+        $this->notices->notice($task, 'permission_mode', $by, ['mode' => $mode->value]);
     }
 
     /**
@@ -269,7 +269,7 @@ class TaskService
         if ($task->session_open) {
             WorkspaceException::wrapDaemon(fn () => $this->daemon->for($task->workspace)->setModel($task->id, $model));
         }
-        $this->notice($task, 'model', $by, ['model' => $model]);
+        $this->notices->notice($task, 'model', $by, ['model' => $model]);
     }
 
     /** Claude Code's /effort for the task; null goes back to the model's default. */
@@ -284,7 +284,7 @@ class TaskService
         if ($task->session_open) {
             WorkspaceException::wrapDaemon(fn () => $this->daemon->for($task->workspace)->setEffort($task->id, $effort));
         }
-        $this->notice($task, 'effort', $by, ['effort' => $effort]);
+        $this->notices->notice($task, 'effort', $by, ['effort' => $effort]);
     }
 
     /**
@@ -523,99 +523,6 @@ class TaskService
      * Invite a workspace member to collaborate (write, approve, review,
      * ship). Readers of the workspace become collaborators of this task only.
      */
-    /**
-     * Who can be invited to a task: workspace members besides the owner and
-     * the ones already in it.
-     *
-     * @return array<int, string> user id => name
-     */
-    public function inviteCandidates(Task $task): array
-    {
-        return $task->workspace->users()
-            ->whereKeyNot($task->owner_user_id)
-            ->whereNotIn('users.id', $task->members()->pluck('user_id'))
-            ->orderBy('name')
-            ->pluck('name', 'users.id')
-            ->all();
-    }
-
-    /**
-     * Who a task can be handed to: members whose role may create tasks and
-     * who have an agent the task can run on (what transfer() checks).
-     *
-     * @return array<int, string> user id => name
-     */
-    public function transferCandidates(Task $task): array
-    {
-        return $task->workspace->users()->whereKeyNot($task->owner_user_id)->orderBy('name')->get()
-            ->filter(fn (User $user): bool => ($task->workspace->roleOf($user)?->grants(Capability::TaskCreate) ?? false) && $this->pool->usableAgentsFor($user)->isNotEmpty())
-            ->pluck('name', 'id')
-            ->all();
-    }
-
-    public function invite(Task $task, User $by, User $member): void
-    {
-        Gate::forUser($by)->authorize('invite', $task);
-        // Working together on a task is pair programming: behind the same gate as workspace members.
-        if (! app(WorkspaceMemberService::class)->collaborationEnabled($by)) {
-            throw WorkspaceException::translated('workspaces.errors.collaboration_disabled');
-        }
-        if ($task->workspace->roleOf($member) === null) {
-            throw WorkspaceException::translated('workspaces.errors.not_a_member', ['name' => $member->name]);
-        }
-        if ($task->isOwnedBy($member) || $task->members()->where('user_id', $member->id)->exists()) {
-            return;
-        }
-
-        TaskMember::query()->create(['task_id' => $task->id, 'user_id' => $member->id, 'invited_by' => $by->id]);
-        $this->notice($task, 'invited', $by, ['member_name' => $member->name]);
-        app(WorkspaceNotifier::class)->notify($task->workspace, $task, 'invite', __('workspaces.notifications.invite', ['name' => $by->name]), $task->title, $by->id);
-    }
-
-    public function uninvite(Task $task, User $by, User $member): void
-    {
-        Gate::forUser($by)->authorize('invite', $task);
-        if ($task->members()->where('user_id', $member->id)->delete() > 0) {
-            $this->notice($task, 'uninvited', $by, ['member_name' => $member->name]);
-        }
-    }
-
-    /**
-     * Hand the task to another person: from now on it runs on their
-     * subscription (the open session ends). The previous owner stays on as a
-     * collaborator.
-     */
-    public function transfer(Task $task, User $by, User $newOwner, ?AgentCredential $agent = null): void
-    {
-        Gate::forUser($by)->authorize('transfer', $task);
-        if ($task->isOwnedBy($newOwner)) {
-            return;
-        }
-        $role = $task->workspace->roleOf($newOwner);
-        if ($role === null || ! $role->grants(Capability::TaskCreate)) {
-            throw WorkspaceException::translated('workspaces.errors.transfer_needs_member', ['name' => $newOwner->name]);
-        }
-        // Own agents come first (AgentPool orders them so).
-        $agent ??= $this->pool->usableAgentsFor($newOwner)->first();
-        if ($agent === null || ! Gate::forUser($newOwner)->allows('use', $agent)) {
-            throw WorkspaceException::translated('workspaces.errors.transfer_needs_agent', ['name' => $newOwner->name]);
-        }
-
-        if ($task->session_open) {
-            $this->close($task);
-        }
-        $previous = $task->owner;
-        $task->forceFill(['owner_user_id' => $newOwner->id, 'agent_credential_id' => $agent->id])->save();
-        $task->members()->where('user_id', $newOwner->id)->delete();
-        if ($previous !== null) {
-            TaskMember::query()->firstOrCreate(['task_id' => $task->id, 'user_id' => $previous->id], ['invited_by' => $by->id]);
-        }
-        $task->unsetRelation('members');
-
-        $this->notice($task, 'transferred', $by, ['owner_name' => $newOwner->name]);
-        app(IssueRunReporter::class)->ownerChanged($task, $newOwner);
-        app(WorkspaceNotifier::class)->notify($task->workspace, $task, 'invite', __('workspaces.notifications.transferred', ['name' => $by->name]), $task->title, $by->id);
-    }
 
     /** Stop working on a task without merging (its pull request stays as it is). */
     public function cancel(Task $task, User $by): void
@@ -633,7 +540,7 @@ class TaskService
             'queued_at' => null,
             'auto_state' => $task->auto_state?->isRunning() === true ? AutoTaskState::Paused : $task->auto_state,
         ])->save();
-        $this->notice($task, 'cancelled', $by);
+        $this->notices->notice($task, 'cancelled', $by);
         app(IssueRunReporter::class)->closed($task);
         $this->endPreview($task);
     }
@@ -681,62 +588,6 @@ class TaskService
         ]);
     }
 
-    /**
-     * The first message of a follow-up: what the earlier task was about and
-     * where it ended (prefilled, never sent automatically).
-     */
-    public function followUpBrief(Task $task): string
-    {
-        $parent = $task->parent;
-        if ($parent === null) {
-            return '';
-        }
-        $last = TaskEvent::query()->where('task_id', $parent->id)->where('type', TaskEventType::AssistantMessage->value)->latest('id')->value('payload');
-
-        return trim(implode("\n\n", array_filter([
-            __('workspaces.task.follow_up_intro', ['title' => $parent->title, 'branch' => (string) $parent->branch]),
-            $parent->pr_url !== null ? __('workspaces.task.follow_up_pr', ['url' => $parent->pr_url, 'state' => (string) $parent->pr_state]) : null,
-            is_array($last) && trim((string) ($last['text'] ?? '')) !== '' ? __('workspaces.task.follow_up_last')."\n> ".str_replace("\n", "\n> ", mb_strimwidth(trim((string) $last['text']), 0, 1500, '…')) : null,
-        ])));
-    }
-
-    /** Link a task to a ticket of the workspace's tracker after the fact. */
-    public function linkTicket(Task $task, User $by, string $number): void
-    {
-        Gate::forUser($by)->authorize('update', $task);
-        if ($task->external_ref !== null) {
-            throw WorkspaceException::translated('workspaces.errors.ticket_linked');
-        }
-        $ref = app(WorkspaceIssueService::class)->load($task->workspace, $number);
-        $task->forceFill(['external_ref' => $ref])->save();
-        $this->notice($task, 'ticket_linked', $by, ['ticket' => (string) TaskRefs::ticketLabel($task)]);
-        app(WorkspaceIssueService::class)->comment($task, __('workspaces.issue.run.linked', ['url' => $task->url()]));
-    }
-
-    /** Open a ticket in the workspace's tracker for a task that has none. */
-    public function createTicket(Task $task, User $by, string $title, string $body): void
-    {
-        Gate::forUser($by)->authorize('update', $task);
-        if ($task->external_ref !== null) {
-            throw WorkspaceException::translated('workspaces.errors.ticket_linked');
-        }
-        $ref = app(WorkspaceIssueService::class)->create($task->workspace, $title, trim($body)."\n\n".__('workspaces.issue.created_footer', ['url' => $task->url()]));
-        $task->forceFill(['external_ref' => $ref])->save();
-        $this->notice($task, 'ticket_created', $by, ['ticket' => (string) TaskRefs::ticketLabel($task), 'url' => $ref['url']]);
-    }
-
-    /**
-     * A new comment on the task's ticket: a hint in the chat (never sent to
-     * Claude by itself) and a notification for the task's people.
-     */
-    public function ticketComment(Task $task, string $author, string $body, ?string $url = null): void
-    {
-        $text = mb_strimwidth(trim($body), 0, 2000, '…');
-        // The author is a tracker login, not an Argos user: a system notice that names them.
-        $this->systemNotice($task, 'ticket_comment', ['author_name' => $author, 'body' => $text, 'url' => $url]);
-        app(WorkspaceNotifier::class)->notify($task->workspace, $task, 'ticket', __('workspaces.notifications.ticket_comment', ['name' => $author]), mb_strimwidth($text, 0, 200, '…'));
-    }
-
     public function rename(Task $task, User $by, string $title): void
     {
         Gate::forUser($by)->authorize('update', $task);
@@ -781,51 +632,6 @@ class TaskService
         if ($mode === PermissionMode::BypassPermissions && ! $by->can('bypassPermissions', $workspace)) {
             throw WorkspaceException::translated('workspaces.errors.bypass_owner_only');
         }
-    }
-
-    /**
-     * A notice nobody in particular caused (pull request changes, Argos
-     * itself), persisted and broadcast.
-     *
-     * @param  array<string, mixed>  $extra
-     */
-    public function systemNotice(Task $task, string $kind, array $extra = []): void
-    {
-        $this->recordNotice($task, $kind, null, $extra);
-    }
-
-    /**
-     * Persist a system notice (e.g. "Ada interrupted") in the history and
-     * broadcast it.
-     *
-     * @param  array<string, mixed>  $extra
-     */
-    public function notice(Task $task, string $kind, User $by, array $extra = []): void
-    {
-        $this->recordNotice($task, $kind, $by, $extra);
-    }
-
-    /**
-     * Store a notice in the history and tell the open pages (they re-render
-     * it from the history; a system notice sends only its kind).
-     *
-     * @param  array<string, mixed>  $extra
-     */
-    private function recordNotice(Task $task, string $kind, ?User $by, array $extra): void
-    {
-        $payload = ['kind' => $kind, ...($by !== null ? ['author_name' => $by->name] : []), ...$extra];
-        $event = TaskEvent::query()->create([
-            'task_id' => $task->id,
-            'type' => TaskEventType::Notice,
-            'author_user_id' => $by?->id,
-            'payload' => $payload,
-        ]);
-
-        $this->publisher->publish($task->workspace_id, $task->id, [[
-            'type' => 'notice',
-            'event_id' => $event->id,
-            'data' => $by !== null ? $payload : ['kind' => $kind],
-        ]]);
     }
 
     /**

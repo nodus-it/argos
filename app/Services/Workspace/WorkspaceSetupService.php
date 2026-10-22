@@ -51,6 +51,7 @@ class WorkspaceSetupService
     public function __construct(
         private readonly GitServiceFactory $git,
         private readonly TaskService $tasks,
+        private readonly TaskNoticeService $notices,
         private readonly AgentPool $agents,
         private readonly WorkspaceService $workspaces,
     ) {}
@@ -240,7 +241,7 @@ class WorkspaceSetupService
         }
 
         $task->workspace->forceFill(['setup_status' => WorkspaceSetupStatus::Testing])->save();
-        $this->tasks->systemNotice($task, 'setup_testing');
+        $this->notices->systemNotice($task, 'setup_testing');
         CheckWorkspaceSetupJob::dispatch($task->id, $by->id);
     }
 
@@ -283,7 +284,7 @@ class WorkspaceSetupService
             'worker_source' => $passed && $ownImage ? WorkerSource::Byoi : $workspace->worker_source,
         ])->save();
 
-        $this->tasks->systemNotice($task, $passed ? 'setup_passed' : 'setup_failed', [
+        $this->notices->systemNotice($task, $passed ? 'setup_passed' : 'setup_failed', [
             'steps' => array_map(fn (array $r): array => ['step' => $r['step'], 'ok' => $r['ok']], $results),
             'url' => $task->pr_url,
         ]);
