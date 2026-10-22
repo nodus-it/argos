@@ -315,6 +315,7 @@ return [
         'then_push_pr' => 'Danach pushen und Pull Request öffnen',
         'then_push' => 'Danach pushen',
         'committed' => 'Committet.',
+        'claude_working' => 'Claude arbeitet noch in dieser Aufgabe. Warte, bis der Turn fertig ist (oder stoppe ihn), und committe dann.',
         'nothing_to_commit' => 'Nichts zu committen — alles ist schon committet.',
         'push' => 'Pushen',
         'push_pr' => 'Pushen & PR',

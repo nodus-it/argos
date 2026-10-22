@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Workspace;
 
+use App\Enums\SessionStatus;
 use App\Enums\TaskEventType;
 use App\Enums\TaskStatus;
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
@@ -122,6 +123,7 @@ class WorkspaceShipService
     public function commit(Task $task, User $by, string $subject, string $body): string
     {
         Gate::forUser($by)->authorize('ship', $task);
+        $this->assertClaudeIsQuiet($task);
         $subject = trim($subject);
         if ($subject === '') {
             throw WorkspaceException::translated('workspaces.ship.subject_required');
@@ -164,6 +166,7 @@ class WorkspaceShipService
     public function ship(Task $task, User $by, string $subject, string $body, bool $draft = false, bool $pullRequest = true): string
     {
         Gate::forUser($by)->authorize('ship', $task);
+        $this->assertClaudeIsQuiet($task);
         $subject = trim($subject);
         if ($subject === '') {
             throw WorkspaceException::translated('workspaces.ship.subject_required');
@@ -190,6 +193,18 @@ class WorkspaceShipService
         $message = $this->draft($task, $by);
 
         return $this->ship($task, $by, $message['subject'] !== '' ? $message['subject'] : $task->title, trim($message['body']."\n\n".$note), $draft, $pullRequest);
+    }
+
+    /**
+     * A commit takes every file as it is: while Claude is mid-turn that is a
+     * half-done edit (and git's index lock may clash with its own commands).
+     */
+    private function assertClaudeIsQuiet(Task $task): void
+    {
+        $status = Task::query()->whereKey($task->id)->value('session_status');
+        if (in_array($status, [SessionStatus::Starting, SessionStatus::Running, SessionStatus::WaitingInput], true)) {
+            throw WorkspaceException::translated('workspaces.ship.claude_working');
+        }
     }
 
     private function pushAndOpen(Task $task, User $by, WorkspaceDaemonTransport $api, string $title, string $body, bool $draft, bool $pullRequest): string

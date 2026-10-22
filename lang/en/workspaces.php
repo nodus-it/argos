@@ -315,6 +315,7 @@ return [
         'then_push_pr' => 'Then push and open the pull request',
         'then_push' => 'Then push',
         'committed' => 'Committed.',
+        'claude_working' => 'Claude is still working in this task. Wait until the turn is done (or stop it), then commit.',
         'nothing_to_commit' => 'Nothing to commit — everything is committed already.',
         'push' => 'Push',
         'push_pr' => 'Push & PR',

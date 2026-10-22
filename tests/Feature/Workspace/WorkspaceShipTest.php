@@ -6,6 +6,7 @@ namespace Tests\Feature\Workspace;
 
 use App\Broadcasting\TaskStream;
 use App\Enums\GitProvider;
+use App\Enums\SessionStatus;
 use App\Enums\TaskEventType;
 use App\Enums\TaskProviderKind;
 use App\Enums\TaskStatus;
@@ -28,6 +29,7 @@ use App\Models\WorkspaceMember;
 use App\Services\GitProvider\Contracts\GitServiceContract;
 use App\Services\GitProvider\GitServiceFactory;
 use App\Services\GitProvider\PullRequestDetails;
+use App\Services\Workspace\PullRequestService;
 use App\Services\Workspace\WorkspaceException;
 use App\Services\Workspace\WorkspaceIssueService;
 use App\Services\Workspace\WorkspaceShipService;
@@ -146,6 +148,21 @@ class WorkspaceShipTest extends TestCase
         $this->assertSame(1, count($this->sent['GitCommit']));
         $this->assertCount(1, $this->sent['GitPush']);
         $this->assertSame(9, $this->task->fresh()->pr_number);
+    }
+
+    public function test_no_commit_while_claude_is_mid_turn(): void
+    {
+        $this->task->forceFill(['session_open' => true, 'session_status' => SessionStatus::Running])->save();
+
+        foreach ([fn () => $this->service()->commit($this->task, $this->editor, 'feat: x', ''), fn () => $this->service()->ship($this->task, $this->editor, 'feat: x', '')] as $call) {
+            try {
+                $call();
+                $this->fail('expected WorkspaceException');
+            } catch (WorkspaceException $e) {
+                $this->assertSame(__('workspaces.ship.claude_working'), $e->getMessage());
+            }
+        }
+        $this->assertArrayNotHasKey('GitCommit', $this->sent);
     }
 
     public function test_nothing_to_commit_and_nothing_to_push(): void
@@ -321,7 +338,7 @@ class WorkspaceShipTest extends TestCase
         $this->task->forceFill(['pr_number' => 5, 'pr_url' => 'https://x/5', 'pr_state' => 'open', 'status' => TaskStatus::PrOpen])->save();
         $this->git->shouldReceive('pullRequestDetails')->once()->andReturn(new PullRequestDetails('closed', 'https://x/5'));
 
-        app(\App\Services\Workspace\PullRequestService::class)->refresh($this->task);
+        app(PullRequestService::class)->refresh($this->task);
 
         $task = $this->task->fresh();
         $this->assertSame('closed', $task->pr_state);
@@ -334,7 +351,7 @@ class WorkspaceShipTest extends TestCase
         $this->task->forceFill(['pr_number' => 5, 'pr_url' => 'https://x/5', 'pr_state' => 'draft', 'status' => TaskStatus::PrOpen])->save();
         $this->git->shouldReceive('pullRequestDetails')->once()->andReturn(new PullRequestDetails('open', 'https://x/5'));
 
-        app(\App\Services\Workspace\PullRequestService::class)->refresh($this->task);
+        app(PullRequestService::class)->refresh($this->task);
 
         $task = $this->task->fresh();
         $this->assertSame('open', $task->pr_state);
