@@ -295,8 +295,9 @@ compose file:
 - **No host `ports:`** and **no Traefik labels** — routing is done by Argos.
 - For the bundled runtime image use the placeholder `__ARGOS_DEMO_IMAGE__`;
   otherwise name your image.
-- Put your services on a **private** network; Argos adds `argos_edge` to the
-  entry service.
+- Put your services on a **private** network, or leave out `networks:` so
+  they share the implicit `default` one. Argos adds `argos_edge` to the entry
+  service and keeps it on `default`.
 - The entry service serves HTTP on the declared `entry.port`.
 - Do **not** cache config (`config:cache`) in the boot commands — Laravel must
   keep reading the env vars Argos injects.
@@ -305,8 +306,8 @@ compose file:
   `working_dir`, `user`, `depends_on`, `healthcheck`, `networks`, `volumes`,
   `tmpfs`, `restart`, `expose`, `stop_grace_period`, `stop_signal`, `init`,
   `hostname`. Volumes must be **named** volumes declared under `volumes:`
-  (no host paths, no driver options); networks must be declared under
-  `networks:` (not external). `build`, `privileged`, capabilities, devices,
+  (no host paths, no driver options); networks other than `default` must be
+  declared under `networks:` (not external). `build`, `privileged`, capabilities, devices,
   `network_mode`, `pid`, `env_file` and `ports` are refused with a clear
   message. Every service runs with `no-new-privileges` and a process limit.
 
