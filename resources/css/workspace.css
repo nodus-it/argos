@@ -666,6 +666,30 @@ a.ag-ref-chip:hover { text-decoration: underline; }
 .ag-setup-steps .is-ok { color: var(--ag-ok); }
 .ag-setup-steps .is-fail { color: var(--ag-danger); }
 
+/* Phones: banner and composer stay compact so the feed keeps most of the height. */
+@media (max-width: 640px) {
+  .ag-chat-main { overflow-y: auto; }
+  .ag-center .ws-feed { min-height: 12rem; padding: 16px 12px 12px; }
+  .ag-center .ws-new-task, .ag-center .ws-alert, .ag-center .ws-viewer, .ag-center .ws-empty { margin-inline: 12px; }
+  .ag-task-bar, .ag-presence { padding-inline: 12px; }
+  .ag-bottom { padding: 0 12px 12px; gap: 8px; }
+  .ws-setup-note { flex-wrap: nowrap; gap: 8px; padding: 6px 8px; margin: 6px 0; font-size: 12.5px; line-height: 1.35; }
+  .ws-setup-note > svg { display: none; }
+  .ws-setup-note > span { min-width: 0; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .ws-setup-note .ag-btn { flex: none; padding-inline: 12px; }
+  .ag-ta { min-height: 44px; max-height: 30dvh; padding: 10px 12px 2px; }
+  .ag-composer-bar { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding: 6px 8px; }
+  .ag-composer-bar::-webkit-scrollbar { display: none; }
+  .ag-composer-bar > * { flex: none; }
+  .ag-pill { max-width: 150px; }
+  .ag-bottom .ag-tray { padding: 6px 8px; }
+  .ag-tray .ag-tray-row { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .ag-tray .ag-tray-row > * { flex: none; }
+  .ag-tray .ag-tray-row > .ag-btn-primary { order: -1; }
+  .ag-tray .ag-tray-gates { display: none; }
+  .ag-composer-bar .ag-send, .ag-composer-bar .ag-send-review { position: sticky; right: 0; box-shadow: -8px 0 8px var(--ag-surface); }
+}
+
 /* Chat column: wide enough for code and tables on large screens. */
 .ag-page { --ag-chat-w: 1080px; }
 
