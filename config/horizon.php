@@ -54,7 +54,7 @@ return [
     |--------------------------------------------------------------------------
     |
     | supervisor-default: general background jobs (BuildWorkerImageJob, …)
-    | supervisor-tasks:   long-running phase runs (RunPhaseJob)
+    | supervisor-tasks:   long-running workspace jobs (provision, stop)
     |
     | Worker counts are static (balance=simple) and driven by env vars so
     | operators can tune them via .env without touching this file.

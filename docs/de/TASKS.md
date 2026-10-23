@@ -1,324 +1,523 @@
-# Tasks & der Workflow
+# Aufgaben
 
-Ein **Task** ist die zentrale Arbeitseinheit in Argos. Sie beschreiben eine
-Änderung, die an einem Repository vorgenommen werden soll, und Argos führt sie
-durch eine feste Abfolge von Phasen — **Concept → Implement → Push (Pull
-Request)** — und pausiert bei jedem Schritt, sodass Sie vor dem Weitermachen
-prüfen können. Nachdem der Pull Request geöffnet ist, können Sie mit
-Review-Feedback weiter iterieren (**Respond**).
+Jede Unterhaltung mit Claude in einem [Workspace](WORKSPACES.md) ist eine
+**Aufgabe**. Eine Aufgabe
 
-Dieses Dokument erklärt aus Anwendersicht, was ein Task ist, wie man einen
-erstellt, was jede Phase tut, was Sie zur Prüfung erhalten und jeden Status, den
-ein Task im Verlauf anzeigen kann — einschließlich wie man pausiert, fortsetzt,
-erneut versucht, abbricht und Feedback gibt.
+- gehört einer Person (**Besitz**) und läuft über deren Claude-Abo — auch wenn
+  Mitarbeitende schreiben,
+- hat ihren **eigenen Branch** (nach dem Branch-Muster des Workspaces), ihren
+  eigenen git-**Worktree** unter `/workspace/tasks/<slug>`, ihre **eigene
+  Datenbank** (und ihr eigenes Redis-Präfix), wenn der Workspace diese Dienste
+  hat, bei Bedarf ihre eigene **Preview** und ihren eigenen **Pull Request**,
+- kann mit genau einem [Ticket](TICKETS.md) verknüpft sein.
 
-Für die zugrunde liegenden Worker-Kommandos und wie Phasen innerhalb des
-Docker-Workers laufen, siehe [EXECUTION-COMMANDS.md](EXECUTION-COMMANDS.md). Für
-Projekte/Repo-Profile, welche die von einem Task geerbten Standardwerte liefern,
-siehe [PROJECTS.md](PROJECTS.md). Für den Agent/das Modell, das die Arbeit
-erledigt, siehe [AGENTS.md](AGENTS.md).
+Die Aufgaben eines Workspaces teilen sich den Container, aber nicht ihre
+Dateien: Was Claude in einer Aufgabe ändert, taucht in keiner anderen auf.
 
 ## Inhalt
 
-- [Was ein Task ist](#what-a-task-is)
-- [Einen Task erstellen](#creating-a-task)
-- [Der Lebenszyklus im Überblick](#the-lifecycle-at-a-glance)
-- [Die Phasen](#the-phases)
-  - [Concept](#concept)
-  - [Implement](#implement)
-  - [Push & Pull Request](#push--pull-request)
-  - [Respond (Review-Feedback)](#respond-review-feedback)
-- [Selbst am Branch arbeiten](#working-on-the-branch-yourself)
-- [Status & Stufen](#statuses--stages)
-- [Pausieren & Fortsetzen (das Turn-Limit)](#pausing--resuming-the-turn-limit)
-- [Eine fehlgeschlagene Phase erneut versuchen](#retrying-a-failed-phase)
-- [Einen hängenden Implement-Run zwangsweise entsperren](#force-unlock-a-stuck-implement-run)
-- [Einen laufenden Task abbrechen](#aborting-a-running-task)
-- [Einen Task abschließen](#completing-a-task)
-- [Die Live-Demo](#the-live-demo)
-- [Aus Issues erstellte Tasks](#tasks-created-from-issues)
+- [Eine Aufgabe starten](#eine-aufgabe-starten)
+- [Vorbereitung: Worktree, Datenbank, Setup-Schritte](#vorbereitung-worktree-datenbank-setup-schritte)
+- [Status und der Aufgaben-Wechsler](#status-und-der-aufgaben-wechsler)
+- [Mit Claude chatten](#mit-claude-chatten)
+- [Bilder, Dateien und Befehle](#bilder-dateien-und-befehle)
+- [Freigaben, Pläne und Fragen](#freigaben-plane-und-fragen)
+- [Zusammenarbeiten](#zusammenarbeiten)
+- [Session-Warteschlange](#session-warteschlange)
+- [Die Seitenleiste: Editor, Preview, Branch](#die-seitenleiste-editor-preview-branch)
+- [Das Review](#das-review)
+- [Quality-Gates](#quality-gates)
+- [Checkpoints und Zurücksetzen](#checkpoints-und-zurucksetzen)
+- [Ausliefern: Commit und Pull Request](#ausliefern-commit-und-pull-request)
+- [Automatische Aufgaben](#automatische-aufgaben)
+- [Eine Aufgabe abschließen](#eine-aufgabe-abschliessen)
+- [Aufräumen](#aufraumen)
+- [Benachrichtigungen](#benachrichtigungen)
 
-## Was ein Task ist
+## Eine Aufgabe starten
 
-Ein Task verknüpft:
+**Neue Aufgabe** (Kopfzeile oder Wechsler) fragt nach:
 
-- einen **Namen** — ein frei wählbares Anzeige-Label. Er darf sich über Tasks
-  wiederholen und ist später änderbar. Beim Anlegen leitet Argos daraus einmalig
-  einen unveränderlichen **Slug** ab (der Slug bestimmt den Namen des
-  Docker-Workspace-Volumes und das Feature-Branch-Präfix und ändert sich beim
-  Umbenennen nie);
-- ein **Projekt** (Repo-Profil) — in welchem Repository gearbeitet werden soll.
-  Der Worker-Stack, der Agent, die Modelle und der Base-Branch werden alle vom
-  Projektstandard geerbt, sofern Sie sie nicht am Task überschreiben;
-- eine **Beschreibung** — was sich ändern soll, *warum*, und woran Sie erkennen,
-  dass es funktioniert hat. Konkrete Akzeptanzkriterien führen zu besseren
-  Ergebnissen;
-- ein privates **Docker-Workspace-Volume**, das das geklonte Repository und den
-  Arbeitszustand des Agents über die Laufzeit des Tasks hinweg hält.
+| Feld | Bedeutung |
+|---|---|
+| Ticket (optional) | Durchsucht die offenen Issues des Trackers des Workspaces nach Titel oder Nummer. Die Aufgabe übernimmt Titel und Beschreibung des Tickets und [meldet sich dort zurück](TICKETS.md). |
+| Titel | Woran du arbeitest (Standard: der Titel des Tickets). Der Branch wird daraus abgeleitet. |
+| Basis-Branch | Wo der Branch der Aufgabe startet (Standard: der Default-Branch des Workspaces). Ihr Pull Request zielt darauf. |
+| Automatisch umsetzen | Macht sie zu einer [automatischen Aufgabe](#automatische-aufgaben): Beschreib die Arbeit, wähle Plan- und Auslieferungsmodus und die Gate-Fix-Runden. |
+| Automatisch mergen | Schaltet das Auto-Merge des Providers ein, sobald der Pull Request existiert — siehe [Pull Requests](PULL-REQUESTS.md#auto-merge). |
+| Agent | Auf welchem deiner Claude-Abos (oder einem geteilten) die Aufgabe läuft. |
+| Modell, Modus | Siehe [Mit Claude chatten](#mit-claude-chatten). |
 
-Jeder Task trägt seinen eigenen Fortschritt (aktuelle Phase, Status), seine
-erzeugten Artefakte (das Concept, die Implementierungs-Zusammenfassungen, den
-Diff, die Pull-Request-URL) sowie ein Log pro Iteration, durch das Sie
-zurückscrollen können.
+Eine Aufgabe zu starten braucht die Rolle *Admin* oder *Mitglied* und einen
+nutzbaren Agenten.
 
-## Einen Task erstellen
+**Branch-Namen.** Mit Ticket heißt der Branch `<Ticket-Schlüssel>-<Titel>`
+(zum Beispiel `gitlab-42-login-page` oder `eng-118-login-page`), ohne
+`argos/<Titel>`. Ein Workspace kann ein eigenes **Branch-Muster** festlegen
+(Einstellungen → Allgemein) mit den Platzhaltern `{ticket}` (der
+Ticket-Schlüssel, ohne Ticket `argos`) und `{title}` (der Titel als Slug). Ein
+vergebener Name bekommt ein numerisches Suffix.
 
-Öffnen Sie die Task-Liste unter `${APP_URL}/admin/tasks` und wählen Sie **New
-task**. Das Formular hat zwei Tabs:
+## Vorbereitung: Worktree, Datenbank, Setup-Schritte
 
-**General**
+Eine neue Aufgabe startet im Zustand **Vorbereitung**; der Chat zeigt den
+Fortschritt:
 
-- **Name** — das frei wählbare Anzeige-Label (siehe oben); der unveränderliche
-  Slug wird automatisch daraus abgeleitet.
-- **Project** — das Repo-Profil, in dem gearbeitet werden soll.
-- **Description** — die vorzunehmende Änderung, mit Akzeptanzkriterien.
-- **Start concept immediately** — wenn aktiviert, startet die Concept-Phase
-  direkt nach der Erstellung (Auto-Concept). Wenn deaktiviert, wird der Task als
-  **Draft** erstellt, und Sie starten das Concept selbst.
-- **Base branch (override)** — Branch, auf dem die Arbeit basieren soll. Leer
-  verwendet den Projektstandard.
+1. Argos legt die Datenbank der Aufgabe `task_<slug>` im MySQL-Sidecar des
+   Workspaces an (wenn MySQL aktiviert ist).
+2. Der Daemon fetcht den Haupt-Klon und legt den Worktree an: auf dem
+   Remote-Branch, wenn es ihn schon gibt (eine wieder aufgenommene Aufgabe),
+   sonst auf dem frisch gefetchten Basis-Branch.
+3. Er schreibt die Werte der Aufgabe in die `.env` des Worktrees — ausgehend
+   von `.env.example`, wenn es noch keine `.env` gibt: `DB_*` mit der Datenbank
+   der Aufgabe, `REDIS_*`, `REDIS_PREFIX` und `CACHE_PREFIX`. Dieselben Werte
+   stehen in `.agent/task-env.json` und überschreiben die Umgebung des
+   Containers für alles, was im Worktree läuft (Claudes Tools, die Gates, das
+   Setup).
+4. Er führt die **Setup-Schritte** aus: `.argos/setup.sh` aus dem Repository
+   oder — ohne diese Datei — die Laravel-Standards (`composer install`, ein
+   `APP_KEY`, wenn er in der `.env` leer ist, `php artisan migrate`). Solange
+   ein getestetes Workspace-Setup noch nicht gemergt ist, kommen die Schritte
+   von seinem Branch. Siehe
+   [Ein Repository vorbereiten](PREPARE-PROJECT.md#setup-befehle-argossetupsh).
 
-**Worker & models** (alle optionale Overrides; leer erbt den Projekt-/
-Agent-Standard)
+Danach ist die Aufgabe bereit, und Claude startet. Schlagen die Setup-Schritte
+fehl, ist die Aufgabe trotzdem nutzbar (der Chat zeigt das Setup-Log, und
+Claude kann sich darum kümmern). Schlägt die Vorbereitung selbst fehl,
+versucht **Erneut versuchen** es noch einmal. Nachrichten, die während der
+Vorbereitung geschrieben werden, werden mit einem Hinweis abgewiesen.
 
-- **Worker stack**, **Agent** und **Agent credential** — die Laufzeitumgebung
-  und Identität, die den Task ausführt (siehe [AGENTS.md](AGENTS.md)).
-- **Concept model** / **Implement model** — das pro Phase verwendete
-  Claude-Modell. Die Auflösung erfolgt als Task-Override → Projektstandard →
-  Argos-Standard.
-- **Max turns for Concept** / **Max turns for Implement** — die Obergrenze für
-  Tool-Calls pro Run. Leer verwendet den Standard. Dies ist das Budget, das,
-  sobald es erschöpft ist, eine Phase *pausiert*, statt sie scheitern zu lassen
-  (siehe [Pausieren & Fortsetzen](#pausing--resuming-the-turn-limit)).
+## Status und der Aufgaben-Wechsler
 
-Wenn Sie speichern, erstellt Argos das Workspace-Volume und — falls Auto-Concept
-aktiviert ist — stellt sofort die Concept-Phase in die Warteschlange.
+| Status | Bedeutung | Gruppe im Wechsler |
+|---|---|---|
+| Vorbereitung | Worktree, Datenbank und Setup-Schritte laufen | Läuft |
+| Läuft | Claude arbeitet | Läuft |
+| Wartet auf dich | Eine Freigabe, ein Plan oder eine Frage ist offen | Wartet auf dich |
+| Bereit | Der Turn ist beendet, nichts ist offen, noch kein Pull Request | Bereit |
+| PR offen | Ein Pull Request (Entwurf oder bereit) existiert | PR offen |
+| Fertig | Der Pull Request wurde gemergt | Fertig |
+| Abgebrochen | Der Pull Request wurde ohne Merge geschlossen, oder die Aufgabe wurde abgebrochen | Fertig |
+| Archiviert | Aus der Liste genommen, im Archiv lesbar | Archiv |
 
-## Der Lebenszyklus im Überblick
+Automatische Aufgaben zeigen zusätzlich ihren Laufzustand (*Plant*, *Behebt
+Gate-Fehler · Runde 2/3*, …).
 
-Phasen laufen **asynchron** im Worker. Wenn Sie eine starten, wechselt der Task
-in einen *queued*-Zustand, bis ein Worker sie aufnimmt, dann *running*, und
-schließlich in einen *review*-Zustand, der auf Ihre Entscheidung wartet. Die
-Reihenfolge ist strikt und nur vorwärtsgerichtet:
+### Der Aufgaben-Wechsler
 
-```
-Draft
-  │  start concept
-  ▼
-Concept ──► (review the concept) ──► Implement ──► (review the implementation)
-  │                                                          │
-  │                                                          ▼
-  │                                              Push & Pull Request
-  │                                                          │
-  │                                                          ▼
-  │                                              In review (PR is open)
-  │                                                  │           ▲
-  │                                                  │ feedback  │
-  │                                                  ▼           │
-  │                                              Respond ────────┘
-  │                                                  │
-  ▼                                                  ▼ mark complete
-                                                  Completed
-```
+Der Knopf in der Kopfzeile zeigt die aktuelle Aufgabe; klick darauf oder drück
+**⌘J** / **Strg+J**. Der Wechsler gruppiert die Aufgaben in *Wartet auf dich*,
+*Läuft*, *Bereit*, *PR offen* und *Fertig* (eingeklappt; die drei neuesten und
+*N weitere anzeigen*). Jede Zeile zeigt, wem die Aufgabe gehört, das Ticket,
+den Pull Request, eine Statuszeile (die offene Freigabe, der Schritt, an dem
+Claude gerade ist, wie viele Dateien der letzte Turn geändert hat, *Wartet auf
+eine freie Session*) und die Zeit der letzten Aktivität.
 
-Zwei wichtige Regeln:
+- Der Filter wechselt zwischen **Meine + eingeladen** und **Alle**.
+- Tippen sucht im Titel; mit den Pfeiltasten und **Enter** wechselst du,
+  **Esc** schließt.
+- Fährst du über eine Aufgabe, kannst du sie umbenennen oder archivieren (nur
+  bei Aufgaben, die du ändern darfst; Archivieren fragt vorher nach); unten
+  gibt es das **Archiv** mit archivierten Aufgaben zum Wiederherstellen. Das
+  **+** direkt neben dem Wechsler legt eine neue Aufgabe an.
+- Ungelesene Einträge erscheinen als Zähler; der Wechsler aktualisiert sich
+  live.
 
-- **Das Concept wird gesperrt, sobald die Implementierung beginnt.** Sie können
-  nach dem ersten Implement-Run nicht zur Concept-Phase zurückkehren —
-  verfeinern Sie stattdessen die Implementierung.
-- **Push läuft automatisch nach einem erfolgreichen Implement**, wenn bereits ein
-  Pull Request existiert (d.h. bei späteren Iterationen). Beim ersten Mal lösen
-  Sie **Push & PR** selbst vom Review-Dock aus.
+Wartet eine **andere** Aufgabe auf eine Freigabe, erscheint neben dem Wechsler
+ein Chip *N wartet auf Freigabe*; ein Klick führt dich zu dieser Aufgabe und
+ihrer offenen Karte.
 
-## Die Phasen
+## Mit Claude chatten
 
-Sie prüfen jede Phase von der Task-Detailseite unter
-`${APP_URL}/admin/tasks/{id}`. Am unteren Rand dieser Seite befindet sich das
-**Review-Dock**: ein Composer, der die passenden Buttons und den Hinweis für die
-aktuelle Stufe anzeigt. Der Header trägt nur die wenigen Aktionen, die das Dock
-nicht besitzt (eine pausierte Phase fortsetzen, einen Lock freigeben, nach dem PR
-abschließen) plus ein `⋯`-Menü mit Zusatzaktionen (Logs, Demo-Steuerung,
-Abbruch).
+Schreib, und Claudes Antwort erscheint live. Jeder Turn beginnt mit einem
+kleinen Kopf — Dauer und Kosten, oder *arbeitet seit N s*, solange er läuft —
+gefolgt von seinen Schritten als **kompakte Zeitleiste**: eine Zeile pro
+Tool-Aufruf mit Zustand, einem Verb (*Bearbeitet*, *Erstellt*, *Ausgeführt*,
+…), der Datei oder dem Befehl und den geänderten Zeilen oder einem kurzen
+Ergebnis. Ein Klick auf eine Zeile zeigt Ein- und Ausgabe vollständig; mehr als
+drei Schritte klappen zu *N weitere Schritte anzeigen* zusammen.
 
-### Concept
+- **Folgenachrichten, während Claude arbeitet,** werden eingereiht
+  (Senden-Knopf oder `Enter`) und aufgenommen, sobald Claude bereit ist — bis
+  dahin zeigen sie *in Warteschlange*.
+- **Stopp** (neben dem Senden-Knopf, solange Claude arbeitet) unterbricht den
+  aktuellen Turn. Offene Freigaben werden abgebrochen.
+- **Modus** (die erste Pille unter dem Eingabefeld) legt fest, wie viel Claude
+  ohne Rückfrage tun darf:
+  - *Vor Änderungen fragen* (Standard) — jede Änderung und jeder Befehl braucht
+    eine Freigabe,
+  - *Änderungen annehmen* — Dateiänderungen laufen ohne Rückfrage, Befehle
+    fragen weiterhin,
+  - *Plan-Mode* — Claude recherchiert und schlägt einen Plan vor, bevor es
+    etwas ändert,
+  - *Freigaben umgehen* — Claude führt jedes Tool ohne Rückfrage aus. Nur
+    Workspace-Admins (und Argos-Admins) können das wählen.
+- Das **Modell** (die zweite Pille) lässt sich jederzeit wechseln — wie
+  `/model` in Claude Code. *Immer die neueste Version* listet die Aliasse, die
+  dein Abo anbietet (mit der Version, für die sie heute stehen); *Feste
+  Version* legt genau dieses Modell fest (z. B. `claude-opus-5-5`), das auch
+  bleibt, wenn ein neueres erscheint; *Andere Modell-ID …* nimmt jede
+  Modell-ID von Hand. Argos fragt Claude Code nach der Liste, sobald die
+  Aufgabe offen ist (es wird keine Nachricht geschickt), und danach alle 12
+  Stunden erneut.
+- **Effort** (die Pille neben dem Modell, wie `/effort` in Claude Code) legt
+  fest, wie gründlich Claude nachdenkt: der Standard des Modells oder eine der
+  Stufen, die das Modell anbietet (niedrig bis maximal). Modelle ohne
+  Effort-Steuerung zeigen keine Pille.
+  Die Kosten der Aufgabe stehen neben dem Senden-Knopf.
+- Ist eine Session beendet (Container-Neustart, Absturz), setzt **Session
+  fortsetzen** dieselbe Claude-Unterhaltung fort.
+- Claude arbeitet im Worktree der Aufgabe. Slash-Commands, Skills und die
+  `CLAUDE.md` des Repositorys werden wie in Claude Code geladen.
 
-Der Agent analysiert Ihre Beschreibung gegen das Repository und entwirft einen
-Plan: was er ändern möchte und die nächsten Schritte. Er erstellt während dieser
-Phase den Feature-Branch. Es wird noch kein Code geändert.
+Eine **Aktionsleiste** über dem Eingabefeld zeigt, was sich geändert hat —
+Dateien, hinzugefügte und entfernte Zeilen und den Stand der
+[Quality-Gates](#quality-gates) oder noch nicht gepushte Commits —, mit
+**Gates prüfen**, **Review**, **Committen** und **Pushen & PR** (siehe
+[Ausliefern](#ausliefern-commit-und-pull-request)). Darunter stehen die
+To-dos, die gerade jemanden brauchen, jeweils mit ihrer Aktion: rote Gates
+(*Ansehen*), eine rote Pipeline (*Claude fixen lassen*), Konflikte oder ein
+weitergelaufener Basis-Branch (*Rebase durch Claude*), neue Review-Kommentare
+(*In mein Review übernehmen*) und ein Pull-Request-Entwurf (*Als bereit
+markieren*). Sie erscheint nur, wenn es etwas zu tun gibt.
 
-**Was Sie prüfen:** das vorgeschlagene Concept, auf dem **Concept**-Tab. Im
-Review-Dock können Sie:
+## Bilder, Dateien und Befehle
 
-- **Update concept** — eingeben, was sich ändern oder ergänzen soll, und das
-  Concept mit Ihren Anmerkungen als Feedback erneut ausführen (dies bearbeitet
-  das Concept, nicht bloß einen Kommentar hinterlassen); oder
-- **Start implementation** — das Concept akzeptieren und weitergehen.
+- **Bilder:** Screenshots einfügen, hineinziehen oder anhängen (PNG, JPEG, GIF,
+  WebP; bis zu 5 pro Nachricht, je `ARGOS_WORKSPACE_UPLOAD_MAX_MB`). Claude
+  sieht sie mit der Nachricht; andere sehen sie als Vorschaubilder. Sie werden
+  privat gespeichert.
+- **`@`-Erwähnungen:** Tippe `@` und einen Teil eines Pfads, um eine Datei aus
+  dem Worktree der Aufgabe auszuwählen (unscharfe Suche über getrackte und
+  ungetrackte Dateien; ignorierte bleiben außen vor). Der Pfad wird als Text
+  eingefügt.
+- **`/`-Befehle:** Tippe `/` für eine Liste. Die eigenen Befehle von Argos
+  laufen im Browser und gehen nicht an Claude:
 
-### Implement
+  | Befehl | Wirkung |
+  |---|---|
+  | `/plan [Anfrage]` | In den Plan-Mode wechseln, optional die Anfrage senden. |
+  | `/ship` | Den nächsten Schritt zum Ausliefern öffnen: Committen, solange etwas nicht committet ist, sonst Pushen & Pull Request. |
+  | `/review` | Das [Review](#das-review) öffnen. |
+  | `/preview` | Die Preview in der Seitenleiste zeigen (aufgeklappt und markiert; auf schmalen Bildschirmen öffnet sich die Schublade). |
+  | `/gates` | Die [Quality-Gates](#quality-gates) ausführen. |
+  | `/checkpoint [Name]` | Einen benannten [Checkpoint](#checkpoints-und-zurucksetzen) setzen. |
 
-Der Agent wendet die tatsächlichen Code-Änderungen auf dem Feature-Branch an.
-Standardmäßig startet er von einem sauberen Checkout des Base-Branches; wenn Sie
-eine geprüfte Implementierung **verfeinern**, baut er auf dem Working Tree der
-vorherigen Iteration auf, statt zurückzusetzen. Nachdem der Agent fertig ist,
-führt der Worker die **Quality Gates** des Projekts (Formatter, Tests, statische
-Analyse, sofern konfiguriert) als blockierenden Verifizierungsschritt erneut aus.
+  Alle anderen Befehle — die Commands und Skills des Repositorys, `/compact`
+  und Co. — gehen so an Claude Code, wie du sie tippst. `/ship` und `/gates`
+  sagen Bescheid, wenn der Workspace nicht läuft oder du sie nicht nutzen
+  darfst.
 
-**Was Sie prüfen:** den **Implementation**-Tab (eine Zusammenfassung in
-einfacher Sprache und eine technische Zusammenfassung) und den **Diff**-Tab. Im
-Review-Dock können Sie:
+`Enter` sendet, `Shift+Enter` fügt eine Zeile ein; solange die Vorschlagsliste
+offen ist, übernehmen `Enter`/`Tab` den markierten Eintrag. **?** (außerhalb
+eines Eingabefelds) oder **⋯ → Tastenkürzel** zeigt alle Tastenkürzel.
 
-- **Refine implementation** — eingeben, was sich ändern soll, und Implement auf
-  Basis der aktuellen Arbeit erneut ausführen; oder
-- **Create Push & PR** — die Implementierung akzeptieren und den Pull Request
-  öffnen.
+## Freigaben, Pläne und Fragen
 
-Eine [Live-Demo](#the-live-demo) wird nach einem erfolgreichen Implement-Run
-automatisch gebaut, wenn das Projekt Demos aktiviert hat.
+Braucht Claude eine Entscheidung, erscheint für alle eine Karte in der Aufgabe:
 
-### Push & Pull Request
+| Karte | Was du tun kannst |
+|---|---|
+| Tool-Aufruf (z. B. *Claude möchte einen Befehl ausführen*) | **Erlauben**, **Immer erlauben** oder **Ablehnen** (mit optionaler Begründung). Befehle stehen vollständig da, Änderungen werden angezeigt. *Immer erlauben* übernimmt Claude Codes eigenen Regelvorschlag für den Rest der Session, sodass derselbe Aufruf nicht mehr fragt; angeboten wird es, wenn Claude Code eine solche Regel vorschlägt. |
+| Plan (aus dem Plan-Mode) | Annehmen und den Modus wählen, in dem es weitergeht, oder mit Feedback ablehnen. |
+| Frage | Pro Frage eine Option wählen oder eine eigene Antwort eingeben. |
 
-Der Worker generiert eine Commit-Message, committet die Änderungen, pusht den
-Feature-Branch zum Remote und öffnet (oder aktualisiert) den Pull Request.
+Datei-Tools außerhalb des Worktrees der Aufgabe (und `/tmp`) fragen immer, auch
+in *Änderungen annehmen*. Es entscheiden die Person, der die Aufgabe gehört,
+die Mitarbeitenden und die Workspace-Admins; die **erste Entscheidung gilt**,
+alle sehen, wer entschieden hat.
 
-**Was Sie prüfen:** der **Pull Request**-Tab zeigt den PR-Link. Der Task wechselt
-nach **In review** — öffnen Sie den PR in Ihrem Git-Host und prüfen Sie ihn dort.
-Von hier aus schließen Sie entweder den Task ab oder senden Feedback.
+## Zusammenarbeiten
 
-### Respond (Review-Feedback)
+- **Einladen** (das **+** neben den Bildern in der Kopfzeile): Wem die Aufgabe
+  gehört, wählt Mitglieder des Workspaces als Mitarbeitende aus. Sie schreiben,
+  geben frei, reviewen und liefern in dieser Aufgabe aus; sie läuft weiter über
+  das Abo der Person, der sie gehört. Ein Klick auf das Bild einer
+  mitarbeitenden Person in der Kopfzeile nimmt sie (nach einer Rückfrage)
+  wieder heraus.
+- **Übergeben**: Die Aufgabe gehört dann der neuen Person (Workspace-Admin oder
+  Mitglied mit nutzbarem Claude-Abo) und läuft über deren Abo; die offene
+  Session endet, wem sie bisher gehörte, arbeitet als mitarbeitende Person
+  weiter, und die Zuständigkeit im Ticket folgt, wo der Tracker das kann (siehe
+  [Tickets](TICKETS.md#ubergabe-und-zugewiesene-person)).
+- Die Kopfzeile zeigt Besitz und Mitarbeitende mit ihrer Anwesenheit; der Chat
+  zeigt, wer tippt. Nachrichten anderer Personen tragen deren Namen und Farbe,
+  und Claude sieht sie als `[Name]: …`. Freigaben und Auslieferungen nennen,
+  wer sie gemacht hat.
 
-Wenn ein PR offen ist und Sie Änderungen wünschen, nutzen Sie **Review
-feedback** (erreichbar vom in-review-Task). Sie schreiben Ihr Feedback; Argos
-übergibt es dem Agent, der *nur die angesprochenen Punkte* in den bestehenden
-Feature-Branch einarbeitet — kein unverbundenes Refactoring — und der Pull
-Request wird aktualisiert. Der Task kehrt nach **In review** zurück, sodass Sie
-das Ergebnis lesen und bei Bedarf weiteres Feedback senden können. Wiederholen
-Sie dies, bis Sie zufrieden sind, und schließen Sie dann den Task ab.
+> Alles, was in einer Aufgabe geschrieben wird, läuft über das Abo der
+> **Person, der sie gehört** — auch Nachrichten von Mitarbeitenden.
 
-## Selbst am Branch arbeiten
+## Session-Warteschlange
 
-Sobald der Feature-Branch auf dem Remote liegt (nach einem **Push**), können Sie
-ihn auschecken, bearbeiten und eigene Commits pushen — wie jeden Branch. Wenn Sie
-den Task danach fortsetzen (ein **Refine**-Implement oder **Review
-feedback**/Respond), **pullt Argos den Branch zuerst** und arbeitet auf Ihren
-Commits weiter, sodass Ihre manuellen Änderungen erhalten bleiben und darauf
-aufgebaut wird. Ein **Neuaufbau der Live-Demo** spiegelt ebenso den gepushten
-Remote-Stand.
+Sessions sind pro Workspace (**Parallele Sessions**, Standard 3) und pro
+Claude-Abo (die *parallelen Sessions* des Agenten, Standard 1) begrenzt. Findet
+eine Nachricht keine freie Session, wird eine ruhende Session (untätig,
+niemand wartet auf sie) geschlossen, um Platz zu machen; gibt es keine, wartet
+die Nachricht in der Schlange — der Chat zeigt *Wartet auf eine freie Session —
+Platz N* — und geht automatisch raus, sobald eine Session frei wird, die älteste
+zuerst. Ruhende Aufgaben halten eine Session nicht lange.
 
-Zwei Dinge sind wichtig:
+## Die Seitenleiste: Editor, Preview, Branch
 
-- Das gilt für die **fortsetzenden** Läufe (Refine, Respond). Ein bewusstes
-  **Fresh-Re-Implement** baut die Änderung von der Base neu auf und würde externe
-  Commits ersetzen — nutzen Sie Refine/Respond, wenn Ihre manuelle Arbeit
-  weitergetragen werden soll.
-- Pushen Sie auf den Branch, *während* eine Phase läuft, verweigert dieser Lauf
-  das Überschreiben Ihrer Commits und scheitert mit einer klaren Meldung —
-  starten Sie den Task einfach erneut, dann werden Ihre Änderungen übernommen.
+Die Seitenleiste gehört zur aktuellen Aufgabe:
 
-## Status & Stufen
+- **Umgebung** — VS Code und die Preview, jeweils mit Zustand und Knopf. Beide
+  öffnen sich in **einem eigenen Browser-Tab** (beim nächsten Klick
+  wiederverwendet), sodass sie das ganze Fenster bekommen und auch Apps, die
+  sich nicht einbetten lassen, angezeigt werden.
+- **Branch** — der Branch der Aufgabe, ihr Basis-Branch, die Zahl
+  **uncommitteter** Dateien und **ungepushter** Commits und das Ticket.
+- **Pull Request** — Zustand, Checks, Reviews, Konflikte und seine Aktionen;
+  siehe [Pull Requests](PULL-REQUESTS.md).
+- **Quality Gates** — jedes Gate mit seinem Zustand (offen, läuft, ok, Fehler,
+  übersprungen) und *Alle prüfen*; siehe [Quality-Gates](#quality-gates).
+- **Geänderte Dateien** — Statusbuchstabe (M/A/D/R), Name und geänderte
+  Zeilen. Ein Klick öffnet das [Review](#das-review) mit dieser Datei.
 
-Intern hat ein Task einen persistierten Workflow-Status plus eine aktuelle
-Phase/einen aktuellen Status. Die UI fasst diese zu einer einzigen **Stufe**
-zusammen, die im Status-Banner angezeigt wird. Das ist, was Sie tatsächlich sehen
-und worauf Sie reagieren:
+### VS Code
 
-| Stufe (Banner) | Bedeutung | Ihre Aktion |
-| --- | --- | --- |
-| **Draft** | Erstellt, Concept noch nicht gestartet. | Optional Hinweise hinzufügen, dann **Start concept**. |
-| **Concept waiting for worker** | Concept in Warteschlange; wartet auf einen freien Worker. | Warten. |
-| **Concept running** | Der Agent entwirft das Concept. | Warten (oder **Abort**). |
-| **Concept paused (turn limit)** | Concept hat mitten im Run sein Turn-Budget erreicht. | **Continue concept** mit einem frischen Budget. |
-| **Review concept** | Concept fertig. | **Update concept** oder **Start implementation**. |
-| **Concept failed** | Der Concept-Run ist fehlgeschlagen. | **Try again** vom Dock. |
-| **Implementation waiting for worker** | Implement in Warteschlange. | Warten. |
-| **Implementation running** | Der Agent ändert Code. | Warten (oder **Abort**). |
-| **Implementation paused (turn limit)** | Implement hat sein Turn-Budget erreicht. | **Continue** mit einem frischen Budget. |
-| **Review implementation** | Code + Zusammenfassungen + Diff fertig. | **Refine implementation** oder **Create Push & PR**. |
-| **Implementation failed** | Implement fehlgeschlagen (oder durch einen Lock blockiert). | **Try again**, oder **Release lock** falls blockiert. |
-| **Push waiting for worker** | Push & PR in Warteschlange. | Warten. |
-| **Push & PR running** | Committen, pushen, PR öffnen. | Warten. |
-| **Push failed** | Der Push-/PR-Schritt ist fehlgeschlagen. | **Try again** vom Dock. |
-| **Pull request created** | PR ist offen; in review. | Den PR prüfen, dann **Complete** oder Feedback senden (**Respond**). |
-| **Completed** | Task abgeschlossen; Workspace entfernt. | Endzustand. |
-| **Aborted** | Manuell gestoppt. | Endzustand, schreibgeschützt. |
+**Öffnen** startet OpenVSCode Server auf dem Ordner der Aufgabe
+(`/workspace/tasks/<slug>`). Was du änderst, sieht Claude sofort und
+umgekehrt. Nur Workspace-Admins und Mitglieder bekommen den Editor; der Zugang
+wird bei jeder Anfrage geprüft.
 
-Hinweise:
+### Preview
 
-- *Waiting for worker* (queued) und *running* sind verschieden: queued bedeutet,
-  der Job ist dispatcht, aber noch kein Worker hat ihn aufgenommen.
-- Während eine Phase **running oder queued** ist, sind das Review-Dock und die
-  Phasen-Steuerungen ausgeblendet — nur das `⋯`-Menü (Recovery + Logs) und
-  **Abort** bleiben übrig.
+Die Preview ist eine [Live-Demo](LIVE-DEMOS.md) des Worktrees der Aufgabe,
+unter einer eigenen Subdomain. **Starten** baut sie, **Öffnen** öffnet sie,
+**Neu bauen** ersetzt sie, **Setup-Befehle erneut ausführen** führt die Befehle
+des Vertrags noch einmal aus (nach einer Migration oder einer
+`composer`-/`npm`-Änderung), **Preview stoppen** entfernt sie. Previews
+brauchen `ARGOS_PREVIEW_ENABLED` und den Schalter *Live-Demo* des Workspaces;
+pro Workspace laufen höchstens *Parallele Previews*.
 
-## Pausieren & Fortsetzen (das Turn-Limit)
+## Das Review
 
-Jeder Run hat ein **max-turns**-Budget (die Obergrenze für Tool-Calls). Wenn ein
-Concept- oder Implement-Run dieses Budget erreicht, bevor er fertig ist,
-**pausiert** er, statt zu scheitern — der Workspace und die Agent-Session bleiben
-erhalten.
+**Review** in der Aktionsleiste, eine geänderte Datei in der Seitenleiste
+oder `/review` schalten in den **Review-Modus**: Die Seitenleiste wird zum
+Review-Panel, der Chat schrumpft auf eine schmale Spalte. **Maximieren** gibt
+dem Diff die volle Breite. **Review schließen** oder **Esc** kehrt zurück; der
+Modus steht in der URL (`?review=1&file=…`), sodass ein Neuladen oder ein
+geteilter Link dieselbe Datei öffnet.
 
-Um fortzufahren, nutzen Sie die Header-Aktion **Continue** (Implement) oder
-**Continue concept**. Sie öffnet ein Modal, das mit einem frischen Turn-Budget
-vorausgefüllt ist; das Fortsetzen setzt dieselbe Claude-Session mit vollem
-Kontext fort, sodass keine Arbeit verloren geht.
+Das Review zeigt die Änderungen der Aufgabe gegenüber ihrem Basis-Branch —
+Commits, nicht committete Änderungen und neue Dateien:
 
-Wenn eine Phase das Turn-Limit **wiederholt** erreicht hat (der Agent
-konvergiert nicht), warnt Sie Argos im Resume-Modal — erwägen Sie, den Task
-einzugrenzen oder max-turns deutlich anzuheben, statt einfach erneut
-fortzusetzen.
+- Die **Werkzeugleiste** zeigt die hinzugefügten/entfernten Zeilen, *X / N
+  gesehen*, einen Chip pro Gate, **Split** oder **Unified** (für dich
+  gespeichert) und Maximieren.
+- Der **Dateibaum** gruppiert die Dateien nach Verzeichnis, mit
+  Statusbuchstabe und Badges: Befunde der Gates, *neu* (Claude hat die Datei
+  geändert, während du reviewst) und ein Haken für Dateien, die du als gesehen
+  markiert hast. Generierte Dateien (Lockfiles, Build-Ausgabe) sind
+  eingeklappt; ihr Diff lädt bei Bedarf.
+- Der **Diff** zeigt alte und neue Zeilennummern; unveränderte Zeilen zwischen
+  den geänderten Blöcken klappen auf. **Gesehen** markiert eine Datei als
+  geprüft — die Markierung verschwindet, sobald sich die Datei wieder ändert.
+  Große Diffs laden schrittweise.
+- Ändert Claude eine Datei, während du reviewst, erscheint ein Hinweis *Claude
+  hat X gerade geändert (+a −b)*; **Änderung zeigen** lädt den Diff neu.
 
-## Eine fehlgeschlagene Phase erneut versuchen
+### Zeilen-Kommentare
 
-Wenn eine Phase mit einem Fehler endet, zeigt der Task eine *failed*-Stufe, und
-das Banner verlinkt auf das Log. Das Review-Dock bietet **Try again**, das
-dieselbe Phase erneut ausführt. (Ein fehlgeschlagener Concept-Retry übergibt Ihre
-bestehenden Anmerkungen als Feedback; ein fehlgeschlagener Implement-Retry
-startet von einem sauberen Checkout.)
+Fahr über eine Zeile und klick auf **+**, um sie zu kommentieren (Shift-Klick
+auf eine zweite Zeile wählt einen Bereich). Ein gespeicherter Kommentar wird
+**nicht gesendet**: Er erscheint im Diff und als Chip `Datei:Zeile ×` im
+Eingabefeld, das **Review senden (N)** anbietet. Das schickt alle gesammelten
+Kommentare und deinen Text als **eine** Nachricht. Kommentare werden pro
+Aufgabe und Person gespeichert.
 
-## Einen hängenden Implement-Run zwangsweise entsperren
+Ändert Claude Zeilen, die du kommentiert hast, wandert der Kommentar mit
+Zeilen, die nur verschoben wurden. Haben sich die kommentierten Zeilen selbst
+geändert, wird er **veraltet** und nicht gesendet: **Trotzdem senden**, **Auf
+neue Zeile verschieben** oder **Verwerfen**.
 
-Wenn ein Worker-Container abstürzt, kann der Worker-Lock gesetzt bleiben, was sich
-als **Implementation failed**-Stufe mit einem Hinweis "blocked by a lock" zeigt.
-Nutzen Sie **Release lock** (im Header / `⋯`-Menü), um den Lock zu lösen und die
-Implement-Phase neu zu starten. Tun Sie dies nur, wenn Sie sicher sind, dass kein
-Worker mehr läuft.
+## Quality-Gates
 
-## Einen laufenden Task abbrechen
+**Gates prüfen** (Aktionsleiste, *Alle prüfen* in der Seitenleiste oder
+`/gates`) führt die Quality-Gates im Worktree der Aufgabe aus:
+Artisan-Start, Pint auf geänderten Dateien, Pest/PHPUnit, PHPStan,
+Migrations-Syntax, Debug-Aufrufe und vorhandene Tests. Sie sind für
+PHP/Laravel-Projekte gemacht; bei anderen Stacks werden die Gates
+übersprungen.
 
-Während eine Phase running oder queued ist, bietet das `⋯`-Menü **Abort**. Dies
-killt sofort hart den laufenden Worker (und etwaige Sidecar-Container), sodass die
-Phase augenblicklich stoppt, schließt den in Bearbeitung befindlichen Run und
-versetzt den Task in den **Aborted**-Endzustand.
+- **Baseline pro Basis-Commit:** Argos erfasst einmal, welche Tests und
+  PHPStan-Fehler schon auf dem Basis-Commit fehlschlagen; alle Aufgaben auf
+  diesem Commit teilen sie, sodass nur Fehler zählen, die die Aufgabe **neu
+  einführt**. Ohne Baseline (wird noch erfasst oder ist fehlgeschlagen) zählt
+  jeder Fehler.
+- Ein Lauf gleichzeitig pro Aufgabe. Ein Klick auf ein Gate — auch ein grünes —
+  öffnet seine **Gate-Details**: Ergebnis, Dauer, Zeitpunkt, den
+  Baseline-Hinweis, das vollständige Log mit Suche und die betroffenen Dateien
+  (ein Klick öffnet das Review auf dieser Datei). **Erneut prüfen** führt nur
+  dieses Gate noch einmal aus (die anderen behalten ihr Ergebnis); ein
+  fehlgeschlagenes Gate bietet außerdem **Claude fixen lassen**, das einen
+  Fix-Prompt mit dem Log in die Aufgabe schickt.
+- Im [Review](#das-review) erscheinen PHPStan-Fehler **an ihrer Zeile**, und
+  Pint markiert die Datei; **Ins Review übernehmen** legt den Befund dort zu
+  deinen gesammelten Kommentaren.
+- Commit- und Push-Dialog nennen das letzte Ergebnis. Fehlgeschlagene Gates sind ein
+  Warnhinweis, nie eine Sperre.
 
-Das Workspace-**Volume bleibt erhalten** (sodass Sie es weiterhin inspizieren
-können); es wird erst entfernt, wenn Sie den Task löschen. Aborted ist
-schreibgeschützt — es gibt kein Dock und keine Phasen-Steuerungen. Um erneut zu
-handeln, erstellen Sie einen neuen Task.
+Die Gate-Logs liegen in `.agent/logs/` im Worktree, das git lokal ignoriert.
 
-## Einen Task abschließen
+## Checkpoints und Zurücksetzen
 
-Wenn Sie mit dem Pull Request zufrieden sind, nutzen Sie **Complete** (die
-primäre Header-Aktion in der Stufe *Pull request created*). Dies markiert den
-Task als **Completed**, löscht sein Docker-Workspace-Volume und schließt — falls
-der Task aus einem externen Issue stammt — das Quell-Issue. Sowohl die
-Volume-Entfernung als auch der Abschluss sind unwiderruflich.
+Bevor Claude eine Nachricht bearbeitet, legt Argos einen **Checkpoint** des
+Worktrees der Aufgabe an — getrackte, gestagte und ungetrackte Dateien, keine
+ignorierten — gespeichert als Git-Ref (`refs/argos/checkpoints/<task>/<n>`).
+Branch, Index und deine Dateien bleiben unberührt. Eine Aufgabe behält ihre
+neuesten 200 Checkpoints.
 
-## Die Live-Demo
+- **Bis hierhin zurücksetzen** an einer Nachricht (mit der Maus darüberfahren)
+  zeigt, was das Zurücksetzen verwirft, und setzt die Dateien auf den Stand vor
+  dieser Nachricht zurück. Solange Claude in dieser Aufgabe arbeitet, wird das
+  abgelehnt — stoppe es zuerst. Andere Aufgaben sind nicht betroffen.
+- Der aktuelle Stand wird vorher als Checkpoint gesichert, sodass
+  **Rückgängig** ihn zurückholt.
+- Commits werden nie zurückgenommen: Wurden seitdem Commits erstellt, werden
+  nur die Dateien zurückgesetzt.
+- Der Chat bleibt; Claude erfährt es mit deiner nächsten Nachricht und liest
+  die Dateien neu.
+- `/checkpoint [Name]` setzt einen benannten Checkpoint.
 
-Wenn das Projekt Live-Demos aktiviert hat, baut Argos nach jedem erfolgreichen
-Implement-Run automatisch eine laufende Vorschau des implementierten Branches.
-Das **Live demo**-Panel auf der Task-Seite zeigt die URL und das Ablaufdatum und
-lässt Sie die Demo neu bauen, neu starten, stoppen oder den Zugriffsschutz der
-Demo ändern. Die Demo wird nach dem Pull Request abgebaut, aber Sie können sie
-jederzeit neu starten.
+## Ausliefern: Commit und Pull Request
 
-Siehe [LIVE-DEMOS.md](LIVE-DEMOS.md) dafür, wie Demos gebaut, exponiert und
-geschützt werden.
+Ausliefern hat zwei Schritte — committen, dann pushen mit dem Pull Request
+(GitLab: Merge Request) gegen den Basis-Branch. Die Aktionsleiste bietet den
+jeweils nächsten als Hauptknopf an.
 
-## Aus Issues erstellte Tasks
+1. **Claude committet selbst.** Ist ein abgeschlossener Teil fertig und laufen
+   seine Tests, committet Claude ihn mit einer Conventional-Commits-Nachricht
+   (`feat: …`, `fix: …`) und einem `Co-Authored-By: Claude`-Trailer. Autor des
+   Commits ist die **Person, der die Aufgabe gehört**. Claude pusht nie und
+   öffnet nie einen Pull Request.
+2. **Committen** committet, was noch nicht committet ist. Claude entwirft die
+   Nachricht aus genau diesen Änderungen und der Unterhaltung, auf **deinem**
+   Abo; ohne Abo oder wenn das fehlschlägt, schreibst du sie selbst. Der Commit
+   trägt deinen Namen und deine E-Mail-Adresse. *Danach pushen und Pull Request
+   öffnen* geht direkt weiter zu Schritt 3.
+3. **Pushen & PR** pusht den Branch. Gibt es noch keinen Pull Request, entwirft
+   Claude Titel und Beschreibung aus dem ganzen Branch und der Unterhaltung —
+   *What*, *Why*, *Testing* —, und du bearbeitest sie, bevor er sich öffnet.
+   Ein verknüpftes Ticket wird referenziert (siehe
+   [Tickets](TICKETS.md#schliessen-beim-merge)); *Als Entwurf öffnen* öffnet
+   einen Entwurfs-Pull-Request. Ist ein Pull Request offen, bestätigt
+   **Pushen** nur, wie viele Commits rausgehen, und kommentiert den Pull
+   Request.
 
-Tasks können auch automatisch aus Issues in einem verbundenen Issue-Tracker
-(GitHub, GitLab, Linear, …) erstellt werden. Ein solcher Task trägt einen Link
-zurück zu seinem Quell-Issue (im Task-Header angezeigt), und der Abschluss des
-Tasks kann dieses Issue schließen. Siehe
-[SETUP-TASK-PROVIDERS.md](SETUP-TASK-PROVIDERS.md) für das Verbinden einer
-Issue-Quelle und wie eingehende Issues zu Tasks werden.
+- Push und Pull Request nutzen den Repository-Zugang des Workspaces; der Pull
+  Request nennt, wer ihn geöffnet hat.
+- Nicht committete Dateien bleiben beim Pushen zurück — der Push-Dialog sagt
+  das.
+- Hat sich der Remote-Branch bewegt, wird der Push abgelehnt. Meldet der Pull
+  Request Konflikte oder einen weitergelaufenen Basis-Branch, bittet **Claude
+  rebasen lassen** (Menü der Kopfzeile, in der Seitenleiste *Rebase durch
+  Claude*) Claude, zu fetchen, zu rebasen und Konflikte zu lösen.
+- Ab dann folgt die Seitenleiste dem Pull Request — siehe
+  [Pull Requests](PULL-REQUESTS.md).
+- [Automatische Aufgaben](#automatische-aufgaben), die API und MCP erledigen
+  beide Schritte auf einmal.
+
+Ausliefern dürfen die Person, der die Aufgabe gehört, die Mitarbeitenden und
+die Workspace-Admins.
+
+## Automatische Aufgaben
+
+Eine **automatische Aufgabe** arbeitet ohne Menschen: Sie plant (optional),
+setzt um, prüft die [Quality-Gates](#quality-gates), behebt Fehler und liefert
+aus. Du kannst live zusehen und jederzeit übernehmen.
+
+**Eine starten**
+
+- In einem Workspace: **Neue Aufgabe → Automatisch umsetzen**, dann die Arbeit
+  beschreiben.
+- Von außen: die [REST-API](REST-API.md#eine-aufgabe-starten)
+  (`POST /api/v1/workspaces/{workspace}/tasks`), [MCP](SETUP-MCP.md)
+  (`task_create`) oder ein Issue eines verbundenen Trackers
+  ([Issue-Trigger](SETUP-TASK-PROVIDERS.md#vom-issue-zur-automatischen-aufgabe)).
+
+**Wie sie läuft**
+
+1. **Plan** (je nach Einstellung *Plan*): *aus* setzt sofort um; *automatisch*
+   plant zuerst und macht dann selbst weiter; *auf Freigabe warten* hält beim
+   Plan an, bis jemand ihn freigibt — auf der Plan-Karte, per API oder MCP oder
+   mit 👍 auf dem Issue-Kommentar. Lehnst du mit Feedback ab, überarbeitet
+   Claude den Plan.
+2. **Umsetzen** im Modus *Freigaben umgehen* — niemand ist da, um Freigaben zu
+   beantworten; Datei-Tools außerhalb des Worktrees werden abgelehnt. Stellt
+   Claude eine Frage, wird es angewiesen, selbst zu entscheiden und seine
+   Annahme zu nennen.
+3. **Gates** nach jedem Turn. Fehlgeschlagene Gates gehen mit dem Fix-Prompt
+   zurück an Claude, bis zu *Gate-Fix-Runden* Mal; danach wird trotzdem
+   ausgeliefert, und der Pull Request nennt die Gates, die weiterhin
+   fehlschlagen.
+4. **Ausliefern** je nach *Wenn fertig*: Pull Request, Entwurfs-Pull-Request
+   oder nur committen und pushen. Danach endet die Session; der Container läuft
+   für die anderen Aufgaben weiter.
+
+**Übernehmen.** Schreibst du in eine laufende automatische Aufgabe, pausiert
+die Automatik. **Automatisch fortsetzen** (Play-Button in der Kopfzeile) gibt
+sie zurück: Sie prüft die Gates und liefert aus. **Automatik pausieren** hält
+sie an, ohne etwas zu schreiben.
+
+**Budgets.** *Max. Turns*, *Max. Kosten* und *Max. Laufzeit* stoppen einen
+Lauf (*Budget überschritten*); die bisherige Arbeit bleibt. Erreicht das Abo
+sein Nutzungslimit, geht der Lauf weiter, sobald das Limit aufgehoben ist.
+
+**Für wen sie läuft.** Eine automatische Aufgabe gehört einer Person: wer sie
+in der UI gestartet hat, die angemeldete MCP-Person, die **Handelt als**-Person
+des API-Clients, der **Automatik-Nutzer** des Workspaces (Workspace-Tokens,
+Issue-Trigger) — oder, bei einem Issue, die zugewiesene Person, wenn sie in
+ihrem Profil zugestimmt hat (siehe
+[Tickets](TICKETS.md#automatische-aufgaben-aus-issues)).
+
+Die Standards kommen aus **Einstellungen → Automatik**; alle Einstellungen
+stehen unter [Konfiguration](CONFIGURATION.md#automatische-aufgaben).
+
+## Eine Aufgabe abschließen
+
+| Aktion | Wer | Wirkung |
+|---|---|---|
+| Pull Request gemergt | — | Die Aufgabe ist **Fertig**. |
+| Pull Request ohne Merge geschlossen | — | Die Aufgabe ist **Abgebrochen**. |
+| **Aufgabe abbrechen** | Besitz, Workspace-Admins | Die Aufgabe endet ohne Merge; ihr Pull Request bleibt, wie er ist. |
+| **Archivieren** | Besitz, Workspace-Admins | Die Aufgabe verlässt die Liste (Session geschlossen) und bleibt im Archiv lesbar; **Wiederherstellen** holt sie zurück. |
+| **Aufgabe löschen** | Besitz, Workspace-Admins | Unterhaltung, Worktree, Datenbank und Preview werden endgültig gelöscht. Remote-Branch und Pull Request bleiben. |
+| **Folge-Aufgabe** | Admins, Mitglieder | Setzt eine abgeschlossene Aufgabe fort: gleiches Ticket, ein frischer Branch vom aktuellen Basis-Branch, ein Link zur früheren Aufgabe und eine vorbefüllte erste Nachricht, die sie zusammenfasst. |
+
+Abgeschlossene Aufgaben nehmen keine neuen Nachrichten an — starte eine
+Folge-Aufgabe, um weiterzumachen.
+
+## Aufräumen
+
+`cleanup_after_days` (Einstellungen → Ressourcen, Standard 14) nachdem eine
+Aufgabe fertig oder abgebrochen ist, entfernt Argos ihre Preview, ihren
+Worktree, ihren lokalen Branch und ihre Datenbank (täglich um 03:30,
+`argos:tasks:cleanup`). Unterhaltung, Remote-Branch und Pull Request bleiben.
+Aufgaben eines gestoppten Workspaces werden bei einem späteren Lauf
+aufgeräumt, sobald er läuft.
+
+## Benachrichtigungen
+
+Die Person, der eine Aufgabe gehört, und ihre Mitarbeitenden werden
+benachrichtigt (außer der Person, die es ausgelöst hat), je nach ihren
+Profileinstellungen:
+
+| Art | Wann |
+|---|---|
+| Claude wartet auf eine Entscheidung | eine Freigabe, ein Plan oder eine Frage erscheint |
+| Claude hat einen längeren Turn beendet | ein Turn länger als 30 Sekunden gedauert hat |
+| Ein Abo hat sein Nutzungslimit erreicht | der Agent der Aufgabe sein Limit meldet |
+| Neue Kommentare am Ticket | ein Kommentar am Ticket der Aufgabe eingegangen ist |
+| Fehler | eine Aufgabe fehlschlägt |
+| Automatische Läufe | ein Plan wartet, ein Lauf fertig ist, fehlgeschlagen ist oder sein Budget erreicht hat |
+| Jemand hat eine Aufgabe ausgeliefert | Commits gepusht wurden oder sich Pipeline, Reviews oder Zustand des Pull Requests geändert haben |
+| Eingeladen oder übergeben | du zu einer Aufgabe eingeladen wurdest oder sie dir übergeben wurde |
+
+Alles außer beendeten Turns landet auch in der Benachrichtigungsglocke. Im
+Browser erscheint eine Benachrichtigung (und ein Zähler im Tab-Titel) nur, wenn
+die betreffende Aufgabe nicht gerade vor dir offen ist; Browser-Benachrichtigungen
+erlaubst du in deinem **Profil**, wo du auch jede Art einzeln abschalten
+kannst.

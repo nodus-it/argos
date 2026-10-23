@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Middleware;
 
-use App\Models\RepoProfile;
 use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -16,59 +16,64 @@ class RedirectToOnboardingTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->actingAs(User::factory()->create());
+        $this->actingAs(User::factory()->admin()->create());
     }
 
-    public function test_dashboard_redirects_to_onboarding_when_no_profile(): void
+    public function test_dashboard_redirects_to_onboarding_when_no_workspace(): void
     {
-        $response = $this->get('/admin');
+        $response = $this->get('/');
 
-        $response->assertRedirect(route('filament.admin.pages.onboarding'));
+        $response->assertRedirect(route('filament.app.pages.setup'));
     }
 
-    public function test_tasks_index_redirects_to_onboarding_when_no_profile(): void
+    public function test_workspaces_index_redirects_to_onboarding_when_no_workspace(): void
     {
-        $response = $this->get(route('filament.admin.resources.tasks.index'));
+        $response = $this->get(route('filament.app.resources.workspaces.index'));
 
-        $response->assertRedirect(route('filament.admin.pages.onboarding'));
+        $response->assertRedirect(route('filament.app.pages.setup'));
     }
 
-    public function test_no_redirect_when_profile_exists(): void
+    public function test_no_redirect_when_workspace_exists(): void
     {
-        RepoProfile::factory()->create();
+        Workspace::factory()->create();
 
-        $response = $this->get(route('filament.admin.resources.tasks.index'));
+        $response = $this->get(route('filament.app.resources.workspaces.index'));
 
         $response->assertOk();
     }
 
     public function test_onboarding_page_itself_is_not_redirected(): void
     {
-        $response = $this->get(route('filament.admin.pages.onboarding'));
+        $response = $this->get(route('filament.app.pages.setup'));
 
         $response->assertOk();
     }
 
-    public function test_repo_profile_create_page_is_not_redirected(): void
+    public function test_workspace_create_page_is_not_redirected(): void
     {
-        $response = $this->get(route('filament.admin.resources.repo-profiles.create'));
+        $response = $this->get(route('filament.app.resources.workspaces.create'));
 
         $response->assertOk();
     }
 
     public function test_agent_credential_create_page_is_not_redirected(): void
     {
-        // Onboarding's Codex setup links to this route — the middleware must
-        // let it through even though no RepoProfile exists yet.
-        $response = $this->get(route('filament.admin.resources.agent-credentials.create'));
+        // Shared agents are managed here — the middleware must let it
+        // through even though no workspace exists yet.
+        $response = $this->get(route('filament.app.account.resources.agents.create'));
 
         $response->assertOk();
     }
 
     public function test_agent_credential_list_page_is_not_redirected(): void
     {
-        $response = $this->get(route('filament.admin.resources.agent-credentials.index'));
+        $response = $this->get(route('filament.app.account.resources.agents.index'));
 
         $response->assertOk();
+    }
+
+    public function test_the_profile_with_your_own_agents_is_reachable_before_the_first_workspace(): void
+    {
+        $this->get(route('filament.app.auth.profile'))->assertOk();
     }
 }

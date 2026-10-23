@@ -5,25 +5,26 @@ declare(strict_types=1);
 namespace App\Services\GitProvider;
 
 use App\Enums\GitProvider as GitProviderEnum;
-use App\Models\RepoProfile;
+use App\Models\Workspace;
 use App\Services\GitProvider\Contracts\GitServiceContract;
+use App\Support\RepoUrlBuilder;
 
 class GitServiceFactory
 {
     public function __construct(private readonly GitProviderRegistry $registry) {}
 
-    public function fromRepoProfile(RepoProfile $profile): GitServiceContract
+    public function forWorkspace(Workspace $workspace): GitServiceContract
     {
-        $token = $profile->resolveToken();
-        $instanceUrl = $profile->platform === GitProviderEnum::GitLab
-            ? $this->extractInstanceUrl($profile->url)
+        $token = $workspace->resolveToken();
+        $instanceUrl = $workspace->platform === GitProviderEnum::GitLab
+            ? $this->extractInstanceUrl($workspace->repo_url)
             : '';
 
-        return $this->registry->make($profile->platform->value, $token, $instanceUrl);
+        return $this->registry->make($workspace->platform->value, $token, $instanceUrl);
     }
 
     /**
-     * Build a service from a raw token, for use cases (e.g. OAuth) that have no RepoProfile yet.
+     * Build a service from a raw token, for use cases (e.g. OAuth) that have no workspace yet.
      */
     public function forPlatform(string $platform, string $token, string $instanceUrl = ''): GitServiceContract
     {
@@ -32,8 +33,6 @@ class GitServiceFactory
 
     private function extractInstanceUrl(string $repoUrl): string
     {
-        $parsed = parse_url($repoUrl);
-
-        return ($parsed['scheme'] ?? 'https').'://'.($parsed['host'] ?? 'gitlab.com');
+        return RepoUrlBuilder::instanceOf($repoUrl);
     }
 }

@@ -1,20 +1,10 @@
 <?php
 
 // Closed-deployment app — driver choices are fixed, only credentials are ENV-driven.
-// Cookie domain + secure flag are derived from APP_URL so a single APP_URL is the
-// source of truth (no separate SESSION_DOMAIN / SESSION_SECURE_COOKIE needed).
+// The secure flag is derived from APP_URL so a single APP_URL is the source of
+// truth (no separate SESSION_SECURE_COOKIE needed).
 
 $appUrl = (string) env('APP_URL', 'http://localhost');
-$appHost = parse_url($appUrl, PHP_URL_HOST) ?: 'localhost';
-
-// A leading-dot cookie domain (.example.com) lets the Argos session span demo
-// subdomains (demo-<task>.example.com) — required for session-protected demos.
-// Only valid for a real registrable domain; bare localhost / IPs / *.nip.io
-// (dev) must stay host-only (null) or browsers reject the cookie.
-$bareHost = $appHost === 'localhost'
-    || filter_var($appHost, FILTER_VALIDATE_IP) !== false
-    || str_ends_with($appHost, '.nip.io')
-    || ! str_contains($appHost, '.');
 
 return [
 
@@ -38,7 +28,7 @@ return [
 
     // Env-overridable only so Argos-deployed-as-its-own-live-demo can pick a
     // distinct name (.argos/demo.compose.yml sets SESSION_COOKIE). The main app
-    // sets a leading-dot `.{domain}` cookie that spans demo-<task>.{domain}; if
+    // sets a leading-dot `.{domain}` cookie that spans demo-ws-<slug>.{domain}; if
     // the demo is also an Argos instance it would otherwise reuse `argos_session`
     // too, the browser would send the main app's cookie to the demo, the demo
     // couldn't decrypt it (different APP_KEY) and would reset the session every
@@ -48,7 +38,10 @@ return [
 
     'path' => '/',
 
-    'domain' => env('SESSION_DOMAIN') ?: ($bareHost ? null : '.'.$appHost),
+    // Host-only: previews (demo-…) and editors (code-…) run repository and
+    // agent code on subdomains and must never receive the Argos session. Their
+    // gate uses its own per-host cookie instead.
+    'domain' => env('SESSION_DOMAIN') ?: null,
 
     'secure' => env('SESSION_SECURE_COOKIE', str_starts_with($appUrl, 'https://')),
 

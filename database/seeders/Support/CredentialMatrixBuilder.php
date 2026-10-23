@@ -20,7 +20,7 @@ use App\Models\ProviderCredential;
 final class CredentialMatrixBuilder
 {
     /**
-     * Claude active, Claude expired, Codex active, Codex revoked.
+     * Claude active, Claude expired, Claude revoked.
      *
      * @return list<AgentCredential>
      */
@@ -29,8 +29,7 @@ final class CredentialMatrixBuilder
         return [
             $this->agentCredential('Claude · Active', AgentName::ClaudeCode, AgentCredentialStatus::Active, ['token' => 'oat-demo-active']),
             $this->agentCredential('Claude · Expired', AgentName::ClaudeCode, AgentCredentialStatus::Expired, ['token' => 'oat-demo-expired']),
-            $this->agentCredential('Codex · Active', AgentName::Codex, AgentCredentialStatus::Active, ['OPENAI_API_KEY' => 'sk-demo-active']),
-            $this->agentCredential('Codex · Revoked', AgentName::Codex, AgentCredentialStatus::Revoked, ['OPENAI_API_KEY' => 'sk-demo-revoked']),
+            $this->agentCredential('Claude · Revoked', AgentName::ClaudeCode, AgentCredentialStatus::Revoked, ['token' => 'oat-demo-revoked']),
         ];
     }
 

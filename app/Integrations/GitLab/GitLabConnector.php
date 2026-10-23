@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Integrations\GitLab;
 
+use App\Support\OutboundUrlGuard;
+use App\Support\RepoUrlBuilder;
 use Saloon\Contracts\Authenticator;
 use Saloon\Http\Auth\TokenAuthenticator;
 use Saloon\Http\Connector;
+use Saloon\Http\PendingRequest;
 
 /**
  * Saloon connector for the GitLab REST API (v4).
@@ -20,12 +23,18 @@ class GitLabConnector extends Connector
 {
     public function __construct(
         private readonly string $token,
-        private readonly string $instanceUrl = 'https://gitlab.com',
+        private readonly string $instanceUrl = RepoUrlBuilder::DEFAULT_GITLAB_INSTANCE,
     ) {}
 
     public function resolveBaseUrl(): string
     {
         return rtrim($this->instanceUrl, '/').'/api/v4';
+    }
+
+    /** The URL is configured by people: never let it reach Argos' own services. */
+    public function boot(PendingRequest $pendingRequest): void
+    {
+        OutboundUrlGuard::assertAllowed($pendingRequest->getUrl());
     }
 
     protected function defaultAuth(): ?Authenticator

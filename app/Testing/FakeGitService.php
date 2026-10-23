@@ -5,16 +5,17 @@ declare(strict_types=1);
 namespace App\Testing;
 
 use App\Services\GitProvider\Contracts\GitProviderContract;
+use App\Services\GitProvider\PullRequestDetails;
 
 /**
  * Browser-E2E fake git provider: serves canonical repo/branch data so the
- * RepoProfile form's dropdowns fill in without any external API call, and
+ * workspace form's dropdowns fill in without any external API call, and
  * returns plausible PR payloads. Bound per platform by E2eFakeServiceProvider
  * (env-gated, never in production).
  *
  * The data is intentionally platform-agnostic — the suite only needs the
  * dropdowns populated and a stable default branch; which platform/agent/auth a
- * run exercises is decided by the seeded RepoProfile, not by this service.
+ * run exercises is decided by the seeded Workspace, not by this service.
  */
 class FakeGitService implements GitProviderContract
 {
@@ -22,11 +23,6 @@ class FakeGitService implements GitProviderContract
         private readonly string $providerKey = 'github',
         private readonly string $label = 'Fake Provider',
     ) {}
-
-    public function getProviderKey(): string
-    {
-        return $this->providerKey;
-    }
 
     public function label(): string
     {
@@ -104,6 +100,11 @@ class FakeGitService implements GitProviderContract
         ];
     }
 
+    public function findOpenPullRequest(string $owner, string $repo, string $headBranch): ?array
+    {
+        return null;
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -119,13 +120,51 @@ class FakeGitService implements GitProviderContract
     /**
      * @return array<string, mixed>
      */
-    public function updatePullRequest(
-        string $owner,
-        string $repo,
-        int|string $pullRequestId,
-        string $title,
-        string $body,
-    ): array {
-        return ['number' => $pullRequestId, 'title' => $title, 'body' => $body];
+    public function getPullRequest(string $owner, string $repo, int|string $pullRequestId): array
+    {
+        return ['number' => (int) $pullRequestId, 'html_url' => "https://example.test/{$owner}/{$repo}/pull/{$pullRequestId}", 'state' => 'open', 'merged' => false];
+    }
+
+    /**
+     * A healthy open PR: green checks, no conflicts, one inline review
+     * comment — enough for the review panel to render every section.
+     */
+    public function pullRequestDetails(string $owner, string $repo, int|string $number): PullRequestDetails
+    {
+        $url = "https://example.test/{$owner}/{$repo}/pull/{$number}";
+
+        return new PullRequestDetails(
+            state: PullRequestDetails::STATE_OPEN,
+            url: $url,
+            headSha: 'e2e0000000000000000000000000000000000000',
+            conflicts: false,
+            behindBase: false,
+            checks: ['state' => 'success', 'url' => "{$url}/checks", 'failed' => []],
+            reviewState: 'commented',
+            reviews: [
+                ['author' => 'e2e-reviewer', 'state' => 'commented', 'body' => 'Looks good overall.', 'submitted_at' => '2026-01-01T10:00:00Z'],
+            ],
+            comments: [
+                ['id' => '1', 'author' => 'e2e-reviewer', 'body' => 'Please add a test for this branch.', 'path' => 'app/Example.php', 'line' => 12, 'url' => "{$url}#discussion_r1", 'created_at' => '2026-01-01T10:00:00Z'],
+            ],
+            autoMerge: false,
+        );
+    }
+
+    public function markPullRequestReady(string $owner, string $repo, int|string $number): void {}
+
+    public function enableAutoMerge(string $owner, string $repo, int|string $number): bool
+    {
+        return true;
+    }
+
+    public function disableAutoMerge(string $owner, string $repo, int|string $number): bool
+    {
+        return true;
+    }
+
+    public function failedCheckLog(string $owner, string $repo, int|string $number): string
+    {
+        return '';
     }
 }

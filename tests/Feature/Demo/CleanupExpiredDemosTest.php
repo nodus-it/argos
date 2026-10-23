@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Demo;
 
 use App\Enums\DemoStatus;
-use App\Jobs\StopDemoJob;
+use App\Jobs\Workspace\StopWorkspaceDemoJob;
 use App\Models\Demo;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
@@ -28,9 +28,9 @@ class CleanupExpiredDemosTest extends TestCase
 
         $this->artisan('argos:cleanup-demos')->assertSuccessful();
 
-        Bus::assertDispatched(StopDemoJob::class, fn (StopDemoJob $j): bool => $j->taskId === $expired->task_id);
-        Bus::assertNotDispatched(StopDemoJob::class, fn (StopDemoJob $j): bool => $j->taskId === $fresh->task_id);
-        Bus::assertNotDispatched(StopDemoJob::class, fn (StopDemoJob $j): bool => $j->taskId === $expiredButStopped->task_id);
+        Bus::assertDispatched(StopWorkspaceDemoJob::class, fn (StopWorkspaceDemoJob $j): bool => $j->taskId === $expired->task_id);
+        Bus::assertNotDispatched(StopWorkspaceDemoJob::class, fn (StopWorkspaceDemoJob $j): bool => $j->taskId === $fresh->task_id);
+        Bus::assertNotDispatched(StopWorkspaceDemoJob::class, fn (StopWorkspaceDemoJob $j): bool => $j->taskId === $expiredButStopped->task_id);
     }
 
     public function test_succeeds_with_no_expired_demos(): void
@@ -40,6 +40,6 @@ class CleanupExpiredDemosTest extends TestCase
 
         $this->artisan('argos:cleanup-demos')->assertSuccessful();
 
-        Bus::assertNotDispatched(StopDemoJob::class);
+        Bus::assertNotDispatched(StopWorkspaceDemoJob::class);
     }
 }

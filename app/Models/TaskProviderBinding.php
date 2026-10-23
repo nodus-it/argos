@@ -19,7 +19,9 @@ use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
- * @property string $repo_profile_id
+ * @property string $workspace_id
+ * @property bool $close_on_merge
+ * @property string|null $callback_url
  * @property TaskProviderKind $kind
  * @property TaskProviderMode $mode
  * @property AuthMethod $auth_method
@@ -34,7 +36,7 @@ use Illuminate\Support\Carbon;
  * @property TaskProviderSyncStatus $sync_status
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
- * @property-read RepoProfile $repoProfile
+ * @property-read Workspace $workspace
  * @property-read ConnectedAccount|null $connectedAccount
  * @property-read ProviderCredential|null $providerCredential
  * @property-read Collection<int, ExternalIssueLink> $externalIssueLinks
@@ -47,7 +49,9 @@ class TaskProviderBinding extends Model
     use HasUlids;
 
     protected $fillable = [
-        'repo_profile_id',
+        'workspace_id',
+        'close_on_merge',
+        'callback_url',
         'kind',
         'mode',
         'auth_method',
@@ -70,17 +74,18 @@ class TaskProviderBinding extends Model
             'auth_method' => AuthMethod::class,
             'sync_status' => TaskProviderSyncStatus::class,
             'filters' => 'array',
+            'close_on_merge' => 'boolean',
             'webhook_secret' => 'encrypted',
             'last_polled_at' => 'datetime',
         ];
     }
 
     /**
-     * @return BelongsTo<RepoProfile, $this>
+     * @return BelongsTo<Workspace, $this>
      */
-    public function repoProfile(): BelongsTo
+    public function workspace(): BelongsTo
     {
-        return $this->belongsTo(RepoProfile::class);
+        return $this->belongsTo(Workspace::class);
     }
 
     /**

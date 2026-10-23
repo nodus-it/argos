@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Tests\Feature\Auth;
 
 use App\Models\ConnectedAccount;
-use App\Models\RepoProfile;
 use App\Models\User;
+use App\Models\Workspace;
 use App\Services\Credentials\CredentialVerification;
 use App\Services\Credentials\CredentialVerifier;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -119,7 +119,7 @@ class ConnectedAccountControllerTest extends TestCase
 
         $response = $this->get(route('auth.github.callback'));
 
-        $response->assertRedirect(route('filament.admin.pages.connected-accounts'));
+        $response->assertRedirect(route('filament.app.account.pages.connections'));
     }
 
     public function test_redirect_with_onboarding_return_sets_session_marker(): void
@@ -147,7 +147,7 @@ class ConnectedAccountControllerTest extends TestCase
 
         $response = $this->get(route('auth.github.callback'));
 
-        $response->assertRedirect(route('filament.admin.pages.onboarding'));
+        $response->assertRedirect(route('filament.app.pages.setup'));
         $this->assertNull(session('oauth.github.return'));
     }
 
@@ -160,21 +160,22 @@ class ConnectedAccountControllerTest extends TestCase
 
         $response = $this->post(route('auth.github.disconnect'));
 
-        $response->assertRedirect(route('filament.admin.pages.connected-accounts'));
+        $response->assertRedirect(route('filament.app.account.pages.connections'));
         $this->assertDatabaseMissing(ConnectedAccount::class, [
             'user_id' => $this->user->id,
             'provider' => 'github',
         ]);
     }
 
-    public function test_callback_relinks_orphaned_profiles_after_reconnect(): void
+    public function test_callback_relinks_orphaned_workspaces_after_reconnect(): void
     {
-        // Vorher verbunden, dann disconnect → Profil zeigt auf NULL
-        $orphan = RepoProfile::factory()->create([
+        // Connected before, then disconnected → the workspace points to NULL
+        $orphan = Workspace::factory()->create([
+            'created_by' => $this->user->id,
             'platform' => 'github',
             'auth_method' => 'oauth',
             'connected_account_id' => null,
-            'url' => 'https://github.com/nodus-it/repo',
+            'repo_url' => 'https://github.com/nodus-it/repo',
         ]);
 
         $this->mockSocialiteCallback($this->makeSocialiteUser());
@@ -191,7 +192,7 @@ class ConnectedAccountControllerTest extends TestCase
     {
         $response = $this->post(route('auth.github.disconnect'));
 
-        $response->assertRedirect(route('filament.admin.pages.connected-accounts'));
+        $response->assertRedirect(route('filament.app.account.pages.connections'));
         $this->assertDatabaseCount(ConnectedAccount::class, 0);
     }
 

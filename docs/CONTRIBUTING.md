@@ -19,22 +19,25 @@ Argos), see [`CLAUDE.md`](../CLAUDE.md).
 
 ```
 app/                 ← Laravel application (controllers, models, services)
-worker/              ← Bash worker (phases, libs, prompts, schemas)
-.tools/docker/       ← Dockerfiles + compose for manager and worker
+daemon/              ← Workspace daemon (TypeScript, Claude Agent SDK)
+worker/              ← Gate helpers (libs), commit-message prompt + schema
+.tools/docker/       ← Dockerfiles + compose for manager, worker and workspace
 docs/                ← User-facing docs
 tests/               ← PHP feature & unit tests
-worker/tests/        ← Bash unit + integration tests (bats)
+worker/tests/        ← Bash unit tests (bats)
 ```
 
-The Laravel app lives in the repo root. Everything under `worker/` is the
-Bash runtime that runs *inside* the worker container.
+The Laravel app lives in the repo root. `worker/lib` holds the quality-gate
+helpers that run *inside* the workspace container (via
+`.tools/docker/worker/workspace/run-gates.sh`); `daemon/` is the process that
+hosts the agent sessions there.
 
 ## Local development
 
 ### Prerequisites
 
 - Docker + Compose v2
-- PHP 8.4
+- PHP 8.5
 - Composer 2
 - Node 22+
 
@@ -57,7 +60,7 @@ composer run dev
 That spins up the compose stack (db + redis + app + nginx + queue + scheduler)
 **and** runs the Vite watcher locally. Jobs run on Laravel Horizon (Redis), so
 the `redis` service is part of the stack — no separate install needed. Open
-<http://localhost:8080/admin>.
+<http://localhost:8080>.
 
 Useful sub-commands:
 
@@ -88,14 +91,12 @@ php artisan test --compact \
 ### Bash
 
 ```bash
-./worker/tests/run-tests.sh                # everything: shellcheck + bats + integration
+./worker/tests/run-tests.sh                # everything: shellcheck + bats
 ./worker/tests/run-tests.sh --bats         # unit tests only
-./worker/tests/run-tests.sh --integration  # phase lifecycle against mock-claude
 ./worker/tests/run-tests.sh --shellcheck   # lint
 ```
 
-Tests run **offline** — no real GitHub access, no real Claude API. The mock
-implementations live under `worker/tests/fixtures/`.
+Tests run **offline** — no real GitHub access, no real Claude API.
 
 ### External provider tests
 
@@ -108,7 +109,7 @@ then run:
 composer run test:external
 ```
 
-Or use the helper that seeds three RepoProfiles per provider (PAT + OAuth)
+Or use the helper that seeds three workspaces per provider (PAT + OAuth)
 and runs both auth modes:
 
 ```bash
@@ -123,7 +124,7 @@ php artisan test:providers --reset  # clean up afterwards
 - Run `vendor/bin/pint --dirty` before finalising any change. Pint is the
   source of truth for style.
 - Filament resources follow the existing patterns under
-  `app/Filament/Admin/Resources/` — check sibling files before introducing a
+  `app/Filament/App/` (clusters `Account` and `System` for account and administration pages) — check sibling files before introducing a
   new structure.
 - Eloquent enums are preferred over string columns; new enums go under
   `app/Enums/`.
@@ -146,7 +147,7 @@ high-level rules:
 Conventional Commits style:
 
 ```
-feat: add concept replay button
+feat: add thread replay button
 fix: handle 422 from GitHub PR creation
 docs: split README into landing + extended setup
 refactor: extract StackAgentCompatibility
@@ -197,9 +198,10 @@ For non-security bugs, open an issue on
 - Argos image tag (`:latest`, `:stage`, `:next`, `vX.Y.Z`)
 - Worker image tag if relevant
 - Provider (GitHub / GitLab / Bitbucket) + auth mode (PAT / OAuth)
-- Reproduction steps and any logs from the affected task
+- Reproduction steps and any logs from the affected workspace
 
-Logs are visible per-task in the UI under **Task → Logs**.
+The agent's output is in the tasks of the workspace; the manager log can be
+downloaded under **Settings**.
 
 ## License
 

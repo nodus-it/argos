@@ -2,10 +2,10 @@
 
 Argos supports two ways of authenticating against your Git host:
 
-1. **Personal Access Token (PAT)** — paste a token per project. Works
+1. **Personal Access Token (PAT)** — paste a token per workspace. Works
    immediately, no server-side configuration.
 2. **OAuth** — register an OAuth App on the provider, add its client ID/secret
-   in the Argos UI (Configuration → OAuth Apps), and let users connect their
+   in the Argos UI (Administration → OAuth apps), and let users connect their
    own accounts.
 
 ## Which one should I pick?
@@ -15,12 +15,12 @@ Argos supports two ways of authenticating against your Git host:
 | Just trying Argos out, single user | **PAT** |
 | Solo developer, one Git host | **PAT** |
 | Multiple users, each with their own Git account | **OAuth** |
-| You want repo/branch dropdowns in the project form | **OAuth** |
+| You want repo/branch dropdowns in the workspace form | **OAuth** |
 | Self-hosted GitLab with many repos | **OAuth** |
 | Air-gapped or no public callback URL reachable from the provider | **PAT** |
 
 You can mix and match: configure OAuth for one provider and use PATs for
-another. Each project picks its own auth method at creation time.
+another. Each workspace picks its own auth method at creation time.
 
 ## What OAuth gets you
 
@@ -31,7 +31,9 @@ another. Each project picks its own auth method at creation time.
 - **Auto-default-branch** — Argos reads the repo's default branch from the
   provider when you select it.
 
-PAT projects keep working alongside OAuth projects — switching is per-project.
+PAT workspaces keep working alongside OAuth workspaces — the choice is per
+workspace. OAuth also lets Argos move a ticket's assignee to a task's new
+owner on GitHub and GitLab (the login of their connected account).
 
 ## What OAuth costs you
 
@@ -56,7 +58,7 @@ OAuth apps are managed **in the UI** — there are no `*_CLIENT_ID` /
 `*_CLIENT_SECRET` environment variables. After creating the OAuth App on the
 provider side:
 
-1. Open **Configuration → OAuth Apps** in the Argos admin.
+1. Open **Administration → OAuth apps** (`${APP_URL}/system/oauth-apps`).
 2. Add an app for the provider, paste its **client ID** and **client secret**,
    and enable it. For self-hosted GitLab, set the instance URL on the app
    itself (no `GITLAB_INSTANCE_URL` environment variable needed).
@@ -70,23 +72,21 @@ environment variables that *are* still ENV-based.
 
 ## After OAuth is configured
 
-The **Connected Accounts** page in the Argos navigation shows a "Connect"
+The **My account → Connected accounts** page (`/account/connections`) shows a "Connect"
 button for each configured provider. Once connected, the **Authentication**
-field in the project form gains an "OAuth" option that pulls repos and
+field in the workspace form gains an "OAuth" option that pulls repos and
 branches from the connected account.
 
 ## Token refresh
 
 Bitbucket and GitLab issue short-lived access tokens (~2h); GitHub OAuth Apps
 with token expiration enabled behave the same way. Argos refreshes the access
-token via the stored `refresh_token` whenever a connected account is used to
-build worker credentials and the token has less than 1h of validity left
-(`TokenRefresher::REFRESH_BUFFER_SECONDS`, sized to cover the worker's 3600s
-job timeout), so a freshly started job always begins with a token that survives
-the run.
+token via the stored `refresh_token` whenever a connected account is used — for
+example when a workspace's git asks for its repository credential — and the
+token has less than 1h of validity left (`TokenRefresher::REFRESH_BUFFER_SECONDS`),
+so a clone, fetch or push never starts with a token about to expire.
 
 If a refresh fails (revoked token, provider 4xx, missing `refresh_token`), the
-phase fails fast with a message asking you to reconnect the account. (The UI
-message is currently shown in German — "… bitte Account neu verbinden".)
-Reconnect the account on the **Connected Accounts** page to mint a fresh token
-+ refresh token pair, then re-run the task.
+git operation (or the workspace start) fails with a message asking you to
+reconnect the account. Reconnect the account under **My account → Connected accounts**
+to mint a fresh token + refresh token pair, then try again.

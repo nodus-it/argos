@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests;
 
+use App\Testing\FakeWorkspaceDaemon;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Support\Facades\Artisan;
@@ -16,7 +17,8 @@ abstract class TestCase extends BaseTestCase
     {
         parent::setUp();
         $this->ensurePassportKeys();
-        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        FakeWorkspaceDaemon::reset();
+        Filament::setCurrentPanel(Filament::getPanel('app'));
     }
 
     /**

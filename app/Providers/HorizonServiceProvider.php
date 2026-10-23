@@ -16,6 +16,7 @@ class HorizonServiceProvider extends HorizonApplicationServiceProvider
 
     protected function gate(): void
     {
-        Gate::define('viewHorizon', fn ($user = null) => $user !== null);
+        // Job payloads carry every workspace's prompts and messages: operators only.
+        Gate::define('viewHorizon', fn ($user = null) => $user !== null && Gate::forUser($user)->allows('administer-argos'));
     }
 }

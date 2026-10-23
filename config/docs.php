@@ -29,6 +29,11 @@ return [
     // up-to-date copy of every manifest page.
     'translations' => ['de'],
 
+    // Old slug => new slug: links from before a page was renamed still land.
+    'aliases' => [
+        'projects' => 'workspace-settings',
+    ],
+
     'sections' => [
         [
             'title' => 'Introduction',
@@ -40,17 +45,21 @@ return [
             'title' => 'Getting Started',
             'pages' => [
                 ['slug' => 'setup', 'title' => 'Setup', 'file' => 'SETUP.md'],
-                ['slug' => 'prepare-project', 'title' => 'Preparing a Project', 'file' => 'PREPARE-PROJECT.md'],
+                ['slug' => 'prepare-project', 'title' => 'Preparing a Repository', 'file' => 'PREPARE-PROJECT.md'],
             ],
         ],
         [
             'title' => 'Concepts',
             'pages' => [
-                ['slug' => 'projects', 'title' => 'Projects', 'file' => 'PROJECTS.md'],
-                ['slug' => 'tasks', 'title' => 'Tasks & Workflow', 'file' => 'TASKS.md'],
-                ['slug' => 'worker-stacks', 'title' => 'Worker Stacks', 'file' => 'WORKER-STACKS.md'],
+                ['slug' => 'workspaces', 'title' => 'Workspaces', 'file' => 'WORKSPACES.md'],
+                // Slug kept from the former "Projects" page (deep links); the workspace is the project now.
+                ['slug' => 'workspace-settings', 'title' => 'Workspace Settings', 'file' => 'WORKSPACE-SETTINGS.md'],
+                ['slug' => 'tasks', 'title' => 'Tasks', 'file' => 'TASKS.md'],
+                ['slug' => 'pull-requests', 'title' => 'Pull Requests', 'file' => 'PULL-REQUESTS.md'],
+                ['slug' => 'tickets', 'title' => 'Tickets', 'file' => 'TICKETS.md'],
+                ['slug' => 'worker-stacks', 'title' => 'Stacks and Images', 'file' => 'WORKER-STACKS.md'],
                 ['slug' => 'agents', 'title' => 'Agents', 'file' => 'AGENTS.md'],
-                ['slug' => 'live-demos', 'title' => 'Live Demos', 'file' => 'LIVE-DEMOS.md'],
+                ['slug' => 'live-demos', 'title' => 'Previews', 'file' => 'LIVE-DEMOS.md'],
                 ['slug' => 'byoi', 'title' => 'Custom Worker Image (BYOI)', 'file' => 'BYOI.md'],
             ],
         ],
@@ -63,7 +72,7 @@ return [
                 ['slug' => 'gitlab', 'title' => 'GitLab', 'file' => 'SETUP-GITLAB.md'],
                 ['slug' => 'bitbucket', 'title' => 'Bitbucket', 'file' => 'SETUP-BITBUCKET.md'],
                 ['slug' => 'linear', 'title' => 'Linear', 'file' => 'SETUP-LINEAR.md'],
-                ['slug' => 'task-providers', 'title' => 'Task Providers', 'file' => 'SETUP-TASK-PROVIDERS.md'],
+                ['slug' => 'task-providers', 'title' => 'Issue Triggers', 'file' => 'SETUP-TASK-PROVIDERS.md'],
             ],
         ],
         [
@@ -77,8 +86,7 @@ return [
             'title' => 'Operations',
             'pages' => [
                 ['slug' => 'configuration', 'title' => 'Configuration', 'file' => 'CONFIGURATION.md'],
-                ['slug' => 'execution-commands', 'title' => 'Worker & Demo Commands', 'file' => 'EXECUTION-COMMANDS.md'],
-                ['slug' => 'media-library', 'title' => 'Media Library', 'file' => 'SETUP-MEDIA-LIBRARY.md'],
+                ['slug' => 'execution-commands', 'title' => 'Workspace & Demo Commands', 'file' => 'EXECUTION-COMMANDS.md'],
             ],
         ],
     ],

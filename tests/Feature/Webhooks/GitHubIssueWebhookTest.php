@@ -9,16 +9,19 @@ use App\Enums\TaskProviderMode;
 use App\Enums\TaskProviderSyncStatus;
 use App\Jobs\ProcessIncomingIssueJob;
 use App\Models\ExternalIssueLink;
+use App\Models\Task;
 use App\Models\TaskProviderBinding;
 use App\Services\IssueTracker\IssueIngestService;
 use App\Services\IssueTracker\IssueTrackerRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Testing\TestResponse;
+use Tests\Support\LaunchesIssueRuns;
 use Tests\TestCase;
 
 class GitHubIssueWebhookTest extends TestCase
 {
+    use LaunchesIssueRuns;
     use RefreshDatabase;
 
     private TaskProviderBinding $binding;
@@ -36,6 +39,7 @@ class GitHubIssueWebhookTest extends TestCase
             'webhook_secret' => self::SECRET,
             'external_project_ref' => 'acme/widget',
         ]);
+        $this->prepareIssueRuns($this->binding->workspace);
     }
 
     /** @param  array<string, mixed>  $data */
@@ -110,12 +114,9 @@ class GitHubIssueWebhookTest extends TestCase
         ]);
 
         $link = ExternalIssueLink::where('task_provider_binding_id', $this->binding->id)->first();
-        $this->assertNotNull($link->task_id, 'A task should be created for the ingested issue');
+        $this->assertNotNull($link->task_id, 'A task should be launched for the ingested issue');
 
-        $this->assertDatabaseHas('tasks', [
-            'id' => $link->task_id,
-            'name' => 'Something is broken',
-        ]);
+        $this->assertStringEndsWith('Something is broken', Task::query()->findOrFail($link->task_id)->title);
     }
 
     // ── invalid signature ────────────────────────────────────────────────────

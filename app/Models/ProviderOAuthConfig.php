@@ -66,10 +66,4 @@ class ProviderOAuthConfig extends Model
         static::saved(fn () => app(OAuthConfigHydrator::class)->forgetCache());
         static::deleted(fn () => app(OAuthConfigHydrator::class)->forgetCache());
     }
-
-    /** Whether this row targets the provider's public SaaS instance. */
-    public function isPublicInstance(): bool
-    {
-        return $this->instance_url === '';
-    }
 }

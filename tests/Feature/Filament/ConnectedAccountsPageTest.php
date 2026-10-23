@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Filament;
 
-use App\Filament\Admin\Pages\ConnectedAccounts;
+use App\Filament\App\Clusters\Account;
+use App\Filament\App\Clusters\Account\Pages\ConnectedAccounts;
 use App\Models\ConnectedAccount;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -68,7 +69,7 @@ class ConnectedAccountsPageTest extends TestCase
         ]);
 
         Livewire::test(ConnectedAccounts::class)
-            ->call('disconnectGitHub')
+            ->call('disconnect', 'github')
             ->assertNotified();
 
         $this->assertDatabaseMissing(ConnectedAccount::class, [
@@ -85,13 +86,13 @@ class ConnectedAccountsPageTest extends TestCase
         ]);
 
         Livewire::test(ConnectedAccounts::class)
-            ->call('disconnectGitHub')
+            ->call('disconnect', 'github')
             ->assertNotified('GitHub connection disconnected');
     }
 
-    public function test_page_is_in_settings_navigation_group(): void
+    public function test_page_belongs_to_my_account(): void
     {
-        $this->assertSame('Configuration', ConnectedAccounts::getNavigationGroup());
+        $this->assertSame(Account::class, ConnectedAccounts::getCluster());
     }
 
     public function test_only_current_users_account_shown(): void
@@ -129,7 +130,7 @@ class ConnectedAccountsPageTest extends TestCase
         Livewire::test(ConnectedAccounts::class)
             ->assertSee(__('accounts.blade.gitlab_not_configured_description'))
             // Direct link to create the OAuth app with the provider preselected.
-            ->assertSee(route('filament.admin.resources.provider-oauth-configs.create', ['provider' => 'gitlab']), escape: false);
+            ->assertSee(route('filament.app.system.resources.oauth-apps.create', ['provider' => 'gitlab']), escape: false);
     }
 
     public function test_gitlab_section_shows_not_connected_when_configured_but_not_linked(): void
@@ -164,7 +165,7 @@ class ConnectedAccountsPageTest extends TestCase
         ]);
 
         Livewire::test(ConnectedAccounts::class)
-            ->call('disconnectGitLab')
+            ->call('disconnect', 'gitlab')
             ->assertNotified('GitLab connection disconnected');
 
         $this->assertDatabaseMissing(ConnectedAccount::class, [
@@ -224,7 +225,7 @@ class ConnectedAccountsPageTest extends TestCase
         ]);
 
         Livewire::test(ConnectedAccounts::class)
-            ->call('disconnectBitbucket')
+            ->call('disconnect', 'bitbucket')
             ->assertNotified('Bitbucket connection disconnected');
 
         $this->assertDatabaseMissing(ConnectedAccount::class, [
@@ -248,7 +249,7 @@ class ConnectedAccountsPageTest extends TestCase
         ]);
 
         Livewire::test(ConnectedAccounts::class)
-            ->call('disconnectBitbucket');
+            ->call('disconnect', 'bitbucket');
 
         $this->assertDatabaseMissing(ConnectedAccount::class, [
             'user_id' => $this->user->id,

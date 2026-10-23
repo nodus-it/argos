@@ -1,306 +1,266 @@
-# Task-Provider-Integration (Issue-Tracker)
+# Issue-Trigger
 
-Argos kann ein Projekt mit einem externen Issue-Tracker verbinden. Neue Issues
-werden als Argos-Tasks importiert, Argos schreibt seine Phasenergebnisse als
-Kommentare zurück auf das Quell-Issue, eine autorisierte 👍-Reaktion auf den
-Konzept-Kommentar startet die Implement-Phase, und — sofern du dich dafür
-entscheidest — wird das Quell-Issue geschlossen, sobald der Task fertig ist.
+Ein Workspace kann mit einem Issue-Tracker verbunden werden. Seine Issues
+lassen sich dann als [Tickets](TICKETS.md) von Aufgaben auswählen, und ein
+neues passendes Issue startet von selbst eine **automatische Aufgabe** im
+Workspace: Claude plant, setzt um, behebt fehlschlagende Quality-Gates und
+öffnet einen Pull Request. Argos berichtet unterwegs am Issue, schließt es beim
+Merge, wenn die Integration das vorsieht, und ein autorisiertes 👍 auf den
+Plan-Kommentar gibt den Plan frei.
 
-Diese Seite richtet sich an Betreiber, die einen Issue-Tracker mit einem
-Argos-Projekt verdrahten. Sie setzt voraus, dass die Provider-Verbindung
-(OAuth oder ein Personal Access Token) bereits besteht; das
-provider-spezifische Setup wird in den unten verlinkten Anleitungen behandelt.
+Diese Seite richtet sich an Workspace-Admins, die einen Tracker mit einem
+Workspace verdrahten. Sie setzt voraus, dass die Provider-Verbindung (OAuth
+oder ein Personal Access Token) bereits besteht; siehe die Provider-Anleitungen
+unten. Eigene Ticket-Systeme (REST + signierter Webhook) sind unter
+[Tickets → Eigene Ticket-Systeme](TICKETS.md#eigene-ticket-systeme) beschrieben.
 
 ## Inhalt
 
-- [Unterstützte Provider](#supported-providers)
-- [Wie die Integration funktioniert](#how-the-integration-works)
-- [Voraussetzungen](#prerequisites)
-- [Ein Binding erstellen](#creating-a-binding)
-- [Webhook-Modus](#webhook-mode)
-- [Poll-Modus](#poll-mode)
-- [Issue zu Task](#issue-to-task)
-- [Konzept-Rückschreibung und das Approve-Gate](#concept-write-back-and-the-approve-gate)
-- [Status-Sync beim Abschluss](#status-sync-on-completion)
-- [Filterung](#filtering)
-- [Umgebungsvariablen](#environment-variables)
-- [Fehlerbehebung](#troubleshooting)
+- [Unterstützte Provider](#unterstutzte-provider)
+- [Wie die Integration funktioniert](#wie-die-integration-funktioniert)
+- [Voraussetzungen](#voraussetzungen)
+- [Eine Integration anlegen](#eine-integration-anlegen)
+- [Webhook-Modus](#webhook-modus)
+- [Poll-Modus](#poll-modus)
+- [Vom Issue zur automatischen Aufgabe](#vom-issue-zur-automatischen-aufgabe)
+- [Kommentare und Plan-Freigabe](#kommentare-und-plan-freigabe)
+- [Filterung](#filterung)
+- [Umgebungsvariablen](#umgebungsvariablen)
+- [Fehlerbehebung](#fehlerbehebung)
 
 ## Unterstützte Provider
-
-Als Task-Provider (Issue-Ingest, Rückschreibung, Approve-Gate, Status-Sync):
 
 - **GitHub** — siehe [SETUP-GITHUB.md](SETUP-GITHUB.md)
 - **GitLab** (inklusive self-hosted) — siehe [SETUP-GITLAB.md](SETUP-GITLAB.md)
 - **Linear** — siehe [SETUP-LINEAR.md](SETUP-LINEAR.md)
+- **Eigenes System** — Aufgaben kommen über die REST API herein, Events gehen
+  als signierter Webhook hinaus; siehe [Tickets](TICKETS.md#eigene-ticket-systeme).
 
-Bitbucket lässt sich als *Code*-Provider mit Argos verbinden
-([SETUP-BITBUCKET.md](SETUP-BITBUCKET.md)), ist aber **nicht** als Task-Provider
-verdrahtet — im Binding-Formular gibt es keine Bitbucket-Option, und
-Webhook-Registrierung / Signaturprüfung sind dafür nicht implementiert. Erwarte
-keinen Issue-Ingest aus Bitbucket.
+Bitbucket kann das Repository eines Workspaces hosten
+([SETUP-BITBUCKET.md](SETUP-BITBUCKET.md)), steht aber **nicht** als
+Issue-Tracker zur Verfügung — im Integrationsformular gibt es keine
+Bitbucket-Option.
 
 ## Wie die Integration funktioniert
 
-Von Ende zu Ende erledigt ein Task-Provider vier Dinge:
+Eine Integration gehört zu einem Workspace und zeigt auf ein externes Projekt
+(GitHub-/GitLab-Repository) oder Team (Linear). Sie erledigt vier Dinge:
 
-1. **Ingest** — ein neues Issue (per Webhook empfangen oder vom Poller
-   abgeholt), das den Filtern des Bindings entspricht, wird zu einem neuen
-   Argos-Task.
-2. **Rückschreibung** — wenn eine Argos-Phase abgeschlossen ist, schreibt Argos
-   einen Kommentar auf das Quell-Issue mit dem Phasenergebnis (Konzepttext,
-   Implement-Zusammenfassung oder den Pull-/Merge-Request-Link).
-3. **Approve-Gate** — wenn die Konzept-Phase abgeschlossen ist, ist der
-   Konzept-Kommentar die Review-Oberfläche. Eine autorisierte 👍-Reaktion auf
-   diesen Kommentar startet die Implement-Phase. Reaktionen werden von den
-   Providern nicht gepusht, daher pollt Argos danach.
-4. **Status-Sync** (opt-in) — wenn der Argos-Task als abgeschlossen markiert
-   wird, wird das Quell-Issue geschlossen/aufgelöst.
+1. **Tickets** — die offenen Issues lassen sich aus Aufgaben heraus auswählen,
+   verknüpfen und anlegen (dafür wird die erste aktive Integration des
+   Workspaces genutzt).
+2. **Ingest** — ein neues Issue (per Webhook empfangen oder vom Poller
+   abgeholt), das den Filtern entspricht, startet eine automatische Aufgabe im
+   Workspace, einmal pro Issue.
+3. **Rückmeldung** — Argos kommentiert am Issue: Aufgabe gestartet, Plan
+   wartet, Pull Request, Lauf fehlgeschlagen oder Budget aufgebraucht, fertig
+   oder abgebrochen; neue Kommentare am Issue erscheinen in der Aufgabe. Siehe
+   [Tickets](TICKETS.md#was-am-ticket-ankommt).
+4. **Plan-Freigabe** — mit der Plan-Einstellung *auf Freigabe warten* gibt ein
+   autorisiertes 👍 auf den Plan-Kommentar den Plan frei. Reaktionen werden von
+   den Providern nicht gepusht, daher pollt Argos danach.
 
-Jedes Binding gehört zu einem Projekt (Repo Profile) und zeigt auf ein externes
-Projekt/Team. Die Verbindung zwischen einem importierten Task und seinem
-Quell-Issue wird als *External Issue Link* festgehalten — dieser Datensatz trägt
-die Task-ID, die Konzept-Kommentar-ID und den letzten Sync-Zeitstempel.
+Die Verbindung zwischen einem Issue und seiner Aufgabe wird als *External
+Issue Link* festgehalten.
 
 ## Voraussetzungen
 
-- Eine Provider-Verbindung für den Provider des Projekts — entweder ein
-  **Connected Account** (OAuth) oder ein gespeicherter **Access Token (PAT)**.
-  Siehe die Provider-Anleitung: [SETUP-GITHUB.md](SETUP-GITHUB.md),
-  [SETUP-GITLAB.md](SETUP-GITLAB.md) oder [SETUP-LINEAR.md](SETUP-LINEAR.md).
-- Das Projekt (**Repo Profile**) muss in Argos bereits existieren.
-- Der Scheduler muss für den Poll-Modus und das Approve-Gate laufen — sowohl
-  das Issue-Polling als auch die Konzept-Freigabe-Prüfung laufen über Laravels
-  Schedule (siehe [Poll-Modus](#poll-mode)).
+- Eine Provider-Verbindung — ein **Connected Account** (OAuth) oder ein
+  gespeicherter **Access Token (PAT)**. Siehe
+  [SETUP-GITHUB.md](SETUP-GITHUB.md), [SETUP-GITLAB.md](SETUP-GITLAB.md) oder
+  [SETUP-LINEAR.md](SETUP-LINEAR.md).
+- Der Workspace und ein **Automatik-Nutzer** in seinen Einstellungen
+  (Einstellungen → Automatik), es sei denn, jede zugewiesene Person hat
+  zugestimmt, ihre Aufgaben selbst zu übernehmen (siehe
+  [Vom Issue zur automatischen Aufgabe](#vom-issue-zur-automatischen-aufgabe)).
+- Ein laufender Scheduler — für den Poll-Modus, die Plan-Freigabe und die
+  Ticket-Kommentare.
 
 Die OAuth-Scopes, die du für GitHub (`repo`) und GitLab (`api`) ohnehin
-vergibst, decken die Webhook-Verwaltung ab, sodass für den Webhook-Modus kein
-zusätzlicher Scope nötig ist. Für Linear erfordert das Registrieren eines
-Webhooks ein Organisationsmitglied mit ausreichenden Berechtigungen; siehe
-[SETUP-LINEAR.md](SETUP-LINEAR.md).
+vergibst, decken die Webhook-Verwaltung ab. Für Linear erfordert das
+Registrieren eines Webhooks ein Organisationsmitglied mit ausreichenden
+Berechtigungen; siehe [SETUP-LINEAR.md](SETUP-LINEAR.md).
 
-## Ein Binding erstellen
+## Eine Integration anlegen
 
-1. Öffne im Admin-Panel das Projekt unter **Repo Profiles**.
-2. Öffne den Tab **Task-Provider** → **Create**.
+1. Öffne die **Einstellungen → Integrationen** des Workspaces
+   (Workspace-Admins und Argos-Admins).
+2. Wähle unter **Issue-Tracker** die Aktion **Erstellen**.
 3. Fülle die Felder aus:
 
 | Feld | Beschreibung |
 |---|---|
-| **Provider** | GitHub, GitLab oder Linear |
-| **Modus** (Mode) | `Webhook (Push)`, `Polling` oder `Deaktiviert` (Disabled) |
-| **Zugang** (Credential) | Das OAuth-Konto **oder** der gespeicherte Access Token (PAT) für diesen Provider |
-| **Projekt / Team** | Das externe Projekt/Team. Wird automatisch aus dem gewählten Credential geladen. GitHub/GitLab: ein Repository (`owner/repo`); Linear: ein Team |
-| **Labels-Filter** | Optional: Nur Issues, die mindestens eines dieser Labels tragen, werden importiert |
-| **Issue schließen bei Task-Abschluss** | Optionaler Schalter: das Quell-Issue schließen, wenn der Argos-Task abgeschlossen wird ([Status-Sync](#status-sync-on-completion)) |
+| **Provider** | GitHub, GitLab, Linear oder Eigenes System |
+| **Modus** | *Webhook (Push)*, *Polling* oder *Deaktiviert* |
+| **Zugang** | Das OAuth-Konto **oder** der gespeicherte Access Token (PAT) für diesen Provider |
+| **Projekt / Team** | Wird aus dem gewählten Zugang geladen. GitHub/GitLab: ein Repository (`owner/repo`); Linear: ein Team |
+| **Labels-Filter** | Optional: Nur Issues, die mindestens eines dieser Labels tragen, starten eine Aufgabe |
+| **Ticket beim Merge schließen** | Standardmäßig an; siehe [Schließen beim Merge](TICKETS.md#schliessen-beim-merge) |
 
-4. Speichern → das Binding wird im Status **Pending** angelegt.
-5. Führe die Aktion **Einrichten** (Setup) in der Binding-Zeile aus → das
-   Binding wird aktiviert (Status **Active**).
+4. Speichern → die Integration wird im Status **Ausstehend** angelegt.
+5. Führe **Einrichten** in ihrer Zeile aus → die Integration wird **Aktiv**.
 
-Die Setup-Aktion verhält sich je nach Modus unterschiedlich:
+**Einrichten** je Modus:
 
-- **Polling** — markiert das Binding sofort als **Active**; kein
-  Provider-API-Aufruf.
-- **Webhook (Push)** — erzeugt ein Webhook-Secret, registriert den Webhook beim
-  Provider, speichert die zurückgegebene Webhook-ID + das Secret und markiert
-  das Binding als **Active**. Schlägt die Registrierung fehl, wird der Fehler in
-  **Letzter Fehler** (Last error) festgehalten und das Binding bleibt Pending.
-- **Deaktiviert** — setzt das Binding zurück auf Pending und löscht eine etwaige
-  gespeicherte Webhook-ID/-Secret.
+- **Polling** — markiert die Integration als **Aktiv**; kein Provider-Aufruf.
+- **Webhook (Push)** — erzeugt ein Webhook-Secret, registriert den Webhook
+  beim Provider, speichert seine ID + das Secret und markiert die Integration
+  als **Aktiv**. Schlägt die Registrierung fehl, steht der Fehler in **Letzter
+  Fehler**, und sie bleibt Ausstehend.
+- **Deaktiviert** — setzt sie zurück auf Ausstehend und löscht einen
+  gespeicherten Webhook.
 
-> Hinweis: Die Beschriftungen des Binding-Formulars im Admin-Panel sind derzeit
-> auf Deutsch (Provider, Modus, Zugang, Projekt / Team, Labels-Filter). Die
-> Provider-Werte entsprechen GitHub / GitLab / Linear.
+Binde die Integration bei GitHub und GitLab an das **eigene Repository des
+Workspaces**, wenn Pull Requests dessen Issues schließen sollen (`Closes #`
+bezieht sich nur auf Issues im Repository des Pull Requests).
 
 ## Webhook-Modus
 
 Der Webhook-Modus liefert Issues in Echtzeit. Der eingehende Endpunkt ist eine
 einzelne, session-lose Route; die Anfrage wird über die Signatur des Providers
-authentifiziert, geprüft im Controller:
+authentifiziert:
 
 ```
-POST  ${APP_URL}/webhooks/issues/{provider}/{binding-id}
+POST  ${APP_URL}/webhooks/issues/{provider}/{integration-id}
 ```
 
-`{provider}` ist `github`, `gitlab` oder `linear`; `{binding-id}` ist die ID des
-Bindings. `APP_URL` muss öffentlich erreichbar sein, damit der Provider
-ausliefern kann.
+`{provider}` ist `github`, `gitlab` oder `linear`. `APP_URL` muss öffentlich
+erreichbar sein, damit der Provider ausliefern kann.
 
-Für **GitHub** und **GitLab** registriert die Setup-Aktion den Webhook
-automatisch über die API für dich — normalerweise fügst du ihn nicht manuell
-hinzu. Für **Linear** registriert Setup automatisch einen
-Organisations-Webhook für `Issue`-Ressourcen; in der Linear-UI ist kein
-manueller Schritt nötig.
-
-Wenn du den Webhook von Hand registrieren musst (z. B. weil eine Org-Policy die
-API-Registrierung blockiert), verwende diese Werte. Das Secret ist das von Setup
-erzeugte und am Binding gespeicherte.
+**Einrichten** registriert den Webhook für dich (GitHub und GitLab pro
+Repository, Linear als Organisations-Webhook für `Issue`-Ressourcen). Um ihn
+von Hand zu registrieren (z. B. weil eine Org-Policy die API-Registrierung
+blockiert), verwende das von **Einrichten** gespeicherte Secret:
 
 **GitHub** — Repository → Settings → Webhooks → Add webhook:
 
-- Payload URL: `${APP_URL}/webhooks/issues/github/<binding-id>`
+- Payload URL: `${APP_URL}/webhooks/issues/github/<integration-id>`
 - Content type: `application/json`
-- Secret: das erzeugte Secret (verifiziert über den `X-Hub-Signature-256`
-  HMAC-SHA256-Header)
-- Events: **Issues** (Argos akzeptiert auch `issue_comment`; andere
-  Event-Typen werden bestätigt und ignoriert, damit GitHub keinen Retry macht)
+- Secret: das erzeugte Secret (verifiziert über `X-Hub-Signature-256`)
+- Events: **Issues** (Argos akzeptiert auch `issue_comment`; andere Events
+  werden bestätigt und ignoriert)
 
 **GitLab** — Project → Settings → Webhooks:
 
-- URL: `${APP_URL}/webhooks/issues/gitlab/<binding-id>`
-- Secret token: das erzeugte Secret (zurückgesendet und abgeglichen gegen den
-  `X-Gitlab-Token`-Header)
+- URL: `${APP_URL}/webhooks/issues/gitlab/<integration-id>`
+- Secret token: das erzeugte Secret (abgeglichen gegen `X-Gitlab-Token`)
 - Trigger: **Issues events**
 
-**Linear** — wird während Setup automatisch registriert; kein manueller Schritt
-nötig:
+**Linear** — wird automatisch registriert:
 
-- URL: `${APP_URL}/webhooks/issues/linear/<binding-id>`
-- Signatur: roher HMAC-SHA256-Hex-Digest im `Linear-Signature`-Header
+- URL: `${APP_URL}/webhooks/issues/linear/<integration-id>`
+- Signatur: roher HMAC-SHA256-Hex-Digest in `Linear-Signature`
 
 Auslieferungen werden anhand der Delivery-ID des Providers
 (`X-GitHub-Delivery` / `X-Gitlab-Event-UUID` / `Linear-Delivery`) für 24 h
-dedupliziert, sodass ein Provider-Retry keinen doppelten Task erzeugt.
+dedupliziert.
 
 ## Poll-Modus
 
-Im Poll-Modus holt Argos Issues nach einem Zeitplan ab, statt Pushes zu
-empfangen. Im externen System wird kein Webhook registriert, und `APP_URL` muss
-nicht öffentlich erreichbar sein.
-
-Der Scheduler stößt für jedes **aktive Binding im Poll-Modus** über den Befehl
-`argos:poll-issues` einen Poll-Job an. Das Intervall ist über
-`ARGOS_POLL_INTERVAL_MINUTES` konfigurierbar (Standard **5**, begrenzt auf
-**1–59**). Setze es lokal auf `1` für schnelles Feedback.
-
-Dasselbe Intervall steuert auch die Konzept-Freigabe-Prüfung
-(`argos:check-concept-approvals`), denn Reaktionen werden nie gepusht — siehe
-[das Approve-Gate](#concept-write-back-and-the-approve-gate).
-
-Manuelle Auslöser:
+Argos holt Issues stattdessen nach einem Zeitplan ab; es wird kein Webhook
+registriert, und `APP_URL` muss nicht öffentlich sein. Der Scheduler pollt
+jede **aktive Integration im Poll-Modus** (`argos:poll-issues`) alle
+`ARGOS_POLL_INTERVAL_MINUTES` (Standard **5**, begrenzt auf **1–59**).
+Dasselbe Intervall steuert die Plan-Freigabe-Prüfung
+(`argos:check-plan-approvals`) und die Ticket-Kommentare
+(`argos:tasks:sync-ticket-comments`).
 
 ```bash
 php artisan argos:poll-issues
-php artisan argos:check-concept-approvals
+php artisan argos:check-plan-approvals
 ```
 
-## Issue zu Task
+## Vom Issue zur automatischen Aufgabe
 
-Wenn ein passendes Issue zum ersten Mal gesehen wird, legt Argos einen Task auf
-dem Projekt des Bindings an:
+Wird ein passendes Issue zum ersten Mal gesehen, startet Argos eine
+automatische Aufgabe im Workspace der Integration:
 
-- Der **Name** des Tasks ist der Issue-Titel; die **Beschreibung** ist der
-  Issue-Body.
-- Wenn das Projekt (Repo Profile) **Auto-Concept** aktiviert hat, startet die
-  Konzept-Phase für den neuen Task automatisch; andernfalls wartet der Task auf
-  einen manuellen Start.
+- Die Aufgabe trägt den Titel des Issues und ist mit ihm als Ticket verknüpft;
+  ihr Branch folgt dem Branch-Muster des Workspaces, standardmäßig
+  `<ticket key>-<title>` (z. B. `github-42-fix-login`, `eng-118-fix-login`).
+- Der Prompt besteht aus Titel, Text und Link des Issues, markiert als nicht
+  vertrauenswürdige Eingabe.
+- Plan-Modus, Auslieferungs-Modus und Budgets kommen aus **Einstellungen →
+  Automatik**.
+- **Besitz:** die dem Issue zugewiesene Person, wenn sie Admin oder Mitglied
+  im Workspace ist, ein nutzbares Claude-Abo hat und in ihrem Profil
+  zugestimmt hat (*Mir zugewiesene Issues dürfen automatisch auf meinem Abo
+  starten*); sonst der **Automatik-Nutzer** des Workspaces, und die
+  zugewiesene Person wird als Mitarbeitende eingeladen. Ohne beides startet
+  nichts, und **Letzter Fehler** sagt das.
 
-Der Import erfolgt „einmalig, für immer" pro Issue: Der External Issue Link
-hält fest, dass das Issue importiert wurde. Ein Issue, das zuerst *nicht*
-passend gesehen und erst später gelabelt wird, importiert bei einem späteren
-Poll/einer späteren Auslieferung trotzdem, aber ein importierter Task, den du in
-Argos *löschst*, wird **nicht** stillschweigend erneut importiert.
+Der Start erfolgt „einmalig, für immer“ pro Issue: Ein Issue, das zuerst
+*nicht* passend gesehen und später gelabelt wird, startet trotzdem eine
+Aufgabe, aber eine Aufgabe, die du *löschst*, wird **nicht** neu angelegt.
+Kann die Aufgabe nicht starten (kein nutzbarer Agent, zu viele laufende
+Workspaces), versucht es der nächste Poll oder die nächste Auslieferung
+erneut.
 
-## Konzept-Rückschreibung und das Approve-Gate
+## Kommentare und Plan-Freigabe
 
-Nach Abschluss jeder Phase schreibt Argos einen Kommentar auf das verknüpfte
-Issue. Der Kommentar trägt eine Überschrift plus das Phasenergebnis:
+Argos kommentiert am Issue wie unter
+[Tickets → Was am Ticket ankommt](TICKETS.md#was-am-ticket-ankommt)
+beschrieben. Schlägt das Posten fehl (z. B. ein abgelaufener Token), wird der
+Fehler protokolliert und die Aufgabe läuft weiter.
 
-- **concept** — der vollständige Konzepttext (gekappt unter die
-  Kommentar-Größenlimits des Providers), zur Review direkt am Issue.
-- **implement** — die Ergebniszusammenfassung (nicht-technischer +
-  technischer Abschnitt).
-- **push** — der Pull-/Merge-Request-Link.
+**Plan-Freigabe.** Mit *Planen, dann auf Freigabe warten* wird der Plan als
+Kommentar gepostet. Findet die Plan-Freigabe-Prüfung darauf ein 👍 (`+1` /
+`thumbsup` / `👍`) von einer Person, die **zur Freigabe autorisiert** ist,
+läuft der Lauf weiter. Du kannst auch in Argos, über die REST API oder per MCP
+freigeben.
 
-Jeder Kommentar endet mit einem Link zurück nach Argos. Schlägt das Posten fehl
-(z. B. ein abgelaufener Token), wird der Fehler protokolliert und der Workflow
-fährt fort.
-
-> Der Kommentartext wird derzeit auf Deutsch gerendert, zum Beispiel:
-> `**Argos** — Phase **Concept** abgeschlossen mit Status: **Completed**`.
-
-**Approve-Gate.** Wenn der Konzept-Kommentar gepostet wird, speichert Argos
-dessen Kommentar-ID. Während der Task in **Concept Review** ist, pollt die
-Konzept-Freigabe-Prüfung diesen Kommentar auf Reaktionen. Findet sie ein 👍
-(`+1` / `thumbsup` / `👍`) von einem Benutzer, der **zur Freigabe autorisiert**
-ist, startet sie die Implement-Phase.
-
-„Autorisiert" ist provider-spezifisch:
-
-- **GitHub / GitLab** — der reagierende Benutzer hat Write-/Admin-Zugriff auf
+- **GitHub / GitLab** — die reagierende Person hat Write-/Admin-Zugriff auf
   das Repository.
 - **Linear** — ein aktives Organisationsmitglied, das kein Gast ist.
 
-Das Gate ist idempotent: Der Start von Implement bewegt den Task aus Concept
-Review heraus, sodass ein zweites 👍 ein No-op ist. Die Prüfung läuft auf
-demselben Zeitplan wie das Polling (`ARGOS_POLL_INTERVAL_MINUTES`); sie
-erfordert, dass der Scheduler auch im Webhook-Modus läuft, da Provider keine
+Die Prüfung braucht den Scheduler auch im Webhook-Modus, da Provider keine
 Reaktions-Events pushen.
-
-## Status-Sync beim Abschluss
-
-Der Status-Sync ist **opt-in pro Binding** über den Schalter **Issue schließen
-bei Task-Abschluss** (das Filter-Flag `close_on_complete`). Wenn aktiviert und
-der Argos-Task als abgeschlossen markiert wird, tut Argos:
-
-1. Postet einen Abschluss-Kommentar mit dem Pull-Request-Link (falls vorhanden),
-   dann
-2. Schließt/löst das Quell-Issue auf.
-
-Dies ist Best-Effort: Ein Provider-Fehler wird protokolliert und blockiert nie
-den Abschluss des Tasks in Argos. Mit ausgeschaltetem Schalter bleibt der Ingest
-rein eingehend und das Quell-Issue wird unangetastet gelassen.
 
 ## Filterung
 
-Die Filterung wird vor dem Ingest angewendet:
+- **Labels-Filter** — ODER-Semantik: Ein Issue startet nur dann eine Aufgabe,
+  wenn es mindestens eines der Labels trägt. Ohne Labels passieren alle
+  Issues.
+- Ein Filter auf den **Status** des Issues (z. B. nur offene Issues) wird
+  daneben gespeichert.
 
-- **Labels-Filter** — ODER-Semantik: Ein Issue wird nur importiert, wenn es
-  mindestens eines der konfigurierten Labels trägt. Sind keine Labels
-  konfiguriert, passieren alle Issues den Label-Filter.
-- Ein Binding kann auch nach dem **Status** des Issues filtern (z. B. nur
-  offene Issues), gespeichert neben den übrigen Filtern.
-
-Ein Issue, das die Filter nicht passiert, erhält trotzdem einen External Issue
-Link (damit sein zuletzt gesehener Zustand verfolgt wird), aber es wird kein
-Task erstellt.
+Ein Issue, das die Filter nicht passiert, bekommt trotzdem einen External
+Issue Link (damit sein Zustand verfolgt wird), aber es startet keine Aufgabe.
+Das Auswählen von Issues als Tickets in der UI ist von den Filtern nicht
+betroffen.
 
 ## Umgebungsvariablen
 
-Für das Binding selbst werden keine Provider-Secrets über env konfiguriert — das
-Credential kommt aus dem gewählten OAuth-Konto oder PAT. Die relevanten
-Variablen sind:
+Das Credential kommt aus dem gewählten OAuth-Konto oder PAT. Relevant sind:
 
 ```env
-# Base URL — also the base of the inbound webhook URL.
-# Must be publicly reachable when webhook mode is used.
+# Base of the inbound webhook URL; must be public for webhook mode.
 APP_URL=https://argos.example.com
 
-# How often (minutes) the scheduler polls issue providers and checks
-# concept-comment reactions. Default 5; clamped to 1–59. Set to 1 locally.
+# Poll interval (minutes) for issues, plan reactions and ticket comments. 1–59.
 ARGOS_POLL_INTERVAL_MINUTES=5
 ```
 
-Der Scheduler (`php artisan schedule:work` oder ein System-Cron-Eintrag, der
-`schedule:run` ausführt) muss aktiv sein, damit der Poll-Modus und das
-Approve-Gate funktionieren.
+Der Scheduler (`php artisan schedule:work` oder ein Cron-Eintrag, der
+`schedule:run` ausführt) muss aktiv sein.
 
 ## Fehlerbehebung
 
-- **Setup schlägt fehl / Binding bleibt Pending** — lies **Letzter Fehler**
-  (Last error) in der Binding-Zeile. Häufige Ursachen: dem Credential fehlt die
-  Webhook-Berechtigung, oder `APP_URL` ist für den Provider zur Validierung
-  nicht erreichbar.
-- **Im Poll-Modus erscheinen keine Tasks** — stelle sicher, dass der Scheduler
-  läuft und das Binding **Active** ist; prüfe, dass der **Labels-Filter** die
-  Issues nicht ausschließt. Die Spalte **Letzter Poll** (Last poll) zeigt, wann
-  das Binding zuletzt abgeholt wurde.
+- **Einrichten schlägt fehl / Integration bleibt Ausstehend** — lies
+  **Letzter Fehler**. Häufige Ursachen: dem Credential fehlt die
+  Webhook-Berechtigung, oder `APP_URL` ist nicht erreichbar.
+- **Es starten keine Aufgaben** — prüfe, dass der Scheduler läuft
+  (Poll-Modus), die Integration **Aktiv** ist, der Workspace einen
+  **Automatik-Nutzer** mit nutzbarem Agenten hat (oder die zugewiesene Person
+  zugestimmt hat) und der **Labels-Filter** die Issues nicht ausschließt.
+  **Letzter Poll** zeigt, wann zuletzt abgeholt wurde.
 - **Webhook-Auslieferungen abgelehnt (401)** — Signatur/Secret stimmen nicht
-  überein. Führe **Einrichten** erneut aus, um das Secret neu zu erzeugen und
-  erneut zu registrieren, oder kopiere bei einem manuellen Webhook das exakt
-  gespeicherte Secret in den Provider.
-- **👍 startet Implement nicht** — der Task muss in **Concept Review** sein, die
-  Reaktion muss 👍 sein, der reagierende Benutzer muss autorisiert sein
-  (Repo-Write/-Admin oder Linear-Mitglied ohne Gast-Status), und der Scheduler
-  muss die Freigabe-Prüfung ausführen.
+  überein. Führe **Einrichten** erneut aus oder kopiere das gespeicherte
+  Secret in den Provider.
+- **👍 gibt den Plan nicht frei** — die Aufgabe muss auf Freigabe warten, die
+  Reaktion muss ein 👍 auf dem Plan-Kommentar von Argos sein, die reagierende
+  Person muss autorisiert sein, und der Scheduler muss die Freigabe-Prüfung
+  ausführen.
+- **Das Issue wird beim Merge nicht geschlossen** — *Ticket beim Merge
+  schließen* ist aus, oder (GitHub/GitLab) das Issue liegt in einem anderen
+  Repository als der Pull Request.

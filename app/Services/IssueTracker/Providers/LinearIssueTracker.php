@@ -7,6 +7,7 @@ namespace App\Services\IssueTracker\Providers;
 use App\Integrations\Linear\LinearConnector;
 use App\Integrations\Linear\Requests\GraphQLRequest;
 use App\Services\IssueTracker\Contracts\IssueTrackerContract;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 class LinearIssueTracker implements IssueTrackerContract
@@ -50,11 +51,13 @@ class LinearIssueTracker implements IssueTrackerContract
                 issues(filter: $filter, first: 250) {
                     nodes {
                         id
+                        identifier
                         title
                         description
                         url
                         state { name }
                         labels { nodes { name } }
+                        assignee { email name }
                     }
                 }
             }
@@ -79,11 +82,13 @@ class LinearIssueTracker implements IssueTrackerContract
             query GetIssue($id: String!) {
                 issue(id: $id) {
                     id
+                    identifier
                     title
                     description
                     url
                     state { name }
                     labels { nodes { name } }
+                    assignee { email name }
                     comments {
                         nodes {
                             id
@@ -120,6 +125,131 @@ class LinearIssueTracker implements IssueTrackerContract
         ]);
 
         return $result['data']['commentCreate'] ?? [];
+    }
+
+    public function createIssue(string $owner, string $project, string $title, string $body): array
+    {
+        // $owner carries the team key (e.g. 'ENG'); $project is empty for Linear.
+        $teamId = $this->resolveTeamId($owner);
+
+        $result = $this->graphql('
+            mutation CreateIssue($input: IssueCreateInput!) {
+                issueCreate(input: $input) {
+                    success
+                    issue {
+                        id
+                        identifier
+                        title
+                        description
+                        url
+                        state { name }
+                        labels { nodes { name } }
+                        assignee { email name }
+                    }
+                }
+            }
+        ', [
+            'input' => [
+                'teamId' => $teamId,
+                'title' => $title,
+                'description' => $body,
+            ],
+        ]);
+
+        $issue = $result['data']['issueCreate']['issue'] ?? null;
+        if (($result['data']['issueCreate']['success'] ?? false) !== true || ! is_array($issue)) {
+            throw new RuntimeException("Linear issue could not be created in team: {$owner}");
+        }
+
+        return $this->normalizeIssue($issue);
+    }
+
+    public function listComments(string $owner, string $project, int|string $issueNumber): array
+    {
+        // $issueNumber is the Linear issue UUID.
+        $result = $this->graphql('
+            query IssueComments($id: String!) {
+                issue(id: $id) {
+                    comments(first: 250) {
+                        nodes {
+                            id
+                            body
+                            createdAt
+                            url
+                            user { name displayName }
+                        }
+                    }
+                }
+            }
+        ', ['id' => (string) $issueNumber]);
+
+        $nodes = $result['data']['issue']['comments']['nodes'] ?? [];
+
+        $out = [];
+        foreach (is_array($nodes) ? $nodes : [] as $node) {
+            if (! is_array($node)) {
+                continue;
+            }
+            $user = is_array($node['user'] ?? null) ? $node['user'] : [];
+            $displayName = (string) ($user['displayName'] ?? '');
+            $out[] = [
+                'id' => (string) ($node['id'] ?? ''),
+                'author' => $displayName !== '' ? $displayName : (string) ($user['name'] ?? ''),
+                'body' => (string) ($node['body'] ?? ''),
+                'created_at' => isset($node['createdAt']) ? (string) $node['createdAt'] : null,
+                'url' => isset($node['url']) ? (string) $node['url'] : null,
+            ];
+        }
+
+        usort($out, fn (array $a, array $b): int => strcmp((string) $a['created_at'], (string) $b['created_at']));
+
+        return $out;
+    }
+
+    /**
+     * $assignee is the person's e-mail address; Linear addresses users by id,
+     * so it is resolved first.
+     */
+    public function assignIssue(string $owner, string $project, int|string $issueNumber, string $assignee): bool
+    {
+        $context = ['provider' => 'linear', 'issue' => (string) $issueNumber, 'assignee' => $assignee];
+
+        try {
+            $users = $this->graphql('
+                query UserByEmail($email: String!) {
+                    users(filter: { email: { eq: $email } }) {
+                        nodes { id }
+                    }
+                }
+            ', ['email' => $assignee]);
+
+            $userId = $users['data']['users']['nodes'][0]['id'] ?? null;
+            if (! is_string($userId) || $userId === '') {
+                Log::channel('argos')->info('Issue assignee not found', $context);
+
+                return false;
+            }
+
+            $result = $this->graphql('
+                mutation AssignIssue($id: String!, $assigneeId: String!) {
+                    issueUpdate(id: $id, input: { assigneeId: $assigneeId }) {
+                        success
+                    }
+                }
+            ', ['id' => (string) $issueNumber, 'assigneeId' => $userId]);
+
+            if (($result['data']['issueUpdate']['success'] ?? false) !== true) {
+                Log::channel('argos')->info('Issue assignment refused', $context);
+
+                return false;
+            }
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::channel('argos')->info('Issue assignment failed', [...$context, 'error' => $e->getMessage()]);
+
+            return false;
+        }
     }
 
     public function closeIssue(string $owner, string $project, int|string $issueNumber): void
@@ -310,7 +440,8 @@ class LinearIssueTracker implements IssueTrackerContract
 
     /**
      * Map a raw Linear issue node to the canonical array format understood
-     * by IssueIngestService: id, html_url, title, body, state, labels.
+     * by IssueIngestService: id, html_url, title, body, state, labels — plus
+     * identifier and assignee when the source carries them.
      *
      * Handles both API list/getIssue nodes (labels under 'labels.nodes')
      * and webhook data payloads (labels as flat array).
@@ -330,7 +461,7 @@ class LinearIssueTracker implements IssueTrackerContract
             array_filter((array) $rawLabels, fn (mixed $l): bool => is_array($l)),
         ));
 
-        return [
+        $issue = [
             'id' => (string) ($data['id'] ?? ''),
             'html_url' => (string) ($data['url'] ?? ''),
             'title' => (string) ($data['title'] ?? ''),
@@ -338,6 +469,18 @@ class LinearIssueTracker implements IssueTrackerContract
             'state' => $stateName,
             'labels' => $labels,
         ];
+
+        // Human-readable key ("ENG-118") → ExternalIssue::$key.
+        if (is_string($data['identifier'] ?? null) && $data['identifier'] !== '') {
+            $issue['identifier'] = $data['identifier'];
+        }
+
+        // {email, name} → ExternalIssue::$assignee (e-mail).
+        if (is_array($data['assignee'] ?? null)) {
+            $issue['assignee'] = $data['assignee'];
+        }
+
+        return $issue;
     }
 
     /**

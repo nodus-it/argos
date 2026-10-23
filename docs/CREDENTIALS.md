@@ -10,7 +10,7 @@ This document is about the first one — **Provider Credentials, i.e. Personal
 Access Tokens (PATs)**. The OAuth side is covered in [OAUTH.md](OAUTH.md).
 
 > Provider credentials are *not* the same as agent credentials (the
-> Claude/Codex token the worker uses to think). Those are configured
+> Claude token the agent runs on). Those are configured
 > separately — see [AGENTS.md](AGENTS.md).
 
 ## Contents
@@ -22,7 +22,7 @@ Access Tokens (PATs)**. The OAuth side is covered in [OAUTH.md](OAUTH.md).
   - [Self-hosted instances](#self-hosted-instances)
   - [Test connection](#test-connection)
 - [Security](#security)
-- [How a project uses a credential](#how-a-project-uses-a-credential)
+- [How a workspace uses a credential](#how-a-workspace-uses-a-credential)
 - [How an issue tracker uses a credential](#how-an-issue-tracker-uses-a-credential)
 - [Expiry, rotation, and status](#expiry-rotation-and-status)
 
@@ -47,8 +47,8 @@ Quick decision pointer:
 - **Use OAuth** when you'd rather log in interactively and let Argos handle
   token refresh for you. See [OAUTH.md](OAUTH.md).
 
-You do not have to pick one globally — each project and each issue-tracker
-binding chooses its own credential source independently, and a PAT and an
+You do not have to pick one globally — each workspace and each issue-tracker
+integration chooses its own credential source independently, and a PAT and an
 OAuth account can coexist for the same provider.
 
 ## What a provider credential is
@@ -74,11 +74,11 @@ for that provider is needed.
 
 ## Adding a credential
 
-Provider credentials are managed in the admin panel under the **Configuration**
-navigation group, on the **Access Tokens** page:
+Provider credentials are managed by Argos administrators under
+**Administration → Access tokens**:
 
 ```
-${APP_URL}/admin/provider-credentials
+${APP_URL}/system/tokens
 ```
 
 You can also create one during onboarding — in the authorize/repository step,
@@ -149,25 +149,28 @@ show.
 - The token field in the form is masked (revealable on demand) so it isn't
   shown in plain text by default.
 
-## How a project uses a credential
+## How a workspace uses a credential
 
-When you create a project (RepoProfile), you choose a **token source** for the
-repository — either an OAuth account or a stored Access Token. If you pick a
-PAT, its token and platform are used to set up the project's git
-authentication, with the project's auth method recorded as `pat`. At run time
-the worker resolves the project's token from that PAT (OAuth projects instead
-resolve — and refresh — the token from their Connected Account).
+A workspace's repository access is either an **OAuth account** or a **PAT**
+(auth method `pat`). In the workspace form you paste the PAT directly; the
+onboarding wizard can also pick one of your stored Access Tokens, whose token
+is then copied into the workspace. That access clones, pushes the task
+branches and opens and reads the pull requests of **every** task in the
+workspace (OAuth workspaces resolve — and refresh — the token from their
+Connected Account). A copied token does not follow later changes of the
+stored credential — renew it in the workspace's settings (General →
+**Repository access**).
 
-For the full project-authentication walkthrough, see
-[PROJECTS.md](PROJECTS.md).
+For the workspace form, see [Workspace Settings](WORKSPACE-SETTINGS.md).
 
 ## How an issue tracker uses a credential
 
-When you attach an issue tracker to a project (a task-provider binding), the
-**Access** picker lets you choose either a connected OAuth account or one of
-your stored Access Tokens for that provider, in one unified list. If you choose
-a PAT, the binding references that credential directly, and the issue tracker
-(reading issues, writing back) authenticates with it.
+When you add an issue tracker to a workspace (Settings → Integrations →
+Issue trackers), the **Access** picker lets you choose either a connected
+OAuth account or one of your stored Access Tokens for that provider, in one
+unified list. If you choose a PAT, the integration references that credential
+directly, and the issue tracker (reading issues, comments, closing,
+assignees) authenticates with it — so a rotated token applies right away.
 
 This is why the set of providers a credential can serve is deliberately broad:
 a single credential can apply to both the git role (clone/push/PR) and the
@@ -189,5 +192,5 @@ Consequently, **rotation is manual**:
   confirmed the token worked — use **Test connection** to refresh it after a
   rotation.
 
-If a token expires or is revoked at the provider, the next run that uses it
+If a token expires or is revoked at the provider, the next call that uses it
 will fail to authenticate; re-test or replace the token to recover.

@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Models\ConnectedAccount;
-use App\Models\RepoProfile;
 use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -32,14 +32,14 @@ class TestProvidersCommandTest extends TestCase
         ]);
 
         // Profile that should be deleted: name starts with [contract-test].
-        RepoProfile::factory()->create([
+        Workspace::factory()->create([
             'name' => '[contract-test] github-pat',
             'platform' => 'github',
             'auth_method' => 'pat',
             'token' => 'pat',
             'connected_account_id' => null,
         ]);
-        RepoProfile::factory()->create([
+        Workspace::factory()->create([
             'name' => '[contract-test] github-oauth',
             'platform' => 'github',
             'auth_method' => 'oauth',
@@ -48,7 +48,7 @@ class TestProvidersCommandTest extends TestCase
         ]);
 
         // Profile that must not be touched (different name).
-        $kept = RepoProfile::factory()->create([
+        $kept = Workspace::factory()->create([
             'name' => 'My Real Project',
             'platform' => 'github',
             'auth_method' => 'pat',
@@ -59,9 +59,9 @@ class TestProvidersCommandTest extends TestCase
             ->expectsOutputToContain('Reset: 2 Profile, 1 ConnectedAccounts gelöscht.')
             ->assertExitCode(0);
 
-        $this->assertDatabaseHas(RepoProfile::class, ['id' => $kept->id]);
+        $this->assertDatabaseHas(Workspace::class, ['id' => $kept->id]);
         $this->assertDatabaseMissing(ConnectedAccount::class, ['id' => $contractAccount->id]);
-        $this->assertSame(0, RepoProfile::where('name', 'like', '[contract-test]%')->count());
+        $this->assertSame(0, Workspace::where('name', 'like', '[contract-test]%')->count());
     }
 
     public function test_unknown_user_email_returns_failure(): void

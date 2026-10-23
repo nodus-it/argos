@@ -5,9 +5,8 @@ declare(strict_types=1);
 namespace App\Enums;
 
 /**
- * Backing services Argos can boot for a project — as ephemeral sidecars for a
- * worker phase run AND (unified) for the live demo. One private network per
- * run, torn down afterwards.
+ * Backing services Argos can boot for a project — as sidecars of a workspace
+ * AND (unified) for the live demo. One private network per workspace.
  *
  * The enum is the *catalog*: image, readiness probe, the fixed network alias,
  * and the env-key shapes. The concrete coordinate VALUES (host, port,
@@ -113,6 +112,18 @@ enum BackingService: string
                 'MARIADB_ROOT_PASSWORD' => $c['password'],
             ],
             self::Redis => [],
+        };
+    }
+
+    /**
+     * Data directory inside the service image; persistent workspace
+     * sidecars mount a named volume here so data survives an idle stop.
+     */
+    public function dataPath(): string
+    {
+        return match ($this) {
+            self::Mysql => '/var/lib/mysql',
+            self::Redis => '/data',
         };
     }
 

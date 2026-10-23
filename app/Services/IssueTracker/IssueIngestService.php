@@ -4,28 +4,66 @@ declare(strict_types=1);
 
 namespace App\Services\IssueTracker;
 
-use App\Events\Integration\NewIssueFoundEvent;
+use App\Enums\Capability;
+use App\Enums\TaskOrigin;
+use App\Enums\TaskProviderKind;
+use App\Models\ConnectedAccount;
 use App\Models\ExternalIssueLink;
-use App\Models\Task;
 use App\Models\TaskProviderBinding;
+use App\Models\User;
+use App\Models\Workspace;
 use App\Services\IssueTracker\DTO\ExternalIssue;
-use App\Services\Task\TaskService;
-use Illuminate\Support\Facades\Event;
+use App\Services\Workspace\AgentPool;
+use App\Services\Workspace\AutoRunService;
+use App\Services\Workspace\TaskMembershipService;
+use App\Services\Workspace\WorkspaceException;
+use App\Services\Workspace\WorkspaceIssueService;
+use Illuminate\Support\Facades\Log;
 
 final class IssueIngestService
 {
     public function __construct(
-        private readonly TaskService $taskService,
         private readonly IssueFilterMatcher $filters,
         private readonly IssueSignature $signatures,
+        private readonly AutoRunService $runs,
+        private readonly WorkspaceIssueService $issues,
+        private readonly AgentPool $pool,
+        private readonly TaskMembershipService $members,
     ) {}
+
+    /** The Argos person behind the issue's assignee (connected account login, or e-mail for Linear). */
+    private function assigneeUser(ExternalIssue $issue, TaskProviderBinding $binding): ?User
+    {
+        if ($issue->assignee === null || $issue->assignee === '') {
+            return null;
+        }
+        if ($binding->kind === TaskProviderKind::Linear) {
+            return User::query()->where('email', $issue->assignee)->first();
+        }
+        $provider = $binding->kind->providerKey();
+
+        return $provider === null ? null : ConnectedAccount::query()
+            ->where('provider', $provider)
+            ->where('nickname', $issue->assignee)
+            ->first()?->user;
+    }
+
+    /** May own a task in the workspace and has a subscription to run it on. */
+    private function mayRunOn(User $user, Workspace $workspace): bool
+    {
+        return ($workspace->roleOf($user)?->grants(Capability::TaskCreate) ?? false)
+            && $this->pool->usableAgentsFor($user)->isNotEmpty();
+    }
 
     /**
      * Process a normalized issue for the given binding.
      *
-     * Creates or updates the corresponding ExternalIssueLink, and optionally
-     * creates a new Task when a matching issue is seen for the first time.
-     * Returns the ExternalIssueLink (new or updated).
+     * Creates or updates the ExternalIssueLink and, the first time an issue
+     * matches the binding's filters, starts an automatic task in the
+     * binding's workspace. It belongs to the issue's assignee when they agreed
+     * to run automatic tasks on their subscription (profile), otherwise to
+     * the workspace's automation user with the assignee invited. Returns the
+     * link.
      */
     public function ingest(ExternalIssue $issue, TaskProviderBinding $binding): ExternalIssueLink
     {
@@ -40,47 +78,50 @@ final class IssueIngestService
         $link->last_synced_at = now();
         $link->signature = $signature;
 
-        if (! $this->filters->passes($issue, $binding)) {
+        // Launch once, ever: a task someone deleted is not re-created on
+        // the next poll; an issue first seen not matching (labelled later)
+        // still launches.
+        if (! $this->filters->passes($issue, $binding) || $link->launched_at !== null) {
             $link->save();
 
             return $link;
         }
 
-        // Import once, ever. task_imported_at (not task_id) is the gate: an
-        // issue first seen NOT matching, then labelled later, still imports;
-        // but a task the user deleted (task_id nulled, marker kept) is never
-        // silently re-imported on the next poll.
-        $importedTask = null;
-        if ($link->task_imported_at === null) {
-            $importedTask = $this->createTaskFromIssue($issue, $binding);
-            $link->task_id = $importedTask->id;
-            $link->task_imported_at = now();
+        $workspace = $binding->workspace;
+        $assignee = $workspace !== null ? $this->assigneeUser($issue, $binding) : null;
+        $actor = $assignee !== null && $assignee->auto_task_consent && $this->mayRunOn($assignee, $workspace)
+            ? $assignee
+            : $workspace?->automationUser;
+        if ($workspace === null || $actor === null) {
+            // Nothing to act for — the binding shows why; the issue launches
+            // once an automation user is set.
+            $binding->forceFill(['last_error' => __('workspaces.issue.run.no_automation_user')])->save();
+            $link->save();
+
+            return $link;
         }
 
+        // Saved first: the run may report back (plan comment) before launch() returns.
+        $link->save();
+        $data = $this->issues->fromExternal($issue, $binding);
+        try {
+            $task = $this->runs->launch($actor, $workspace, $this->issues->promptFor($data), ['issue' => $data], [], TaskOrigin::Issue);
+        } catch (WorkspaceException $e) {
+            // No agent, capacity reached …: retried on the next poll.
+            Log::channel('argos')->info('Issue run could not start', ['binding' => $binding->id, 'issue' => $issue->externalId, 'error' => $e->getMessage()]);
+            $link->save();
+
+            return $link;
+        }
+
+        if ($assignee !== null && $assignee->id !== $actor->id && $workspace->roleOf($assignee) !== null) {
+            rescue(fn () => $this->members->invite($task, $actor, $assignee), report: false);
+        }
+
+        $link->task_id = $task->id;
+        $link->launched_at = now();
         $link->save();
 
-        // Fan-out/audit seam — fired only on the first import, after the link is
-        // persisted, so the core ingest stays idempotent regardless of listeners.
-        if ($importedTask !== null) {
-            Event::dispatch(new NewIssueFoundEvent($binding, $issue, $importedTask));
-        }
-
         return $link;
-    }
-
-    private function createTaskFromIssue(ExternalIssue $issue, TaskProviderBinding $binding): Task
-    {
-        $title = $issue->title !== '' ? $issue->title : 'Imported issue';
-        $body = $issue->body !== '' ? $issue->body : $title;
-
-        $profile = $binding->repoProfile;
-        $autoConcept = $profile?->auto_concept ?? false;
-
-        return $this->taskService->createTask([
-            'name' => $title,
-            'description' => $body,
-            'repo_profile_id' => $binding->repo_profile_id,
-            'auto_concept' => $autoConcept,
-        ]);
     }
 }

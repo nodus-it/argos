@@ -43,11 +43,20 @@ return [
      * ARGOS_SOURCE_URL.
      */
     'source_url' => env('ARGOS_SOURCE_URL', 'https://github.com/nodus-it/argos'),
+    /*
+     * Where "Send feedback" leads (a beta's own tracker or chat channel).
+     * Empty: the upstream issue chooser. A GitHub/GitLab ".../issues/new"
+     * link is prefilled with version and page.
+     */
+    'feedback_url' => env('ARGOS_FEEDBACK_URL', ''),
     'config_dir' => env('ARGOS_CONFIG_DIR', (getenv('HOME') ?: ($_SERVER['HOME'] ?? posix_getpwuid(posix_getuid())['dir'])).'/.config/argos'),
-    'admin_password' => env('ADMIN_PASSWORD') ?: '12345',
+    // Password of the first administrator on a fresh installation. Only dev
+    // and tests fall back to a known one; production must set ADMIN_PASSWORD
+    // (the installer generates it).
+    'admin_password' => env('ADMIN_PASSWORD') ?: (in_array(env('APP_ENV', 'production'), ['local', 'testing'], true) ? '12345' : null),
     /*
      * Local one-click developer login (filament-developer-logins). Only ever
-     * active in the `local` environment — the AdminPanelProvider gates the
+     * active in the `local` environment — the panel (ConfiguresArgosPanel) gates the
      * plugin on app()->environment('local'), so this email is meaningless in
      * staging/production. Matches the demo seeders' admin so the button works
      * out of the box after a dev reset.
@@ -55,7 +64,7 @@ return [
     'dev_login_email' => env('SEED_USER_EMAIL', 'admin@argos.local'),
     /*
      * How often (minutes) the scheduler polls issue providers and checks
-     * concept-comment reactions. Default 5 keeps API usage low at scale; set
+     * plan-comment reactions. Default 5 keeps API usage low at scale; set
      * ARGOS_POLL_INTERVAL_MINUTES=1 locally for fast feedback. Clamped to 1–59.
      */
     'poll_interval_minutes' => max(1, min(59, (int) env('ARGOS_POLL_INTERVAL_MINUTES', 5))),
@@ -76,16 +85,11 @@ return [
         'bitbucket_ref' => env('SEED_BITBUCKET_REF') ?: null,
         'linear_team' => env('SEED_LINEAR_TEAM') ?: null,
     ],
-    'docker' => [
-        'memory_limit' => env('ARGOS_MEM_LIMIT', '4g'),
-        'cpu_limit' => env('ARGOS_CPU_LIMIT', '2'),
-    ],
     /*
-     * Backing services Argos can boot alongside a worker phase run as ephemeral
-     * sidecars (one private network per run, torn down afterwards) so a
-     * project's tests can talk to a real MySQL/Redis. A repo profile opts in per
-     * service; only the test-running phases start them. See
-     * App\Enums\BackingService and App\Services\Workflow\WorkerSidecarManager.
+     * Backing services Argos boots alongside a workspace as sidecars (one
+     * private network per workspace) so a project's tests can talk to a real
+     * MySQL/Redis. A repo profile opts in per service. See
+     * App\Enums\BackingService and App\Services\Worker\WorkerSidecarManager.
      */
     'worker' => [
         'services' => [
@@ -100,23 +104,22 @@ return [
     ],
     /*
      * Compose-pipeline settings. The WorkerImageResolver consults
-     * `compose.default_stack` when neither the task nor the repo profile
-     * pins a stack; this is the slug of a row in `worker_stacks`, populated
+     * `compose.default_stack` when the repo profile pins no stack; this is the slug of a row in `worker_stacks`, populated
      * from the built-in manifest by BuiltinSync on every `migrate`.
      */
     'compose' => [
-        'default_stack' => env('ARGOS_DEFAULT_STACK', 'php-8.4'),
+        'default_stack' => env('ARGOS_DEFAULT_STACK', 'php-8.5'),
     ],
 
-    // Live-Demo (P6): ephemeral per-task demo deployments, routed by Traefik
-    // under their own subdomain. See docs/backlog/live-demo-concept.md.
+    // Live previews of workspaces, routed by Traefik under their own
+    // subdomain and guarded by the workspace gate. See docs/LIVE-DEMOS.md.
     'preview' => [
         // On by default — a project's own `live_demo_enabled` toggle is the real
         // per-project gate, so this only governs whether the platform *can*
         // deploy demos at all. Operators without preview infra (Traefik +
         // argos_edge + a base domain) can opt out with ARGOS_PREVIEW_ENABLED=false.
         'enabled' => (bool) env('ARGOS_PREVIEW_ENABLED', true),
-        // Demos live at demo-{task}.{base_domain}. Defaults to the APP_URL host
+        // Demos live at demo-ws-{slug}.{base_domain}. Defaults to the APP_URL host
         // (demos as subdomains of the app); locally that host has no wildcard
         // DNS, so fall back to nip.io (*.127.0.0.1.nip.io → 127.0.0.1).
         'base_domain' => env('ARGOS_PREVIEW_BASE_DOMAIN') ?: ($bareHost ? '127.0.0.1.nip.io' : $appHost),
@@ -130,22 +133,6 @@ return [
         'scheme' => env('ARGOS_PREVIEW_SCHEME') ?: $appScheme,
         'port' => (int) $envOr('ARGOS_PREVIEW_PORT', $envOr('ARGOS_PORT', 8080)),
         'ttl_hours' => (int) $envOr('ARGOS_PREVIEW_TTL_HOURS', 24),
-        // Stack-wide default access protection for demos whose task is set to
-        // "inherit" (the default). One of: none | session | basic.
-        //   none    — public, anyone with the URL
-        //   session — Argos login required (Traefik forwardAuth → the gate below)
-        //   basic   — shared HTTP Basic credentials
-        // Per-task overrides (tasks.demo_access_mode) win over this default.
-        'auth' => $envOr('ARGOS_PREVIEW_AUTH', 'none'),
-        // HTTP Basic username for basic-protected demos. The password is either
-        // per-task (generated when a task is switched to basic) or this global
-        // fallback for tasks that merely inherit the basic default.
-        'basic_user' => $envOr('ARGOS_PREVIEW_BASIC_USER', 'demo'),
-        'basic_password' => env('ARGOS_PREVIEW_BASIC_PASSWORD') ?: null,
-        // Internal URL Traefik's forwardAuth middleware calls to validate the
-        // Argos session for session-protected demos. Points at the in-stack
-        // nginx that fronts the app; reachable from Traefik on the default net.
-        'auth_gate_url' => $envOr('ARGOS_PREVIEW_AUTH_GATE_URL', 'http://nginx:80/_argos/demo-gate'),
         // External Docker network shared with Traefik (defined in docker-compose.yml).
         'network' => $envOr('ARGOS_PREVIEW_NETWORK', 'argos_edge'),
         // Shared volume where the manager writes one Traefik file-provider route
@@ -153,7 +140,7 @@ return [
         // docker-compose.yml.
         'traefik_dir' => env('ARGOS_TRAEFIK_DIR', '/data/traefik'),
         // Cap on concurrently running demos. When a new deploy would exceed it,
-        // the oldest running demos of other tasks are evicted (logged) to make
+        // the oldest running demos of other workspaces are evicted (logged) to make
         // room. 0 disables the cap.
         'max_concurrent' => (int) $envOr('ARGOS_PREVIEW_MAX_CONCURRENT', 10),
         // Per-demo resource limits (separate from the worker limits — demos run
@@ -168,6 +155,54 @@ return [
     ],
 
     /*
+     * Interactive workspaces: a long-lived container per workspace running the
+     * workspace daemon (daemon/) and OpenVSCode Server. See docs/WORKSPACES.md.
+     */
+    'workspaces' => [
+        // Value behind the `workspace-collaboration` gate (pair programming:
+        // members besides the owner). Redefine the gate for finer control.
+        'collaboration' => filter_var($envOr('ARGOS_WORKSPACE_COLLABORATION', true), FILTER_VALIDATE_BOOLEAN),
+        // Cap on concurrently running workspace containers. Starting beyond it
+        // is refused — running workspaces are never evicted.
+        'max_active' => (int) $envOr('ARGOS_WORKSPACE_MAX_ACTIVE', 5),
+        // Stop idle workspaces (container only; volumes stay) after this many
+        // minutes without activity and without a busy task.
+        'idle_minutes' => (int) $envOr('ARGOS_WORKSPACE_IDLE_MINUTES', 60),
+        'cpus' => (string) $envOr('ARGOS_WORKSPACE_CPUS', '2'),
+        'memory' => (string) $envOr('ARGOS_WORKSPACE_MEMORY', '4g'),
+        // Process limit per workspace container (fork bombs stay inside).
+        'pids_limit' => (int) $envOr('ARGOS_WORKSPACE_PIDS_LIMIT', 4096),
+        // Memory of each backing-service container (MySQL, Redis) of a workspace.
+        'sidecar_memory' => (string) $envOr('ARGOS_WORKSPACE_SIDECAR_MEMORY', '1g'),
+        // Base URL the daemon uses to reach the manager on the argos_ws network.
+        'internal_url' => rtrim((string) $envOr('ARGOS_INTERNAL_URL', 'http://nginx'), '/'),
+        // Docker network shared by the manager and workspace containers.
+        'network' => $envOr('ARGOS_WORKSPACE_NETWORK', 'argos_ws'),
+        // forwardAuth target guarding code-<slug> (editor) and workspace demos.
+        'gate_url' => $envOr('ARGOS_WORKSPACE_GATE_URL', 'http://nginx:80/_argos/workspace-gate'),
+        // Lifetime of the editor access cookie set on code-<slug> hosts.
+        'editor_cookie_hours' => (int) $envOr('ARGOS_WORKSPACE_EDITOR_COOKIE_HOURS', 12),
+        // How often open pull requests of workspaces are re-read (minutes).
+        'pr_sync_minutes' => (int) $envOr('ARGOS_WORKSPACE_PR_SYNC_MINUTES', 3),
+        // Upload limit per image attached to a task message (MB).
+        'upload_max_mb' => (int) $envOr('ARGOS_WORKSPACE_UPLOAD_MAX_MB', 5),
+        // Defaults for auto-tasks; a project overrides them in its settings,
+        // a single run (UI/API/MCP) overrides the project.
+        'auto' => [
+            'plan' => (string) $envOr('ARGOS_AUTO_PLAN', 'auto'),
+            'ship' => (string) $envOr('ARGOS_AUTO_SHIP', 'pr'),
+            'max_fix_rounds' => (int) $envOr('ARGOS_AUTO_MAX_FIX_ROUNDS', 3),
+            'max_turns' => (int) $envOr('ARGOS_AUTO_MAX_TURNS', 60),
+            // 0 = no cost limit (subscriptions are flat; the agent's usage limit applies).
+            'max_cost_usd' => (float) $envOr('ARGOS_AUTO_MAX_COST_USD', 0),
+            'max_minutes' => (int) $envOr('ARGOS_AUTO_MAX_MINUTES', 120),
+        ],
+        'daemon_port' => 7777,
+        'editor_port' => 3000,
+        'openvscode_version' => $envOr('ARGOS_OPENVSCODE_VERSION', '1.109.5'),
+    ],
+
+    /*
      * Set inside an Argos live-demo container (DemoDeployer injects ARGOS_DEMO=1
      * into the entry service). DatabaseSeeder reads this to seed the full demo
      * profile instead of the production-safe admin-only seed, so Argos' own live
@@ -177,34 +212,30 @@ return [
         'enabled' => filter_var($envOr('ARGOS_DEMO', false), FILTER_VALIDATE_BOOLEAN),
     ],
 
-    'concept' => [
-        'max_turns_default' => (int) env('ARGOS_CONCEPT_MAX_TURNS_DEFAULT', 50),
-    ],
-    'implement' => [
-        'max_turns_default' => (int) env('ARGOS_MAX_TURNS_DEFAULT', 200),
-    ],
     'factories' => [
         'github_token' => env('GITHUB_TOKEN', 'test-token'),
     ],
 
     /*
-     * Public documentation URLs surfaced from in-app help hints. Centralising
-     * them here keeps every "Learn more" link in a single place — when the
-     * docs move or get a versioned URL, change it once.
+     * External pages the in-app help hints link to (token pages of the
+     * providers, Claude's setup). Argos' own docs are linked in-app through
+     * App\Support\DocLink.
      */
     'docs' => [
-        'base' => 'https://github.com/nodus-it/argos/blob/master/docs',
-        'setup' => 'https://github.com/nodus-it/argos/blob/master/docs/SETUP.md',
-        'configuration' => 'https://github.com/nodus-it/argos/blob/master/docs/CONFIGURATION.md',
-        'oauth' => 'https://github.com/nodus-it/argos/blob/master/docs/OAUTH.md',
-        'setup_github' => 'https://github.com/nodus-it/argos/blob/master/docs/SETUP-GITHUB.md',
-        'setup_gitlab' => 'https://github.com/nodus-it/argos/blob/master/docs/SETUP-GITLAB.md',
-        'setup_bitbucket' => 'https://github.com/nodus-it/argos/blob/master/docs/SETUP-BITBUCKET.md',
-        'setup_linear' => 'https://github.com/nodus-it/argos/blob/master/docs/SETUP-LINEAR.md',
-        'contributing' => 'https://github.com/nodus-it/argos/blob/master/docs/CONTRIBUTING.md',
         'github_pat' => 'https://github.com/settings/tokens',
         'gitlab_pat' => 'https://gitlab.com/-/user_settings/personal_access_tokens',
         'bitbucket_pat' => 'https://support.atlassian.com/bitbucket-cloud/docs/repository-access-tokens/',
         'claude_setup_token' => 'https://docs.claude.com/en/docs/claude-code/quickstart',
+    ],
+
+    /*
+     * Top-level paths the app uses itself. A workspace lives at `/{slug}`,
+     * so these can never be a workspace slug (a clashing name gets `-2`).
+     */
+    'reserved_slugs' => [
+        'account', 'admin', 'api', 'auth', 'broadcasting', 'docs', 'email-verification', 'filament',
+        'filament-developer-logins', 'horizon', 'internal', 'login', 'logout', 'mcp', 'my-work', 'new',
+        'oauth', 'password-reset', 'profile', 'register', 'sanctum', 'setup', 'storage', 'system', 'tasks',
+        'up', 'users', 'w', 'webhooks', 'workspaces',
     ],
 ];

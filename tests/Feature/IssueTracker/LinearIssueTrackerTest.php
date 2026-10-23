@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature\IssueTracker;
 
+use App\Enums\TaskProviderKind;
+use App\Services\IssueTracker\DTO\ExternalIssue;
 use App\Services\IssueTracker\Providers\LinearIssueTracker;
 use Saloon\Http\Faking\MockResponse;
 use Saloon\Http\Request;
@@ -402,5 +404,141 @@ class LinearIssueTrackerTest extends TestCase
                 ],
             ],
         ];
+    }
+
+    // ── createIssue / listComments / assignIssue ─────────────────────────────
+
+    public function test_create_issue_creates_in_resolved_team_and_returns_normalized_issue(): void
+    {
+        Saloon::fake([
+            MockResponse::make($this->teamResponse()),
+            MockResponse::make(['data' => ['issueCreate' => [
+                'success' => true,
+                'issue' => [
+                    'id' => 'issue-uuid-9',
+                    'identifier' => 'ENG-9',
+                    'title' => 'New bug',
+                    'description' => 'Steps…',
+                    'url' => 'https://linear.app/eng/issue/ENG-9',
+                    'state' => ['name' => 'Todo'],
+                    'labels' => ['nodes' => []],
+                    'assignee' => null,
+                ],
+            ]]]),
+        ]);
+
+        $raw = $this->tracker->createIssue(self::TEAM_KEY, '', 'New bug', 'Steps…');
+
+        $issue = ExternalIssue::fromProvider($raw, TaskProviderKind::Linear);
+        $this->assertSame('issue-uuid-9', $issue->externalId);
+        $this->assertSame('ENG-9', $issue->key);
+        $this->assertSame('https://linear.app/eng/issue/ENG-9', $issue->url);
+        $this->assertSame('Steps…', $issue->body);
+        $this->assertNull($issue->assignee);
+
+        Saloon::assertSent(function (Request $request): bool {
+            $body = $request->body()->all();
+
+            return str_contains((string) ($body['query'] ?? ''), 'issueCreate')
+                && ($body['variables']['input'] ?? null) === ['teamId' => self::TEAM_ID, 'title' => 'New bug', 'description' => 'Steps…'];
+        });
+    }
+
+    public function test_create_issue_throws_when_linear_reports_failure(): void
+    {
+        Saloon::fake([
+            MockResponse::make($this->teamResponse()),
+            MockResponse::make(['data' => ['issueCreate' => ['success' => false, 'issue' => null]]]),
+        ]);
+
+        $this->expectException(\RuntimeException::class);
+
+        $this->tracker->createIssue(self::TEAM_KEY, '', 'New bug', '');
+    }
+
+    public function test_list_comments_uses_display_name_and_orders_oldest_first(): void
+    {
+        Saloon::fake([
+            'https://api.linear.app/graphql' => MockResponse::make(['data' => ['issue' => ['comments' => ['nodes' => [
+                ['id' => 'c2', 'body' => 'second', 'createdAt' => '2026-01-02T00:00:00.000Z', 'url' => 'https://linear.app/c2', 'user' => ['name' => 'Bob Builder', 'displayName' => 'bob']],
+                ['id' => 'c1', 'body' => 'first', 'createdAt' => '2026-01-01T00:00:00.000Z', 'url' => 'https://linear.app/c1', 'user' => ['name' => 'Alice A', 'displayName' => '']],
+            ]]]]]),
+        ]);
+
+        $comments = $this->tracker->listComments('', '', 'issue-uuid-1');
+
+        $this->assertSame([
+            ['id' => 'c1', 'author' => 'Alice A', 'body' => 'first', 'created_at' => '2026-01-01T00:00:00.000Z', 'url' => 'https://linear.app/c1'],
+            ['id' => 'c2', 'author' => 'bob', 'body' => 'second', 'created_at' => '2026-01-02T00:00:00.000Z', 'url' => 'https://linear.app/c2'],
+        ], $comments);
+    }
+
+    public function test_assign_issue_resolves_user_by_email_and_updates_assignee(): void
+    {
+        Saloon::fake([
+            MockResponse::make(['data' => ['users' => ['nodes' => [['id' => 'user-uuid-7']]]]]),
+            MockResponse::make(['data' => ['issueUpdate' => ['success' => true]]]),
+        ]);
+
+        $this->assertTrue($this->tracker->assignIssue('', '', 'issue-uuid-1', 'alice@example.com'));
+
+        Saloon::assertSent(function (Request $request): bool {
+            $body = $request->body()->all();
+
+            return str_contains((string) ($body['query'] ?? ''), 'users(filter')
+                && ($body['variables']['email'] ?? null) === 'alice@example.com';
+        });
+        Saloon::assertSent(function (Request $request): bool {
+            $body = $request->body()->all();
+
+            return str_contains((string) ($body['query'] ?? ''), 'issueUpdate')
+                && ($body['variables'] ?? null) === ['id' => 'issue-uuid-1', 'assigneeId' => 'user-uuid-7'];
+        });
+    }
+
+    public function test_assign_issue_returns_false_when_user_not_found(): void
+    {
+        Saloon::fake([
+            MockResponse::make(['data' => ['users' => ['nodes' => []]]]),
+        ]);
+
+        $this->assertFalse($this->tracker->assignIssue('', '', 'issue-uuid-1', 'nobody@example.com'));
+
+        Saloon::assertSentCount(1);
+    }
+
+    public function test_assign_issue_returns_false_when_update_is_refused(): void
+    {
+        Saloon::fake([
+            MockResponse::make(['data' => ['users' => ['nodes' => [['id' => 'user-uuid-7']]]]]),
+            MockResponse::make(['errors' => [['message' => 'Entity not found']], 'data' => null]),
+        ]);
+
+        $this->assertFalse($this->tracker->assignIssue('', '', 'issue-uuid-1', 'alice@example.com'));
+    }
+
+    public function test_list_issues_exposes_identifier_and_assignee_email(): void
+    {
+        Saloon::fake([
+            MockResponse::make($this->teamResponse()),
+            MockResponse::make(['data' => ['issues' => ['nodes' => [[
+                'id' => 'issue-uuid-1',
+                'identifier' => 'ENG-1',
+                'title' => 'Fix login bug',
+                'description' => '',
+                'url' => 'https://linear.app/eng/issue/ENG-1',
+                'state' => ['name' => 'Todo'],
+                'labels' => ['nodes' => []],
+                'assignee' => ['email' => 'alice@example.com', 'name' => 'Alice'],
+            ]]]]]),
+        ]);
+
+        $issues = $this->tracker->listIssues(self::TEAM_KEY, '');
+        $issue = ExternalIssue::fromProvider($issues[0], TaskProviderKind::Linear);
+
+        $this->assertSame('ENG-1', $issue->key);
+        $this->assertSame('alice@example.com', $issue->assignee);
+
+        Saloon::assertSent(fn (Request $r): bool => str_contains((string) ($r->body()->all()['query'] ?? ''), 'assignee { email'));
     }
 }

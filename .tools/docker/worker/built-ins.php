@@ -25,10 +25,10 @@ declare(strict_types=1);
 return [
     'stacks' => [
         [
-            'name' => 'php-8.3',
-            'label' => 'PHP 8.3',
-            'base_image' => 'php:8.3-cli-bookworm',
-            'dockerfile' => 'stacks/Dockerfile.php-8.3',
+            'name' => 'php-8.5',
+            'label' => 'PHP 8.5',
+            'base_image' => 'php:8.5-cli-bookworm',
+            'dockerfile' => 'stacks/Dockerfile.php-8.5',
             'capabilities' => ['php', 'composer', 'node'],
             'common_tools' => ['git', 'gh', 'jq', 'curl', 'unzip', 'coreutils'],
         ],
@@ -38,6 +38,14 @@ return [
             'base_image' => 'php:8.4-cli-bookworm',
             'dockerfile' => 'stacks/Dockerfile.php-8.4',
             'capabilities' => ['php', 'composer', 'node'],
+            'common_tools' => ['git', 'gh', 'jq', 'curl', 'unzip', 'coreutils'],
+        ],
+        [
+            'name' => 'node-22',
+            'label' => 'Node 22',
+            'base_image' => 'node:22-bookworm',
+            'dockerfile' => 'stacks/Dockerfile.node-22',
+            'capabilities' => ['node'],
             'common_tools' => ['git', 'gh', 'jq', 'curl', 'unzip', 'coreutils'],
         ],
     ],

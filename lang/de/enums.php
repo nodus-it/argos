@@ -3,60 +3,9 @@
 declare(strict_types=1);
 
 return [
-    'workflow_status' => [
-        'draft' => 'Entwurf',
-        'concept_running' => 'Konzept läuft',
-        'concept_review' => 'Konzept bereit',
-        'implement_running' => 'Implementierung läuft',
-        'implement_paused' => 'Pausiert (Turn-Limit)',
-        'implement_completed' => 'Implementierung abgeschlossen',
-        'in_review' => 'In Review',
-        'completed' => 'Abgeschlossen',
-        'failed' => 'Fehlgeschlagen',
-        'aborted' => 'Abgebrochen',
-    ],
-
-    'phase_status' => [
-        'pending' => 'Ausstehend',
-        'running' => 'Läuft',
-        'completed' => 'Abgeschlossen',
-        'paused' => 'Pausiert',
-        'failed' => 'Fehlgeschlagen',
-        'quality_gate_failed' => 'Quality Gate fehlgeschlagen',
-        'no_changes' => 'Keine Änderungen',
-        'lock_blocked' => 'Lock blockiert',
-        'rate_limited' => 'Rate-Limit erreicht',
-    ],
-
-    'phases' => [
-        'concept' => 'Concept',
-        'implement' => 'Implement',
-        'diff' => 'Diff',
-        'push' => 'Push',
-        'respond' => 'Respond',
-        'commit_message' => 'Commit-Message',
-    ],
-
-    'phase_runs' => [
-        'title' => 'Phase-Läufe',
-        'columns' => [
-            'phase' => 'Phase',
-            'iteration' => '#',
-            'status' => 'Status',
-            'started' => 'Gestartet',
-            'finished' => 'Beendet',
-            'duration' => 'Dauer',
-            'input' => 'Input',
-            'output' => 'Output',
-            'cost' => 'Kosten',
-            'model' => 'Modell',
-        ],
-    ],
-
     'worker_source' => [
         'standard' => 'Standard',
         'byoi' => 'Eigenes Image (BYOI)',
-        'devcontainer' => 'Devcontainer',
     ],
 
     'worker_image_entity_status' => [
@@ -90,13 +39,6 @@ return [
         'failed' => 'Fehlgeschlagen',
         'stopped' => 'Gestoppt',
     ],
-    'demo_access_mode' => [
-        'inherit' => 'Standard',
-        'session' => 'Argos-Login',
-        'basic' => 'Passwortschutz',
-        'public' => 'Öffentlich',
-    ],
-
     'task_provider_mode' => [
         'webhook' => 'Webhook (Push)',
         'poll' => 'Polling',
@@ -107,5 +49,122 @@ return [
         'pending' => 'Ausstehend',
         'active' => 'Aktiv',
         'error' => 'Fehler',
+    ],
+
+    'workspace_status' => [
+        'provisioning' => 'Wird eingerichtet',
+        'starting' => 'Startet',
+        'running' => 'Läuft',
+        'stopping' => 'Stoppt',
+        'stopped' => 'Gestoppt',
+        'failed' => 'Fehlgeschlagen',
+    ],
+
+    'workspace_role' => [
+        'admin' => 'Admin',
+        'member' => 'Mitglied',
+        'viewer' => 'Leser',
+    ],
+
+    'gate_run_status' => [
+        'running' => 'Läuft',
+        'passed' => 'Bestanden',
+        'failed' => 'Fehlgeschlagen',
+        'error' => 'Fehler',
+    ],
+    'auto_task_state' => [
+        'queued' => 'Wartet',
+        'planning' => 'Plant',
+        'awaiting_plan_approval' => 'Plan wartet auf Freigabe',
+        'implementing' => 'Setzt um',
+        'gating' => 'Prüft Gates',
+        'fixing' => 'Behebt Gate-Fehler',
+        'shipping' => 'Liefert aus',
+        'done' => 'Fertig',
+        'paused' => 'Pausiert',
+        'failed' => 'Fehlgeschlagen',
+        'budget_exceeded' => 'Budget überschritten',
+    ],
+    'auto_plan_mode' => [
+        'off' => 'Kein Plan — direkt umsetzen',
+        'auto' => 'Planen, dann automatisch weiter',
+        'approve' => 'Planen, dann auf Freigabe warten',
+    ],
+    'auto_ship_mode' => [
+        'pr' => 'Pull Request',
+        'draft_pr' => 'Entwurfs-Pull-Request',
+        'none' => 'Nur committen und pushen',
+    ],
+    'task_origin' => [
+        'manual' => 'Manuell',
+        'api' => 'API',
+        'mcp' => 'MCP',
+        'issue' => 'Issue',
+    ],
+    'session_status' => [
+        'closed' => 'Geschlossen',
+        'starting' => 'Startet',
+        'idle' => 'Bereit',
+        'running' => 'Arbeitet',
+        'waiting_input' => 'Wartet auf Eingabe',
+        'error' => 'Fehler',
+    ],
+
+    'task_status' => [
+        'preparing' => 'Vorbereitung',
+        'active' => 'Aktiv',
+        'pr_open' => 'PR offen',
+        'done' => 'Fertig',
+        'cancelled' => 'Abgebrochen',
+    ],
+    'task_state' => [
+        'preparing' => 'Vorbereitung',
+        'running' => 'Läuft',
+        'waiting' => 'Wartet auf dich',
+        'ready' => 'Bereit',
+        'pr_open' => 'PR offen',
+        'done' => 'Fertig',
+        'cancelled' => 'Abgebrochen',
+        'archived' => 'Archiviert',
+    ],
+    'workspace_setup_status' => [
+        'needed' => 'Einrichtung nötig',
+        'running' => 'Wird eingerichtet',
+        'testing' => 'Wird getestet',
+        'ready' => 'Eingerichtet',
+        'failed' => 'Test fehlgeschlagen',
+        'needs_agent' => 'Braucht ein Claude-Abo',
+    ],
+
+    'task_kind' => [
+        'task' => 'Aufgabe',
+        'setup' => 'Einrichtung',
+    ],
+
+    'permission_mode' => [
+        'default' => 'Vor Änderungen fragen',
+        'acceptEdits' => 'Änderungen annehmen',
+        'plan' => 'Plan-Mode',
+        'bypassPermissions' => 'Freigaben umgehen',
+    ],
+
+    'approval_kind' => [
+        'tool' => 'Tool-Aufruf',
+        'plan' => 'Plan',
+        'question' => 'Frage',
+    ],
+
+    'approval_status' => [
+        'pending' => 'Offen',
+        'allowed' => 'Erlaubt',
+        'denied' => 'Abgelehnt',
+        'answered' => 'Beantwortet',
+        'cancelled' => 'Abgebrochen',
+    ],
+    'review_comment_status' => [
+        'draft' => 'Gesammelt',
+        'stale' => 'Veraltet',
+        'sent' => 'Gesendet',
+        'discarded' => 'Verworfen',
     ],
 ];

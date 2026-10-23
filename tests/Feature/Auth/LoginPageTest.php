@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Auth;
 
-use App\Filament\Admin\Pages\Login;
+use App\Filament\App\Pages\Login;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -16,9 +16,9 @@ class LoginPageTest extends TestCase
 
     public function test_login_route_renders_redesigned_page(): void
     {
-        // Wiring: the /admin/login route must render our custom split-screen
+        // Wiring: the /login route must render our custom split-screen
         // view (the default Filament login has none of these strings).
-        $this->get('/admin/login')
+        $this->get('/login')
             ->assertOk()
             ->assertSee('Welcome back')
             ->assertSee('One view.')

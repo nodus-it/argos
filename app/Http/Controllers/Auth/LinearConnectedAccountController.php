@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Auth;
 
+use App\Http\Controllers\Auth\Concerns\ReturnsAfterConnect;
 use App\Http\Controllers\Auth\Concerns\ReverifiesConnectedAccount;
 use App\Http\Controllers\Controller;
 use App\Integrations\Linear\LinearConnector;
@@ -17,19 +18,13 @@ use Illuminate\Support\Facades\Auth;
 
 final class LinearConnectedAccountController extends Controller
 {
-    use ReverifiesConnectedAccount;
-
-    private const RETURN_SESSION_KEY = 'oauth.linear.return';
+    use ReturnsAfterConnect, ReverifiesConnectedAccount;
 
     private const STATE_SESSION_KEY = 'oauth.linear.state';
 
     public function redirect(Request $request): RedirectResponse
     {
-        if ($request->query('return') === 'onboarding') {
-            $request->session()->put(self::RETURN_SESSION_KEY, 'onboarding');
-        } else {
-            $request->session()->forget(self::RETURN_SESSION_KEY);
-        }
+        $this->rememberReturn($request, 'linear');
 
         $state = bin2hex(random_bytes(16));
         $request->session()->put(self::STATE_SESSION_KEY, $state);
@@ -89,13 +84,7 @@ final class LinearConnectedAccountController extends Controller
         ]);
         $this->reverifyConnectedAccount($account);
 
-        $returnTo = $request->session()->pull(self::RETURN_SESSION_KEY);
-
-        if ($returnTo === 'onboarding') {
-            return redirect()->route('filament.admin.pages.onboarding');
-        }
-
-        return redirect()->route('filament.admin.pages.connected-accounts');
+        return $this->redirectAfterConnect($request, 'linear');
     }
 
     public function disconnect(): RedirectResponse
@@ -105,6 +94,6 @@ final class LinearConnectedAccountController extends Controller
 
         app(ConnectedAccountService::class)->disconnect($user, 'linear');
 
-        return redirect()->route('filament.admin.pages.connected-accounts');
+        return redirect()->route('filament.app.account.pages.connections');
     }
 }

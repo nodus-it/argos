@@ -28,12 +28,12 @@ class ConfigDerivationTest extends TestCase
         }
     }
 
-    public function test_session_cookie_domain_gets_leading_dot_for_a_real_domain(): void
+    public function test_the_session_cookie_never_spans_preview_and_editor_subdomains(): void
     {
         $cfg = $this->freshConfig('https://argos.example.com', 'session');
 
-        // Leading dot so the session spans demo-<task>.argos.example.com.
-        $this->assertSame('.argos.example.com', $cfg['domain']);
+        // Host-only: demo-…/code-… subdomains run repository code.
+        $this->assertNull($cfg['domain']);
         $this->assertTrue($cfg['secure']);
     }
 
@@ -69,22 +69,6 @@ class ConfigDerivationTest extends TestCase
         $this->assertSame('argos_demo_session', $cfg['cookie']);
     }
 
-    public function test_concurrent_demos_get_non_overlapping_cookie_domains(): void
-    {
-        // Each demo runs under its own subdomain, so its cookie domain is scoped
-        // to that subdomain. Two demos are SIBLINGS — neither domain is a parent
-        // of the other — so a shared static SESSION_COOKIE name never collides
-        // across demos (only the differently-named parent cookie spans them).
-        $a = $this->freshConfig('https://demo-task-a.argos.example.com', 'session')['domain'];
-        $b = $this->freshConfig('https://demo-task-b.argos.example.com', 'session')['domain'];
-
-        $this->assertSame('.demo-task-a.argos.example.com', $a);
-        $this->assertSame('.demo-task-b.argos.example.com', $b);
-        // Sibling check: neither is a suffix-domain of the other.
-        $this->assertStringNotContainsString($a, $b);
-        $this->assertStringNotContainsString($b, $a);
-    }
-
     public function test_preview_base_domain_and_scheme_derive_from_app_url(): void
     {
         $cfg = $this->freshConfig('https://argos.example.com', 'argos');
@@ -113,8 +97,7 @@ class ConfigDerivationTest extends TestCase
     {
         $keys = [
             'ARGOS_PREVIEW_DEFAULT_IMAGE', 'ARGOS_PREVIEW_TTL_HOURS', 'ARGOS_PREVIEW_PORT',
-            'ARGOS_PREVIEW_NETWORK', 'ARGOS_PREVIEW_AUTH', 'ARGOS_PREVIEW_AUTH_GATE_URL',
-            'ARGOS_PREVIEW_BASIC_USER', 'ARGOS_PREVIEW_MAX_CONCURRENT',
+            'ARGOS_PREVIEW_NETWORK', 'ARGOS_PREVIEW_MAX_CONCURRENT',
             'ARGOS_PREVIEW_CPU_LIMIT', 'ARGOS_PREVIEW_MEM_LIMIT', 'ARGOS_PORT',
         ];
         foreach ($keys as $key) {
@@ -133,9 +116,6 @@ class ConfigDerivationTest extends TestCase
         $this->assertSame(24, $cfg['ttl_hours']);
         $this->assertSame(8080, $cfg['port']);
         $this->assertSame('argos_edge', $cfg['network']);
-        $this->assertSame('none', $cfg['auth']);
-        $this->assertSame('http://nginx:80/_argos/demo-gate', $cfg['auth_gate_url']);
-        $this->assertSame('demo', $cfg['basic_user']);
         $this->assertSame(10, $cfg['max_concurrent']);
         $this->assertSame('1.0', $cfg['cpu_limit']);
         $this->assertSame('1g', $cfg['memory_limit']);

@@ -7,22 +7,24 @@ import { login } from './helpers/auth';
  * server error. Seeded with FullDemoSeeder so list pages have data to show.
  */
 const PAGES: Array<{ label: string; path: string; expect?: RegExp }> = [
-  { label: 'Dashboard', path: '/admin' },
-  { label: 'Tasks', path: '/admin/tasks', expect: /Demo ·|Showcase/i },
-  { label: 'Projects', path: '/admin/repo-profiles' },
-  { label: 'API clients', path: '/admin/api-clients' },
-  { label: 'Agent credentials', path: '/admin/agent-credentials' },
-  { label: 'Worker stacks', path: '/admin/worker-stacks' },
-  { label: 'Worker image builds', path: '/admin/worker-image-builds' },
-  { label: 'Connected accounts', path: '/admin/connected-accounts' },
-  { label: 'Settings', path: '/admin/settings' },
+  { label: 'My work', path: '/' },
+  { label: 'Workspaces', path: '/workspaces' },
+  { label: 'Profile', path: '/account/profile' },
+  { label: 'Claude subscriptions', path: '/account/agents' },
+  { label: 'Connected accounts', path: '/account/connections' },
+  { label: 'Administration', path: '/system/overview' },
+  { label: 'Users', path: '/system/users' },
+  { label: 'Access tokens', path: '/system/tokens' },
+  { label: 'OAuth apps', path: '/system/oauth-apps' },
+  { label: 'API clients', path: '/system/api-clients' },
+  { label: 'Documentation', path: '/docs' },
 ];
 
 test.beforeEach(() => {
   resetDatabase('FullDemoSeeder');
 });
 
-test('every admin mask renders without error', async ({ page }) => {
+test('every account and administration mask renders without error', async ({ page }) => {
   await login(page);
 
   for (const entry of PAGES) {

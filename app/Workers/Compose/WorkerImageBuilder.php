@@ -85,8 +85,8 @@ class WorkerImageBuilder
 
     /**
      * Smoke-test the freshly built worker image: every command we list
-     * must exist on PATH inside the container, otherwise PhaseRunner
-     * would crash mid-phase with a less-actionable error. This catches
+     * must exist on PATH inside the container, otherwise a workspace
+     * would fail later with a less-actionable error. This catches
      * dockerfile drift (apt package missing, agent install script
      * silently failing, etc.) at build time.
      *
@@ -121,8 +121,8 @@ class WorkerImageBuilder
 
         if (! $process->isSuccessful()) {
             // Untag the broken image: workerImageExists() is the only gate
-            // resolveOrBuild() consults, so an image that's tagged but
-            // invalid would silently get reused on the next phase run —
+            // the provisioner consults, so an image that's tagged but
+            // invalid would silently get reused by the next workspace —
             // exactly the failure mode this validator is meant to catch.
             // Best-effort; if the rmi itself fails the build is still
             // recorded as failed and the next save bumps the dockerfile

@@ -2,16 +2,16 @@
 
 Argos ships a built-in [MCP](https://modelcontextprotocol.io) server so an
 external MCP client — in particular **Claude Code** — can drive Argos directly:
-list projects and tasks, hand over a plan as a new task, run the
-Concept / Implement / Push phases, and pull the resulting feature branch
-locally.
+list workspaces, hand over what to implement as an **automatic task** in a
+workspace, follow it, approve its plan, steer it with feedback, and pick up the
+pull request.
 
 This turns the usual loop ("plan in Claude Code → copy into the Argos UI →
-watch the browser → copy the branch name") into a single in-session flow,
+watch the browser → copy the pull request link") into a single in-session flow,
 without leaving your planning client.
 
 If you'd rather automate Argos from scripts or CI than from an interactive MCP
-client, the same workflow is also exposed as a plain HTTP API — see
+client, the same workspaces are also exposed as a plain HTTP API — see
 [REST-API.md](REST-API.md). The two surfaces are equivalent; MCP is the
 chat-client front door, the REST API is the scripting front door.
 
@@ -38,8 +38,7 @@ chat-client front door, the REST API is the scripting front door.
   (`/oauth/register`); discovery metadata lives under the
   `/.well-known/oauth-*` endpoints. You do not pre-register a client by hand.
 - The first connect opens a **browser login** as an Argos user plus a consent
-  screen for the `mcp:use` scope. Argos is single-user today, so this is just
-  your admin login.
+  screen for the `mcp:use` scope. The tools then act as that user.
 
 ## Prerequisites
 
@@ -61,8 +60,8 @@ claude mcp add --transport http argos https://your-argos.example.com/mcp
 ```
 
 Then, inside Claude Code, run `/mcp`, pick `argos`, and choose **Authenticate**.
-A browser opens at `${APP_URL}/oauth/authorize`; sign in as your Argos admin
-user and approve the `mcp:use` scope. The status flips to **connected** and the
+A browser opens at `${APP_URL}/oauth/authorize`; sign in with your Argos
+account and approve the `mcp:use` scope. The status flips to **connected** and the
 tools below become available.
 
 > Other clients that speak HTTP MCP with OAuth (Cursor, VS Code) work the same
@@ -72,56 +71,50 @@ tools below become available.
 
 ## Available tools
 
-The server exposes nine tools. A `task` or `project` argument always accepts
-either the record's ULID **or** its exact name.
+The server exposes nine tools — `workspace_*` for workspaces, `task_*` for
+tasks. A `workspace` argument accepts either the workspace's ULID **or** its
+exact name; a `task` argument takes the task's ULID. Creating workspaces is not
+possible over MCP (use the UI or the [REST API](REST-API.md#create-a-workspace)).
 
-### Projects (read)
-
-| Tool | What it does |
-|---|---|
-| `project_list` | Lists the configured repository profiles (projects) Argos can run tasks against, with their workflow defaults and the number of open tasks. |
-| `project_get` | Returns one project (by id or name) together with an overview of its tasks. |
-
-### Tasks (read)
+### Workspaces (read)
 
 | Tool | What it does |
-|---|---|
-| `task_list` | Lists tasks, optionally filtered by `project` and by workflow `status`. |
-| `task_get` | Returns full detail for one task: description, concept, implement summaries, recent phase runs, the **checkout block** (`repo_url`, `base_branch`, `feature_branch`) and the PR url. |
+| --- | --- |
+| `workspace_list` | Lists the workspaces you can see: repository, default branch and container status. |
+| `workspace_get` | One workspace by id or name, with its open tasks (owner, status, branch, pull request, gates, ticket, `auto.state`). |
 
-The `status` filter accepts a workflow status string: `draft`,
-`concept_running`, `concept_review`, `implement_running`, `implement_paused`,
-`implement_completed`, `in_review`, `completed`, `failed`, `aborted`.
-
-### Workflow (write)
+### Tasks and automatic runs
 
 | Tool | What it does |
-|---|---|
-| `task_create` | Creates a task from a plan and starts the Concept phase. The plan is stored both as the task description and as the concept notes, so the Concept run respects it. The feature branch is created during the Concept phase. Args: `name`, `project`, `plan`, optional `base_branch`. |
-| `task_concept` | Runs (or re-runs) the Concept phase. If the previous Concept run is paused, it resumes with a fresh turn budget. Optional `max_turns`. |
-| `task_implement` | Runs (or re-runs) the Implement phase. Requires a completed Concept run; resumes a paused run with a fresh turn budget. Optional `max_turns`. |
-| `task_pr` | Runs the Push phase — pushes the feature branch and opens a pull request. Requires a completed Implement run. |
-| `task_feedback` | Sends review feedback (`feedback`, Markdown) for a task and runs the Respond phase, which acts on the feedback. |
+| --- | --- |
+| `task_create` | Starts an automatic task in a workspace: plan (per `plan`: `off` / `auto` / `approve`), implement on its own branch, fix failing quality gates, ship (per `ship`: `pr` / `draft_pr` / `none`). Args: `workspace`, `prompt`, optional `title`, `issue` (ticket number of the workspace's tracker), `base_branch`, `plan`, `ship`, `auto_merge` (switch on the provider's auto-merge, see [Pull Requests](PULL-REQUESTS.md#auto-merge)). Runs on your subscription; returns immediately. |
+| `task_get` | One task — status, owner, branch, pull request (state, checks, review, conflicts), gates, ticket and `auto.state`. Poll it to follow a run. |
+| `task_plan_decide` | Approves or rejects a waiting plan (`decision`, optional `feedback`). |
+| `task_message` | Writes into a task (`text`); `resume_auto` lets the run continue on its own afterwards. |
+| `task_pause` / `task_resume` | Pause automation / hand a paused, failed or budget-stopped task back to it (it checks the gates and ships). |
+| `task_ship` | Commits, pushes and opens/updates the task's pull request now (optional `draft`). |
 
-Write tools that start a phase return immediately: phases run asynchronously in
-the worker, so you advance by re-reading `task_get`, not by waiting on the
-write call.
+Tasks act for you: your Claude agent does the work and you own the task. You
+can read every task of a workspace you belong to, but only write into, steer or
+ship your own tasks and those you collaborate on (a workspace admin may all).
 
 ## Typical flow
 
 A plan → PR round trip from a planning session:
 
-1. `project_list` — pick the repository profile to work in.
-2. `task_create` — hand over the plan. The Concept phase starts automatically
-   and the feature branch is created during that run.
-3. `task_get` — poll the workflow status. Phases run asynchronously, so write
-   tools return immediately; re-read to follow progress.
-4. `task_implement`, then `task_pr` — advance once the previous phase is done
-   (each gated on the prior phase having completed).
-5. After `task_pr`, `task_get` exposes the checkout block, so you can
-   `git checkout <feature_branch>` locally and review in your IDE.
-6. `task_feedback` — send review feedback, which runs the Respond phase. Repeat
-   until the change is ready to merge.
+1. `workspace_list` / `workspace_get` — pick the workspace to work in.
+2. `task_create` — hand over what to implement (`prompt`). Choose `plan` and
+   `ship`, or leave them to the workspace's defaults. It returns immediately.
+3. `task_get` — poll the run: its `auto.state` goes queued → planning →
+   implementing → gating/fixing → shipping → done.
+4. With `plan = approve` the run stops at `awaiting_plan_approval`:
+   `task_plan_decide` approves or rejects (with feedback).
+5. When the run is done, `task_get` shows the pull request under
+   `pull_request` with its checks and review state; check out its branch
+   locally to review in your IDE.
+6. `task_message` — send review feedback into the task; set `resume_auto` to
+   let the run continue on its own. `task_ship` ships the current state on
+   demand.
 
 ## Security
 
@@ -136,10 +129,9 @@ A plan → PR round trip from a planning session:
 - **Signing keys persist.** The Passport keys live on the persistent volume
   (`PASSPORT_KEYS_PATH`, `/data/passport` in compose), so an image rebuild does
   not silently invalidate every issued token.
-- **Single user today.** Argos is single-user, so the OAuth login is your admin
-  login. Anyone holding a valid `mcp:use` token has the same reach as that user
-  — treat the token like a password and revoke it from the Argos UI if a client
-  is lost.
+- **Acts as you.** Anyone holding a valid `mcp:use` token has the same reach
+  as the user who granted it — treat the token like a password and revoke it
+  from the Argos UI if a client is lost.
 
 ## Troubleshooting
 
@@ -150,13 +142,16 @@ A plan → PR round trip from a planning session:
   in `config/mcp.php` (`custom_schemes` / `redirect_domains`).
 - **Token stops working after a rebuild** — `PASSPORT_KEYS_PATH` is not on a
   persistent volume; in the stock compose stack it points at `/data/passport`.
-- **Tool calls succeed but nothing happens in the UI** — phases run
-  asynchronously. Confirm the queue worker (`queue` service) is up; re-read
-  with `task_get` to see the status advance.
+- **Tool calls succeed but nothing happens in the UI** — runs are
+  asynchronous. Confirm the queue worker (`queue` service) is up; re-read
+  with `task_get` to see the state advance.
+- **`task_create` fails with "no usable agent"** — you need an active
+  Claude agent of your own (or a shared one) under *Agents*, and the role
+  *admin* or *member* in the workspace.
 
 ## See also
 
-- [REST-API.md](REST-API.md) — the same workflow as a plain HTTP API for
+- [REST-API.md](REST-API.md) — the same workspaces as a plain HTTP API for
   scripts and CI (the non-MCP automation path).
 - [OAUTH.md](OAUTH.md) — the OAuth app wiring Argos uses for git providers.
 - [CONFIGURATION.md](CONFIGURATION.md) — the related environment variables

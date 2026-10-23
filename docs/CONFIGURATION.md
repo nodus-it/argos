@@ -11,7 +11,7 @@ ENV var Argos actually reads.
 >
 > - **`APP_KEY`** is auto-generated on first manager boot and persisted; you
 >   never set it unless restoring a backup.
-> - **OAuth apps and the Claude/Codex credentials are UI/DB-managed, not ENV.**
+> - **OAuth apps and the Claude agent credentials are UI/DB-managed, not ENV.**
 >   See [OAuth & credentials](#oauth--credentials-ui-managed) below.
 
 ## Contents
@@ -20,14 +20,15 @@ ENV var Argos actually reads.
 - [Sessions (reverse proxy / HTTPS)](#sessions-reverse-proxy--https)
 - [Database](#database)
 - [Queue, Redis & Horizon](#queue-redis--horizon)
-- [Worker (phase containers)](#worker-phase-containers)
+- [Worker image](#worker-image)
 - [Worker backing services (test sidecars)](#worker-backing-services-test-sidecars)
-- [Live demos (optional)](#live-demos-optional)
+- [Live previews](#live-previews)
+- [Workspaces](#workspaces)
+- [Realtime (Reverb)](#realtime-reverb)
 - [Integrations & polling](#integrations--polling)
 - [OAuth & credentials (UI-managed)](#oauth--credentials-ui-managed)
 - [MCP server (Argos API)](#mcp-server-argos-api)
-- [Target-project MCP (Laravel Boost)](#target-project-mcp-laravel-boost)
-- [Media library (optional)](#media-library-optional)
+- [Repository settings in tasks](#repository-settings-in-tasks)
 - [Logging](#logging)
 - [Compose / OPS-level keys](#compose--ops-level-keys)
 
@@ -42,9 +43,11 @@ ENV var Argos actually reads.
 | `APP_DEBUG` | `false` | Enable detailed error pages. **Never enable in production.** |
 | `APP_URL` | `http://localhost` | Base URL of the Argos instance and the **single source of truth** for host + scheme. OAuth callbacks, the session cookie domain and the live-demo subdomains all derive from it. **Must match the public URL.** |
 | `APP_LOCALE` | `en` | Default UI language (`en` or `de`). |
-| `ADMIN_PASSWORD` | `12345` | Password for the auto-created admin user. **Change before exposing the instance.** |
+| `ADMIN_PASSWORD` | *(required; the installer generates it — `12345` only in local dev)* | Password of the administrator created on an empty installation (`admin@argos.local`). Without it a fresh production install refuses to create one. |
 | `ARGOS_CONFIG_DIR` | `~/.config/argos` (compose: `/data/config`) | Directory for persisted config / the default SQLite path inside the manager. |
 | `ARGOS_SOURCE_URL` | `https://github.com/nodus-it/argos` | AGPL-3.0 §13 source-offer URL surfaced in the UI. **Forks must override this** with their own source URL. |
+| `ARGOS_FEEDBACK_URL` | *(empty)* | Where *Send feedback* in the user menu leads — e.g. your own tracker or chat channel for a beta. A GitHub or GitLab `…/issues/new` link is prefilled with version and page. Empty: the upstream issue chooser. |
+| `ARGOS_ACCESS_LINK_HOURS` | `72` | How long an access link (set or reset a password, see [Adding colleagues](SETUP.md#adding-colleagues)) stays valid. |
 | `ARGOS_VERSION` | – | Overrides the baked-in app version string. CI bakes a `stage-…` value into stage images; leave unset for releases. |
 
 ## Sessions (reverse proxy / HTTPS)
@@ -53,7 +56,8 @@ Both values **derive from `APP_URL`** and rarely need setting:
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `SESSION_DOMAIN` | derived: `.<APP_URL host>` for a real domain, host-only for localhost/IP/`nip.io` | Cookie domain. The leading dot lets the session span demo subdomains (`demo-<task>.<host>`). Override only when demos live on a domain different from the app. |
+| `SESSION_DOMAIN` | *(empty: host-only)* | Cookie domain of the Argos session. Leave it empty: previews (`demo-…`) and editors (`code-…`) run repository code on subdomains and must not receive the session; they use their own per-host access cookie. |
+| `ARGOS_TRUSTED_PROXIES` | private ranges (`10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,127.0.0.1/32`) | Addresses whose `X-Forwarded-*` headers Traefik accepts — set it to your TLS proxy's address. Headers from anyone else are replaced, so clients cannot fake their IP (login rate limit) or host. |
 | `SESSION_SECURE_COOKIE` | derived: `true` when `APP_URL` is `https://` | Force `Secure` on the session cookie. Set explicitly only when terminating TLS at a proxy that rewrites the scheme. |
 | `SESSION_COOKIE` | `argos_session` | Name of the session cookie. Rarely changed. |
 
@@ -77,7 +81,7 @@ server. The compose stack sets `mariadb`.
 
 ## Queue, Redis & Horizon
 
-Background jobs — task phase runs and issue polling — run on **Laravel
+Background jobs — workspace provisioning, task preparation, image builds, previews and issue polling — run on **Laravel
 Horizon**, backed by **Redis**. In the compose stack the `redis` service and
 the `queue` (Horizon) + `scheduler` workers are wired up automatically; you
 normally only tune the process counts.
@@ -89,42 +93,40 @@ normally only tune the process counts.
 | `ARGOS_REDIS_PORT` | falls back to `REDIS_PORT`, then `6379` | Redis port. |
 | `ARGOS_REDIS_PASSWORD` | falls back to `REDIS_PASSWORD` | Redis password (if your Redis requires auth). |
 | `ARGOS_QUEUE_DEFAULT_PROCESSES` | `5` | Horizon worker processes for the `default` queue (`minProcesses` = `maxProcesses`). |
-| `ARGOS_QUEUE_TASKS_PROCESSES` | `2` | Horizon worker processes for the `tasks` queue (phase runs). |
+| `ARGOS_QUEUE_TASKS_PROCESSES` | `2` | Horizon worker processes for the `tasks` queue (workspace provisioning and stopping). |
 
 > `ARGOS_REDIS_*` take precedence; the plain `REDIS_HOST` / `REDIS_PORT` /
 > `REDIS_PASSWORD` Laravel defaults are honored as a fallback (and are what the
 > compose stack actually sets).
 
-## Worker (phase containers)
+## Worker image
 
-Each task phase runs in an ephemeral worker container. These govern the image
-selection and per-container resource limits.
+The worker image (stack + agent + gate helpers) is the base every workspace
+image is built from. Resource limits of a running workspace are set under
+[Workspaces](#workspaces).
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `ARGOS_DEFAULT_STACK` | `php-8.4` | Slug of the worker stack used when neither the task nor the project pins one. Must match a row in `worker_stacks` (built-ins are mirrored on `migrate`). |
-| `ARGOS_MEM_LIMIT` | `4g` | Memory limit per worker container. |
-| `ARGOS_CPU_LIMIT` | `2` | CPU limit per worker container. |
-| `ARGOS_CONCEPT_MAX_TURNS_DEFAULT` | `50` | Default max-turns for the concept phase (overridable per task). max-turns is a ceiling, not a budget — well-scoped tasks finish early regardless; large repos need the headroom to explore *and* write. |
-| `ARGOS_MAX_TURNS_DEFAULT` | `200` | Default max-turns for the implement phase (overridable per task). |
+| `ARGOS_DEFAULT_STACK` | `php-8.5` | Slug of the stack used when a workspace sets none: `php-8.5`, `php-8.4` or `node-22` (the built-ins, mirrored into `worker_stacks` on `migrate`). See [Stacks and Images](WORKER-STACKS.md). |
 
 ## Worker backing services (test sidecars)
 
-Argos can boot ephemeral backing-service sidecars (one private network per phase
-run, torn down afterwards) so a project's tests can talk to a real MySQL/Redis.
-A repo profile opts in per service; only the test-running phases start them.
+Argos can boot backing-service sidecars next to a workspace (one private
+network per workspace, data kept until the workspace is deleted) so a project's
+tests can talk to a real MySQL/Redis. Each task gets its own database and Redis
+prefix on them. A workspace opts in per service (Settings → Environment).
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `ARGOS_WORKER_SERVICE_TIMEOUT` | `60` | Seconds to wait for a backing service to become ready before failing the phase. |
+| `ARGOS_WORKER_SERVICE_TIMEOUT` | `60` | Seconds to wait for a backing service to become ready before the workspace start fails. |
 | `ARGOS_WORKER_MYSQL_IMAGE` | `mariadb:11` | Image used for the MySQL/MariaDB sidecar. |
 | `ARGOS_WORKER_REDIS_IMAGE` | `redis:7-alpine` | Image used for the Redis sidecar. |
 
-## Live demos (optional)
+## Live previews
 
-Ephemeral per-task demo deployments, routed by Traefik under their own
-subdomain. On by default at the platform level, but a per-project toggle
-(*Live-Demo* / `live_demo_enabled`) is the real gate that opts each project in.
+Live previews of tasks, routed by Traefik under their own subdomain and
+guarded by the workspace gate (members only). On by default at the platform level, but the per-workspace toggle
+(*Enable live demo* / `live_demo_enabled`, on for new workspaces) is the real gate per workspace. See [Previews](LIVE-DEMOS.md).
 Base domain + scheme **derive from `APP_URL`** — override only for a demo
 domain different from the app. Requires wildcard DNS `*.<host>` resolving to
 this host (and the Traefik + `argos_edge` preview infra).
@@ -132,35 +134,83 @@ this host (and the Traefik + `argos_edge` preview infra).
 | Variable | Default | Purpose |
 |---|---|---|
 | `ARGOS_PREVIEW_ENABLED` | `true` (compose forwards `false`) | Master switch for the live-demo infrastructure. Set `false` to disable platform-wide (e.g. no Traefik/preview infra). |
-| `ARGOS_PREVIEW_BASE_DOMAIN` | derived from `APP_URL` host (`127.0.0.1.nip.io` for bare/localhost) | Demos live at `demo-<task>.<base_domain>`. |
+| `ARGOS_PREVIEW_BASE_DOMAIN` | derived from `APP_URL` host (`127.0.0.1.nip.io` for bare/localhost) | Previews live at `demo-<workspace>-<task>.<base_domain>`, editors at `code-<workspace>.<base_domain>`. |
 | `ARGOS_PREVIEW_SCHEME` | derived from `APP_URL` scheme | `http` or `https` used in the demo URL. |
 | `ARGOS_PREVIEW_PORT` | falls back to `ARGOS_PORT`, then `8080` | External port the demo URL is reachable on (the public endpoint, independent of the host port Traefik binds). Behind a TLS proxy on 443, set `scheme=https` and `ARGOS_PREVIEW_PORT=443` so the URL drops the port. |
 | `ARGOS_PREVIEW_TTL_HOURS` | `24` | Hours before an idle demo is torn down. |
-| `ARGOS_PREVIEW_AUTH` | `none` | Stack-wide default access protection for demos set to *inherit* (`none` / `session` / `basic`); per-task overrides win. |
-| `ARGOS_PREVIEW_BASIC_USER` | `demo` | HTTP Basic username for `basic`-protected demos. |
-| `ARGOS_PREVIEW_BASIC_PASSWORD` | – | Global HTTP Basic password fallback for tasks that merely inherit the `basic` default (per-task passwords are generated when a task is switched to `basic`). |
-| `ARGOS_PREVIEW_AUTH_GATE_URL` | `http://nginx:80/_argos/demo-gate` | Internal URL Traefik's forwardAuth middleware calls to validate the Argos session for `session`-protected demos. |
-| `ARGOS_PREVIEW_MAX_CONCURRENT` | `10` | Cap on concurrently running demos (`0` = unlimited; when exceeded, the oldest demos of other tasks are evicted). |
-| `ARGOS_PREVIEW_CPU_LIMIT` | `1.0` | Per-demo CPU limit (separate from the worker limits). |
-| `ARGOS_PREVIEW_MEM_LIMIT` | `1g` | Per-demo memory limit. |
+| `ARGOS_PREVIEW_MAX_CONCURRENT` | `10` | Cap on concurrently running previews across all workspaces (`0` = unlimited; when exceeded, the oldest previews of other tasks are evicted). Each workspace also has its own *Parallel previews* limit. |
+| `ARGOS_PREVIEW_CPU_LIMIT` | `1.0` | Per-preview CPU limit (separate from the workspace limits). |
+| `ARGOS_PREVIEW_MEM_LIMIT` | `1g` | Per-preview memory limit. |
 | `ARGOS_PREVIEW_NETWORK` | `argos_edge` | External Docker network shared with Traefik (defined in `docker-compose.yml`). |
 | `ARGOS_PREVIEW_DEFAULT_IMAGE` | `argos-demo` | Built-in default demo runtime (php-fpm + nginx + node), used when a repo ships no `.argos/demo.*` contract. A content hash is appended (`argos-demo:<hash>`). |
 | `ARGOS_TRAEFIK_DIR` | `/data/traefik` | Shared volume where the manager writes one Traefik file-provider route per demo (Traefik mounts it read-only). |
 
-## Integrations & polling
+## Workspaces
 
-Issue/task providers (GitHub, GitLab, Bitbucket, Linear) are polled on a
-schedule by the `scheduler` worker. The provider connections themselves are
-UI/DB-managed — see [OAuth & credentials](#oauth--credentials-ui-managed).
+Interactive workspaces (see [Workspaces](WORKSPACES.md)): one long-lived
+container per workspace running the workspace daemon and OpenVSCode Server on
+the internal `argos_ws` network. The editor is served at
+`code-<workspace>.<base_domain>`, a task's preview at
+`demo-<workspace>-<task>.<base_domain>`. Per-workspace limits (parallel
+sessions and previews, CPU, memory, cleanup) are set in the workspace settings
+(see [Workspace Settings](WORKSPACE-SETTINGS.md#resources)).
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `ARGOS_POLL_INTERVAL_MINUTES` | `5` (clamped to 1–59) | How often the scheduler polls issue providers and checks concept-comment reactions. Default keeps API usage low at scale; set `1` locally for fast feedback. |
+| `ARGOS_WORKSPACE_COLLABORATION` | `true` | Whether workspaces may have members besides their creator and tasks collaborators. Backs the `workspace-collaboration` gate. |
+| `ARGOS_WORKSPACE_MAX_ACTIVE` | `5` | Workspace containers running at the same time. Starting beyond it is refused — running workspaces are never evicted. `0` disables the cap. |
+| `ARGOS_WORKSPACE_IDLE_MINUTES` | `60` | Stop a running workspace after this many minutes without activity (never while a task is being prepared, queued, working, waiting for a decision or running automatically). `0` disables. |
+| `ARGOS_WORKSPACE_CPUS` | `2` | Default CPU limit per workspace container (a workspace can set its own). |
+| `ARGOS_WORKSPACE_MEMORY` | `4g` | Default memory limit per workspace container (a workspace can set its own). |
+| `ARGOS_INTERNAL_URL` | `http://nginx` | Base URL the workspace daemon uses to reach the manager on `argos_ws`. |
+| `ARGOS_WORKSPACE_NETWORK` | `argos_ws` | Docker network shared by the manager and workspace containers. |
+| `ARGOS_WORKSPACE_GATE_URL` | `http://nginx:80/_argos/workspace-gate` | forwardAuth target Traefik calls for `code-*` and `demo-*` hosts (membership check). |
+| `ARGOS_WORKSPACE_EDITOR_COOKIE_HOURS` | `12` | Lifetime of the access cookie on workspace hosts. |
+| `ARGOS_WORKSPACE_PR_SYNC_MINUTES` | `3` | How often the pull requests of open tasks (state, checks, reviews, conflicts) are re-read from the provider (`argos:tasks:sync-prs`). See [Pull Requests](PULL-REQUESTS.md#sync). |
+| `ARGOS_WORKSPACE_UPLOAD_MAX_MB` | `5` | Size limit per image attached to a task message (up to 5 images per message). |
+| `ARGOS_OPENVSCODE_VERSION` | `1.109.5` | OpenVSCode Server release baked into the workspace image. |
+
+### Automatic tasks
+
+Installation defaults for [automatic tasks](TASKS.md#automatic-tasks); a workspace overrides them under *Settings → Automation*, a single run overrides the workspace.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `ARGOS_AUTO_PLAN` | `auto` | `off` (implement right away), `auto` (plan, then continue) or `approve` (plan, then wait for approval). |
+| `ARGOS_AUTO_SHIP` | `pr` | `pr`, `draft_pr` or `none` (commit and push only). |
+| `ARGOS_AUTO_MAX_FIX_ROUNDS` | `3` | Rounds Claude may fix failing quality gates before shipping anyway. |
+| `ARGOS_AUTO_MAX_TURNS` | `60` | Turn budget per run. |
+| `ARGOS_AUTO_MAX_COST_USD` | `0` | Cost budget per run; `0` = none (subscriptions are flat). |
+| `ARGOS_AUTO_MAX_MINUTES` | `120` | Runtime budget per run. |
+
+## Realtime (Reverb)
+
+Live updates of tasks travel over [Laravel Reverb](https://reverb.laravel.com)
+(the `reverb` service). Browsers connect through Traefik on the Argos host at
+`/app/…`; the manager publishes to `reverb:8080` internally. The compose file
+sets the connection for you.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `ARGOS_REVERB_APP_SECRET` | generated by the installer | Signs messages between the manager and Reverb. Keep it stable. |
+| `ARGOS_REVERB_APP_KEY` | `argos` | Public app key the browser connects with. |
+
+## Integrations & polling
+
+Issue trackers (GitHub, GitLab, Linear) are polled on a schedule by the
+`scheduler` worker — new issues of bindings in poll mode, 👍 approvals on plan
+comments, and new comments on the tickets of open tasks. The provider
+connections themselves are UI/DB-managed — see
+[OAuth & credentials](#oauth--credentials-ui-managed).
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `ARGOS_POLL_INTERVAL_MINUTES` | `5` (clamped to 1–59) | How often the scheduler polls issue trackers (`argos:poll-issues`), checks plan-comment reactions (`argos:check-plan-approvals`) and reads ticket comments (`argos:tasks:sync-ticket-comments`). Default keeps API usage low at scale; set `1` locally for fast feedback. |
 
 ## OAuth & credentials (UI-managed)
 
 OAuth apps for GitHub / GitLab / Bitbucket / Linear are **managed in the UI**
-(Configuration → OAuth Apps) and stored in the database — there are **no**
+(Administration → OAuth apps, `/system/oauth-apps`) and stored in the database — there are **no**
 `*_CLIENT_ID` / `*_CLIENT_SECRET` environment variables. Self-hosted GitLab
 instances are configured per app via the `instance_url` field.
 
@@ -169,12 +219,12 @@ that URL in the provider's OAuth app. See [OAuth Overview](OAUTH.md) and the
 per-provider setup guides ([GitHub](SETUP-GITHUB.md), [GitLab](SETUP-GITLAB.md),
 [Bitbucket](SETUP-BITBUCKET.md), [Linear](SETUP-LINEAR.md)).
 
-The **Claude / Codex agent credentials** are likewise **not** environment
-variables — add them in the onboarding wizard / credentials UI, where they are
-stored per agent in the database.
+The **Claude agent credentials** are likewise **not** environment variables —
+add them in the setup wizard or under **My account → Claude subscriptions**
+(`/account/agents`), where they are stored in the database.
 
 > The `SEED_*` variables (e.g. `SEED_USER_EMAIL`, `SEED_REPO_URL`,
-> `SEED_CLAUDE_OAUTH_TOKEN`, `SEED_CODEX_AUTH_JSON_B64`) are **dev-only seeding
+> `SEED_CLAUDE_OAUTH_TOKEN`) are **dev-only seeding
 > overrides** read by `.tools/bin/dev-reset.sh`. They are not operator
 > configuration and have no effect outside seeding.
 
@@ -192,39 +242,12 @@ Passport (scope `mcp:use`).
 See the [MCP Server guide](SETUP-MCP.md) for the connect flow and the available
 tools.
 
-## Target-project MCP (Laravel Boost)
+## Repository settings in tasks
 
-The worker checks the cloned target project's `boost.json` for `"mcp": true`.
-If present, the active agent runner attaches the project's MCP server as a
-local `stdio` subprocess (`php artisan boost:mcp`) before each session — no
-network access, no Argos database connection. The target repo decides; no
-manager-side flag.
-
-**Requirements on the target project:**
-- `laravel/boost ^2.4` in `composer.json`
-- `boost.json` with `"mcp": true`
-- `composer install` has run (vendor directory present)
-
-**Wiring per agent (handled automatically):**
-- Claude Code: `claude --mcp-config <file>` with a generated config file.
-- Codex: `-c mcp_servers.laravel-boost.{command,args}=…` overrides spliced
-  into the `codex exec` invocation.
-
-The MCP server runs entirely inside the worker container. It gives the agent
-access to Boost tools (e.g. `search-docs`, `database-schema`) scoped to the
-target project. To opt out, set `"mcp": false` in `boost.json` or remove the
-file.
-
-## Media library (optional)
-
-File and image uploads attached to models go through
-[spatie/laravel-medialibrary](https://spatie.be/docs/laravel-medialibrary).
-
-| Variable | Default | Purpose |
-|---|---|---|
-| `MEDIA_DISK` | `public` | Filesystem disk (from `config/filesystems.php`) uploads are stored on. Point at `s3` etc. for off-box storage. |
-
-See [Media library setup](SETUP-MEDIA-LIBRARY.md).
+Tasks run Claude Code in their worktree with the repository's *project* and *local* settings,
+so project-level configuration (`CLAUDE.md`, `.claude/settings.json`,
+`.mcp.json`) applies as it would on a developer machine. There is no
+manager-side flag; the repository decides.
 
 ## Logging
 

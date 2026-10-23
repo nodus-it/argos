@@ -6,23 +6,22 @@
     "keywords": ["laravel", "framework"],
     "license": "AGPL-3.0-or-later",
     "require": {
-        "php": "^8.3",
+        "php": "^8.5",
         "dedoc/scramble": "^0.13.26",
         "dutchcodingcompany/filament-developer-logins": "^2.1",
         "filament/filament": "^5.0",
         "laravel/framework": "^13.0",
         "laravel/horizon": "^5.46",
         "laravel/passport": "^13",
+        "laravel/reverb": "^1.12",
         "laravel/sanctum": "^4.0",
         "laravel/socialite": "^5.27",
         "laravel/tinker": "^3.0",
         "predis/predis": "^3.4",
         "saloonphp/laravel-plugin": "^4.3",
-        "saloonphp/pagination-plugin": "^2.3",
         "saloonphp/saloon": "^4.0",
         "socialiteproviders/bitbucket": "^4.1",
         "socialiteproviders/gitlab": "^4.1",
-        "spatie/laravel-medialibrary": "^11.23",
         "symfony/process": "^8.0",
         "symfony/yaml": "^8.0"
     },
@@ -74,7 +73,6 @@
         "test:external": "@php artisan test --compact --configuration=phpunit.external.xml",
         "test:browser:up": "bash .tools/bin/e2e-up.sh",
         "test:browser": "npx playwright test",
-        "test:browser:real": "npx playwright test full-flow.real",
 
         "qa:full": [
             "@qa",

@@ -4,18 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
-use App\Events\Task\PhaseCompleted;
-use App\Events\Task\TaskCompleted;
-use App\Events\Task\TaskDeleted;
-use App\Jobs\RunPhaseJob;
-use App\Listeners\Task\CloseSourceIssue;
-use App\Listeners\Task\DispatchAutoPush;
-use App\Listeners\Task\NotifyIssueTrackerOfPhase;
-use App\Listeners\Task\PurgeTaskResources;
-use App\Listeners\Task\RemoveTaskVolume;
-use App\Listeners\Task\StopDemoAfterPush;
 use App\Models\User;
-use App\Services\Anthropic\CredentialStore;
 use App\Services\GitProvider\BitbucketGitService;
 use App\Services\GitProvider\GitHubGitService;
 use App\Services\GitProvider\GitLabGitService;
@@ -26,11 +15,17 @@ use App\Services\IssueTracker\Providers\GitHubIssueTracker;
 use App\Services\IssueTracker\Providers\GitLabIssueTracker;
 use App\Services\IssueTracker\Providers\LinearIssueTracker;
 use App\Services\OAuth\OAuthConfigHydrator;
+use App\Services\Workspace\PullRequestFeedbackService;
+use App\Services\Workspace\PullRequestService;
+use App\Services\Workspace\WorkspaceMemberService;
+use App\Support\RepoUrlBuilder;
 use App\Workers\Agents\AgentRegistry;
 use App\Workers\Agents\ClaudeCodeRunner;
-use App\Workers\Agents\CodexRunner;
 use App\Workers\Builtin\BuiltinSync;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Events\MigrationsEnded;
+use Illuminate\Http\Request;
 use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Support\Env;
 use Illuminate\Support\Facades\Artisan;
@@ -38,6 +33,8 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Passport\Passport;
 use PDO;
@@ -50,7 +47,9 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->app->singleton(CredentialStore::class);
+        // Request-scoped: pull request details and feedback are read once per request.
+        $this->app->scoped(PullRequestService::class);
+        $this->app->scoped(PullRequestFeedbackService::class);
 
         $this->app->singleton(GitProviderRegistry::class, function (): GitProviderRegistry {
             $registry = new GitProviderRegistry;
@@ -64,7 +63,7 @@ class AppServiceProvider extends ServiceProvider
                 'gitlab',
                 fn (string $token, string $instanceUrl): GitLabGitService => new GitLabGitService(
                     $token,
-                    $instanceUrl ?: 'https://gitlab.com',
+                    RepoUrlBuilder::gitlabInstance($instanceUrl),
                 ),
             );
 
@@ -90,7 +89,7 @@ class AppServiceProvider extends ServiceProvider
                 'gitlab',
                 fn (string $token, string $instanceUrl): GitLabIssueTracker => new GitLabIssueTracker(
                     $token,
-                    $instanceUrl ?: 'https://gitlab.com',
+                    RepoUrlBuilder::gitlabInstance($instanceUrl),
                 ),
             );
 
@@ -113,13 +112,12 @@ class AppServiceProvider extends ServiceProvider
             // Adding a new agent: write the runner class, add a case to
             // App\Enums\AgentName, register here. No DB seeding required.
             $registry->register(ClaudeCodeRunner::class);
-            $registry->register(CodexRunner::class);
 
             return $registry;
         });
 
         // Browser-E2E test mode: deterministic, offline replacements for the
-        // worker run and external validations (Anthropic, Git providers).
+        // workspace runtime and external validations (Anthropic, Git providers).
         // Double-gated — only when ARGOS_E2E_FAKE is set AND not in production —
         // so the production autoload path is never touched. Registered last so
         // its bindings override the real ones above.
@@ -130,26 +128,19 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // Production URLs come from APP_URL, never from a forwarded host:
+        // links in mails and redirects cannot be pointed elsewhere.
+        if ($this->app->environment('production') && filled(config('app.url'))) {
+            URL::forceRootUrl((string) config('app.url'));
+            if (str_starts_with((string) config('app.url'), 'https://')) {
+                URL::forceScheme('https');
+            }
+        }
+
         Event::listen(SocialiteWasCalled::class, GitLabExtendSocialite::class.'@handle');
         Event::listen(SocialiteWasCalled::class, BitbucketExtendSocialite::class.'@handle');
 
-        // Task workflow follow-up actions. The kernel services (WorkflowService,
-        // TaskService) just advance state and fire the event; these listeners
-        // carry out the side-effects so the services stay side-effect-free.
-        // Auto-discovery is explicitly disabled in bootstrap/app.php so this
-        // block remains the single source of truth and no listener fires twice.
-        Event::listen(PhaseCompleted::class, DispatchAutoPush::class);
-        Event::listen(PhaseCompleted::class, StopDemoAfterPush::class);
-        Event::listen(PhaseCompleted::class, NotifyIssueTrackerOfPhase::class);
-        Event::listen(TaskCompleted::class, CloseSourceIssue::class);
-        Event::listen(TaskCompleted::class, RemoveTaskVolume::class);
-        Event::listen(TaskDeleted::class, PurgeTaskResources::class);
-
         Queue::failing(function (JobFailed $event): void {
-            if ($event->job->resolveName() === RunPhaseJob::class) {
-                return;
-            }
-
             Log::channel('argos')->error('Job failed', [
                 'job' => $event->job->resolveName(),
                 'error' => $event->exception->getMessage(),
@@ -185,6 +176,26 @@ class AppServiceProvider extends ServiceProvider
         // authenticated user by default; redefine this gate to restrict access
         // (e.g. role-based) without touching the User model or the panel.
         Gate::define('access-argos-panel', fn (User $user): bool => true);
+
+        // Workspace daemons report many small event batches; cap each
+        // workspace separately so one busy daemon cannot starve the others.
+        // REST API and MCP: per caller (API client, workspace token or user), else per address.
+        RateLimiter::for('api', function (Request $request): Limit {
+            $caller = $request->user();
+
+            return Limit::perMinute(120)->by($caller instanceof Model ? $caller::class.':'.$caller->getKey() : 'ip:'.$request->ip());
+        });
+        RateLimiter::for('oauth-registration', fn (Request $request): Limit => Limit::perMinute(20)->by('ip:'.$request->ip()));
+        RateLimiter::for('workspace-daemon', fn (Request $request): Limit => Limit::perMinute(600)->by('ws:'.$request->route('workspace')));
+
+        // Platform administration (users, worker stacks, OAuth apps, settings,
+        // API clients, provider credentials). Redefine for finer roles.
+        Gate::define('administer-argos', fn (User $user): bool => $user->isAdmin());
+
+        // EE seam for pair programming: whether a workspace may have members
+        // besides its owner. Enforced in exactly one place
+        // (WorkspaceMemberService::add); redefine this gate to restrict it.
+        Gate::define(WorkspaceMemberService::COLLABORATION_GATE, fn (User $user): bool => (bool) config('argos.workspaces.collaboration', true));
     }
 
     /**

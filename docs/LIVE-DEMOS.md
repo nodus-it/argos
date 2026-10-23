@@ -1,197 +1,132 @@
-# Live Demos
+# Previews
 
-A **live demo** is an ephemeral, running deployment of a task's implemented
-branch. After Argos finishes the Implement phase, it can spin up the code in
-its own container stack and publish it under a temporary subdomain so you can
-click through the result in a browser **before** the pull request is merged.
-
-This page explains what a live demo is, when it appears, how to control who can
-open it, and how its lifecycle (build → live → stopped) works.
+A **preview** (live demo) is a running deployment of one
+[task](TASKS.md)'s current files. Argos boots the task's worktree in its own
+small container stack and publishes it under a temporary subdomain, so you can
+click through the change in a browser **before** the pull request is merged.
 
 ## Contents
 
-- [What a live demo is](#what-a-live-demo-is)
-- [When a demo appears](#when-a-demo-appears)
-- [Where to find the demo URL](#where-to-find-the-demo-url)
-- [The demo contract](#the-demo-contract)
-- [Access modes](#access-modes)
+- [What a preview is](#what-a-preview-is)
+- [When a preview is available](#when-a-preview-is-available)
+- [Starting and opening a preview](#starting-and-opening-a-preview)
+- [The preview contract](#the-preview-contract)
+- [Access](#access)
 - [Lifecycle](#lifecycle)
-- [Rebuild and stop](#rebuild-and-stop)
 - [Operator configuration](#operator-configuration)
 
-## What a live demo is
+## What a preview is
 
-When a task's Implement phase completes, the implemented code already lives in
-the task's workspace volume. Argos mounts that volume into a small container
-stack, runs the build/setup commands, and publishes a route through Traefik so
-the deployment is reachable under its own subdomain — typically
-`demo-<task>.<base-domain>`.
+A workspace keeps its checkout in a Docker volume; each task has its worktree
+there. The preview mounts **only that task's worktree** into a small container
+stack, runs the contract's boot commands and publishes a route through
+Traefik at `demo-<workspace>-<task>.<base-domain>` (cut to 63 characters).
+Because it mounts the worktree, the preview always shows the task's current
+files — PHP changes appear without a rebuild.
 
-A demo is **ephemeral** and **per task**:
+A preview is **ephemeral** and **per task**:
 
-- There is exactly one current demo per task. A new Implement run replaces the
-  previous demo cleanly (old containers, volumes, and route are torn down
-  first).
-- A demo has a **time-to-live (TTL)**. Once it expires it is stopped
-  automatically.
-- The demo runs alongside Argos itself — it is meant for quick review, not as a
+- At most one preview per task. **Rebuild** replaces it cleanly (old
+  containers, volumes and route are torn down first).
+- It has its own database inside its compose stack — not the task's working
+  database.
+- It has a **time-to-live (TTL)** and is meant for quick review, not as a
   production deployment.
 
-## When a demo appears
+## When a preview is available
 
-A demo is built automatically after a **successful Implement run**, but only
-when **both** of these are true:
+A task can start a preview only when **both** are true:
 
-1. **Live demos are enabled on the project.** Each project (repo profile) has a
-   `live_demo_enabled` toggle. See [PROJECTS.md](PROJECTS.md) for where to set
-   it.
-2. **Previews are enabled platform-wide.** The operator must have preview
-   infrastructure switched on (`ARGOS_PREVIEW_ENABLED`, on by default — see
-   [Operator configuration](#operator-configuration)).
+1. **Live demo is enabled for the workspace** (Settings → Environment →
+   *Enable live demo*; on for new workspaces). See
+   [Workspace Settings](WORKSPACE-SETTINGS.md#live-demo).
+2. **Previews are enabled platform-wide** (`ARGOS_PREVIEW_ENABLED`, on by
+   default).
 
-If either is off, no demo is built and the demo actions stay hidden on the
-task.
+If either is off, the sidebar says why and offers no preview.
 
-When the conditions are met, finishing the Implement phase dispatches the
-deploy in the background — the task page shows **"Building demo…"** while it
-runs and switches to the live URL once it is ready.
+## Starting and opening a preview
 
-## Where to find the demo URL
+The preview controls sit in the **Environment** part of the task's sidebar
+(`/preview` shows the sidebar):
 
-The **Live demo** panel is shown on the task's view page. Open the task in
-Argos (`${APP_URL}`) and look for the "Live demo" section. Depending on state
-it shows:
+- **Start** builds the preview in the background; the row shows *Building the
+  preview…* until it is live.
+- **Open** opens it in its own browser tab (one per task, reused on the next
+  click). The row shows when it expires.
+- **Rebuild** replaces the running preview with a fresh build.
+- **Re-run setup commands** runs the contract's `commands` again in the running
+  preview — after a migration, a `composer`/`npm` change or a build-config
+  edit — without a rebuild. The output is appended to the build log.
+- **Stop preview** removes its containers, volumes and route.
+- When a build fails, the **build log** opens.
 
-- **Building demo…** while the deployment is being built.
-- The demo **URL** and an **Expires** timestamp once the demo is live.
-- A hint and a **Show build log** link when the build failed.
-- A hint that no demo exists yet (it is built after the next successful
-  Implement run).
+The contract commands run as the workspace's `agent` user, so files they
+create (e.g. `vendor/`, compiled views) stay editable in the task.
 
-## The demo contract
+## The preview contract
 
-How a demo is built and what it runs is defined by a **demo contract** — two
-files in the repository at `.argos/`:
+How a preview is built is defined by two files in the repository:
 
 | File | Purpose |
 | --- | --- |
-| `.argos/demo.compose.yml` | The Docker Compose services the demo runs (the app, its database, any backing services). |
-| `.argos/demo.yml` | Settings: which service/port to route to, where to mount the workspace, the setup commands to run, and an optional health check. |
+| `.argos/demo.compose.yml` | The Docker Compose services the preview runs (the app, its database, any backing services). |
+| `.argos/demo.yml` | Settings: which service/port to route to, where to mount the worktree, the boot commands, and a health check. |
 
-Both files are read from the project's **default branch**. They must exist
-**together** — a repository that ships only one of them is treated as a
-mistake, and the demo build fails with an error rather than silently falling
-back.
+They are read at the workspace's setup ref — the default branch, or a tested,
+unmerged setup branch; the [setup task](PREPARE-PROJECT.md#the-setup-task)
+previews its own branch. Both must exist **together**; shipping only one fails
+the build with an error rather than silently falling back.
 
-For details on writing a contract and the commands it runs, see
-[PREPARE-PROJECT.md](PREPARE-PROJECT.md) and
-[EXECUTION-COMMANDS.md](EXECUTION-COMMANDS.md).
+Without either file, Argos uses a **bundled Laravel contract**: nginx +
+php-fpm + Node, a MariaDB database, and a standard bring-up (`composer
+install`, `.env` from `.env.example`, `php artisan migrate --force --seed`,
+`npm ci && npm run build`, `php artisan storage:link`). Its database uses the
+workspace's MySQL credentials, and a Redis service is added when the workspace
+enabled Redis.
 
-### Default Laravel demo
+How to write a contract: [Preparing a Repository](PREPARE-PROJECT.md#live-preview);
+the exact commands: [EXECUTION-COMMANDS.md](EXECUTION-COMMANDS.md#the-preview-deployer).
 
-If a repository ships **no** `.argos/demo.*` files at all, Argos uses a
-**built-in default Laravel contract**. It boots a PHP runtime (nginx + php-fpm)
-plus a MariaDB database, mounts the workspace, and runs a standard Laravel
-bring-up — roughly:
+## Access
 
-- `composer install`
-- copy `.env.example` to `.env` if missing
-- `php artisan migrate --force --seed`
-- `npm ci && npm run build` (when a `package.json` is present)
-- `php artisan storage:link`
-
-The default contract reuses the project's configured backing-service settings:
-the demo database uses the same credentials the project configured for its
-worker MySQL sidecar, and a Redis service is added automatically when the
-project enabled Redis. The default runtime routes to the `app` service on port
-`80`.
-
-A repository that ships its own contract keeps full control and is not touched
-by these defaults.
-
-## Access modes
-
-Each demo is protected according to an **access mode**. You set it per task via
-the **Demo access** action on the task page. Changes apply **immediately** to a
-running demo (the route is re-written without a full rebuild); for a stopped
-demo they take effect on the next build.
-
-| Mode | Meaning |
-| --- | --- |
-| **Inherit** (default) | Use the stack-wide default access setting (`ARGOS_PREVIEW_AUTH`). The action shows what that currently resolves to. |
-| **Session** | Require an Argos login. Traefik checks your Argos session via a forward-auth gate before serving the demo. |
-| **Basic** | Protect the demo with shared HTTP Basic credentials (username + password). |
-| **Public** | No protection — anyone with the URL can open it. |
-
-Notes:
-
-- **Inherit** resolves against the operator default `ARGOS_PREVIEW_AUTH`
-  (`none`, `session`, or `basic`). A default of `none` resolves to **Public**.
-- For **Basic**, the **username** is the stack-wide value
-  `ARGOS_PREVIEW_BASIC_USER` (default `demo`). The **password** is either one
-  you type in the access dialog or, if you leave it empty, a 16-character
-  password Argos generates — a basic-protected demo is never left without a
-  password. After saving, Argos shows you the resulting credentials in a
-  notification.
+A preview is **members-only**. Every request passes Traefik's forward-auth
+check against the workspace gate, which lets through only members of the
+workspace (admins, members and viewers) and Argos administrators. There is no
+public or password-only mode.
 
 ## Lifecycle
 
-A demo moves through these states:
-
 | State | Meaning |
 | --- | --- |
-| **Building** | The deployment is being built (containers up, setup commands, health check). |
-| **Live** | The demo is reachable at its URL. |
-| **Failed** | The build failed — the build log explains why; any partial containers are cleaned up. |
-| **Stopped** | The demo's containers, volumes, and route have been removed. It can be restarted. |
+| **Building** | Containers come up, boot commands and the health check run. |
+| **Live** | The preview is reachable at its URL. |
+| **Failed** | The build failed — the build log explains why; partial containers are cleaned up. |
+| **Stopped** | Containers, volumes and route are removed. It can be started again. |
 
-How a demo leaves the **Live** state:
+A preview leaves the **Live** state by
 
-- **TTL expiry.** A demo lives for `ARGOS_PREVIEW_TTL_HOURS` (default 24 hours)
-  from when it was built. A scheduled cleanup runs periodically and tears down
-  any demo past its TTL.
-- **After the pull request.** When the task's Push phase opens the pull
-  request, the demo is torn down automatically. You can restart it at any time
-  from the task page.
-- **Concurrency cap.** The platform limits how many demos run at once
-  (`ARGOS_PREVIEW_MAX_CONCURRENT`, default 10). When a new demo would exceed
-  the cap, the **oldest** running demos of *other* tasks are evicted (stopped)
-  to make room. Evictions are logged, never silent. Set the cap to `0` to
-  disable it.
-- **Manual stop.** See below.
-
-## Rebuild and stop
-
-The task page offers two actions (visible only when live demos are enabled for
-the project and the Implement phase has completed):
-
-- **Rebuild demo** — replaces the current demo with a fresh build of the latest
-  implemented code. A running demo for the task is torn down first; the build
-  runs in the background. (For a previously stopped demo this is shown as
-  **Restart demo**.)
-- **Stop demo** — removes the demo's containers, volumes, and route. Available
-  while the demo is **Building** or **Live**. A stopped demo can be restarted
-  later.
+- **TTL expiry** — `ARGOS_PREVIEW_TTL_HOURS` (default 24) after it was built;
+  a scheduled cleanup stops it,
+- **the workspace's limit** — *Parallel previews* (Settings → Resources,
+  default 3): starting one more stops the oldest preview of the workspace,
+- **the platform cap** — `ARGOS_PREVIEW_MAX_CONCURRENT` (default 10, `0`
+  disables): the oldest previews of other tasks are stopped to make room
+  (logged, never silent),
+- **the workspace stopping** (by hand or after idling),
+- **task cleanup** — `cleanup_after_days` after the task is done or cancelled,
+  or when the task is deleted,
+- **Stop preview**.
 
 ## Operator configuration
 
-Live demos are governed by the `preview.*` settings in `config/argos.php`,
-driven by environment variables. The most relevant for users and operators:
-
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `ARGOS_PREVIEW_ENABLED` | `true` | Platform-wide master switch for demos. |
-| `ARGOS_PREVIEW_TTL_HOURS` | `24` | How long a demo lives before automatic teardown. |
-| `ARGOS_PREVIEW_MAX_CONCURRENT` | `10` | Cap on simultaneously running demos (`0` disables). |
-| `ARGOS_PREVIEW_AUTH` | `none` | Default access mode for tasks set to *Inherit* (`none` \| `session` \| `basic`). |
-| `ARGOS_PREVIEW_BASIC_USER` | `demo` | HTTP Basic username for basic-protected demos. |
-| `ARGOS_PREVIEW_BASIC_PASSWORD` | *(unset)* | Fallback Basic password for tasks that merely inherit the basic default. |
-| `ARGOS_PREVIEW_BASE_DOMAIN` | derived from `APP_URL` | Base domain demos are served under (`demo-<task>.<base-domain>`). |
+| `ARGOS_PREVIEW_ENABLED` | `true` | Platform-wide master switch for previews. |
+| `ARGOS_PREVIEW_TTL_HOURS` | `24` | How long a preview lives before automatic teardown. |
+| `ARGOS_PREVIEW_MAX_CONCURRENT` | `10` | Cap on simultaneously running previews (`0` disables). |
+| `ARGOS_PREVIEW_BASE_DOMAIN` | derived from `APP_URL` | Base domain previews are served under. |
 
-Demos require preview infrastructure on the host (a Traefik edge with the
-shared `argos_edge` network and a wildcard-capable base domain). Operators
-without that infrastructure can turn demos off entirely with
-`ARGOS_PREVIEW_ENABLED=false`.
-
-For the full list of settings and how to set environment variables, see
-[CONFIGURATION.md](CONFIGURATION.md).
+Previews need a Traefik edge with the shared `argos_edge` network and a
+wildcard-capable base domain. Without that infrastructure, turn them off with
+`ARGOS_PREVIEW_ENABLED=false`. All settings: [Configuration](CONFIGURATION.md#live-previews).

@@ -9,8 +9,8 @@ use App\Enums\TaskProviderKind;
 use App\Enums\TaskProviderMode;
 use App\Enums\TaskProviderSyncStatus;
 use App\Models\ProviderCredential;
-use App\Models\RepoProfile;
 use App\Models\TaskProviderBinding;
+use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -21,7 +21,7 @@ class TaskProviderBindingFactory extends Factory
     public function definition(): array
     {
         return [
-            'repo_profile_id' => RepoProfile::factory(),
+            'workspace_id' => Workspace::factory(),
             'kind' => TaskProviderKind::GitHub,
             'mode' => TaskProviderMode::Disabled,
             'auth_method' => AuthMethod::OAuth,

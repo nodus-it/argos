@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Demo;
 
-use App\Models\RepoProfile;
+use App\Models\Workspace;
 use App\Services\Demo\DemoContractBuilder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Symfony\Component\Yaml\Yaml;
@@ -17,14 +17,14 @@ class DemoContractBuilderTest extends TestCase
     /**
      * @return array{0: string, 1: string}
      */
-    private function build(RepoProfile $profile): array
+    private function build(Workspace $profile): array
     {
         return app(DemoContractBuilder::class)->buildDefault($profile);
     }
 
     public function test_unconfigured_profile_keeps_stub_defaults_and_no_redis(): void
     {
-        [$composeYaml, $settingsYaml] = $this->build(RepoProfile::factory()->create());
+        [$composeYaml, $settingsYaml] = $this->build(Workspace::factory()->create());
         $compose = Yaml::parse($composeYaml);
 
         $this->assertSame('demo', $compose['services']['db']['environment']['MARIADB_DATABASE']);
@@ -34,7 +34,7 @@ class DemoContractBuilderTest extends TestCase
 
     public function test_configured_mysql_credentials_apply_to_db_and_app(): void
     {
-        $profile = RepoProfile::factory()
+        $profile = Workspace::factory()
             ->withServiceConfig(['mysql' => ['database' => 'shop', 'username' => 'sa', 'password' => 'pw']])
             ->create();
 
@@ -49,7 +49,7 @@ class DemoContractBuilderTest extends TestCase
 
     public function test_redis_added_when_enabled(): void
     {
-        $profile = RepoProfile::factory()->withBackingServices(['redis'])->create();
+        $profile = Workspace::factory()->withBackingServices(['redis'])->create();
 
         $compose = Yaml::parse($this->build($profile)[0]);
 

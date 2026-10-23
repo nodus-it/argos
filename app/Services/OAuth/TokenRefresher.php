@@ -31,8 +31,8 @@ class TokenRefresher
 
     /**
      * Buffer before `expires_at` at which a token is considered in need of
-     * refresh. Sized to cover the full RunPhaseJob timeout (3600s) so a token
-     * obtained at dispatch survives the worker's entire run.
+     * refresh. One hour of headroom, so a token handed to a workspace does not
+     * expire in the middle of a long agent turn.
      */
     public const REFRESH_BUFFER_SECONDS = 3600;
 

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Services\GitProvider;
 
 use App\Integrations\Bitbucket\Requests\CommentOnPullRequest;
-use App\Integrations\Bitbucket\Requests\UpdatePullRequest;
+use App\Integrations\Bitbucket\Requests\FindOpenPullRequest;
 use App\Services\GitProvider\BitbucketGitService;
 use Saloon\Http\Faking\MockResponse;
 use Saloon\Http\Request;
@@ -192,22 +192,16 @@ class BitbucketGitServiceTest extends TestCase
         });
     }
 
-    public function test_update_pull_request_puts_title_and_description(): void
+    public function test_find_open_pull_request_looks_up_the_branch(): void
     {
-        Saloon::fake([
-            'https://api.bitbucket.org/2.0/repositories/acme/widget/pullrequests/3' => MockResponse::make(['id' => 3]),
-        ]);
+        Saloon::fake([FindOpenPullRequest::class => MockResponse::make(['values' => [['id' => 7, 'state' => 'OPEN']]])]);
 
-        (new BitbucketGitService('user:pass'))->updatePullRequest('acme', 'widget', 3, 'new title', 'new body');
+        $found = (new BitbucketGitService('user:app_password'))->findOpenPullRequest('acme', 'widget', 'argos/login');
 
-        Saloon::assertSent(function (Request $request, $response): bool {
-            $body = $request instanceof UpdatePullRequest ? $request->body()->all() : [];
+        $this->assertSame(7, $found['id'] ?? null);
+        Saloon::assertSent(fn (Request $request): bool => $request instanceof FindOpenPullRequest && $request->query()->all() === ['q' => 'source.branch.name="argos/login" AND state="OPEN"', 'pagelen' => 1]);
 
-            return $request instanceof UpdatePullRequest
-                && $response->getPendingRequest()->getMethod()->value === 'PUT'
-                && str_ends_with($request->resolveEndpoint(), '/pullrequests/3')
-                && ($body['title'] ?? null) === 'new title'
-                && ($body['description'] ?? null) === 'new body';
-        });
+        Saloon::fake([FindOpenPullRequest::class => MockResponse::make(['values' => []])]);
+        $this->assertNull((new BitbucketGitService('user:app_password'))->findOpenPullRequest('acme', 'widget', 'argos/login'));
     }
 }

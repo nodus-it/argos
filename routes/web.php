@@ -5,17 +5,39 @@ declare(strict_types=1);
 use App\Http\Controllers\Auth\BitbucketConnectedAccountController;
 use App\Http\Controllers\Auth\ConnectedAccountController;
 use App\Http\Controllers\Auth\LinearConnectedAccountController;
-use App\Http\Controllers\DemoGateController;
-use App\Http\Controllers\TaskLogController;
+use App\Http\Controllers\LegacyAdminRedirectController;
+use App\Http\Controllers\LegacyWorkspaceRedirectController;
+use App\Http\Controllers\SystemLogController;
+use App\Http\Controllers\TaskAttachmentController;
+use App\Http\Controllers\UserAvatarController;
 use App\Http\Controllers\Webhooks\IssueWebhookController;
+use App\Http\Controllers\WorkspaceGateController;
+use App\Http\Controllers\WorkspaceOpenController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', fn () => redirect('/admin'));
+// The admin panel is gone: its pages live under /account, /system, /docs
+// and /setup now.
+Route::get('/admin/{path?}', LegacyAdminRedirectController::class)
+    ->where('path', '.*')
+    ->name('admin.legacy');
 
-// Traefik forwardAuth target for session-protected live demos. Public route
-// (no auth middleware) — it answers 204 when logged in, else redirects to the
-// Argos login. See DemoGateController.
-Route::get('/_argos/demo-gate', DemoGateController::class)->name('demo.gate');
+// The workspace app sits at the root (`/`, `/{workspace}/{task}`); links
+// from before still point at /w/… — they keep working.
+Route::middleware('auth')->group(function () {
+    Route::get('/w/{path?}', LegacyWorkspaceRedirectController::class)
+        ->where('path', '.*')
+        ->name('workspaces.legacy');
+});
+
+// Traefik forwardAuth target for workspace hosts (code-<slug> editor and
+// workspace demos). Checks membership, not just a login. See
+// WorkspaceGateController.
+// Stateless on purpose: forwardAuth runs for every editor request, and the
+// web group would start a throwaway session each time (Traefik drops the
+// cookie on success). Access comes from the ticket/host cookie instead.
+Route::get('/_argos/workspace-gate', WorkspaceGateController::class)
+    ->name('workspace.gate')
+    ->withoutMiddleware(['web']);
 
 // Inbound issue webhooks — no session auth, signature verified in controller.
 // SubstituteBindings is re-added explicitly since withoutMiddleware('web') would
@@ -26,13 +48,18 @@ Route::post('/webhooks/issues/{kind}/{binding}', [IssueWebhookController::class,
     ->middleware(['throttle:60,1']);
 
 Route::middleware('auth')->group(function () {
-    Route::get('/tasks/{task}/logs/download', [TaskLogController::class, 'downloadPhaseLog'])
-        ->name('tasks.logs.download');
+    Route::get('/tasks/{task}/attachments/{file}', TaskAttachmentController::class)
+        ->name('tasks.attachments');
 
-    Route::get('/tasks/{task}/logs/bundle', [TaskLogController::class, 'downloadBundle'])
-        ->name('tasks.logs.bundle');
+    Route::get('/users/{user}/avatar', UserAvatarController::class)
+        ->name('users.avatar');
 
-    Route::get('/system/log/download', [TaskLogController::class, 'downloadAppLog'])
+    // Open a workspace host (editor/preview) with a fresh access ticket.
+    Route::get('/workspaces/{workspace}/open/{target}', WorkspaceOpenController::class)
+        ->whereIn('target', ['code', 'preview'])
+        ->name('workspaces.open');
+    Route::get('/system/log/download', SystemLogController::class)
+        ->middleware('can:administer-argos')
         ->name('system.log.download');
 });
 

@@ -1,0 +1,113 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Services\Workspace\Environment;
+
+use App\Models\Workspace;
+
+/**
+ * Resolves the workspace environment Argos injects into BOTH the worker
+ * (dependency install + quality gates) and the live demo. Two sources are
+ * merged into one flat NAME => value map:
+ *
+ *   1. composer_registries → a single `COMPOSER_AUTH` http-basic JSON blob, so
+ *      `composer install` reaches private registries (Private Packagist, Satis,
+ *      Flux, Scramble, …) in both places.
+ *   2. worker_env → raw NAME/value secrets (DB creds, API keys, or a
+ *      hand-written `COMPOSER_AUTH` that then wins over the generated one).
+ *
+ * Argos-owned keys are dropped so a project secret can never clobber
+ * REPO_TOKEN, the agent credential, APP_KEY, the demo's APP_URL, etc.
+ */
+class EnvironmentResolver
+{
+    /**
+     * Env names Argos sets itself for the worker and/or the demo. A project's
+     * secrets list must not override these.
+     *
+     * @var list<string>
+     */
+    private const RESERVED = [
+        'REPO_URL', 'REPO_TOKEN', 'REPO_PLATFORM', 'BASE_BRANCH',
+        'CLAUDE_CONFIG_DIR', 'CLAUDE_CODE_OAUTH_TOKEN', 'LOG_LEVEL',
+        'APP_KEY', 'APP_URL', 'ASSET_URL', 'SESSION_COOKIE', 'ARGOS_DEMO',
+        'COMMIT_USER_NAME', 'COMMIT_USER_EMAIL',
+        // Workspace daemon wiring (see WorkspaceContainerManager).
+        'ARGOS_DAEMON_TOKEN', 'ARGOS_EVENTS_URL', 'ARGOS_REPO_CREDENTIAL_URL',
+        'ARGOS_DAEMON_PORT', 'ARGOS_CREDENTIAL_PORT', 'ARGOS_CREDENTIAL_HELPER',
+        'ARGOS_WORKSPACE_DIR', 'ARGOS_AGENTS_DIR', 'ARGOS_CLAUDE_BIN', 'ARGOS_EDITOR_PORT',
+    ];
+
+    /**
+     * @return array<string, string>
+     */
+    public function resolve(Workspace $workspace): array
+    {
+        $env = [];
+
+        $composerAuth = $this->composerAuth($workspace->composer_registries ?? []);
+        if ($composerAuth !== null) {
+            $env['COMPOSER_AUTH'] = $composerAuth;
+        }
+
+        // Raw secrets layer on top — a hand-written COMPOSER_AUTH overrides the
+        // generated one on purpose (the documented escape hatch).
+        foreach ($workspace->worker_env ?? [] as $row) {
+            $name = trim((string) ($row['name'] ?? ''));
+            if ($name === '') {
+                continue;
+            }
+            $env[$name] = (string) ($row['value'] ?? '');
+        }
+
+        // Expand backing-service placeholders (`${mysql.host}`, …) in the values
+        // so a project with non-standard env names bridges to the sidecars
+        // without hardcoding internal hosts/credentials.
+        $placeholders = app(BackingServiceResolver::class)->placeholders($workspace);
+        if ($placeholders !== []) {
+            foreach ($env as $key => $value) {
+                $env[$key] = strtr($value, $placeholders);
+            }
+        }
+
+        foreach (self::RESERVED as $reserved) {
+            unset($env[$reserved]);
+        }
+
+        return $env;
+    }
+
+    /**
+     * Build a Composer `COMPOSER_AUTH` http-basic JSON blob from the structured
+     * registry rows. Returns null when no usable row is configured.
+     *
+     * @param  array<int, array<string, mixed>>  $registries
+     */
+    private function composerAuth(array $registries): ?string
+    {
+        $httpBasic = [];
+
+        foreach ($registries as $row) {
+            $host = trim((string) ($row['host'] ?? ''));
+            $token = (string) ($row['token'] ?? '');
+            if ($host === '' || $token === '') {
+                continue;
+            }
+            $username = trim((string) ($row['username'] ?? ''));
+            $httpBasic[$host] = [
+                'username' => $username !== '' ? $username : 'token',
+                'password' => $token,
+            ];
+        }
+
+        if ($httpBasic === []) {
+            return null;
+        }
+
+        return json_encode(
+            ['http-basic' => $httpBasic],
+            JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES,
+        );
+    }
+}

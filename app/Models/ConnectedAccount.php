@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Enums\AuthMethod;
 use App\Enums\GitProvider;
 use App\Enums\TaskProviderKind;
+use App\Support\RepoUrlBuilder;
 use Database\Factories\ConnectedAccountFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -71,12 +72,23 @@ class ConnectedAccount extends Model
     /**
      * Returns the GitLab instance URL, defaulting to https://gitlab.com for public GitLab.
      */
+    /** How the account is named in pickers: "Octocat", plus the host of a self-hosted instance. */
+    public function displayLabel(bool $withProvider = false): string
+    {
+        $label = $this->name ?? $this->nickname ?? '#'.$this->id;
+        $host = $this->instance_url !== null && $this->instance_url !== ''
+            ? ' ('.(parse_url($this->instance_url, PHP_URL_HOST) ?: $this->instance_url).')'
+            : '';
+
+        return $withProvider ? ucfirst($this->provider).$host.' · '.$label : $label.$host;
+    }
+
     public function getInstanceUrl(): string
     {
         // '' is the public-instance sentinel (was null before the multi-instance
         // migration); both map to the public GitLab host.
         return ($this->instance_url === null || $this->instance_url === '')
-            ? 'https://gitlab.com'
+            ? RepoUrlBuilder::DEFAULT_GITLAB_INSTANCE
             : $this->instance_url;
     }
 
@@ -137,9 +149,9 @@ class ConnectedAccount extends Model
 
     /**
      * Heilt verwaiste OAuth-Ressourcen nach einem Re-Connect: sowohl
-     * RepoProfiles als auch Task-Provider-Bindings, deren `connected_account_id`
+     * Workspaces als auch Task-Provider-Bindings, deren `connected_account_id`
      * durch einen Disconnect (foreign-key `nullOnDelete`) auf NULL fiel.
-     * Re-attacht jedes OAuth-RepoProfile gleicher Git-Plattform und jedes
+     * Re-attacht jeden OAuth-Workspace gleicher Git-Plattform und jedes
      * TaskProviderBinding gleicher Issue-Provider-Art ohne Account an diesen
      * frisch wiederverbundenen Account.
      *
@@ -147,13 +159,11 @@ class ConnectedAccount extends Model
      * die Menge leer (kein Schaden), nach Re-Connect werden die Bindungen
      * zurückgesetzt — Poll / Write-back laufen ohne erneutes Seeden wieder.
      *
-     * Annahme single-tenant: Weder RepoProfile noch TaskProviderBinding haben
-     * eine eigene `user_id`. `unique(user_id, provider)` auf
-     * `connected_accounts` garantiert aber genau einen aktiven Account pro
-     * Plattform — alle verwaisten (oauth, NULL)-Ressourcen gehörten also
-     * zwangsläufig dem gerade gelöschten Account.
+     * Nur Ressourcen der Person, die sich gerade verbindet: Workspaces, die
+     * sie angelegt hat, und deren Ticket-Integrationen. Fremde Workspaces
+     * bekommen nie still den Token eines anderen Menschen.
      *
-     * @return int Anzahl re-attachter RepoProfiles + Bindings
+     * @return int Anzahl re-attachter Workspaces + Bindings
      */
     public function relinkOrphanedResources(): int
     {
@@ -161,10 +171,11 @@ class ConnectedAccount extends Model
 
         $gitProvider = GitProvider::tryFrom($this->provider);
         if ($gitProvider !== null) {
-            $count += RepoProfile::query()
+            $count += Workspace::query()
                 ->where('platform', $gitProvider)
                 ->where('auth_method', AuthMethod::OAuth)
                 ->whereNull('connected_account_id')
+                ->where('created_by', $this->user_id)
                 ->update(['connected_account_id' => $this->id]);
         }
 
@@ -173,6 +184,7 @@ class ConnectedAccount extends Model
             $count += TaskProviderBinding::query()
                 ->where('kind', $issueKind)
                 ->whereNull('connected_account_id')
+                ->whereIn('workspace_id', Workspace::query()->select('id')->where('created_by', $this->user_id))
                 ->update(['connected_account_id' => $this->id]);
         }
 

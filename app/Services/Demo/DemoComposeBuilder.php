@@ -4,13 +4,12 @@ declare(strict_types=1);
 
 namespace App\Services\Demo;
 
-use App\Models\Task;
-use App\Services\Project\ProjectEnvironmentResolver;
+use App\Services\Workspace\Environment\EnvironmentResolver;
 use Illuminate\Encryption\Encrypter;
 use Symfony\Component\Yaml\Yaml;
 
 /**
- * Builds the per-task `docker compose` override for a live demo: mounts the task
+ * Builds the `docker compose` override for a live demo: mounts the
  * workspace volume into the entry service, joins the Traefik edge network under
  * a unique alias, pins the external URL + a throwaway app key + a per-demo
  * session cookie, and caps resources. Split out of DemoDeployer so the
@@ -20,14 +19,14 @@ use Symfony\Component\Yaml\Yaml;
 class DemoComposeBuilder
 {
     /**
-     * Generate the per-task compose override. Deliberately carries NO Traefik
+     * Generate the compose override. Deliberately carries NO Traefik
      * labels — routing is done via the file provider, not the docker provider.
      *
      * @param  array{service: string, port: int, workspace_mount: string}  $entry
      * @param  string  $demoUrl  the public URL (incl. external port) the demo is
      *                           reachable under, from TraefikRouter::urlForSlug()
      */
-    public function buildOverrideYaml(Task $task, string $slug, array $entry, string $demoUrl): string
+    public function buildOverrideYaml(DemoTarget $target, string $slug, array $entry, string $demoUrl): string
     {
         $network = (string) config('argos.preview.network', 'argos_edge');
 
@@ -35,9 +34,7 @@ class DemoComposeBuilder
         // API keys, …) so the demo's `composer install` + boot see the same env
         // as the worker. Argos-owned keys below win via array_merge order, so
         // the project can't override APP_URL / APP_KEY / SESSION_COOKIE here.
-        $projectEnv = $task->repoProfile !== null
-            ? app(ProjectEnvironmentResolver::class)->resolve($task->repoProfile)
-            : [];
+        $projectEnv = app(EnvironmentResolver::class)->resolve($target->demoWorkspace());
 
         $override = [
             'services' => [
@@ -74,9 +71,20 @@ class DemoComposeBuilder
                         // seed the full demo profile instead of the production-safe
                         // admin-only seed. Harmless for any other repo.
                         'ARGOS_DEMO' => '1',
-                    ]),
+                    ], $target->demoExecUser() !== null ? [
+                        // Serve as the user that owns the mounted files (see
+                        // .tools/docker/demo/Dockerfile); otherwise Laravel
+                        // cannot write storage/ and every request 500s.
+                        'ARGOS_FPM_USER' => 'argos',
+                    ] : []),
                     'volumes' => [
-                        $task->volumeName().':'.$entry['workspace_mount'],
+                        // Long syntax: a task's preview mounts only its own worktree.
+                        array_filter([
+                            'type' => 'volume',
+                            'source' => $target->workspaceVolumeName(),
+                            'target' => $entry['workspace_mount'],
+                            'volume' => $target->workspaceSubpath() !== null ? ['subpath' => $target->workspaceSubpath()] : null,
+                        ]),
                     ],
                     'networks' => [
                         $network => [
@@ -98,11 +106,11 @@ class DemoComposeBuilder
                     'external' => true,
                 ],
             ],
-            // The task workspace volume is created by the worker and pre-exists;
+            // The workspace volume pre-exists;
             // declare it external so compose mounts it instead of erroring on an
             // "undefined volume".
             'volumes' => [
-                $task->volumeName() => [
+                $target->workspaceVolumeName() => [
                     'external' => true,
                 ],
             ],

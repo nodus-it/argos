@@ -9,7 +9,7 @@ return [
     'platform' => [
         'github' => [
             'title' => 'GitHub Setup',
-            'body' => 'You only need a Personal Access Token with the `repo` scope. Token expired? Generate a new one and update the project.',
+            'body' => 'You only need a Personal Access Token with the `repo` scope. Token expired? Generate a new one and update the workspace.',
             'link_label' => 'Create a token',
             'link_url' => ':github_pat',
             'doc_label' => 'Full guide',
@@ -44,26 +44,15 @@ return [
         ],
         'not_configured' => [
             'title' => 'OAuth not configured',
-            'body' => 'You can still create projects with a Personal Access Token. OAuth enables repo/branch dropdowns and multi-user setups.',
+            'body' => 'You can still create workspaces with a Personal Access Token. OAuth enables repo/branch dropdowns and multi-user setups.',
             'doc_label' => 'When is OAuth worth it?',
             'doc_url' => ':oauth',
         ],
         'overview' => [
             'title' => 'What does OAuth get me?',
-            'body' => 'Connected accounts replace per-project Personal Access Tokens. Pick repos and branches from dropdowns instead of typing URLs, and let each user connect their own accounts.',
+            'body' => 'Connected accounts replace per-workspace Personal Access Tokens. Pick repos and branches from dropdowns instead of typing URLs, and let each user connect their own accounts.',
             'doc_label' => 'OAuth overview',
             'doc_url' => ':oauth',
-        ],
-    ],
-
-    'task' => [
-        'description' => [
-            'title' => 'Tips for good task descriptions',
-            'body' => 'Concrete acceptance criteria lead to better PRs. Describe what should happen, *why*, and how you will know it worked. Skip the user-story formatting — the agent is not a PM.',
-        ],
-        'no_projects' => [
-            'title' => 'No project yet',
-            'body' => 'You need a project with a repo and a token before you can create a task.',
         ],
     ],
 

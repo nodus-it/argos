@@ -18,6 +18,7 @@ class DemoFactory extends Factory
     {
         return [
             'task_id' => Task::factory(),
+            'workspace_id' => fn (array $attributes): string => Task::query()->findOrFail($attributes['task_id'])->workspace_id,
             'status' => DemoStatus::Building,
             'url' => null,
             'compose_project' => 'demo-'.fake()->lexify('??????????'),

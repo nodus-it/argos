@@ -1,12 +1,12 @@
 # Linear Setup Guide
 
-This guide is for **Argos operators** who want to connect **Linear** as a
-task/issue provider: import Linear issues as Argos tasks, post phase results
-back onto the issue, gate the implement phase on a 👍 reaction, and optionally
-close the issue when the task is done.
+This guide is for **Argos operators** who want to connect **Linear** as an
+issue tracker of a workspace: Linear issues become tickets of tasks, matching
+issues start automatic tasks, Argos comments on the issue as the task
+progresses and closes it on merge, and a 👍 reaction approves the plan.
 
-It covers the Linear-specific parts only. The shared mechanics — how a binding
-is created, how webhook vs. poll mode work, the approve gate, status sync — are
+It covers the Linear-specific parts only. The shared mechanics — how an integration
+is created, how webhook vs. poll mode work, plan approval — are
 described once in [SETUP-TASK-PROVIDERS.md](SETUP-TASK-PROVIDERS.md) and only
 summarized here. Read that page alongside this one.
 
@@ -15,19 +15,18 @@ summarized here. Read that page alongside this one.
 - [Choosing a credential: OAuth or API key](#choosing-a-credential-oauth-or-api-key)
 - [Option A: OAuth application](#option-a-oauth-application)
 - [Option B: Personal API key](#option-b-personal-api-key)
-- [Creating the binding](#creating-the-binding)
+- [Creating the integration](#creating-the-integration)
 - [Webhook mode](#webhook-mode)
 - [Poll mode](#poll-mode)
-- [Issue to task](#issue-to-task)
-- [Concept write-back and the approve gate](#concept-write-back-and-the-approve-gate)
-- [Status sync on completion](#status-sync-on-completion)
+- [Issue to automatic task](#issue-to-automatic-task)
+- [Plan approval](#plan-approval)
 - [Issue identifiers](#issue-identifiers)
 - [Troubleshooting](#troubleshooting)
 
 ## Choosing a credential: OAuth or API key
 
 Argos can authenticate against Linear's GraphQL API two ways, and both can be
-selected as the **Zugang** (credential) of a binding:
+selected as the **Access** of an integration:
 
 - **OAuth account** (a Connected Account) — recommended for a multi-user
   instance. The access token is obtained through Linear's OAuth flow and is
@@ -69,8 +68,8 @@ manager so it picks up the new variables.
 
 ### 3. Connect the account
 
-1. In the admin panel go to **Connected Accounts** (or run the onboarding
-   flow) and start the Linear connection.
+1. Go to **My account → Connected accounts** (`/account/connections`), or run
+   the setup wizard, and start the Linear connection.
 2. Argos redirects you to `https://linear.app/oauth/authorize` to authorize the
    application; approve the requested scopes.
 3. You are redirected back to Argos and the Linear account shows as connected.
@@ -95,7 +94,7 @@ single-operator instance.
 1. In Linear go to **Settings** → **API** → **Personal API keys**
    (`https://linear.app/settings/api`) and create a key. It begins with
    `lin_api_`.
-2. In the Argos admin panel open **Access Tokens** (Provider Credentials) →
+2. In Argos open **Administration → Access tokens** (`/system/tokens`) →
    create a credential with **Provider** = `Linear` and paste the key. The
    inline guidance lists the suggested scope as `read, write`.
 
@@ -105,44 +104,43 @@ needs that user to be an admin on the target team. If the key's owner is not a
 team admin, webhook registration during Setup fails — use OAuth (with the
 `admin` scope) or poll mode instead.
 
-## Creating the binding
+## Creating the integration
 
-Bindings are created on a project's **Task-Provider** tab. The full,
-provider-agnostic procedure is in
-[SETUP-TASK-PROVIDERS.md#creating-a-binding](SETUP-TASK-PROVIDERS.md#creating-a-binding).
-The Linear-specific field values:
+Integrations are created in the workspace's **Settings → Integrations →
+Issue trackers**. The full, provider-agnostic procedure is in
+[SETUP-TASK-PROVIDERS.md#creating-an-integration](SETUP-TASK-PROVIDERS.md#creating-an-integration).
+The Linear-specific values:
 
-| Field (German label) | Value for Linear |
+| Field | Value for Linear |
 |---|---|
 | **Provider** | `Linear` |
-| **Modus** (Mode) | `Webhook (Push)`, `Polling`, or `Deaktiviert` |
-| **Zugang** (Credential) | The Linear OAuth account **or** the Linear API key (PAT) |
-| **Projekt / Team** | A Linear **team**, picked from a list loaded from the credential (the team key + name, e.g. `ENG — Engineering`). The team key is stored, not an `owner/repo` path |
-| **Labels-Filter** | Optional: import only issues carrying at least one of these labels |
-| **Issue schließen bei Task-Abschluss** | Optional: close the source issue when the Argos task completes ([status sync](#status-sync-on-completion)) |
+| **Mode** | *Webhook (push)*, *Polling* or *Disabled* |
+| **Access** | The Linear OAuth account **or** the Linear API key (PAT) |
+| **Project / Team** | A Linear **team**, picked from a list loaded from the access (team key + name, e.g. `ENG — Engineering`). The team key is stored, not an `owner/repo` path |
+| **Labels filter** | Optional: only issues carrying at least one of these labels start a task |
+| **Close the ticket on merge** | On (default): Argos moves the issue to the team's *completed* workflow state once the task is done |
 
-The **Projekt / Team** list is populated by querying Linear's `teams` API with
-the chosen credential, so pick the **Provider** and **Zugang** first. You can
-find the same team key in Linear under **Settings** → **Teams** (the short
-uppercase slug next to the team name, e.g. `ENG`).
+The **Project / Team** list is populated by querying Linear's `teams` API with
+the chosen access, so pick **Provider** and **Access** first. The team key is
+also shown in Linear under **Settings** → **Teams** (e.g. `ENG`).
 
-After saving, run the **Einrichten** (Setup) action on the binding row to
-activate it. For poll mode, Setup just marks the binding Active. For webhook
-mode, Setup registers the webhook (see below). On failure, the error is shown
-in the **Letzter Fehler** (Last error) column and the binding stays Pending.
+After saving, run **Set up** on the integration's row. For poll mode it just
+marks the integration Active; for webhook mode it registers the webhook (see
+below). On failure the error is shown in **Last error** and the integration
+stays Pending.
 
 ## Webhook mode
 
-In webhook mode, the **Einrichten** action registers a webhook on the selected
+In webhook mode, **Set up** registers a webhook on the selected
 Linear **team** automatically — there is no manual step in the Linear UI. The
-webhook is scoped to the team behind the chosen **Projekt / Team** ref and
+webhook is scoped to the team behind the chosen **Project / Team** and
 subscribes to the `Issue` resource type only; comment and project events are
 ignored.
 
 The inbound endpoint (shared across all providers) is:
 
 ```
-POST  ${APP_URL}/webhooks/issues/linear/<binding-id>
+POST  ${APP_URL}/webhooks/issues/linear/<integration-id>
 ```
 
 `APP_URL` must be publicly reachable for Linear to deliver. Argos generates a
@@ -153,7 +151,7 @@ controller verifies it with `hash_equals`; a mismatch or a missing secret
 returns `401`.
 
 Deliveries are de-duplicated by the `Linear-Delivery` header for 24 hours, so a
-Linear retry does not create a duplicate task.
+Linear retry does not start a second task.
 
 **Requirements for webhook mode:**
 
@@ -169,31 +167,32 @@ shown); use poll mode instead.
 
 In poll mode Argos fetches the team's issues on a schedule instead of receiving
 pushes. No webhook is registered in Linear and `APP_URL` does not need to be
-publicly reachable. **Einrichten** marks the binding Active immediately.
+publicly reachable. **Set up** marks the integration Active immediately.
 
 The poll runs via the scheduled `argos:poll-issues` command. The interval is
 configurable through `ARGOS_POLL_INTERVAL_MINUTES` (default **5**, clamped to
 **1–59**); set it to `1` locally for faster feedback. The same interval also
-drives the approve-gate check (`argos:check-concept-approvals`). The scheduler
+drives the plan-approval check (`argos:check-plan-approvals`) and the ticket
+comments (`argos:tasks:sync-ticket-comments`). The scheduler
 (`php artisan schedule:work`, or a system cron running `schedule:run`) must be
-active for poll mode *and* for the approve gate — see
+active for poll mode *and* for plan approval — see
 [SETUP-TASK-PROVIDERS.md#poll-mode](SETUP-TASK-PROVIDERS.md#poll-mode).
 
-## Issue to task
+## Issue to automatic task
 
-When a matching Linear issue is seen for the first time, Argos creates a task
-on the binding's project: the task name is the issue title and the description
-is the issue body. If the project has auto-concept enabled, the concept phase
-starts automatically. Import is once-ever per issue. See
-[SETUP-TASK-PROVIDERS.md#issue-to-task](SETUP-TASK-PROVIDERS.md#issue-to-task)
-for the full behavior.
+When a matching Linear issue is seen for the first time, Argos starts an
+automatic task in the integration's workspace. It belongs to the issue's
+assignee (matched by e-mail) when they agreed in their profile, otherwise to
+the workspace's automation user with the assignee invited. The branch carries
+the issue key (e.g. `eng-118-…`). Launching is once-ever per issue. See
+[SETUP-TASK-PROVIDERS.md#issue-to-automatic-task](SETUP-TASK-PROVIDERS.md#issue-to-automatic-task)
+and [Tickets](TICKETS.md).
 
-## Concept write-back and the approve gate
+## Plan approval
 
-After the concept phase, Argos posts a comment on the Linear issue with the
-concept text. While the task is in Concept Review, the approve-gate check polls
-that comment's reactions. A 👍 reaction from an **authorized** user starts the
-implement phase.
+With the workspace's plan setting *wait for approval*, Argos posts the plan as a
+comment on the Linear issue. A 👍 reaction from an **authorized** user approves
+it and the task continues.
 
 For Linear, "authorized to approve" means an **active, non-guest organisation
 member**: the reacting user must have `active = true` and `guest != true` in
@@ -201,37 +200,30 @@ Linear. (Linear has no per-repo permissions, so this org-member check stands in
 for the write/admin access used on GitHub/GitLab. Admins are a non-guest
 superset and qualify.)
 
-Reactions are never pushed by Linear, so the gate relies on the scheduled
-`argos:check-concept-approvals` run even in webhook mode. Full mechanics:
-[SETUP-TASK-PROVIDERS.md#concept-write-back-and-the-approve-gate](SETUP-TASK-PROVIDERS.md#concept-write-back-and-the-approve-gate).
+Reactions are never pushed by Linear, so approval relies on the scheduled
+`argos:check-plan-approvals` run even in webhook mode. Full mechanics:
+[SETUP-TASK-PROVIDERS.md#comments-and-plan-approval](SETUP-TASK-PROVIDERS.md#comments-and-plan-approval).
 
-## Status sync on completion
-
-Status sync is opt-in per binding via the **Issue schließen bei
-Task-Abschluss** toggle (`close_on_complete`). When enabled and the Argos task
-completes, Argos closes the Linear issue.
-
-Linear has no generic "closed" flag, so Argos moves the issue to the **first
-workflow state of type `completed`** on the issue's team. If the team has no
-completed-type state, the close step fails (logged, best-effort — it never
-blocks completing the task in Argos). See
-[SETUP-TASK-PROVIDERS.md#status-sync-on-completion](SETUP-TASK-PROVIDERS.md#status-sync-on-completion).
+The pull request links the Linear issue. When the task is done (pull request
+merged) and *Close the ticket on merge* is on, Argos moves the issue to the
+team's first *completed* workflow state; a hand-over makes the new owner (by
+e-mail) the issue's assignee.
 
 ## Issue identifiers
 
 Linear identifies issues by **UUID**. Argos stores that UUID as the
 `external_id` on the External Issue Link and uses it for all subsequent API
-calls (comment write-back, reaction polling, close). This is transparent — no
+calls (comment write-back, reaction polling). This is transparent — no
 configuration is needed.
 
 ## Troubleshooting
 
 | Symptom | Likely cause |
 |---|---|
-| "Linear team not found for key: …" during Setup | The team key behind **Projekt / Team** is wrong or the credential can't see that team — pick it again from the loaded list, or check the key under Linear Settings → Teams |
+| "Linear team not found for key: …" during Set up | The team key behind **Project / Team** is wrong or the credential can't see that team — pick it again from the loaded list, or check the key under Linear Settings → Teams |
 | OAuth redirect fails / "Invalid OAuth state" | The callback URL on the Linear OAuth app must exactly match `${APP_URL}/auth/linear/callback`; mismatched or expired session state also triggers this |
-| Setup fails in webhook mode | The credential lacks permission to create a webhook on the team — use an OAuth account with the `admin` scope, or an API-key owner who is a team admin. The exact error is in **Letzter Fehler** |
-| Webhook deliveries rejected (401) | Signature/secret mismatch, or no secret stored. Re-run **Einrichten** to regenerate and re-register the secret |
-| No tasks appear in poll mode | The scheduler isn't running, the binding isn't **Active**, or the **Labels-Filter** excludes the issues. Check the **Letzter Poll** column |
-| 👍 does not start implement | The task must be in Concept Review, the reaction must be 👍, the reacting user must be an active non-guest Linear member, and the scheduler must be running the approval check |
+| Setup fails in webhook mode | The credential lacks permission to create a webhook on the team — use an OAuth account with the `admin` scope, or an API-key owner who is a team admin. The exact error is in **Last error** |
+| Webhook deliveries rejected (401) | Signature/secret mismatch, or no secret stored. Run **Set up** again to regenerate and re-register the secret |
+| No tasks start in poll mode | The scheduler isn't running, the integration isn't **Active**, the workspace has no **automation user** with a usable agent (and the assignee did not consent), or the **Labels filter** excludes the issues. Check the **Last poll** and **Last error** columns |
+| 👍 does not approve the plan | The task must be waiting for plan approval, the reaction must be 👍 on Argos' plan comment, the reacting user must be an active non-guest Linear member, and the scheduler must be running the approval check |
 | `400` / `401` on API calls | A `lin_api_…` key sent with a `Bearer` prefix is rejected by Linear — Argos handles this automatically, but a revoked/expired token also fails. Reconnect the OAuth account or recreate the API key |

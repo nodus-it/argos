@@ -14,8 +14,7 @@ use Illuminate\Support\Facades\Hash;
 
 /**
  * Shared building blocks for the demo profiles: the admin user every profile
- * needs, plus the env-driven agent credentials (Claude OAuth token / Codex
- * auth.json) lifted out of the former DemoSeeder so Basic, Full and Live-Ready
+ * needs, plus the env-driven Claude agent credential, lifted out of the former DemoSeeder so Basic, Full and Live-Ready
  * can each pull in exactly the pieces they need.
  */
 final class DemoUserBuilder
@@ -28,13 +27,20 @@ final class DemoUserBuilder
      */
     public function adminUser(): User
     {
-        return User::firstOrCreate(
+        $admin = User::firstOrCreate(
             ['email' => (string) Env::get('SEED_USER_EMAIL', 'admin@argos.local')],
             [
                 'name' => 'Argos Admin',
                 'password' => Hash::make((string) config('argos.admin_password')),
             ],
         );
+
+        // is_admin is not mass-assignable; the seeded account is the admin.
+        if (! $admin->isAdmin()) {
+            $admin->forceFill(['is_admin' => true])->save();
+        }
+
+        return $admin;
     }
 
     /**
@@ -57,47 +63,6 @@ final class DemoUserBuilder
             ],
             [
                 'credentials' => ['token' => trim($token)],
-                'status' => AgentCredentialStatus::Active->value,
-            ],
-        );
-    }
-
-    /**
-     * Seed the Codex agent credential from SEED_CODEX_AUTH_JSON_B64
-     * (base64-encoded ~/.codex/auth.json). Returns null when the env var is
-     * unset/blank or does not decode to a JSON object.
-     */
-    public function codexFromEnv(string $name = 'demo-seed'): ?AgentCredential
-    {
-        $b64 = Env::get('SEED_CODEX_AUTH_JSON_B64');
-
-        if (! is_string($b64) || trim($b64) === '') {
-            return null;
-        }
-
-        $json = base64_decode(trim($b64), true);
-
-        if ($json === false) {
-            $this->command?->warn('SEED_CODEX_AUTH_JSON_B64 is not valid base64 — skipping Codex credential.');
-
-            return null;
-        }
-
-        $decoded = json_decode($json, true);
-
-        if (! is_array($decoded)) {
-            $this->command?->warn('SEED_CODEX_AUTH_JSON_B64 does not decode to a JSON object — skipping Codex credential.');
-
-            return null;
-        }
-
-        return AgentCredential::updateOrCreate(
-            [
-                'agent_name' => AgentName::Codex->value,
-                'name' => $name,
-            ],
-            [
-                'credentials' => $decoded,
                 'status' => AgentCredentialStatus::Active->value,
             ],
         );

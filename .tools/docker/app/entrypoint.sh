@@ -61,17 +61,18 @@ if [[ -f /app/composer.lock ]]; then
     fi
 fi
 
-# Refresh the package-discovery cache when it's stale relative to composer.lock.
+# Rebuild the package-discovery cache on every start. It is derived from
+# vendor/ and cheap to rebuild; comparing mtimes with composer.lock missed
+# caches written after the lock but before a package was removed — the app
+# then crashed on boot loading a provider that no longer exists. Removing
+# the old files first matters: artisan itself boots from them.
 if [[ -f /app/composer.lock ]]; then
-    if [[ ! -f /app/bootstrap/cache/packages.php ]] \
-            || [[ /app/composer.lock -nt /app/bootstrap/cache/packages.php ]]; then
-        echo "Package discovery cache stale — running package:discover..."
-        php /app/artisan package:discover --no-interaction --ansi || true
-    fi
+    rm -f /app/bootstrap/cache/packages.php /app/bootstrap/cache/services.php
+    php /app/artisan package:discover --no-interaction --ansi || true
 fi
 
 # Make the data volume writable for www-data.
-mkdir -p /data/config
+mkdir -p /data/config /data/files /data/logs
 chown -R www-data:www-data /data
 
 # Seed the static Traefik route for the Argos app (file provider). Traefik does
@@ -95,11 +96,22 @@ http:
       priority: 1
       entryPoints: ["web"]
       service: argos
+    # Browser websockets for Laravel Reverb (live workspace tasks). Only the
+    # client path is public; the publish API (/apps) stays internal.
+    argos-realtime:
+      rule: "PathPrefix(`/app/`)"
+      priority: 10
+      entryPoints: ["web"]
+      service: argos-realtime
   services:
     argos:
       loadBalancer:
         servers:
           - url: "http://nginx:80"
+    argos-realtime:
+      loadBalancer:
+        servers:
+          - url: "http://reverb:8080"
 YML
     chown www-data:www-data "$TRAEFIK_DIR/argos.yml"
 fi
@@ -175,7 +187,7 @@ case "${ARGOS_ROLE:-app}" in
         # off or the image is already cached). Dispatched to the queue worker.
         php /app/artisan argos:warm-demo-image --no-interaction || true
         ;;
-    worker|queue|scheduler)
+    worker|queue|scheduler|reverb)
         echo "ARGOS_ROLE=${ARGOS_ROLE} — skipping migrations (app service owns the schema)."
         ;;
     *)

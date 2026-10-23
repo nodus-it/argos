@@ -24,4 +24,12 @@ class GetIssueComments extends Request
     {
         return "/repos/{$this->owner}/{$this->project}/issues/{$this->issueNumber}/comments";
     }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function defaultQuery(): array
+    {
+        return ['per_page' => 100];
+    }
 }

@@ -7,7 +7,6 @@ namespace Tests\Unit\Models;
 use App\Enums\AgentCredentialStatus;
 use App\Enums\AgentName;
 use App\Models\AgentCredential;
-use App\Models\Task;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -55,14 +54,6 @@ class AgentCredentialTest extends TestCase
         $credential = AgentCredential::factory()->create(['agent_name' => 'claude-code']);
 
         $this->assertSame(AgentName::ClaudeCode, $credential->fresh()->agent_name);
-    }
-
-    public function test_tasks_relation_loads(): void
-    {
-        $credential = AgentCredential::factory()->create();
-        Task::factory()->count(2)->create(['agent_credential_id' => $credential->id]);
-
-        $this->assertCount(2, $credential->tasks);
     }
 
     public function test_expired_state(): void

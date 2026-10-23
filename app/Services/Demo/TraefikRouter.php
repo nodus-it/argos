@@ -4,15 +4,12 @@ declare(strict_types=1);
 
 namespace App\Services\Demo;
 
-use App\Enums\DemoAccessMode;
 use RuntimeException;
 use Symfony\Component\Yaml\Yaml;
-use Throwable;
 
 /**
  * Owns the Traefik file-provider route for a demo: writing the dynamic-config
- * route file, attaching the access-mode auth middleware (session forwardAuth /
- * shared basic-auth / none), recovering the upstream port from an existing
+ * route file, attaching the workspace forwardAuth middleware, recovering the upstream port from an existing
  * route, and building the public demo URL. Split out of DemoDeployer so routing
  * is one concern; the deployer orchestrates and asks the router for routes/URLs.
  */
@@ -21,29 +18,21 @@ class TraefikRouter
     /**
      * Write the Traefik file-provider route for this demo into the shared dir
      * and return the public URL. Traefik resolves the `{slug}` host alias on the
-     * edge network to the entry container. The access mode attaches an auth
-     * middleware (session forwardAuth / shared basic-auth) or none (public).
+     * edge network to the entry container. Demos are never public: every
+     * request passes the workspace gate (membership check).
      */
-    public function writeRoute(
-        string $slug,
-        int $port,
-        DemoAccessMode $mode = DemoAccessMode::Public,
-        ?string $basicPassword = null,
-    ): string {
+    public function writeRoute(string $slug, int $port): string
+    {
         $host = $slug.'.'.config('argos.preview.base_domain', '127.0.0.1.nip.io');
 
         $router = [
             'rule' => "Host(`{$host}`)",
             'entryPoints' => ['web'],
             'service' => $slug,
+            'middlewares' => [$slug.'-auth'],
         ];
 
-        $middlewares = $this->buildAuthMiddleware($slug, $mode, $basicPassword);
-        if ($middlewares !== []) {
-            $router['middlewares'] = array_keys($middlewares);
-        }
-
-        $http = [
+        $this->writeRouteFile($slug, [
             'routers' => [$slug => $router],
             'services' => [
                 $slug => [
@@ -54,11 +43,17 @@ class TraefikRouter
                     ],
                 ],
             ],
-        ];
-        if ($middlewares !== []) {
-            $http['middlewares'] = $middlewares;
-        }
+            'middlewares' => [$slug.'-auth' => $this->gateMiddleware()],
+        ]);
 
+        return $this->urlForSlug($slug);
+    }
+
+    /**
+     * @param  array<string, mixed>  $http
+     */
+    private function writeRouteFile(string $slug, array $http): void
+    {
         $dir = $this->traefikDir();
         if (! is_dir($dir) && ! mkdir($dir, 0755, true) && ! is_dir($dir)) {
             throw new RuntimeException("Traefik dynamic-config dir not writable: {$dir}");
@@ -78,8 +73,49 @@ class TraefikRouter
             @unlink($tmp);
             throw new RuntimeException("Could not write Traefik route: {$path}");
         }
+    }
 
-        return $this->urlForSlug($slug);
+    /**
+     * Route `code-<slug>.<base>` to the workspace's OpenVSCode Server, guarded
+     * by forwardAuth against the workspace gate (membership check — the
+     * editor is a shell into the container, it is never public). Behind the
+     * gate the route adds the workspace's editor token, which the daemon's
+     * editor gate requires — so other workspaces on the Docker network can't
+     * reach the editor around Traefik. Returns the editor URL.
+     */
+    public function writeCodeRoute(string $workspaceSlug, string $editorToken, int $port = 3000): string
+    {
+        $key = self::codeKey($workspaceSlug);
+        $host = $key.'.'.config('argos.preview.base_domain', '127.0.0.1.nip.io');
+
+        $this->writeRouteFile($key, [
+            'routers' => [$key => [
+                'rule' => "Host(`{$host}`)",
+                'entryPoints' => ['web'],
+                'service' => $key,
+                'middlewares' => [$key.'-auth', $key.'-token'],
+            ]],
+            'services' => [$key => [
+                'loadBalancer' => ['servers' => [['url' => 'http://argos-ws-'.$workspaceSlug.':'.$port]]],
+            ]],
+            'middlewares' => [
+                $key.'-auth' => $this->gateMiddleware(),
+                $key.'-token' => ['headers' => ['customRequestHeaders' => ['X-Argos-Editor-Token' => $editorToken]]],
+            ],
+        ]);
+
+        return $this->urlForSlug($key);
+    }
+
+    public function removeCodeRoute(string $workspaceSlug): void
+    {
+        $this->removeRoute(self::codeKey($workspaceSlug));
+    }
+
+    /** Route/host key of a workspace editor. */
+    public static function codeKey(string $workspaceSlug): string
+    {
+        return 'code-'.$workspaceSlug;
     }
 
     /**
@@ -94,32 +130,6 @@ class TraefikRouter
         }
     }
 
-    /**
-     * Recover the upstream port from an existing route file's service URL
-     * (`http://{slug}:{port}`). Returns null when the file is missing or
-     * unparseable.
-     */
-    public function existingRoutePort(string $slug): ?int
-    {
-        $file = $this->routeFilePath($slug);
-        if (! is_file($file)) {
-            return null;
-        }
-
-        try {
-            $parsed = Yaml::parseFile($file);
-        } catch (Throwable) {
-            return null;
-        }
-
-        $url = $parsed['http']['services'][$slug]['loadBalancer']['servers'][0]['url'] ?? null;
-        if (! is_string($url) || preg_match('/:(\d+)$/', $url, $m) !== 1) {
-            return null;
-        }
-
-        return (int) $m[1];
-    }
-
     /** Public URL for a demo slug (scheme + slug.base_domain + external port). */
     public function urlForSlug(string $slug): string
     {
@@ -127,53 +137,21 @@ class TraefikRouter
     }
 
     /**
-     * Build the Traefik middleware definitions for the resolved access mode,
-     * keyed by middleware name (referenced from the router). Empty for public.
-     * Fails closed: basic mode without any password throws rather than shipping
-     * an unprotected demo.
+     * forwardAuth against the workspace gate.
      *
-     * @return array<string, array<string, mixed>>
+     * @return array<string, mixed>
      */
-    private function buildAuthMiddleware(string $slug, DemoAccessMode $mode, ?string $basicPassword): array
+    private function gateMiddleware(): array
     {
-        $name = $slug.'-auth';
-
-        return match ($mode->resolve()) {
-            DemoAccessMode::Session => [
-                $name => [
-                    'forwardAuth' => [
-                        'address' => (string) config('argos.preview.auth_gate_url', 'http://nginx:80/_argos/demo-gate'),
-                        'trustForwardHeader' => true,
-                    ],
-                ],
+        return [
+            'forwardAuth' => [
+                'address' => (string) config('argos.workspaces.gate_url', 'http://nginx:80/_argos/workspace-gate'),
+                // Traefik sets X-Forwarded-Host/-Proto/-Uri from the request it
+                // routes; a client's own X-Forwarded-Host must never pick the
+                // workspace the gate checks (the route still targets another).
+                'trustForwardHeader' => false,
             ],
-            DemoAccessMode::Basic => [
-                $name => [
-                    'basicAuth' => [
-                        'users' => [$this->basicAuthUserLine($basicPassword)],
-                    ],
-                ],
-            ],
-            default => [],
-        };
-    }
-
-    /**
-     * Render the `user:bcrypt-hash` line Traefik basicAuth expects. The password
-     * is the per-task one, falling back to the global config password.
-     */
-    private function basicAuthUserLine(?string $basicPassword): string
-    {
-        $password = $basicPassword ?: (string) config('argos.preview.basic_password', '');
-        if ($password === '') {
-            throw new RuntimeException(
-                'Demo basic-auth selected but no password set (task password or ARGOS_PREVIEW_BASIC_PASSWORD).'
-            );
-        }
-
-        $user = (string) config('argos.preview.basic_user', 'demo');
-
-        return $user.':'.password_hash($password, PASSWORD_BCRYPT);
+        ];
     }
 
     /** Public URL for a demo host, appending the external port unless it is 80/443. */

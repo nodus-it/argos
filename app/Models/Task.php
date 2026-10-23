@@ -4,310 +4,332 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Enums\AgentName;
-use App\Enums\ClaudeModel;
-use App\Enums\DemoAccessMode;
-use App\Enums\Phase;
-use App\Enums\PhaseStatus;
-use App\Enums\WorkflowStatus;
-use App\Presenters\TaskPresenter;
+use App\Enums\AutoTaskState;
+use App\Enums\PermissionMode;
+use App\Enums\SessionStatus;
+use App\Enums\TaskKind;
+use App\Enums\TaskOrigin;
+use App\Enums\TaskState;
+use App\Enums\TaskStatus;
+use App\Services\Demo\DemoTarget;
+use App\Services\GitProvider\PullRequestDetails;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
 /**
+ * One conversation with Claude about one piece of work: its own branch,
+ * worktree, database, preview and pull request. It belongs to one person
+ * (and runs on their subscription); invited collaborators write in it too.
+ *
  * @property string $id
- * @property int|null $user_id
- * @property string $name
+ * @property string $workspace_id
  * @property string $slug
- * @property string|null $external_ref
- * @property string|null $repo_profile_id
- * @property string $description
- * @property string|null $base_branch
- * @property string|null $feature_branch
- * @property string|null $pr_url
- * @property Phase|null $current_phase
- * @property PhaseStatus|null $current_status
- * @property WorkflowStatus $workflow_status
- * @property bool $auto_concept
- * @property int|null $max_turns_concept
- * @property int|null $max_turns_implement
- * @property string|null $model_concept
- * @property string|null $model_implement
- * @property string|null $worker_stack_id_override
- * @property AgentName|null $worker_agent_name_override
- * @property array<string, mixed>|null $worker_config_override
+ * @property TaskKind $kind
+ * @property TaskOrigin $origin
+ * @property int|null $owner_user_id
+ * @property int|null $created_by
  * @property string|null $agent_credential_id
- * @property array<string, mixed>|null $agent_config
- * @property string|null $concept_md
- * @property string|null $concept_notes
- * @property string|null $implement_summary_nontechnical
- * @property string|null $implement_summary_technical
- * @property string|null $implement_notes
- * @property Carbon|null $created_at
- * @property Carbon|null $updated_at
- * @property-read User|null $user
- * @property-read RepoProfile|null $repoProfile
- * @property-read Collection<int, PhaseRun> $phaseRuns
- * @property-read ExternalIssueLink|null $externalIssueLink
- * @property-read WorkerStack|null $workerStackOverride
+ * @property string|null $parent_task_id
+ * @property string $title
+ * @property TaskStatus $status
+ * @property SessionStatus $session_status
+ * @property AutoTaskState|null $auto_state
+ * @property array{plan: string, ship: string, max_fix_rounds: int, max_turns: int, max_cost_usd: float, max_minutes: int}|null $auto_config
+ * @property array{fix_rounds?: int, turns?: int, started_at?: string}|null $auto_counters
+ * @property string|null $auto_message
+ * @property PermissionMode $permission_mode
+ * @property string $model
+ * @property string|null $effort
+ * @property string|null $claude_session_id
+ * @property list<array{name: string, description: string, argument_hint: string}>|null $commands
+ * @property int $last_seq
+ * @property string $cost_usd
+ * @property bool $session_open
+ * @property Carbon|null $queued_at
+ * @property string|null $branch
+ * @property string $base_branch
+ * @property string|null $base_commit
+ * @property string|null $worktree_path
+ * @property string|null $db_name
+ * @property string|null $pr_url
+ * @property int|null $pr_number
+ * @property string|null $pr_state
+ * @property array{state?: string, url?: string|null}|null $pr_checks
+ * @property string|null $pr_review_state
+ * @property bool $pr_conflicts
+ * @property Carbon|null $pr_synced_at
+ * @property bool $auto_merge
+ * @property Carbon|null $shipped_at
+ * @property array{binding_id?: string, provider: string, key?: string, number: string, owner?: string, project?: string, title: string, url: string, body?: string}|null $external_ref
+ * @property string|null $restore_note
+ * @property Carbon|null $done_at
+ * @property Carbon|null $cleaned_at
+ * @property Carbon|null $archived_at
+ * @property Carbon $created_at
+ * @property Carbon $updated_at
+ * @property-read Workspace $workspace
+ * @property-read User|null $owner
+ * @property-read User|null $creator
  * @property-read AgentCredential|null $agentCredential
+ * @property-read Task|null $parent
+ * @property-read Collection<int, TaskMember> $members
+ * @property-read Collection<int, User> $collaborators
  */
-class Task extends Model
+class Task extends Model implements DemoTarget
 {
     use HasFactory;
     use HasUlids;
 
+    /** Upper bound of a task slug (worktree folder, database and preview names). */
+    public const SLUG_MAX = 32;
+
     protected $fillable = [
-        'user_id',
-        'name',
+        'workspace_id',
         'slug',
-        'external_ref',
-        'repo_profile_id',
-        'description',
-        'base_branch',
-        'feature_branch',
-        'pr_url',
-        'concept_md',
-        'concept_notes',
-        'implement_summary_nontechnical',
-        'implement_summary_technical',
-        'implement_notes',
-        'current_phase',
-        'current_status',
-        'workflow_status',
-        'auto_concept',
-        'max_turns_concept',
-        'max_turns_implement',
-        'model_concept',
-        'model_implement',
-        'worker_stack_id_override',
-        'worker_agent_name_override',
-        'worker_config_override',
-        'demo_access_mode',
-        'demo_basic_password',
+        'kind',
+        'origin',
+        'owner_user_id',
+        'created_by',
         'agent_credential_id',
-        'agent_config',
+        'parent_task_id',
+        'title',
+        'status',
+        'session_status',
+        'permission_mode',
+        'model',
+        'effort',
+        'claude_session_id',
+        'commands',
+        'last_seq',
+        'cost_usd',
+        'session_open',
+        'queued_at',
+        'branch',
+        'base_branch',
+        'base_commit',
+        'worktree_path',
+        'db_name',
+        'pr_url',
+        'pr_number',
+        'pr_state',
+        'pr_checks',
+        'pr_review_state',
+        'pr_conflicts',
+        'pr_synced_at',
+        'auto_merge',
+        'shipped_at',
+        'external_ref',
+        'done_at',
+        'cleaned_at',
+        'archived_at',
+    ];
+
+    protected $attributes = [
+        'kind' => 'task',
+        'origin' => 'manual',
+        'status' => 'active',
+        'session_status' => 'closed',
     ];
 
     protected function casts(): array
     {
         return [
-            'workflow_status' => WorkflowStatus::class,
-            'current_phase' => Phase::class,
-            'current_status' => PhaseStatus::class,
-            'auto_concept' => 'boolean',
-            'max_turns_concept' => 'integer',
-            'max_turns_implement' => 'integer',
-            'worker_agent_name_override' => AgentName::class,
-            'worker_config_override' => 'array',
-            'demo_access_mode' => DemoAccessMode::class,
-            'agent_config' => 'array',
+            'kind' => TaskKind::class,
+            'origin' => TaskOrigin::class,
+            'status' => TaskStatus::class,
+            'session_status' => SessionStatus::class,
+            'auto_state' => AutoTaskState::class,
+            'auto_config' => 'array',
+            'auto_counters' => 'array',
+            'permission_mode' => PermissionMode::class,
+            'commands' => 'array',
+            'last_seq' => 'integer',
+            'cost_usd' => 'decimal:4',
+            'session_open' => 'boolean',
+            'queued_at' => 'datetime',
+            'pr_number' => 'integer',
+            'pr_checks' => 'array',
+            'pr_conflicts' => 'boolean',
+            'pr_synced_at' => 'datetime',
+            'auto_merge' => 'boolean',
+            'shipped_at' => 'datetime',
+            'external_ref' => 'array',
+            'done_at' => 'datetime',
+            'cleaned_at' => 'datetime',
+            'archived_at' => 'datetime',
         ];
     }
 
-    /**
-     * The effective demo access mode, resolving `Inherit` against the
-     * stack-wide default (config argos.preview.auth).
-     */
-    public function effectiveDemoAccessMode(): DemoAccessMode
+    /** Link to the task in its workspace. */
+    /** The tracker binding the task's ticket came from (null without a ticket or when it was removed). */
+    public function ticketBinding(): ?TaskProviderBinding
     {
-        return ($this->demo_access_mode ?? DemoAccessMode::Inherit)->resolve();
+        $id = $this->external_ref['binding_id'] ?? null;
+
+        return is_string($id) ? TaskProviderBinding::query()->find($id) : null;
     }
 
-    /**
-     * Resolves the Claude model ID for a given phase using three-level priority:
-     * task-level override → RepoProfile default → hardcoded Argos default.
-     */
-    public function modelForPhase(string $phase): string
+    /** The session ended although the task was used: Claude can pick the conversation up again. */
+    public function isResumable(): bool
     {
-        $taskModel = match ($phase) {
-            'concept' => $this->model_concept,
-            'implement' => $this->model_implement,
-            default => null,
+        return ! $this->session_open && in_array($this->session_status, [SessionStatus::Closed, SessionStatus::Error], true) && $this->claude_session_id !== null;
+    }
+
+    /** A pull request that can still change (open or draft). */
+    public function hasOpenPullRequest(): bool
+    {
+        return $this->pr_number !== null && PullRequestDetails::isOpenState($this->pr_state);
+    }
+
+    public function url(): string
+    {
+        return $this->workspace->url($this);
+    }
+
+    /** What a person sees: status, session activity and archive combined. */
+    public function state(): TaskState
+    {
+        if ($this->archived_at !== null) {
+            return TaskState::Archived;
+        }
+
+        return match ($this->status) {
+            TaskStatus::Preparing => TaskState::Preparing,
+            TaskStatus::Done => TaskState::Done,
+            TaskStatus::Cancelled => TaskState::Cancelled,
+            TaskStatus::PrOpen, TaskStatus::Active => match (true) {
+                $this->session_status === SessionStatus::WaitingInput,
+                $this->auto_state === AutoTaskState::AwaitingPlanApproval => TaskState::Waiting,
+                in_array($this->session_status, [SessionStatus::Running, SessionStatus::Starting], true),
+                $this->auto_state?->isRunning() === true => TaskState::Running,
+                $this->status === TaskStatus::PrOpen => TaskState::PrOpen,
+                default => TaskState::Ready,
+            },
         };
+    }
 
-        if ($taskModel !== null) {
-            return $taskModel;
+    public function isOwnedBy(User $user): bool
+    {
+        return $this->owner_user_id === $user->id;
+    }
+
+    /** Owner or invited collaborator. */
+    public function involves(User $user): bool
+    {
+        if ($this->isOwnedBy($user)) {
+            return true;
         }
 
-        $profile = $this->repoProfile;
-        if ($profile !== null) {
-            $profileModel = match ($phase) {
-                'concept' => $profile->model_concept,
-                'implement' => $profile->model_implement,
-                default => null,
-            };
-            if ($profileModel !== null) {
-                return $profileModel;
-            }
-        }
-
-        return ClaudeModel::default($phase)->value;
+        return $this->relationLoaded('members')
+            ? $this->members->contains('user_id', $user->id)
+            : $this->members()->where('user_id', $user->id)->exists();
     }
 
-    public function volumeName(): string
+    /** @return BelongsTo<Workspace, $this> */
+    public function workspace(): BelongsTo
     {
-        return 'task_ws_'.self::slugifyName($this->slug);
+        return $this->belongsTo(Workspace::class);
     }
 
-    public static function slugifyName(string $name): string
+    /** @return BelongsTo<User, $this> */
+    public function owner(): BelongsTo
     {
-        return preg_replace('/[^a-zA-Z0-9_.-]/', '_', $name) ?? $name;
+        return $this->belongsTo(User::class, 'owner_user_id');
     }
 
-    /**
-     * Turn a free-text task name into a git-/path-safe slug. Mirrors the
-     * worker's `_concept_branch_slug` (transliterate umlauts, space/slash → '-',
-     * strip the rest, keep case) so that slug == branch suffix == volume key.
-     */
-    public static function slugifyForBranch(string $value): string
+    /** @return BelongsTo<User, $this> */
+    public function creator(): BelongsTo
     {
-        $value = strtr($value, [
-            'ä' => 'ae', 'ö' => 'oe', 'ü' => 'ue',
-            'Ä' => 'Ae', 'Ö' => 'Oe', 'Ü' => 'Ue', 'ß' => 'ss',
-        ]);
-        $value = str_replace([' ', '/'], '-', $value);
-        $value = preg_replace('/[^a-zA-Z0-9._-]/', '', $value) ?? '';
-
-        return trim($value, '-_.');
+        return $this->belongsTo(User::class, 'created_by');
     }
 
-    /**
-     * Build a unique, frozen slug from a name (slugify + numeric suffix on
-     * collision). Falls back to 'task' when the name slugifies to empty.
-     */
-    public static function generateSlug(string $name): string
-    {
-        $base = self::slugifyForBranch($name);
-        if ($base === '') {
-            $base = 'task';
-        }
-
-        $slug = $base;
-        $suffix = 2;
-        while (self::query()->where('slug', $slug)->exists()) {
-            $slug = $base.'-'.$suffix++;
-        }
-
-        return $slug;
-    }
-
-    protected static function booted(): void
-    {
-        // The slug is the frozen operational identity (volume/branch/log paths).
-        // Auto-derive it from the name on create when not set explicitly; it is
-        // never regenerated on rename.
-        static::creating(function (Task $task): void {
-            if (($task->slug ?? '') === '') {
-                $task->slug = self::generateSlug((string) $task->name);
-            }
-        });
-    }
-
-    /**
-     * @return BelongsTo<User, $this>
-     */
-    public function user(): BelongsTo
-    {
-        return $this->belongsTo(User::class);
-    }
-
-    /**
-     * @return BelongsTo<RepoProfile, $this>
-     */
-    public function repoProfile(): BelongsTo
-    {
-        return $this->belongsTo(RepoProfile::class);
-    }
-
-    /**
-     * @return HasMany<PhaseRun, $this>
-     */
-    public function phaseRuns(): HasMany
-    {
-        return $this->hasMany(PhaseRun::class);
-    }
-
-    /**
-     * The external issue this task was imported from, if any.
-     *
-     * @return HasOne<ExternalIssueLink, $this>
-     */
-    public function externalIssueLink(): HasOne
-    {
-        return $this->hasOne(ExternalIssueLink::class);
-    }
-
-    /**
-     * @return BelongsTo<WorkerStack, $this>
-     */
-    public function workerStackOverride(): BelongsTo
-    {
-        return $this->belongsTo(WorkerStack::class, 'worker_stack_id_override');
-    }
-
-    /**
-     * @return BelongsTo<AgentCredential, $this>
-     */
+    /** @return BelongsTo<AgentCredential, $this> */
     public function agentCredential(): BelongsTo
     {
         return $this->belongsTo(AgentCredential::class);
     }
 
-    /**
-     * Live-demo deployments for this task (latest is the current one).
-     *
-     * @return HasMany<Demo, $this>
-     */
+    /** @return BelongsTo<Task, $this> */
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_task_id');
+    }
+
+    /** @return HasMany<TaskMember, $this> */
+    public function members(): HasMany
+    {
+        return $this->hasMany(TaskMember::class);
+    }
+
+    /** @return BelongsToMany<User, $this> */
+    public function collaborators(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'task_members')->withPivot('invited_by')->withTimestamps();
+    }
+
+    /** @return HasMany<TaskEvent, $this> */
+    public function events(): HasMany
+    {
+        return $this->hasMany(TaskEvent::class);
+    }
+
+    /** @return HasMany<TaskApproval, $this> */
+    public function approvals(): HasMany
+    {
+        return $this->hasMany(TaskApproval::class);
+    }
+
+    /** @return HasMany<Demo, $this> */
     public function demos(): HasMany
     {
         return $this->hasMany(Demo::class);
     }
 
-    /** The most recent demo for this task, if any. */
     public function currentDemo(): ?Demo
     {
         return $this->demos()->latest()->first();
     }
 
     /**
-     * Returns the started_at timestamp of the most recently started PhaseRun,
-     * or null if no PhaseRun has been started yet.
+     * Preview host label: `demo-<workspace>-<task>`, shortened so it stays a
+     * valid DNS label.
      */
-    public function currentPhaseStartedAt(): ?Carbon
+    public function demoSlug(): string
     {
-        return $this->phaseRuns()
-            ->where('status', 'running')
-            ->whereNotNull('started_at')
-            ->latest('started_at')
-            ->first()
-            ?->started_at;
+        return self::demoSlugFor($this->workspace->slug, $this->slug);
     }
 
-    /**
-     * Whether a phase has hit the turn limit repeatedly (default ≥2 runs ended
-     * with error_max_turns). A signal that the agent is not converging — the
-     * task is likely too broad or the budget too small — so the UI can nudge
-     * the user to narrow the task / raise max-turns instead of blindly
-     * resuming again.
-     */
-    public function hasRepeatedMaxTurns(string $phase, int $threshold = 2): bool
+    /** Preview slug for a workspace and task slug; works for orphans. */
+    public static function demoSlugFor(string $workspaceSlug, string $taskSlug): string
     {
-        return $this->phaseRuns()
-            ->where('phase', $phase)
-            ->where('stop_reason', 'error_max_turns')
-            ->count() >= $threshold;
+        return rtrim(substr('demo-'.$workspaceSlug.'-'.$taskSlug, 0, 63), '-');
     }
 
-    /** Display-layer derivations (status label/colour, badge, phase rail). */
-    public function presenter(): TaskPresenter
+    public function workspaceVolumeName(): string
     {
-        return new TaskPresenter($this);
+        return $this->workspace->volumeName();
+    }
+
+    /** The task's worktree on the workspace volume. */
+    public function workspaceSubpath(): ?string
+    {
+        return 'tasks/'.$this->slug;
+    }
+
+    public function demoWorkspace(): Workspace
+    {
+        return $this->workspace;
+    }
+
+    /** The agent user of the worker image. */
+    public function demoExecUser(): ?string
+    {
+        return '1000:1000';
     }
 }

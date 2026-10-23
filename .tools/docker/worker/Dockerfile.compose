@@ -1,9 +1,10 @@
 # syntax=docker/dockerfile:1.7
 #
-# Dockerfile.compose — final worker image = stack + agent + worker code.
+# Dockerfile.compose — worker image = stack + agent + gate helpers. It is
+# the base of the workspace image (.tools/docker/worker/workspace/Dockerfile).
 #
-# Built by the manager's WorkerImageResolver at task spawn (or on demand
-# from the Filament UI) once a (stack, agent) pair is needed. The two
+# Built by the manager's WorkerImageBuilder when a workspace needs it (or on
+# demand from the Filament UI) once a (stack, agent) pair is needed. The two
 # build args wire the prior layers in:
 #
 #   STACK_IMAGE             pre-built stack image tag (e.g. argos-stack:php-8.4)
@@ -29,16 +30,11 @@ COPY ${AGENT_INSTALL_SCRIPT} /tmp/install-agent.sh
 RUN AGENT_VERSION="${AGENT_VERSION}" bash /tmp/install-agent.sh \
     && rm -f /tmp/install-agent.sh
 
-# Worker code ─ phase scripts, libs, prompts, schemas. Static; only changes
-# when we ship a new Argos version, so cached aggressively.
+# Gate helpers (quality.sh, logging.sh) sourced by the workspace's
+# run-gates.sh. Static; only changes when we ship a new Argos version.
 COPY worker/lib/      /usr/local/share/agent/lib/
-COPY worker/phases/   /usr/local/share/agent/phases/
-COPY worker/prompts/  /usr/local/share/agent/prompts/
-COPY worker/schemas/  /usr/local/share/agent/schemas/
-COPY .tools/docker/worker/worker-entrypoint.sh /usr/local/bin/worker-entrypoint.sh
 
-RUN chmod +x /usr/local/bin/worker-entrypoint.sh \
-    && chown -R agent:agent /usr/local/share/agent \
+RUN chown -R agent:agent /usr/local/share/agent \
     && mkdir -p /workspace \
     && chown agent:agent /workspace \
     && mkdir -p /run/agent \
@@ -59,5 +55,4 @@ RUN git config --global --add safe.directory '*' \
 
 WORKDIR /workspace
 
-ENTRYPOINT ["/usr/local/bin/worker-entrypoint.sh"]
-CMD []
+CMD ["bash"]

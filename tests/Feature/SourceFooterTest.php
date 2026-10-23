@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Models\RepoProfile;
 use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -17,7 +17,7 @@ class SourceFooterTest extends TestCase
     {
         config()->set('argos.source_url', 'https://github.com/example/argos-fork');
 
-        $response = $this->get(route('filament.admin.auth.login'));
+        $response = $this->get(route('filament.app.auth.login'));
 
         $response->assertOk();
         $response->assertSee('https://github.com/example/argos-fork', false);
@@ -27,10 +27,10 @@ class SourceFooterTest extends TestCase
     public function test_authed_dashboard_exposes_source_url(): void
     {
         config()->set('argos.source_url', 'https://github.com/example/argos-fork');
-        RepoProfile::factory()->create();
+        Workspace::factory()->create();
         $this->actingAs(User::factory()->create());
 
-        $response = $this->get('/admin');
+        $response = $this->get('/');
 
         $response->assertOk();
         $response->assertSee('https://github.com/example/argos-fork', false);

@@ -7,6 +7,7 @@ namespace Database\Factories;
 use App\Enums\AgentCredentialStatus;
 use App\Enums\AgentName;
 use App\Models\AgentCredential;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -25,6 +26,12 @@ class AgentCredentialFactory extends Factory
             'status' => AgentCredentialStatus::Active,
             'last_validated_at' => null,
         ];
+    }
+
+    /** A personal agent running on the given user's subscription. */
+    public function ownedBy(User $user): static
+    {
+        return $this->state(['user_id' => $user->id]);
     }
 
     public function expired(): static

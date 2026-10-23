@@ -15,12 +15,12 @@ uses(RefreshDatabase::class);
 
 test('guests are redirected to the login when opening the API docs', function () {
     $this->get('/docs/api')
-        ->assertRedirect(route('filament.admin.auth.login'));
+        ->assertRedirect(route('filament.app.auth.login'));
 });
 
 test('guests cannot fetch the OpenAPI document', function () {
     $this->get('/docs/api.json')
-        ->assertRedirect(route('filament.admin.auth.login'));
+        ->assertRedirect(route('filament.app.auth.login'));
 });
 
 test('signed-in users can open the API docs UI', function () {
@@ -39,7 +39,7 @@ test('the OpenAPI document describes the v1 API for signed-in users', function (
     expect($document['openapi'])->toStartWith('3.')
         ->and($document['info']['title'])->toBe('Argos API')
         // Endpoints are inferred from routes/api.php (api_path = api/v1).
-        ->and($document['paths'])->toHaveKeys(['/projects', '/tasks'])
+        ->and($document['paths'])->toHaveKeys(['/workspaces', '/workspaces/{workspace}/tasks', '/tasks/{task}'])
         // Sanctum bearer auth is documented globally (MiddlewareAuthSecurityStrategy).
         ->and($document['security'])->not->toBeEmpty();
 });

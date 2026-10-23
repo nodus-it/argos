@@ -9,7 +9,6 @@ use App\Workers\Agents\AgentRegistry;
 use App\Workers\Agents\AgentRunner;
 use App\Workers\Agents\AgentSpec;
 use App\Workers\Agents\ClaudeCodeRunner;
-use App\Workers\Agents\CodexRunner;
 use InvalidArgumentException;
 use Tests\TestCase;
 
@@ -31,12 +30,18 @@ class AgentRegistryTest extends TestCase
         $this->assertInstanceOf(ClaudeCodeRunner::class, $registry->get(AgentName::ClaudeCode));
     }
 
-    public function test_default_registry_has_codex(): void
+    public function test_every_agent_name_is_registered(): void
     {
         $registry = app(AgentRegistry::class);
 
-        $this->assertTrue($registry->has(AgentName::Codex));
-        $this->assertInstanceOf(CodexRunner::class, $registry->get(AgentName::Codex));
+        foreach (AgentName::cases() as $name) {
+            $this->assertTrue($registry->has($name), "{$name->value} has no runner");
+        }
+    }
+
+    public function test_claude_code_supports_workspaces(): void
+    {
+        $this->assertTrue(AgentName::ClaudeCode->supportsWorkspaces());
     }
 
     public function test_get_throws_for_unregistered_name(): void

@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Tests\Feature\Filament\Admin\Resources;
 
 use App\Enums\IntegrationProvider;
-use App\Filament\Admin\Resources\ProviderOAuthConfigResource\Pages\CreateProviderOAuthConfig;
-use App\Filament\Admin\Resources\ProviderOAuthConfigResource\Pages\ListProviderOAuthConfigs;
+use App\Filament\App\Clusters\System\Resources\ProviderOAuthConfigResource\Pages\CreateProviderOAuthConfig;
+use App\Filament\App\Clusters\System\Resources\ProviderOAuthConfigResource\Pages\ListProviderOAuthConfigs;
 use App\Models\ProviderOAuthConfig;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -20,7 +20,7 @@ class ProviderOAuthConfigResourceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->actingAs(User::factory()->create());
+        $this->actingAs(User::factory()->admin()->create());
     }
 
     public function test_list_page_renders(): void

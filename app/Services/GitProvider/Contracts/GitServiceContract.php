@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\GitProvider\Contracts;
 
+use App\Services\GitProvider\PullRequestDetails;
+
 interface GitServiceContract
 {
     /**
@@ -60,8 +62,7 @@ interface GitServiceContract
     public function getFileContents(string $ownerRepo, string $path, string $ref): ?string;
 
     /**
-     * Posts a comment on the given pull/merge request. Used by the worker's
-     * push phase to log iteration progress on the PR. PR identifier types
+     * Posts a comment on the given pull/merge request. PR identifier types
      * differ per provider (GitHub `int $number`, GitLab `int $iid`,
      * Bitbucket `int $id`) — `int|string` keeps the contract agnostic.
      *
@@ -75,17 +76,53 @@ interface GitServiceContract
     ): array;
 
     /**
-     * Updates the title and description of an existing pull/merge request.
-     * Used by the worker's push phase when re-opening or refreshing a PR
-     * after an additional implementation iteration.
+     * The open pull request whose head is `$headBranch`, as the provider's raw
+     * payload (the shape createPullRequest() returns) — null when none.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function findOpenPullRequest(string $owner, string $repo, string $headBranch): ?array;
+
+    /**
+     * Raw API representation of a pull/merge request (GitHub `number`,
+     * GitLab `iid`, Bitbucket `id`). Read through PullRequestInfo for a
+     * provider-neutral view of number, URL and state.
      *
      * @return array<string, mixed>
      */
-    public function updatePullRequest(
-        string $owner,
-        string $repo,
-        int|string $pullRequestId,
-        string $title,
-        string $body,
-    ): array;
+    public function getPullRequest(string $owner, string $repo, int|string $pullRequestId): array;
+
+    /**
+     * Provider-neutral review snapshot of a pull/merge request: state
+     * (draft|open|merged|closed), head SHA, conflicts/behind-base, CI checks,
+     * review state, reviews, comments (oldest first) and auto-merge.
+     */
+    public function pullRequestDetails(string $owner, string $repo, int|string $number): PullRequestDetails;
+
+    /**
+     * Takes a draft pull/merge request out of draft. A no-op when it is not a
+     * draft; throws RuntimeException when the provider cannot do it.
+     */
+    public function markPullRequestReady(string $owner, string $repo, int|string $number): void;
+
+    /**
+     * Turns on the provider's native auto-merge (GitHub auto-merge, GitLab
+     * merge-when-pipeline-succeeds). Returns false — never throws — when the
+     * repository/provider does not allow or support it.
+     */
+    public function enableAutoMerge(string $owner, string $repo, int|string $number): bool;
+
+    /**
+     * Turns native auto-merge off again. Returns true when it is off
+     * afterwards (also when it was never on), false — never throws — when the
+     * provider refused or does not support it (Bitbucket).
+     */
+    public function disableAutoMerge(string $owner, string $repo, int|string $number): bool;
+
+    /**
+     * Plain-text digest of the failed CI checks of the PR head (job log tails,
+     * check output, annotations), at most ~20 KB with the end kept. Empty
+     * string when nothing failed.
+     */
+    public function failedCheckLog(string $owner, string $repo, int|string $number): string;
 }

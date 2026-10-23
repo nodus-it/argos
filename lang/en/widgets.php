@@ -4,44 +4,18 @@ declare(strict_types=1);
 
 return [
     'stats' => [
-        'running_workers' => 'Running Workers',
-        'workers_active' => 'Containers working',
-        'workers_idle' => 'No active workers',
-        'in_progress' => 'In Progress',
-        'tasks_running_one' => '1 task running',
-        'tasks_running_many' => ':count tasks running',
+        'running_workspaces' => 'Running Workspaces',
+        'workspaces_active' => 'Containers up',
+        'workspaces_idle' => 'No workspace running',
+        'in_progress' => 'Automatic tasks',
+        'runs_running_one' => '1 automatic task at work',
+        'runs_running_many' => ':count automatic tasks at work',
         'waiting' => 'Waiting for you',
-        'review_open' => 'Review or response pending',
+        'review_open' => 'Plan approval or paused automatic task',
         'nothing_todo' => 'Nothing to do',
         'worker_updates' => 'Worker Updates',
         'worker_updates_pending' => 'Image rebuilds available',
         'worker_updates_clean' => 'All up to date',
     ],
 
-    'hero' => [
-        'chips' => [
-            'run' => 'running',
-            'wait' => 'waiting',
-            'ok' => 'total',
-            'projects' => 'projects',
-            'active_tasks' => 'active tasks',
-        ],
-        'tasks_sub' => 'All running, pending, and completed tasks.',
-        'projects_sub' => 'Repository profiles and worker configuration.',
-        'new_task' => 'New Task',
-        'new_project' => 'New Project',
-    ],
-
-    'current_tasks' => [
-        'heading' => 'Current Tasks',
-        'columns' => [
-            'task' => 'Task',
-            'project' => 'Project',
-            'phase' => 'Phase',
-            'workflow' => 'Workflow',
-            'last_updated' => 'Last updated',
-        ],
-        'empty_heading' => 'No tasks yet',
-        'empty_description' => 'Create your first task under Tasks.',
-    ],
 ];

@@ -6,14 +6,16 @@ namespace Tests\Feature\Console;
 
 use App\Enums\TaskProviderKind;
 use App\Models\ExternalIssueLink;
-use App\Models\RepoProfile;
 use App\Models\Task;
 use App\Models\TaskProviderBinding;
+use App\Models\Workspace;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\LaunchesIssueRuns;
 use Tests\TestCase;
 
 class SimulateIssueWebhookCommandTest extends TestCase
 {
+    use LaunchesIssueRuns;
     use RefreshDatabase;
 
     protected function setUp(): void
@@ -24,12 +26,13 @@ class SimulateIssueWebhookCommandTest extends TestCase
         config(['queue.default' => 'sync']);
     }
 
-    public function test_it_creates_a_task_from_a_simulated_github_issue(): void
+    public function test_it_launches_a_task_from_a_simulated_github_issue(): void
     {
         $binding = TaskProviderBinding::factory()->webhook()->create([
-            'repo_profile_id' => RepoProfile::factory()->create()->id,
+            'workspace_id' => Workspace::factory()->create()->id,
             'kind' => TaskProviderKind::GitHub,
         ]);
+        $this->prepareIssueRuns($binding->workspace);
 
         $this->artisan('argos:webhook:simulate', [
             'binding' => $binding->id,
@@ -41,7 +44,7 @@ class SimulateIssueWebhookCommandTest extends TestCase
             'task_provider_binding_id' => $binding->id,
             'external_id' => '4242',
         ]);
-        $this->assertDatabaseHas('tasks', ['name' => 'Hello from simulator']);
+        $this->assertTrue(Task::query()->where('title', 'Hello from simulator')->exists());
     }
 
     public function test_it_rejects_a_binding_without_provider_kind_gracefully(): void
@@ -55,10 +58,11 @@ class SimulateIssueWebhookCommandTest extends TestCase
         // OR semantics: an issue carrying at least one of the configured
         // labels is imported; an issue with none of them is filtered out.
         $binding = TaskProviderBinding::factory()->webhook()->create([
-            'repo_profile_id' => RepoProfile::factory()->create()->id,
+            'workspace_id' => Workspace::factory()->create()->id,
             'kind' => TaskProviderKind::GitHub,
             'filters' => ['labels' => ['argos', 'ready']],
         ]);
+        $this->prepareIssueRuns($binding->workspace);
 
         // One of two configured labels is enough → task created.
         $this->artisan('argos:webhook:simulate', [

@@ -11,9 +11,10 @@
 #   app       — Laravel app (PHP-FPM); runs migrations on boot, spawns worker
 #               containers via the docker socket, seeds Traefik + nginx config
 #   traefik   — single port-80 entry; file-provider routing (app + live demos)
-#   nginx     — serves static assets + proxies to app:9000, behind Traefik
+#   nginx     — serves static assets + proxies to the app's FPM socket, behind Traefik
 #   queue     — Laravel Horizon (same image as app, ARGOS_ROLE=queue)
 #   scheduler — Laravel scheduler (`schedule:work`, ARGOS_ROLE=scheduler)
+#   reverb    — Laravel Reverb websockets (live workspace tasks, ARGOS_ROLE=reverb)
 #
 # Production vs. development:
 #   Production pulls a prebuilt image (ARGOS_APP_IMAGE points at a registry tag,
@@ -39,6 +40,28 @@ name: argos
 # OAuth Apps) and stored in the database; OAuthConfigHydrator mirrors them into
 # config at boot in every context (app + queue + scheduler). No ENV path.
 
+# Workspace settings (see docs/CONFIGURATION.md#workspaces). Forwarded empty
+# by default so config/argos.php applies its defaults; app, queue (provisioning,
+# PR sync) and scheduler (idle stop) must agree, hence one anchor.
+x-workspace-env: &workspace-env
+  ARGOS_WORKSPACE_COLLABORATION:       "${ARGOS_WORKSPACE_COLLABORATION:-}"
+  ARGOS_WORKSPACE_MAX_ACTIVE:          "${ARGOS_WORKSPACE_MAX_ACTIVE:-}"
+  ARGOS_WORKSPACE_IDLE_MINUTES:        "${ARGOS_WORKSPACE_IDLE_MINUTES:-}"
+  ARGOS_WORKSPACE_CPUS:                "${ARGOS_WORKSPACE_CPUS:-}"
+  ARGOS_WORKSPACE_MEMORY:              "${ARGOS_WORKSPACE_MEMORY:-}"
+  ARGOS_WORKSPACE_PIDS_LIMIT:          "${ARGOS_WORKSPACE_PIDS_LIMIT:-}"
+  ARGOS_WORKSPACE_SIDECAR_MEMORY:      "${ARGOS_WORKSPACE_SIDECAR_MEMORY:-}"
+  ARGOS_WORKSPACE_EDITOR_COOKIE_HOURS: "${ARGOS_WORKSPACE_EDITOR_COOKIE_HOURS:-}"
+  ARGOS_WORKSPACE_PR_SYNC_MINUTES:     "${ARGOS_WORKSPACE_PR_SYNC_MINUTES:-}"
+  ARGOS_WORKSPACE_UPLOAD_MAX_MB:       "${ARGOS_WORKSPACE_UPLOAD_MAX_MB:-}"
+  ARGOS_OPENVSCODE_VERSION:            "${ARGOS_OPENVSCODE_VERSION:-}"
+  ARGOS_AUTO_PLAN:                     "${ARGOS_AUTO_PLAN:-}"
+  ARGOS_AUTO_SHIP:                     "${ARGOS_AUTO_SHIP:-}"
+  ARGOS_AUTO_MAX_FIX_ROUNDS:           "${ARGOS_AUTO_MAX_FIX_ROUNDS:-}"
+  ARGOS_AUTO_MAX_TURNS:                "${ARGOS_AUTO_MAX_TURNS:-}"
+  ARGOS_AUTO_MAX_COST_USD:             "${ARGOS_AUTO_MAX_COST_USD:-}"
+  ARGOS_AUTO_MAX_MINUTES:              "${ARGOS_AUTO_MAX_MINUTES:-}"
+
 # Live-Demo (P6) preview settings — shared verbatim by app + queue (the queue
 # worker runs DeployDemoJob, the app warms the runtime image). Listed via an
 # anchor so the two stay in lockstep.
@@ -46,9 +69,8 @@ name: argos
 # Only ARGOS_PREVIEW_ENABLED is a real operator switch; everything else is
 # forwarded empty so the defaults in config/argos.php apply. In particular the
 # base domain + scheme derive from APP_URL there — set them only for a demo
-# domain that differs from the app domain. Session-protected demos rely on the
-# APP_URL-derived cookie domain (config/session.php), so the login cookie spans
-# the demo subdomains automatically.
+# domain that differs from the app domain. The Argos session cookie stays
+# host-only; previews and editors get their own access cookie.
 x-preview-env: &preview-env
   ARGOS_PREVIEW_ENABLED:        "${ARGOS_PREVIEW_ENABLED:-false}"
   ARGOS_PORT:                   "${ARGOS_PORT:-8080}"
@@ -61,10 +83,17 @@ x-preview-env: &preview-env
   ARGOS_PREVIEW_CPU_LIMIT:      "${ARGOS_PREVIEW_CPU_LIMIT:-}"
   ARGOS_PREVIEW_MEM_LIMIT:      "${ARGOS_PREVIEW_MEM_LIMIT:-}"
   ARGOS_PREVIEW_DEFAULT_IMAGE:  "${ARGOS_PREVIEW_DEFAULT_IMAGE:-}"
-  ARGOS_PREVIEW_AUTH:           "${ARGOS_PREVIEW_AUTH:-}"
-  ARGOS_PREVIEW_BASIC_USER:     "${ARGOS_PREVIEW_BASIC_USER:-}"
-  ARGOS_PREVIEW_BASIC_PASSWORD: "${ARGOS_PREVIEW_BASIC_PASSWORD:-}"
-  ARGOS_PREVIEW_AUTH_GATE_URL:  "${ARGOS_PREVIEW_AUTH_GATE_URL:-}"
+
+# Realtime (Laravel Reverb). Server-side publishing goes straight to the
+# reverb service; browsers connect through Traefik at /app on the Argos host.
+x-realtime-env: &realtime-env
+  BROADCAST_CONNECTION:   "reverb"
+  REVERB_APP_ID:          "argos"
+  REVERB_APP_KEY:         "${ARGOS_REVERB_APP_KEY:-argos}"
+  REVERB_APP_SECRET:      "${ARGOS_REVERB_APP_SECRET:-}"
+  REVERB_HOST:            "reverb"
+  REVERB_PORT:            "8080"
+  REVERB_SCHEME:          "http"
 
 services:
 
@@ -98,6 +127,9 @@ services:
       start_period: 10s
 
   app:
+    networks:
+      - default
+      - argos_ws
     # Production pulls the tag in ARGOS_APP_IMAGE; local dev (docker-compose.dev.yml)
     # adds a build block and builds argos-app:local from source.
     image: "${ARGOS_APP_IMAGE:-argos-app:local}"
@@ -120,21 +152,28 @@ services:
       # config without bind-mounts in the host install dir.
       - argos-public:/srv/argos-public
       - argos-nginx-config:/srv/argos-nginx
+      # PHP-FPM's unix socket, shared with nginx only (see php-fpm.conf).
+      - argos-fpm:/run/argos-fpm
     environment:
-      <<: *preview-env
+      <<: [*preview-env, *realtime-env, *workspace-env]
       ARGOS_ROLE:                        "app"
       APP_ENV:                           "${APP_ENV:-production}"
       APP_DEBUG:                         "${APP_DEBUG:-false}"
       APP_URL:                           "${APP_URL:-http://localhost:${ARGOS_PORT:-8080}}"
       APP_KEY:                           "${APP_KEY:-}"
       ADMIN_PASSWORD:                    "${ADMIN_PASSWORD:-}"
+      ARGOS_FEEDBACK_URL:                "${ARGOS_FEEDBACK_URL:-}"
+      ARGOS_ACCESS_LINK_HOURS:           "${ARGOS_ACCESS_LINK_HOURS:-72}"
       # Browser-E2E only: boots E2eFakeServiceProvider (offline fakes for the
-      # worker run + external validations). Empty by default; double-gated in
-      # AppServiceProvider (set AND not-production), so production is never
-      # affected even if it leaks in. Forwarded to app + queue because the
-      # FakePhaseRunner runs in the queued RunPhaseJob.
+      # workspace runtime + external validations). Empty by default; double-
+      # gated in AppServiceProvider (set AND not-production), so production is
+      # never affected even if it leaks in. Forwarded to app + queue because
+      # workspace jobs run queued.
       ARGOS_E2E_FAKE:                    "${ARGOS_E2E_FAKE:-}"
       ARGOS_CONFIG_DIR:                  /data/config
+      ARGOS_LOG_DIR:                     /data/logs
+      LOG_LEVEL:                         "${LOG_LEVEL:-info}"
+      ARGOS_FILES_DIR:                   /data/files
       ARGOS_TRAEFIK_DIR:                 /data/traefik
       DB_CONNECTION:                     "mariadb"
       ARGOS_DB_HOST:                     "db"
@@ -170,13 +209,12 @@ services:
       - "--providers.file.directory=/etc/traefik/dynamic"
       - "--providers.file.watch=true"
       - "--entrypoints.web.address=:80"
-      # Trust + pass through X-Forwarded-* from an upstream TLS-terminating
-      # proxy (HAProxy/nginx/Caddy/another Traefik). Without this Traefik
-      # overwrites X-Forwarded-Proto with "http" for the :80 entrypoint, so
-      # Laravel (which trusts the proto header, see bootstrap/app.php) sees
-      # plain HTTP and emits http:// asset URLs → mixed-content blocked on an
-      # HTTPS site. Mirrors Laravel's trustProxies(at: '*') posture.
-      - "--entrypoints.web.forwardedHeaders.insecure=true"
+      # Pass X-Forwarded-* through only from the upstream TLS-terminating proxy
+      # (HAProxy/nginx/Caddy/another Traefik) — without it Laravel sees plain
+      # HTTP and emits http:// URLs on an HTTPS site. From anyone else Traefik
+      # replaces the headers, so clients cannot fake their IP (login rate
+      # limit) or host (reset links). Laravel trusts what Traefik forwards.
+      - "--entrypoints.web.forwardedHeaders.trustedIPs=${ARGOS_TRUSTED_PROXIES:-10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,127.0.0.1/32}"
     ports:
       - "${ARGOS_PORT:-8080}:80"
     volumes:
@@ -184,6 +222,7 @@ services:
     networks:
       - default
       - argos_edge
+      - argos_ws
     depends_on:
       - nginx
 
@@ -196,14 +235,19 @@ services:
     networks:
       - default
       - argos_edge
+      - argos_ws
     volumes:
       # Both volumes are populated by the app container's entrypoint on every
       # boot. Mounted RO here so nginx serves static assets directly without
       # bouncing through PHP-FPM, and picks up the baked site config.
       - argos-public:/app/public:ro
       - argos-nginx-config:/etc/nginx/conf.d:ro
+      - argos-fpm:/run/argos-fpm
 
   queue:
+    networks:
+      - default
+      - argos_ws
     # Reuses the image built/pulled by the `app` service — same Dockerfile
     # target, same content.
     image: "${ARGOS_APP_IMAGE:-argos-app:local}"
@@ -220,7 +264,7 @@ services:
       - argos-data:/data
       - argos-traefik:/data/traefik
     environment:
-      <<: *preview-env
+      <<: [*preview-env, *realtime-env, *workspace-env]
       ARGOS_ROLE:                        "queue"
       APP_ENV:                           "${APP_ENV:-production}"
       APP_DEBUG:                         "${APP_DEBUG:-false}"
@@ -229,6 +273,9 @@ services:
       # Browser-E2E only — see the note on the app service above.
       ARGOS_E2E_FAKE:                    "${ARGOS_E2E_FAKE:-}"
       ARGOS_CONFIG_DIR:                  /data/config
+      ARGOS_LOG_DIR:                     /data/logs
+      LOG_LEVEL:                         "${LOG_LEVEL:-info}"
+      ARGOS_FILES_DIR:                   /data/files
       ARGOS_TRAEFIK_DIR:                 /data/traefik
       DB_CONNECTION:                     "mariadb"
       ARGOS_DB_HOST:                     "db"
@@ -242,6 +289,43 @@ services:
       ARGOS_QUEUE_DEFAULT_PROCESSES:     "${ARGOS_QUEUE_DEFAULT_PROCESSES:-5}"
       ARGOS_QUEUE_TASKS_PROCESSES:       "${ARGOS_QUEUE_TASKS_PROCESSES:-2}"
     command: ["php", "/app/artisan", "horizon"]
+
+  reverb:
+    image: "${ARGOS_APP_IMAGE:-argos-app:local}"
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - argos-data:/data
+    environment:
+      <<: *realtime-env
+      ARGOS_ROLE:             "reverb"
+      APP_ENV:                "${APP_ENV:-production}"
+      APP_KEY:                "${APP_KEY:-}"
+      APP_URL:                "${APP_URL:-http://localhost:${ARGOS_PORT:-8080}}"
+      ARGOS_CONFIG_DIR:       /data/config
+      ARGOS_LOG_DIR:          /data/logs
+      LOG_LEVEL:              "${LOG_LEVEL:-info}"
+      DB_CONNECTION:          "mariadb"
+      ARGOS_DB_HOST:          "db"
+      ARGOS_DB_PORT:          "3306"
+      ARGOS_DB_DATABASE:      "${ARGOS_DB_DATABASE:-argos}"
+      ARGOS_DB_USERNAME:      "${ARGOS_DB_USERNAME:-argos}"
+      ARGOS_DB_PASSWORD:      "${ARGOS_DB_PASSWORD:-argos}"
+      REVERB_SERVER_HOST:     "0.0.0.0"
+      REVERB_SERVER_PORT:     "8080"
+      REDIS_HOST:             "redis"
+      REDIS_PORT:             "6379"
+    command: ["php", "/app/artisan", "reverb:start", "--host=0.0.0.0", "--port=8080"]
+    healthcheck:
+      test: ["CMD-SHELL", "php -r 'exit(@fsockopen(\"127.0.0.1\", 8080) ? 0 : 1);'"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
 
   scheduler:
     # Runs `schedule:work`, which invokes `schedule:run` every minute (see
@@ -258,12 +342,15 @@ services:
     volumes:
       - argos-data:/data
     environment:
+      <<: [*realtime-env, *workspace-env]
       ARGOS_ROLE:               "scheduler"
       APP_ENV:                  "${APP_ENV:-production}"
       APP_DEBUG:                "${APP_DEBUG:-false}"
       APP_URL:                  "${APP_URL:-http://localhost:${ARGOS_PORT:-8080}}"
       APP_KEY:                  "${APP_KEY:-}"
       ARGOS_CONFIG_DIR:         /data/config
+      ARGOS_LOG_DIR:            /data/logs
+      LOG_LEVEL:                "${LOG_LEVEL:-info}"
       DB_CONNECTION:            "mariadb"
       ARGOS_DB_HOST:            "db"
       ARGOS_DB_PORT:            "3306"
@@ -280,6 +367,12 @@ networks:
   # Named explicitly so the per-demo compose override can join it as external.
   argos_edge:
     name: argos_edge
+  # Workspace network: the manager (app/queue), nginx (daemon → manager
+  # events) and Traefik (code-<slug> editor routes) plus every workspace
+  # container. db and redis are deliberately NOT members — workspace
+  # containers run arbitrary agent code and must not reach them.
+  argos_ws:
+    name: argos_ws
 
 volumes:
   argos-data:
@@ -291,3 +384,5 @@ volumes:
   # nginx-served assets + site config, populated by the app entrypoint.
   argos-public:
   argos-nginx-config:
+  # PHP-FPM unix socket (app ↔ nginx). Keeps FastCGI off every network.
+  argos-fpm:

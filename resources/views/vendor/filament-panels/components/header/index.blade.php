@@ -22,7 +22,8 @@
     }}
 >
     <div>
-        @if ($breadcrumbs)
+        {{-- Breadcrumbs live in the top bar; panels without one (/w) skip them. --}}
+        @if ($breadcrumbs && filament()->hasTopbar())
             <template x-teleport="#argos-topbar-breadcrumbs">
                 <x-filament::breadcrumbs :breadcrumbs="$breadcrumbs" />
             </template>

@@ -12,7 +12,7 @@ use Throwable;
 /**
  * Performs a live, cheap authentication probe for a credential so the UI can
  * verify it the moment it is created/edited instead of discovering a bad token
- * later during a poll or task run.
+ * later during a poll or workspace run.
  *
  * The distinction between a definitive rejection (auth/4xx → block the save)
  * and a mere "couldn't reach the provider" (network/5xx → allow but don't mark

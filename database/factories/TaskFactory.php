@@ -4,76 +4,50 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
-use App\Enums\WorkflowStatus;
-use App\Models\RepoProfile;
+use App\Enums\ClaudeModel;
+use App\Enums\PermissionMode;
+use App\Enums\SessionStatus;
+use App\Enums\TaskStatus;
+use App\Models\AgentCredential;
 use App\Models\Task;
+use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Str;
 
 /**
  * @extends Factory<Task>
  */
 class TaskFactory extends Factory
 {
+    protected $model = Task::class;
+
     public function definition(): array
     {
+        $slug = Workspace::slugify(fake()->unique()->words(2, true), 20).'-'.Str::lower(Str::random(4));
+
         return [
-            'name' => fake()->unique()->words(3, true),
-            'repo_profile_id' => RepoProfile::factory(),
-            'description' => fake()->sentence(),
-            'workflow_status' => WorkflowStatus::Draft,
-            'current_phase' => null,
-            'current_status' => null,
-            'feature_branch' => null,
-            'pr_url' => null,
-            'auto_concept' => false,
+            'workspace_id' => Workspace::factory(),
+            'slug' => $slug,
+            'owner_user_id' => User::factory(),
+            'agent_credential_id' => AgentCredential::factory(),
+            'title' => fake()->sentence(3),
+            'status' => TaskStatus::Active,
+            'session_status' => SessionStatus::Closed,
+            'permission_mode' => PermissionMode::Default,
+            'model' => ClaudeModel::Sonnet46->value,
+            'branch' => 'argos/'.$slug,
+            'base_branch' => 'main',
         ];
     }
 
-    /**
-     * Derive the frozen slug from the final name (after any override). Done in
-     * afterMaking — not via a model event — so it also runs in tests that fake
-     * the event dispatcher.
-     */
-    public function configure(): static
+    public function open(): static
     {
-        return $this->afterMaking(function (Task $task): void {
-            if (($task->slug ?? '') === '') {
-                $task->slug = Task::generateSlug((string) $task->name);
-            }
-        });
+        return $this->state(['session_open' => true, 'session_status' => SessionStatus::Idle]);
     }
 
-    public function inReview(): static
+    public function ownedBy(User $user): static
     {
-        return $this->state([
-            'workflow_status' => WorkflowStatus::InReview,
-            'current_phase' => 'push',
-            'current_status' => 'completed',
-            'feature_branch' => 'argos/test-task',
-            'pr_url' => 'https://github.com/test-org/test-repo/pull/1',
-        ]);
-    }
-
-    public function conceptReady(): static
-    {
-        return $this->state([
-            'workflow_status' => WorkflowStatus::ConceptReview,
-            'current_phase' => 'concept',
-            'current_status' => 'completed',
-            'concept_md' => "# Konzept\n\nTest-Konzept Inhalt.",
-        ]);
-    }
-
-    public function completed(): static
-    {
-        return $this->state(['workflow_status' => WorkflowStatus::Completed]);
-    }
-
-    public function failed(): static
-    {
-        return $this->state([
-            'workflow_status' => WorkflowStatus::Failed,
-            'current_status' => 'failed',
-        ]);
+        return $this->state(['owner_user_id' => $user->id, 'created_by' => $user->id]);
     }
 }

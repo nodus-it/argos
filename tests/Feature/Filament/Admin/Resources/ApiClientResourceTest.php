@@ -4,16 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Filament\Admin\Resources;
 
-use App\Filament\Admin\RelationManagers\ApiTokensRelationManager;
-use App\Filament\Admin\Resources\ApiClientResource;
-use App\Filament\Admin\Resources\ApiClientResource\Pages\CreateApiClient;
-use App\Filament\Admin\Resources\ApiClientResource\Pages\EditApiClient;
-use App\Filament\Admin\Resources\ApiClientResource\Pages\ListApiClients;
-use App\Filament\Admin\Resources\RepoProfileResource;
-use App\Filament\Admin\Resources\RepoProfileResource\Pages\EditRepoProfile;
+use App\Filament\App\Clusters\System\Resources\ApiClientResource;
+use App\Filament\App\Clusters\System\Resources\ApiClientResource\Pages\CreateApiClient;
+use App\Filament\App\Clusters\System\Resources\ApiClientResource\Pages\EditApiClient;
+use App\Filament\App\Clusters\System\Resources\ApiClientResource\Pages\ListApiClients;
+use App\Filament\App\Resources\WorkspaceResource\Pages\EditWorkspaceSettings;
+use App\Filament\App\Resources\WorkspaceResource\RelationManagers\ApiTokensRelationManager;
 use App\Models\ApiClient;
-use App\Models\RepoProfile;
 use App\Models\User;
+use App\Models\Workspace;
 use Filament\Actions\Testing\TestAction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -26,7 +25,7 @@ class ApiClientResourceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->actingAs(User::factory()->create());
+        $this->actingAs(User::factory()->admin()->create());
     }
 
     public function test_list_renders(): void
@@ -60,18 +59,14 @@ class ApiClientResourceTest extends TestCase
             ->assertSeeLivewire(ApiTokensRelationManager::class);
     }
 
-    public function test_repo_profile_also_wires_the_tokens_relation_manager(): void
+    public function test_workspace_also_wires_the_tokens_relation_manager(): void
     {
-        $profile = RepoProfile::factory()->create();
+        $workspace = Workspace::factory()->create();
 
-        $this->assertContains(
-            ApiTokensRelationManager::class,
-            RepoProfileResource::getRelations(),
-        );
-
-        Livewire::test(EditRepoProfile::class, ['record' => $profile->getKey()])
+        // The workspace settings embed it in the Integrations tab.
+        Livewire::test(EditWorkspaceSettings::class, ['record' => $workspace->getKey()])
             ->assertSuccessful()
-            ->assertSee(__('api_tokens.title'));
+            ->assertSeeLivewire(ApiTokensRelationManager::class);
     }
 
     public function test_mints_and_revokes_a_token_via_the_relation_manager(): void

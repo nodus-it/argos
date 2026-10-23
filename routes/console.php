@@ -1,46 +1,63 @@
 <?php
 
-use Illuminate\Foundation\Inspiring;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
 
-Artisan::command('inspire', function () {
-    $this->comment(Inspiring::quote());
-})->purpose('Display an inspiring quote');
-
-// Daily npm-registry poll for every registered agent's pinned package.
-// Result is persisted in agent_versions; the dashboard widget reads from
-// there. Manual trigger: `php artisan argos:check-agent-versions`.
-Schedule::command('argos:check-agent-versions')
-    ->dailyAt('03:00')
-    ->withoutOverlapping();
-
-// Poll issue providers and check concept-comment reactions on a configurable
+// Poll issue providers and check plan-comment reactions on a configurable
 // interval (ARGOS_POLL_INTERVAL_MINUTES, default 5; set to 1 locally for fast
 // feedback). Providers don't push reaction events, so approvals are polled too.
 // Manual triggers: `php artisan argos:poll-issues`,
-// `php artisan argos:check-concept-approvals`.
+// `php artisan argos:check-plan-approvals`.
 $pollCron = '*/'.config('argos.poll_interval_minutes', 5).' * * * *';
 
 Schedule::command('argos:poll-issues')
     ->cron($pollCron)
     ->withoutOverlapping();
 
-Schedule::command('argos:check-concept-approvals')
+// 👍 on the plan comment of an issue-started automatic run approves the plan.
+Schedule::command('argos:check-plan-approvals')
     ->cron($pollCron)
     ->withoutOverlapping();
 
 // Tear down live demos past their TTL (preview.ttl_hours). Dispatches
-// StopDemoJob to the queue (the scheduler has no docker socket).
+// StopWorkspaceDemoJob to the queue (the scheduler has no docker socket).
 // Manual trigger: `php artisan argos:cleanup-demos`.
 Schedule::command('argos:cleanup-demos')
     ->everyFifteenMinutes()
     ->withoutOverlapping();
 
-// Reap orphaned worker/sidecar run resources left by a hard-killed phase job
-// (skipped finally-block teardown). Dispatches ReapOrphanedRunsJob to the
-// queue (the scheduler has no docker socket).
-// Manual trigger: `php artisan argos:cleanup-orphans`.
-Schedule::command('argos:cleanup-orphans')
+// Interactive workspaces: stop idle containers (volumes stay) and remove
+// containers whose workspace is gone.
+Schedule::command('argos:workspaces:idle-stop')
+    ->everyFiveMinutes()
+    ->withoutOverlapping();
+
+// Sessions live in the daemon's memory: close what a restarted daemon lost.
+Schedule::command('argos:workspaces:reconcile-sessions')
+    ->everyMinute()
+    ->withoutOverlapping();
+
+Schedule::command('argos:workspaces:reap-orphans')
     ->everyFifteenMinutes()
     ->withoutOverlapping();
+
+// New comments on the tickets of open tasks become hints in the chat.
+Schedule::command('argos:tasks:sync-ticket-comments')
+    ->cron('*/'.max(1, (int) config('argos.poll_interval_minutes', 5)).' * * * *')
+    ->withoutOverlapping();
+
+Schedule::command('argos:tasks:sync-prs')
+    ->cron('*/'.max(1, (int) config('argos.workspaces.pr_sync_minutes', 3)).' * * * *')
+    ->withoutOverlapping();
+
+// Free preview, worktree and database of tasks that finished more than their
+// workspace's cleanup_after_days ago (the conversation stays).
+Schedule::command('argos:tasks:cleanup')
+    ->dailyAt('03:30')
+    ->withoutOverlapping();
+
+// Housekeeping: failed jobs (two weeks for a look), expired API/OAuth
+// tokens and used or expired access links.
+Schedule::command('queue:prune-failed', ['--hours' => 336])->daily()->withoutOverlapping();
+Schedule::command('passport:purge')->daily()->withoutOverlapping();
+Schedule::command('sanctum:prune-expired', ['--hours' => 168])->daily()->withoutOverlapping();
+Schedule::command('auth:clear-resets')->daily()->withoutOverlapping();

@@ -1,5 +1,4 @@
 import { type Page } from '@playwright/test';
-import { type Agent } from '../matrix';
 
 /**
  * Complete onboarding's agent-auth step, which is what unlocks the onboarding
@@ -13,22 +12,15 @@ import { type Agent } from '../matrix';
  *
  * UNRUN: needs local `npx playwright test` to confirm the post-save wait.
  */
-export async function completeOnboarding(page: Page, agent: Agent): Promise<void> {
+export async function completeOnboarding(page: Page): Promise<void> {
   await page.goto('/admin/onboarding');
 
   // Skip the optional security step to reach the agents step.
   await page.locator('[wire\\:click="nextStep"]').first().click();
   await page.waitForLoadState('networkidle');
 
-  if (agent === 'claude-code') {
-    await page.locator('input[wire\\:model="claudeToken"]').fill('e2e-fake-claude-token');
-    await page.locator('[wire\\:click="saveClaudeToken"]').click();
-  } else {
-    await page
-      .locator('textarea[wire\\:model="codexAuthJson"]')
-      .fill('{"OPENAI_API_KEY":"e2e-fake-key"}');
-    await page.locator('[wire\\:click="saveCodexAuthJson"]').click();
-  }
+  await page.locator('input[wire\\:model="claudeToken"]').fill('e2e-fake-claude-token');
+  await page.locator('[wire\\:click="saveClaudeToken"]').click();
 
   // Saving persists the AgentCredential and unlocks the gate; let the Livewire
   // round-trip settle before navigating on.

@@ -11,10 +11,12 @@ return [
         'back' => 'Back',
     ],
 
+    'language' => 'Language',
+
     'steps' => [
-        'security' => 'Security',
-        'agents' => 'Agents',
-        'repository' => 'Repository',
+        'security' => 'Account',
+        'agents' => 'Claude subscription',
+        'repository' => 'Workspace',
         'done' => 'Done',
     ],
 
@@ -24,18 +26,15 @@ return [
         'empty_token' => 'Please enter a token',
         'invalid_token_title' => 'Token invalid',
         'invalid_token_body' => 'The entered token was rejected by the API.',
+        'avatar_saved' => 'Profile picture saved',
         'saved_title' => 'Token saved',
         'saved_unreachable_body' => 'Note: Token could not be verified against the API — connection not reachable.',
-        'empty_codex' => 'Please paste the auth.json content',
-        'invalid_codex_title' => 'auth.json invalid',
-        'invalid_codex_body' => 'The pasted content is not valid JSON.',
-        'codex_saved' => 'Codex credential saved',
         'disconnected' => ':provider disconnected',
-        'need_agent' => 'Authenticate at least one agent first',
+        'need_agent' => 'Add your Claude subscription first',
         'repo_incomplete' => 'Please pick a repository and branch',
         'name_taken_title' => 'Name already in use',
-        'name_taken_body' => 'A project with this name already exists — choose a different one.',
-        'project_created' => 'Project created',
+        'name_taken_body' => 'A workspace with this name already exists — choose a different one.',
+        'project_created' => 'Workspace created',
     ],
 
     'security' => [
@@ -47,20 +46,17 @@ return [
         'new_placeholder' => 'At least 8 characters',
         'confirm_label' => 'Confirm password',
         'confirm_placeholder' => 'Repeat the password',
+        'avatar_button' => 'Upload picture',
         'save_button' => 'Update password',
         'optional_hint' => 'Optional — skip with “Continue” to set it up later under your profile.',
     ],
 
     'agents' => [
-        'heading' => 'Which agent do you want to use?',
-        'description' => 'Authenticate at least one coding agent. You can add or change agents later.',
-        'gate_hint' => 'At least one agent required',
+        'heading' => 'Your Claude subscription',
+        'description' => 'Tasks run on the subscription of the person who owns them. Add yours — the first workspace\'s setup runs on it too. Other members add their own under My account; shared agents for automation are there too (Claude subscriptions).',
+        'gate_hint' => 'Your Claude subscription is required',
         'claude_label' => 'Claude Code',
         'claude_hint' => 'Generate a token with <code class="text-xs">claude setup-token</code> and paste it below.',
-        'codex_label' => 'OpenAI Codex',
-        'codex_hint' => 'Run <code class="text-xs">codex login</code>, then paste the contents of <code class="text-xs">~/.codex/auth.json</code> below.',
-        'codex_placeholder' => '{"OPENAI_API_KEY": null, "tokens": {…}, …}',
-        'codex_saved_short' => 'Saved — paste new content to overwrite.',
     ],
 
     'token' => [
@@ -78,8 +74,8 @@ return [
     ],
 
     'repo' => [
-        'heading' => 'Connect a repository',
-        'description' => 'Authorize a Git host, then pick the repository Argos should work on.',
+        'heading' => 'Create the first workspace',
+        'description' => 'Authorize a Git host, then pick the repository. A workspace is the project: repository, environment, members and its tasks.',
         'authorize_heading' => '1 · Authorize access',
         'oauth_card_title' => 'OAuth',
         'oauth_card_desc' => 'Connect in one click — then pick repos and branches from dropdowns.',
@@ -101,14 +97,14 @@ return [
         'no_repos' => 'No repositories found for this source.',
         'branch_label' => 'Default branch',
         'branch_placeholder' => 'Choose a branch…',
-        'name_label' => 'Project name',
-        'create_button' => 'Create project',
+        'name_label' => 'Workspace name',
+        'create_button' => 'Create workspace',
     ],
 
     'done' => [
         'heading' => 'Argos is ready',
-        'description' => 'Your first project is connected. Create a task to let an agent turn a plan into a pull request.',
-        'create_task' => 'Create first task',
-        'view_project' => 'View project',
+        'description' => 'Your first workspace exists. Argos is checking the repository now: if the preview contract, the setup steps or a fitting stack are missing, a setup task starts on your subscription — open the workspace to follow it, then start your first task.',
+        'create_workspace' => 'Open first workspace',
+        'view_project' => 'Workspace settings',
     ],
 ];

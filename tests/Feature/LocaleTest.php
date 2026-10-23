@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Filament\Admin\Pages\Profile;
+use App\Filament\App\Clusters\Account\Pages\Profile;
 use App\Http\Middleware\SetUserLocale;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -22,7 +22,7 @@ class LocaleTest extends TestCase
         $user = User::factory()->create(['locale' => 'de']);
         $this->actingAs($user);
 
-        $this->get('/admin/settings');
+        $this->get('/');
 
         $this->assertSame('de', App::getLocale());
     }
@@ -32,7 +32,7 @@ class LocaleTest extends TestCase
         $user = User::factory()->create(['locale' => null]);
         $this->actingAs($user);
 
-        $this->get('/admin/settings');
+        $this->get('/');
 
         $this->assertSame(config('app.locale'), App::getLocale());
     }

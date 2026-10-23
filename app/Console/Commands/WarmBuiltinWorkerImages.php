@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Enums\WorkerImageEntityStatus;
-use App\Filament\Admin\Support\WorkerStackBuildDispatcher;
 use App\Models\WorkerStack;
+use App\Services\Worker\WorkerStackBuildDispatcher;
 use App\Workers\Agents\AgentRegistry;
 use App\Workers\Compose\WorkerImageBuilder;
 use App\Workers\Compose\WorkerImageResolver;
@@ -16,7 +16,7 @@ use Illuminate\Database\Eloquent\Collection;
 /**
  * Pre-warm the worker image cache for the built-in stacks. Intended to
  * run once at app boot (post-migrate, in app/entrypoint.sh) so the
- * first task phase a fresh install kicks off does not pay the 1-3 min
+ * first workspace a fresh install starts does not pay the 1-3 min
  * cold-build cost — by then the queue worker has already done it.
  *
  * Idempotent: skips any (stack × agent) whose image tag is already
@@ -28,7 +28,7 @@ class WarmBuiltinWorkerImages extends Command
         {--default-only : Only warm the default stack (config argos.compose.default_stack)}
         {--sync : Build synchronously instead of dispatching to the queue}';
 
-    protected $description = 'Pre-build worker images for the built-in stacks so the first phase run is fast.';
+    protected $description = 'Pre-build worker images for the built-in stacks so the first workspace starts fast.';
 
     public function handle(
         WorkerImageResolver $resolver,
@@ -81,7 +81,7 @@ class WarmBuiltinWorkerImages extends Command
             ->where('status', '!=', WorkerImageEntityStatus::Disabled);
 
         if ($this->option('default-only')) {
-            $name = (string) config('argos.compose.default_stack', 'php-8.4');
+            $name = (string) config('argos.compose.default_stack', 'php-8.5');
             $query->where('name', $name);
         }
 

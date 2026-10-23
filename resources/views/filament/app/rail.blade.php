@@ -1,0 +1,80 @@
+{{-- Icon rail of the workspaces panel (replaces the top bar): logo, "My
+     work", the workspaces as abbreviations with waiting badges, the list of
+     all workspaces, administration (Argos admins), the bell and the user
+     menu. Icon-only, 44px targets; a bottom bar on phones. --}}
+@php
+    use App\Filament\App\Pages\MyWork;
+    use App\Filament\App\Resources\WorkspaceResource;
+
+    $user = filament()->auth()->user();
+    $onMyWork = request()->routeIs(MyWork::getRouteName(filament()->getPanel('app')));
+    $onList = request()->routeIs('filament.app.resources.workspaces.index');
+    $record = request()->route('record');
+    // The route names the workspace by slug (older links: ULID).
+    $activeId = $record instanceof \App\Models\Workspace ? $record->id : (is_string($record) ? \App\Models\Workspace::query()->where('slug', $record)->orWhere('id', $record)->value('id') : null);
+@endphp
+@if ($user)
+<nav class="ag-rail" aria-label="{{ __('workspaces.panel.navigation') }}">
+    <a href="{{ MyWork::getUrl(panel: 'app') }}" class="ag-rail-logo" aria-label="Argos">
+        <x-ag.icon name="eye" :size="24" />
+    </a>
+    <a href="{{ MyWork::getUrl(panel: 'app') }}" @class(['ag-rail-btn', 'ag-rail-home', 'is-active' => $onMyWork])
+       aria-label="{{ __('workspaces.my_work.title') }}" title="{{ __('workspaces.my_work.title') }}" @if ($onMyWork) aria-current="page" @endif>
+        <x-ag.icon name="inbox" :size="20" />
+    </a>
+    <span class="ag-rail-sep" aria-hidden="true"></span>
+    @livewire(\App\Livewire\Workspace\RailWorkspaces::class, ['activeId' => $activeId], key('rail-workspaces'))
+    <a href="{{ WorkspaceResource::getUrl('index', panel: 'app') }}" @class(['ag-rail-btn', 'ag-rail-all', 'is-active' => $onList])
+       aria-label="{{ __('workspaces.rail.all_workspaces') }}" title="{{ __('workspaces.rail.all_workspaces') }}" @if ($onList) aria-current="page" @endif>
+        <x-ag.icon name="grid" :size="20" />
+    </a>
+    <span class="ag-rail-spacer"></span>
+    @if ($user->isAdmin())
+        <a href="{{ \App\Filament\App\Clusters\System::getUrl(panel: 'app') }}" @class(['ag-rail-btn', 'ag-rail-admin', 'is-active' => request()->routeIs('filament.app.system*')]) aria-label="{{ __('workspaces.panel.admin') }}" title="{{ __('workspaces.panel.admin') }}">
+            <x-ag.icon name="settings" :size="20" />
+        </a>
+    @endif
+    @livewire(\App\Livewire\Workspace\RailNotifications::class, ['lazy' => true])
+    <x-filament::dropdown placement="right-end" class="ag-rail-user">
+        <x-slot name="trigger">
+            <button type="button" @class(['ag-rail-avatar', 'has-image' => $user->avatarUrl() !== null]) aria-label="{{ __('workspaces.panel.signed_in_as', ['name' => $user->name]) }}" title="{{ $user->name }}">@if ($user->avatarUrl() !== null)<img src="{{ $user->avatarUrl() }}" alt="">@else{{ \App\Support\Initials::of($user->name) }}@endif</button>
+        </x-slot>
+        <x-filament::dropdown.header icon="heroicon-o-user">{{ $user->name }}</x-filament::dropdown.header>
+        <x-filament::dropdown.list>
+            @if (filament()->hasProfile())
+                <x-filament::dropdown.list.item :href="filament()->getProfileUrl()" tag="a" icon="heroicon-o-user-circle">
+                    {{ __('account.title') }}
+                </x-filament::dropdown.list.item>
+            @endif
+            <x-filament::dropdown.list.item :href="\App\Filament\App\Pages\Documentation::getUrl(panel: 'app')" tag="a" icon="heroicon-o-book-open">
+                {{ __('system.docs') }}
+            </x-filament::dropdown.list.item>
+            @if ($user->isAdmin())
+                <x-filament::dropdown.list.item :href="\App\Filament\App\Clusters\System::getUrl(panel: 'app')" tag="a" icon="heroicon-o-cog-6-tooth">
+                    {{ __('workspaces.panel.admin') }}
+                </x-filament::dropdown.list.item>
+            @endif
+        </x-filament::dropdown.list>
+        <x-filament::dropdown.list>
+            <x-filament-panels::theme-switcher />
+        </x-filament::dropdown.list>
+        @php $sourceUrl = rtrim((string) config('argos.source_url'), '/'); @endphp
+        @if ($sourceUrl !== '')
+            {{-- AGPL-3.0 §13: the source stays one click away on every page. --}}
+            <x-filament::dropdown.list>
+                <x-filament::dropdown.list.item :href="\App\Support\FeedbackLink::url(request()->fullUrl())" tag="a" target="_blank" icon="heroicon-o-chat-bubble-left-ellipsis" class="fi-argos-feedback-btn">
+                    {{ __('common.feedback_button.tooltip') }}
+                </x-filament::dropdown.list.item>
+                <x-filament::dropdown.list.item :href="$sourceUrl" tag="a" target="_blank" icon="heroicon-o-code-bracket">
+                    {{ __('common.source_link_label') }} · v{{ config('argos.version') }} · AGPL-3.0
+                </x-filament::dropdown.list.item>
+            </x-filament::dropdown.list>
+        @endif
+        <x-filament::dropdown.list>
+            <x-filament::dropdown.list.item :action="filament()->getLogoutUrl()" method="post" tag="form" icon="heroicon-o-arrow-left-on-rectangle">
+                {{ __('filament-panels::layout.actions.logout.label') }}
+            </x-filament::dropdown.list.item>
+        </x-filament::dropdown.list>
+    </x-filament::dropdown>
+</nav>
+@endif

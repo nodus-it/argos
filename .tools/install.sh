@@ -14,6 +14,9 @@
 # downloads any newer docker-compose.yml, merges new keys from .env.example
 # into .env without touching existing values, then `docker compose pull && up -d`.
 #
+# Behind a TLS proxy, pass the public URL (and the host port it forwards to):
+#   curl … | bash -s -- --url https://argos.example.com --port 8080
+#
 # To layer in custom config (extra ports, labels, env), drop a
 # docker-compose.override.yml next to docker-compose.yml — the installer
 # never touches that file.
@@ -50,6 +53,12 @@ IFS=$'\n\t'
 # ── Configuration ───────────────────────────────────────────────────────────
 ARGOS_REPO="${ARGOS_REPO:-nodus-it/argos}"
 INSTALL_DIR="${ARGOS_INSTALL_DIR:-$PWD}"
+# Public URL and host port; empty keeps what .env already has.
+APP_URL_INPUT="${ARGOS_URL:-}"
+PORT_INPUT="${ARGOS_PORT:-}"
+# How long to wait for the app container to report healthy after `up -d`.
+WAIT_SECONDS="${ARGOS_WAIT_SECONDS:-300}"
+WAIT_INTERVAL="${ARGOS_WAIT_INTERVAL:-3}"
 FORCE=0
 RESET=0
 # ARGOS_VERSION is resolved lazily — main() calls resolve_default_version()
@@ -126,6 +135,10 @@ Usage: install.sh [options]
 Options:
   -d, --dir PATH       Install directory (default: \$PWD = $PWD)
   -v, --version REF    Git ref to install from (default: $ARGOS_VERSION)
+  -u, --url URL        Public URL Argos is reached at (writes APP_URL), e.g.
+                       https://argos.example.com behind a TLS proxy.
+  -p, --port PORT      Host port the stack listens on (writes ARGOS_PORT,
+                       default 8080).
   -b, --beta           Install the latest release including pre-releases.
                        Useful before the first stable release ships or to
                        track RC builds. Also activates automatically as a
@@ -151,6 +164,9 @@ Options:
 Environment overrides:
   ARGOS_INSTALL_DIR    Same as --dir
   ARGOS_VERSION        Same as --version
+  ARGOS_URL            Same as --url
+  ARGOS_PORT           Same as --port
+  ARGOS_WAIT_SECONDS   Seconds to wait for the app to become healthy (300)
   ARGOS_BETA=1         Same as --beta
   ARGOS_STAGE=1        Same as --stage
   ARGOS_NEXT=1         Same as --next
@@ -163,6 +179,8 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         -d|--dir)     INSTALL_DIR="$2"; shift 2;;
         -v|--version) ARGOS_VERSION="$2"; shift 2;;
+        -u|--url)     APP_URL_INPUT="$2"; shift 2;;
+        -p|--port)    PORT_INPUT="$2"; shift 2;;
         -b|--beta)    BETA=1; shift;;
         -s|--stage)   STAGE=1; shift;;
         -n|--next)    NEXT=1; shift;;
@@ -387,6 +405,7 @@ initialise_env_file() {
     set_env_value "$ENV_FILE" ADMIN_PASSWORD         "$(gen_password)"
     set_env_value "$ENV_FILE" ARGOS_DB_PASSWORD      "$(gen_password)"
     set_env_value "$ENV_FILE" ARGOS_DB_ROOT_PASSWORD "$(gen_password)"
+    set_env_value "$ENV_FILE" ARGOS_REVERB_APP_SECRET "$(gen_password)"
     chmod 600 "$ENV_FILE"
     success "Wrote $ENV_FILE with generated secrets (mode 600)."
 }
@@ -407,7 +426,7 @@ backfill_missing_secrets() {
         generated=$((generated + 1))
     fi
     local key
-    for key in ADMIN_PASSWORD ARGOS_DB_PASSWORD ARGOS_DB_ROOT_PASSWORD; do
+    for key in ADMIN_PASSWORD ARGOS_DB_PASSWORD ARGOS_DB_ROOT_PASSWORD ARGOS_REVERB_APP_SECRET; do
         if [[ -z "$(get_env_value "$ENV_FILE" "$key")" ]]; then
             set_env_value "$ENV_FILE" "$key" "$(gen_password)"
             warn "$key was empty in $ENV_FILE — generated a new one."
@@ -442,6 +461,87 @@ apply_stage_image() {
 apply_next_image() {
     set_env_value "$ENV_FILE" ARGOS_APP_IMAGE "$NEXT_IMAGE"
     log "Pinned ARGOS_APP_IMAGE=$NEXT_IMAGE (next channel)."
+}
+
+# apply_access_settings: Validate --url / --port and write them to $ENV_FILE as
+# APP_URL / ARGOS_PORT. Empty inputs leave the existing values alone.
+# Args: none (reads $APP_URL_INPUT, $PORT_INPUT; writes $ENV_FILE)
+# Returns: 0, exits via fail() on invalid input
+apply_access_settings() {
+    if [[ -n "$PORT_INPUT" ]]; then
+        if [[ ! "$PORT_INPUT" =~ ^[0-9]+$ ]] || (( PORT_INPUT < 1 || PORT_INPUT > 65535 )); then
+            fail "Invalid --port '$PORT_INPUT' — expected a number between 1 and 65535."
+        fi
+        set_env_value "$ENV_FILE" ARGOS_PORT "$PORT_INPUT"
+        log "Set ARGOS_PORT=$PORT_INPUT."
+    fi
+    if [[ -n "$APP_URL_INPUT" ]]; then
+        if [[ ! "$APP_URL_INPUT" =~ ^https?://[^/[:space:]]+(/[^[:space:]]*)?$ ]]; then
+            fail "Invalid --url '$APP_URL_INPUT' — expected e.g. https://argos.example.com"
+        fi
+        set_env_value "$ENV_FILE" APP_URL "${APP_URL_INPUT%/}"
+        log "Set APP_URL=${APP_URL_INPUT%/}."
+    fi
+}
+
+# port_in_use: Whether something already accepts connections on a local port.
+# Args: =port
+# Returns: 0 when the port is taken, 1 when it is free
+port_in_use() {
+    (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null
+}
+
+# ensure_port_free: Stop a fresh install before `up -d` fails on a taken port.
+# Args: none (reads ARGOS_PORT from $ENV_FILE)
+# Returns: 0, exits via fail() when the port is taken
+ensure_port_free() {
+    local port
+    port="$(get_env_value "$ENV_FILE" ARGOS_PORT)"
+    port="${port:-8080}"
+    if port_in_use "$port"; then
+        fail "Port $port is already in use on this host. Pick another one with --port <port>."
+    fi
+}
+
+# wait_for_app: Poll the app container's health until it is healthy, unhealthy
+# or $WAIT_SECONDS have passed (first boot runs the migrations).
+# Args: none (acts on the compose project in cwd)
+# Returns: 0 when healthy, 1 otherwise
+wait_for_app() {
+    local waited=0 cid status
+    log "Waiting for Argos to finish booting (up to ${WAIT_SECONDS}s) ..."
+    while (( waited < WAIT_SECONDS )); do
+        cid="$(docker compose ps -q app 2>/dev/null || true)"
+        if [[ -n "$cid" ]]; then
+            status="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$cid" 2>/dev/null || true)"
+            case "$status" in
+                healthy) success "Argos is healthy."; return 0;;
+                unhealthy|exited|dead) break;;
+            esac
+        fi
+        sleep "$WAIT_INTERVAL"
+        waited=$((waited + WAIT_INTERVAL))
+    done
+    warn "Argos did not report healthy yet (status: ${status:-unknown})."
+    warn "Check the logs: docker compose -f $INSTALL_DIR/$COMPOSE_FILE logs -f app"
+    return 1
+}
+
+# update_command: The command that updates this install on its channel — $0 is
+# just "bash" under `curl | bash`, so it is rebuilt from the channel instead.
+# Args: none (reads $ARGOS_REPO, channel flags, $INSTALL_DIR)
+# Returns: the command on stdout
+update_command() {
+    local ref="master" flag=""
+    if [[ "$STAGE" -eq 1 ]]; then
+        ref="develop"; flag=" --stage"
+    elif [[ "$NEXT" -eq 1 ]]; then
+        ref="next"; flag=" --next"
+    elif [[ "$BETA" -eq 1 ]]; then
+        flag=" --beta"
+    fi
+    printf 'curl -fsSL https://raw.githubusercontent.com/%s/%s/.tools/install.sh | bash -s -- --dir %s%s' \
+        "$ARGOS_REPO" "$ref" "$INSTALL_DIR" "$flag"
 }
 
 # reset_stack: Tear down the compose stack (containers + named volumes),
@@ -507,8 +607,11 @@ bring_stack_up() {
     docker compose up -d --remove-orphans
 }
 
+# print_summary: Login, install and update details after a fresh install.
+# Args: =healthy (1 when wait_for_app succeeded)
+# Returns: 0
 print_summary() {
-    local port admin url channel
+    local healthy="${1:-1}" port admin url channel headline
     port="$(get_env_value "$ENV_FILE" ARGOS_PORT)"
     admin="$(get_env_value "$ENV_FILE" ADMIN_PASSWORD)"
     url="$(get_env_value "$ENV_FILE" APP_URL)"
@@ -517,6 +620,9 @@ print_summary() {
     [[ "$BETA"  -eq 1 ]] && channel="beta (pre-release)"
     [[ "$STAGE" -eq 1 ]] && channel="stage (rolling develop)"
     [[ "$NEXT"  -eq 1 ]] && channel="next (rolling integration)"
+
+    headline="          Argos is up and running           "
+    [[ "$healthy" -eq 1 ]] || headline="   Argos is installed (still starting up)   "
 
     local b0="" b1=""
     if [[ -t 1 && "${TERM:-dumb}" != "dumb" ]]; then
@@ -527,7 +633,7 @@ print_summary() {
     cat <<SUMMARY
 
 ${b0}╔══════════════════════════════════════════════════════════════════╗
-║                      Argos is up and running                     ║
+║           ${headline}           ║
 ╚══════════════════════════════════════════════════════════════════╝${b1}
 
   URL:       $url
@@ -547,7 +653,7 @@ ${b0}╔════════════════════════
     docker compose -f $INSTALL_DIR/$COMPOSE_FILE restart
 
   Update
-    $0 --dir $INSTALL_DIR
+    $(update_command)
 
   Change your admin password under Profile after first login.
 
@@ -653,10 +759,16 @@ MSG
         apply_next_image
     fi
 
+    apply_access_settings
     remove_legacy_artefacts
 
+    # On update the port is held by our own running stack.
+    [[ "$mode" == "install" ]] && ensure_port_free
+
     bring_stack_up
-    [[ "$mode" == "install" ]] && print_summary
+    local healthy=1
+    wait_for_app || healthy=0
+    [[ "$mode" == "install" ]] && print_summary "$healthy"
     success "Done."
 }
 

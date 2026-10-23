@@ -72,3 +72,24 @@ teardown() {
     run quality_gate_log_converged artisan 1 1
     [ "$status" -eq 0 ]
 }
+
+@test "quality_gate_log_path follows QUALITY_DIR when no log dir is set" {
+    local p
+    p="$(unset QUALITY_LOG_DIR; QUALITY_DIR=/workspace/tasks/fix-login quality_gate_log_path pest 7)"
+    [ "$p" = "/workspace/tasks/fix-login/.agent/logs/pest.7.log" ]
+}
+
+# ─── quality_gate_wanted ────────────────────────────────────────────────────
+
+@test "quality_gate_wanted: every gate runs without QUALITY_ONLY" {
+    unset QUALITY_ONLY
+    quality_gate_wanted pest
+    quality_gate_wanted phpstan
+}
+
+@test "quality_gate_wanted: only the named gate runs with QUALITY_ONLY" {
+    QUALITY_ONLY=pest
+    quality_gate_wanted pest
+    run quality_gate_wanted phpstan
+    [ "$status" -eq 1 ]
+}

@@ -4,9 +4,7 @@ import { resetDatabase } from './helpers/reset';
 import { gotoStable } from './helpers/filament';
 import {
   assertNoHorizontalOverflow,
-  assertNoElementXScroll,
   assertTapTarget,
-  assertWithinViewport,
 } from './helpers/mobile';
 
 /**
@@ -18,27 +16,25 @@ import {
  *   - no horizontal page overflow (the root scroller stays within the viewport),
  *   - the key actions are visible and meet the 44px touch-target minimum.
  *
- * Seeded with FullDemoSeeder so the lists, the masks and the task detail
- * (hero / thread / diff / respond) all have content to render. Offline/fake
+ * Seeded with FullDemoSeeder so the lists and masks have content to render;
+ * the workspace checks use E2eWorkspaceSeeder. Offline/fake
  * stack — no tokens or worker needed, same as the rest of the gemockt suite.
  */
 
-// List + admin masks that must stay overflow-free on a phone. Mirrors the
-// desktop settings-walk plus the in-app docs viewer (concept overlap D).
+// Lists, account and administration masks that must stay overflow-free on a
+// phone, plus the in-app docs viewer (concept overlap D).
 const MASKS: { label: string; path: string }[] = [
-  { label: 'Dashboard', path: '/admin' },
-  { label: 'Tasks', path: '/admin/tasks' },
-  { label: 'Projects', path: '/admin/repo-profiles' },
-  { label: 'API clients', path: '/admin/api-clients' },
-  { label: 'Agent credentials', path: '/admin/agent-credentials' },
-  { label: 'Worker stacks', path: '/admin/worker-stacks' },
-  { label: 'Worker image builds', path: '/admin/worker-image-builds' },
-  { label: 'Connected accounts', path: '/admin/connected-accounts' },
-  { label: 'Settings', path: '/admin/settings' },
-  { label: 'Documentation', path: '/admin/docs' },
+  { label: 'My work', path: '/' },
+  { label: 'Workspaces', path: '/workspaces' },
+  { label: 'Profile', path: '/account/profile' },
+  { label: 'Claude subscriptions', path: '/account/agents' },
+  { label: 'Connected accounts', path: '/account/connections' },
+  { label: 'Administration', path: '/system/overview' },
+  { label: 'Users', path: '/system/users' },
+  { label: 'API clients', path: '/system/api-clients' },
+  { label: 'Documentation', path: '/docs' },
   // Forms must not break on mobile (Filament stacks grids to 1 column below lg).
-  { label: 'Create task', path: '/admin/tasks/create' },
-  { label: 'Create project', path: '/admin/repo-profiles/create' },
+  { label: 'Create workspace', path: '/new' },
 ];
 
 test.describe('mobile gate @375px', () => {
@@ -55,57 +51,47 @@ test.describe('mobile gate @375px', () => {
     }
   });
 
-  test('tasks hero action is tappable and task sub-views fit the phone', async ({ page }) => {
+  test('workspace page fits the phone and its composer actions are tappable', async ({ page }) => {
+    resetDatabase('E2eWorkspaceSeeder');
     await login(page);
 
-    // Tasks list: the "New task" primary action must meet the 44px target, and
-    // the table must not scroll sideways (which used to clip the status column).
-    await gotoStable(page, '/admin/tasks');
-    await assertTapTarget(page.locator('.ph-act a.btn-primary').first(), 'Tasks hero · New task');
-    await assertNoElementXScroll(page, '.fi-ta-ctn', 'Tasks table');
+    await gotoStable(page, '/workspaces');
+    await assertNoHorizontalOverflow(page, 'Workspaces list');
+    await page.getByText('E2E pairing').first().click();
+    await expect(page.locator('.ag-chat')).toBeVisible();
 
-    // Drill into the anchor demo task (InReview) via the searchable name column.
-    const search = page.getByRole('searchbox').first();
-    await search.fill('Demo · Live deployment');
-    const row = page.getByRole('link', { name: 'Demo · Live deployment' });
-    await expect(row.first()).toBeVisible();
-    await row.first().click();
-    await expect(page).toHaveURL(/\/admin\/tasks\/[^/]+$/);
+    await assertNoHorizontalOverflow(page, 'Workspace · chat');
 
-    const taskPath = new URL(page.url()).pathname;
-    await assertNoHorizontalOverflow(page, 'Task detail · thread');
+    // KNOWN FAILURE (app bug, not a stale selector): the redesigned send button
+    // `.ag-send` is a fixed 36x36px (resources/css/workspace.css) and the mobile
+    // 44px touch-target rules in resources/css/app.css only cover the legacy
+    // `.btn`/`.ws-*` controls. Fix the CSS, don't relax this check.
+    await assertTapTarget(page.locator('.ag-composer').getByRole('button', { name: 'Send', exact: true }), 'Workspace · Send');
 
-    // Every bespoke task sub-view (its own route) must also fit at 375px.
-    const subViews = ['concept', 'diff', 'logs', 'quality-gates', 'respond'];
-    for (const sub of subViews) {
-      await gotoStable(page, `${taskPath}/${sub}`);
-      await assertNoHorizontalOverflow(page, `Task detail · ${sub}`);
+    // The workspace settings (every tab) must fit the phone as well.
+    const settings = page.url().replace(/\?.*$/, '') + '/settings';
+    for (const tab of ['general', 'environment', 'resources', 'integrations', 'automation', 'members']) {
+      await gotoStable(page, `${settings}?tab=${tab}`);
+      await assertNoHorizontalOverflow(page, `Workspace settings · ${tab}`);
     }
   });
 
-  test('respond dock actions stay on-screen and tappable', async ({ page }) => {
+  test('the new-task form with the auto toggle fits the phone', async ({ page }) => {
+    resetDatabase('E2eWorkspaceSeeder');
     await login(page);
 
-    // A concept_review task renders the inline respond dock with a textarea and
-    // two stacked action buttons — the spot where avatar + textarea + buttons
-    // used to overflow the row and clip the primary button off the right edge.
-    await gotoStable(page, '/admin/tasks');
-    const search = page.getByRole('searchbox').first();
-    await search.fill('Review concept');
-    const row = page.getByRole('link', { name: /Review concept/i }).first();
-    await expect(row).toBeVisible();
-    await row.click();
-    await expect(page).toHaveURL(/\/admin\/tasks\/[^/]+$/);
+    await gotoStable(page, '/workspaces');
+    await page.getByText('E2E pairing').first().click();
+    await expect(page.locator('.ag-chat')).toBeVisible();
 
-    await assertNoHorizontalOverflow(page, 'Task detail · respond dock');
+    await page.getByTestId('switcher-new-task').click();
+    const form = page.getByTestId('new-task-form');
+    await form.getByRole('checkbox', { name: /Run automatically/ }).check();
+    // The auto options (plan, when done, fix rounds) are revealed by the toggle.
+    await expect(form.getByRole('combobox', { name: 'Plan', exact: true })).toBeVisible();
+    await expect(form.getByRole('combobox', { name: 'When done', exact: true })).toBeVisible();
 
-    const dockButtons = page.locator('.respond-body .btn');
-    const count = await dockButtons.count();
-    expect(count, 'respond dock has at least one action button').toBeGreaterThan(0);
-    for (let i = 0; i < count; i++) {
-      const btn = dockButtons.nth(i);
-      await assertWithinViewport(page, btn, `Respond dock button ${i}`);
-      await assertTapTarget(btn, `Respond dock button ${i}`);
-    }
+    await assertNoHorizontalOverflow(page, 'Workspace · new auto-task form');
+    await assertTapTarget(form.getByRole('button', { name: 'Start automatically' }), 'Workspace · Start automatic run');
   });
 });

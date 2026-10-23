@@ -43,6 +43,33 @@ interface IssueTrackerContract
     ): array;
 
     /**
+     * Create a new issue / ticket and return the provider's raw issue payload,
+     * in the same shape as getIssue()/listIssues() items, so it can be fed
+     * straight into ExternalIssue::fromProvider().
+     *
+     * Linear: $owner carries the team key, $project is empty.
+     *
+     * @return array<string, mixed>
+     */
+    public function createIssue(string $owner, string $project, string $title, string $body): array;
+
+    /**
+     * The issue's comments, normalised and ordered oldest first. `author` is
+     * the login/username (GitHub/GitLab/Bitbucket) or display name (Linear).
+     *
+     * @return list<array{id: string, author: string, body: string, created_at: string|null, url: string|null}>
+     */
+    public function listComments(string $owner, string $project, int|string $issueNumber): array;
+
+    /**
+     * Set the issue's assignee. $assignee is the provider login/username
+     * (GitHub/GitLab/Bitbucket) or the person's e-mail address (Linear).
+     * Returns false — never throws — when the user can't be resolved or the
+     * provider refuses the change.
+     */
+    public function assignIssue(string $owner, string $project, int|string $issueNumber, string $assignee): bool;
+
+    /**
      * Extract the provider's comment id from a createComment() response, so it
      * can be stored and later polled for reactions. Null when not derivable.
      *
@@ -51,8 +78,8 @@ interface IssueTrackerContract
     public function commentId(array $createResult): ?string;
 
     /**
-     * Close / resolve the source issue — the outbound status-sync that fires
-     * when an Argos task is marked completed. Providers map this to their
+     * Close / resolve the source issue. Not called by Argos today (merging the
+     * pull request closes the issue); kept for providers. Providers map this to their
      * native "done" state (GitHub/GitLab close, Bitbucket resolved, Linear's
      * first completed-type workflow state).
      */

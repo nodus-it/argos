@@ -12,7 +12,7 @@ pick.
 
 Recommended for single-user instances or when you just want to try Argos. PAT
 works without any server-side configuration — you only paste the token in the
-project form.
+workspace form.
 
 ### Step 1: Create a token
 
@@ -31,9 +31,10 @@ project form.
 > read/write access to **Contents**, **Pull requests**, and **Workflows** (if
 > applicable).
 
-### Step 2: Configure the project in Argos
+### Step 2: Create the workspace in Argos
 
-Under **Projects → New Project**:
+As an Argos administrator, choose **New workspace** (on the workspace list,
+or directly at `/new`):
 
 - **Platform**: GitHub
 - **Authentication**: Personal Access Token (PAT)
@@ -45,7 +46,7 @@ Under **Projects → New Project**:
 
 ## Option 2: OAuth (optional)
 
-OAuth enables repo and branch dropdowns in the project form and per-user
+OAuth enables repo and branch dropdowns in the workspace form and per-user
 account binding — no manual URL entry, and each user connects their own GitHub
 account.
 
@@ -75,7 +76,7 @@ flow is described in
 
 ### Step 2: Add the OAuth App in Argos
 
-1. Open **Configuration → OAuth Apps** in the Argos admin.
+1. Open **Administration → OAuth apps** (`${APP_URL}/system/oauth-apps`).
 2. Add an app for **GitHub**, paste its **Client ID** and **Client secret**,
    and enable it.
 3. The **callback URL** shown in the form is read-only and derived from
@@ -95,20 +96,20 @@ provides.
 ### Step 3: Connect your account
 
 1. Sign in to Argos.
-2. Go to **Connected Accounts** in the navigation.
+2. Go to **My account → Connected accounts** (`/account/connections`).
 3. Click **Connect GitHub** — you are redirected to GitHub to authorize the
-   app. After authorizing, you are returned to the Connected Accounts page.
-4. When creating a project, select **GitHub** as the platform and choose
+   app. After authorizing, you are returned to the Connected accounts page.
+4. When creating a workspace, select **GitHub** as the platform and choose
    **OAuth** as the authentication method — the repo and branch dropdowns
    appear, populated from your connected account.
 
 ---
 
-## Option 3: Issue-Provider (Pull + Webhook)
+## Option 3: Issue trigger (poll or webhook)
 
-Argos can import GitHub Issues as Tasks and keep them in sync via polling or
-webhooks. Each repository needs a **TaskProviderBinding** (one per GitHub repo)
-configured through the Filament admin interface.
+A workspace can use GitHub Issues as [tickets](TICKETS.md) and start automatic
+tasks from new issues, via polling or webhooks. The integration lives on the
+workspace (one per GitHub repository).
 
 ### Step 1: Required token scopes
 
@@ -121,34 +122,36 @@ configured through the Filament admin interface.
 > **Note**: `admin:repo_hook` is a sub-scope of `repo` in classic PATs.
 > Fine-grained tokens require "Webhooks: Read & Write" explicitly.
 
-### Step 2: Create a binding in Filament
+### Step 2: Create the integration
 
-1. Open **Argos Admin → Task Provider Bindings → New**.
-2. Set **Kind** to `GitHub` and choose the **Connected Account** that holds your
-   PAT or OAuth token.
-3. Enter the **External Project Ref** in `owner/repo` format, e.g.
-   `your-org/your-repo`.
+1. Open the workspace's **Settings → Integrations** → **Issue trackers** →
+   **New** (workspace admins and Argos administrators).
+2. Set **Provider** to `GitHub` and choose the **Access** (OAuth account or
+   stored PAT).
+3. Pick the **Project / Team** — the repository in `owner/repo` format. Use
+   the workspace's own repository if merged pull requests should close the
+   issues.
 4. Choose a **Mode**:
-   - **Webhook** — real-time; requires `APP_URL` to be publicly reachable.
-   - **Poll** — periodic polling; works behind firewalls or in local development.
-5. Optionally set **Filters** (e.g. `state=open`, label filters) so only
-   relevant issues become tasks.
-6. Click **Save**. The binding starts in `Pending` state.
+   - **Webhook (push)** — real-time; requires `APP_URL` to be publicly
+     reachable.
+   - **Polling** — periodic; works behind firewalls or in local development.
+5. Optionally set a **Labels filter** so only relevant issues start automatic
+   tasks, and decide on **Close the ticket on merge**.
+6. Save. The integration starts in `Pending` state.
 
-### Step 3: Activate with "Einrichten"
+### Step 3: Activate with "Set up"
 
-Click the **Einrichten** (Setup) action on the binding row:
+Click **Set up** on the integration's row:
 
 - **Webhook mode**: Argos calls `POST /repos/{owner}/{repo}/hooks` on GitHub and
-  registers the callback URL `${APP_URL}/webhooks/issues/github/{binding-id}`
-  automatically. No manual URL entry needed. The binding moves to `Active` once
-  GitHub confirms the hook.
-- **Poll mode**: The binding moves to `Active` immediately. The poll scheduler
-  will fetch issues on the next run.
+  registers `${APP_URL}/webhooks/issues/github/{integration-id}`
+  automatically. The integration moves to `Active` once GitHub confirms the
+  hook.
+- **Poll mode**: The integration moves to `Active` immediately.
 
-If setup fails (invalid token, missing scopes, `APP_URL` not reachable), the
-binding stays `Pending` and the error message is shown in the **Last Error**
-column. Fix the issue and click **Einrichten** again.
+If setup fails (invalid token, missing scopes, `APP_URL` not reachable), it
+stays `Pending` and the error is shown in **Last error**. Fix it and click
+**Set up** again.
 
 ### Webhook vs. Poll
 
@@ -158,23 +161,33 @@ column. Fix the issue and click **Einrichten** again.
 | Requires public `APP_URL` | Yes | No |
 | GitHub rate limits | Not applicable | Counts against API quota |
 
-> **Tip**: Use Poll mode during local development or when `APP_URL` is not
-> publicly reachable (e.g. behind a VPN or NAT). Switch to Webhook mode in
-> production for real-time updates.
-
 ### Behaviour notes
 
-- **issue_comment** events are accepted by the webhook endpoint but not
-  currently ingested as tasks. Only `issues` events (opened, edited, etc.)
-  create or update Tasks.
-- **Issue state and Task state are independent.** Closing a GitHub issue does
-  not close the corresponding Task in Argos; Tasks are managed separately.
-- **Duplicate-safe**: the webhook endpoint ignores re-deliveries (identified by
-  the `X-GitHub-Delivery` header). Pull requests appearing in the issues list
-  are filtered out automatically.
+- **issue_comment** events are accepted by the webhook endpoint but ignored.
+  Only `issues` events (opened, edited, etc.) can start a task. Comments reach
+  the task through the scheduled ticket-comment sync.
+- **Issue state and the task are independent.** Closing a GitHub issue does
+  not stop or cancel its task; merging the pull request closes the issue
+  (`Closes #…`) when *Close the ticket on merge* is on (otherwise the pull
+  request says `Refs #…`).
+- **Assignee:** a hand-over makes the new owner's GitHub login (their
+  connected account) the issue's assignee.
+- **Duplicate-safe**: re-deliveries (same `X-GitHub-Delivery`) are ignored.
+  Pull requests appearing in the issues list are filtered out.
 
-For the shared binding setup details, see
-[Task Providers Setup](SETUP-TASK-PROVIDERS.md).
+For the shared details, see [Issue Triggers](SETUP-TASK-PROVIDERS.md) and
+[Tickets](TICKETS.md).
+
+---
+
+## Pull requests on GitHub
+
+- Argos reads check runs and commit statuses, reviews and review comments of
+  the task's pull request, and the job logs of failed GitHub Actions runs
+  (see [Pull Requests](PULL-REQUESTS.md)). A classic PAT with `repo` or the
+  OAuth `repo` scope covers this.
+- **Merge automatically** needs *Settings → General → Allow auto-merge* in the
+  repository.
 
 ---
 
@@ -186,5 +199,5 @@ For the shared binding setup details, see
 | 403 when pushing to `.github/workflows/*` | PAT missing the `workflow` scope. |
 | OAuth redirect fails with "redirect_uri mismatch" | The Authorization callback URL on the GitHub OAuth App must exactly match `${APP_URL}/auth/github/callback` — including scheme. Verify `APP_URL`. |
 | OAuth callback returns 500 | `APP_URL` not set or doesn't match the public URL — Laravel can't generate the correct callback. |
-| "Connect GitHub" rejected right after authorizing | The OAuth App in **Configuration → OAuth Apps** is disabled or has the wrong client ID/secret. Re-check and enable it. |
+| "Connect GitHub" rejected right after authorizing | The OAuth App under **Administration → OAuth apps** is disabled or has the wrong client ID/secret. Re-check and enable it. |
 | PR creation returns 422 with "A pull request already exists" | Argos detects this and reports the existing PR URL — no action needed. |

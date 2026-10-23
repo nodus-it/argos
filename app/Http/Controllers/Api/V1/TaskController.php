@@ -4,273 +4,166 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
-use App\Enums\Phase;
-use App\Enums\PhaseStatus;
-use App\Http\Controllers\Api\V1\Concerns\ResolvesApiScope;
+use App\Enums\TaskOrigin;
+use App\Http\Controllers\Api\V1\Concerns\ActsForAutomation;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Api\V1\StoreTaskRequest;
-use App\Http\Requests\Api\V1\SubmitFeedbackRequest;
+use App\Http\Requests\Api\V1\StartAutoRunRequest;
 use App\Http\Resources\Api\V1\TaskResource;
-use App\Http\Resources\Api\V1\TaskSummaryResource;
-use App\Models\PhaseRun;
-use App\Models\RepoProfile;
 use App\Models\Task;
-use App\Services\Task\TaskService;
+use App\Models\Workspace;
+use App\Services\Workspace\AutoRunService;
+use App\Services\Workspace\AutoTaskDriver;
+use App\Services\Workspace\TaskService;
+use App\Services\Workspace\TaskTicketService;
+use App\Services\Workspace\WorkspaceIssueService;
+use App\Services\Workspace\WorkspaceShipService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Illuminate\Validation\ValidationException;
-use RuntimeException;
 
+/** Tasks of a workspace: list, start automatic ones, write, decide plans, pause/resume, ship. */
 class TaskController extends Controller
 {
-    use ResolvesApiScope;
+    use ActsForAutomation;
 
-    public function __construct(private readonly TaskService $taskService) {}
-
-    public function index(Request $request): AnonymousResourceCollection
+    public function index(Request $request, Workspace $workspace): AnonymousResourceCollection
     {
-        $scoped = $this->scopedProjectId($request);
+        $this->assertWorkspaceVisible($request, $workspace);
 
-        $tasks = Task::query()
-            ->with('repoProfile')
-            ->when($scoped !== null, fn ($query) => $query->where('repo_profile_id', $scoped))
-            ->when(
-                $scoped === null && is_string($request->query('project')) && $request->query('project') !== '',
-                fn ($query) => $query->where('repo_profile_id', $this->resolveProjectId((string) $request->query('project'))),
-            )
-            ->when(
-                is_string($request->query('status')) && $request->query('status') !== '',
-                fn ($query) => $query->where('workflow_status', $request->query('status')),
-            )
-            // Lets a caller check its key without creating a task.
-            ->when(
-                is_string($request->query('external_ref')) && $request->query('external_ref') !== '',
-                fn ($query) => $query->where('external_ref', $request->query('external_ref')),
-            )
-            ->latest()
+        $tasks = $workspace->tasks()
+            ->with(['workspace', 'owner'])
+            ->when(! $request->boolean('archived'), fn ($q) => $q->whereNull('archived_at'))
+            ->when(is_string($request->query('origin')) && $request->query('origin') !== '', fn ($q) => $q->where('origin', $request->query('origin')))
+            ->latest('updated_at')
+            ->limit(200)
             ->get();
 
-        return TaskSummaryResource::collection($tasks);
+        return TaskResource::collection($tasks);
+    }
+
+    /**
+     * Start an automatic task in the workspace (202: it continues
+     * asynchronously — poll the task to follow it). `issue` links a ticket
+     * of the workspace's tracker.
+     */
+    public function store(StartAutoRunRequest $request, Workspace $workspace, AutoRunService $runs, WorkspaceIssueService $issues): JsonResponse
+    {
+        $this->assertWorkspaceVisible($request, $workspace);
+        $actor = $this->actor($request);
+
+        return $this->domain(function () use ($request, $workspace, $actor, $runs, $issues): JsonResponse {
+            $issue = match (true) {
+                $request->filled('issue') => $issues->load($workspace, (string) $request->input('issue')),
+                is_array($request->input('ticket')) => $issues->customTicket($workspace, (array) $request->input('ticket')),
+                default => null,
+            };
+            $task = $runs->launch($actor, $workspace, (string) $request->input('prompt'), [
+                'title' => $request->input('title'),
+                'base_branch' => $request->input('base_branch'),
+                'agent_id' => $request->input('agent_id'),
+                'model' => $request->input('model'),
+                'issue' => $issue,
+                'auto_merge' => $request->boolean('auto_merge'),
+            ], $request->settings(), TaskOrigin::Api);
+
+            return (new TaskResource($task->load(['workspace', 'owner'])))->response()->setStatusCode(202);
+        });
     }
 
     public function show(Request $request, Task $task): TaskResource
     {
-        $this->assertTaskVisible($request, $task);
-
-        $task->load('repoProfile')
-            ->load(['phaseRuns' => fn ($query) => $query->latest('started_at')->limit(5)]);
+        $this->assertWorkspaceVisible($request, $task->workspace);
 
         return new TaskResource($task);
     }
 
-    /**
-     * Create a task — at most once per `external_ref`.
-     *
-     * `202` for a fresh task (the concept phase starts asynchronously), `200`
-     * for a repeat, which starts nothing. Both carry a `created` flag.
-     */
-    public function store(StoreTaskRequest $request): JsonResponse
+    /** A comment on the task's ticket in an own system: shown as a hint in the task. */
+    public function ticketComment(Request $request, Task $task, TaskTicketService $tickets): JsonResponse
     {
-        $project = $this->resolveStoreProject($request);
-        $plan = (string) $request->input('plan');
+        $this->assertWorkspaceVisible($request, $task->workspace);
+        $actor = $this->actor($request);
+        $request->validate(['author' => ['required', 'string', 'max:120'], 'body' => ['required', 'string', 'max:20000'], 'url' => ['nullable', 'url', 'max:2000']]);
 
-        ['task' => $task, 'created' => $created] = $this->taskService->createIdempotent([
-            // API-created tasks are owned by the consumer (ApiClient/RepoProfile
-            // token), not a human user.
-            'user_id' => null,
-            'name' => $request->input('name'),
-            'repo_profile_id' => $project->id,
-            'description' => $plan,
-            'base_branch' => $request->input('base_branch'),
-            'auto_concept' => false,
-        ], $request->input('external_ref'));
-
-        if (! $created) {
-            return (new TaskResource($task->load('repoProfile')))
-                ->additional(['created' => false])
-                ->response()
-                ->setStatusCode(200);
-        }
-
-        // createTask() inserts with the DB default workflow_status ('draft') but
-        // leaves it unset in memory; refresh so startPhase() transitions cleanly.
-        $task->refresh();
-
-        // Persist the plan as concept notes so the worker injects it as
-        // concept.notes.md (createTask() does not take concept_notes).
-        $this->taskService->saveConceptNotes($task, $plan);
-
-        try {
-            $this->taskService->startPhase($task, Phase::Concept);
-        } catch (RuntimeException $e) {
-            return $this->conflict($e->getMessage());
-        }
-
-        return (new TaskResource($task->load('repoProfile')))
-            ->additional(['created' => true])
-            ->response()
-            ->setStatusCode(202);
-    }
-
-    public function feedback(SubmitFeedbackRequest $request, Task $task): JsonResponse
-    {
-        $this->assertTaskVisible($request, $task);
-
-        try {
-            $this->taskService->submitFeedback($task, (string) $request->input('feedback'));
-        } catch (RuntimeException $e) {
-            return $this->conflict($e->getMessage());
-        }
-
-        return $this->accepted($task);
-    }
-
-    public function concept(Request $request, Task $task): JsonResponse
-    {
-        $this->assertTaskVisible($request, $task);
-        $this->assertNotCompleted($task, 'Concept');
-        $this->assertNotRunning($task);
-
-        try {
-            if ($this->latestPhaseRun($task, 'concept')?->status === PhaseStatus::Paused) {
-                $maxTurns = $this->maxTurns($request, $task->max_turns_concept, (int) config('argos.concept.max_turns_default', 30));
-                $this->taskService->continueConcept($task, $maxTurns);
-            } else {
-                $this->taskService->startPhase($task, Phase::Concept);
+        return $this->domain(function () use ($request, $task, $actor, $tickets): JsonResponse {
+            if (! $actor->can('view', $task)) {
+                abort(404);
             }
-        } catch (RuntimeException $e) {
-            return $this->conflict($e->getMessage());
-        }
-
-        return $this->accepted($task);
-    }
-
-    public function implement(Request $request, Task $task): JsonResponse
-    {
-        $this->assertTaskVisible($request, $task);
-        $this->assertNotCompleted($task, 'Implement');
-
-        if (! $this->hasCompletedPhase($task, 'concept')) {
-            return $this->conflict('The Implement phase requires a completed Concept run first.');
-        }
-
-        $this->assertNotRunning($task);
-
-        try {
-            if ($this->latestPhaseRun($task, 'implement')?->status === PhaseStatus::Paused) {
-                $maxTurns = $this->maxTurns($request, $task->max_turns_implement, (int) config('argos.implement.max_turns_default', 200));
-                $this->taskService->continueImplement($task, $maxTurns);
-            } else {
-                $this->taskService->startPhase($task, Phase::Implement);
+            // A comment shows up in the task as a notice: writing, not reading.
+            if (! $actor->can('update', $task)) {
+                abort(403);
             }
-        } catch (RuntimeException $e) {
-            return $this->conflict($e->getMessage());
-        }
+            $tickets->ticketComment($task, (string) $request->input('author'), (string) $request->input('body'), $request->input('url'));
 
-        return $this->accepted($task);
+            return new JsonResponse([], 202);
+        });
     }
 
-    public function pr(Request $request, Task $task): JsonResponse
+    /** Commit, push and open/update the task's pull request now. */
+    public function ship(Request $request, Task $task, WorkspaceShipService $ship): JsonResponse
     {
-        $this->assertTaskVisible($request, $task);
-        $this->assertNotCompleted($task, 'Push');
+        $this->assertWorkspaceVisible($request, $task->workspace);
+        $actor = $this->actor($request);
+        $request->validate(['draft' => ['nullable', 'boolean']]);
 
-        if (! $this->hasCompletedPhase($task, 'implement')) {
-            return $this->conflict('The Push phase requires a completed Implement run first.');
-        }
+        return $this->domain(function () use ($task, $actor, $ship, $request): JsonResponse {
+            $url = $ship->shipWithDraft($task, $actor, (bool) $request->boolean('draft'));
 
-        $this->assertNotRunning($task);
-
-        try {
-            $this->taskService->startPhase($task, Phase::Push);
-        } catch (RuntimeException $e) {
-            return $this->conflict($e->getMessage());
-        }
-
-        return $this->accepted($task);
+            return new JsonResponse(['pull_request_url' => $url]);
+        });
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────
-
-    private function resolveStoreProject(StoreTaskRequest $request): RepoProfile
+    /** Write into the task. In a running auto-task this pauses automation unless `resume_auto` is set. */
+    public function message(Request $request, Task $task, TaskService $tasks, AutoTaskDriver $driver): JsonResponse
     {
-        $scoped = $this->scopedProjectId($request);
-        $ref = $request->input('project');
+        $this->assertWorkspaceVisible($request, $task->workspace);
+        $actor = $this->actor($request);
+        $request->validate(['text' => ['required', 'string', 'max:200000'], 'resume_auto' => ['nullable', 'boolean']]);
 
-        if ($scoped !== null) {
-            // Project-bound token: ignore/validate the payload against its scope.
-            if (is_string($ref) && $ref !== '' && $this->resolveProjectId($ref) !== $scoped) {
-                throw ValidationException::withMessages([
-                    'project' => 'This token is bound to a different project.',
-                ]);
+        return $this->domain(function () use ($request, $task, $actor, $tasks, $driver): JsonResponse {
+            $event = $tasks->send($task, $actor, (string) $request->input('text'));
+            if ($request->boolean('resume_auto') && $task->fresh()?->auto_state !== null) {
+                $driver->resume($task->fresh(), $actor);
             }
 
-            return RepoProfile::findOrFail($scoped);
-        }
-
-        if (! is_string($ref) || $ref === '') {
-            throw ValidationException::withMessages(['project' => 'The project field is required.']);
-        }
-
-        $project = RepoProfile::query()->where('id', $ref)->orWhere('name', $ref)->first();
-
-        if ($project === null) {
-            throw ValidationException::withMessages(['project' => "Project not found: {$ref}"]);
-        }
-
-        return $project;
+            return new JsonResponse(['message_id' => $event->id], 202);
+        });
     }
 
-    private function resolveProjectId(string $ref): ?string
+    /** Approve or reject a plan that waits for approval. */
+    public function plan(Request $request, Task $task, AutoTaskDriver $driver): JsonResponse
     {
-        return RepoProfile::query()->where('id', $ref)->orWhere('name', $ref)->value('id');
+        $this->assertWorkspaceVisible($request, $task->workspace);
+        $actor = $this->actor($request);
+        $request->validate(['decision' => ['required', 'in:approve,reject'], 'feedback' => ['nullable', 'string', 'max:20000']]);
+
+        return $this->domain(function () use ($request, $task, $actor, $driver): JsonResponse {
+            $driver->decidePlan($task, $actor, $request->input('decision') === 'approve', $request->input('feedback'));
+
+            return (new TaskResource($task->fresh()))->response()->setStatusCode(202);
+        });
     }
 
-    private function latestPhaseRun(Task $task, string $phase): ?PhaseRun
+    public function pause(Request $request, Task $task, AutoTaskDriver $driver): JsonResponse
     {
-        return $task->phaseRuns()->where('phase', $phase)->orderByDesc('iteration')->first();
+        $this->assertWorkspaceVisible($request, $task->workspace);
+        $actor = $this->actor($request);
+
+        return $this->domain(function () use ($task, $actor, $driver): JsonResponse {
+            $driver->pause($task, $actor);
+
+            return (new TaskResource($task->fresh()))->response();
+        });
     }
 
-    private function hasCompletedPhase(Task $task, string $phase): bool
+    public function resume(Request $request, Task $task, AutoTaskDriver $driver): JsonResponse
     {
-        return $task->phaseRuns()->where('phase', $phase)->where('status', 'completed')->exists();
-    }
+        $this->assertWorkspaceVisible($request, $task->workspace);
+        $actor = $this->actor($request);
 
-    private function maxTurns(Request $request, ?int $taskDefault, int $configDefault): int
-    {
-        $validated = $request->validate([
-            'max_turns' => ['nullable', 'integer', 'min:10', 'max:1000'],
-        ]);
+        return $this->domain(function () use ($task, $actor, $driver): JsonResponse {
+            $driver->resume($task, $actor);
 
-        return (int) ($validated['max_turns'] ?? $taskDefault ?? $configDefault);
-    }
-
-    private function assertNotCompleted(Task $task, string $phaseLabel): void
-    {
-        if ($task->workflow_status->value === 'completed') {
-            abort(response()->json([
-                'message' => "Task is completed; the {$phaseLabel} phase cannot be run.",
-            ], 409));
-        }
-    }
-
-    private function assertNotRunning(Task $task): void
-    {
-        if ($task->current_status === PhaseStatus::Running) {
-            abort(response()->json(['message' => 'A phase is already running for this task.'], 409));
-        }
-    }
-
-    private function conflict(string $message): JsonResponse
-    {
-        return response()->json(['message' => $message], 409);
-    }
-
-    private function accepted(Task $task): JsonResponse
-    {
-        return (new TaskResource($task->fresh()->load('repoProfile')))
-            ->response()
-            ->setStatusCode(202);
+            return (new TaskResource($task->fresh()))->response()->setStatusCode(202);
+        });
     }
 }

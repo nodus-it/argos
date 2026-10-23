@@ -10,9 +10,9 @@ use Tests\TestCase;
 
 class DeveloperLoginsTest extends TestCase
 {
-    public function test_admin_panel_registers_developer_logins_plugin(): void
+    public function test_the_panel_registers_developer_logins_plugin(): void
     {
-        $plugin = Filament::getPanel('admin')->getPlugin('filament-developer-logins');
+        $plugin = Filament::getPanel('app')->getPlugin('filament-developer-logins');
 
         $this->assertInstanceOf(FilamentDeveloperLoginsPlugin::class, $plugin);
         $this->assertSame(['Admin' => 'admin@argos.local'], $plugin->getUsers());
@@ -24,7 +24,7 @@ class DeveloperLoginsTest extends TestCase
         // The panel is built once at boot under the testing environment, so the
         // gate must have resolved to disabled — proving it never renders the
         // password-free login buttons in staging/production.
-        $plugin = Filament::getPanel('admin')->getPlugin('filament-developer-logins');
+        $plugin = Filament::getPanel('app')->getPlugin('filament-developer-logins');
 
         $this->assertFalse($plugin->getEnabled());
     }

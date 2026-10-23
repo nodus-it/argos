@@ -37,10 +37,10 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Setup PHP 8.4
+      - name: Setup PHP 8.5
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.4'
+          php-version: '8.5'
           extensions: mbstring, pdo_sqlite, sqlite3
           coverage: none
 

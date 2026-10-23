@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Integrations\OAuth;
 
+use App\Support\OutboundUrlGuard;
 use Saloon\Http\Connector;
+use Saloon\Http\PendingRequest;
 
 /**
  * Saloon connector for OAuth token endpoints.
@@ -24,5 +26,11 @@ class OAuthTokenConnector extends Connector
     public function resolveBaseUrl(): string
     {
         return $this->tokenEndpoint;
+    }
+
+    /** The URL is configured by people: never let it reach Argos' own services. */
+    public function boot(PendingRequest $pendingRequest): void
+    {
+        OutboundUrlGuard::assertAllowed($pendingRequest->getUrl());
     }
 }

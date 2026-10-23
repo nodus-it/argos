@@ -15,11 +15,10 @@ return [
             'driver' => 'sync',
         ],
 
-        // retry_after MUST exceed the longest job timeout (RunPhaseJob::$timeout
-        // = 3600s). With the Laravel default of 90s the queue re-reserves a
-        // still-running phase after 90s → Horizon re-attempts it → tries=1 →
-        // "RunPhaseJob has been attempted too many times", the task is marked
-        // failed while the worker container keeps running. 3900 > 3600 + headroom.
+        // retry_after MUST exceed the longest job timeout (image builds and
+        // workspace provisioning run for many minutes). With the Laravel
+        // default of 90s the queue re-reserves a still-running job and the
+        // single-try job fails while its container keeps working.
         'database' => [
             'driver' => 'database',
             'connection' => null,

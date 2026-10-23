@@ -3,60 +3,9 @@
 declare(strict_types=1);
 
 return [
-    'workflow_status' => [
-        'draft' => 'Draft',
-        'concept_running' => 'Concept running',
-        'concept_review' => 'Concept ready',
-        'implement_running' => 'Implementation running',
-        'implement_paused' => 'Paused (turn limit)',
-        'implement_completed' => 'Implementation completed',
-        'in_review' => 'In Review',
-        'completed' => 'Completed',
-        'failed' => 'Failed',
-        'aborted' => 'Aborted',
-    ],
-
-    'phase_status' => [
-        'pending' => 'Pending',
-        'running' => 'Running',
-        'completed' => 'Completed',
-        'paused' => 'Paused',
-        'failed' => 'Failed',
-        'quality_gate_failed' => 'Quality Gate Failed',
-        'no_changes' => 'No Changes',
-        'lock_blocked' => 'Lock Blocked',
-        'rate_limited' => 'Rate Limited',
-    ],
-
-    'phases' => [
-        'concept' => 'Concept',
-        'implement' => 'Implement',
-        'diff' => 'Diff',
-        'push' => 'Push',
-        'respond' => 'Respond',
-        'commit_message' => 'Commit Message',
-    ],
-
-    'phase_runs' => [
-        'title' => 'Phase Runs',
-        'columns' => [
-            'phase' => 'Phase',
-            'iteration' => '#',
-            'status' => 'Status',
-            'started' => 'Started',
-            'finished' => 'Finished',
-            'duration' => 'Duration',
-            'input' => 'Input',
-            'output' => 'Output',
-            'cost' => 'Cost',
-            'model' => 'Model',
-        ],
-    ],
-
     'worker_source' => [
         'standard' => 'Standard',
         'byoi' => 'Bring Your Own Image (BYOI)',
-        'devcontainer' => 'Devcontainer',
     ],
 
     'worker_image_entity_status' => [
@@ -90,13 +39,6 @@ return [
         'failed' => 'Failed',
         'stopped' => 'Stopped',
     ],
-    'demo_access_mode' => [
-        'inherit' => 'Default',
-        'session' => 'Argos login',
-        'basic' => 'Password',
-        'public' => 'Public',
-    ],
-
     'task_provider_mode' => [
         'webhook' => 'Webhook (push)',
         'poll' => 'Polling',
@@ -107,5 +49,122 @@ return [
         'pending' => 'Pending',
         'active' => 'Active',
         'error' => 'Error',
+    ],
+
+    'workspace_status' => [
+        'provisioning' => 'Provisioning',
+        'starting' => 'Starting',
+        'running' => 'Running',
+        'stopping' => 'Stopping',
+        'stopped' => 'Stopped',
+        'failed' => 'Failed',
+    ],
+
+    'workspace_role' => [
+        'admin' => 'Admin',
+        'member' => 'Member',
+        'viewer' => 'Viewer',
+    ],
+
+    'gate_run_status' => [
+        'running' => 'Running',
+        'passed' => 'Passed',
+        'failed' => 'Failed',
+        'error' => 'Error',
+    ],
+    'auto_task_state' => [
+        'queued' => 'Queued',
+        'planning' => 'Planning',
+        'awaiting_plan_approval' => 'Plan waits for approval',
+        'implementing' => 'Implementing',
+        'gating' => 'Checking gates',
+        'fixing' => 'Fixing gate failures',
+        'shipping' => 'Shipping',
+        'done' => 'Done',
+        'paused' => 'Paused',
+        'failed' => 'Failed',
+        'budget_exceeded' => 'Budget exceeded',
+    ],
+    'auto_plan_mode' => [
+        'off' => 'No plan — implement right away',
+        'auto' => 'Plan, then continue automatically',
+        'approve' => 'Plan, then wait for approval',
+    ],
+    'auto_ship_mode' => [
+        'pr' => 'Pull request',
+        'draft_pr' => 'Draft pull request',
+        'none' => 'Commit and push only',
+    ],
+    'task_origin' => [
+        'manual' => 'Manual',
+        'api' => 'API',
+        'mcp' => 'MCP',
+        'issue' => 'Issue',
+    ],
+    'session_status' => [
+        'closed' => 'Closed',
+        'starting' => 'Starting',
+        'idle' => 'Idle',
+        'running' => 'Working',
+        'waiting_input' => 'Waiting for input',
+        'error' => 'Error',
+    ],
+
+    'task_status' => [
+        'preparing' => 'Preparing',
+        'active' => 'Active',
+        'pr_open' => 'PR open',
+        'done' => 'Done',
+        'cancelled' => 'Cancelled',
+    ],
+    'task_state' => [
+        'preparing' => 'Preparing',
+        'running' => 'Running',
+        'waiting' => 'Waiting for you',
+        'ready' => 'Ready',
+        'pr_open' => 'PR open',
+        'done' => 'Done',
+        'cancelled' => 'Cancelled',
+        'archived' => 'Archived',
+    ],
+    'workspace_setup_status' => [
+        'needed' => 'Needs setting up',
+        'running' => 'Being set up',
+        'testing' => 'Being tested',
+        'ready' => 'Set up',
+        'failed' => 'Test failed',
+        'needs_agent' => 'Needs a Claude subscription',
+    ],
+
+    'task_kind' => [
+        'task' => 'Task',
+        'setup' => 'Setup',
+    ],
+
+    'permission_mode' => [
+        'default' => 'Ask before changes',
+        'acceptEdits' => 'Accept edits',
+        'plan' => 'Plan mode',
+        'bypassPermissions' => 'Bypass permissions',
+    ],
+
+    'approval_kind' => [
+        'tool' => 'Tool call',
+        'plan' => 'Plan',
+        'question' => 'Question',
+    ],
+
+    'approval_status' => [
+        'pending' => 'Pending',
+        'allowed' => 'Allowed',
+        'denied' => 'Denied',
+        'answered' => 'Answered',
+        'cancelled' => 'Cancelled',
+    ],
+    'review_comment_status' => [
+        'draft' => 'Collected',
+        'stale' => 'Outdated',
+        'sent' => 'Sent',
+        'discarded' => 'Discarded',
     ],
 ];

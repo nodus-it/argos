@@ -1,10 +1,12 @@
 <?php
 
 use App\Http\Middleware\ForceJsonForApi;
+use App\Http\Middleware\RedirectToCanonicalHost;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
 use Laravel\Sanctum\Http\Middleware\CheckAbilities;
 use Laravel\Sanctum\Http\Middleware\CheckForAnyAbility;
 
@@ -14,7 +16,13 @@ return Application::configure(basePath: dirname(__DIR__))
         api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
+        then: function (): void {
+            // Workspace daemon endpoints: stateless, outside the web/api groups.
+            Route::group([], base_path('routes/internal.php'));
+        },
     )
+    // Channel auth runs in the web group so the Filament session decides.
+    ->withBroadcasting(__DIR__.'/../routes/channels.php', ['middleware' => ['web', 'auth']])
     ->withMiddleware(function (Middleware $middleware): void {
         // Argos is designed to run behind a reverse proxy (the bundled nginx
         // service plus, typically, a TLS-terminating proxy like HAProxy /
@@ -26,7 +34,11 @@ return Application::configure(basePath: dirname(__DIR__))
             | Request::HEADER_X_FORWARDED_PORT
             | Request::HEADER_X_FORWARDED_PROTO);
 
-        $middleware->redirectGuestsTo(fn () => route('filament.admin.auth.login'));
+        // Page loads on another host than APP_URL go to the APP_URL host,
+        // where the session cookie lives (see RedirectToCanonicalHost).
+        $middleware->append(RedirectToCanonicalHost::class);
+
+        $middleware->redirectGuestsTo(fn () => route('filament.app.auth.login'));
 
         // REST API always speaks JSON — so an unauthenticated request answers
         // 401 instead of redirecting (302) to the Filament login.

@@ -1,0 +1,102 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Feature\Workspace;
+
+use App\Enums\WorkspaceRole;
+use App\Models\User;
+use App\Models\Workspace;
+use App\Services\Workspace\WorkspaceException;
+use App\Services\Workspace\WorkspaceMemberService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class WorkspaceMemberServiceTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private WorkspaceMemberService $members;
+
+    private Workspace $workspace;
+
+    private User $owner;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->members = app(WorkspaceMemberService::class);
+        $this->workspace = Workspace::factory()->create();
+        $this->owner = User::factory()->create();
+        $this->members->addAdmin($this->workspace, $this->owner);
+    }
+
+    public function test_owner_adds_and_changes_members(): void
+    {
+        $pair = User::factory()->create();
+        $this->members->add($this->workspace, $this->owner, $pair, WorkspaceRole::Member);
+        $this->assertSame(WorkspaceRole::Member, $this->workspace->roleOf($pair));
+
+        $this->members->changeRole($this->workspace, $pair, WorkspaceRole::Viewer);
+        $this->assertSame(WorkspaceRole::Viewer, $this->workspace->roleOf($pair));
+
+        $this->members->remove($this->workspace, $pair);
+        $this->assertNull($this->workspace->roleOf($pair));
+    }
+
+    public function test_a_new_member_hears_about_it_once(): void
+    {
+        $pair = User::factory()->create();
+
+        $this->members->add($this->workspace, $this->owner, $pair, WorkspaceRole::Member);
+        $this->members->add($this->workspace, $this->owner, $pair, WorkspaceRole::Viewer);
+
+        $this->assertSame(1, $pair->notifications()->count());
+        $this->assertStringContainsString($this->workspace->name, (string) $pair->notifications()->first()->data['title']);
+        $this->assertSame(0, $this->owner->notifications()->count());
+    }
+
+    public function test_adding_members_is_blocked_when_the_collaboration_gate_is_closed(): void
+    {
+        config(['argos.workspaces.collaboration' => false]);
+
+        $this->expectException(WorkspaceException::class);
+        $this->members->add($this->workspace, $this->owner, User::factory()->create(), WorkspaceRole::Member);
+    }
+
+    public function test_the_owner_is_added_even_without_collaboration(): void
+    {
+        config(['argos.workspaces.collaboration' => false]);
+        $workspace = Workspace::factory()->create();
+        $this->members->addAdmin($workspace, $this->owner);
+
+        $this->assertSame(WorkspaceRole::Admin, $workspace->roleOf($this->owner));
+    }
+
+    public function test_the_last_owner_cannot_leave_or_be_demoted(): void
+    {
+        foreach ([fn () => $this->members->remove($this->workspace, $this->owner), fn () => $this->members->changeRole($this->workspace, $this->owner, WorkspaceRole::Member)] as $attempt) {
+            try {
+                $attempt();
+                $this->fail('expected WorkspaceException');
+            } catch (WorkspaceException) {
+                $this->assertSame(WorkspaceRole::Admin, $this->workspace->roleOf($this->owner));
+            }
+        }
+
+        $second = User::factory()->create();
+        $this->members->add($this->workspace, $this->owner, $second, WorkspaceRole::Admin);
+        $this->members->changeRole($this->workspace, $this->owner, WorkspaceRole::Member);
+        $this->assertSame(WorkspaceRole::Member, $this->workspace->roleOf($this->owner));
+    }
+
+    public function test_adding_an_existing_owner_cannot_demote_the_last_owner(): void
+    {
+        try {
+            $this->members->add($this->workspace, $this->owner, $this->owner, WorkspaceRole::Member);
+            $this->fail('expected WorkspaceException');
+        } catch (WorkspaceException) {
+            $this->assertSame(WorkspaceRole::Admin, $this->workspace->roleOf($this->owner));
+        }
+    }
+}

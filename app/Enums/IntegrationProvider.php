@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
+use App\Enums\Concerns\ProvidesOptions;
+
 /**
  * The full set of providers Argos can hold credentials for. Spans both the
  * git providers (clone/push) and the task providers (issues). Deliberately
@@ -12,6 +14,8 @@ namespace App\Enums;
  */
 enum IntegrationProvider: string
 {
+    use ProvidesOptions;
+
     case GitHub = 'github';
     case GitLab = 'gitlab';
     case Bitbucket = 'bitbucket';

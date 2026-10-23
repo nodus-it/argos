@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Enums\DemoStatus;
-use App\Jobs\StopDemoJob;
+use App\Jobs\Workspace\StopWorkspaceDemoJob;
 use App\Models\Demo;
 use Illuminate\Console\Command;
 
 /**
  * Tears down live demos whose TTL has elapsed. Runs on the scheduler, which has
- * no docker socket — so it only DISPATCHES StopDemoJob; the queue worker (which
+ * no docker socket — so it only DISPATCHES StopWorkspaceDemoJob; the queue worker (which
  * does have the socket) performs the actual `docker compose down`.
  */
 class CleanupExpiredDemos extends Command
@@ -29,7 +29,7 @@ class CleanupExpiredDemos extends Command
             ->get();
 
         foreach ($expired as $demo) {
-            StopDemoJob::dispatch($demo->task_id);
+            StopWorkspaceDemoJob::dispatch($demo->task_id);
             $this->info("Dispatched teardown for expired demo {$demo->id} (task {$demo->task_id}).");
         }
 

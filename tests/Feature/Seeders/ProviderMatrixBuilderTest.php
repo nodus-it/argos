@@ -3,9 +3,9 @@
 declare(strict_types=1);
 
 use App\Models\ConnectedAccount;
-use App\Models\RepoProfile;
 use App\Models\TaskProviderBinding;
 use App\Models\User;
+use App\Models\Workspace;
 use Database\Seeders\Support\ProviderMatrixBuilder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -16,23 +16,23 @@ function buildMatrix(User $user): void
     (new ProviderMatrixBuilder)->build($user);
 }
 
-it('seeds a repo profile for every git provider', function () {
+it('seeds a workspace for every git provider', function () {
     buildMatrix(User::factory()->create());
 
     // Defaults come from tests/External/providers.defaults.php.
     foreach (['github', 'gitlab', 'bitbucket'] as $platform) {
-        $profile = RepoProfile::where('name', "provider-demo ({$platform})")->first();
-        expect($profile)->not->toBeNull("{$platform} demo profile should exist")
-            ->and($profile->platform->value)->toBe($platform);
+        $workspace = Workspace::where('name', "provider-demo ({$platform})")->first();
+        expect($workspace)->not->toBeNull("{$platform} demo workspace should exist")
+            ->and($workspace->platform->value)->toBe($platform);
     }
 });
 
-it('gives github and gitlab a webhook and poll binding on their own profile', function () {
+it('gives github and gitlab a webhook and poll binding on their own workspace', function () {
     buildMatrix(User::factory()->create());
 
     foreach (['github' => 'nodus-it/argos-test', 'gitlab' => 'bastian-schur/argos-test'] as $kind => $ref) {
-        $profile = RepoProfile::where('name', "provider-demo ({$kind})")->first();
-        $bindings = TaskProviderBinding::where('repo_profile_id', $profile->id)
+        $workspace = Workspace::where('name', "provider-demo ({$kind})")->first();
+        $bindings = TaskProviderBinding::where('workspace_id', $workspace->id)
             ->where('kind', $kind)->get();
 
         expect($bindings->map(fn (TaskProviderBinding $b): string => $b->mode->value)->all())
@@ -43,14 +43,14 @@ it('gives github and gitlab a webhook and poll binding on their own profile', fu
     }
 });
 
-it('seeds the linear binding by default on the bitbucket profile', function () {
+it('seeds the linear binding by default on the bitbucket workspace', function () {
     buildMatrix(User::factory()->create());
 
-    $bitbucket = RepoProfile::where('name', 'provider-demo (bitbucket)')->first();
+    $bitbucket = Workspace::where('name', 'provider-demo (bitbucket)')->first();
     $linear = TaskProviderBinding::where('kind', 'linear')->get();
 
     expect($linear)->toHaveCount(2); // webhook + poll
-    expect($linear->first()->repo_profile_id)->toBe($bitbucket->id);
+    expect($linear->first()->workspace_id)->toBe($bitbucket->id);
     // Default team comes from providers.defaults.php.
     expect($linear->first()->external_project_ref)->toBe('BAS');
 });
@@ -91,13 +91,13 @@ it('is idempotent and preserves webhook secrets', function () {
     $user = User::factory()->create();
 
     buildMatrix($user);
-    $profileCount = RepoProfile::count();
+    $workspaceCount = Workspace::count();
     $bindingCount = TaskProviderBinding::count();
     $secret = TaskProviderBinding::where('mode', 'webhook')->first()->webhook_secret;
 
     buildMatrix($user);
 
-    expect(RepoProfile::count())->toBe($profileCount);
+    expect(Workspace::count())->toBe($workspaceCount);
     expect(TaskProviderBinding::count())->toBe($bindingCount);
     expect(TaskProviderBinding::where('mode', 'webhook')->first()->webhook_secret)->toBe($secret);
 });

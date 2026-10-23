@@ -1,0 +1,33 @@
+{
+    "name": "@argos/workspace-daemon",
+    "version": "0.1.0",
+    "private": true,
+    "description": "Argos workspace daemon: holds interactive Claude sessions inside a workspace container and relays events to the Argos manager.",
+    "license": "AGPL-3.0-or-later",
+    "//": "@anthropic-ai/claude-agent-sdk is governed by Anthropic's terms, not AGPL. Never bundle it into the repo (no committed dist/); it is installed with `npm ci` at image build time.",
+    "type": "module",
+    "engines": {
+        "node": ">=22"
+    },
+    "main": "dist/main.js",
+    "scripts": {
+        "build": "tsc -p tsconfig.build.json",
+        "start": "node dist/main.js",
+        "typecheck": "tsc --noEmit",
+        "lint": "eslint .",
+        "test": "vitest run",
+        "check": "npm run typecheck && npm run lint && npm run test"
+    },
+    "dependencies": {
+        "@anthropic-ai/claude-agent-sdk": "0.3.304",
+        "fastify": "5.12.7",
+        "zod": "4.6.7"
+    },
+    "devDependencies": {
+        "@types/node": "22.20.5",
+        "eslint": "10.13.0",
+        "typescript": "5.9.3",
+        "typescript-eslint": "8.72.0",
+        "vitest": "5.0.5"
+    }
+}

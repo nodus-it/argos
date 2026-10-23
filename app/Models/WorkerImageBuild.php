@@ -12,7 +12,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\DB;
 
 /**
  * @property string $id
@@ -65,20 +64,9 @@ class WorkerImageBuild extends Model
     }
 
     /**
-     * A build is "outdated" when one of two drifts applies:
-     *
-     * 1. **Stack drift**: The 8-char hash this build was made against is
-     *    not the current `sha256(stack.dockerfile_body)[0:8]`. The resolver
-     *    would compute a different worker tag now, so this build is
-     *    objectively obsolete regardless of what's inside the image.
-     *
-     * 2. **Agent drift**: The agent has `has_update=true` AND this build
-     *    pre-dates the last npm-version check. Fresh builds (built_at >
-     *    agent.last_checked_at) are NEVER agent-outdated, because they
-     *    just pulled the current upstream during their own `npm install`.
-     *
-     * Failed builds (no built_at) are never considered outdated — they
-     * have nothing to drift from.
+     * A build is "outdated" when the 8-char hash it was made against is not
+     * the current `sha256(stack.dockerfile_body)[0:8]`: the resolver would
+     * compute a different worker tag now, so this build is obsolete.
      */
     public function isOutdated(): bool
     {
@@ -89,16 +77,7 @@ class WorkerImageBuild extends Model
             }
         }
 
-        if ($this->built_at === null) {
-            return false;
-        }
-
-        $version = AgentVersion::query()->find($this->agent_name->value);
-        if ($version?->has_update !== true || $version->last_checked_at === null) {
-            return false;
-        }
-
-        return $this->built_at->lessThan($version->last_checked_at);
+        return false;
     }
 
     /**
@@ -123,18 +102,6 @@ class WorkerImageBuild extends Model
                     ->where('worker_stack_id', $stack->id)
                     ->where('stack_hash', '!=', $currentHash));
             }
-
-            // (2) Agent drift: agent has_update + build built before last
-            // npm version check. Fresh builds skip this branch because their
-            // built_at is past last_checked_at.
-            $q->orWhereExists(function ($sub) {
-                $sub->select(DB::raw(1))
-                    ->from('agent_versions')
-                    ->whereColumn('agent_versions.agent_name', 'worker_image_builds.agent_name')
-                    ->where('agent_versions.has_update', true)
-                    ->whereColumn('worker_image_builds.built_at', '<', 'agent_versions.last_checked_at')
-                    ->whereNotNull('worker_image_builds.built_at');
-            });
         });
     }
 }

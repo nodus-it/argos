@@ -1,9 +1,9 @@
 # syntax=docker/dockerfile:1.7
 
 # ============================================================
-# base: PHP 8.4-FPM + system tools
+# base: PHP 8.5-FPM + system tools
 # ============================================================
-FROM php:8.4-fpm-bookworm AS base
+FROM php:8.5-fpm-bookworm AS base
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -49,7 +49,7 @@ RUN set -eux; \
     npm --version; \
     docker compose version
 
-# PHP extensions
+# PHP extensions (OPcache is built into PHP 8.5 — nothing to install)
 RUN set -eux; \
     docker-php-ext-configure intl; \
     docker-php-ext-configure gd --with-freetype --with-jpeg; \
@@ -62,9 +62,7 @@ RUN set -eux; \
         exif \
         gd \
         pcntl \
-        posix \
-        opcache; \
-    docker-php-ext-enable opcache
+        posix
 
 COPY --from=composer:latest /usr/bin/composer /usr/local/bin/composer
 
@@ -105,10 +103,12 @@ RUN composer install --no-dev --optimize-autoloader --no-interaction \
 # PhaseRunner via php-fpm/queue-worker) can manage its own ~/.docker config.
 RUN chown www-data:www-data /var/www
 
-# PHP-FPM: disable default pool, use our config (listens on 0.0.0.0:9000 so
-# the separate nginx container can reach it).
-RUN rm -f /usr/local/etc/php-fpm.d/www.conf
-COPY .tools/docker/app/php-fpm.conf /usr/local/etc/php-fpm.d/argos.conf
+# PHP-FPM: disable default pool, use our config (listens on a unix socket in
+# /run/argos-fpm, a volume shared with the nginx container — no TCP port).
+# Loaded last (zz-) so the base image's docker.conf `listen = 9000` can't win.
+RUN rm -f /usr/local/etc/php-fpm.d/www.conf /usr/local/etc/php-fpm.d/zz-docker.conf \
+    && mkdir -p /run/argos-fpm && chown www-data:www-data /run/argos-fpm
+COPY .tools/docker/app/php-fpm.conf /usr/local/etc/php-fpm.d/zz-argos.conf
 
 # Bake the nginx site config into the image. The app entrypoint copies it
 # into a shared volume on boot so the nginx container can mount it RO without
@@ -142,8 +142,6 @@ ENV DB_CONNECTION=mariadb \
 # $argosVersion literal. Kept last so the changing value only busts this layer.
 ARG ARGOS_VERSION=
 ENV ARGOS_VERSION=${ARGOS_VERSION}
-
-EXPOSE 9000
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["php-fpm", "--nodaemonize"]

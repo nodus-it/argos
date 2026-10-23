@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Tests\Unit\Services\GitProvider;
 
 use App\Integrations\GitHub\Requests\CommentOnPullRequest;
+use App\Integrations\GitHub\Requests\FindOpenPullRequest;
 use App\Integrations\GitHub\Requests\GetRepository;
-use App\Integrations\GitHub\Requests\UpdatePullRequest;
 use App\Services\GitProvider\GitHubGitService;
 use Saloon\Http\Faking\MockResponse;
 use Saloon\Http\Request;
@@ -80,21 +80,16 @@ class GitHubGitServiceTest extends TestCase
         });
     }
 
-    public function test_update_pull_request_patches_title_and_body(): void
+    public function test_find_open_pull_request_looks_up_the_branch(): void
     {
-        Saloon::fake([
-            UpdatePullRequest::class => MockResponse::make(['number' => 42]),
-        ]);
+        Saloon::fake([FindOpenPullRequest::class => MockResponse::make([['number' => 7, 'html_url' => 'https://github.com/acme/widget/pull/7', 'state' => 'open']])]);
 
-        (new GitHubGitService('tok'))->updatePullRequest('acme', 'widget', 42, 'new title', 'new body');
+        $found = (new GitHubGitService('tok'))->findOpenPullRequest('acme', 'widget', 'argos/login');
 
-        Saloon::assertSent(function (Request $request): bool {
-            $body = $request instanceof UpdatePullRequest ? $request->body()->all() : [];
+        $this->assertSame(7, $found['number'] ?? null);
+        Saloon::assertSent(fn (Request $request): bool => $request instanceof FindOpenPullRequest && $request->query()->all() === ['head' => 'acme:argos/login', 'state' => 'open', 'per_page' => 1]);
 
-            return $request instanceof UpdatePullRequest
-                && $request->resolveEndpoint() === '/repos/acme/widget/pulls/42'
-                && ($body['title'] ?? null) === 'new title'
-                && ($body['body'] ?? null) === 'new body';
-        });
+        Saloon::fake([FindOpenPullRequest::class => MockResponse::make([])]);
+        $this->assertNull((new GitHubGitService('tok'))->findOpenPullRequest('acme', 'widget', 'argos/login'));
     }
 }

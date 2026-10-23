@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\OAuth;
 
 use App\Models\ProviderOAuthConfig;
+use App\Support\RepoUrlBuilder;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
 use Throwable;
@@ -44,10 +45,7 @@ final class OAuthConfigHydrator
             ]);
 
             if ($provider === 'gitlab') {
-                // socialiteproviders/gitlab concatenates instance_uri verbatim,
-                // so the trailing slash must be guaranteed (mirrors config/services.php).
-                $instance = $config['instance_url'] !== '' ? $config['instance_url'] : 'https://gitlab.com';
-                config(['services.gitlab.instance_uri' => rtrim($instance, '/').'/']);
+                config(['services.gitlab.instance_uri' => RepoUrlBuilder::gitlabSocialiteUri($config['instance_url'])]);
             }
         }
     }

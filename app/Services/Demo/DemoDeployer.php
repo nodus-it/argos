@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Services\Demo;
 
 use App\Enums\DemoStatus;
+use App\Enums\TaskKind;
 use App\Models\Demo;
-use App\Models\RepoProfile;
 use App\Models\Task;
+use App\Models\Workspace;
 use App\Services\GitProvider\GitServiceFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Symfony\Component\Process\Process;
@@ -16,11 +18,10 @@ use Symfony\Component\Yaml\Yaml;
 use Throwable;
 
 /**
- * Deploys an ephemeral live demo for a task after a successful implement run.
+ * Deploys an ephemeral live demo (preview) for a workspace.
  *
- * The implemented code already lives in the task workspace volume
- * (`task_ws_{id}`); rather than checking it out again, the deployer MOUNTS that
- * volume into the entry service of the repo-supplied `.argos/demo.compose.yml`,
+ * The code already lives in the workspace volume; rather than checking it out
+ * again, the deployer MOUNTS that volume into the entry service of the repo-supplied `.argos/demo.compose.yml`,
  * runs the configured `commands` inside the container, and publishes a Traefik
  * file-provider route so the demo is reachable under its own subdomain.
  *
@@ -43,25 +44,22 @@ class DemoDeployer
     ) {}
 
     /**
-     * Build (or rebuild) the live demo for a task. Always replaces a previous
-     * demo of the same task. Returns the persisted Demo row (live or failed).
+     * Build (or rebuild) the live demo for a target. Always replaces
+     * a previous demo of the same target. Returns the persisted Demo row (live
+     * or failed).
      */
-    public function deploy(Task $task): Demo
+    public function deploy(DemoTarget $target): Demo
     {
-        $profile = $task->repoProfile;
-        if ($profile === null) {
-            throw new RuntimeException("Task '{$task->name}' has no repo profile — cannot deploy a demo.");
-        }
-
-        $slug = $this->demoSlug($task);
+        $workspace = $target->demoWorkspace();
+        $slug = $target->demoSlug();
         $project = $slug;
 
-        // A task has exactly one current demo — tear the old one down first so
-        // a re-implement cleanly replaces it (containers, volumes, route).
+        // A target has exactly one current demo — tear the old one down first so
+        // a rebuild cleanly replaces it (containers, volumes, route).
         $this->teardownBySlug($slug);
 
         $demo = Demo::query()->create([
-            'task_id' => $task->id,
+            ...$this->ownerColumns($target),
             'status' => DemoStatus::Building,
             'compose_project' => $project,
             'url' => null,
@@ -71,12 +69,7 @@ class DemoDeployer
 
         $log = '';
         try {
-            // Pull external commits a user pushed to the feature branch into the
-            // volume first, so the demo reflects the current remote state (I2).
-            // No-op on a dirty tree — see DemoWorkspaceSync.
-            app(DemoWorkspaceSync::class)->syncToRemote($task);
-
-            [$composeYaml, $settings] = $this->readContract($profile);
+            [$composeYaml, $settings] = $this->readContract($workspace, $this->contractRef($target));
 
             // Resolve the built-in runtime-image placeholder to the content-
             // hashed, build-on-demand tag whenever a contract references it. The
@@ -88,24 +81,23 @@ class DemoDeployer
                 $composeYaml = str_replace(self::DEMO_IMAGE_PLACEHOLDER, $this->imageBuilder->ensure(), $composeYaml);
             }
 
+            // Repository content, started over the host's Docker socket: only a
+            // safe subset of compose passes, hardened (see DemoComposeGuard).
+            $composeYaml = app(DemoComposeGuard::class)->harden($composeYaml);
+
             $entry = $this->parseEntry($settings);
 
             $router = app(TraefikRouter::class);
             $overrideYaml = app(DemoComposeBuilder::class)
-                ->buildOverrideYaml($task, $slug, $entry, $router->urlForSlug($slug));
+                ->buildOverrideYaml($target, $slug, $entry, $router->urlForSlug($slug));
             $workDir = $this->prepareWorkDir($slug, $composeYaml, $overrideYaml);
 
-            $log .= $this->enforceConcurrencyCap($task);
+            $log .= $this->enforceConcurrencyCap($target);
             $log .= $this->composeUp($project, $workDir);
-            $log .= $this->runCommands($project, $entry['service'], $settings['commands'] ?? []);
+            $log .= $this->runCommands($project, $entry['service'], $settings['commands'] ?? [], $target->demoExecUser());
             $log .= $this->probeHealth($project, $entry, $settings['health'] ?? null);
 
-            $url = $router->writeRoute(
-                $slug,
-                $entry['port'],
-                $task->effectiveDemoAccessMode(),
-                $task->demo_basic_password,
-            );
+            $url = $router->writeRoute($slug, $entry['port']);
 
             $demo->forceFill([
                 'status' => DemoStatus::Live,
@@ -115,7 +107,7 @@ class DemoDeployer
             ])->save();
         } catch (Throwable $e) {
             Log::channel('argos')->warning('Demo deploy failed', [
-                'task' => $task->name,
+                'target' => $slug,
                 'demo' => $demo->id,
                 'error' => $e->getMessage(),
             ]);
@@ -133,19 +125,64 @@ class DemoDeployer
     }
 
     /**
-     * Stop and remove a task's running demo (containers + volumes + route).
+     * Stop and remove a target's running demo (containers + volumes + route).
      * Safe to call when nothing is running.
      */
-    public function teardown(Task $task): void
+    public function teardown(DemoTarget $target): void
     {
-        $this->teardownBySlug($this->demoSlug($task));
+        $this->teardownBySlug($target->demoSlug());
     }
 
     /**
-     * Tear a demo stack down by its slug alone — no Task row required, so this
-     * still works after the task (and its demo row) has been deleted. The slug
-     * is derived deterministically from the task name (demoSlug), so a deleted
-     * task's stack stays addressable.
+     * Re-run the contract's setup commands in the running demo — after a
+     * migration, a composer/npm change or a build-config edit — without a
+     * teardown. Appends the output to the demo's build log.
+     */
+    public function rerunCommands(DemoTarget $target): Demo
+    {
+        $demo = $this->currentDemoOf($target);
+        if ($demo === null || $demo->status !== DemoStatus::Live) {
+            throw new RuntimeException('No live demo to re-run the setup commands in.');
+        }
+
+        $workspace = $target->demoWorkspace();
+
+        [, $settings] = $this->readContract($workspace, $this->contractRef($target));
+        $entry = $this->parseEntry($settings);
+
+        $log = "\n[rerun ".now()->toIso8601String()."]\n";
+        try {
+            $log .= $this->runCommands($target->demoSlug(), $entry['service'], $settings['commands'] ?? [], $target->demoExecUser());
+        } catch (Throwable $e) {
+            $log .= '[error] '.$e->getMessage()."\n";
+        }
+
+        $demo->forceFill(['build_log' => $this->truncateLog(($demo->build_log ?? '').$log)])->save();
+
+        return $demo->refresh();
+    }
+
+    /**
+     * Columns tying a demo row to its target.
+     *
+     * @return array<string, string|null>
+     */
+    private function ownerColumns(DemoTarget $target): array
+    {
+        return [
+            'workspace_id' => $target->demoWorkspace()->id,
+            'task_id' => $target instanceof Task ? $target->id : null,
+        ];
+    }
+
+    private function currentDemoOf(DemoTarget $target): ?Demo
+    {
+        return Demo::query()->where($this->ownerColumns($target))->latest()->first();
+    }
+
+    /**
+     * Tear a demo stack down by its slug alone, so this still works after the
+     * target (and its demo row) has been deleted.
      */
     public function teardownBySlug(string $slug): void
     {
@@ -161,20 +198,34 @@ class DemoDeployer
     }
 
     /**
-     * Honour preview.max_concurrent: if running demos of OTHER tasks would push
-     * the total over the cap (counting the one we're about to start), evict the
+     * Honour the workspace's preview limit and the platform's
+     * preview.max_concurrent: if running demos of OTHER targets would push a
+     * total over its cap (counting the one we're about to start), evict the
      * oldest ones until there is room. Evictions are logged — never silent.
      */
-    private function enforceConcurrencyCap(Task $current): string
+    private function enforceConcurrencyCap(DemoTarget $current): string
     {
-        $max = (int) config('argos.preview.max_concurrent', 10);
+        $own = $this->ownerColumns($current);
+        $log = $this->evictOverflow(
+            (int) $current->demoWorkspace()->max_previews,
+            fn ($q) => $q->where('workspace_id', $own['workspace_id']),
+            $own['task_id'],
+        );
+
+        return $log.$this->evictOverflow((int) config('argos.preview.max_concurrent', 10), fn ($q) => $q, $own['task_id']);
+    }
+
+    /** @param  callable(Builder<Demo>): mixed  $scope */
+    private function evictOverflow(int $max, callable $scope, ?string $exceptTaskId): string
+    {
         if ($max <= 0) {
             return '';
         }
 
         $active = Demo::query()
             ->whereIn('status', [DemoStatus::Building->value, DemoStatus::Live->value])
-            ->where('task_id', '!=', $current->id)
+            ->where($scope)
+            ->when($exceptTaskId !== null, fn ($q) => $q->where('task_id', '!=', $exceptTaskId))
             ->orderBy('created_at')
             ->get();
 
@@ -186,13 +237,13 @@ class DemoDeployer
 
         $log = '';
         foreach ($active->take($overflow) as $demo) {
-            $task = $demo->task;
-            if ($task !== null) {
-                $this->teardownBySlug($this->demoSlug($task));
+            $target = $demo->target();
+            if ($target !== null) {
+                $this->teardownBySlug($target->demoSlug());
             }
             $demo->update(['status' => DemoStatus::Stopped, 'url' => null]);
 
-            $log .= "[cap] evicted demo {$demo->id} (task {$demo->task_id}) to stay under max_concurrent={$max}\n";
+            $log .= "[cap] evicted demo {$demo->id} (task {$demo->task_id}) to stay under {$max} previews\n";
             Log::channel('argos')->info('Evicted demo to honour concurrency cap', [
                 'demo' => $demo->id,
                 'task' => $demo->task_id,
@@ -209,11 +260,10 @@ class DemoDeployer
      *
      * @return array{0: string, 1: array<string, mixed>} [composeYaml, settings]
      */
-    private function readContract(RepoProfile $profile): array
+    private function readContract(Workspace $workspace, string $ref): array
     {
-        $service = $this->gitFactory->fromRepoProfile($profile);
-        $ownerRepo = $profile->getOwnerRepo();
-        $ref = $profile->default_branch;
+        $service = $this->gitFactory->forWorkspace($workspace);
+        $ownerRepo = $workspace->getOwnerRepo();
 
         $composeYaml = $service->getFileContents($ownerRepo, DemoConfigLocator::COMPOSE_PATH, $ref);
         $settingsYaml = $service->getFileContents($ownerRepo, DemoConfigLocator::SETTINGS_PATH, $ref);
@@ -221,7 +271,7 @@ class DemoDeployer
         if ($composeYaml === null && $settingsYaml === null) {
             // No contract at all → built-in default runtime, unified with the
             // project's backing-service config (creds + Redis toggle).
-            [$composeYaml, $settingsYaml] = $this->defaultContract($profile);
+            [$composeYaml, $settingsYaml] = $this->defaultContract($workspace);
         } elseif ($composeYaml === null || $settingsYaml === null) {
             // A half-written contract is a mistake the author must see, not a
             // silent fall-through to the generic demo.
@@ -240,15 +290,29 @@ class DemoDeployer
     }
 
     /**
+     * The branch the contract is read from: a setup task tests its own
+     * branch; everything else uses the workspace's setup (an unmerged setup
+     * branch, else the default branch).
+     */
+    private function contractRef(DemoTarget $target): string
+    {
+        if ($target instanceof Task && $target->kind === TaskKind::Setup && $target->branch !== null) {
+            return $target->branch;
+        }
+
+        return $target->demoWorkspace()->setupRef();
+    }
+
+    /**
      * Build the bundled default Laravel demo contract (compose + settings),
      * unified with the profile's backing-service config (DB credentials + an
      * optional Redis service).
      *
      * @return array{0: string, 1: string} [composeYaml, settingsYaml]
      */
-    private function defaultContract(RepoProfile $profile): array
+    private function defaultContract(Workspace $workspace): array
     {
-        return app(DemoContractBuilder::class)->buildDefault($profile);
+        return app(DemoContractBuilder::class)->buildDefault($workspace);
     }
 
     /**
@@ -314,7 +378,7 @@ class DemoDeployer
      *
      * @param  array<int, mixed>  $commands
      */
-    private function runCommands(string $project, string $service, array $commands): string
+    private function runCommands(string $project, string $service, array $commands, ?string $user = null): string
     {
         $log = '';
         foreach ($commands as $command) {
@@ -322,11 +386,12 @@ class DemoDeployer
                 continue;
             }
 
-            $process = $this->newProcess([
-                'docker', 'compose', '-p', $project,
-                'exec', '-T', $service,
-                'sh', '-c', $command,
-            ]);
+            $exec = ['docker', 'compose', '-p', $project, 'exec', '-T'];
+            if ($user !== null) {
+                // HOME must be writable for npm/composer caches of a non-root user.
+                $exec = [...$exec, '--user', $user, '-e', 'HOME=/tmp'];
+            }
+            $process = $this->newProcess([...$exec, $service, 'sh', '-c', $command]);
             $process->setTimeout($this->commandTimeoutSeconds);
             $process->run();
 
@@ -384,53 +449,6 @@ class DemoDeployer
         }
 
         throw new RuntimeException("Demo health check failed after {$timeout}s ({$url}): {$lastErr}");
-    }
-
-    /**
-     * Re-write the live demo's route for a task after its access mode (or basic
-     * password) changed — applies the new protection without a full redeploy.
-     * No-op when the task has no live demo with a known entry port.
-     */
-    public function applyAccessMode(Task $task): void
-    {
-        $demo = $task->currentDemo();
-        if ($demo === null || $demo->status !== DemoStatus::Live) {
-            return;
-        }
-
-        $slug = $this->demoSlug($task);
-        $router = app(TraefikRouter::class);
-
-        // Demos deployed before the `port` column existed have a null port —
-        // recover it from the live route file so the toggle still works.
-        $port = $demo->port ?? $router->existingRoutePort($slug);
-        if ($port === null) {
-            return;
-        }
-
-        if ($demo->port === null) {
-            $demo->forceFill(['port' => $port])->save();
-        }
-
-        $router->writeRoute(
-            $slug,
-            $port,
-            $task->effectiveDemoAccessMode(),
-            $task->demo_basic_password,
-        );
-    }
-
-    /**
-     * DNS-safe demo slug derived from the task name. Used identically as the
-     * compose project name, the edge-network alias, the Traefik router/service
-     * name, and the subdomain label — so they always line up.
-     */
-    public function demoSlug(Task $task): string
-    {
-        $base = strtolower((string) preg_replace('/[^a-zA-Z0-9]+/', '-', $task->slug));
-        $base = trim($base, '-');
-
-        return 'demo-'.($base !== '' ? $base : 'task');
     }
 
     /** Truncate an overly long build log to keep the DB row reasonable (head+tail). */

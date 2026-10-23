@@ -1,32 +1,34 @@
 # Einrichtungsleitfaden
 
-Dies ist der Installations- und Einrichtungsleitfaden für Betreiber, die eine
+Dies ist der Installations- und Einrichtungsleitfaden für alle, die eine
 Argos-Instanz betreiben. Er behandelt Voraussetzungen, den Ein-Befehl-Installer
 und seine Release-Kanäle, was der Stack ausführt, den ersten Start und die erste
 Anmeldung, den Hinweis zu Reverse-Proxy / `APP_URL`, das Aktualisieren und wie es
-weitergeht (Onboarding, OAuth, Worker-Stacks).
+weitergeht (Onboarding, OAuth, Stacks).
 
 Die vollständige Referenz der Umgebungsvariablen findest du in
 [CONFIGURATION.md](CONFIGURATION.md). Für einen schnellen Probelauf ist der
-[Quick Start im README](../README.md#quick-start) derselbe Einzeiler mit weniger
+[Quick Start im README](../../README.md#quick-start) derselbe Einzeiler mit weniger
 Details.
 
 ## Inhalt
 
-- [Voraussetzungen](#prerequisites)
-- [Ein-Befehl-Installation](#one-command-install)
-- [Release-Kanäle](#release-channels)
-- [Was der Stack ausführt](#what-the-stack-runs)
-- [Erster Start](#first-boot)
-- [Erste Anmeldung und Onboarding](#first-login-and-onboarding)
-- [Reverse-Proxy und APP_URL](#reverse-proxy-and-app_url)
+- [Voraussetzungen](#voraussetzungen)
+- [Ein-Befehl-Installation](#ein-befehl-installation)
+- [Release-Kanäle](#release-kanale)
+- [Was der Stack ausführt](#was-der-stack-ausfuhrt)
+- [Erster Start](#erster-start)
+- [Erste Anmeldung und Onboarding](#erste-anmeldung-und-onboarding)
+- [Reverse-Proxy und APP_URL](#reverse-proxy-und-app-url)
 - [OAuth (optional)](#oauth-optional)
-- [Auswahl von Worker-Stack und Agent](#choosing-a-worker-stack-and-agent)
-- [Vorbelegen des Claude-Tokens](#pre-seeding-the-claude-token)
-- [Produktionsnahe Installation](#production-style-install)
-- [Aktualisieren](#updating)
-- [Zurücksetzen und Sicherung](#reset-and-backup)
-- [Umgebungsvariablen](#environment-variables)
+- [Stacks und Agenten](#stacks-und-agenten)
+- [Nutzende und Admins](#nutzende-und-admins)
+- [Workspaces](#workspaces)
+- [Vorbelegen des Claude-Tokens](#vorbelegen-des-claude-tokens)
+- [Produktionsnahe Installation](#produktionsnahe-installation)
+- [Aktualisieren](#aktualisieren)
+- [Zurücksetzen und Sicherung](#zurucksetzen-und-sicherung)
+- [Umgebungsvariablen](#umgebungsvariablen)
 
 ## Voraussetzungen
 
@@ -35,7 +37,7 @@ Du benötigst einen Linux-Host mit:
 - **Docker Engine 20.10+** mit dem **Compose-v2-Plugin** (`docker compose`,
   nicht das veraltete `docker-compose`). Der Installer prüft dies und
   verweigert andernfalls die Ausführung.
-- Einem Benutzer, der mit dem Docker-Daemon kommunizieren kann (in der
+- Einem Benutzerkonto, das mit dem Docker-Daemon kommunizieren kann (in der
   `docker`-Gruppe, oder den Installer als root ausführen). Die Container `app`
   und `queue` binden den Docker-Socket des Hosts ein, um kurzlebige
   Worker-Container zu starten.
@@ -47,11 +49,11 @@ Optional, aber empfohlen für alles, was über einen lokalen Test hinausgeht:
 - **Eine Domain und ein TLS-terminierender Reverse-Proxy** (Caddy, nginx,
   Traefik, HAProxy). Du benötigst dies, damit OAuth-Callbacks korrekt aufgelöst
   werden, und für HTTPS. Siehe
-  [Reverse-Proxy und APP_URL](#reverse-proxy-and-app_url).
+  [Reverse-Proxy und APP_URL](#reverse-proxy-und-app-url).
 
 Du musst **nichts** vorab bauen. Das Manager-Image wird von GHCR bezogen;
-Worker-Images werden beim ersten Phasenlauf bedarfsgesteuert aus den lokalen
-Manifesten gebaut.
+Worker- und Workspace-Images werden bedarfsgesteuert aus den lokalen Manifesten
+gebaut, wenn der erste Workspace startet.
 
 ## Ein-Befehl-Installation
 
@@ -70,8 +72,15 @@ curl -fsSL https://raw.githubusercontent.com/nodus-it/argos/master/.tools/instal
     | bash -s -- --dir /opt/argos
 ```
 
-Nach Abschluss gibt der Installer eine Zusammenfassung mit der URL, der
-Admin-Anmeldung und dem generierten Admin-Passwort aus.
+Der Installer wartet, bis die App als healthy gemeldet wird (der erste Start
+führt die Migrationen aus), und gibt dann eine Zusammenfassung mit der URL, der
+Admin-Anmeldung und dem generierten Admin-Passwort aus. Hinter einem
+TLS-Proxy übergibst du die öffentliche URL und den Host-Port gleich mit:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/nodus-it/argos/master/.tools/install.sh \
+    | bash -s -- --dir /opt/argos --url https://argos.example.com --port 8080
+```
 
 Installer-Flags (nach `bash -s --` anhängen oder die Umgebungsvariable setzen):
 
@@ -79,18 +88,21 @@ Installer-Flags (nach `bash -s --` anhängen oder die Umgebungsvariable setzen):
 |---|---|---|
 | `--dir PATH` | `ARGOS_INSTALL_DIR` | Installiert nach `PATH` statt nach `$PWD` |
 | `--version REF` | `ARGOS_VERSION` | Heftet ein bestimmtes Git-Tag oder einen Branch an |
+| `--url URL` | `ARGOS_URL` | Öffentliche URL, wird als `APP_URL` in die `.env` geschrieben |
+| `--port PORT` | `ARGOS_PORT` | Host-Port des Stacks (Standard `8080`); eine frische Installation bricht früh ab, wenn er belegt ist |
 | `--stage` | `ARGOS_STAGE=1` | Verfolgt die rollierenden `:stage`-Images aus `develop` |
 | `--next` | `ARGOS_NEXT=1` | Verfolgt die rollierenden `:next`-Images aus dem Integrationsbranch `next` |
 | `--beta` | `ARGOS_BETA=1` | Installiert das neueste Release inklusive Pre-Releases |
 | `--reset` | — | Fährt den Stack herunter und löscht alle Daten (destruktiv) |
 | `--force` | — | Überspringt Sicherheitsabfragen (für `--reset` in nicht-interaktiven Shells erforderlich) |
 | `--help` | — | Zeigt alle Optionen an |
+| — | `ARGOS_WAIT_SECONDS` | Wie lange auf eine healthy App gewartet wird (Standard `300`) |
 
 Der Installer verweigert es, Dateien in ein nicht-leeres Verzeichnis zu legen,
 sofern du nicht `--force` übergibst. Bringe eigene Anpassungen in einer
 `docker-compose.override.yml` neben der ausgelieferten Compose-Datei ein — der
 Installer fasst diese Datei niemals an (siehe
-[Produktionsnahe Installation](#production-style-install)).
+[Produktionsnahe Installation](#produktionsnahe-installation)).
 
 ## Release-Kanäle
 
@@ -133,12 +145,12 @@ werden bedarfsgesteuert auf dem Host gebaut.
 |---|---|---|
 | `db` | `mariadb:11` | Anwendungsdatenbank. Die Daten liegen im Volume `argos-db`. |
 | `redis` | `redis:7-alpine` | Queue-Backend für Horizon. Daten im Volume `argos-redis`. |
-| `app` | `ghcr.io/nodus-it/argos-app` | Web-UI + [MCP-Server](SETUP-MCP.md) + REST-API (PHP-FPM). Führt beim Start Migrationen aus; bindet den Docker-Socket ein, um Worker zu starten. |
+| `app` | `ghcr.io/nodus-it/argos-app` | Web-UI + [MCP-Server](SETUP-MCP.md) + REST-API (PHP-FPM). Führt beim Start Migrationen aus; bindet den Docker-Socket ein, um Workspaces und Previews zu starten. |
 | `traefik` | `traefik:v3.5` | Der einzige Einstiegspunkt auf Port 80. Wird auf dem Host via `ARGOS_PORT` veröffentlicht. Leitet zu nginx (und zu Live-Demo-Containern) weiter. |
-| `nginx` | `nginx:1.27-alpine` | Liefert statische Assets aus und leitet dynamische Anfragen an `app:9000` weiter. Sitzt hinter Traefik. |
-| `queue` | `ghcr.io/nodus-it/argos-app` | Laravel-Horizon-Worker — führt die Task-Phasen (`RunPhaseJob`) auf Redis aus. Gleiches Image wie `app`. |
-| `scheduler` | `ghcr.io/nodus-it/argos-app` | Laravel-Scheduler (`schedule:work`) — stößt wiederkehrende Jobs an (z. B. Issue-Polling). Gleiches Image wie `app`. |
-| `worker` (transient) | `argos-worker:<stack>-<hash>-<agent>-<version>` | Kurzlebiger Container, der pro Phase von den Diensten `app`/`queue` gestartet wird. **Hier läuft die gesamte KI** — der Manager berührt Claude niemals direkt. Wird bedarfsgesteuert aus der `worker_stacks`-Zeile × dem gewählten Agent gebaut. |
+| `nginx` | `nginx:1.27-alpine` | Liefert statische Assets aus und leitet dynamische Anfragen an den PHP-FPM-Socket der App weiter. Sitzt hinter Traefik. |
+| `queue` | `ghcr.io/nodus-it/argos-app` | Laravel-Horizon-Worker — führt Hintergrund-Jobs auf Redis aus: Workspace-Bereitstellung, Vorbereitung von Aufgaben, Image-Builds, Previews, automatische Aufgaben, Ticket-Webhooks. Gleiches Image wie `app`. |
+| `scheduler` | `ghcr.io/nodus-it/argos-app` | Laravel-Scheduler (`schedule:work`) — stößt wiederkehrende Jobs an (Issue-Polling, Abgleich von Pull Requests und Ticket-Kommentaren, Stopp bei Inaktivität, Aufräumen von Aufgaben). Gleiches Image wie `app`. |
+| Workspace-Container | gebaut aus `argos-worker:<stack>-<hash>-<lib>-<agent>-<version>` | Ein Container pro laufendem Workspace, mit einem Git-Worktree pro Aufgabe, gestartet von den Diensten `app`/`queue`. **Hier läuft die gesamte KI** — der Manager berührt Claude niemals direkt. Das Image wird bedarfsgesteuert aus dem Stack des Workspaces (eingebaut oder `.argos/worker.dockerfile`) × dem Agent gebaut, plus Workspace-Daemon und VS Code. |
 
 Der Host-Port wird über **`ARGOS_PORT`** (Standard `8080`) gesetzt und auf
 **Traefiks** Port 80 abgebildet. Alles, was nicht von einer Live-Demo-Host-Regel
@@ -161,7 +173,7 @@ Reihenfolge):
    ihren geteilten Volumes an; generiert die Passport-Signierschlüssel (einmalig)
    unter `argos-data`.
 5. Wartet auf die Datenbank und führt dann — **nur in der Rolle `app`** —
-   `migrate --force` aus, legt den Admin-Benutzer an (`AdminUserSeeder`) und
+   `migrate --force` aus, legt das Admin-Konto an (`AdminUserSeeder`) und
    stößt Pre-Warm-Builds für das Standard-Worker-Image und das Live-Demo-Image an.
 
 Die Dienste `queue` und `scheduler` teilen sich dasselbe Image, überspringen aber
@@ -169,17 +181,16 @@ die Schema-Arbeit — der Dienst `app` ist für Migrationen und Seeding zuständ
 
 Der `app`-Container meldet sich erst als gesund, sobald die Datenbank erreichbar
 **und** das Schema vollständig migriert ist; `nginx`, `queue` und `scheduler`
-warten auf dieses Tor. Die erste Phase, die eine frische Installation ausführt,
-baut ihr Worker-Image (1–3 Minuten kalt; der Pre-Warm-Schritt beim Start
-verbirgt das meiste davon), danach verwenden nachfolgende Läufe das gecachte
-Image.
+warten auf dieses Tor. Der erste Workspace, den eine frische Installation
+startet, baut sein Image (1–3 Minuten kalt; der Pre-Warm-Schritt beim Start
+verbirgt das meiste davon), danach verwenden spätere Starts das gecachte Image.
 
 ## Erste Anmeldung und Onboarding
 
-Öffne die Admin-UI:
+Öffne die App:
 
-- `http://localhost:8080/admin` (oder `${APP_URL}/admin`). Der Aufruf von `/`
-  leitet auf `/admin` um.
+- `http://localhost:8080` (oder `${APP_URL}`) — die App; `/` ist deine Arbeit.
+  Die Administration liegt unter `/system`, die Anmeldung unter `/login`.
 
 Melde dich mit den Zugangsdaten aus der Installer-Zusammenfassung an:
 
@@ -187,15 +198,23 @@ Melde dich mit den Zugangsdaten aus der Installer-Zusammenfassung an:
 - **Passwort:** das generierte `ADMIN_PASSWORD` aus der Zusammenfassung (auch in
   `.env`).
 
-Ein in der App integrierter **Onboarding-Assistent** führt dich anschließend
-durch die Einrichtung. Sein erster Schritt ist **Sicherheit**: Lege dort direkt
+Ein in der App integrierter **Onboarding-Assistent** (`/setup`) führt dich anschließend
+durch die Einrichtung (seine Sprache wählst du oben). Sein erster Schritt ist
+**Konto**: Lade ein Profilbild hoch (es erscheint bei deinen Nachrichten und
+Aufgaben, später auch unter **Mein Konto → Profil** änderbar) und lege dort direkt
 ein eigenes Passwort fest, um das generierte Standard-Passwort zu ersetzen. Der
 Schritt ist optional und überspringbar — solange du noch das Standard-Passwort
 nutzt, weist dich ein Hinweis darauf hin, es zu ändern (du kannst es auch
-jederzeit später unter **Profile** ändern). Der Assistent führt dich danach
-durch das Einfügen deines Claude-Tokens und das Anlegen deines ersten Projekts.
-Um ein Ziel-Repository "Argos-ready" zu machen (eine eigene Build-Umgebung oder
-einen Live-Demo-Vertrag), siehe [PREPARE-PROJECT.md](PREPARE-PROJECT.md).
+jederzeit später unter **Mein Konto → Profil** ändern). Der Assistent führt dich danach
+durch das Einfügen deines Claude-Tokens — daraus wird dein **persönlicher**
+Agent, auf dem deine Aufgaben laufen; andere hinterlegen ihren unter
+**Mein Konto → Claude-Abos**, wo Argos-Admins auch die geteilten Agenten
+sehen — und das Anlegen deines ersten Workspaces aus einem
+Repository. Argos untersucht dann das Repository und
+startet, falls etwas fehlt, eine
+[Einrichtungsaufgabe](PREPARE-PROJECT.md#die-einrichtungs-aufgabe) auf deinem Abo. Um ein
+Repository von Hand "Argos-ready" zu machen, siehe
+[Ein Repository vorbereiten](PREPARE-PROJECT.md).
 
 ## Reverse-Proxy und APP_URL
 
@@ -207,14 +226,16 @@ HAProxy) und leitest an diesen Port weiter.
 Achte darauf:
 
 - **`APP_URL`** auf die öffentliche URL zu setzen (z. B.
-  `https://argos.example.com`). `APP_URL` ist die einzige Quelle der Wahrheit für
-  Host und Schema — OAuth-Callbacks, die Domain des Session-Cookies und
-  Live-Demo-Subdomains leiten sich alle davon ab.
+  `https://argos.example.com`), am einfachsten mit `--url` beim Installer.
+  `APP_URL` ist die einzige Quelle der Wahrheit für Host und Schema —
+  OAuth-Callbacks sowie die Preview- und Editor-Subdomains leiten sich davon ab.
 - `X-Forwarded-Proto: https` weiterzuleiten (sowie `X-Forwarded-For` /
-  `X-Forwarded-Host`). Argos und das mitgelieferte Traefik vertrauen
-  weitergeleiteten Headern von jedem vorgelagerten Proxy. Ohne
+  `X-Forwarded-Host`). Das mitgelieferte Traefik übernimmt diese Header nur von
+  `ARGOS_TRUSTED_PROXIES` (Standard: die privaten Adressbereiche). Ohne
   `X-Forwarded-Proto` werden Asset-URLs als `http://` gerendert und der Browser
   markiert Mixed Content.
+- WebSockets durchzulassen: Die Live-Ansicht einer Aufgabe verbindet sich mit
+  `/app/` auf dem Argos-Host und hält diese Verbindung offen.
 - Dieselbe `APP_URL` beim Registrieren von OAuth-Apps zu verwenden — die
   Redirect-URI muss übereinstimmen.
 
@@ -223,24 +244,30 @@ HAProxy-Snippet (in das *Advanced pass thru* des Argos-Backends einfügen):
 ```
 option forwardfor
 http-request set-header X-Forwarded-Proto https if { ssl_fc }
+timeout tunnel 1h
 ```
 
-Siehe die Session-/HTTPS-Variablen (`SESSION_DOMAIN`, `SESSION_SECURE_COOKIE`) in
-[CONFIGURATION.md#sessions-reverse-proxy--https](CONFIGURATION.md#sessions-reverse-proxy--https)
-— beide leiten sich von `APP_URL` ab und müssen selten gesetzt werden.
+Ohne `timeout tunnel` schließt HAProxy ruhende WebSockets nach seinem
+Server-Timeout, und die Live-Ansicht verbindet sich ständig neu.
+
+Setze `ARGOS_TRUSTED_PROXIES` auf die Adresse, von der dein Proxy verbindet
+(Traefik übernimmt `X-Forwarded-*`-Header nur von dort). Die Session-Variablen
+(`SESSION_DOMAIN`, `SESSION_SECURE_COOKIE`) in
+[CONFIGURATION.md#sessions-reverse-proxy-https](CONFIGURATION.md#sessions-reverse-proxy-https)
+folgen `APP_URL` und müssen selten gesetzt werden.
 
 ## OAuth (optional)
 
-Standardmäßig arbeitet Argos mit Personal Access Tokens (PATs) — füge pro Projekt
-einen Token ein und du bist fertig. **OAuth** ist das optionale Upgrade, das
+Standardmäßig arbeitet Argos mit Personal Access Tokens (PATs) — füge pro
+Workspace einen Token ein und du bist fertig. **OAuth** ist das optionale Upgrade, das
 folgendes ermöglicht:
 
-- Repository- und Branch-Dropdowns beim Anlegen eines Projekts
-- Authentifizierung pro Benutzer (jeder Benutzer verbindet seine eigenen Konten)
-- Unterstützung für selbst gehostetes GitLab ohne Token-Verwaltung pro Projekt
+- Repository- und Branch-Dropdowns beim Anlegen eines Workspaces
+- Authentifizierung pro Person (jede Person verbindet ihre eigenen Konten)
+- Unterstützung für selbst gehostetes GitLab ohne Token-Verwaltung pro Workspace
 
-OAuth-Client-Zugangsdaten werden vollständig in der UI verwaltet (Configuration →
-OAuth Apps) und in der Datenbank gespeichert — es gibt keinen ENV-Pfad. Siehe:
+OAuth-Client-Zugangsdaten werden vollständig in der UI verwaltet (Administration →
+OAuth-Apps, `/system/oauth-apps`) und in der Datenbank gespeichert — es gibt keinen ENV-Pfad. Siehe:
 
 - [OAuth-Überblick](OAUTH.md) — wenn du dir nicht sicher bist, welchen Modus du
   wählen sollst
@@ -248,27 +275,79 @@ OAuth Apps) und in der Datenbank gespeichert — es gibt keinen ENV-Pfad. Siehe:
 - [GitLab-Einrichtung](SETUP-GITLAB.md)
 - [Bitbucket-Einrichtung](SETUP-BITBUCKET.md)
 
-## Auswahl von Worker-Stack und Agent
+## Stacks und Agenten
 
 Worker-Images werden **nicht** von GHCR bezogen — der Manager baut sie
-bedarfsgesteuert aus der Tabelle `worker_stacks`, sobald zum ersten Mal ein Task
-mit dieser Kombination aus (Stack × Agent × Version) läuft. Der erste Lauf dauert
-1–3 Minuten; nachfolgende Läufe verwenden das gecachte Image.
+bedarfsgesteuert, sobald zum ersten Mal ein Workspace mit dieser Kombination
+aus Stack × Agent × Version startet (1–3 Minuten; der Standard-Stack wird beim
+Start vorab gebaut). Argos liefert drei eingebaute Stacks aus — **PHP 8.5**
+(Standard), **PHP 8.4** und **Node 22** — und wählt pro Workspace einen anhand
+des Repositorys; alles andere kommt aus dem eigenen `.argos/worker.dockerfile`
+des Repositorys. Einen Stack-Editor gibt es nicht. Siehe
+[Stacks und Images](WORKER-STACKS.md).
 
-Wähle den Stack und den Agent unter **Worker → Stacks** und **Worker → Agent
-Credentials** in der Admin-UI, weise dann Standardwerte pro Projekt und
-(optional) Overrides pro Task zu. Eingebaute Stacks (`php-8.3`, `php-8.4`, …)
-werden bei jeder Migration aus dem Repo-Manifest in die DB gespiegelt; du kannst
-in derselben UI deinen eigenen Benutzer-Stack hinzufügen.
+Agenten (Claude-Abos) verwaltest du unter **Mein Konto → Claude-Abos**
+(`/account/agents`); alle Nutzenden können eigene hinzufügen. Siehe
+[Agenten](AGENTS.md).
 
-Um ein *Ziel*-Repository auf Argos zuzuschneiden — eine eigene Build-Umgebung
-(`.argos/worker.dockerfile`) oder einen Live-Demo-Vertrag (`.argos/demo.*`) —
-siehe [PREPARE-PROJECT.md](PREPARE-PROJECT.md).
+Um ein Repository auf Argos zuzuschneiden — Einrichtungsschritte
+(`.argos/setup.sh`), ein eigenes Image (`.argos/worker.dockerfile`) oder einen
+Preview-Vertrag (`.argos/demo.*`) — siehe
+[Ein Repository vorbereiten](PREPARE-PROJECT.md).
+
+## Nutzende und Admins
+
+Das bei der Installation angelegte Admin-Konto hat die Rolle
+**Argos-Administrator**. Wer sie hat, verwaltet unter **Administration**
+(`/system`) Benutzerkonten, Access-Tokens, OAuth-Apps und API-Clients, sieht
+alle Agenten, legt Workspaces an und darf in jedem Workspace alles. Alle
+anderen arbeiten in den Workspaces, in denen sie Mitglied sind — als Admin,
+Mitglied oder Leser (siehe [Workspaces → Rollen](WORKSPACES.md#rollen)) — mit
+ihren eigenen Agenten. Die Administrator-Rolle lässt sich über die
+Kommandozeile wiederherstellen:
+
+```bash
+docker compose exec app php artisan argos:user:admin someone@example.com
+```
+
+Beim Upgrade erhält das erste bestehende Benutzerkonto die Administrator-Rolle.
+
+### Kolleg:innen hinzufügen
+
+Eine Selbstregistrierung gibt es nicht. So kommt jemand dazu:
+
+1. **Administration → Benutzer → Neu**: Name und E-Mail; das Passwort leer
+   lassen.
+2. Auf das **Schlüssel-Symbol** (*Zugangslink*) neben der Person klicken und
+   ihr die angezeigte Willkommensnachricht schicken (Chat oder Mail). Über den
+   Link setzt sie ihr Passwort selbst; er funktioniert einmal und läuft nach
+   `ARGOS_ACCESS_LINK_HOURS` ab (Standard 72). Ein neuer Link macht den alten
+   ungültig – so auch bei vergessenem Passwort: Argos verschickt Reset-Links
+   nur, wenn Mail eingerichtet ist.
+3. Die Person als Mitglied zu einem Workspace hinzufügen (**Workspace →
+   Einstellungen → Mitglieder**).
+
+Beim ersten Anmelden führt *Meine Arbeit* durch den Rest: Claude-Abo
+hinterlegen und eine Aufgabe starten.
+
+## Workspaces
+
+[Workspaces](WORKSPACES.md) brauchen zusätzlich zum oben beschriebenen Stack:
+
+- den Dienst `reverb` (Live-Updates; Teil der Compose-Datei),
+- das Docker-Netz `argos_ws` (legt Compose an) — Workspace-Container, Manager,
+  nginx und Traefik teilen es; db und Redis nicht,
+- Wildcard-DNS für `code-<workspace>.<base-domain>` und
+  `demo-<workspace>-<task>.<base-domain>` (dieselbe Basisdomain wie die
+  Previews).
+
+Der erste Start eines Workspaces baut sein Image (Worker-Image +
+Workspace-Daemon + VS Code); das dauert einige Minuten.
 
 ## Vorbelegen des Claude-Tokens
 
 Der Token liegt **pro Agent in der Datenbank**. Der normale Weg ist der
-Onboarding-Schritt in der App oder **Worker → Agent Credentials** im Admin —
+Onboarding-Schritt in der App oder **Mein Konto → Claude-Abos** —
 eine DB-Zugangsinformation gewinnt immer (es gibt keinen
 `CLAUDE_CODE_OAUTH_TOKEN`-Env-Var-Pfad).
 
@@ -279,7 +358,7 @@ Team-Plan):
 claude setup-token
 ```
 
-Füge ihn in das Onboarding / die Agent Credentials ein. Tokens laufen nach einigen
+Füge ihn in das Onboarding / unter Claude-Abos ein. Tokens laufen nach einigen
 Wochen ab — erneuere sie in der UI und führe `claude setup-token` erneut aus.
 
 Für ein unbeaufsichtigtes Local-Dev-Seeding kannst du stattdessen den rohen Token
@@ -298,15 +377,13 @@ und der Installer fasst es niemals an:
 ```bash
 mkdir -p /srv/argos
 curl -fsSL https://raw.githubusercontent.com/nodus-it/argos/master/.tools/install.sh \
-    | bash -s -- --dir /srv/argos
+    | bash -s -- --dir /srv/argos --url https://argos.example.com
 ```
 
 ```yaml
 # /srv/argos/docker-compose.override.yml
 services:
   app:
-    environment:
-      APP_URL: https://argos.example.com
     volumes:
       - /srv/argos-backups/data:/data
   db:
@@ -322,8 +399,6 @@ Das Override oben gibt dir:
 
 - **Bind-Mounts** statt benannter Volumes, sodass Backups und Snapshots mit
   deinem Host-Tooling erfolgen
-- `APP_URL`, damit OAuth-Callbacks hinter einem Reverse-Proxy korrekt aufgelöst
-  werden
 
 Der Installer hat bereits ein starkes `ADMIN_PASSWORD`, einen `APP_KEY` und
 DB-Passwörter in `/srv/argos/.env` generiert — verschiebe diese nicht in die
@@ -357,12 +432,19 @@ Hinweise:
 
 **Sicherung.** Der zu sichernde Zustand liegt in den benannten Volumes:
 
-- `argos-db` — die MariaDB-Datenbank (das primäre Backup-Ziel)
+- `argos-db` — die MariaDB-Datenbank (das primäre Backup-Ziel). Erstelle einen
+  logischen Dump, statt die laufenden Dateien zu kopieren:
+  `docker compose exec db mariadb-dump --single-transaction -uargos -p argos > argos.sql`
 - `argos-data` — persistierter App-Zustand (`APP_KEY`-Fallback,
-  Passport-Schlüssel, `ARGOS_CONFIG_DIR`)
+  Passport-Schlüssel, `ARGOS_CONFIG_DIR`) und Uploads (Avatare, an Nachrichten
+  angehängte Bilder, unter `/data/files`)
+- `ws_<slug>` und `ws_<slug>_agents` — ein Paar pro Workspace: der Clone mit
+  den Arbeitskopien aller Aufgaben (uncommittete Arbeit, Backup-Referenzen) und
+  Claudes Session-Zustand. Gepushte Arbeit liegt sicher beim Git-Host; sichere
+  diese Volumes, wenn laufende Arbeit wichtig ist.
 
 Verwende Bind-Mounts (siehe
-[Produktionsnahe Installation](#production-style-install)), um diese mit deinem
+[Produktionsnahe Installation](#produktionsnahe-installation)), um diese mit deinem
 Host-Tooling zu sichern, oder snapshotte die Volumes direkt. Die generierte
 `.env` (Modus `600`) enthält deine Secrets — sichere sie ebenfalls, da `APP_KEY`
 benötigt wird, um gespeicherte Zugangsdaten zu entschlüsseln.
@@ -386,10 +468,10 @@ dieses Stacks deklariert sind — niemals unbeteiligte Compose-Projekte.
 ## Umgebungsvariablen
 
 Siehe die [Konfigurationsreferenz](CONFIGURATION.md) für jede Variable, die Argos
-liest, mit Standardwerten. Die Schlüssel, die die meisten Betreiber setzen:
+liest, mit Standardwerten. Die Schlüssel, die in den meisten Installationen gesetzt werden:
 
 - `APP_URL` — öffentliche URL (Host + Schema), siehe
-  [Reverse-Proxy und APP_URL](#reverse-proxy-and-app_url)
+  [Reverse-Proxy und APP_URL](#reverse-proxy-und-app-url)
 - `ARGOS_PORT` — Host-Port für den Stack (Standard `8080`)
 - `ARGOS_APP_IMAGE` — das Manager-Image-Tag (durch die Kanal-Flags gesetzt)
 - `ADMIN_PASSWORD`, `APP_KEY`, `ARGOS_DB_PASSWORD`, `ARGOS_DB_ROOT_PASSWORD` —

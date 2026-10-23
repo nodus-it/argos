@@ -6,7 +6,7 @@ namespace Tests\Unit\Services\GitProvider;
 
 use App\Integrations\GitLab\Requests\CommentOnMergeRequest;
 use App\Integrations\GitLab\Requests\CreateMergeRequest;
-use App\Integrations\GitLab\Requests\UpdateMergeRequest;
+use App\Integrations\GitLab\Requests\FindOpenMergeRequest;
 use App\Services\GitProvider\GitLabGitService;
 use Saloon\Http\Faking\MockResponse;
 use Saloon\Http\Request;
@@ -219,22 +219,16 @@ class GitLabGitServiceTest extends TestCase
         });
     }
 
-    public function test_update_pull_request_puts_title_and_description(): void
+    public function test_find_open_pull_request_looks_up_the_branch(): void
     {
-        Saloon::fake([
-            'https://gitlab.com/api/v4/projects/acme%2Fwidget/merge_requests/7' => MockResponse::make(['iid' => 7]),
-        ]);
+        Saloon::fake([FindOpenMergeRequest::class => MockResponse::make([['iid' => 7, 'web_url' => 'https://gitlab.com/acme/widget/-/merge_requests/7', 'state' => 'opened']])]);
 
-        (new GitLabGitService('tok'))->updatePullRequest('acme', 'widget', 7, 'new title', 'new body');
+        $found = (new GitLabGitService('tok'))->findOpenPullRequest('acme', 'widget', 'argos/login');
 
-        Saloon::assertSent(function (Request $request, $response): bool {
-            $body = $request instanceof UpdateMergeRequest ? $request->body()->all() : [];
+        $this->assertSame(7, $found['iid'] ?? null);
+        Saloon::assertSent(fn (Request $request): bool => $request instanceof FindOpenMergeRequest && $request->query()->all() === ['source_branch' => 'argos/login', 'state' => 'opened', 'per_page' => 1]);
 
-            return $request instanceof UpdateMergeRequest
-                && $response->getPendingRequest()->getMethod()->value === 'PUT'
-                && str_contains($request->resolveEndpoint(), '/merge_requests/7')
-                && ($body['title'] ?? null) === 'new title'
-                && ($body['description'] ?? null) === 'new body';
-        });
+        Saloon::fake([FindOpenMergeRequest::class => MockResponse::make([])]);
+        $this->assertNull((new GitLabGitService('tok'))->findOpenPullRequest('acme', 'widget', 'argos/login'));
     }
 }

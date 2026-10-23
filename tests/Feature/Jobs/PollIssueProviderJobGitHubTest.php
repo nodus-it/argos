@@ -17,10 +17,12 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Saloon\Http\Faking\MockResponse;
 use Saloon\Http\Request;
 use Saloon\Laravel\Facades\Saloon;
+use Tests\Support\LaunchesIssueRuns;
 use Tests\TestCase;
 
 class PollIssueProviderJobGitHubTest extends TestCase
 {
+    use LaunchesIssueRuns;
     use RefreshDatabase;
 
     private TaskProviderBinding $binding;
@@ -36,6 +38,7 @@ class PollIssueProviderJobGitHubTest extends TestCase
             'external_project_ref' => 'acme/widget',
             'filters' => null,
         ]);
+        $this->prepareIssueRuns($this->binding->workspace);
     }
 
     private function fakeIssuesEndpoint(array $issues): void
@@ -47,7 +50,7 @@ class PollIssueProviderJobGitHubTest extends TestCase
 
     // ── happy path ───────────────────────────────────────────────────────────
 
-    public function test_poll_creates_tasks_for_matching_issues(): void
+    public function test_poll_launches_tasks_for_matching_issues(): void
     {
         $this->fakeIssuesEndpoint([
             ['id' => 1, 'title' => 'First issue', 'body' => 'body', 'state' => 'open', 'labels' => [], 'html_url' => 'https://github.com/acme/widget/issues/1'],
