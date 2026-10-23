@@ -203,12 +203,14 @@ auf Manager-Seite (er braucht den Docker-Socket).
 ### Build des Runtime-Images
 
 Liefert ein Repo **keinen** Demo-Vertrag mit, nutzt Argos ein eingebautes
-Laravel-Runtime-Image, das einmal gebaut und per Inhalts-Hash gecacht wird
-(neu gebaut nur, wenn sich das Rezept ändert). Beim Booten von
-`argos:warm-demo-image` vorgewärmt, sonst bei Bedarf gebaut:
+Laravel-Runtime-Image, das einmal pro PHP-Version gebaut und per Inhalts-Hash
+gecacht wird (neu gebaut nur, wenn sich das Rezept ändert). Die PHP-Version
+folgt dem eingebauten Stack des Workspaces (PHP 8.5 oder 8.4; eigene Images und
+Node erhalten die Version des Standard-Stacks). Die Standard-Version wird beim
+Booten von `argos:warm-demo-image` vorgewärmt, andere werden bei Bedarf gebaut:
 
 ```
-docker build -t argos-demo:<8-hex-hash> -f .tools/docker/demo/Dockerfile <repo root>
+docker build -t argos-demo:<php>-<8-hex-hash> --build-arg PHP_VERSION=<php> -f .tools/docker/demo/Dockerfile <repo root>
 ```
 
 Ein Repo, das seine eigene `.argos/demo.compose.yml` mitliefert, bringt sein

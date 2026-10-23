@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Demo;
 
+use App\Models\Workspace;
 use RuntimeException;
 use Symfony\Component\Process\Process;
 
@@ -11,8 +12,8 @@ use Symfony\Component\Process\Process;
  * Builds (and caches) the built-in default demo runtime image used when a repo
  * ships no .argos/demo.* contract.
  *
- * Unlike the worker images there is no stack × agent matrix — one fixed image
- * from .tools/docker/demo/Dockerfile. The tag carries a content hash of the
+ * One recipe (.tools/docker/demo/Dockerfile), built per PHP version of the
+ * workspace's built-in stack (argos-demo:<php>-<8hex>). The hash covers the
  * Dockerfile and its bundled configs, so a recipe change yields a new tag and
  * the next deploy rebuilds; an unchanged recipe is a no-op (image already
  * present). Built on demand by DemoDeployer and warmed at boot via
@@ -38,27 +39,47 @@ class DemoImageBuilder
         '.tools/docker/demo/supervisord.conf',
     ];
 
-    /** Fully-qualified, content-hashed image tag (argos-demo:<8hex>). */
-    public function tag(): string
+    /** Fully-qualified, content-hashed image tag (argos-demo:<php>-<8hex>). */
+    public function tag(?string $phpVersion = null): string
     {
         $repository = (string) config('argos.preview.default_image', 'argos-demo');
 
-        return $repository.':'.$this->fingerprint();
+        return $repository.':'.($phpVersion ?? $this->defaultPhpVersion()).'-'.$this->fingerprint();
     }
 
     /**
      * Return the runtime image tag, building it first if it is not present in
      * the local Docker daemon. Idempotent.
      */
-    public function ensure(): string
+    public function ensure(?string $phpVersion = null): string
     {
-        $tag = $this->tag();
+        $phpVersion ??= $this->defaultPhpVersion();
+        $tag = $this->tag($phpVersion);
 
         if (! $this->imageExists($tag)) {
-            $this->build($tag);
+            $this->build($tag, $phpVersion);
         }
 
         return $tag;
+    }
+
+    /**
+     * The PHP version of the workspace's built-in stack (php-8.4 → 8.4). Own
+     * images and non-PHP stacks get the default stack's version.
+     */
+    public function phpVersionFor(?Workspace $workspace): string
+    {
+        return $this->versionOf((string) $workspace?->workerStack?->name) ?? $this->defaultPhpVersion();
+    }
+
+    private function defaultPhpVersion(): string
+    {
+        return $this->versionOf((string) config('argos.compose.default_stack')) ?? '8.5';
+    }
+
+    private function versionOf(string $stackName): ?string
+    {
+        return preg_match('/^php-(\d+\.\d+)$/', $stackName, $match) === 1 ? $match[1] : null;
     }
 
     public function imageExists(string $tag): bool
@@ -70,7 +91,7 @@ class DemoImageBuilder
         return $process->isSuccessful();
     }
 
-    private function build(string $tag): void
+    private function build(string $tag, string $phpVersion): void
     {
         $dockerfile = base_path(self::DOCKERFILE);
         if (! is_file($dockerfile)) {
@@ -80,6 +101,7 @@ class DemoImageBuilder
         $process = $this->newProcess([
             'docker', 'build',
             '-t', $tag,
+            '--build-arg', 'PHP_VERSION='.$phpVersion,
             '-f', $dockerfile,
             base_path(),
         ]);

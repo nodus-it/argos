@@ -142,7 +142,7 @@ Default-Branch):
 | `composer.json` | Stack PHP 8.5 — oder PHP 8.4, wenn die PHP-Constraint 8.4 festlegt, ohne 8.5 zu erlauben |
 | `package.json` ohne `composer.json` | Stack Node 22 |
 | `.argos/worker.dockerfile` | Das eigene Image des Repositorys |
-| `composer.json` + `artisan` (Laravel) | Einrichtungsschritte und Preview-Vertrag fallen auf die Laravel-Standards zurück |
+| `composer.json` + `artisan` (Laravel) | Einrichtungsschritte und Preview-Vertrag fallen auf die Laravel-Standards zurück — mit eigenem Image gilt der Preview-Vertrag als fehlend, da die Standard-Preview auf den PHP-Images von Argos läuft |
 
 Fehlt nichts, wird der Stand der Einrichtung *Eingerichtet* und der Workspace
 ist bereit. Fehlen der Stack, der Preview-Vertrag (`.argos/demo.yml`) oder die

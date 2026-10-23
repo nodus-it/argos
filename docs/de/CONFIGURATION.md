@@ -147,7 +147,7 @@ Traefik- + `argos_edge`-Preview-Infrastruktur).
 | `ARGOS_PREVIEW_CPU_LIMIT` | `1.0` | CPU-Limit pro Preview (getrennt von den Workspace-Limits). |
 | `ARGOS_PREVIEW_MEM_LIMIT` | `1g` | Speicherlimit pro Preview. |
 | `ARGOS_PREVIEW_NETWORK` | `argos_edge` | Externes Docker-Netzwerk, das mit Traefik geteilt wird (definiert in `docker-compose.yml`). |
-| `ARGOS_PREVIEW_DEFAULT_IMAGE` | `argos-demo` | Eingebaute Standard-Demo-Laufzeitumgebung (php-fpm + nginx + node), verwendet, wenn ein Repo keinen `.argos/demo.*`-Vertrag mitliefert. Ein Content-Hash wird angehängt (`argos-demo:<hash>`). |
+| `ARGOS_PREVIEW_DEFAULT_IMAGE` | `argos-demo` | Eingebaute Standard-Demo-Laufzeitumgebung (php-fpm + nginx + node), verwendet, wenn ein Repo keinen `.argos/demo.*`-Vertrag mitliefert. PHP-Version und Content-Hash werden angehängt (`argos-demo:8.5-<hash>`). |
 | `ARGOS_TRAEFIK_DIR` | `/data/traefik` | Geteiltes Volume, in das der Manager pro Demo eine Traefik-File-Provider-Route schreibt (Traefik mountet es read-only). |
 
 ## Workspaces

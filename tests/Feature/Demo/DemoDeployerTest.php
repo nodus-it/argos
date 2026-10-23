@@ -489,12 +489,12 @@ class FakeDemoDeployer extends DemoDeployer
 /** Stubs the runtime image so the default-contract path never touches Docker. */
 class FakeDemoImageBuilder extends DemoImageBuilder
 {
-    public function tag(): string
+    public function tag(?string $phpVersion = null): string
     {
         return 'argos-demo:testtag';
     }
 
-    public function ensure(): string
+    public function ensure(?string $phpVersion = null): string
     {
         return 'argos-demo:testtag';
     }
