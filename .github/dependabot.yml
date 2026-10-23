@@ -1,0 +1,40 @@
+# Updates target develop: security-update PRs would always hit master and bypass the
+# develop -> master release flow, so vulnerabilities surface as Dependabot alerts instead.
+version: 2
+updates:
+  - package-ecosystem: composer
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+    groups:
+      composer-minor-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+    groups:
+      npm-minor-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: docker
+    directories:
+      - /.tools/docker/app
+      - /.tools/docker/worker
+      - /.tools/docker/worker/stacks
+      - /.tools/docker/demo
+    target-branch: develop
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
