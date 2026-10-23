@@ -224,6 +224,7 @@ class DemoDeployerTest extends TestCase
         $this->assertSame(DemoStatus::Failed, $demo->status);
         $this->assertNull($demo->url);
         $this->assertStringContainsString('Demo command failed', $demo->build_log);
+        $this->assertStringContainsString('composer failed', $demo->build_log);
         // No route written for a failed demo.
         $this->assertFileDoesNotExist($this->traefikDir.'/demo-ws-feat2.yml');
     }
@@ -429,6 +430,21 @@ class DemoDeployerTest extends TestCase
         $this->assertStringStartsWith('first build', $demo->build_log);
         $this->assertStringContainsString('migrated', $demo->build_log);
         $this->assertSame(['docker', 'compose', '-p', 'demo-ws-login', 'exec', '-T', '--user', '1000:1000'], array_slice($deployer->invokedCommands[0], 0, 8));
+    }
+
+    public function test_a_failed_rerun_keeps_the_command_output(): void
+    {
+        $this->fakeContract();
+        $task = $this->task('rerun-fail');
+        Demo::factory()->create(['task_id' => $task->id, 'status' => DemoStatus::Live, 'build_log' => 'first build']);
+
+        $deployer = new FakeDemoDeployer(app(GitServiceFactory::class), new FakeDemoImageBuilder, [
+            ['cmd' => 'exec', 'exit' => 1, 'stderr' => "SQLSTATE[HY000] [2002] Connection refused\n"],
+        ]);
+        $demo = $deployer->rerunCommands($task);
+
+        $this->assertStringContainsString('Connection refused', $demo->build_log);
+        $this->assertStringContainsString('Demo command failed', $demo->build_log);
     }
 
     public function test_rerun_requires_a_live_demo(): void
