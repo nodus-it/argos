@@ -28,7 +28,7 @@ final class DemoComposeGuard
 
     private const TOP_LEVEL_KEYS = ['services', 'networks', 'volumes'];
 
-    private const PIDS_LIMIT = 512;
+    public const PIDS_LIMIT = 512;
 
     /** The checked compose file, hardened; throws with the reasons otherwise. */
     public function harden(string $composeYaml): string
