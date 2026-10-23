@@ -103,7 +103,7 @@ return [
 
     'done' => [
         'heading' => 'Argos ist startklar',
-        'description' => 'Dein erster Workspace steht. Argos prüft jetzt das Repository: Fehlen Preview-Vertrag, Setup-Befehle oder ein passender Stack, startet eine Einrichtungs-Aufgabe auf deinem Abo — öffne den Workspace, um sie zu verfolgen, und starte dann deine erste Aufgabe.',
+        'description' => 'Dein erster Workspace steht. Argos prüft jetzt das Repository: Fehlen Preview-Vertrag, Setup-Befehle oder ein passender Stack, startet eine Einrichtungs-Aufgabe auf deinem Abo — öffne den Workspace, um sie zu verfolgen, und starte dann deine erste Aufgabe. Ein Laravel-Repository läuft stattdessen mit dem eingebauten Standard; braucht es mehr, nutze „Einrichtung überarbeiten“ in den Workspace-Einstellungen.',
         'create_workspace' => 'Ersten Workspace öffnen',
         'view_project' => 'Workspace-Einstellungen',
     ],

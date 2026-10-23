@@ -830,6 +830,8 @@ return [
         'rebuild_queued' => 'The image is being rebuilt; the workspace uses it from its next start.',
         'revise' => 'Revise setup',
         'open_task' => 'Open the setup task',
+        'defaults_title' => ':workspace runs on the Laravel defaults',
+        'defaults_body' => 'The repository brings no setup of its own, so the built-in Laravel preview and setup steps apply. If the project needs more (another database, Redis, built assets, keys), let Claude write it with "Revise setup".',
         'banner' => 'This task sets up the workspace. When Claude is done, press "Test setup".',
     ],
     'api' => [

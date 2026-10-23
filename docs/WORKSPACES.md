@@ -141,6 +141,11 @@ the creating admin's subscription, in which Claude writes them — see
 Without a usable Claude subscription the status is *Needs a Claude
 subscription*; add one and choose **Revise setup** in the settings.
 
+A Laravel repository without `.argos/setup.sh` or `.argos/demo.yml` starts no
+setup task — the defaults cover it. The creating admin gets a notification in
+the bell instead: when the project needs more than the defaults (another
+database, Redis, built assets, keys), **Revise setup** lets Claude write it.
+
 ## Settings
 
 Workspace admins (and Argos administrators) open **Workspace settings** from

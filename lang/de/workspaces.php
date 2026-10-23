@@ -830,6 +830,8 @@ return [
         'rebuild_queued' => 'Das Image wird neu gebaut; der Workspace nutzt es ab dem nächsten Start.',
         'revise' => 'Einrichtung überarbeiten',
         'open_task' => 'Einrichtungs-Aufgabe öffnen',
+        'defaults_title' => ':workspace läuft mit dem Laravel-Standard',
+        'defaults_body' => 'Das Repository bringt keine eigene Einrichtung mit, daher gelten die eingebaute Laravel-Preview und die Standard-Setup-Befehle. Braucht das Projekt mehr (andere Datenbank, Redis, gebaute Assets, Schlüssel), lass Claude sie über „Einrichtung überarbeiten“ schreiben.',
         'banner' => 'Diese Aufgabe richtet den Workspace ein. Wenn Claude fertig ist, „Einrichtung testen“ drücken.',
     ],
     'api' => [
