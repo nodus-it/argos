@@ -82,6 +82,7 @@ return [
         'show_less' => 'Weniger anzeigen',
         'generated' => '{1} + :count generierte Datei (:files)|[0,*] + :count generierte Dateien (:files)',
         'review_mode' => 'Review-Modus',
+        'close_context' => 'Seitenleiste schließen',
         'close_review' => 'Review schließen',
         'more' => 'Weitere Aktionen',
         'context' => 'Kontext',
