@@ -82,6 +82,7 @@ return [
         'show_less' => 'Show fewer',
         'generated' => '{1} + :count generated file (:files)|[0,*] + :count generated files (:files)',
         'review_mode' => 'Review mode',
+        'close_context' => 'Close sidebar',
         'close_review' => 'Close review',
         'more' => 'More actions',
         'context' => 'Context',

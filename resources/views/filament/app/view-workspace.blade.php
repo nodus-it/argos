@@ -126,7 +126,9 @@
         @livewire('workspace.task-chat', ['workspaceId' => $workspace->id], key('chat-'.$workspace->id))
     </div>
 
+    <div class="ag-drawer-backdrop" x-show="drawer" x-cloak x-on:click="drawer = false" aria-hidden="true"></div>
     <aside class="ag-context" aria-label="{{ __('workspaces.focus.context') }}">
+        <button type="button" class="ag-icon-btn ag-drawer-close" x-on:click="drawer = false" aria-label="{{ __('workspaces.focus.close_context') }}" title="{{ __('workspaces.focus.close_context') }}"><x-ag.icon name="x" :size="18" :stroke="2" /></button>
         <div x-show="!review">
             @livewire('workspace.context-panel', ['workspaceId' => $workspace->id], key('context-'.$workspace->id))
         </div>
