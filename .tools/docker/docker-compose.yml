@@ -69,9 +69,8 @@ x-workspace-env: &workspace-env
 # Only ARGOS_PREVIEW_ENABLED is a real operator switch; everything else is
 # forwarded empty so the defaults in config/argos.php apply. In particular the
 # base domain + scheme derive from APP_URL there — set them only for a demo
-# domain that differs from the app domain. Session-protected demos rely on the
-# APP_URL-derived cookie domain (config/session.php), so the login cookie spans
-# the demo subdomains automatically.
+# domain that differs from the app domain. The Argos session cookie stays
+# host-only; previews and editors get their own access cookie.
 x-preview-env: &preview-env
   ARGOS_PREVIEW_ENABLED:        "${ARGOS_PREVIEW_ENABLED:-false}"
   ARGOS_PORT:                   "${ARGOS_PORT:-8080}"

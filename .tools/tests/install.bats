@@ -348,3 +348,142 @@ EOF
 
     popd >/dev/null
 }
+
+# ── apply_access_settings ───────────────────────────────────────────────────
+
+@test "apply_access_settings writes APP_URL without trailing slash and ARGOS_PORT" {
+    ENV_FILE="$TEST_DIR/.env"
+    printf 'APP_URL=\nARGOS_PORT=8080\n' > "$ENV_FILE"
+    APP_URL_INPUT="https://argos.example.com/"
+    PORT_INPUT="9090"
+
+    apply_access_settings >/dev/null
+
+    [ "$(get_env_value "$ENV_FILE" APP_URL)" = "https://argos.example.com" ]
+    [ "$(get_env_value "$ENV_FILE" ARGOS_PORT)" = "9090" ]
+}
+
+@test "apply_access_settings leaves .env alone without --url / --port" {
+    ENV_FILE="$TEST_DIR/.env"
+    printf 'APP_URL=https://kept.example\nARGOS_PORT=8181\n' > "$ENV_FILE"
+    APP_URL_INPUT=""
+    PORT_INPUT=""
+
+    apply_access_settings >/dev/null
+
+    [ "$(get_env_value "$ENV_FILE" APP_URL)" = "https://kept.example" ]
+    [ "$(get_env_value "$ENV_FILE" ARGOS_PORT)" = "8181" ]
+}
+
+@test "apply_access_settings rejects a port outside 1-65535" {
+    ENV_FILE="$TEST_DIR/.env"
+    printf 'ARGOS_PORT=8080\n' > "$ENV_FILE"
+    APP_URL_INPUT=""
+    PORT_INPUT="70000"
+
+    run apply_access_settings
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Invalid --port"* ]]
+    [ "$(get_env_value "$ENV_FILE" ARGOS_PORT)" = "8080" ]
+}
+
+@test "apply_access_settings rejects a URL without scheme" {
+    ENV_FILE="$TEST_DIR/.env"
+    printf 'APP_URL=\n' > "$ENV_FILE"
+    APP_URL_INPUT="argos.example.com"
+    PORT_INPUT=""
+
+    run apply_access_settings
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Invalid --url"* ]]
+}
+
+# ── ensure_port_free ────────────────────────────────────────────────────────
+
+@test "ensure_port_free fails with a --port hint when the port is taken" {
+    ENV_FILE="$TEST_DIR/.env"
+    printf 'ARGOS_PORT=8181\n' > "$ENV_FILE"
+    port_in_use() { [ "$1" = "8181" ]; }
+
+    run ensure_port_free
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Port 8181 is already in use"* ]]
+    [[ "$output" == *"--port"* ]]
+}
+
+@test "ensure_port_free falls back to 8080 and passes when it is free" {
+    ENV_FILE="$TEST_DIR/.env"
+    printf 'ARGOS_PORT=\n' > "$ENV_FILE"
+    port_in_use() { [ "$1" != "8080" ]; }
+
+    run ensure_port_free
+    [ "$status" -eq 0 ]
+}
+
+# ── wait_for_app ────────────────────────────────────────────────────────────
+
+@test "wait_for_app returns 0 once the app container reports healthy" {
+    WAIT_SECONDS=10
+    WAIT_INTERVAL=0
+    export CALLS_FILE="$TEST_DIR/calls"
+    echo 0 > "$CALLS_FILE"
+    docker() {
+        case "$1" in
+            compose) echo "cid123";;
+            inspect)
+                local n; n=$(( $(cat "$CALLS_FILE") + 1 )); echo "$n" > "$CALLS_FILE"
+                if (( n < 3 )); then echo starting; else echo healthy; fi;;
+        esac
+    }
+
+    run wait_for_app
+    [ "$status" -eq 0 ]
+    [ "$(cat "$CALLS_FILE")" = "3" ]
+}
+
+@test "wait_for_app stops early and points at the logs when the app is unhealthy" {
+    WAIT_SECONDS=10
+    WAIT_INTERVAL=0
+    docker() {
+        case "$1" in
+            compose) echo "cid123";;
+            inspect) echo unhealthy;;
+        esac
+    }
+
+    run wait_for_app
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"status: unhealthy"* ]]
+    [[ "$output" == *"logs -f app"* ]]
+}
+
+@test "wait_for_app gives up after WAIT_SECONDS" {
+    WAIT_SECONDS=2
+    WAIT_INTERVAL=1
+    sleep() { :; }
+    docker() {
+        case "$1" in
+            compose) echo "cid123";;
+            inspect) echo starting;;
+        esac
+    }
+
+    run wait_for_app
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"status: starting"* ]]
+}
+
+# ── update_command ──────────────────────────────────────────────────────────
+
+@test "update_command rebuilds a curl one-liner for the chosen channel" {
+    ARGOS_REPO="nodus-it/argos"
+    INSTALL_DIR="/opt/argos"
+    BETA=0; STAGE=0; NEXT=1
+
+    run update_command
+    [ "$output" = "curl -fsSL https://raw.githubusercontent.com/nodus-it/argos/next/.tools/install.sh | bash -s -- --dir /opt/argos --next" ]
+
+    NEXT=0
+    run update_command
+    [ "$output" = "curl -fsSL https://raw.githubusercontent.com/nodus-it/argos/master/.tools/install.sh | bash -s -- --dir /opt/argos" ]
+}

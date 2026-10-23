@@ -72,8 +72,15 @@ curl -fsSL https://raw.githubusercontent.com/nodus-it/argos/master/.tools/instal
     | bash -s -- --dir /opt/argos
 ```
 
-Nach Abschluss gibt der Installer eine Zusammenfassung mit der URL, der
-Admin-Anmeldung und dem generierten Admin-Passwort aus.
+Der Installer wartet, bis die App als healthy gemeldet wird (der erste Start
+führt die Migrationen aus), und gibt dann eine Zusammenfassung mit der URL, der
+Admin-Anmeldung und dem generierten Admin-Passwort aus. Hinter einem
+TLS-Proxy übergibst du die öffentliche URL und den Host-Port gleich mit:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/nodus-it/argos/master/.tools/install.sh \
+    | bash -s -- --dir /opt/argos --url https://argos.example.com --port 8080
+```
 
 Installer-Flags (nach `bash -s --` anhängen oder die Umgebungsvariable setzen):
 
@@ -81,12 +88,15 @@ Installer-Flags (nach `bash -s --` anhängen oder die Umgebungsvariable setzen):
 |---|---|---|
 | `--dir PATH` | `ARGOS_INSTALL_DIR` | Installiert nach `PATH` statt nach `$PWD` |
 | `--version REF` | `ARGOS_VERSION` | Heftet ein bestimmtes Git-Tag oder einen Branch an |
+| `--url URL` | `ARGOS_URL` | Öffentliche URL, wird als `APP_URL` in die `.env` geschrieben |
+| `--port PORT` | `ARGOS_PORT` | Host-Port des Stacks (Standard `8080`); eine frische Installation bricht früh ab, wenn er belegt ist |
 | `--stage` | `ARGOS_STAGE=1` | Verfolgt die rollierenden `:stage`-Images aus `develop` |
 | `--next` | `ARGOS_NEXT=1` | Verfolgt die rollierenden `:next`-Images aus dem Integrationsbranch `next` |
 | `--beta` | `ARGOS_BETA=1` | Installiert das neueste Release inklusive Pre-Releases |
 | `--reset` | — | Fährt den Stack herunter und löscht alle Daten (destruktiv) |
 | `--force` | — | Überspringt Sicherheitsabfragen (für `--reset` in nicht-interaktiven Shells erforderlich) |
 | `--help` | — | Zeigt alle Optionen an |
+| — | `ARGOS_WAIT_SECONDS` | Wie lange auf eine healthy App gewartet wird (Standard `300`) |
 
 Der Installer verweigert es, Dateien in ein nicht-leeres Verzeichnis zu legen,
 sofern du nicht `--force` übergibst. Bringe eigene Anpassungen in einer
@@ -216,14 +226,16 @@ HAProxy) und leitest an diesen Port weiter.
 Achte darauf:
 
 - **`APP_URL`** auf die öffentliche URL zu setzen (z. B.
-  `https://argos.example.com`). `APP_URL` ist die einzige Quelle der Wahrheit für
-  Host und Schema — OAuth-Callbacks, die Domain des Session-Cookies und
-  Live-Demo-Subdomains leiten sich alle davon ab.
+  `https://argos.example.com`), am einfachsten mit `--url` beim Installer.
+  `APP_URL` ist die einzige Quelle der Wahrheit für Host und Schema —
+  OAuth-Callbacks sowie die Preview- und Editor-Subdomains leiten sich davon ab.
 - `X-Forwarded-Proto: https` weiterzuleiten (sowie `X-Forwarded-For` /
-  `X-Forwarded-Host`). Argos und das mitgelieferte Traefik vertrauen
-  weitergeleiteten Headern von jedem vorgelagerten Proxy. Ohne
+  `X-Forwarded-Host`). Das mitgelieferte Traefik übernimmt diese Header nur von
+  `ARGOS_TRUSTED_PROXIES` (Standard: die privaten Adressbereiche). Ohne
   `X-Forwarded-Proto` werden Asset-URLs als `http://` gerendert und der Browser
   markiert Mixed Content.
+- WebSockets durchzulassen: Die Live-Ansicht einer Aufgabe verbindet sich mit
+  `/app/` auf dem Argos-Host und hält diese Verbindung offen.
 - Dieselbe `APP_URL` beim Registrieren von OAuth-Apps zu verwenden — die
   Redirect-URI muss übereinstimmen.
 
@@ -232,7 +244,11 @@ HAProxy-Snippet (in das *Advanced pass thru* des Argos-Backends einfügen):
 ```
 option forwardfor
 http-request set-header X-Forwarded-Proto https if { ssl_fc }
+timeout tunnel 1h
 ```
+
+Ohne `timeout tunnel` schließt HAProxy ruhende WebSockets nach seinem
+Server-Timeout, und die Live-Ansicht verbindet sich ständig neu.
 
 Setze `ARGOS_TRUSTED_PROXIES` auf die Adresse, von der dein Proxy verbindet
 (Traefik übernimmt `X-Forwarded-*`-Header nur von dort). Die Session-Variablen
@@ -361,15 +377,13 @@ und der Installer fasst es niemals an:
 ```bash
 mkdir -p /srv/argos
 curl -fsSL https://raw.githubusercontent.com/nodus-it/argos/master/.tools/install.sh \
-    | bash -s -- --dir /srv/argos
+    | bash -s -- --dir /srv/argos --url https://argos.example.com
 ```
 
 ```yaml
 # /srv/argos/docker-compose.override.yml
 services:
   app:
-    environment:
-      APP_URL: https://argos.example.com
     volumes:
       - /srv/argos-backups/data:/data
   db:
@@ -385,8 +399,6 @@ Das Override oben gibt dir:
 
 - **Bind-Mounts** statt benannter Volumes, sodass Backups und Snapshots mit
   deinem Host-Tooling erfolgen
-- `APP_URL`, damit OAuth-Callbacks hinter einem Reverse-Proxy korrekt aufgelöst
-  werden
 
 Der Installer hat bereits ein starkes `ADMIN_PASSWORD`, einen `APP_KEY` und
 DB-Passwörter in `/srv/argos/.env` generiert — verschiebe diese nicht in die

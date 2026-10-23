@@ -69,8 +69,15 @@ curl -fsSL https://raw.githubusercontent.com/nodus-it/argos/master/.tools/instal
     | bash -s -- --dir /opt/argos
 ```
 
-When it finishes, the installer prints a summary with the URL, the admin
-login, and the generated admin password.
+The installer waits until the app reports healthy (the first boot runs the
+migrations), then prints a summary with the URL, the admin login, and the
+generated admin password. Behind a TLS proxy, pass the public URL and the host
+port right away:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/nodus-it/argos/master/.tools/install.sh \
+    | bash -s -- --dir /opt/argos --url https://argos.example.com --port 8080
+```
 
 Installer flags (append after `bash -s --`, or set the env var):
 
@@ -78,12 +85,15 @@ Installer flags (append after `bash -s --`, or set the env var):
 |---|---|---|
 | `--dir PATH` | `ARGOS_INSTALL_DIR` | Install into `PATH` instead of `$PWD` |
 | `--version REF` | `ARGOS_VERSION` | Pin a specific Git tag or branch |
+| `--url URL` | `ARGOS_URL` | Public URL, written to `APP_URL` in `.env` |
+| `--port PORT` | `ARGOS_PORT` | Host port of the stack (default `8080`); a fresh install stops early when it is taken |
 | `--stage` | `ARGOS_STAGE=1` | Track the rolling `:stage` images from `develop` |
 | `--next` | `ARGOS_NEXT=1` | Track the rolling `:next` images from the `next` integration branch |
 | `--beta` | `ARGOS_BETA=1` | Install the latest release including pre-releases |
 | `--reset` | — | Tear down the stack and wipe all data (destructive) |
 | `--force` | — | Skip safety prompts (required for `--reset` in non-interactive shells) |
 | `--help` | — | Show all options |
+| — | `ARGOS_WAIT_SECONDS` | How long to wait for the app to become healthy (default `300`) |
 
 The installer refuses to drop files into a non-empty directory unless you pass
 `--force`. Layer your own customisations into a `docker-compose.override.yml`
@@ -203,14 +213,17 @@ your reverse proxy (Caddy, nginx, Traefik, HAProxy) and forward to that port.
 
 Make sure to:
 
-- Set **`APP_URL`** to the public URL (e.g. `https://argos.example.com`).
-  `APP_URL` is the single source of truth for host and scheme — OAuth
-  callbacks, the session-cookie domain, and live-demo subdomains all derive
-  from it.
+- Set **`APP_URL`** to the public URL (e.g. `https://argos.example.com`),
+  most easily with the installer's `--url`. `APP_URL` is the single source of
+  truth for host and scheme — OAuth callbacks and the preview and editor
+  subdomains derive from it.
 - Forward `X-Forwarded-Proto: https` (and `X-Forwarded-For` /
-  `X-Forwarded-Host`). Argos and the bundled Traefik trust forwarded headers
-  from any upstream proxy. Without `X-Forwarded-Proto`, asset URLs render as
-  `http://` and the browser flags mixed content.
+  `X-Forwarded-Host`). The bundled Traefik accepts these headers only from
+  `ARGOS_TRUSTED_PROXIES` (default: the private address ranges). Without
+  `X-Forwarded-Proto`, asset URLs render as `http://` and the browser flags
+  mixed content.
+- Let WebSockets through: the live task view connects to `/app/` on the Argos
+  host and keeps that connection open.
 - Use that same `APP_URL` when registering OAuth apps — the redirect URI must
   match.
 
@@ -219,7 +232,11 @@ HAProxy snippet (paste into the Argos backend's *Advanced pass thru*):
 ```
 option forwardfor
 http-request set-header X-Forwarded-Proto https if { ssl_fc }
+timeout tunnel 1h
 ```
+
+Without `timeout tunnel`, HAProxy closes idle WebSockets after its server
+timeout and the live view keeps reconnecting.
 
 Set `ARGOS_TRUSTED_PROXIES` to the address your proxy connects from (Traefik
 accepts its `X-Forwarded-*` headers only from there). The session variables
@@ -339,15 +356,13 @@ it:
 ```bash
 mkdir -p /srv/argos
 curl -fsSL https://raw.githubusercontent.com/nodus-it/argos/master/.tools/install.sh \
-    | bash -s -- --dir /srv/argos
+    | bash -s -- --dir /srv/argos --url https://argos.example.com
 ```
 
 ```yaml
 # /srv/argos/docker-compose.override.yml
 services:
   app:
-    environment:
-      APP_URL: https://argos.example.com
     volumes:
       - /srv/argos-backups/data:/data
   db:
@@ -363,7 +378,6 @@ The override above gives you:
 
 - **bind mounts** instead of named volumes, so backups and snapshots happen
   with your host tooling
-- `APP_URL` so OAuth callbacks resolve correctly behind a reverse proxy
 
 The installer already generated a strong `ADMIN_PASSWORD`, `APP_KEY`, and DB
 passwords in `/srv/argos/.env` — don't move those into the compose file (you'd
