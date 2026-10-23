@@ -58,4 +58,14 @@ class DemoComposeBuilderEnvTest extends TestCase
 
         $this->assertSame($hardened['services']['app']['pids_limit'], $limits['pids']);
     }
+
+    public function test_the_entry_service_stays_on_the_default_network(): void
+    {
+        $entry = ['service' => 'app', 'port' => 80, 'workspace_mount' => '/var/www/html'];
+        $networks = Yaml::parse(app(DemoComposeBuilder::class)
+            ->buildOverrideYaml(Task::factory()->create(), 'demo-x', $entry, 'http://demo-x.test:8080'))['services']['app']['networks'];
+
+        $this->assertArrayHasKey('default', $networks);
+        $this->assertSame(['demo-x'], $networks[config('argos.preview.network')]['aliases']);
+    }
 }

@@ -135,7 +135,7 @@ final class DemoComposeGuard
         }
         $names = array_is_list($networks) ? $networks : array_keys($networks);
         foreach ($names as $network) {
-            if (! in_array((string) $network, $declared, true)) {
+            if ((string) $network !== 'default' && ! in_array((string) $network, $declared, true)) {
                 $errors[] = "service `{$service}`: network `{$network}` must be declared under networks: (Argos adds argos_edge itself)";
             }
         }

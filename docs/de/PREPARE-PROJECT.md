@@ -310,8 +310,9 @@ für die Compose-Datei:
   Argos.
 - Für das mitgelieferte Runtime-Image nutze den Platzhalter
   `__ARGOS_DEMO_IMAGE__`; sonst gib dein Image an.
-- Leg deine Services in ein **privates** Netzwerk; Argos fügt dem
-  Entry-Service `argos_edge` hinzu.
+- Leg deine Services in ein **privates** Netzwerk oder lass `networks:` weg,
+  dann teilen sie das implizite Netz `default`. Argos fügt dem Entry-Service
+  `argos_edge` hinzu und lässt ihn in `default`.
 - Der Entry-Service liefert HTTP auf dem angegebenen `entry.port` aus.
 - Cache die Konfiguration **nicht** (`config:cache`) in den Boot-Befehlen —
   Laravel muss die Env-Variablen, die Argos injiziert, weiter lesen.
@@ -321,8 +322,8 @@ für die Compose-Datei:
   `networks`, `volumes`, `tmpfs`, `restart`, `expose`, `stop_grace_period`,
   `stop_signal`, `init`, `hostname`. Volumes müssen **benannte** Volumes
   sein, die unter `volumes:` deklariert sind (keine Host-Pfade, keine
-  Treiber-Optionen); Netzwerke müssen unter `networks:` deklariert sein (nicht
-  extern). `build`, `privileged`, Capabilities, Devices, `network_mode`, `pid`,
+  Treiber-Optionen); Netzwerke außer `default` müssen unter `networks:`
+  deklariert sein (nicht extern). `build`, `privileged`, Capabilities, Devices, `network_mode`, `pid`,
   `env_file` und `ports` werden mit klarer Meldung abgelehnt. Jeder Service
   läuft mit `no-new-privileges` und einem Prozesslimit.
 

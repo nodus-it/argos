@@ -39,6 +39,13 @@ class DemoComposeGuardTest extends TestCase
         $this->assertStringContainsString('no-new-privileges', (new DemoComposeGuard)->harden($yaml));
     }
 
+    public function test_the_implicit_default_network_needs_no_declaration(): void
+    {
+        $yaml = "services:\n  app:\n    image: x\n    networks: [default, backend]\nnetworks:\n  backend: {}\n";
+
+        $this->assertStringContainsString('no-new-privileges', (new DemoComposeGuard)->harden($yaml));
+    }
+
     /** @return array<string, array{string}> */
     public static function dangerous(): array
     {

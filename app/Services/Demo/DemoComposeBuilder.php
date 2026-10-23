@@ -86,7 +86,9 @@ class DemoComposeBuilder
                             'volume' => $target->workspaceSubpath() !== null ? ['subpath' => $target->workspaceSubpath()] : null,
                         ]),
                     ],
+                    // Compose drops the implicit `default` network once a service lists any, so keep it explicitly.
                     'networks' => [
+                        'default' => null,
                         $network => [
                             'aliases' => [$slug],
                         ],
