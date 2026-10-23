@@ -103,7 +103,7 @@ return [
 
     'done' => [
         'heading' => 'Argos is ready',
-        'description' => 'Your first workspace exists. Argos is checking the repository now: if the preview contract, the setup steps or a fitting stack are missing, a setup task starts on your subscription — open the workspace to follow it, then start your first task.',
+        'description' => 'Your first workspace exists. Argos is checking the repository now: if the preview contract, the setup steps or a fitting stack are missing, a setup task starts on your subscription — open the workspace to follow it, then start your first task. A Laravel repository runs on the built-in defaults instead; if it needs more, use "Revise setup" in the workspace settings.',
         'create_workspace' => 'Open first workspace',
         'view_project' => 'Workspace settings',
     ],

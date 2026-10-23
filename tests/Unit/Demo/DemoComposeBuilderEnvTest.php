@@ -7,6 +7,7 @@ namespace Tests\Unit\Demo;
 use App\Models\Task;
 use App\Models\Workspace;
 use App\Services\Demo\DemoComposeBuilder;
+use App\Services\Demo\DemoComposeGuard;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Symfony\Component\Yaml\Yaml;
 use Tests\TestCase;
@@ -46,5 +47,15 @@ class DemoComposeBuilderEnvTest extends TestCase
             ->buildOverrideYaml(Task::factory()->create(), 'demo-x', $entry, 'http://demo-x.test:8080'))['services']['app']['environment'];
 
         $this->assertSame('argos', $env['ARGOS_FPM_USER']);
+    }
+
+    public function test_the_resource_limits_repeat_the_guards_process_limit(): void
+    {
+        $entry = ['service' => 'app', 'port' => 80, 'workspace_mount' => '/var/www/html'];
+        $limits = Yaml::parse(app(DemoComposeBuilder::class)
+            ->buildOverrideYaml(Task::factory()->create(), 'demo-x', $entry, 'http://demo-x.test:8080'))['services']['app']['deploy']['resources']['limits'];
+        $hardened = Yaml::parse(app(DemoComposeGuard::class)->harden("services:\n  app:\n    image: nginx\n"));
+
+        $this->assertSame($hardened['services']['app']['pids_limit'], $limits['pids']);
     }
 }

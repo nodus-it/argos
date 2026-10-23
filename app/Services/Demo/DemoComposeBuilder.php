@@ -96,6 +96,8 @@ class DemoComposeBuilder
                             'limits' => [
                                 'cpus' => (string) config('argos.preview.cpu_limit', '1.0'),
                                 'memory' => (string) config('argos.preview.memory_limit', '1g'),
+                                // Compose rejects a pids_limit (set by DemoComposeGuard) that differs from this.
+                                'pids' => DemoComposeGuard::PIDS_LIMIT,
                             ],
                         ],
                     ],

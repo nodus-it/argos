@@ -139,6 +139,26 @@ class WorkspaceSetupTest extends TestCase
         $this->assertSame(0, Task::query()->count());
     }
 
+    public function test_a_laravel_workspace_on_the_defaults_points_the_admin_at_revise_setup(): void
+    {
+        $this->files = ['composer.json' => '{}', 'artisan' => '<?php'];
+
+        $this->service()->afterCreate($this->workspace, $this->admin);
+
+        $notification = $this->admin->notifications()->sole();
+        $this->assertSame(__('workspaces.setup.defaults_title', ['workspace' => $this->workspace->name]), $notification->data['title']);
+        $this->assertStringEndsWith('/'.$this->workspace->slug.'/settings', $notification->data['actions'][0]['url']);
+    }
+
+    public function test_a_laravel_workspace_with_its_own_setup_gets_no_hint(): void
+    {
+        $this->files = ['composer.json' => '{}', 'artisan' => '<?php', '.argos/setup.sh' => 'true', '.argos/demo.yml' => 'entry: {}'];
+
+        $this->service()->afterCreate($this->workspace, $this->admin);
+
+        $this->assertSame(0, $this->admin->notifications()->count());
+    }
+
     public function test_a_repo_with_gaps_starts_the_setup_task_with_its_brief(): void
     {
         $this->files = ['package.json' => '{}'];

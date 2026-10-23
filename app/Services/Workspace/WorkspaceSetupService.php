@@ -28,6 +28,8 @@ use App\Services\GitProvider\GitServiceFactory;
 use App\Services\Worker\WorkerSidecarManager;
 use App\Workers\Compose\WorkerImageBuilder;
 use App\Workers\Compose\WorkerImageResolver;
+use Filament\Actions\Action;
+use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
@@ -145,6 +147,9 @@ class WorkspaceSetupService
         }
         if ($found['missing'] === []) {
             $workspace->forceFill(['setup_status' => WorkspaceSetupStatus::Ready])->save();
+            if (in_array('default', $this->sources($workspace), true)) {
+                $this->notifyLaravelDefaults($workspace, $admin);
+            }
 
             return null;
         }
@@ -160,6 +165,18 @@ class WorkspaceSetupService
 
             return $this->openTask($workspace);
         }
+    }
+
+    /** The Laravel defaults may not fit (other database, Redis, built assets): point at "Revise setup". */
+    private function notifyLaravelDefaults(Workspace $workspace, User $admin): void
+    {
+        $locale = $admin->locale ?: null;
+        Notification::make()
+            ->title(__('workspaces.setup.defaults_title', ['workspace' => $workspace->name], $locale))
+            ->body(__('workspaces.setup.defaults_body', [], $locale))
+            ->icon('heroicon-o-wrench-screwdriver')
+            ->actions([Action::make('settings')->label(__('workspaces.setup.revise', [], $locale))->url(route('filament.app.resources.workspaces.settings', ['record' => $workspace->slug]))])
+            ->sendToDatabase($admin);
     }
 
     /**

@@ -153,6 +153,12 @@ anlegt, in der Claude sie schreibt — siehe
 Ohne nutzbares Claude-Abo ist der Stand *Braucht ein Claude-Abo*; hinterlege
 eines und wähle in den Einstellungen **Einrichtung überarbeiten**.
 
+Ein Laravel-Repository ohne `.argos/setup.sh` oder `.argos/demo.yml` startet
+keine Einrichtungs-Aufgabe — die Standards decken es ab. Die Person (Admin), die
+den Workspace anlegt, bekommt stattdessen eine Benachrichtigung in der Glocke:
+Braucht das Projekt mehr als die Standards (andere Datenbank, Redis, gebaute
+Assets, Schlüssel), lässt **Einrichtung überarbeiten** Claude es schreiben.
+
 ## Einstellungen
 
 Workspace-Admins (und Argos-Admins) öffnen die **Workspace-Einstellungen** über
