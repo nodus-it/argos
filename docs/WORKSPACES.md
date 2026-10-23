@@ -131,7 +131,7 @@ Right after creation Argos **inspects the repository** (at its default branch):
 | `composer.json` | Stack PHP 8.5 — or PHP 8.4 when the PHP constraint pins 8.4 without allowing 8.5 |
 | `package.json` without `composer.json` | Stack Node 22 |
 | `.argos/worker.dockerfile` | The repository's own image |
-| `composer.json` + `artisan` (Laravel) | Setup steps and preview contract fall back to the Laravel defaults |
+| `composer.json` + `artisan` (Laravel) | Setup steps and preview contract fall back to the Laravel defaults — with an own image the preview contract counts as missing, since the default preview runs on Argos' PHP images |
 
 When nothing is missing, the setup status becomes *Set up* and the workspace
 is ready. When the stack, the preview contract (`.argos/demo.yml`) or the

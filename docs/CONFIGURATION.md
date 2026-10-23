@@ -142,7 +142,7 @@ this host (and the Traefik + `argos_edge` preview infra).
 | `ARGOS_PREVIEW_CPU_LIMIT` | `1.0` | Per-preview CPU limit (separate from the workspace limits). |
 | `ARGOS_PREVIEW_MEM_LIMIT` | `1g` | Per-preview memory limit. |
 | `ARGOS_PREVIEW_NETWORK` | `argos_edge` | External Docker network shared with Traefik (defined in `docker-compose.yml`). |
-| `ARGOS_PREVIEW_DEFAULT_IMAGE` | `argos-demo` | Built-in default demo runtime (php-fpm + nginx + node), used when a repo ships no `.argos/demo.*` contract. A content hash is appended (`argos-demo:<hash>`). |
+| `ARGOS_PREVIEW_DEFAULT_IMAGE` | `argos-demo` | Built-in default demo runtime (php-fpm + nginx + node), used when a repo ships no `.argos/demo.*` contract. The PHP version and a content hash are appended (`argos-demo:8.5-<hash>`). |
 | `ARGOS_TRAEFIK_DIR` | `/data/traefik` | Shared volume where the manager writes one Traefik file-provider route per demo (Traefik mounts it read-only). |
 
 ## Workspaces

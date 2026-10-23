@@ -8,7 +8,9 @@
 #
 # nginx serves /var/www/html/public and proxies *.php to php-fpm on 127.0.0.1:9000.
 # The workspace volume is mounted at /var/www/html by the deployer's override.
-FROM php:8.4-fpm-bookworm
+# PHP_VERSION follows the workspace's built-in stack (DemoImageBuilder).
+ARG PHP_VERSION=8.5
+FROM php:${PHP_VERSION}-fpm-bookworm
 
 # System packages: nginx (web server), supervisor (runs fpm+nginx in one
 # container), git + unzip for composer, plus the libs the PHP extensions need.

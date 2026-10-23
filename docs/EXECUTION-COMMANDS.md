@@ -191,11 +191,14 @@ a Traefik file-provider route. Manager-side only (it needs the Docker socket).
 ### Runtime image build
 
 When a repo ships **no** demo contract, Argos uses a built-in Laravel runtime
-image, built once and content-hash cached (rebuilt only when the recipe
-changes). Warmed at boot by `argos:warm-demo-image`, otherwise built on demand:
+image, built once per PHP version and content-hash cached (rebuilt only when
+the recipe changes). The PHP version follows the workspace's built-in stack
+(PHP 8.5 or 8.4; own images and Node get the default stack's version). The
+default version is warmed at boot by `argos:warm-demo-image`, others are built
+on demand:
 
 ```
-docker build -t argos-demo:<8-hex-hash> -f .tools/docker/demo/Dockerfile <repo root>
+docker build -t argos-demo:<php>-<8-hex-hash> --build-arg PHP_VERSION=<php> -f .tools/docker/demo/Dockerfile <repo root>
 ```
 
 A repo that ships its own `.argos/demo.compose.yml` provides its own image and

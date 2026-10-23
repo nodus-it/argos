@@ -78,7 +78,8 @@ class DemoDeployer
             // settings/commands. Contracts that ship their own image simply
             // omit the token, so this is a no-op for them.
             if (str_contains($composeYaml, self::DEMO_IMAGE_PLACEHOLDER)) {
-                $composeYaml = str_replace(self::DEMO_IMAGE_PLACEHOLDER, $this->imageBuilder->ensure(), $composeYaml);
+                $image = $this->imageBuilder->ensure($this->imageBuilder->phpVersionFor($workspace));
+                $composeYaml = str_replace(self::DEMO_IMAGE_PLACEHOLDER, $image, $composeYaml);
             }
 
             // Repository content, started over the host's Docker socket: only a

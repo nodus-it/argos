@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Demo;
 
+use App\Models\WorkerStack;
+use App\Models\Workspace;
 use App\Services\Demo\DemoImageBuilder;
 use RuntimeException;
 use Symfony\Component\Process\Process;
@@ -15,9 +17,22 @@ class DemoImageBuilderTest extends TestCase
     {
         config()->set('argos.preview.default_image', 'argos-demo');
 
-        $tag = app(DemoImageBuilder::class)->tag();
+        config()->set('argos.compose.default_stack', 'php-8.5');
 
-        $this->assertMatchesRegularExpression('/^argos-demo:[a-f0-9]{8}$/', $tag);
+        $this->assertMatchesRegularExpression('/^argos-demo:8\.5-[a-f0-9]{8}$/', app(DemoImageBuilder::class)->tag());
+        $this->assertMatchesRegularExpression('/^argos-demo:8\.4-[a-f0-9]{8}$/', app(DemoImageBuilder::class)->tag('8.4'));
+    }
+
+    public function test_php_version_follows_the_workspace_stack(): void
+    {
+        config()->set('argos.compose.default_stack', 'php-8.5');
+        $builder = app(DemoImageBuilder::class);
+        $workspace = fn (?string $stack): Workspace => (new Workspace)->setRelation('workerStack', $stack === null ? null : new WorkerStack(['name' => $stack]));
+
+        $this->assertSame('8.4', $builder->phpVersionFor($workspace('php-8.4')));
+        $this->assertSame('8.5', $builder->phpVersionFor($workspace('node-22')));
+        $this->assertSame('8.5', $builder->phpVersionFor($workspace(null)));
+        $this->assertSame('8.5', $builder->phpVersionFor(null));
     }
 
     public function test_tag_honours_configured_repository_name(): void
@@ -34,10 +49,11 @@ class DemoImageBuilderTest extends TestCase
             ['cmd' => 'build', 'exit' => 0],           // build succeeds
         ]);
 
-        $tag = $builder->ensure();
+        $tag = $builder->ensure('8.4');
 
-        $this->assertMatchesRegularExpression('/^argos-demo:[a-f0-9]{8}$/', $tag);
+        $this->assertMatchesRegularExpression('/^argos-demo:8\.4-[a-f0-9]{8}$/', $tag);
         $this->assertContains('build', array_column($builder->invoked, 'verb'));
+        $this->assertContains('PHP_VERSION=8.4', $builder->buildCommand);
     }
 
     public function test_ensure_skips_build_when_image_present(): void
@@ -71,6 +87,9 @@ class ScriptedDemoImageBuilder extends DemoImageBuilder
     /** @var list<array{verb: string}> */
     public array $invoked = [];
 
+    /** @var list<string> */
+    public array $buildCommand = [];
+
     /** @param  list<array{cmd: string, exit: int, stderr?: string}>  $script */
     public function __construct(array $script)
     {
@@ -80,6 +99,9 @@ class ScriptedDemoImageBuilder extends DemoImageBuilder
     protected function newProcess(array $cmd): Process
     {
         $this->invoked[] = ['verb' => in_array('build', $cmd, true) ? 'build' : 'inspect'];
+        if (in_array('build', $cmd, true)) {
+            $this->buildCommand = $cmd;
+        }
 
         $next = array_shift($this->script) ?? ['cmd' => '', 'exit' => 0];
 

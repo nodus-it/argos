@@ -99,6 +99,14 @@ class WorkspaceSetupTest extends TestCase
         $this->assertSame(['project' => 'laravel', 'stack' => 'php-8.5', 'missing' => []], $this->service()->inspect($this->workspace));
     }
 
+    public function test_a_laravel_repo_with_its_own_image_needs_a_preview(): void
+    {
+        $this->files = ['composer.json' => '{}', 'artisan' => '<?php', '.argos/worker.dockerfile' => "FROM debian:bookworm\n"];
+
+        $this->assertSame(['project' => 'laravel', 'stack' => null, 'missing' => ['preview']], $this->service()->inspect($this->workspace));
+        $this->assertSame('missing', $this->service()->sources($this->workspace)['preview']);
+    }
+
     public function test_a_node_repo_needs_a_preview_and_setup_steps(): void
     {
         $this->files = ['package.json' => '{}'];

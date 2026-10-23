@@ -83,7 +83,8 @@ class WorkspaceSetupService
         if (! $ownImage && $stack === null) {
             $missing[] = 'stack';
         }
-        if (! $laravel && $file(DemoConfigLocator::SETTINGS_PATH) === null) {
+        // The bundled preview runs on our PHP images, which an own image may not match.
+        if ((! $laravel || $ownImage) && $file(DemoConfigLocator::SETTINGS_PATH) === null) {
             $missing[] = 'preview';
         }
         if (! $laravel && $file('.argos/setup.sh') === null) {
@@ -111,9 +112,10 @@ class WorkspaceSetupService
                 $service = $this->git->forWorkspace($workspace);
                 $file = fn (string $path): bool => $service->getFileContents($workspace->getOwnerRepo(), $path, $workspace->setupRef()) !== null;
                 $laravel = $file('artisan');
+                $bundledPreview = $laravel && ! $file('.argos/worker.dockerfile');
 
                 return [
-                    'preview' => $file(DemoConfigLocator::SETTINGS_PATH) ? 'repo' : ($laravel ? 'default' : 'missing'),
+                    'preview' => $file(DemoConfigLocator::SETTINGS_PATH) ? 'repo' : ($bundledPreview ? 'default' : 'missing'),
                     'setup' => $file('.argos/setup.sh') ? 'repo' : ($laravel ? 'default' : 'missing'),
                 ];
             } catch (Throwable) {
