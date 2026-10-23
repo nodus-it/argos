@@ -95,7 +95,7 @@ class DemoDeployer
 
             $log .= $this->enforceConcurrencyCap($target);
             $log .= $this->composeUp($project, $workDir);
-            $log .= $this->runCommands($project, $entry['service'], $settings['commands'] ?? [], $target->demoExecUser());
+            $this->runCommands($project, $entry['service'], $settings['commands'] ?? [], $target->demoExecUser(), $log);
             $log .= $this->probeHealth($project, $entry, $settings['health'] ?? null);
 
             $url = $router->writeRoute($slug, $entry['port']);
@@ -153,7 +153,7 @@ class DemoDeployer
 
         $log = "\n[rerun ".now()->toIso8601String()."]\n";
         try {
-            $log .= $this->runCommands($target->demoSlug(), $entry['service'], $settings['commands'] ?? [], $target->demoExecUser());
+            $this->runCommands($target->demoSlug(), $entry['service'], $settings['commands'] ?? [], $target->demoExecUser(), $log);
         } catch (Throwable $e) {
             $log .= '[error] '.$e->getMessage()."\n";
         }
@@ -375,13 +375,13 @@ class DemoDeployer
 
     /**
      * Run the configured lifecycle commands, in order, inside the entry
-     * container. Stops at the first failure.
+     * container. Stops at the first failure; each output lands in `$log`
+     * as it runs, so the failing command's output survives the exception.
      *
      * @param  array<int, mixed>  $commands
      */
-    private function runCommands(string $project, string $service, array $commands, ?string $user = null): string
+    private function runCommands(string $project, string $service, array $commands, ?string $user, string &$log): void
     {
-        $log = '';
         foreach ($commands as $command) {
             if (! is_string($command) || trim($command) === '') {
                 continue;
@@ -402,8 +402,6 @@ class DemoDeployer
                 throw new RuntimeException("Demo command failed (exit {$process->getExitCode()}): {$command}");
             }
         }
-
-        return $log;
     }
 
     /**
