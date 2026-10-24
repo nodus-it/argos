@@ -19,5 +19,5 @@ Secrets never go into these files. Values the project needs at runtime (API keys
 ## How to finish
 
 - Try what you can here: run `.argos/setup.sh` in this worktree and fix it until it passes.
-- Then tell the person in two or three sentences what you set up and ask them to press **Test setup**. Argos then commits your files, opens a pull request, builds the image, runs `.argos/setup.sh` in a fresh worktree and starts the preview. When something fails you get the log here — fix it and ask for another test.
+- Then tell the person in two or three sentences what you set up. Do not ask them to start a test: when your turn ends with changes under `.argos/`, Argos tests on its own — it commits your files, opens a pull request, builds the image, runs `.argos/setup.sh` in a fresh worktree and starts the preview. When something fails you get the log here; fix it and the next test follows.
 - If you cannot tell how the project is meant to run, ask instead of guessing.

@@ -813,7 +813,7 @@ return [
         'test' => 'Test setup',
         'test_help' => 'Commits the files as a pull request, builds the image, runs the setup steps in a fresh working copy and starts the preview.',
         'test_queued' => 'The test is running — the result appears in the chat.',
-        'fix_prompt' => 'The setup test failed at ":step". Here is the log — please fix it and tell me when I can test again.',
+        'fix_prompt' => 'The setup test failed at ":step". Here is the log — please fix it. Argos tests again once your turn ends with changes under .argos/.',
         'pr_body' => 'Sets up this repository for Argos: the image, the setup steps for new tasks and the live preview contract under .argos/.',
         'builtin_stack' => 'Built-in stack — nothing to build.',
         'preview_skipped' => 'Preview skipped: :reason',
@@ -833,7 +833,7 @@ return [
         'open_task' => 'Open the setup task',
         'defaults_title' => ':workspace runs on the Laravel defaults',
         'defaults_body' => 'The repository brings no setup of its own, so the built-in Laravel preview and setup steps apply. If the project needs more (another database, Redis, built assets, keys), let Claude write it with "Revise setup".',
-        'banner' => 'This task sets up the workspace. When Claude is done, press "Test setup".',
+        'banner' => 'This task sets up the workspace. Argos tests it whenever Claude changes it; "Test setup" runs the test by hand.',
     ],
     'api' => [
         'no_connected_account' => 'The API client\'s user has no connected account on this platform.',

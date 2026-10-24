@@ -220,6 +220,43 @@ class WorkspaceSetupTest extends TestCase
         $this->assertSame(WorkspaceSetupStatus::NeedsAgent, $workspace->fresh()->setup_status);
     }
 
+    private function turn(Task $task, string $path): void
+    {
+        TaskEvent::query()->create(['task_id' => $task->id, 'type' => TaskEventType::ToolCall, 'payload' => ['name' => 'Write', 'input' => ['file_path' => $path]]]);
+        TaskEvent::query()->create(['task_id' => $task->id, 'type' => TaskEventType::TurnCompleted, 'payload' => []]);
+    }
+
+    public function test_a_turn_that_changes_the_setup_files_tests_them(): void
+    {
+        Bus::fake([CheckWorkspaceSetupJob::class]);
+        $task = $this->setupTask();
+
+        $this->turn($task, 'README.md');
+        $this->service()->afterTurn($task);
+        Bus::assertNotDispatched(CheckWorkspaceSetupJob::class);
+
+        $this->turn($task, '/var/www/html/.argos/demo.yml');
+        $this->service()->afterTurn($task);
+        Bus::assertDispatchedTimes(CheckWorkspaceSetupJob::class, 1);
+        $this->assertSame(WorkspaceSetupStatus::Testing, $this->workspace->fresh()->setup_status);
+    }
+
+    public function test_automatic_tests_stop_after_a_few_rounds(): void
+    {
+        Bus::fake([CheckWorkspaceSetupJob::class]);
+        $task = $this->setupTask();
+        foreach (range(1, WorkspaceSetupService::AUTO_TEST_ROUNDS) as $round) {
+            TaskEvent::query()->create(['task_id' => $task->id, 'type' => TaskEventType::Notice, 'payload' => ['kind' => 'setup_testing']]);
+        }
+        $this->workspace->forceFill(['setup_status' => WorkspaceSetupStatus::Failed])->save();
+
+        $this->turn($task, '.argos/setup.sh');
+        $this->service()->afterTurn($task);
+
+        Bus::assertNotDispatched(CheckWorkspaceSetupJob::class);
+        $this->assertSame(WorkspaceSetupStatus::Untested, $this->workspace->fresh()->setup_status);
+    }
+
     public function test_test_setup_queues_the_check(): void
     {
         Bus::fake([CheckWorkspaceSetupJob::class]);

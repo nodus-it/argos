@@ -80,15 +80,19 @@ Wenn ein Workspace angelegt wird, prüft Argos das Repository:
 
 Fehlt etwas, startet Argos eine **Einrichtungs-Aufgabe** — eine Aufgabe der Art
 *Einrichtung*, die der Admin-Person gehört, die den Workspace angelegt hat,
-über deren Claude-Abo läuft und im Modus *Änderungen annehmen* arbeitet. Claude
+über deren Claude-Abo läuft. Sie arbeitet im Modus *Berechtigungen umgehen*,
+wenn diese Person ihn im Workspace nutzen darf, sonst in *Änderungen
+annehmen*; im Eingabefeld lässt sich der Modus während der Aufgabe wechseln. Claude
 bekommt ein Briefing (was fehlt, das erkannte Projekt, der Stack) und schreibt:
 
 1. `.argos/setup.sh` — idempotente, nicht-interaktive Setup-Befehle,
 2. `.argos/demo.compose.yml` und `.argos/demo.yml` — den Preview-Vertrag,
 3. `.argos/worker.dockerfile` — nur, wenn kein eingebauter Stack passt.
 
-Claude probiert `.argos/setup.sh` im Worktree der Aufgabe aus und bittet dich
-dann, im Banner der Aufgabe **Einrichtung testen** zu drücken. Secrets bleiben
+Claude probiert `.argos/setup.sh` im Worktree der Aufgabe aus. Endet ein
+Durchgang mit Änderungen unter `.argos/`, startet Argos **Einrichtung testen**
+selbst, höchstens fünfmal in Folge, bis wieder jemand im Chat schreibt; der
+Button im Banner der Aufgabe startet den Test von Hand. Secrets bleiben
 aus den Dateien heraus; Claude nennt die, die du unter Einstellungen → Umgebung
 hinterlegen musst. Kann Claude nicht erkennen, wie das Projekt laufen soll,
 fragt es im Chat nach.
@@ -106,7 +110,7 @@ fehlschlägt:
 | Preview und Health-Check | Die Preview der Einrichtungs-Aufgabe startet und ihr Health-Check ist grün. Übersprungen (gilt als bestanden), wenn Previews für die Installation oder den Workspace aus sind. |
 
 Das Log eines fehlgeschlagenen Schritts geht an Claude in der Aufgabe, mit der
-Bitte, es zu beheben; teste erneut, wenn Claude Bescheid gibt. Der Chat und
+Bitte, es zu beheben; Claudes Korrektur stößt den nächsten Test an. Der Chat und
 **Einstellungen → Umgebung → Einrichtung** zeigen das Ergebnis pro Schritt.
 
 **Ein bestandener Test gilt sofort**: Neue Aufgaben führen die Setup-Befehle
@@ -122,9 +126,10 @@ Status geht zurück auf *Einrichtung nötig*.
 | Status | Bedeutung |
 |---|---|
 | Einrichtung nötig | Etwas fehlt, oder das Repository konnte nicht gelesen werden. |
+| Noch nicht getestet | Nichts fehlt (etwa eine Laravel-App mit den Standards), aber noch kein Test hat bestanden — oder die automatischen Tests haben nach fünf Runden aufgehört. |
 | Wird eingerichtet | Die Einrichtungs-Aufgabe ist offen. |
 | Wird getestet | **Einrichtung testen** läuft. |
-| Eingerichtet | Nichts fehlt, oder der letzte Test hat bestanden. |
+| Eingerichtet | Der letzte Test hat bestanden. |
 | Test fehlgeschlagen | Der letzte Test ist fehlgeschlagen — sein Log steht in der Einrichtungs-Aufgabe. |
 | Braucht ein Claude-Abo | Wer die Einrichtungs-Aufgabe ausführen soll, hat keinen nutzbaren Agenten. |
 
@@ -401,10 +406,10 @@ health:
 
 ## Abschluss-Checkliste
 
-1. Laravel-App? Nichts zu tun — prüfe, dass der Stand der Einrichtung unter
-   Einstellungen → Umgebung *Eingerichtet* zeigt.
+1. Laravel-App? Die Standards passen meist; der Stand zeigt *Noch nicht
+   getestet*, bis eine Einrichtungs-Aufgabe **Einrichtung testen** bestanden hat.
 2. Sonst lass die [Einrichtungs-Aufgabe](#die-einrichtungs-aufgabe) `.argos/`
-   schreiben (oder schreib es selbst), drücke **Einrichtung testen**, bis alle
+   schreiben (oder schreib es selbst), lass **Einrichtung testen** laufen, bis alle
    vier Schritte bestehen, und merge ihren Pull Request.
 3. Aktiviere die [Backing-Services](#backing-services-mysql-redis), die deine
    Tests brauchen; Registry-Zugänge und Secrets kommen nach Einstellungen →

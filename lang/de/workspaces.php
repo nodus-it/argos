@@ -813,7 +813,7 @@ return [
         'test' => 'Einrichtung testen',
         'test_help' => 'Committet die Dateien als Pull Request, baut das Image, führt die Setup-Befehle in einer frischen Arbeitskopie aus und startet die Preview.',
         'test_queued' => 'Der Test läuft — das Ergebnis erscheint im Chat.',
-        'fix_prompt' => 'Der Einrichtungs-Test ist bei „:step“ fehlgeschlagen. Hier ist das Log — bitte behebe das und sag mir, wann ich erneut testen kann.',
+        'fix_prompt' => 'Der Einrichtungs-Test ist bei „:step“ fehlgeschlagen. Hier ist das Log — bitte behebe das. Argos testet erneut, sobald dein Durchgang Änderungen unter .argos/ enthält.',
         'pr_body' => 'Richtet dieses Repository für Argos ein: Image, Setup-Befehle für neue Aufgaben und der Preview-Vertrag unter .argos/.',
         'builtin_stack' => 'Eingebauter Stack — nichts zu bauen.',
         'preview_skipped' => 'Preview übersprungen: :reason',
@@ -833,7 +833,7 @@ return [
         'open_task' => 'Einrichtungs-Aufgabe öffnen',
         'defaults_title' => ':workspace läuft mit dem Laravel-Standard',
         'defaults_body' => 'Das Repository bringt keine eigene Einrichtung mit, daher gelten die eingebaute Laravel-Preview und die Standard-Setup-Befehle. Braucht das Projekt mehr (andere Datenbank, Redis, gebaute Assets, Schlüssel), lass Claude sie über „Einrichtung überarbeiten“ schreiben.',
-        'banner' => 'Diese Aufgabe richtet den Workspace ein. Wenn Claude fertig ist, „Einrichtung testen“ drücken.',
+        'banner' => 'Diese Aufgabe richtet den Workspace ein. Argos testet, sobald Claude die Einrichtung ändert; „Einrichtung testen“ startet den Test von Hand.',
     ],
     'api' => [
         'no_connected_account' => 'Der Nutzer des API-Clients hat kein verbundenes Konto auf dieser Plattform.',
