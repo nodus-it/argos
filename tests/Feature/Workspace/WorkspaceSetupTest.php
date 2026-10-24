@@ -28,12 +28,16 @@ use App\Models\Workspace;
 use App\Models\WorkspaceMember;
 use App\Services\GitProvider\Contracts\GitServiceContract;
 use App\Services\GitProvider\GitServiceFactory;
+use App\Services\Workspace\AutoTaskDriver;
 use App\Services\Workspace\TaskService;
 use App\Services\Workspace\WorkspaceDaemonClient;
 use App\Services\Workspace\WorkspaceException;
+use App\Services\Workspace\WorkspaceGateService;
+use App\Services\Workspace\WorkspacePreviewService;
 use App\Services\Workspace\WorkspaceService;
 use App\Services\Workspace\WorkspaceSetupService;
 use App\Services\Workspace\WorkspaceShipService;
+use App\Support\GateRows;
 use App\Testing\FakeWorkspaceDaemon;
 use App\Workers\Compose\WorkerImageBuilder;
 use Filament\Actions\Testing\TestAction;
@@ -255,6 +259,42 @@ class WorkspaceSetupTest extends TestCase
 
         Bus::assertNotDispatched(CheckWorkspaceSetupJob::class);
         $this->assertSame(WorkspaceSetupStatus::Untested, $this->workspace->fresh()->setup_status);
+    }
+
+    public function test_gates_previews_and_auto_tasks_wait_for_a_tested_setup(): void
+    {
+        $this->workspace->forceFill(['setup_status' => WorkspaceSetupStatus::Untested, 'live_demo_enabled' => true])->save();
+        config(['argos.preview.enabled' => true]);
+        $task = app(TaskService::class)->create($this->workspace, $this->admin, AgentCredential::query()->firstOrFail(), 'Login')->fresh();
+        $locked = __('workspaces.setup.locked', ['status' => WorkspaceSetupStatus::Untested->label()]);
+
+        $this->assertSame($locked, app(WorkspacePreviewService::class)->unavailableReason($task));
+        // The setup task is how the setup gets tested, so it keeps them.
+        $this->assertNull(app(WorkspacePreviewService::class)->unavailableReason($this->setupTask()));
+        try {
+            app(WorkspaceGateService::class)->run($task, $this->admin);
+            $this->fail('Gates ran without a tested setup.');
+        } catch (WorkspaceException $e) {
+            $this->assertSame($locked, $e->getMessage());
+        }
+        $this->expectExceptionMessage($locked);
+        app(AutoTaskDriver::class)->start($this->workspace, $this->admin, AgentCredential::query()->firstOrFail(), 'Fix it');
+    }
+
+    public function test_only_gates_whose_tools_the_repo_requires_are_listed(): void
+    {
+        $this->files = ['composer.json' => json_encode(['require' => ['laravel/framework' => '^12.0'], 'require-dev' => ['laravel/pint' => '^1.0', 'pestphp/pest' => '^4.0']]), 'artisan' => '<?php'];
+
+        $this->assertSame(['pint', 'pest', 'artisan'], $this->service()->availableGates($this->workspace));
+        $this->assertSame(['pint', 'pest', 'artisan'], array_column(GateRows::of(null, ['pint', 'pest', 'artisan']), 'key'));
+    }
+
+    public function test_a_composer_setup_script_counts_as_setup_steps(): void
+    {
+        $this->files = ['package.json' => '{}', 'composer.json' => json_encode(['scripts' => ['setup' => ['composer install']]])];
+
+        $this->assertNotContains('setup', $this->service()->inspect($this->workspace)['missing']);
+        $this->assertSame('composer', $this->service()->sources($this->workspace)['setup']);
     }
 
     public function test_test_setup_queues_the_check(): void

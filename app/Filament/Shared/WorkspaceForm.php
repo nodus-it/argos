@@ -19,6 +19,7 @@ use App\Services\Git\RepositoryFetcher;
 use App\Services\OAuth\ConnectedAccountService;
 use App\Services\OAuth\TokenRefresher;
 use App\Services\Workspace\AutoSettings;
+use App\Services\Workspace\Environment\EnvAudit;
 use App\Services\Workspace\WorkspaceException;
 use App\Services\Workspace\WorkspaceSetupService;
 use App\Support\DocLink;
@@ -462,6 +463,8 @@ final class WorkspaceForm
                 Toggle::make('live_demo_enabled')
                     ->label(__('workspace_form.fields.live_demo_label'))
                     ->helperText(__('workspace_form.fields.live_demo_helper'))
+                    ->hint(fn (?Workspace $record): ?string => $record !== null ? app(WorkspaceSetupService::class)->lockReason($record) : null)
+                    ->hintColor('warning')
                     ->default(true)
                     ->live(),
 
@@ -578,6 +581,17 @@ final class WorkspaceForm
                             __('workspaces.setup.source_preview').': '.__('workspaces.setup.source.'.$sources['preview']),
                             __('workspaces.setup.source_setup').': '.__('workspaces.setup.source.'.$sources['setup']),
                         ];
+                    })
+                    ->listWithLineBreaks(),
+                TextEntry::make('env_audit_state')
+                    ->label(__('workspaces.setup.env_heading'))
+                    ->state(function (?Workspace $record): array {
+                        $audit = $record !== null ? app(EnvAudit::class)->audit($record) : ['open' => [], 'missing' => []];
+
+                        return array_values(array_filter([
+                            $audit['missing'] !== [] ? __('workspaces.setup.env_missing').': '.implode(', ', $audit['missing']) : null,
+                            $audit['open'] !== [] ? __('workspaces.setup.env_open').': '.implode(', ', $audit['open']) : null,
+                        ])) ?: [(string) __('workspaces.setup.env_none')];
                     })
                     ->listWithLineBreaks(),
                 TextEntry::make('image_state')

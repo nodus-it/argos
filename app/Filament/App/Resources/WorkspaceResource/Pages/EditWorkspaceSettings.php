@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\App\Resources\WorkspaceResource\Pages;
 
+use App\Enums\WorkerSource;
 use App\Filament\App\Resources\WorkspaceResource;
 use App\Filament\App\Resources\WorkspaceResource\RelationManagers\ApiTokensRelationManager;
 use App\Filament\App\Resources\WorkspaceResource\RelationManagers\MembersRelationManager;
@@ -115,10 +116,15 @@ class EditWorkspaceSettings extends EditRecord
     public function environmentForm(Schema $schema): Schema
     {
         return $this->settingsSchema($schema, 'environment')->components([
-            WorkspaceForm::workerSection(gated: false),
+            WorkspaceForm::setupSection(),
             WorkspaceForm::liveDemoSection(gated: false),
             WorkspaceForm::envSecretsSection(gated: false),
-            WorkspaceForm::setupSection(),
+            // Stack, backing services and database names rarely change after the setup.
+            WorkspaceForm::workerSection(gated: false)
+                ->heading(__('workspaces.settings.sections.advanced').': '.__('workspace_form.sections.worker'))
+                ->aside(false)
+                ->collapsible()
+                ->collapsed(fn (): bool => $this->workspace()->worker_stack_id !== null || $this->workspace()->worker_source === WorkerSource::Byoi),
         ]);
     }
 
@@ -152,10 +158,10 @@ class EditWorkspaceSettings extends EditRecord
                         ->key('environment')
                         ->icon('heroicon-o-cpu-chip')
                         ->schema([$this->formComponent('environmentForm', 'saveEnvironment')]),
-                    Tab::make(__('workspaces.settings.tabs.resources'))
-                        ->key('resources')
-                        ->icon('heroicon-o-adjustments-vertical')
-                        ->schema([$this->formComponent('resourcesForm', 'saveResources')]),
+                    Tab::make(__('workspaces.settings.tabs.automation'))
+                        ->key('automation')
+                        ->icon('heroicon-o-bolt')
+                        ->schema([$this->formComponent('automationForm', 'saveAutomation')]),
                     Tab::make(__('workspaces.settings.tabs.integrations'))
                         ->key('integrations')
                         ->icon('heroicon-o-link')
@@ -163,14 +169,14 @@ class EditWorkspaceSettings extends EditRecord
                             $this->relationManager(TaskProviderBindingsRelationManager::class, 'trackers'),
                             $this->relationManager(ApiTokensRelationManager::class, 'tokens'),
                         ]),
-                    Tab::make(__('workspaces.settings.tabs.automation'))
-                        ->key('automation')
-                        ->icon('heroicon-o-bolt')
-                        ->schema([$this->formComponent('automationForm', 'saveAutomation')]),
                     Tab::make(__('workspaces.settings.tabs.members'))
                         ->key('members')
                         ->icon('heroicon-o-users')
                         ->schema([$this->relationManager(MembersRelationManager::class, 'members')]),
+                    Tab::make(__('workspaces.settings.tabs.resources'))
+                        ->key('resources')
+                        ->icon('heroicon-o-adjustments-vertical')
+                        ->schema([$this->formComponent('resourcesForm', 'saveResources')]),
                 ]),
         ]);
     }

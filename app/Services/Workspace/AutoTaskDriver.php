@@ -66,6 +66,9 @@ class AutoTaskDriver
      */
     public function start(Workspace $workspace, User $by, AgentCredential $agent, string $prompt, ?string $title = null, ?string $model = null, array $overrides = [], array $taskOptions = []): Task
     {
+        if (($locked = app(WorkspaceSetupService::class)->lockReason($workspace)) !== null) {
+            throw new WorkspaceException($locked);
+        }
         $config = AutoSettings::resolve($workspace, $overrides);
         $mode = $config['plan'] === AutoPlanMode::Off->value ? PermissionMode::BypassPermissions : PermissionMode::Plan;
 

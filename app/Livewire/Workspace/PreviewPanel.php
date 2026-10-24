@@ -7,6 +7,7 @@ namespace App\Livewire\Workspace;
 use App\Enums\DemoStatus;
 use App\Livewire\Concerns\InteractsWithWorkspace;
 use App\Models\Task;
+use App\Services\Workspace\Environment\EnvAudit;
 use App\Services\Workspace\WorkspacePreviewService;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\View\View;
@@ -79,6 +80,7 @@ class PreviewPanel extends Component
             'task' => $task,
             'demo' => $demo,
             'reason' => app(WorkspacePreviewService::class)->unavailableReason($task),
+            'login' => $demo?->status === DemoStatus::Live ? app(EnvAudit::class)->login($workspace) : null,
             'canOperate' => $this->user()->can('prompt', $task),
             'building' => $this->queuedAt !== null || $demo?->status === DemoStatus::Building,
             'queued' => $this->queuedAt !== null,

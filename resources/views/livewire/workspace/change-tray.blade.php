@@ -17,7 +17,7 @@
                     <span class="ag-tray-files">{{ trans_choice('workspaces.tray.todo_count', count($todos), ['count' => count($todos)]) }}</span>
                 @endif
                 <span class="ag-spacer"></span>
-                @if ($hasChanges && $canOperate)
+                @if ($hasChanges && $canOperate && ! $gatesLocked)
                     <button type="button" class="ag-btn ag-btn-sm ag-btn-surface" x-on:click="$dispatch('workspace-run-gates')">{{ __('workspaces.tray.check') }}</button>
                 @endif
                 @if ($hasChanges)

@@ -6,6 +6,7 @@ namespace App\Services\Demo;
 
 use App\Enums\BackingService;
 use App\Models\Workspace;
+use App\Services\Workspace\Environment\EnvAudit;
 use Symfony\Component\Yaml\Yaml;
 
 /**
@@ -31,6 +32,7 @@ class DemoContractBuilder
             $compose = [];
         }
 
+        data_set($compose, 'services.app.environment.DB_CONNECTION', app(EnvAudit::class)->databaseDriver($workspace));
         $this->applyMysqlCredentials($compose, $workspace);
         $this->applyRedis($compose, $workspace);
 

@@ -207,6 +207,23 @@ class DemoDeployerTest extends TestCase
         $this->assertStringContainsString('composer ok', $demo->build_log);
     }
 
+    public function test_a_demo_without_data_gets_a_warning_in_its_log(): void
+    {
+        $this->fakeContract();
+        $deployer = new FakeDemoDeployer(app(GitServiceFactory::class), new FakeDemoImageBuilder, [
+            ['cmd' => 'down', 'exit' => 0],
+            ['cmd' => 'up', 'exit' => 0],
+            ['cmd' => 'exec -T app', 'exit' => 0],
+            ['cmd' => 'exec -T app', 'exit' => 0],
+        ]);
+        $deployer->dbShow = json_encode(['tables' => [['table' => 'migrations', 'rows' => 40], ['table' => 'users', 'rows' => 0]]]);
+
+        $demo = $deployer->deploy($this->task('empty'));
+
+        $this->assertSame(DemoStatus::Live, $demo->status);
+        $this->assertStringContainsString('[warn] The demo database has no data', $demo->build_log);
+    }
+
     public function test_deploy_marks_failed_when_a_command_fails(): void
     {
         $this->fakeContract();
@@ -468,6 +485,9 @@ class FakeDemoDeployer extends DemoDeployer
     /** @var list<list<string>> */
     public array $invokedCommands = [];
 
+    /** Output of the data probe (`db:show`); null = artisan cannot tell. */
+    public ?string $dbShow = null;
+
     /**
      * @param  list<array{cmd: string, exit: int, stdout?: string, stderr?: string}>  $script
      */
@@ -486,6 +506,9 @@ class FakeDemoDeployer extends DemoDeployer
     {
         $this->invokedCommands[] = $cmd;
         $joined = implode(' ', $cmd);
+        if (str_contains($joined, 'db:show')) {
+            return new FakeDemoProcess(exitCode: $this->dbShow === null ? 1 : 0, stdout: (string) $this->dbShow, stderr: '');
+        }
 
         // Match the next scripted response whose marker appears in the command;
         // fall back to the head of the queue so ordering stays explicit.

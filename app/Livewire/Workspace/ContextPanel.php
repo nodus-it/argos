@@ -6,6 +6,7 @@ namespace App\Livewire\Workspace;
 
 use App\Enums\GitProvider;
 use App\Enums\WorkspaceStatus;
+use App\Filament\App\Resources\WorkspaceResource;
 use App\Integrations\WorkspaceDaemon\DaemonTransportException;
 use App\Livewire\Concerns\InteractsWithWorkspace;
 use App\Models\Task;
@@ -13,6 +14,8 @@ use App\Services\Git\WorkspaceDiffService;
 use App\Services\Workspace\PullRequestFeedbackService;
 use App\Services\Workspace\PullRequestService;
 use App\Services\Workspace\WorkspaceGateService;
+use App\Services\Workspace\WorkspaceOnboarding;
+use App\Services\Workspace\WorkspaceSetupService;
 use App\Support\GateRows;
 use App\Support\RequestedTask;
 use App\Support\TaskRefs;
@@ -159,7 +162,10 @@ class ContextPanel extends Component
             'files' => self::changedFiles(array_values(array_filter($diff['files'] ?? [], fn (array $f): bool => ! $f['generated']))),
             'generated' => array_values(array_filter($diff['files'] ?? [], fn (array $f): bool => $f['generated'])),
             'gateRun' => $gateRun,
-            'gates' => GateRows::of($gateRun),
+            'gates' => GateRows::of($gateRun, app(WorkspaceSetupService::class)->availableGates($workspace)),
+            'onboarding' => $this->user()->can('setup', $workspace) ? app(WorkspaceOnboarding::class)->steps($workspace, $this->user()) : null,
+            'gatesLocked' => app(WorkspaceSetupService::class)->lockReason($workspace, $task),
+            'settingsUrl' => WorkspaceResource::getUrl('settings', ['record' => $workspace]).'?tab=environment',
             'canOperate' => $task !== null && $this->user()->can('prompt', $task),
             'canEdit' => $this->user()->can('editor', $workspace),
             'running' => $workspace->status === WorkspaceStatus::Running,

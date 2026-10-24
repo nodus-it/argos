@@ -113,6 +113,15 @@
     </div>
 
     <div class="ag-center" x-show="!(review && maximized)">
+        @if ($onboarding !== null && collect($onboarding)->contains(fn (array $s): bool => $s['required'] && ! $s['done']))
+            <section class="ag-onboarding-card" aria-labelledby="ag-ob-title">
+                <div class="ag-ob-head">
+                    <h2 id="ag-ob-title" class="ag-ob-title">{{ __('workspaces.onboarding.title') }} · {{ collect($onboarding)->where('done', true)->count() }}/{{ count($onboarding) }}</h2>
+                    <button type="button" class="ag-text-btn" x-on:click="$dispatch('workspace-focus', { target: 'setup' })">{{ __('workspaces.onboarding.all_steps') }}</button>
+                </div>
+                @include('livewire.workspace.partials.onboarding', ['steps' => array_values(array_filter($onboarding, fn (array $s): bool => $s['required'] && ! $s['done']))])
+            </section>
+        @endif
         @if ($workspace->status !== WorkspaceStatus::Running)
             <div @class(['ag-banner', 'is-error' => $workspace->status === WorkspaceStatus::Failed]) role="status">
                 @if ($transitional) <span class="ag-spin"></span> @else <x-ag.icon name="alert" :size="16" /> @endif

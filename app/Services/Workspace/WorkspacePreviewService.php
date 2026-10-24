@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Workspace;
 
 use App\Enums\DemoStatus;
+use App\Enums\TaskKind;
 use App\Enums\WorkspaceStatus;
 use App\Jobs\Workspace\DeployWorkspaceDemoJob;
 use App\Jobs\Workspace\RerunWorkspaceDemoCommandsJob;
@@ -12,6 +13,7 @@ use App\Models\Demo;
 use App\Models\Task;
 use App\Models\User;
 use App\Services\Demo\DemoDeployer;
+use App\Services\Workspace\Environment\EnvAudit;
 use Illuminate\Support\Facades\Gate;
 
 /**
@@ -32,8 +34,15 @@ class WorkspacePreviewService
             ! (bool) config('argos.preview.enabled') => __('workspaces.preview.disabled_platform'),
             ! (bool) $workspace->live_demo_enabled => __('workspaces.preview.disabled_project'),
             $workspace->status !== WorkspaceStatus::Running => __('workspaces.tabs.not_running'),
-            default => null,
+            default => app(WorkspaceSetupService::class)->lockReason($workspace, $task) ?? $this->missingEnv($task),
         };
+    }
+
+    private function missingEnv(Task $task): ?string
+    {
+        $missing = $task->kind === TaskKind::Setup ? [] : app(EnvAudit::class)->audit($task->workspace)['missing'];
+
+        return $missing === [] ? null : __('workspaces.preview.missing_env', ['keys' => implode(', ', $missing)]);
     }
 
     /** Build or rebuild the preview (replaces a running one). */

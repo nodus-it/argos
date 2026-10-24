@@ -58,7 +58,7 @@ while a tested setup is not merged yet, the setup task's branch (see
 
 | File | What it controls | Default if absent |
 | --- | --- | --- |
-| `.argos/setup.sh` | Steps a fresh task worktree runs before Claude starts (dependencies, `.env`, keys, migrations). | Laravel defaults: `composer install`, `APP_KEY`, `php artisan migrate`. |
+| `.argos/setup.sh` | Steps a fresh task worktree runs before Claude starts (dependencies, `.env`, keys, migrations). | The project's `composer setup` script if `composer.json` has one, else Laravel defaults: `composer install`, `APP_KEY`, `php artisan migrate`. |
 | `.argos/demo.compose.yml` + `.argos/demo.yml` | The live preview of a task (both files or neither). | Bundled Laravel contract (`app` php-fpm/nginx + MariaDB `db`). |
 | `.argos/worker.dockerfile` | The image the workspace container runs in (instead of a built-in stack). | Built-in stack picked from `composer.json` / `package.json` (default PHP 8.5). |
 
@@ -73,7 +73,7 @@ When a workspace is created, Argos inspects the repository:
 | --- | --- |
 | a fitting stack | no `composer.json`, no `package.json` and no `.argos/worker.dockerfile` |
 | the preview contract | not a Laravel app (`composer.json` + `artisan`) and no `.argos/demo.yml` |
-| the setup steps | not a Laravel app and no `.argos/setup.sh` |
+| the setup steps | not a Laravel app, no `.argos/setup.sh` and no `composer setup` script |
 
 If anything is missing, Argos starts a **setup task** — a task of kind
 *Setup*, owned by the admin who created the workspace and running on their
@@ -116,6 +116,13 @@ merge, everything comes from the default branch again. Closing the pull
 request without a merge drops the branch and sets the status back to *Needs
 setting up*.
 
+### Setup checklist
+
+Workspace admins see a checklist on the workspace page while a required step
+is open — Claude subscription, stack, tested setup, and the demo environment
+when the live demo is on — and the full list, optional steps included, at the
+top of the sidebar. Each open step links to the place that completes it.
+
 ### Setup status
 
 | Status | Meaning |
@@ -127,6 +134,10 @@ setting up*.
 | Set up | The last test passed. |
 | Test failed | The last test failed — see its log in the setup task. |
 | Needs a Claude subscription | The admin who should run the setup task has no usable agent. |
+
+Quality gates, previews and automatic tasks wait for *Set up*: until then
+the sidebar names the status and links here, and starting them is refused.
+The setup task itself is exempt, since it is how the setup gets tested.
 
 **Settings → Environment → Setup** (workspace admins) shows the status, the
 last test, where the preview contract and the setup steps come from (*in the
@@ -387,6 +398,25 @@ health:
   path: /
   timeout: 120
 ```
+
+Two optional keys help the demo itself:
+
+```yaml
+env:
+  required: [STRIPE_SECRET]   # the app cannot start without these
+login:
+  path: /login
+  email: admin@example.com
+  password: secret
+```
+
+`env.required` keys without a value in `.env.example` or Settings →
+Environment lock the preview until they are set. Settings → Environment →
+Setup lists them, and also every other key that is empty in `.env.example`
+and set nowhere (a hint, not a lock). `login` appears on the preview card.
+After the demo commands, Argos counts the rows of a Laravel demo's database;
+a demo with no data outside `migrations` gets a warning in its log. Argos
+also keeps the repo's `DB_CONNECTION` when it is `mysql` or `mariadb`.
 
 ## Final checklist
 

@@ -11,6 +11,13 @@
      x-on:argos-gates-updated.window="$wire.$refresh()"
      @if ($gateRun?->status === \App\Enums\GateRunStatus::Running) wire:poll.10s @elseif ($prLoading) wire:poll.2s @endif>
 
+    @if ($onboarding !== null)
+        <section class="ag-section" id="ctx-setup" x-data="{ ...argosFold('setup', @js(collect($onboarding)->contains(fn (array $s): bool => $s['required'] && ! $s['done']))) }" :class="{ 'is-folded': !open }">
+            <h2 class="ag-section-h"><button type="button" class="ag-section-title ag-fold-btn" x-on:click="toggleFold()" :aria-expanded="open"><x-ag.icon name="chevron-right" :size="12" :stroke="2.4" class="ag-fold-chev" />{{ __('workspaces.onboarding.section') }} · {{ collect($onboarding)->where('done', true)->count() }}/{{ count($onboarding) }}</button></h2>
+            @include('livewire.workspace.partials.onboarding', ['steps' => $onboarding])
+        </section>
+    @endif
+
     <section class="ag-section" id="ctx-env" x-data="{ ...argosFold('env') }" :class="{ 'is-folded': !open }">
         <h2 class="ag-section-h"><button type="button" class="ag-section-title ag-fold-btn" x-on:click="toggleFold()" :aria-expanded="open"><x-ag.icon name="chevron-right" :size="12" :stroke="2.4" class="ag-fold-chev" />{{ __('workspaces.focus.environment') }}</button></h2>
         <div class="ag-env-grid">
@@ -198,10 +205,15 @@
     <section class="ag-section" id="ctx-gates" x-data="{ ...argosFold('gates') }" :class="{ 'is-folded': !open }">
         <div class="ag-section-head">
             <h2 class="ag-section-h"><button type="button" class="ag-section-title ag-fold-btn" x-on:click="toggleFold()" :aria-expanded="open"><x-ag.icon name="chevron-right" :size="12" :stroke="2.4" class="ag-fold-chev" />{{ __('workspaces.focus.gates') }}</button></h2>
-            @if ($canOperate && $running)
+            @if ($canOperate && $running && $gatesLocked === null && $gates !== [])
                 <button type="button" class="ag-text-btn" wire:click="runGates" wire:loading.attr="disabled" @disabled($gateRun?->status === \App\Enums\GateRunStatus::Running)>{{ __('workspaces.focus.check_all') }}</button>
             @endif
         </div>
+        @if ($gates === [])
+            <p class="ag-locked">{{ __('workspaces.focus.no_gates') }}</p>
+        @elseif ($gatesLocked !== null)
+            <p class="ag-locked" data-testid="gates-locked">{{ $gatesLocked }} <a href="{{ $settingsUrl }}" wire:navigate>{{ __('workspaces.setup.locked_action') }}</a></p>
+        @endif
         <ul class="ag-card ag-gates">
             @foreach ($gates as $gate)
                 <li class="ag-gate-item">

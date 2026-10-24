@@ -67,6 +67,10 @@ requests for **every** task of the workspace.
 
 ## Environment
 
+The tab opens with **Setup**, then the live demo and the secrets. The worker
+section (image source, stack, backing services) sits last under *Advanced*
+and stays folded once a stack is set.
+
 ### Worker: image source and stack
 
 - **Image source**
@@ -139,13 +143,17 @@ Rules:
 
 Only on the settings page, read-only plus actions:
 
-- **Setup status** (*Needs setting up*, *Being set up*, *Being tested*, *Set
-  up*, *Test failed*, *Needs a Claude subscription*) and, while a tested setup
+- **Setup status** (*Needs setting up*, *Not tested yet*, *Being set up*,
+  *Being tested*, *Set up*, *Test failed*, *Needs a Claude subscription*) and, while a tested setup
   is not merged, the branch it comes from.
 - **Last test** — each step of the last **Test setup** with ✓ / ✗.
 - **From the repository** — whether the preview contract (`.argos/demo.yml`)
   and the setup steps (`.argos/setup.sh`) are *in the repository*, come from
-  the *Laravel defaults*, are *missing*, or *cannot be read*.
+  the project's *composer setup* script or the *Laravel defaults*, are
+  *missing*, or *cannot be read*.
+- **Demo environment** — required keys still missing and other keys that
+  are empty in `.env.example` and set nowhere (see
+  [Preparing a Repository](PREPARE-PROJECT.md)).
 - **Image** — state and age of the current image build, its **Build log**
   and **Rebuild** (the workspace uses the new image from its next start).
 - **Revise setup** / **Open the setup task** — see

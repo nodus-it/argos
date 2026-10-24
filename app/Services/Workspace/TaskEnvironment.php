@@ -7,6 +7,7 @@ namespace App\Services\Workspace;
 use App\Enums\BackingService;
 use App\Models\Task;
 use App\Services\Workspace\Environment\BackingServiceResolver;
+use App\Services\Workspace\Environment\EnvAudit;
 
 /**
  * The values that set a task apart from its siblings in the same container:
@@ -16,7 +17,7 @@ use App\Services\Workspace\Environment\BackingServiceResolver;
  */
 class TaskEnvironment
 {
-    public function __construct(private readonly BackingServiceResolver $services) {}
+    public function __construct(private readonly BackingServiceResolver $services, private readonly EnvAudit $audit) {}
 
     /** `task_<slug>` (underscores; MySQL names stay short). */
     public static function databaseName(Task $task): string
@@ -35,7 +36,7 @@ class TaskEnvironment
 
         if (isset($coordinates[BackingService::Mysql->value])) {
             $env = [
-                'DB_CONNECTION' => 'mysql',
+                'DB_CONNECTION' => $this->audit->databaseDriver($workspace),
                 ...BackingService::Mysql->connectionEnv([...$coordinates[BackingService::Mysql->value], 'database' => self::databaseName($task)]),
             ];
         }

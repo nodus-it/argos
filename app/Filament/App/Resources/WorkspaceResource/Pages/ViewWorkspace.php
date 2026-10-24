@@ -15,6 +15,7 @@ use App\Services\Workspace\PullRequestService;
 use App\Services\Workspace\TaskService;
 use App\Services\Workspace\WorkspaceException;
 use App\Services\Workspace\WorkspaceGateService;
+use App\Services\Workspace\WorkspaceOnboarding;
 use App\Services\Workspace\WorkspaceService;
 use App\Support\RequestedTask;
 use Filament\Actions\Action;
@@ -244,6 +245,7 @@ class ViewWorkspace extends ViewRecord
             'canInvite' => $task !== null && (auth()->user()?->can('invite', $task) ?? false),
             'canOperate' => auth()->user()?->can('operate', $workspace) ?? false,
             'running' => $workspace->status === WorkspaceStatus::Running,
+            'onboarding' => (auth()->user()?->can('setup', $workspace) ?? false) ? app(WorkspaceOnboarding::class)->steps($workspace, auth()->user()) : null,
             'transitional' => in_array($workspace->status, [WorkspaceStatus::Provisioning, WorkspaceStatus::Starting, WorkspaceStatus::Stopping], true),
         ];
     }

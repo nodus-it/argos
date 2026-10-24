@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
+use App\Enums\WorkspaceSetupStatus;
 use App\Enums\WorkspaceStatus;
 use App\Models\User;
 use App\Models\Workspace;
@@ -32,6 +33,7 @@ class WorkspaceFactory extends Factory
             'connected_account_id' => null,
             'default_branch' => 'main',
             'status' => WorkspaceStatus::Running,
+            'setup_status' => WorkspaceSetupStatus::Ready,
             'daemon_token' => Str::random(48),
         ];
     }

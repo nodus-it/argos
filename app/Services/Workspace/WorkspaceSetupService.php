@@ -94,7 +94,7 @@ class WorkspaceSetupService
         if ((! $laravel || $ownImage) && $file(DemoConfigLocator::SETTINGS_PATH) === null) {
             $missing[] = 'preview';
         }
-        if (! $laravel && $file('.argos/setup.sh') === null) {
+        if (! $laravel && $file('.argos/setup.sh') === null && ! self::hasComposerSetup($composer)) {
             $missing[] = 'setup';
         }
 
@@ -123,7 +123,12 @@ class WorkspaceSetupService
 
                 return [
                     'preview' => $file(DemoConfigLocator::SETTINGS_PATH) ? 'repo' : ($bundledPreview ? 'default' : 'missing'),
-                    'setup' => $file('.argos/setup.sh') ? 'repo' : ($laravel ? 'default' : 'missing'),
+                    'setup' => match (true) {
+                        $file('.argos/setup.sh') => 'repo',
+                        self::hasComposerSetup($service->getFileContents($workspace->getOwnerRepo(), 'composer.json', $workspace->setupRef())) => 'composer',
+                        $laravel => 'default',
+                        default => 'missing',
+                    },
                 ];
             } catch (Throwable) {
                 return ['preview' => 'unknown', 'setup' => 'unknown'];
@@ -254,6 +259,56 @@ class WorkspaceSetupService
         } catch (Throwable $e) {
             Log::channel('argos')->warning('Setup brief could not be sent', ['task' => $task->id, 'error' => $e->getMessage()]);
         }
+    }
+
+    /**
+     * Why gates, previews and auto-tasks are locked: they need a tested setup.
+     * The setup task itself is exempt, it is how the setup gets tested.
+     */
+    public function lockReason(Workspace $workspace, ?Task $task = null): ?string
+    {
+        if ($workspace->setup_status === WorkspaceSetupStatus::Ready || $task?->kind === TaskKind::Setup) {
+            return null;
+        }
+
+        return __('workspaces.setup.locked', ['status' => ($workspace->setup_status ?? WorkspaceSetupStatus::Untested)->label()]);
+    }
+
+    /** The project's own `composer setup` script (the Laravel skeleton convention). */
+    private static function hasComposerSetup(?string $composerJson): bool
+    {
+        return isset(json_decode((string) $composerJson, true)['scripts']['setup']);
+    }
+
+    /**
+     * Gate rows whose tool the repository requires in `composer.json`; null when
+     * it cannot be read (then all rows show).
+     *
+     * @return list<string>|null
+     */
+    public function availableGates(Workspace $workspace): ?array
+    {
+        return Cache::remember('ws-gates:'.$workspace->id.':'.$workspace->setupRef(), 300, function () use ($workspace): ?array {
+            try {
+                $service = $this->git->forWorkspace($workspace);
+                $file = fn (string $path): ?string => $service->getFileContents($workspace->getOwnerRepo(), $path, $workspace->setupRef());
+                $composer = json_decode((string) $file('composer.json'), true);
+                if (! is_array($composer)) {
+                    return null;
+                }
+                $packages = array_keys([...(array) ($composer['require'] ?? []), ...(array) ($composer['require-dev'] ?? [])]);
+                $has = fn (string ...$names): bool => array_intersect($names, $packages) !== [];
+
+                return array_values(array_filter([
+                    $has('laravel/pint') ? 'pint' : null,
+                    $has('pestphp/pest', 'phpunit/phpunit') ? 'pest' : null,
+                    $has('phpstan/phpstan', 'larastan/larastan', 'nunomaduro/larastan') ? 'phpstan' : null,
+                    $file('artisan') !== null ? 'artisan' : null,
+                ]));
+            } catch (Throwable) {
+                return null;
+            }
+        });
     }
 
     /** "Test setup": queue the check of the setup task's branch. */

@@ -61,7 +61,7 @@ Einrichtungs-Aufgabe (siehe [unten](#die-einrichtungs-aufgabe)).
 
 | Datei | Was sie steuert | Standard, wenn sie fehlt |
 | --- | --- | --- |
-| `.argos/setup.sh` | Schritte, die ein frischer Worktree einer Aufgabe ausführt, bevor Claude startet (Abhängigkeiten, `.env`, Schlüssel, Migrationen). | Laravel-Standards: `composer install`, `APP_KEY`, `php artisan migrate`. |
+| `.argos/setup.sh` | Schritte, die ein frischer Worktree einer Aufgabe ausführt, bevor Claude startet (Abhängigkeiten, `.env`, Schlüssel, Migrationen). | Das `composer setup`-Skript des Projekts, wenn `composer.json` eines hat, sonst die Laravel-Standards: `composer install`, `APP_KEY`, `php artisan migrate`. |
 | `.argos/demo.compose.yml` + `.argos/demo.yml` | Die Live-Preview einer Aufgabe (beide Dateien oder keine). | Mitgelieferter Laravel-Vertrag (`app` php-fpm/nginx + MariaDB `db`). |
 | `.argos/worker.dockerfile` | Das Image, in dem der Workspace-Container läuft (statt eines eingebauten Stacks). | Eingebauter Stack, gewählt anhand von `composer.json` / `package.json` (Standard PHP 8.5). |
 
@@ -76,7 +76,7 @@ Wenn ein Workspace angelegt wird, prüft Argos das Repository:
 | --- | --- |
 | ein passender Stack | keine `composer.json`, keine `package.json` und keine `.argos/worker.dockerfile` |
 | der Preview-Vertrag | keine Laravel-App (`composer.json` + `artisan`) und keine `.argos/demo.yml` |
-| die Setup-Befehle | keine Laravel-App und keine `.argos/setup.sh` |
+| die Setup-Befehle | keine Laravel-App, keine `.argos/setup.sh` und kein `composer setup`-Skript |
 
 Fehlt etwas, startet Argos eine **Einrichtungs-Aufgabe** — eine Aufgabe der Art
 *Einrichtung*, die der Admin-Person gehört, die den Workspace angelegt hat,
@@ -121,6 +121,14 @@ Request gemergt ist.* Nach dem Merge kommt alles wieder vom Default-Branch.
 Wird der Pull Request ohne Merge geschlossen, entfällt der Branch und der
 Status geht zurück auf *Einrichtung nötig*.
 
+### Einrichtungs-Checkliste
+
+Workspace-Admins sehen auf der Workspace-Seite eine Checkliste, solange ein
+Pflichtschritt offen ist — Claude-Abo, Stack, getestete Einrichtung und, bei
+eingeschalteter Live-Demo, die Demo-ENVs — und die ganze Liste samt optionaler
+Schritte oben in der Seitenleiste. Jeder offene Schritt verlinkt dorthin, wo
+er sich erledigen lässt.
+
 ### Stand der Einrichtung
 
 | Status | Bedeutung |
@@ -132,6 +140,11 @@ Status geht zurück auf *Einrichtung nötig*.
 | Eingerichtet | Der letzte Test hat bestanden. |
 | Test fehlgeschlagen | Der letzte Test ist fehlgeschlagen — sein Log steht in der Einrichtungs-Aufgabe. |
 | Braucht ein Claude-Abo | Wer die Einrichtungs-Aufgabe ausführen soll, hat keinen nutzbaren Agenten. |
+
+Quality Gates, Previews und automatische Aufgaben warten auf *Eingerichtet*:
+bis dahin nennt die Seitenleiste den Stand und verlinkt hierher, und ein Start
+wird abgelehnt. Die Einrichtungs-Aufgabe selbst ist ausgenommen, denn mit ihr
+wird die Einrichtung getestet.
 
 **Einstellungen → Umgebung → Einrichtung** (Workspace-Admins) zeigt den
 Status, den letzten Test, woher Preview-Vertrag und Setup-Befehle kommen
@@ -403,6 +416,27 @@ health:
   path: /
   timeout: 120
 ```
+
+Zwei optionale Schlüssel helfen der Demo selbst:
+
+```yaml
+env:
+  required: [STRIPE_SECRET]   # ohne diese startet die App nicht
+login:
+  path: /login
+  email: admin@example.com
+  password: secret
+```
+
+Schlüssel unter `env.required`, die weder in `.env.example` noch unter
+Einstellungen → Umgebung einen Wert haben, sperren die Preview, bis sie gesetzt
+sind. Einstellungen → Umgebung → Einrichtung listet sie, dazu jeden anderen
+Schlüssel, der in `.env.example` leer ist und nirgends gesetzt wird (ein
+Hinweis, keine Sperre). `login` erscheint auf der Preview-Karte. Nach den
+Demo-Befehlen zählt Argos die Zeilen in der Datenbank einer Laravel-Demo; eine
+Demo ohne Daten außerhalb von `migrations` bekommt eine Warnung im Log. Argos
+übernimmt außerdem das `DB_CONNECTION` des Repos, wenn es `mysql` oder
+`mariadb` ist.
 
 ## Abschluss-Checkliste
 
