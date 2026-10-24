@@ -133,6 +133,11 @@ Status geht zurück auf *Einrichtung nötig*.
 | Test fehlgeschlagen | Der letzte Test ist fehlgeschlagen — sein Log steht in der Einrichtungs-Aufgabe. |
 | Braucht ein Claude-Abo | Wer die Einrichtungs-Aufgabe ausführen soll, hat keinen nutzbaren Agenten. |
 
+Quality Gates, Previews und automatische Aufgaben warten auf *Eingerichtet*:
+bis dahin nennt die Seitenleiste den Stand und verlinkt hierher, und ein Start
+wird abgelehnt. Die Einrichtungs-Aufgabe selbst ist ausgenommen, denn mit ihr
+wird die Einrichtung getestet.
+
 **Einstellungen → Umgebung → Einrichtung** (Workspace-Admins) zeigt den
 Status, den letzten Test, woher Preview-Vertrag und Setup-Befehle kommen
 (*im Repository*, *Laravel-Standard*, *fehlt*), das aktuelle Image mit seinem

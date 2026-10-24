@@ -32,7 +32,7 @@ class WorkspacePreviewService
             ! (bool) config('argos.preview.enabled') => __('workspaces.preview.disabled_platform'),
             ! (bool) $workspace->live_demo_enabled => __('workspaces.preview.disabled_project'),
             $workspace->status !== WorkspaceStatus::Running => __('workspaces.tabs.not_running'),
-            default => null,
+            default => app(WorkspaceSetupService::class)->lockReason($workspace, $task),
         };
     }
 

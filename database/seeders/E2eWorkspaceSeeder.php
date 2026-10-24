@@ -12,6 +12,7 @@ use App\Enums\GitProvider;
 use App\Enums\PermissionMode;
 use App\Enums\SessionStatus;
 use App\Enums\WorkspaceRole;
+use App\Enums\WorkspaceSetupStatus;
 use App\Enums\WorkspaceStatus;
 use App\Models\AgentCredential;
 use App\Models\Task;
@@ -63,6 +64,7 @@ class E2eWorkspaceSeeder extends Seeder
             'auth_method' => AuthMethod::Pat,
             'default_branch' => 'main',
             'status' => WorkspaceStatus::Running,
+            'setup_status' => WorkspaceSetupStatus::Ready,
             'daemon_token' => Str::random(64),
             'last_activity_at' => now(),
         ])->save();

@@ -53,6 +53,9 @@ class WorkspaceGateService
             throw WorkspaceException::translated('workspaces.gates.unknown_gate');
         }
         $workspace = $task->workspace;
+        if (($locked = app(WorkspaceSetupService::class)->lockReason($workspace, $task)) !== null) {
+            throw new WorkspaceException($locked);
+        }
         $active = $this->active($workspace);
         if ($active !== null) {
             throw WorkspaceException::translated('workspaces.gates.already_running');

@@ -806,6 +806,8 @@ return [
         ],
     ],
     'setup' => [
+        'locked' => 'Needs a tested setup (now: :status).',
+        'locked_action' => 'Set up',
         'task_title' => 'Set up the workspace',
         'needs_agent' => 'Setting up needs your Claude subscription — add it in your profile first.',
         'not_setup_task' => 'Only the setup task can be tested.',

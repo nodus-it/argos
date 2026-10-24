@@ -806,6 +806,8 @@ return [
         ],
     ],
     'setup' => [
+        'locked' => 'Braucht eine getestete Einrichtung (jetzt: :status).',
+        'locked_action' => 'Einrichten',
         'task_title' => 'Workspace einrichten',
         'needs_agent' => 'Für die Einrichtung braucht es dein Claude-Abo — hinterlege es zuerst in deinem Profil.',
         'not_setup_task' => 'Nur die Einrichtungs-Aufgabe lässt sich testen.',

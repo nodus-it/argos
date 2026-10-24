@@ -128,6 +128,10 @@ setting up*.
 | Test failed | The last test failed — see its log in the setup task. |
 | Needs a Claude subscription | The admin who should run the setup task has no usable agent. |
 
+Quality gates, previews and automatic tasks wait for *Set up*: until then
+the sidebar names the status and links here, and starting them is refused.
+The setup task itself is exempt, since it is how the setup gets tested.
+
 **Settings → Environment → Setup** (workspace admins) shows the status, the
 last test, where the preview contract and the setup steps come from (*in the
 repository*, *Laravel defaults*, *missing*), the current image with its build

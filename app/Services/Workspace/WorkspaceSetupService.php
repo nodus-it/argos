@@ -256,6 +256,19 @@ class WorkspaceSetupService
         }
     }
 
+    /**
+     * Why gates, previews and auto-tasks are locked: they need a tested setup.
+     * The setup task itself is exempt, it is how the setup gets tested.
+     */
+    public function lockReason(Workspace $workspace, ?Task $task = null): ?string
+    {
+        if ($workspace->setup_status === WorkspaceSetupStatus::Ready || $task?->kind === TaskKind::Setup) {
+            return null;
+        }
+
+        return __('workspaces.setup.locked', ['status' => ($workspace->setup_status ?? WorkspaceSetupStatus::Untested)->label()]);
+    }
+
     /** "Test setup": queue the check of the setup task's branch. */
     public function requestTest(Task $task, User $by): void
     {

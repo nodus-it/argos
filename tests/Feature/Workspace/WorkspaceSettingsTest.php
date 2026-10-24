@@ -150,6 +150,7 @@ class WorkspaceSettingsTest extends TestCase
     {
         $admin = User::factory()->create();
         $workspace = $this->workspaceFor($admin);
+        $workspace->forceFill(['setup_status' => null])->save();
 
         Livewire::actingAs($admin)->test(EditWorkspaceSettings::class, ['record' => $workspace->getKey()])
             ->assertSee(__('workspaces.settings.setup_status.none'))

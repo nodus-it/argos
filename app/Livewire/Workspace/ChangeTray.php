@@ -15,6 +15,7 @@ use App\Services\GitProvider\PullRequestDetails;
 use App\Services\Workspace\PullRequestFeedbackService;
 use App\Services\Workspace\PullRequestService;
 use App\Services\Workspace\WorkspaceGateService;
+use App\Services\Workspace\WorkspaceSetupService;
 use App\Support\GateAnnotations;
 use App\Support\GateRows;
 use Illuminate\Contracts\View\View;
@@ -88,6 +89,7 @@ class ChangeTray extends Component
             'deletions' => array_sum(array_column($files, 'deletions')),
             'gates' => self::gateSummary($run),
             'canOperate' => $canOperate,
+            'gatesLocked' => app(WorkspaceSetupService::class)->lockReason($task->workspace, $task) !== null,
         ]);
     }
 
