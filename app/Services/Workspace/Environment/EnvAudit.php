@@ -93,8 +93,13 @@ class EnvAudit
     public function databaseDriver(Workspace $workspace): string
     {
         $driver = $this->example($workspace)['DB_CONNECTION'] ?? '';
+        if (in_array($driver, ['mysql', 'mariadb'], true)) {
+            return $driver;
+        }
+        // An app that only configures a `mariadb` connection cannot use `mysql`.
+        $config = $this->cached($workspace, 'database', fn (): string => (string) $this->file($workspace, 'config/database.php'));
 
-        return in_array($driver, ['mysql', 'mariadb'], true) ? $driver : 'mysql';
+        return ! str_contains($config, "'mysql' =>") && str_contains($config, "'mariadb' =>") ? 'mariadb' : 'mysql';
     }
 
     public static function setByArgos(string $key): bool

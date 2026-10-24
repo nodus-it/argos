@@ -26,6 +26,7 @@ use App\Models\WorkerImageBuild;
 use App\Models\WorkerStack;
 use App\Models\Workspace;
 use App\Models\WorkspaceMember;
+use App\Services\Git\WorkspaceDiffService;
 use App\Services\GitProvider\Contracts\GitServiceContract;
 use App\Services\GitProvider\GitServiceFactory;
 use App\Services\Workspace\AutoTaskDriver;
@@ -224,25 +225,41 @@ class WorkspaceSetupTest extends TestCase
         $this->assertSame(WorkspaceSetupStatus::NeedsAgent, $workspace->fresh()->setup_status);
     }
 
-    private function turn(Task $task, string $path): void
+    /** @var array<string, string> path => content hash of the task's changed files */
+    private array $changed = [];
+
+    private function fakeDiff(): void
     {
-        TaskEvent::query()->create(['task_id' => $task->id, 'type' => TaskEventType::ToolCall, 'payload' => ['name' => 'Write', 'input' => ['file_path' => $path]]]);
-        TaskEvent::query()->create(['task_id' => $task->id, 'type' => TaskEventType::TurnCompleted, 'payload' => []]);
+        $this->mock(WorkspaceDiffService::class)->shouldReceive('summary')->andReturnUsing(fn (): array => [
+            'files' => array_map(fn (string $path, string $hash): array => ['path' => $path, 'hash' => $hash], array_keys($this->changed), $this->changed),
+            'ahead' => 0,
+            'uncommitted' => count($this->changed),
+        ]);
     }
 
-    public function test_a_turn_that_changes_the_setup_files_tests_them(): void
+    public function test_a_turn_that_changes_the_setup_files_tests_them_once_per_change(): void
     {
         Bus::fake([CheckWorkspaceSetupJob::class]);
+        $this->fakeDiff();
         $task = $this->setupTask();
 
-        $this->turn($task, 'README.md');
+        $this->changed = ['README.md' => 'a1'];
         $this->service()->afterTurn($task);
         Bus::assertNotDispatched(CheckWorkspaceSetupJob::class);
 
-        $this->turn($task, '/var/www/html/.argos/demo.yml');
+        // Whatever wrote it (an edit tool or a shell command), the diff shows it.
+        $this->changed = ['README.md' => 'a1', '.argos/demo.yml' => 'b1'];
         $this->service()->afterTurn($task);
         Bus::assertDispatchedTimes(CheckWorkspaceSetupJob::class, 1);
         $this->assertSame(WorkspaceSetupStatus::Testing, $this->workspace->fresh()->setup_status);
+
+        $this->workspace->forceFill(['setup_status' => WorkspaceSetupStatus::Failed])->save();
+        $this->service()->afterTurn($task);
+        Bus::assertDispatchedTimes(CheckWorkspaceSetupJob::class, 1);
+
+        $this->changed['.argos/demo.yml'] = 'b2';
+        $this->service()->afterTurn($task);
+        Bus::assertDispatchedTimes(CheckWorkspaceSetupJob::class, 2);
     }
 
     public function test_automatic_tests_stop_after_a_few_rounds(): void
@@ -254,7 +271,8 @@ class WorkspaceSetupTest extends TestCase
         }
         $this->workspace->forceFill(['setup_status' => WorkspaceSetupStatus::Failed])->save();
 
-        $this->turn($task, '.argos/setup.sh');
+        $this->fakeDiff();
+        $this->changed = ['.argos/setup.sh' => 'c1'];
         $this->service()->afterTurn($task);
 
         Bus::assertNotDispatched(CheckWorkspaceSetupJob::class);
