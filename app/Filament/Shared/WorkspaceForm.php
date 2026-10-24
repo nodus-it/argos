@@ -463,6 +463,8 @@ final class WorkspaceForm
                 Toggle::make('live_demo_enabled')
                     ->label(__('workspace_form.fields.live_demo_label'))
                     ->helperText(__('workspace_form.fields.live_demo_helper'))
+                    ->hint(fn (?Workspace $record): ?string => $record !== null ? app(WorkspaceSetupService::class)->lockReason($record) : null)
+                    ->hintColor('warning')
                     ->default(true)
                     ->live(),
 

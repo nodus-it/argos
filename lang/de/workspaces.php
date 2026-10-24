@@ -724,6 +724,7 @@ return [
             'members' => 'Mitglieder',
         ],
         'sections' => [
+            'advanced' => 'Erweitert',
             'setup' => 'Einrichtung',
             'setup_description' => 'Was eine neue Aufgabe ausführt, bevor Claude startet.',
             'resources' => 'Grenzen',
@@ -735,7 +736,7 @@ return [
             'default_branch_helper' => 'Neue Aufgaben zweigen davon ab, ihre Pull Requests zielen darauf.',
             'setup_status' => 'Stand der Einrichtung',
             'setup_commands_heading' => 'Setup-Befehle liegen im Repository',
-            'setup_commands_body' => 'Jede neue Aufgabe führt .argos/setup.sh aus dem Repository in ihrer eigenen Arbeitskopie aus (Abhängigkeiten, Datenbank, …), bevor Claude startet. Ohne die Datei laufen die Laravel-Standards (composer install, APP_KEY, Migrationen). Ändere die Datei in einer Aufgabe und liefere sie aus wie jede andere Änderung.',
+            'setup_commands_body' => 'Jede neue Aufgabe führt .argos/setup.sh aus dem Repository in ihrer eigenen Arbeitskopie aus (Abhängigkeiten, Datenbank, …), bevor Claude startet. Ohne die Datei läuft das `composer setup`-Skript des Projekts, sonst die Laravel-Standards (composer install, APP_KEY, Migrationen). Ändere die Datei in einer Aufgabe und liefere sie aus wie jede andere Änderung.',
             'max_sessions' => 'Parallele Sessions',
             'max_sessions_helper' => 'Wie viele Aufgaben gleichzeitig mit Claude sprechen dürfen. Weitere Aufgaben warten in der Warteschlange.',
             'max_previews' => 'Parallele Previews',

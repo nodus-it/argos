@@ -73,6 +73,10 @@ Aufgaben-Branches zu pushen und Pull Requests zu öffnen.
 
 ## Umgebung
 
+Der Tab beginnt mit **Einrichtung**, dann folgen Live-Demo und Secrets. Der
+Worker-Abschnitt (Image-Quelle, Stack, Backing Services) steht zuletzt unter
+*Erweitert* und bleibt eingeklappt, sobald ein Stack gesetzt ist.
+
 ### Worker: Image-Quelle und Stack
 
 - **Image-Quelle**
@@ -149,15 +153,20 @@ Regeln:
 
 Nur auf der Einstellungsseite, schreibgeschützt plus Aktionen:
 
-- **Stand der Einrichtung** (*Einrichtung nötig*, *Wird eingerichtet*, *Wird
-  getestet*, *Eingerichtet*, *Test fehlgeschlagen*, *Braucht ein Claude-Abo*)
+- **Stand der Einrichtung** (*Einrichtung nötig*, *Noch nicht getestet*, *Wird
+  eingerichtet*, *Wird getestet*, *Eingerichtet*, *Test fehlgeschlagen*,
+  *Braucht ein Claude-Abo*)
   und, solange eine getestete Einrichtung nicht gemergt ist, der Branch, aus
   dem sie stammt.
 - **Letzter Test** — jeder Schritt des letzten **Einrichtung testen** mit
   ✓ / ✗.
 - **Aus dem Repository** — ob der Preview-Vertrag (`.argos/demo.yml`) und die
-  Einrichtungsschritte (`.argos/setup.sh`) *im Repository* liegen, vom
-  *Laravel-Standard* kommen, *fehlen* oder *nicht lesbar* sind.
+  Einrichtungsschritte (`.argos/setup.sh`) *im Repository* liegen, aus dem
+  *composer setup*-Skript des Projekts oder vom *Laravel-Standard* kommen,
+  *fehlen* oder *nicht lesbar* sind.
+- **Demo-ENVs** — fehlende Pflicht-Schlüssel und weitere Schlüssel, die in
+  `.env.example` leer sind und nirgends gesetzt werden (siehe
+  [Ein Repository vorbereiten](PREPARE-PROJECT.md)).
 - **Image** — Zustand und Alter des aktuellen Image-Builds, sein **Build-Log**
   und **Neu bauen** (der Workspace nutzt das neue Image ab seinem nächsten
   Start).

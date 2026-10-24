@@ -724,6 +724,7 @@ return [
             'members' => 'Members',
         ],
         'sections' => [
+            'advanced' => 'Advanced',
             'setup' => 'Setup',
             'setup_description' => 'What a fresh task runs before Claude starts.',
             'resources' => 'Limits',
@@ -735,7 +736,7 @@ return [
             'default_branch_helper' => 'New tasks branch off it and their pull requests target it.',
             'setup_status' => 'Setup status',
             'setup_commands_heading' => 'Setup commands live in the repository',
-            'setup_commands_body' => 'Every new task runs .argos/setup.sh from the repository in its own working copy (dependencies, database, …) before Claude starts. Without the file Argos runs the Laravel defaults (composer install, APP_KEY, migrations). Change the file in a task and ship it like any other change.',
+            'setup_commands_body' => 'Every new task runs .argos/setup.sh from the repository in its own working copy (dependencies, database, …) before Claude starts. Without the file Argos runs the `composer setup` script of the project, else the Laravel defaults (composer install, APP_KEY, migrations). Change the file in a task and ship it like any other change.',
             'max_sessions' => 'Parallel sessions',
             'max_sessions_helper' => 'How many tasks may talk to Claude at the same time. Further tasks wait in the queue.',
             'max_previews' => 'Parallel previews',
