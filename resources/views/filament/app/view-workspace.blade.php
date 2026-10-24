@@ -113,7 +113,7 @@
     </div>
 
     <div class="ag-center" x-show="!(review && maximized)">
-        @if ($onboarding !== null && collect($onboarding)->contains(fn (array $s): bool => $s['required'] && ! $s['done']))
+        @if ($onboarding !== null && $task?->kind !== \App\Enums\TaskKind::Setup && collect($onboarding)->contains(fn (array $s): bool => $s['required'] && ! $s['done']))
             <section class="ag-onboarding-card" aria-labelledby="ag-ob-title">
                 <div class="ag-ob-head">
                     <h2 id="ag-ob-title" class="ag-ob-title">{{ __('workspaces.onboarding.title') }} · {{ collect($onboarding)->where('done', true)->count() }}/{{ count($onboarding) }}</h2>

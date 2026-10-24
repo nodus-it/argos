@@ -23,7 +23,7 @@ class WorkspaceOnboarding
     ) {}
 
     /**
-     * @return list<array{key: string, done: bool, required: bool, label: string, action: string, url: string}>
+     * @return list<array{key: string, done: bool, required: bool, running: bool, label: string, action: string, url: string}>
      */
     public function steps(Workspace $workspace, User $user): array
     {
@@ -47,6 +47,7 @@ class WorkspaceOnboarding
             'key' => $s[0],
             'done' => $s[1],
             'required' => $s[2],
+            'running' => $s[0] === 'setup' && ! $s[1] && $setupTask !== null,
             'label' => (string) __('workspaces.onboarding.steps.'.$s[0]),
             'action' => (string) __('workspaces.onboarding.actions.'.$s[0]),
             'url' => $s[3],

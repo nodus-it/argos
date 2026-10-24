@@ -674,6 +674,7 @@ a.ag-ref-chip:hover { text-decoration: underline; }
 .ag-ob-step.is-done .ag-ob-mark { border-color: var(--ag-ok); color: var(--ag-ok); }
 .ag-ob-step.is-done .ag-ob-label { color: var(--ag-muted); }
 .ag-ob-label { flex: 1; min-width: 0; }
+.ag-ob-running { font-size: 12.5px; color: var(--ag-muted); }
 @media (max-width: 640px) { .ag-onboarding-card { margin: 8px 12px 0; padding: 10px 12px; } }
 .ag-locked { margin: 0 0 8px; font-size: 12.5px; color: var(--ag-muted); }
 .ag-locked a { color: var(--ag-accent); }

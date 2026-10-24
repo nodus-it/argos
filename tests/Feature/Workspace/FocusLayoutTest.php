@@ -10,6 +10,7 @@ use App\Enums\ApprovalStatus;
 use App\Enums\GateRunStatus;
 use App\Enums\SessionStatus;
 use App\Enums\TaskEventType;
+use App\Enums\TaskKind;
 use App\Enums\TaskStatus;
 use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceSetupStatus;
@@ -82,6 +83,11 @@ class FocusLayoutTest extends TestCase
         Livewire::actingAs($this->owner)->test(ViewWorkspace::class, ['record' => $this->workspace->getKey()])
             ->assertSee(__('workspaces.onboarding.title'))
             ->assertSee(__('workspaces.onboarding.steps.setup'));
+
+        // On the setup task itself its banner says what happens; the card would ask for the same step.
+        $setup = Task::factory()->ownedBy($this->owner)->create(['workspace_id' => $this->workspace->id, 'kind' => TaskKind::Setup]);
+        Livewire::actingAs($this->owner)->test(ViewWorkspace::class, ['record' => $this->workspace->getKey(), 'task' => $setup->slug])
+            ->assertDontSee(__('workspaces.onboarding.title'));
 
         $member = User::factory()->create();
         WorkspaceMember::query()->create(['workspace_id' => $this->workspace->id, 'user_id' => $member->id, 'role' => WorkspaceRole::Member]);
