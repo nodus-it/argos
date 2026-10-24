@@ -239,6 +239,8 @@ return [
         'failed' => 'Der Workspace konnte nicht starten.',
     ],
     'preview' => [
+        'missing_env' => 'Braucht Werte für: :keys (Einstellungen → Umgebung).',
+        'login' => 'Login',
         'start_short' => 'Starten',
         'off_short' => 'Aus',
         'live' => 'Läuft',
@@ -808,6 +810,10 @@ return [
     'setup' => [
         'locked' => 'Braucht eine getestete Einrichtung (jetzt: :status).',
         'locked_action' => 'Einrichten',
+        'env_open' => 'Leer in .env.example, nirgends gesetzt',
+        'env_missing' => 'Für die Demo nötig, fehlt noch',
+        'env_none' => 'Nichts offen',
+        'env_heading' => 'Demo-ENVs',
         'task_title' => 'Workspace einrichten',
         'needs_agent' => 'Für die Einrichtung braucht es dein Claude-Abo — hinterlege es zuerst in deinem Profil.',
         'not_setup_task' => 'Nur die Einrichtungs-Aufgabe lässt sich testen.',

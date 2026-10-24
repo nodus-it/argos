@@ -96,6 +96,7 @@ class DemoDeployer
             $log .= $this->enforceConcurrencyCap($target);
             $log .= $this->composeUp($project, $workDir);
             $this->runCommands($project, $entry['service'], $settings['commands'] ?? [], $target->demoExecUser(), $log);
+            $log .= $this->probeData($project, $entry['service'], $target->demoExecUser());
             $log .= $this->probeHealth($project, $entry, $settings['health'] ?? null);
 
             $url = $router->writeRoute($slug, $entry['port']);
@@ -402,6 +403,26 @@ class DemoDeployer
                 throw new RuntimeException("Demo command failed (exit {$process->getExitCode()}): {$command}");
             }
         }
+    }
+
+    /**
+     * A warning line when a Laravel demo has no rows outside `migrations`; other
+     * stacks, or an artisan that cannot tell, pass silently.
+     */
+    private function probeData(string $project, string $service, ?string $user): string
+    {
+        $exec = ['docker', 'compose', '-p', $project, 'exec', '-T', ...($user !== null ? ['--user', $user, '-e', 'HOME=/tmp'] : [])];
+        $process = $this->newProcess([...$exec, $service, 'sh', '-c', 'test -f artisan && php artisan db:show --counts --json 2>/dev/null']);
+        $process->setTimeout(60);
+        $process->run();
+
+        $tables = json_decode($process->getOutput(), true)['tables'] ?? null;
+        if (! $process->isSuccessful() || ! is_array($tables)) {
+            return '';
+        }
+        $rows = array_sum(array_map(fn (mixed $t): int => is_array($t) && ($t['table'] ?? '') !== 'migrations' ? (int) ($t['rows'] ?? 0) : 0, $tables));
+
+        return $rows > 0 ? '' : "[warn] The demo database has no data outside `migrations` — does a seeder run?\n";
     }
 
     /**

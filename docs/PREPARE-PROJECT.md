@@ -392,6 +392,25 @@ health:
   timeout: 120
 ```
 
+Two optional keys help the demo itself:
+
+```yaml
+env:
+  required: [STRIPE_SECRET]   # the app cannot start without these
+login:
+  path: /login
+  email: admin@example.com
+  password: secret
+```
+
+`env.required` keys without a value in `.env.example` or Settings →
+Environment lock the preview until they are set. Settings → Environment →
+Setup lists them, and also every other key that is empty in `.env.example`
+and set nowhere (a hint, not a lock). `login` appears on the preview card.
+After the demo commands, Argos counts the rows of a Laravel demo's database;
+a demo with no data outside `migrations` gets a warning in its log. Argos
+also keeps the repo's `DB_CONNECTION` when it is `mysql` or `mariadb`.
+
 ## Final checklist
 
 1. Laravel app? The defaults usually fit; the status says *Not tested yet*

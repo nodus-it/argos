@@ -409,6 +409,27 @@ health:
   timeout: 120
 ```
 
+Zwei optionale Schlüssel helfen der Demo selbst:
+
+```yaml
+env:
+  required: [STRIPE_SECRET]   # ohne diese startet die App nicht
+login:
+  path: /login
+  email: admin@example.com
+  password: secret
+```
+
+Schlüssel unter `env.required`, die weder in `.env.example` noch unter
+Einstellungen → Umgebung einen Wert haben, sperren die Preview, bis sie gesetzt
+sind. Einstellungen → Umgebung → Einrichtung listet sie, dazu jeden anderen
+Schlüssel, der in `.env.example` leer ist und nirgends gesetzt wird (ein
+Hinweis, keine Sperre). `login` erscheint auf der Preview-Karte. Nach den
+Demo-Befehlen zählt Argos die Zeilen in der Datenbank einer Laravel-Demo; eine
+Demo ohne Daten außerhalb von `migrations` bekommt eine Warnung im Log. Argos
+übernimmt außerdem das `DB_CONNECTION` des Repos, wenn es `mysql` oder
+`mariadb` ist.
+
 ## Abschluss-Checkliste
 
 1. Laravel-App? Die Standards passen meist; der Stand zeigt *Noch nicht

@@ -42,6 +42,11 @@
             </span>
         @endif
     </div>
+    @if ($reason !== null)
+        <p class="ag-locked" data-testid="preview-reason">{{ $reason }}</p>
+    @elseif ($login !== null)
+        <p class="ag-demo-login" data-testid="preview-login">{{ __('workspaces.preview.login') }}: <span class="mono" x-on:click="window.getSelection().selectAllChildren($el)">{{ $login['email'] }}</span> · <span class="mono" x-on:click="window.getSelection().selectAllChildren($el)">{{ $login['password'] }}</span></p>
+    @endif
     @if ($reason === null && $demo?->build_log)
         <pre class="ag-log mono" x-show="log" x-cloak>{{ \Illuminate\Support\Str::limit($demo->build_log, 20000) }}</pre>
     @endif

@@ -239,6 +239,8 @@ return [
         'failed' => 'The workspace failed to start.',
     ],
     'preview' => [
+        'missing_env' => 'Needs values for: :keys (Settings → Environment).',
+        'login' => 'Login',
         'start_short' => 'Start',
         'off_short' => 'Off',
         'live' => 'Live',
@@ -808,6 +810,10 @@ return [
     'setup' => [
         'locked' => 'Needs a tested setup (now: :status).',
         'locked_action' => 'Set up',
+        'env_open' => 'Empty in .env.example, set nowhere',
+        'env_missing' => 'Required for the demo, still missing',
+        'env_none' => 'Nothing open',
+        'env_heading' => 'Demo environment',
         'task_title' => 'Set up the workspace',
         'needs_agent' => 'Setting up needs your Claude subscription — add it in your profile first.',
         'not_setup_task' => 'Only the setup task can be tested.',
