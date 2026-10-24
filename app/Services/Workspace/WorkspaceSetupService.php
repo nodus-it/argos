@@ -146,7 +146,8 @@ class WorkspaceSetupService
             $workspace->worker_stack_id = WorkerStack::query()->where('name', $found['stack'])->value('id');
         }
         if ($found['missing'] === []) {
-            $workspace->forceFill(['setup_status' => WorkspaceSetupStatus::Ready])->save();
+            // Complete is not tested: only a passed check makes it Ready.
+            $workspace->forceFill(['setup_status' => WorkspaceSetupStatus::Untested])->save();
             if (in_array('default', $this->sources($workspace), true)) {
                 $this->notifyLaravelDefaults($workspace, $admin);
             }

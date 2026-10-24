@@ -129,6 +129,7 @@ return [
     ],
     'workspace_setup_status' => [
         'needed' => 'Einrichtung nötig',
+        'untested' => 'Noch nicht getestet',
         'running' => 'Wird eingerichtet',
         'testing' => 'Wird getestet',
         'ready' => 'Eingerichtet',

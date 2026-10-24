@@ -127,14 +127,14 @@ class WorkspaceSetupTest extends TestCase
         $this->assertSame(['stack', 'preview', 'setup'], $this->service()->inspect($this->workspace)['missing']);
     }
 
-    public function test_a_laravel_workspace_is_ready_after_creating_it(): void
+    public function test_a_laravel_workspace_is_complete_but_untested_after_creating_it(): void
     {
         $this->files = ['composer.json' => '{}', 'artisan' => '<?php'];
 
         $this->assertNull($this->service()->afterCreate($this->workspace, $this->admin));
 
         $workspace = $this->workspace->fresh();
-        $this->assertSame(WorkspaceSetupStatus::Ready, $workspace->setup_status);
+        $this->assertSame(WorkspaceSetupStatus::Untested, $workspace->setup_status);
         $this->assertSame('php-8.5', $workspace->workerStack?->name);
         $this->assertSame(0, Task::query()->count());
     }
