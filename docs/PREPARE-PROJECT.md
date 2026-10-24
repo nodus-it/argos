@@ -75,12 +75,14 @@ When a workspace is created, Argos inspects the repository:
 | the preview contract | not a Laravel app (`composer.json` + `artisan`) and no `.argos/demo.yml` |
 | the setup steps | not a Laravel app, no `.argos/setup.sh` and no `composer setup` script |
 
-If anything is missing, Argos starts a **setup task** — a task of kind
+After creating a workspace Argos starts a **setup task**, even when nothing
+is missing (a Laravel app on the defaults still needs its test) — a task of kind
 *Setup*, owned by the admin who created the workspace and running on their
 Claude subscription. It runs in *Bypass permissions* mode when that admin may
 use it in the workspace, otherwise in *Accept edits*; the composer switches
 the mode while the task runs. Claude gets a brief (what is
-missing, the detected project, the stack) and writes:
+missing, the detected project, the stack; the chat shows a one-line summary),
+answers in the owner's language, and writes:
 
 1. `.argos/setup.sh` — idempotent, non-interactive setup steps,
 2. `.argos/demo.compose.yml` and `.argos/demo.yml` — the preview contract,
@@ -420,8 +422,8 @@ also keeps the repo's `DB_CONNECTION` when it is `mysql` or `mariadb`.
 
 ## Final checklist
 
-1. Laravel app? The defaults usually fit; the status says *Not tested yet*
-   until a setup task has passed **Test setup**.
+1. Laravel app? The defaults usually fit; the setup task checks and completes
+   them and tests the result.
 2. Otherwise let the [setup task](#the-setup-task) write `.argos/` (or write
    it yourself), let **Test setup** run until all four steps pass, and merge its
    pull request.
