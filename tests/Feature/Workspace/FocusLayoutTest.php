@@ -12,6 +12,7 @@ use App\Enums\SessionStatus;
 use App\Enums\TaskEventType;
 use App\Enums\TaskStatus;
 use App\Enums\WorkspaceRole;
+use App\Enums\WorkspaceSetupStatus;
 use App\Filament\App\Resources\WorkspaceResource\Pages\ViewWorkspace;
 use App\Livewire\Workspace\ChangeTray;
 use App\Livewire\Workspace\ContextPanel;
@@ -26,6 +27,7 @@ use App\Models\WorkspaceGateRun;
 use App\Models\WorkspaceMember;
 use App\Services\Workspace\TaskOverview;
 use App\Services\Workspace\WorkspaceDaemonClient;
+use App\Services\Workspace\WorkspaceOnboarding;
 use App\Support\GateRows;
 use App\Support\TaskTimeline;
 use App\Testing\FakeWorkspaceDaemon;
@@ -68,6 +70,23 @@ class FocusLayoutTest extends TestCase
             ->assertSeeLivewire(TaskSwitcher::class)
             ->assertSeeLivewire(TaskChat::class)
             ->assertSeeLivewire(ContextPanel::class);
+    }
+
+    public function test_admins_see_the_open_setup_steps_until_the_setup_is_tested(): void
+    {
+        $this->workspace->forceFill(['setup_status' => WorkspaceSetupStatus::Untested])->save();
+        $steps = app(WorkspaceOnboarding::class)->steps($this->workspace, $this->owner);
+        $this->assertFalse(collect($steps)->firstWhere('key', 'setup')['done']);
+        $this->assertTrue(app(WorkspaceOnboarding::class)->incomplete($this->workspace, $this->owner));
+
+        Livewire::actingAs($this->owner)->test(ViewWorkspace::class, ['record' => $this->workspace->getKey()])
+            ->assertSee(__('workspaces.onboarding.title'))
+            ->assertSee(__('workspaces.onboarding.steps.setup'));
+
+        $member = User::factory()->create();
+        WorkspaceMember::query()->create(['workspace_id' => $this->workspace->id, 'user_id' => $member->id, 'role' => WorkspaceRole::Member]);
+        Livewire::actingAs($member)->test(ViewWorkspace::class, ['record' => $this->workspace->getKey()])
+            ->assertDontSee(__('workspaces.onboarding.title'));
     }
 
     public function test_tasks_are_grouped_with_a_status_line(): void

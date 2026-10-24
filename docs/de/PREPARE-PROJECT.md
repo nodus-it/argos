@@ -121,6 +121,14 @@ Request gemergt ist.* Nach dem Merge kommt alles wieder vom Default-Branch.
 Wird der Pull Request ohne Merge geschlossen, entfällt der Branch und der
 Status geht zurück auf *Einrichtung nötig*.
 
+### Einrichtungs-Checkliste
+
+Workspace-Admins sehen auf der Workspace-Seite eine Checkliste, solange ein
+Pflichtschritt offen ist — Claude-Abo, Stack, getestete Einrichtung und, bei
+eingeschalteter Live-Demo, die Demo-ENVs — und die ganze Liste samt optionaler
+Schritte oben in der Seitenleiste. Jeder offene Schritt verlinkt dorthin, wo
+er sich erledigen lässt.
+
 ### Stand der Einrichtung
 
 | Status | Bedeutung |

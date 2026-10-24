@@ -807,6 +807,31 @@ return [
             'pr_closed' => 'Der Pull Request wurde geschlossen',
         ],
     ],
+    'onboarding' => [
+        'title' => 'Workspace einrichten',
+        'section' => 'Einrichtung',
+        'optional' => 'optional',
+        'all_steps' => 'Alle Schritte',
+        'steps' => [
+            'agent' => 'Claude-Abo verbunden',
+            'stack' => 'Stack erkannt',
+            'setup' => 'Einrichtung getestet',
+            'demo' => 'Live-Demo eingeschaltet',
+            'env' => 'Demo-ENVs vollständig',
+            'tracker' => 'Ticket-System verbunden',
+            'members' => 'Team eingeladen',
+        ],
+        'actions' => [
+            'agent' => 'Verbinden',
+            'stack' => 'Auswählen',
+            'setup' => 'Einrichten',
+            'demo' => 'Einschalten',
+            'env' => 'Werte setzen',
+            'tracker' => 'Verbinden',
+            'members' => 'Einladen',
+        ],
+    ],
+
     'setup' => [
         'locked' => 'Braucht eine getestete Einrichtung (jetzt: :status).',
         'locked_action' => 'Einrichten',

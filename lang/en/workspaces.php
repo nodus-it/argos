@@ -807,6 +807,31 @@ return [
             'pr_closed' => 'The pull request was closed',
         ],
     ],
+    'onboarding' => [
+        'title' => 'Set up this workspace',
+        'section' => 'Setup',
+        'optional' => 'optional',
+        'all_steps' => 'All steps',
+        'steps' => [
+            'agent' => 'Claude subscription connected',
+            'stack' => 'Stack detected',
+            'setup' => 'Setup tested',
+            'demo' => 'Live demo enabled',
+            'env' => 'Demo environment complete',
+            'tracker' => 'Issue tracker connected',
+            'members' => 'Team invited',
+        ],
+        'actions' => [
+            'agent' => 'Connect',
+            'stack' => 'Choose',
+            'setup' => 'Set up',
+            'demo' => 'Enable',
+            'env' => 'Set values',
+            'tracker' => 'Connect',
+            'members' => 'Invite',
+        ],
+    ],
+
     'setup' => [
         'locked' => 'Needs a tested setup (now: :status).',
         'locked_action' => 'Set up',

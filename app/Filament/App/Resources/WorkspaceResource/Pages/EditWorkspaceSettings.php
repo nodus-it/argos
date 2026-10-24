@@ -152,10 +152,10 @@ class EditWorkspaceSettings extends EditRecord
                         ->key('environment')
                         ->icon('heroicon-o-cpu-chip')
                         ->schema([$this->formComponent('environmentForm', 'saveEnvironment')]),
-                    Tab::make(__('workspaces.settings.tabs.resources'))
-                        ->key('resources')
-                        ->icon('heroicon-o-adjustments-vertical')
-                        ->schema([$this->formComponent('resourcesForm', 'saveResources')]),
+                    Tab::make(__('workspaces.settings.tabs.automation'))
+                        ->key('automation')
+                        ->icon('heroicon-o-bolt')
+                        ->schema([$this->formComponent('automationForm', 'saveAutomation')]),
                     Tab::make(__('workspaces.settings.tabs.integrations'))
                         ->key('integrations')
                         ->icon('heroicon-o-link')
@@ -163,14 +163,14 @@ class EditWorkspaceSettings extends EditRecord
                             $this->relationManager(TaskProviderBindingsRelationManager::class, 'trackers'),
                             $this->relationManager(ApiTokensRelationManager::class, 'tokens'),
                         ]),
-                    Tab::make(__('workspaces.settings.tabs.automation'))
-                        ->key('automation')
-                        ->icon('heroicon-o-bolt')
-                        ->schema([$this->formComponent('automationForm', 'saveAutomation')]),
                     Tab::make(__('workspaces.settings.tabs.members'))
                         ->key('members')
                         ->icon('heroicon-o-users')
                         ->schema([$this->relationManager(MembersRelationManager::class, 'members')]),
+                    Tab::make(__('workspaces.settings.tabs.resources'))
+                        ->key('resources')
+                        ->icon('heroicon-o-adjustments-vertical')
+                        ->schema([$this->formComponent('resourcesForm', 'saveResources')]),
                 ]),
         ]);
     }

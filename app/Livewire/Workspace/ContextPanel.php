@@ -14,6 +14,7 @@ use App\Services\Git\WorkspaceDiffService;
 use App\Services\Workspace\PullRequestFeedbackService;
 use App\Services\Workspace\PullRequestService;
 use App\Services\Workspace\WorkspaceGateService;
+use App\Services\Workspace\WorkspaceOnboarding;
 use App\Services\Workspace\WorkspaceSetupService;
 use App\Support\GateRows;
 use App\Support\RequestedTask;
@@ -162,6 +163,7 @@ class ContextPanel extends Component
             'generated' => array_values(array_filter($diff['files'] ?? [], fn (array $f): bool => $f['generated'])),
             'gateRun' => $gateRun,
             'gates' => GateRows::of($gateRun),
+            'onboarding' => $this->user()->can('setup', $workspace) ? app(WorkspaceOnboarding::class)->steps($workspace, $this->user()) : null,
             'gatesLocked' => app(WorkspaceSetupService::class)->lockReason($workspace, $task),
             'settingsUrl' => WorkspaceResource::getUrl('settings', ['record' => $workspace]).'?tab=environment',
             'canOperate' => $task !== null && $this->user()->can('prompt', $task),

@@ -116,6 +116,13 @@ merge, everything comes from the default branch again. Closing the pull
 request without a merge drops the branch and sets the status back to *Needs
 setting up*.
 
+### Setup checklist
+
+Workspace admins see a checklist on the workspace page while a required step
+is open — Claude subscription, stack, tested setup, and the demo environment
+when the live demo is on — and the full list, optional steps included, at the
+top of the sidebar. Each open step links to the place that completes it.
+
 ### Setup status
 
 | Status | Meaning |
