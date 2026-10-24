@@ -93,7 +93,10 @@ RUN mkdir -p bootstrap/cache \
 # CSS/JS/fonts into public/{css,js,fonts}/filament — these are generated, not
 # committed, so the image must regenerate them. Explicit (not relying on the
 # composer post-autoload-dump hook) so a future --no-scripts can't drop them.
+# The touch keeps installed.json newer than the copied composer.lock when the
+# dependency layer above came from cache; otherwise every container start reinstalls.
 RUN composer install --no-dev --optimize-autoloader --no-interaction \
+    && touch vendor/composer/installed.json \
     && npm ci \
     && npm run build \
     && php artisan filament:assets \

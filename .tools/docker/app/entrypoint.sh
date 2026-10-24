@@ -54,10 +54,12 @@ if [[ -f /app/composer.lock ]]; then
     if [[ ! -f /app/vendor/autoload.php ]] \
             || [[ /app/composer.lock -nt /app/vendor/composer/installed.json ]]; then
         echo "Composer dependencies out of sync — running composer install..."
-        composer install \
-            --working-dir=/app \
-            --no-interaction \
-            --optimize-autoloader
+        composer_flags=(--working-dir=/app --no-interaction --optimize-autoloader)
+        # Production images ship without dev packages; a sync must not pull them in.
+        if [[ "${APP_ENV:-production}" == "production" ]]; then
+            composer_flags+=(--no-dev)
+        fi
+        composer install "${composer_flags[@]}"
     fi
 fi
 
