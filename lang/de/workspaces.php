@@ -814,6 +814,7 @@ return [
         'section' => 'Einrichtung',
         'optional' => 'optional',
         'all_steps' => 'Alle Schritte',
+        'running' => 'Claude arbeitet daran …',
         'steps' => [
             'agent' => 'Claude-Abo verbunden',
             'stack' => 'Stack erkannt',
@@ -868,7 +869,7 @@ return [
         'open_task' => 'Einrichtungs-Aufgabe öffnen',
         'defaults_title' => ':workspace läuft mit dem Laravel-Standard',
         'defaults_body' => 'Das Repository bringt keine eigene Einrichtung mit, daher gelten die eingebaute Laravel-Preview und die Standard-Setup-Befehle. Braucht das Projekt mehr (andere Datenbank, Redis, gebaute Assets, Schlüssel), lass Claude sie über „Einrichtung überarbeiten“ schreiben.',
-        'banner' => 'Diese Aufgabe richtet den Workspace ein. Argos testet, sobald Claude die Einrichtung ändert; „Einrichtung testen“ startet den Test von Hand.',
+        'banner' => 'Claude richtet hier den Workspace ein, Argos testet jede Änderung selbst — du musst nichts tun, bis Claude dich etwas fragt.',
     ],
     'api' => [
         'no_connected_account' => 'Der Nutzer des API-Clients hat kein verbundenes Konto auf dieser Plattform.',

@@ -65,7 +65,7 @@
             @svg('heroicon-o-wrench-screwdriver')
             <span>{{ __('workspaces.setup.banner') }}@if ($task->workspace->setup_status) · <strong>{{ $task->workspace->setup_status->label() }}</strong>@endif</span>
             @if ($canWrite)
-                <button type="button" class="ag-btn ag-btn-sm ag-btn-primary" wire:click="testSetup" wire:loading.attr="disabled" title="{{ __('workspaces.setup.test_help') }}"
+                <button type="button" class="ag-btn ag-btn-sm ag-btn-soft" wire:click="testSetup" wire:loading.attr="disabled" title="{{ __('workspaces.setup.test_help') }}"
                         @disabled($task->workspace->setup_status === \App\Enums\WorkspaceSetupStatus::Testing)>{{ __('workspaces.setup.test') }}</button>
             @endif
         </div>

@@ -814,6 +814,7 @@ return [
         'section' => 'Setup',
         'optional' => 'optional',
         'all_steps' => 'All steps',
+        'running' => 'Claude is on it …',
         'steps' => [
             'agent' => 'Claude subscription connected',
             'stack' => 'Stack detected',
@@ -868,7 +869,7 @@ return [
         'open_task' => 'Open the setup task',
         'defaults_title' => ':workspace runs on the Laravel defaults',
         'defaults_body' => 'The repository brings no setup of its own, so the built-in Laravel preview and setup steps apply. If the project needs more (another database, Redis, built assets, keys), let Claude write it with "Revise setup".',
-        'banner' => 'This task sets up the workspace. Argos tests it whenever Claude changes it; "Test setup" runs the test by hand.',
+        'banner' => 'Claude sets up the workspace here and Argos tests every change on its own — nothing to do until Claude asks you something.',
     ],
     'api' => [
         'no_connected_account' => 'The API client\'s user has no connected account on this platform.',

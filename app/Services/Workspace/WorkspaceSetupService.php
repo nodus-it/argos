@@ -24,6 +24,7 @@ use App\Models\WorkerStack;
 use App\Models\Workspace;
 use App\Services\Demo\DemoConfigLocator;
 use App\Services\Demo\DemoDeployer;
+use App\Services\Git\WorkspaceDiffService;
 use App\Services\GitProvider\GitServiceFactory;
 use App\Services\Worker\WorkerSidecarManager;
 use App\Workers\Compose\WorkerImageBuilder;
@@ -52,8 +53,6 @@ class WorkspaceSetupService
 
     /** Automatic tests in a row before a person has to look again. */
     public const AUTO_TEST_ROUNDS = 5;
-
-    private const EDIT_TOOLS = ['Edit', 'MultiEdit', 'Write'];
 
     public function __construct(
         private readonly GitServiceFactory $git,
@@ -322,18 +321,24 @@ class WorkspaceSetupService
             throw WorkspaceException::translated('workspaces.setup.testing');
         }
 
-        $this->queueTest($task, $by);
+        $this->queueTest($task, $by, $this->setupFingerprint($task));
     }
 
     /**
-     * A turn of the setup task ended: when Claude changed `.argos/`, test right
-     * away — at most AUTO_TEST_ROUNDS times since a person last wrote.
+     * A turn of the setup task ended: when `.argos/` differs from the last test,
+     * test right away — at most AUTO_TEST_ROUNDS times since a person last wrote.
      */
     public function afterTurn(Task $task): void
     {
         $task = $task->fresh() ?? $task;
         if ($task->kind !== TaskKind::Setup || $task->status->isFinished() || $task->owner === null
-            || $task->workspace->setup_status === WorkspaceSetupStatus::Testing || ! $this->turnChangedSetup($task)) {
+            || $task->workspace->setup_status === WorkspaceSetupStatus::Testing) {
+            return;
+        }
+        $fingerprint = $this->setupFingerprint($task);
+        $lastTested = $task->events()->where('type', TaskEventType::Notice->value)->latest('id')->get(['payload'])
+            ->first(fn ($event): bool => ($event->payload['kind'] ?? null) === 'setup_testing')?->payload['fingerprint'] ?? null;
+        if ($fingerprint === null || $fingerprint === $lastTested) {
             return;
         }
 
@@ -347,31 +352,36 @@ class WorkspaceSetupService
             return;
         }
 
-        $this->queueTest($task, $task->owner);
+        $this->queueTest($task, $task->owner, $fingerprint);
     }
 
-    private function queueTest(Task $task, User $by): void
+    private function queueTest(Task $task, User $by, ?string $fingerprint): void
     {
         $task->workspace->forceFill(['setup_status' => WorkspaceSetupStatus::Testing])->save();
-        $this->notices->systemNotice($task, 'setup_testing');
+        $this->notices->systemNotice($task, 'setup_testing', ['fingerprint' => $fingerprint]);
         CheckWorkspaceSetupJob::dispatch($task->id, $by->id);
     }
 
-    /** Did the turn that just ended edit a file under `.argos/`? */
-    private function turnChangedSetup(Task $task): bool
+    /**
+     * The content hashes of the task's changed `.argos/` files, whatever wrote
+     * them; null when there are none or the diff cannot be read.
+     */
+    private function setupFingerprint(Task $task): ?string
     {
-        $turns = $task->events()->where('type', TaskEventType::TurnCompleted->value)->latest('id')->limit(2)->pluck('id');
-        if ($turns->isEmpty()) {
-            return false;
+        try {
+            $files = app(WorkspaceDiffService::class)->summary($task)['files'];
+        } catch (Throwable) {
+            return null;
         }
+        $setup = [];
+        foreach ($files as $file) {
+            if (str_starts_with($file['path'], '.argos/')) {
+                $setup[$file['path']] = $file['hash'];
+            }
+        }
+        ksort($setup);
 
-        return $task->events()
-            ->where('type', TaskEventType::ToolCall->value)
-            ->where('id', '<', $turns[0])
-            ->where('id', '>', (int) ($turns[1] ?? 0))
-            ->get(['payload'])
-            ->contains(fn ($event): bool => in_array($event->payload['name'] ?? '', self::EDIT_TOOLS, true)
-                && preg_match('#(^|/)\.argos/#', (string) ($event->payload['input']['file_path'] ?? '')) === 1);
+        return $setup === [] ? null : sha1((string) json_encode($setup));
     }
 
     /**

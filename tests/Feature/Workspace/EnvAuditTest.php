@@ -59,6 +59,9 @@ class EnvAuditTest extends TestCase
 
         $this->files = ['.env.example' => "DB_CONNECTION=sqlite\n"];
         $this->assertSame('mysql', app(EnvAudit::class)->databaseDriver(Workspace::factory()->create()));
+
+        $this->files = ['.env.example' => "DB_CONNECTION=sqlite\n", 'config/database.php' => "<?php return ['connections' => ['sqlite' => [], 'mariadb' => []]];"];
+        $this->assertSame('mariadb', app(EnvAudit::class)->databaseDriver(Workspace::factory()->create()));
     }
 
     public function test_missing_required_keys_lock_previews_except_for_the_setup_task(): void
