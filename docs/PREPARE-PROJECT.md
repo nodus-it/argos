@@ -58,7 +58,7 @@ while a tested setup is not merged yet, the setup task's branch (see
 
 | File | What it controls | Default if absent |
 | --- | --- | --- |
-| `.argos/setup.sh` | Steps a fresh task worktree runs before Claude starts (dependencies, `.env`, keys, migrations). | Laravel defaults: `composer install`, `APP_KEY`, `php artisan migrate`. |
+| `.argos/setup.sh` | Steps a fresh task worktree runs before Claude starts (dependencies, `.env`, keys, migrations). | The project's `composer setup` script if `composer.json` has one, else Laravel defaults: `composer install`, `APP_KEY`, `php artisan migrate`. |
 | `.argos/demo.compose.yml` + `.argos/demo.yml` | The live preview of a task (both files or neither). | Bundled Laravel contract (`app` php-fpm/nginx + MariaDB `db`). |
 | `.argos/worker.dockerfile` | The image the workspace container runs in (instead of a built-in stack). | Built-in stack picked from `composer.json` / `package.json` (default PHP 8.5). |
 
@@ -73,7 +73,7 @@ When a workspace is created, Argos inspects the repository:
 | --- | --- |
 | a fitting stack | no `composer.json`, no `package.json` and no `.argos/worker.dockerfile` |
 | the preview contract | not a Laravel app (`composer.json` + `artisan`) and no `.argos/demo.yml` |
-| the setup steps | not a Laravel app and no `.argos/setup.sh` |
+| the setup steps | not a Laravel app, no `.argos/setup.sh` and no `composer setup` script |
 
 If anything is missing, Argos starts a **setup task** — a task of kind
 *Setup*, owned by the admin who created the workspace and running on their

@@ -61,7 +61,7 @@ Einrichtungs-Aufgabe (siehe [unten](#die-einrichtungs-aufgabe)).
 
 | Datei | Was sie steuert | Standard, wenn sie fehlt |
 | --- | --- | --- |
-| `.argos/setup.sh` | Schritte, die ein frischer Worktree einer Aufgabe ausführt, bevor Claude startet (Abhängigkeiten, `.env`, Schlüssel, Migrationen). | Laravel-Standards: `composer install`, `APP_KEY`, `php artisan migrate`. |
+| `.argos/setup.sh` | Schritte, die ein frischer Worktree einer Aufgabe ausführt, bevor Claude startet (Abhängigkeiten, `.env`, Schlüssel, Migrationen). | Das `composer setup`-Skript des Projekts, wenn `composer.json` eines hat, sonst die Laravel-Standards: `composer install`, `APP_KEY`, `php artisan migrate`. |
 | `.argos/demo.compose.yml` + `.argos/demo.yml` | Die Live-Preview einer Aufgabe (beide Dateien oder keine). | Mitgelieferter Laravel-Vertrag (`app` php-fpm/nginx + MariaDB `db`). |
 | `.argos/worker.dockerfile` | Das Image, in dem der Workspace-Container läuft (statt eines eingebauten Stacks). | Eingebauter Stack, gewählt anhand von `composer.json` / `package.json` (Standard PHP 8.5). |
 
@@ -76,7 +76,7 @@ Wenn ein Workspace angelegt wird, prüft Argos das Repository:
 | --- | --- |
 | ein passender Stack | keine `composer.json`, keine `package.json` und keine `.argos/worker.dockerfile` |
 | der Preview-Vertrag | keine Laravel-App (`composer.json` + `artisan`) und keine `.argos/demo.yml` |
-| die Setup-Befehle | keine Laravel-App und keine `.argos/setup.sh` |
+| die Setup-Befehle | keine Laravel-App, keine `.argos/setup.sh` und kein `composer setup`-Skript |
 
 Fehlt etwas, startet Argos eine **Einrichtungs-Aufgabe** — eine Aufgabe der Art
 *Einrichtung*, die der Admin-Person gehört, die den Workspace angelegt hat,

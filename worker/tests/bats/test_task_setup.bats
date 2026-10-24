@@ -56,6 +56,18 @@ SH
     [[ "$output" == *"[setup] done"* ]]
 }
 
+@test "runs the project's composer setup script when it has one" {
+    printf '{"scripts": {"setup": ["@php -v"]}}\n' > composer.json
+    mkdir -p "$TASK_DIR/.bin"
+    printf '#!/usr/bin/env bash\necho "composer $*"\n' > "$TASK_DIR/.bin/composer"
+    chmod +x "$TASK_DIR/.bin/composer"
+    PATH="$TASK_DIR/.bin:$PATH" run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"[setup] composer run-script setup"* ]]
+    [[ "$output" == *"composer run-script setup --no-interaction"* ]]
+    [[ "$output" != *"[setup] done"* ]]
+}
+
 @test "runs .argos/setup.sh from the unmerged setup branch when the worktree has none" {
     git init -q -b main .
     git -c user.name=t -c user.email=t@t commit -q --allow-empty -m base

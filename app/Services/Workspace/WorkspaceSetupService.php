@@ -94,7 +94,7 @@ class WorkspaceSetupService
         if ((! $laravel || $ownImage) && $file(DemoConfigLocator::SETTINGS_PATH) === null) {
             $missing[] = 'preview';
         }
-        if (! $laravel && $file('.argos/setup.sh') === null) {
+        if (! $laravel && $file('.argos/setup.sh') === null && ! self::hasComposerSetup($composer)) {
             $missing[] = 'setup';
         }
 
@@ -123,7 +123,12 @@ class WorkspaceSetupService
 
                 return [
                     'preview' => $file(DemoConfigLocator::SETTINGS_PATH) ? 'repo' : ($bundledPreview ? 'default' : 'missing'),
-                    'setup' => $file('.argos/setup.sh') ? 'repo' : ($laravel ? 'default' : 'missing'),
+                    'setup' => match (true) {
+                        $file('.argos/setup.sh') => 'repo',
+                        self::hasComposerSetup($service->getFileContents($workspace->getOwnerRepo(), 'composer.json', $workspace->setupRef())) => 'composer',
+                        $laravel => 'default',
+                        default => 'missing',
+                    },
                 ];
             } catch (Throwable) {
                 return ['preview' => 'unknown', 'setup' => 'unknown'];
@@ -267,6 +272,12 @@ class WorkspaceSetupService
         }
 
         return __('workspaces.setup.locked', ['status' => ($workspace->setup_status ?? WorkspaceSetupStatus::Untested)->label()]);
+    }
+
+    /** The project's own `composer setup` script (the Laravel skeleton convention). */
+    private static function hasComposerSetup(?string $composerJson): bool
+    {
+        return isset(json_decode((string) $composerJson, true)['scripts']['setup']);
     }
 
     /**

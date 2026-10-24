@@ -4,8 +4,9 @@
 # Called by the workspace daemon with the worktree as working directory,
 # after it wrote the task's values (database, Redis prefix, …) into .env.
 # A project can bring its own steps in .argos/setup.sh (run with bash, from
-# the worktree root); without one the Laravel defaults run: composer install,
-# an APP_KEY and the migrations. While a workspace setup is not merged yet,
+# the worktree root); next comes the project's `composer setup` script (the
+# Laravel skeleton ships one); otherwise the Laravel defaults run: composer
+# install, an APP_KEY and the migrations. While a workspace setup is not merged yet,
 # ARGOS_SETUP_REF names its branch and the steps come from there. Output goes to stdout/stderr; a non-zero
 # exit marks the setup as failed (the task stays usable).
 set -euo pipefail
@@ -52,6 +53,12 @@ if [[ -n "${ARGOS_SETUP_REF:-}" ]] && git cat-file -e "origin/${ARGOS_SETUP_REF}
     trap 'rm -f "$script"' EXIT
     bash "$script"
     exit $?
+fi
+
+if [[ -f composer.json ]] && command -v composer >/dev/null && command -v jq >/dev/null \
+        && jq -e '.scripts.setup' composer.json >/dev/null 2>&1; then
+    setup_log "composer run-script setup"
+    exec composer run-script setup --no-interaction
 fi
 
 setup_composer

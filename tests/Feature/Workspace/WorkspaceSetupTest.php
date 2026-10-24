@@ -289,6 +289,14 @@ class WorkspaceSetupTest extends TestCase
         $this->assertSame(['pint', 'pest', 'artisan'], array_column(GateRows::of(null, ['pint', 'pest', 'artisan']), 'key'));
     }
 
+    public function test_a_composer_setup_script_counts_as_setup_steps(): void
+    {
+        $this->files = ['package.json' => '{}', 'composer.json' => json_encode(['scripts' => ['setup' => ['composer install']]])];
+
+        $this->assertNotContains('setup', $this->service()->inspect($this->workspace)['missing']);
+        $this->assertSame('composer', $this->service()->sources($this->workspace)['setup']);
+    }
+
     public function test_test_setup_queues_the_check(): void
     {
         Bus::fake([CheckWorkspaceSetupJob::class]);

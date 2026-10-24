@@ -857,7 +857,7 @@ return [
         'sources' => 'Aus dem Repository',
         'source_preview' => 'Preview-Vertrag (.argos/demo.yml)',
         'source_setup' => 'Setup-Befehle (.argos/setup.sh)',
-        'source' => ['repo' => 'im Repository', 'default' => 'Laravel-Standard', 'missing' => 'fehlt', 'unknown' => 'nicht lesbar'],
+        'source' => ['repo' => 'im Repository', 'composer' => 'composer setup', 'default' => 'Laravel-Standard', 'missing' => 'fehlt', 'unknown' => 'nicht lesbar'],
         'image' => 'Image',
         'image_none' => 'Noch nicht gebaut — wird beim nächsten Start gebaut.',
         'image_log' => 'Build-Log',
