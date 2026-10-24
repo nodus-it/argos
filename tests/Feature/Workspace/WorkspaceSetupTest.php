@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Workspace;
 
 use App\Broadcasting\TaskStream;
+use App\Enums\PermissionMode;
 use App\Enums\TaskEventType;
 use App\Enums\TaskKind;
 use App\Enums\TaskStatus;
@@ -169,6 +170,7 @@ class WorkspaceSetupTest extends TestCase
         $task->refresh();
         $this->assertSame(TaskKind::Setup, $task->kind);
         $this->assertSame($this->admin->id, $task->owner_user_id);
+        $this->assertSame(PermissionMode::BypassPermissions, $task->permission_mode);
         $this->assertSame(WorkspaceSetupStatus::Running, $this->workspace->fresh()->setup_status);
         $this->assertSame('node-22', $this->workspace->fresh()->workerStack?->name);
         // Prepared right away by the fake daemon: Claude got the brief, once.

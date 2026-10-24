@@ -199,7 +199,9 @@ class WorkspaceSetupService
             throw WorkspaceException::translated('workspaces.setup.needs_agent');
         }
 
-        $task = $this->tasks->create($workspace, $by, $agent, __('workspaces.setup.task_title'), mode: PermissionMode::AcceptEdits, options: ['kind' => TaskKind::Setup]);
+        // The setup runs many shell commands; whoever may skip approvals does so here.
+        $mode = $by->can('bypassPermissions', $workspace) ? PermissionMode::BypassPermissions : PermissionMode::AcceptEdits;
+        $task = $this->tasks->create($workspace, $by, $agent, __('workspaces.setup.task_title'), mode: $mode, options: ['kind' => TaskKind::Setup]);
         $workspace->forceFill(['setup_status' => WorkspaceSetupStatus::Running])->save();
         if ($workspace->status === WorkspaceStatus::Stopped) {
             $this->workspaces->start($workspace);
