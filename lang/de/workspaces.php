@@ -77,6 +77,7 @@ return [
         'invalid' => 'Das ist keine gültige Modell-ID (z. B. claude-opus-5-5, opus, sonnet[1m]).',
     ],
     'focus' => [
+        'no_gates' => 'Keine Prüfwerkzeuge in composer.json gefunden (Pint, Pest/PHPUnit, PHPStan).',
         'filter_files' => 'Dateien filtern',
         'show_all' => 'Alle :count Dateien anzeigen',
         'show_less' => 'Weniger anzeigen',

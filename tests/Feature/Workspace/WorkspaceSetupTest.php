@@ -37,6 +37,7 @@ use App\Services\Workspace\WorkspacePreviewService;
 use App\Services\Workspace\WorkspaceService;
 use App\Services\Workspace\WorkspaceSetupService;
 use App\Services\Workspace\WorkspaceShipService;
+use App\Support\GateRows;
 use App\Testing\FakeWorkspaceDaemon;
 use App\Workers\Compose\WorkerImageBuilder;
 use Filament\Actions\Testing\TestAction;
@@ -278,6 +279,14 @@ class WorkspaceSetupTest extends TestCase
         }
         $this->expectExceptionMessage($locked);
         app(AutoTaskDriver::class)->start($this->workspace, $this->admin, AgentCredential::query()->firstOrFail(), 'Fix it');
+    }
+
+    public function test_only_gates_whose_tools_the_repo_requires_are_listed(): void
+    {
+        $this->files = ['composer.json' => json_encode(['require' => ['laravel/framework' => '^12.0'], 'require-dev' => ['laravel/pint' => '^1.0', 'pestphp/pest' => '^4.0']]), 'artisan' => '<?php'];
+
+        $this->assertSame(['pint', 'pest', 'artisan'], $this->service()->availableGates($this->workspace));
+        $this->assertSame(['pint', 'pest', 'artisan'], array_column(GateRows::of(null, ['pint', 'pest', 'artisan']), 'key'));
     }
 
     public function test_test_setup_queues_the_check(): void

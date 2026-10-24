@@ -162,7 +162,7 @@ class ContextPanel extends Component
             'files' => self::changedFiles(array_values(array_filter($diff['files'] ?? [], fn (array $f): bool => ! $f['generated']))),
             'generated' => array_values(array_filter($diff['files'] ?? [], fn (array $f): bool => $f['generated'])),
             'gateRun' => $gateRun,
-            'gates' => GateRows::of($gateRun),
+            'gates' => GateRows::of($gateRun, app(WorkspaceSetupService::class)->availableGates($workspace)),
             'onboarding' => $this->user()->can('setup', $workspace) ? app(WorkspaceOnboarding::class)->steps($workspace, $this->user()) : null,
             'gatesLocked' => app(WorkspaceSetupService::class)->lockReason($workspace, $task),
             'settingsUrl' => WorkspaceResource::getUrl('settings', ['record' => $workspace]).'?tab=environment',

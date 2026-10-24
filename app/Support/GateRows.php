@@ -25,11 +25,13 @@ final class GateRows
 
     /**
      * Gate rows with a state: open, running, pass, fail or skip. Gates outside
-     * the four fixed rows appear once they ran.
+     * the four fixed rows appear once they ran. `$available` limits the fixed
+     * rows to the tools the repository has.
      *
+     * @param  list<string>|null  $available
      * @return list<array{key: string, label: string, keys: list<string>, state: string, failed: list<string>, log: string}>
      */
-    public static function of(?WorkspaceGateRun $run): array
+    public static function of(?WorkspaceGateRun $run, ?array $available = null): array
     {
         $results = $run?->gates ?? [];
         $runningNow = $run?->status === GateRunStatus::Running;
@@ -37,6 +39,9 @@ final class GateRows
         $covered = [];
 
         foreach (self::ROWS as $key => $row) {
+            if ($available !== null && ! in_array($key, $available, true)) {
+                continue;
+            }
             $found = array_values(array_filter(array_map(fn (string $k): ?string => $results[$k] ?? null, $row['keys'])));
             $covered = [...$covered, ...$row['keys']];
             $failed = array_values(array_filter($row['keys'], fn (string $k): bool => ($results[$k] ?? null) === 'fail'));

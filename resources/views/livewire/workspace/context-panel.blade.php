@@ -205,11 +205,13 @@
     <section class="ag-section" id="ctx-gates" x-data="{ ...argosFold('gates') }" :class="{ 'is-folded': !open }">
         <div class="ag-section-head">
             <h2 class="ag-section-h"><button type="button" class="ag-section-title ag-fold-btn" x-on:click="toggleFold()" :aria-expanded="open"><x-ag.icon name="chevron-right" :size="12" :stroke="2.4" class="ag-fold-chev" />{{ __('workspaces.focus.gates') }}</button></h2>
-            @if ($canOperate && $running && $gatesLocked === null)
+            @if ($canOperate && $running && $gatesLocked === null && $gates !== [])
                 <button type="button" class="ag-text-btn" wire:click="runGates" wire:loading.attr="disabled" @disabled($gateRun?->status === \App\Enums\GateRunStatus::Running)>{{ __('workspaces.focus.check_all') }}</button>
             @endif
         </div>
-        @if ($gatesLocked !== null)
+        @if ($gates === [])
+            <p class="ag-locked">{{ __('workspaces.focus.no_gates') }}</p>
+        @elseif ($gatesLocked !== null)
             <p class="ag-locked" data-testid="gates-locked">{{ $gatesLocked }} <a href="{{ $settingsUrl }}" wire:navigate>{{ __('workspaces.setup.locked_action') }}</a></p>
         @endif
         <ul class="ag-card ag-gates">

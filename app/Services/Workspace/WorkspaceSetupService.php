@@ -269,6 +269,37 @@ class WorkspaceSetupService
         return __('workspaces.setup.locked', ['status' => ($workspace->setup_status ?? WorkspaceSetupStatus::Untested)->label()]);
     }
 
+    /**
+     * Gate rows whose tool the repository requires in `composer.json`; null when
+     * it cannot be read (then all rows show).
+     *
+     * @return list<string>|null
+     */
+    public function availableGates(Workspace $workspace): ?array
+    {
+        return Cache::remember('ws-gates:'.$workspace->id.':'.$workspace->setupRef(), 300, function () use ($workspace): ?array {
+            try {
+                $service = $this->git->forWorkspace($workspace);
+                $file = fn (string $path): ?string => $service->getFileContents($workspace->getOwnerRepo(), $path, $workspace->setupRef());
+                $composer = json_decode((string) $file('composer.json'), true);
+                if (! is_array($composer)) {
+                    return null;
+                }
+                $packages = array_keys([...(array) ($composer['require'] ?? []), ...(array) ($composer['require-dev'] ?? [])]);
+                $has = fn (string ...$names): bool => array_intersect($names, $packages) !== [];
+
+                return array_values(array_filter([
+                    $has('laravel/pint') ? 'pint' : null,
+                    $has('pestphp/pest', 'phpunit/phpunit') ? 'pest' : null,
+                    $has('phpstan/phpstan', 'larastan/larastan', 'nunomaduro/larastan') ? 'phpstan' : null,
+                    $file('artisan') !== null ? 'artisan' : null,
+                ]));
+            } catch (Throwable) {
+                return null;
+            }
+        });
+    }
+
     /** "Test setup": queue the check of the setup task's branch. */
     public function requestTest(Task $task, User $by): void
     {
