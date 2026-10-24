@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Workspace;
 
 use App\Broadcasting\TaskStream;
+use App\Enums\PermissionMode;
 use App\Enums\TaskEventType;
 use App\Enums\TaskKind;
 use App\Enums\TaskStatus;
@@ -127,14 +128,14 @@ class WorkspaceSetupTest extends TestCase
         $this->assertSame(['stack', 'preview', 'setup'], $this->service()->inspect($this->workspace)['missing']);
     }
 
-    public function test_a_laravel_workspace_is_ready_after_creating_it(): void
+    public function test_a_laravel_workspace_is_complete_but_untested_after_creating_it(): void
     {
         $this->files = ['composer.json' => '{}', 'artisan' => '<?php'];
 
         $this->assertNull($this->service()->afterCreate($this->workspace, $this->admin));
 
         $workspace = $this->workspace->fresh();
-        $this->assertSame(WorkspaceSetupStatus::Ready, $workspace->setup_status);
+        $this->assertSame(WorkspaceSetupStatus::Untested, $workspace->setup_status);
         $this->assertSame('php-8.5', $workspace->workerStack?->name);
         $this->assertSame(0, Task::query()->count());
     }
@@ -169,6 +170,7 @@ class WorkspaceSetupTest extends TestCase
         $task->refresh();
         $this->assertSame(TaskKind::Setup, $task->kind);
         $this->assertSame($this->admin->id, $task->owner_user_id);
+        $this->assertSame(PermissionMode::BypassPermissions, $task->permission_mode);
         $this->assertSame(WorkspaceSetupStatus::Running, $this->workspace->fresh()->setup_status);
         $this->assertSame('node-22', $this->workspace->fresh()->workerStack?->name);
         // Prepared right away by the fake daemon: Claude got the brief, once.
@@ -216,6 +218,43 @@ class WorkspaceSetupTest extends TestCase
         // The queued inspection ran (sync in tests): an empty repo needs a
         // setup, and the creator has no Claude subscription to run it on.
         $this->assertSame(WorkspaceSetupStatus::NeedsAgent, $workspace->fresh()->setup_status);
+    }
+
+    private function turn(Task $task, string $path): void
+    {
+        TaskEvent::query()->create(['task_id' => $task->id, 'type' => TaskEventType::ToolCall, 'payload' => ['name' => 'Write', 'input' => ['file_path' => $path]]]);
+        TaskEvent::query()->create(['task_id' => $task->id, 'type' => TaskEventType::TurnCompleted, 'payload' => []]);
+    }
+
+    public function test_a_turn_that_changes_the_setup_files_tests_them(): void
+    {
+        Bus::fake([CheckWorkspaceSetupJob::class]);
+        $task = $this->setupTask();
+
+        $this->turn($task, 'README.md');
+        $this->service()->afterTurn($task);
+        Bus::assertNotDispatched(CheckWorkspaceSetupJob::class);
+
+        $this->turn($task, '/var/www/html/.argos/demo.yml');
+        $this->service()->afterTurn($task);
+        Bus::assertDispatchedTimes(CheckWorkspaceSetupJob::class, 1);
+        $this->assertSame(WorkspaceSetupStatus::Testing, $this->workspace->fresh()->setup_status);
+    }
+
+    public function test_automatic_tests_stop_after_a_few_rounds(): void
+    {
+        Bus::fake([CheckWorkspaceSetupJob::class]);
+        $task = $this->setupTask();
+        foreach (range(1, WorkspaceSetupService::AUTO_TEST_ROUNDS) as $round) {
+            TaskEvent::query()->create(['task_id' => $task->id, 'type' => TaskEventType::Notice, 'payload' => ['kind' => 'setup_testing']]);
+        }
+        $this->workspace->forceFill(['setup_status' => WorkspaceSetupStatus::Failed])->save();
+
+        $this->turn($task, '.argos/setup.sh');
+        $this->service()->afterTurn($task);
+
+        Bus::assertNotDispatched(CheckWorkspaceSetupJob::class);
+        $this->assertSame(WorkspaceSetupStatus::Untested, $this->workspace->fresh()->setup_status);
     }
 
     public function test_test_setup_queues_the_check(): void

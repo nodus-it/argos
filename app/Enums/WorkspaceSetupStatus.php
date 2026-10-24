@@ -6,12 +6,13 @@ namespace App\Enums;
 
 /**
  * Where a workspace's setup stands: something is missing (stack, preview
- * contract, setup steps), the setup task works on it or is being tested,
- * tested and in use, failed, or no Claude subscription to run it on.
+ * contract, setup steps), complete but never tested, the setup task works on
+ * it or is being tested, tested and in use, failed, or no Claude subscription.
  */
 enum WorkspaceSetupStatus: string
 {
     case Needed = 'needed';
+    case Untested = 'untested';
     case Running = 'running';
     case Testing = 'testing';
     case Ready = 'ready';
@@ -29,7 +30,7 @@ enum WorkspaceSetupStatus: string
             self::Ready => 'success',
             self::Running, self::Testing => 'info',
             self::Failed => 'danger',
-            self::Needed, self::NeedsAgent => 'warning',
+            self::Needed, self::Untested, self::NeedsAgent => 'warning',
         };
     }
 }

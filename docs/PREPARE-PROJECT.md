@@ -77,15 +77,19 @@ When a workspace is created, Argos inspects the repository:
 
 If anything is missing, Argos starts a **setup task** — a task of kind
 *Setup*, owned by the admin who created the workspace and running on their
-Claude subscription, in *Accept edits* mode. Claude gets a brief (what is
+Claude subscription. It runs in *Bypass permissions* mode when that admin may
+use it in the workspace, otherwise in *Accept edits*; the composer switches
+the mode while the task runs. Claude gets a brief (what is
 missing, the detected project, the stack) and writes:
 
 1. `.argos/setup.sh` — idempotent, non-interactive setup steps,
 2. `.argos/demo.compose.yml` and `.argos/demo.yml` — the preview contract,
 3. `.argos/worker.dockerfile` — only if no built-in stack fits.
 
-Claude tries `.argos/setup.sh` in the task's worktree, then asks you to press
-**Test setup** in the banner of the task. Secrets stay out of the files;
+Claude tries `.argos/setup.sh` in the task's worktree. When a turn ends with
+changes under `.argos/`, Argos runs **Test setup** on its own, at most five
+times in a row before someone writes in the chat again; the button in the
+banner of the task starts it by hand. Secrets stay out of the files;
 Claude names the ones you have to add under Settings → Environment. If it
 cannot tell how the project is meant to run, it asks in the chat.
 
@@ -101,7 +105,7 @@ cannot tell how the project is meant to run, it asks in the chat.
 | Preview and health check | The preview of the setup task starts and its health check is green. Skipped (counts as passed) when previews are off for the installation or the workspace. |
 
 A failed step's log goes to Claude in the task, with the request to fix it;
-test again when it says so. The chat and **Settings → Environment → Setup**
+its fix triggers the next test. The chat and **Settings → Environment → Setup**
 show the result per step.
 
 **A passed test applies right away**: new tasks run the setup steps and
@@ -117,9 +121,10 @@ setting up*.
 | Status | Meaning |
 |---|---|
 | Needs setting up | Something is missing, or the repository could not be read. |
+| Not tested yet | Nothing is missing (for example a Laravel app on the defaults), but no test has passed yet — or the automatic tests stopped after five rounds. |
 | Being set up | The setup task is open. |
 | Being tested | **Test setup** is running. |
-| Set up | Nothing missing, or the last test passed. |
+| Set up | The last test passed. |
 | Test failed | The last test failed — see its log in the setup task. |
 | Needs a Claude subscription | The admin who should run the setup task has no usable agent. |
 
@@ -385,10 +390,10 @@ health:
 
 ## Final checklist
 
-1. Laravel app? Nothing to do — check the setup status in Settings →
-   Environment says *Set up*.
+1. Laravel app? The defaults usually fit; the status says *Not tested yet*
+   until a setup task has passed **Test setup**.
 2. Otherwise let the [setup task](#the-setup-task) write `.argos/` (or write
-   it yourself), press **Test setup** until all four steps pass, and merge its
+   it yourself), let **Test setup** run until all four steps pass, and merge its
    pull request.
 3. Enable the [backing services](#backing-services-mysql-redis) your tests
    need; put registry auth and secrets into Settings → Environment — never into

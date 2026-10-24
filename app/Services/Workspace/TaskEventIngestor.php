@@ -8,6 +8,7 @@ use App\Enums\ApprovalKind;
 use App\Enums\ApprovalStatus;
 use App\Enums\SessionStatus;
 use App\Enums\TaskEventType;
+use App\Enums\TaskKind;
 use App\Jobs\Workspace\DrainSessionQueueJob;
 use App\Jobs\Workspace\ReanchorReviewCommentsJob;
 use App\Models\AgentCredential;
@@ -164,6 +165,9 @@ class TaskEventIngestor
             }
             if ($task?->auto_state !== null) {
                 $this->followUp('auto', fn () => app(AutoTaskDriver::class)->onTaskEvents($task, $outgoing));
+            }
+            if ($task?->kind === TaskKind::Setup && in_array('turn.completed', array_column($outgoing, 'type'), true)) {
+                $this->followUp('setup', fn () => app(WorkspaceSetupService::class)->afterTurn($task));
             }
             // Claude may have changed lines that carry collected review comments.
             if ($task !== null && in_array('turn.completed', array_column($outgoing, 'type'), true)) {

@@ -50,6 +50,11 @@ class WorkspaceSetupService
 
     private const PROMPT_PATH = 'worker/prompts/workspace-setup.md';
 
+    /** Automatic tests in a row before a person has to look again. */
+    public const AUTO_TEST_ROUNDS = 5;
+
+    private const EDIT_TOOLS = ['Edit', 'MultiEdit', 'Write'];
+
     public function __construct(
         private readonly GitServiceFactory $git,
         private readonly TaskService $tasks,
@@ -146,7 +151,8 @@ class WorkspaceSetupService
             $workspace->worker_stack_id = WorkerStack::query()->where('name', $found['stack'])->value('id');
         }
         if ($found['missing'] === []) {
-            $workspace->forceFill(['setup_status' => WorkspaceSetupStatus::Ready])->save();
+            // Complete is not tested: only a passed check makes it Ready.
+            $workspace->forceFill(['setup_status' => WorkspaceSetupStatus::Untested])->save();
             if (in_array('default', $this->sources($workspace), true)) {
                 $this->notifyLaravelDefaults($workspace, $admin);
             }
@@ -198,7 +204,9 @@ class WorkspaceSetupService
             throw WorkspaceException::translated('workspaces.setup.needs_agent');
         }
 
-        $task = $this->tasks->create($workspace, $by, $agent, __('workspaces.setup.task_title'), mode: PermissionMode::AcceptEdits, options: ['kind' => TaskKind::Setup]);
+        // The setup runs many shell commands; whoever may skip approvals does so here.
+        $mode = $by->can('bypassPermissions', $workspace) ? PermissionMode::BypassPermissions : PermissionMode::AcceptEdits;
+        $task = $this->tasks->create($workspace, $by, $agent, __('workspaces.setup.task_title'), mode: $mode, options: ['kind' => TaskKind::Setup]);
         $workspace->forceFill(['setup_status' => WorkspaceSetupStatus::Running])->save();
         if ($workspace->status === WorkspaceStatus::Stopped) {
             $this->workspaces->start($workspace);
@@ -259,9 +267,56 @@ class WorkspaceSetupService
             throw WorkspaceException::translated('workspaces.setup.testing');
         }
 
+        $this->queueTest($task, $by);
+    }
+
+    /**
+     * A turn of the setup task ended: when Claude changed `.argos/`, test right
+     * away — at most AUTO_TEST_ROUNDS times since a person last wrote.
+     */
+    public function afterTurn(Task $task): void
+    {
+        $task = $task->fresh() ?? $task;
+        if ($task->kind !== TaskKind::Setup || $task->status->isFinished() || $task->owner === null
+            || $task->workspace->setup_status === WorkspaceSetupStatus::Testing || ! $this->turnChangedSetup($task)) {
+            return;
+        }
+
+        $since = (int) $task->events()->where('type', TaskEventType::UserMessage->value)->get(['id', 'payload'])
+            ->filter(fn ($event): bool => empty($event->payload['auto']))->max('id');
+        $rounds = $task->events()->where('type', TaskEventType::Notice->value)->where('id', '>', $since)->get(['payload'])
+            ->filter(fn ($event): bool => ($event->payload['kind'] ?? null) === 'setup_testing')->count();
+        if ($rounds >= self::AUTO_TEST_ROUNDS) {
+            $task->workspace->forceFill(['setup_status' => WorkspaceSetupStatus::Untested])->save();
+
+            return;
+        }
+
+        $this->queueTest($task, $task->owner);
+    }
+
+    private function queueTest(Task $task, User $by): void
+    {
         $task->workspace->forceFill(['setup_status' => WorkspaceSetupStatus::Testing])->save();
         $this->notices->systemNotice($task, 'setup_testing');
         CheckWorkspaceSetupJob::dispatch($task->id, $by->id);
+    }
+
+    /** Did the turn that just ended edit a file under `.argos/`? */
+    private function turnChangedSetup(Task $task): bool
+    {
+        $turns = $task->events()->where('type', TaskEventType::TurnCompleted->value)->latest('id')->limit(2)->pluck('id');
+        if ($turns->isEmpty()) {
+            return false;
+        }
+
+        return $task->events()
+            ->where('type', TaskEventType::ToolCall->value)
+            ->where('id', '<', $turns[0])
+            ->where('id', '>', (int) ($turns[1] ?? 0))
+            ->get(['payload'])
+            ->contains(fn ($event): bool => in_array($event->payload['name'] ?? '', self::EDIT_TOOLS, true)
+                && preg_match('#(^|/)\.argos/#', (string) ($event->payload['input']['file_path'] ?? '')) === 1);
     }
 
     /**
@@ -310,7 +365,7 @@ class WorkspaceSetupService
         if (! $passed) {
             $failed = $results[array_key_last($results)];
             try {
-                $this->tasks->send($task, $by, __('workspaces.setup.fix_prompt', ['step' => __('workspaces.setup.steps.'.$failed['step'])])."\n\n```\n".$failed['log']."\n```");
+                $this->tasks->send($task, $by, __('workspaces.setup.fix_prompt', ['step' => __('workspaces.setup.steps.'.$failed['step'])])."\n\n```\n".$failed['log']."\n```", automated: true);
             } catch (Throwable $e) {
                 Log::channel('argos')->info('Setup failure could not be handed to Claude', ['task' => $task->id, 'error' => $e->getMessage()]);
             }
