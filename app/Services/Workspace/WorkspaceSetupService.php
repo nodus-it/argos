@@ -27,6 +27,7 @@ use App\Services\Demo\DemoDeployer;
 use App\Services\Git\WorkspaceDiffService;
 use App\Services\GitProvider\GitServiceFactory;
 use App\Services\Worker\WorkerSidecarManager;
+use App\Services\Workspace\Environment\BackingServiceResolver;
 use App\Workers\Compose\WorkerImageBuilder;
 use App\Workers\Compose\WorkerImageResolver;
 use Illuminate\Support\Facades\Cache;
@@ -191,7 +192,7 @@ class WorkspaceSetupService
 
         // The setup runs many shell commands; whoever may skip approvals does so here.
         $mode = $by->can('bypassPermissions', $workspace) ? PermissionMode::BypassPermissions : PermissionMode::AcceptEdits;
-        $task = $this->tasks->create($workspace, $by, $agent, __('workspaces.setup.task_title'), mode: $mode, options: ['kind' => TaskKind::Setup]);
+        $task = $this->tasks->create($workspace, $by, $agent, __('workspaces.setup.task_title', [], $by->locale ?: null), mode: $mode, options: ['kind' => TaskKind::Setup]);
         $workspace->forceFill(['setup_status' => WorkspaceSetupStatus::Running])->save();
         if ($workspace->status === WorkspaceStatus::Stopped) {
             $this->workspaces->start($workspace);
@@ -231,6 +232,7 @@ class WorkspaceSetupService
                 default => 'the setup steps',
             }, $found['missing'])),
             '{{project}}' => $found['project'],
+            '{{services}}' => $this->servicesForBrief($task->workspace),
             '{{language}}' => self::LANGUAGES[$task->owner?->locale ?: app()->getLocale()] ?? 'English',
             '{{stack}}' => $task->workspace->workerStack->label ?? ($task->workspace->worker_source === WorkerSource::Byoi ? '.argos/worker.dockerfile' : (string) config('argos.compose.default_stack')),
         ]);
@@ -293,6 +295,21 @@ class WorkspaceSetupService
                 return null;
             }
         });
+    }
+
+    /** What the brief tells Claude about the database and Redis the task worktrees get. */
+    private function servicesForBrief(Workspace $workspace): string
+    {
+        $services = array_keys(app(BackingServiceResolver::class)->coordinates($workspace));
+        if ($services === []) {
+            return 'none. Task worktrees and the setup test get no database and no Redis. Do not work around that (for example with SQLite): if the project needs them, tell the person to enable MySQL and Redis under Settings → Environment, then continue.';
+        }
+
+        return implode(', ', array_map(fn (string $service): string => match ($service) {
+            'mysql' => 'MySQL (DB_* in .env, an own database per task and for the setup test)',
+            'redis' => 'Redis (REDIS_* in .env, an own key prefix per task)',
+            default => $service,
+        }, $services)).'.';
     }
 
     /** "Test setup": queue the check of the setup task's branch. */
@@ -415,7 +432,7 @@ class WorkspaceSetupService
         if (! $passed) {
             $failed = $results[array_key_last($results)];
             try {
-                $this->tasks->send($task, $by, __('workspaces.setup.fix_prompt', ['step' => __('workspaces.setup.steps.'.$failed['step'])])."\n\n```\n".$failed['log']."\n```", automated: true);
+                $this->tasks->send($task, $by, __('workspaces.setup.fix_prompt', ['step' => __('workspaces.setup.steps.'.$failed['step'], [], $task->owner?->locale ?: null)], $task->owner?->locale ?: null)."\n\n```\n".$failed['log']."\n```", automated: true);
             } catch (Throwable $e) {
                 Log::channel('argos')->info('Setup failure could not be handed to Claude', ['task' => $task->id, 'error' => $e->getMessage()]);
             }

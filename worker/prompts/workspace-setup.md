@@ -4,6 +4,7 @@ Write every message to the person in {{language}}; these instructions are in Eng
 
 What is missing right now: {{missing}}
 Detected project: {{project}}
+Backing services for task worktrees: {{services}}
 The workspace runs on the stack "{{stack}}" (built-in stacks: PHP 8.5, PHP 8.4 — both with Composer and Node 22 — and Node 22).
 
 ## What to write
