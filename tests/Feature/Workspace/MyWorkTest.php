@@ -79,6 +79,18 @@ class MyWorkTest extends TestCase
             ->assertSeeLivewire('workspace.rail-workspaces');
     }
 
+    public function test_tasks_of_a_deleted_workspace_do_not_break_the_page_for_admins(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $gone = Workspace::factory()->create(['name' => 'Gone']);
+        Task::factory()->ownedBy($admin)->create(['workspace_id' => $gone->id, 'title' => 'Orphaned']);
+        $gone->delete();
+
+        $this->actingAs($admin)->get(MyWork::getUrl(panel: 'app'))
+            ->assertOk()
+            ->assertDontSee('Orphaned');
+    }
+
     public function test_groups_waiting_running_pr_open_then_ready(): void
     {
         $this->task('Ready one', ['updated_at' => now()->subHours(3)]);

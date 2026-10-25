@@ -70,6 +70,8 @@ class WorkspaceSummaryService
             ->whereNotIn('status', TaskStatus::finishedValues())
             ->where(fn (Builder $q) => $q->where('owner_user_id', $user->id)
                 ->orWhereHas('members', fn (Builder $m) => $m->where('user_id', $user->id)))
+            // A deleted (soft-deleted) workspace leaves its tasks behind; they are not "work" any more.
+            ->whereHas('workspace')
             ->when(! $user->isAdmin(), fn (Builder $q) => $q->whereHas('workspace.members', fn (Builder $m) => $m->where('user_id', $user->id)));
     }
 
