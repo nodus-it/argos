@@ -95,6 +95,18 @@ class FocusLayoutTest extends TestCase
             ->assertDontSee(__('workspaces.onboarding.title'));
     }
 
+    public function test_the_composer_offers_voice_input_in_the_users_language(): void
+    {
+        $task = $this->task('Voice');
+        $this->owner->forceFill(['locale' => 'de'])->save();
+        app()->setLocale('de');
+
+        Livewire::actingAs($this->owner)->test(TaskChat::class, ['workspaceId' => $this->workspace->id])
+            ->set('taskId', $task->id)
+            ->assertSeeHtml("argosDictation('ag-composer-")
+            ->assertSeeHtml("'de-DE')");
+    }
+
     public function test_tasks_are_grouped_with_a_status_line(): void
     {
         $waiting = $this->task('Navbar', SessionStatus::WaitingInput);

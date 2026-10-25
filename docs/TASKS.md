@@ -165,6 +165,10 @@ to do.
 
 ## Images, files and commands
 
+- **Voice:** the microphone next to the paperclip (and next to the prompt of an
+  automatic task) dictates into the field in your language; tap again to stop.
+  It uses the browser's speech recognition — Chrome and Edge send the audio to
+  Google for that, Safari to Apple; Firefox has none, so the button is hidden.
 - **Images:** paste, drop or attach screenshots (PNG, JPEG, GIF, WebP; up to 5
   per message, `ARGOS_WORKSPACE_UPLOAD_MAX_MB` each). Claude sees them with the
   message; others see them as thumbnails. They are stored privately.

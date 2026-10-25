@@ -317,6 +317,8 @@ button.ag-gate:not([disabled]):hover { background: var(--ag-raised); }
 .ag-ta:focus { box-shadow: none; outline: none; }
 .ag-ta::placeholder { color: var(--ag-muted); }
 .ag-composer-bar { display: flex; align-items: center; gap: 8px; padding: 8px 10px; flex-wrap: wrap; }
+.ag-dictation-field { align-self: flex-start; margin-top: -6px; }
+.ag-dictation .is-listening { color: var(--ag-on-accent); background: var(--ag-danger); animation: ag-pulse 1.2s ease-in-out infinite; }
 .ag-pill { height: 30px; padding: 0 28px 0 10px; border-radius: 999px; border: 1px solid var(--ag-border); background-color: transparent; color: var(--ag-text); font: 12.5px var(--font-sans); cursor: pointer; max-width: 220px; }
 .ag-pill.mono { font-family: var(--font-mono); font-size: 12px; }
 .ag-pill:focus-visible { outline: 2px solid var(--ag-accent); outline-offset: 1px; }

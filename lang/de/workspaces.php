@@ -156,6 +156,9 @@ return [
         'details' => 'Details',
     ],
     'chat' => [
+        'dictation' => 'Sprechen',
+        'dictation_stop' => 'Sprechen beenden',
+        'dictation_failed' => 'Spracheingabe ging nicht — Mikrofon-Freigabe prüfen',
         'command_not_running' => 'Der Workspace läuft nicht — starte ihn zuerst.',
         'queue' => 'Nach dem aktuellen Schritt einreihen',
         'claude_working' => 'Claude arbeitet',

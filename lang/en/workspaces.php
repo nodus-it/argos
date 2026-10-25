@@ -156,6 +156,9 @@ return [
         'details' => 'Details',
     ],
     'chat' => [
+        'dictation' => 'Speak',
+        'dictation_stop' => 'Stop speaking',
+        'dictation_failed' => 'Voice input did not work — check the microphone permission',
         'command_not_running' => 'The workspace is not running — start it first.',
         'queue' => 'Queue after the current step',
         'claude_working' => 'Claude is working',
