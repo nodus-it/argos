@@ -126,11 +126,16 @@ Nur **Argos-Admins** legen Workspaces an:
   `workspaces:write`-Token eines API-Clients, der als Admin läuft (siehe
   [REST-API](REST-API.md#einen-workspace-anlegen)).
 
-Das Formular beginnt mit der **Plattform** (GitHub, GitLab, Bitbucket), dann
-folgen der Zugang (ein verbundenes OAuth-Konto oder ein Personal Access Token),
-das Repository und sein Default-Branch sowie der Name. Die übrigen Tabs
-(Umgebung, Ressourcen, Automatik) kannst du jetzt oder später ausfüllen —
-siehe [Workspace-Einstellungen](WORKSPACE-SETTINGS.md). Wer den Workspace anlegt, wird
+`/new` führt dich in fünf Schritten: **Repository** (Plattform, Zugang,
+Repository, Default-Branch, Name); **Was Argos erkannt hat** (Projekt, Stack,
+Datenbank und Redis, Quality Gates und woher Setup-Schritte und Live-Demo
+kommen — aus dem Repository gelesen, bevor etwas gespeichert ist, jeweils mit
+Begründung, änderbar); **Live-Demo** (an oder aus, und welche ENV-Werte noch
+fehlen); **Optional** (Limits und Automatik, eingeklappt; Team und Ticket-System
+folgen über die Einrichtungs-Checkliste); **Los** (eine Zusammenfassung, dann
+startet „Anlegen und einrichten“ die Einrichtungs-Aufgabe). **Alles selbst
+einstellen** wechselt zum vollen Formular unter `/new/expert` und nimmt deine
+Eingaben mit — siehe [Workspace-Einstellungen](WORKSPACE-SETTINGS.md). Wer den Workspace anlegt, wird
 sein erster Admin; weitere Mitglieder fügst du danach in den Einstellungen
 hinzu.
 

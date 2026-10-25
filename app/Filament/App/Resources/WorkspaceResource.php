@@ -7,6 +7,7 @@ namespace App\Filament\App\Resources;
 use App\Enums\ApprovalStatus;
 use App\Enums\WorkspaceStatus;
 use App\Filament\App\Resources\WorkspaceResource\Pages\CreateWorkspace;
+use App\Filament\App\Resources\WorkspaceResource\Pages\CreateWorkspaceExpert;
 use App\Filament\App\Resources\WorkspaceResource\Pages\EditWorkspaceSettings;
 use App\Filament\App\Resources\WorkspaceResource\Pages\ListWorkspaces;
 use App\Filament\App\Resources\WorkspaceResource\Pages\ViewWorkspace;
@@ -181,6 +182,7 @@ class WorkspaceResource extends Resource
         return [
             'index' => ListWorkspaces::route('/workspaces'),
             'create' => CreateWorkspace::route('/new'),
+            'create-expert' => CreateWorkspaceExpert::route('/new/expert'),
             'settings' => EditWorkspaceSettings::route('/{record}/settings'),
             'view' => ViewWorkspace::route('/{record}/{task?}'),
         ];

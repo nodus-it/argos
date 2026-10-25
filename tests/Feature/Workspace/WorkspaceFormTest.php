@@ -6,8 +6,10 @@ namespace Tests\Feature\Workspace;
 
 use App\Enums\AuthMethod;
 use App\Enums\IntegrationProvider;
+use App\Enums\WorkerImageEntityStatus;
 use App\Filament\App\Resources\WorkspaceResource;
 use App\Filament\App\Resources\WorkspaceResource\Pages\CreateWorkspace;
+use App\Filament\App\Resources\WorkspaceResource\Pages\CreateWorkspaceExpert;
 use App\Filament\App\Resources\WorkspaceResource\Pages\EditWorkspaceSettings;
 use App\Filament\App\Resources\WorkspaceResource\Pages\ListWorkspaces;
 use App\Filament\App\Resources\WorkspaceResource\Pages\ViewWorkspace;
@@ -17,13 +19,17 @@ use App\Models\ConnectedAccount;
 use App\Models\ProviderCredential;
 use App\Models\TaskProviderBinding;
 use App\Models\User;
+use App\Models\WorkerStack;
 use App\Models\Workspace;
+use App\Services\GitProvider\Contracts\GitServiceContract;
+use App\Services\GitProvider\GitServiceFactory;
 use App\Services\Workspace\WorkspaceService;
 use App\Services\Workspace\WorkspaceTeardown;
 use Filament\Actions\CreateAction;
 use Filament\Actions\Testing\TestAction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Mockery;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Saloon\Http\Faking\MockResponse;
 use Saloon\Laravel\Facades\Saloon;
@@ -80,6 +86,42 @@ class WorkspaceFormTest extends TestCase
             'name' => 'Test Projekt',
             'platform' => 'github',
         ]);
+    }
+
+    public function test_the_guided_page_reads_the_repository_before_saving(): void
+    {
+        WorkerStack::factory()->builtin()->create(['name' => 'php-8.5', 'label' => 'PHP 8.5', 'status' => WorkerImageEntityStatus::Active]);
+        $files = [
+            'composer.json' => '{"require": {"laravel/horizon": "^5.0"}, "require-dev": {"pestphp/pest": "^4.0"}}',
+            'artisan' => '<?php',
+            '.env.example' => "DB_CONNECTION=mariadb\nSTRIPE_SECRET=\n",
+        ];
+        $git = Mockery::mock(GitServiceContract::class);
+        $git->shouldReceive('getFileContents')->andReturnUsing(fn (string $repo, string $path): ?string => $files[$path] ?? null);
+        $git->shouldReceive('getBranchOptions')->andReturn(['main' => 'main']);
+        $factory = $this->mock(GitServiceFactory::class);
+        $factory->shouldReceive('forWorkspace')->andReturn($git);
+        $factory->shouldReceive('forPlatform')->andReturn($git);
+
+        Livewire::test(CreateWorkspace::class)
+            ->fillForm(['name' => 'Nexus', 'repo_url' => 'https://github.com/org/repo', 'platform' => 'github', 'token' => 'pat-123', 'default_branch' => 'main'])
+            ->goToNextWizardStep()
+            ->assertHasNoFormErrors()
+            ->assertSee(__('workspaces.create.lines.stack', ['stack' => 'PHP 8.5']))
+            ->assertSee('STRIPE_SECRET')
+            ->assertSet('data.worker_services', ['mysql', 'redis'])
+            ->assertSet('data.worker_stack_id', WorkerStack::query()->where('name', 'php-8.5')->value('id'));
+    }
+
+    public function test_the_expert_mode_takes_the_entries_along(): void
+    {
+        Livewire::test(CreateWorkspace::class)
+            ->fillForm(['name' => 'Nexus', 'platform' => 'github', 'repo_url' => 'https://github.com/org/repo'])
+            ->callAction('expert')
+            ->assertRedirect(WorkspaceResource::getUrl('create-expert'));
+
+        Livewire::test(CreateWorkspaceExpert::class)
+            ->assertSchemaStateSet(['name' => 'Nexus', 'repo_url' => 'https://github.com/org/repo']);
     }
 
     public function test_create_requires_platform_first(): void
