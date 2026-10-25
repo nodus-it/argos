@@ -95,15 +95,15 @@
                     </label>
                     @if ($newAuto)
                         <label class="ws-field">
-                            <span>{{ __('workspaces.auto.prompt') }}
-                                <span x-data="argosDictation('ag-new-prompt', @js(app()->getLocale() === 'de' ? 'de-DE' : 'en-US'))" x-show="supported" x-cloak class="ag-dictation">
-                                    <button type="button" class="ag-icon-btn ag-icon-btn-sm" x-on:click.prevent="toggle()" :class="{ 'is-listening': listening }" :aria-pressed="listening"
-                                            :aria-label="listening ? @js(__('workspaces.chat.dictation_stop')) : @js(__('workspaces.chat.dictation'))"><x-ag.icon name="mic" :size="15" /></button>
-                                </span>
-                            </span>
+                            <span>{{ __('workspaces.auto.prompt') }}</span>
                             <textarea id="ag-new-prompt" class="respond-ta ws-ta" rows="4" wire:model="newPrompt" maxlength="20000" placeholder="{{ __('workspaces.auto.prompt_placeholder') }}" required></textarea>
                             @error('newPrompt') <small class="t-err">{{ $message }}</small> @enderror
                         </label>
+                        {{-- Outside the label: its text would become part of the field's accessible name. --}}
+                        <span x-data="argosDictation('ag-new-prompt', @js(app()->getLocale() === 'de' ? 'de-DE' : 'en-US'))" x-show="supported" x-cloak class="ag-dictation ag-dictation-field">
+                            <button type="button" class="ag-icon-btn ag-icon-btn-sm" x-on:click="toggle()" :class="{ 'is-listening': listening }" :aria-pressed="listening"
+                                    :aria-label="listening ? @js(__('workspaces.chat.dictation_stop')) : @js(__('workspaces.chat.dictation'))"><x-ag.icon name="mic" :size="15" /></button>
+                        </span>
                         <div class="ws-auto-grid">
                             <label class="ws-field">
                                 <span>{{ __('workspace_form.fields.auto_plan') }}</span>
