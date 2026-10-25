@@ -63,7 +63,17 @@
     @if ($task !== null && $task->kind === \App\Enums\TaskKind::Setup && ! $task->status->isFinished())
         <div class="ws-alert ws-setup-note" role="status" data-testid="setup-banner">
             @svg('heroicon-o-wrench-screwdriver')
-            <span>{{ __('workspaces.setup.banner') }}@if ($task->workspace->setup_status) · <strong>{{ $task->workspace->setup_status->label() }}</strong>@endif</span>
+            @php
+                $setupStatus = $task->workspace->setup_status;
+                $bannerKey = match ($setupStatus) {
+                    \App\Enums\WorkspaceSetupStatus::Testing => 'testing',
+                    \App\Enums\WorkspaceSetupStatus::Ready => 'ready',
+                    \App\Enums\WorkspaceSetupStatus::Failed => 'failed',
+                    \App\Enums\WorkspaceSetupStatus::Untested => 'paused',
+                    default => null,
+                };
+            @endphp
+            <span>{{ $bannerKey !== null ? __('workspaces.setup.banner_states.'.$bannerKey) : __('workspaces.setup.banner') }}@if ($bannerKey === 'ready' && $task->pr_url) <a href="{{ $task->pr_url }}" target="_blank" rel="noopener">{{ __('workspaces.setup.open_pr') }}</a>@endif @if ($setupStatus) · <strong>{{ $setupStatus->label() }}</strong>@endif</span>
             @if ($canWrite)
                 <button type="button" class="ag-btn ag-btn-sm ag-btn-soft" wire:click="testSetup" wire:loading.attr="disabled" title="{{ __('workspaces.setup.test_help') }}"
                         @disabled($task->workspace->setup_status === \App\Enums\WorkspaceSetupStatus::Testing)>{{ __('workspaces.setup.test') }}</button>
@@ -247,6 +257,9 @@
                         </div>
                         @if (! empty($p['review']['comments']) || ! empty($p['review']['text']))
                             @include('livewire.workspace.partials.review-message', ['review' => $p['review']])
+                        @elseif (! empty($p['brief']))
+                            <p class="ag-brief">{{ $p['brief'] }}</p>
+                            <details class="ag-brief-full"><summary>{{ __('workspaces.setup.brief_show') }}</summary><div class="ag-msg-md ag-md ws-md prose">{{ Fmt::markdown((string) ($p['text'] ?? ''), breaks: true) }}</div></details>
                         @else
                             <div class="ag-msg-md ag-md ws-md prose">{{ Fmt::markdown((string) ($p['text'] ?? ''), breaks: true) }}</div>
                         @endif

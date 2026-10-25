@@ -29,8 +29,6 @@ use App\Services\GitProvider\GitServiceFactory;
 use App\Services\Worker\WorkerSidecarManager;
 use App\Workers\Compose\WorkerImageBuilder;
 use App\Workers\Compose\WorkerImageResolver;
-use Filament\Actions\Action;
-use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
@@ -50,6 +48,9 @@ class WorkspaceSetupService
     public const STEPS = ['ship', 'image', 'setup', 'preview'];
 
     private const PROMPT_PATH = 'worker/prompts/workspace-setup.md';
+
+    /** The language Claude answers the setup brief in, by the owner's locale. */
+    private const LANGUAGES = ['de' => 'German', 'en' => 'English'];
 
     /** Automatic tests in a row before a person has to look again. */
     public const AUTO_TEST_ROUNDS = 5;
@@ -154,16 +155,8 @@ class WorkspaceSetupService
         if ($found['stack'] !== null && $workspace->worker_stack_id === null && $workspace->worker_source !== WorkerSource::Byoi) {
             $workspace->worker_stack_id = WorkerStack::query()->where('name', $found['stack'])->value('id');
         }
-        if ($found['missing'] === []) {
-            // Complete is not tested: only a passed check makes it Ready.
-            $workspace->forceFill(['setup_status' => WorkspaceSetupStatus::Untested])->save();
-            if (in_array('default', $this->sources($workspace), true)) {
-                $this->notifyLaravelDefaults($workspace, $admin);
-            }
-
-            return null;
-        }
-        $workspace->save();
+        // Complete is not tested: the setup task runs either way, only a passed check makes it Ready.
+        $workspace->forceFill(['setup_status' => $found['missing'] === [] ? WorkspaceSetupStatus::Untested : $workspace->setup_status])->save();
 
         try {
             return $this->start($workspace, $admin);
@@ -175,18 +168,6 @@ class WorkspaceSetupService
 
             return $this->openTask($workspace);
         }
-    }
-
-    /** The Laravel defaults may not fit (other database, Redis, built assets): point at "Revise setup". */
-    private function notifyLaravelDefaults(Workspace $workspace, User $admin): void
-    {
-        $locale = $admin->locale ?: null;
-        Notification::make()
-            ->title(__('workspaces.setup.defaults_title', ['workspace' => $workspace->name], $locale))
-            ->body(__('workspaces.setup.defaults_body', [], $locale))
-            ->icon('heroicon-o-wrench-screwdriver')
-            ->actions([Action::make('settings')->label(__('workspaces.setup.revise', [], $locale))->url(route('filament.app.resources.workspaces.settings', ['record' => $workspace->slug]))])
-            ->sendToDatabase($admin);
     }
 
     /**
@@ -250,11 +231,15 @@ class WorkspaceSetupService
                 default => 'the setup steps',
             }, $found['missing'])),
             '{{project}}' => $found['project'],
+            '{{language}}' => self::LANGUAGES[$task->owner?->locale ?: app()->getLocale()] ?? 'English',
             '{{stack}}' => $task->workspace->workerStack->label ?? ($task->workspace->worker_source === WorkerSource::Byoi ? '.argos/worker.dockerfile' : (string) config('argos.compose.default_stack')),
         ]);
 
+        $summary = __('workspaces.setup.brief_summary', ['project' => $found['project'], 'missing' => $found['missing'] === []
+            ? __('workspaces.setup.brief_nothing_missing', [], $task->owner?->locale)
+            : implode(', ', array_map(fn (string $m): string => __('workspaces.setup.missing.'.$m, [], $task->owner?->locale), $found['missing']))], $task->owner?->locale);
         try {
-            $this->tasks->send($task, $task->owner, $prompt);
+            $this->tasks->send($task, $task->owner, $prompt, display: ['brief' => $summary]);
         } catch (Throwable $e) {
             Log::channel('argos')->warning('Setup brief could not be sent', ['task' => $task->id, 'error' => $e->getMessage()]);
         }

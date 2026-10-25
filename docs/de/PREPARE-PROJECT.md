@@ -78,12 +78,15 @@ Wenn ein Workspace angelegt wird, prüft Argos das Repository:
 | der Preview-Vertrag | keine Laravel-App (`composer.json` + `artisan`) und keine `.argos/demo.yml` |
 | die Setup-Befehle | keine Laravel-App, keine `.argos/setup.sh` und kein `composer setup`-Skript |
 
-Fehlt etwas, startet Argos eine **Einrichtungs-Aufgabe** — eine Aufgabe der Art
+Nach dem Anlegen startet Argos eine **Einrichtungs-Aufgabe**, auch wenn nichts
+fehlt (eine Laravel-App mit den Standards braucht trotzdem ihren Test) — eine Aufgabe der Art
 *Einrichtung*, die der Admin-Person gehört, die den Workspace angelegt hat,
 über deren Claude-Abo läuft. Sie arbeitet im Modus *Berechtigungen umgehen*,
 wenn diese Person ihn im Workspace nutzen darf, sonst in *Änderungen
 annehmen*; im Eingabefeld lässt sich der Modus während der Aufgabe wechseln. Claude
-bekommt ein Briefing (was fehlt, das erkannte Projekt, der Stack) und schreibt:
+bekommt ein Briefing (was fehlt, das erkannte Projekt, der Stack; der Chat zeigt
+eine einzeilige Zusammenfassung), antwortet in der Sprache der Besitzerin oder
+des Besitzers und schreibt:
 
 1. `.argos/setup.sh` — idempotente, nicht-interaktive Setup-Befehle,
 2. `.argos/demo.compose.yml` und `.argos/demo.yml` — den Preview-Vertrag,
@@ -440,8 +443,8 @@ Demo ohne Daten außerhalb von `migrations` bekommt eine Warnung im Log. Argos
 
 ## Abschluss-Checkliste
 
-1. Laravel-App? Die Standards passen meist; der Stand zeigt *Noch nicht
-   getestet*, bis eine Einrichtungs-Aufgabe **Einrichtung testen** bestanden hat.
+1. Laravel-App? Die Standards passen meist; die Einrichtungs-Aufgabe prüft und
+   ergänzt sie und testet das Ergebnis.
 2. Sonst lass die [Einrichtungs-Aufgabe](#die-einrichtungs-aufgabe) `.argos/`
    schreiben (oder schreib es selbst), lass **Einrichtung testen** laufen, bis alle
    vier Schritte bestehen, und merge ihren Pull Request.

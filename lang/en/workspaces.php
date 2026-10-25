@@ -836,6 +836,17 @@ return [
     ],
 
     'setup' => [
+        'banner_states' => [
+            'testing' => 'Argos is testing the setup …',
+            'ready' => 'The test passed. Merge the pull request so the setup applies for good.',
+            'failed' => 'The test failed; Claude got the log and fixes it.',
+            'paused' => 'Automatic tests paused after several rounds — tell Claude how to go on, or test by hand.',
+        ],
+        'open_pr' => 'Open pull request',
+        'brief_summary' => 'Brief for Claude: set up the workspace (project: :project, missing: :missing).',
+        'brief_nothing_missing' => 'nothing, check and complete the defaults',
+        'brief_show' => 'Show the full brief',
+        'missing' => ['stack' => 'a stack', 'preview' => 'the preview contract', 'setup' => 'the setup steps'],
         'locked' => 'Needs a tested setup (now: :status).',
         'locked_action' => 'Set up',
         'env_open' => 'Empty in .env.example, set nowhere',

@@ -133,27 +133,19 @@ class WorkspaceSetupTest extends TestCase
         $this->assertSame(['stack', 'preview', 'setup'], $this->service()->inspect($this->workspace)['missing']);
     }
 
-    public function test_a_laravel_workspace_is_complete_but_untested_after_creating_it(): void
+    public function test_a_laravel_workspace_starts_the_setup_task_although_nothing_is_missing(): void
     {
         $this->files = ['composer.json' => '{}', 'artisan' => '<?php'];
 
-        $this->assertNull($this->service()->afterCreate($this->workspace, $this->admin));
+        $task = $this->service()->afterCreate($this->workspace, $this->admin);
 
+        $this->assertNotNull($task);
         $workspace = $this->workspace->fresh();
-        $this->assertSame(WorkspaceSetupStatus::Untested, $workspace->setup_status);
+        $this->assertSame(WorkspaceSetupStatus::Running, $workspace->setup_status);
         $this->assertSame('php-8.5', $workspace->workerStack?->name);
-        $this->assertSame(0, Task::query()->count());
-    }
-
-    public function test_a_laravel_workspace_on_the_defaults_points_the_admin_at_revise_setup(): void
-    {
-        $this->files = ['composer.json' => '{}', 'artisan' => '<?php'];
-
-        $this->service()->afterCreate($this->workspace, $this->admin);
-
-        $notification = $this->admin->notifications()->sole();
-        $this->assertSame(__('workspaces.setup.defaults_title', ['workspace' => $this->workspace->name]), $notification->data['title']);
-        $this->assertStringEndsWith('/'.$this->workspace->slug.'/settings', $notification->data['actions'][0]['url']);
+        $brief = TaskEvent::query()->where('task_id', $task->id)->where('type', TaskEventType::UserMessage)->firstOrFail();
+        $this->assertStringContainsString('Write every message to the person in English', (string) $brief->payload['text']);
+        $this->assertSame(__('workspaces.setup.brief_summary', ['project' => 'laravel', 'missing' => __('workspaces.setup.brief_nothing_missing')]), $brief->payload['brief']);
     }
 
     public function test_a_laravel_workspace_with_its_own_setup_gets_no_hint(): void
@@ -415,12 +407,14 @@ class WorkspaceSetupTest extends TestCase
     {
         Bus::fake([CheckWorkspaceSetupJob::class]);
         $task = $this->setupTask();
+        $this->workspace->forceFill(['setup_status' => WorkspaceSetupStatus::Running])->save();
 
-        Livewire::actingAs($this->admin)
+        $chat = Livewire::actingAs($this->admin)
             ->test(TaskChat::class, ['workspaceId' => $this->workspace->id])
             ->set('taskId', $task->id)
-            ->assertSee(__('workspaces.setup.banner'))
-            ->call('testSetup');
+            ->assertSee(__('workspaces.setup.banner'));
+        $this->workspace->forceFill(['setup_status' => WorkspaceSetupStatus::Failed])->save();
+        $chat->call('$refresh')->assertSee(__('workspaces.setup.banner_states.failed'))->call('testSetup');
 
         Bus::assertDispatched(CheckWorkspaceSetupJob::class);
     }

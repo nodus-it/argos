@@ -836,6 +836,17 @@ return [
     ],
 
     'setup' => [
+        'banner_states' => [
+            'testing' => 'Argos testet die Einrichtung …',
+            'ready' => 'Der Test ist bestanden. Merge den Pull Request, dann gilt die Einrichtung dauerhaft.',
+            'failed' => 'Der Test ist fehlgeschlagen; Claude hat das Log bekommen und behebt es.',
+            'paused' => 'Automatische Tests nach mehreren Runden pausiert — sag Claude, wie es weitergeht, oder teste von Hand.',
+        ],
+        'open_pr' => 'Pull Request öffnen',
+        'brief_summary' => 'Auftrag an Claude: Workspace einrichten (Projekt: :project, fehlt: :missing).',
+        'brief_nothing_missing' => 'nichts, Standards prüfen und ergänzen',
+        'brief_show' => 'Ganzen Auftrag anzeigen',
+        'missing' => ['stack' => 'ein Stack', 'preview' => 'der Preview-Vertrag', 'setup' => 'die Setup-Schritte'],
         'locked' => 'Braucht eine getestete Einrichtung (jetzt: :status).',
         'locked_action' => 'Einrichten',
         'env_open' => 'Leer in .env.example, nirgends gesetzt',
