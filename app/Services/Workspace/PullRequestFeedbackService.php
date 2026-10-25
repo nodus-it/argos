@@ -159,7 +159,7 @@ class PullRequestFeedbackService
         return implode("\n", array_map(fn (array $c): string => __('workspaces.review.from_pr', ['name' => $c['author']]).' '.trim($c['body']), $comments));
     }
 
-    private static function fromArgos(string $body): bool
+    public static function fromArgos(string $body): bool
     {
         // Shipping notes from before the marker, in either language.
         return str_contains($body, PullRequestService::ARGOS_MARKER)

@@ -54,7 +54,7 @@ class PullRequestService
         $workspace = $task->workspace;
         [$owner, $repo] = $workspace->ownerAndRepo();
         try {
-            $details = $this->git->forWorkspace($workspace)->pullRequestDetails($owner, $repo, $task->pr_number);
+            $details = self::withoutOwnNotes($this->git->forWorkspace($workspace)->pullRequestDetails($owner, $repo, $task->pr_number));
         } catch (Throwable $e) {
             Log::channel('argos')->info('Pull request sync failed', ['task' => $task->id, 'error' => $e->getMessage()]);
 
@@ -98,6 +98,28 @@ class PullRequestService
      * background refresh fills them in (the sidebar shows the stored summary
      * meanwhile and polls).
      */
+    /** Argos' own shipping notes are no review: "commented" from them alone means none yet. */
+    public static function withoutOwnNotes(PullRequestDetails $details): PullRequestDetails
+    {
+        $others = array_filter($details->comments, fn (array $c): bool => ! PullRequestFeedbackService::fromArgos((string) ($c['body'] ?? '')));
+        if ($details->reviewState !== 'commented' || $others !== []) {
+            return $details;
+        }
+
+        return new PullRequestDetails(
+            state: $details->state,
+            url: $details->url,
+            headSha: $details->headSha,
+            conflicts: $details->conflicts,
+            behindBase: $details->behindBase,
+            checks: $details->checks,
+            reviewState: null,
+            reviews: $details->reviews,
+            comments: $details->comments,
+            autoMerge: $details->autoMerge,
+        );
+    }
+
     public function details(Task $task, bool $wait = false): ?PullRequestDetails
     {
         if ($task->pr_number === null) {
