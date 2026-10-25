@@ -117,10 +117,15 @@ Only **Argos administrators** create workspaces:
   token of an API client that runs as an administrator (see
   [REST API](REST-API.md#create-a-workspace)).
 
-The form starts with the **platform** (GitHub, GitLab, Bitbucket), then the
-access (a connected OAuth account or a Personal Access Token), the repository
-and its default branch, and the name. The other tabs (environment, resources,
-automation) can be filled now or later — see [Workspace Settings](WORKSPACE-SETTINGS.md).
+`/new` guides you in five steps: **Repository** (platform, access, repository,
+default branch, name); **What Argos detected** (project, stack, database and
+Redis, quality gates and where setup steps and live demo come from — read from
+the repository before anything is saved, each with a reason, changeable);
+**Live demo** (on or off, and which environment values are still missing);
+**Optional** (limits and automation, folded; team and tracker follow from the
+setup checklist); **Start** (a summary, then "Create and set up" starts the
+setup task). **Set up everything yourself** switches to the full form at
+`/new/expert` and takes your entries along — see [Workspace Settings](WORKSPACE-SETTINGS.md).
 The creator becomes the workspace's first admin; add further members in the
 settings afterwards.
 

@@ -67,6 +67,19 @@ class WorkspaceSetupService
     ) {}
 
     /**
+     * An unsaved workspace with just the repository access, for reading the
+     * repository while a workspace is being created.
+     *
+     * @param  array<string, mixed>  $attributes  dehydrated form data
+     */
+    public function draft(array $attributes): Workspace
+    {
+        return (new Workspace)->forceFill(array_intersect_key($attributes, array_flip([
+            'platform', 'auth_method', 'token', 'connected_account_id', 'repo_url', 'default_branch',
+        ])));
+    }
+
+    /**
      * What the repo brings at its setup ref.
      *
      * @return array{project: 'laravel'|'php'|'node'|'unknown', stack: string|null, missing: list<'stack'|'preview'|'setup'>}
@@ -117,7 +130,7 @@ class WorkspaceSetupService
      */
     public function sources(Workspace $workspace): array
     {
-        return Cache::remember('ws-setup-sources:'.$workspace->id.':'.$workspace->setupRef(), 300, function () use ($workspace): array {
+        return Cache::remember('ws-setup-sources:'.$workspace->repoCacheKey(), 300, function () use ($workspace): array {
             try {
                 $service = $this->git->forWorkspace($workspace);
                 $file = fn (string $path): bool => $service->getFileContents($workspace->getOwnerRepo(), $path, $workspace->setupRef()) !== null;
@@ -279,7 +292,7 @@ class WorkspaceSetupService
      */
     public function availableGates(Workspace $workspace): ?array
     {
-        return Cache::remember('ws-gates:'.$workspace->id.':'.$workspace->setupRef(), 300, function () use ($workspace): ?array {
+        return Cache::remember('ws-gates:'.$workspace->repoCacheKey(), 300, function () use ($workspace): ?array {
             try {
                 $service = $this->git->forWorkspace($workspace);
                 $file = fn (string $path): ?string => $service->getFileContents($workspace->getOwnerRepo(), $path, $workspace->setupRef());

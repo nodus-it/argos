@@ -333,6 +333,12 @@ class Workspace extends Model implements HasApiTokensContract
         return $this->setup_branch ?? $this->default_branch;
     }
 
+    /** Cache key part for what is read from the repository; a workspace being created has no id yet. */
+    public function repoCacheKey(): string
+    {
+        return ($this->id ?? 'draft-'.md5($this->platform?->value.'|'.$this->repo_url)).':'.$this->setupRef();
+    }
+
     /**
      * The `owner/repo` path of the repository URL (GitLab owners keep their
      * subgroups), without scheme, host and `.git`.
