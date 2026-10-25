@@ -183,6 +183,11 @@ markieren*). Sie erscheint nur, wenn es etwas zu tun gibt.
 
 ## Bilder, Dateien und Befehle
 
+- **Sprache:** Das Mikrofon neben der Büroklammer (und neben dem Auftrag einer
+  automatischen Aufgabe) diktiert in deiner Sprache ins Feld; nochmal tippen
+  beendet es. Es nutzt die Spracherkennung des Browsers — Chrome und Edge
+  schicken den Ton dafür an Google, Safari an Apple; Firefox hat keine, dort
+  fehlt der Knopf.
 - **Bilder:** Screenshots einfügen, hineinziehen oder anhängen (PNG, JPEG, GIF,
   WebP; bis zu 5 pro Nachricht, je `ARGOS_WORKSPACE_UPLOAD_MAX_MB`). Claude
   sieht sie mit der Nachricht; andere sehen sie als Vorschaubilder. Sie werden

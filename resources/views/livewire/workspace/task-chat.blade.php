@@ -95,8 +95,13 @@
                     </label>
                     @if ($newAuto)
                         <label class="ws-field">
-                            <span>{{ __('workspaces.auto.prompt') }}</span>
-                            <textarea class="respond-ta ws-ta" rows="4" wire:model="newPrompt" maxlength="20000" placeholder="{{ __('workspaces.auto.prompt_placeholder') }}" required></textarea>
+                            <span>{{ __('workspaces.auto.prompt') }}
+                                <span x-data="argosDictation('ag-new-prompt', @js(app()->getLocale() === 'de' ? 'de-DE' : 'en-US'))" x-show="supported" x-cloak class="ag-dictation">
+                                    <button type="button" class="ag-icon-btn ag-icon-btn-sm" x-on:click.prevent="toggle()" :class="{ 'is-listening': listening }" :aria-pressed="listening"
+                                            :aria-label="listening ? @js(__('workspaces.chat.dictation_stop')) : @js(__('workspaces.chat.dictation'))"><x-ag.icon name="mic" :size="15" /></button>
+                                </span>
+                            </span>
+                            <textarea id="ag-new-prompt" class="respond-ta ws-ta" rows="4" wire:model="newPrompt" maxlength="20000" placeholder="{{ __('workspaces.auto.prompt_placeholder') }}" required></textarea>
                             @error('newPrompt') <small class="t-err">{{ $message }}</small> @enderror
                         </label>
                         <div class="ws-auto-grid">
@@ -501,6 +506,11 @@
                     <div class="ag-composer-bar">
                         <button type="button" class="ag-icon-btn ag-icon-btn-sm" x-on:click="$refs.file.click()" title="{{ __('workspaces.task.attach') }}" aria-label="{{ __('workspaces.task.attach') }}"><x-ag.icon name="paperclip" :size="17" /></button>
                         <input type="file" class="sr-only" tabindex="-1" aria-hidden="true" x-ref="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple x-on:change="attach($event.target.files); $event.target.value = ''">
+                        <span x-data="argosDictation(@js('ag-composer-'.$task->id), @js(app()->getLocale() === 'de' ? 'de-DE' : 'en-US'))" x-show="supported" x-cloak class="ag-dictation">
+                            <button type="button" class="ag-icon-btn ag-icon-btn-sm" x-on:click="toggle()" :class="{ 'is-listening': listening }" :aria-pressed="listening"
+                                    :title="failed !== '' ? @js(__('workspaces.chat.dictation_failed')) + ' (' + failed + ')' : (listening ? @js(__('workspaces.chat.dictation_stop')) : @js(__('workspaces.chat.dictation')))"
+                                    :aria-label="listening ? @js(__('workspaces.chat.dictation_stop')) : @js(__('workspaces.chat.dictation'))"><x-ag.icon name="mic" :size="17" /></button>
+                        </span>
                         <select class="ag-pill" wire:change="setMode($event.target.value)" wire:key="mode-{{ $task->permission_mode->value }}-{{ $controlsVersion }}" aria-label="{{ __('workspaces.chat.mode') }}">
                             @foreach ($modes as $mode)
                                 <option value="{{ $mode->value }}" @selected($task->permission_mode === $mode)>{{ $mode->label() }}</option>
