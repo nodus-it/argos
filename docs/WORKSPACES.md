@@ -112,7 +112,8 @@ continue.
 Only **Argos administrators** create workspaces:
 
 - with **New workspace** on the workspace list (`/new`),
-- in the setup wizard (`/setup`, its repository step), or
+- from the setup wizard (`/setup`): its repository step picks access and
+  repository, then hands over to the guided creation at `/new`, or
 - through the REST API: `POST /api/v1/workspaces` with a `workspaces:write`
   token of an API client that runs as an administrator (see
   [REST API](REST-API.md#create-a-workspace)).

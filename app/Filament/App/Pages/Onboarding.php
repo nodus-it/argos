@@ -9,6 +9,8 @@ use App\Enums\AgentName;
 use App\Enums\AuthMethod;
 use App\Filament\App\Clusters\System\Resources\ProviderCredentialResource;
 use App\Filament\App\Clusters\System\Resources\ProviderOAuthConfigResource;
+use App\Filament\App\Resources\WorkspaceResource;
+use App\Filament\App\Resources\WorkspaceResource\Pages\CreateWorkspaceExpert;
 use App\Filament\Concerns\AdminOnly;
 use App\Filament\Concerns\VerifiesCredentialOnSave;
 use App\Models\ProviderCredential;
@@ -27,7 +29,6 @@ use App\Services\OAuth\ProviderOAuthConfigService;
 use App\Services\OAuth\TokenRefresher;
 use App\Services\User\UserService;
 use App\Services\Workspace\AgentPool;
-use App\Services\Workspace\WorkspaceService;
 use App\Support\DocsLinkAction;
 use App\Support\RepoUrlBuilder;
 use Filament\Actions\Action;
@@ -758,22 +759,10 @@ class Onboarding extends Page
             return;
         }
 
-        /** @var User $user */
-        $user = auth()->user();
-        // The repo inspection (and a setup task when something is missing) follows.
-        $workspace = app(WorkspaceService::class)->createWorkspace($user, [
-            'name' => $name,
-            'repo_url' => RepoUrlBuilder::build($source['platform'], $this->selectedRepo, $source['instance_url']),
-            'platform' => $source['platform'],
-            'default_branch' => $branch,
-            'auth_method' => $source['auth_method'],
-            'connected_account_id' => $source['account_id'],
-            'token' => $source['credential_id'] !== null ? $source['token'] : null,
-        ]);
-
-        $this->createdWorkspaceId = $workspace->id;
-        $this->currentStep = 4;
-
-        Notification::make()->title(__('onboarding.notifications.project_created'))->success()->send();
+        // The guided creation reads the repository, explains what it found and starts the setup.
+        session()->put(CreateWorkspaceExpert::DRAFT_KEY, ['name' => $name, 'platform' => $source['platform'], ...($source['auth_method'] === AuthMethod::OAuth
+            ? ['auth_method' => 'oauth', 'connected_account_id' => $source['account_id'], 'oauth_repo' => $this->selectedRepo, 'oauth_branch' => $branch]
+            : ['auth_method' => 'pat', 'repo_url' => RepoUrlBuilder::build($source['platform'], $this->selectedRepo, $source['instance_url']), 'token' => $source['token'], 'default_branch' => $branch])]);
+        $this->redirect(WorkspaceResource::getUrl('create'));
     }
 }

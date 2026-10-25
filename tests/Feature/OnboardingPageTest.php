@@ -8,6 +8,8 @@ use App\Enums\AgentCredentialStatus;
 use App\Enums\AgentName;
 use App\Enums\IntegrationProvider;
 use App\Filament\App\Pages\Onboarding;
+use App\Filament\App\Resources\WorkspaceResource;
+use App\Filament\App\Resources\WorkspaceResource\Pages\CreateWorkspaceExpert;
 use App\Models\AgentCredential;
 use App\Models\ProviderCredential;
 use App\Models\ProviderOAuthConfig;
@@ -411,7 +413,7 @@ class OnboardingPageTest extends TestCase
         $this->assertSame(0, ProviderCredential::query()->count());
     }
 
-    public function test_inline_create_with_oauth_account_creates_workspace(): void
+    public function test_the_repository_step_hands_an_oauth_repository_to_the_guided_creation(): void
     {
         $this->configureClaudeAgent();
 
@@ -442,21 +444,17 @@ class OnboardingPageTest extends TestCase
             ->set('selectedBranch', 'main')
             ->set('workspaceName', 'widget')
             ->call('createWorkspace')
-            ->assertSet('currentStep', 4)
-            ->assertSee(__('onboarding.done.create_workspace'))
-            ->assertSee(Workspace::query()->where('name', 'widget')->first()->url());
+            ->assertRedirect(WorkspaceResource::getUrl('create'));
 
-        $this->assertDatabaseHas(Workspace::class, [
-            'name' => 'widget',
-            'platform' => 'github',
-            'auth_method' => 'oauth',
-            'connected_account_id' => $account->id,
-            'default_branch' => 'main',
-            'repo_url' => 'https://github.com/acme/widget',
-        ]);
+        // The guided creation takes over, prefilled; nothing is saved yet.
+        $this->assertSame(0, Workspace::query()->where('name', 'widget')->count());
+        $this->assertSame(
+            ['name' => 'widget', 'platform' => 'github', 'auth_method' => 'oauth', 'connected_account_id' => $account->id, 'oauth_repo' => 'acme/widget', 'oauth_branch' => 'main'],
+            session(CreateWorkspaceExpert::DRAFT_KEY),
+        );
     }
 
-    public function test_inline_create_with_pat_credential_creates_workspace(): void
+    public function test_the_repository_step_hands_a_pat_repository_to_the_guided_creation(): void
     {
         $this->configureClaudeAgent();
 
@@ -480,13 +478,12 @@ class OnboardingPageTest extends TestCase
             ->set('selectedBranch', 'main')
             ->set('workspaceName', 'gadget')
             ->call('createWorkspace')
-            ->assertSet('currentStep', 4);
+            ->assertRedirect(WorkspaceResource::getUrl('create'));
 
-        $workspace = Workspace::query()->where('name', 'gadget')->first();
-        $this->assertNotNull($workspace);
-        $this->assertSame('pat', $workspace->auth_method->value);
-        $this->assertNull($workspace->connected_account_id);
-        $this->assertSame('ghp-secret', $workspace->token);
+        $draft = session(CreateWorkspaceExpert::DRAFT_KEY);
+        $this->assertSame('pat', $draft['auth_method']);
+        $this->assertSame('ghp-secret', $draft['token']);
+        $this->assertSame('https://github.com/acme/gadget', $draft['repo_url']);
     }
 
     public function test_inline_create_rejects_duplicate_name(): void

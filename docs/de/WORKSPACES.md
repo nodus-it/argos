@@ -121,7 +121,8 @@ soll.
 Nur **Argos-Admins** legen Workspaces an:
 
 - mit **Neuer Workspace** in der Workspace-Liste (`/new`),
-- im Einrichtungs-Assistenten (`/setup`, in seinem Repository-Schritt) oder
+- aus dem Einrichtungs-Assistenten (`/setup`): sein Repository-Schritt wählt
+  Zugang und Repository und übergibt dann an das geführte Anlegen unter `/new`, oder
 - über die REST-API: `POST /api/v1/workspaces` mit einem
   `workspaces:write`-Token eines API-Clients, der als Admin läuft (siehe
   [REST-API](REST-API.md#einen-workspace-anlegen)).
