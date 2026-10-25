@@ -179,6 +179,6 @@ class EnvAudit
      */
     private function cached(Workspace $workspace, string $what, callable $resolve): mixed
     {
-        return Cache::remember('ws-env-audit:'.$what.':'.$workspace->id.':'.$workspace->setupRef(), 300, $resolve);
+        return Cache::remember('ws-env-audit:'.$what.':'.$workspace->repoCacheKey(), 300, $resolve);
     }
 }
