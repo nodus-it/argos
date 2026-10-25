@@ -411,6 +411,8 @@ button.ag-gate-chip { cursor: pointer; }
 .ag-dcell.is-drafting { background: var(--ag-info-soft) !important; color: var(--ag-info) !important; }
 .ag-dplus { position: absolute; right: 6px; top: 3px; width: 18px; height: 18px; display: none; place-items: center; border: 0; border-radius: 4px; background: var(--ag-info); color: #fff; font: 600 13px/1 var(--font-sans); cursor: pointer; }
 .ag-dcell:hover .ag-dplus, .ag-dplus:focus-visible { display: grid; }
+/* Touch screens have no hover: the comment button stays visible, with a finger-sized target. */
+@media (hover: none) { .ag-dplus { display: grid; width: 26px; height: 26px; top: 0; opacity: .7; } }
 .ag-dbadge { position: absolute; right: 6px; top: 3px; min-width: 18px; height: 18px; padding: 0 4px; box-sizing: border-box; display: grid; place-items: center; border-radius: 4px; background: var(--ag-info); color: #fff; font: 600 11px/1 var(--font-sans); }
 .ag-dbadge.is-static { position: static; }
 .ag-dnote-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); padding: 8px 12px; font-family: var(--font-sans); line-height: 1.5; }
@@ -461,6 +463,10 @@ button.ag-gate-chip { cursor: pointer; }
   .ag-page.is-drawer-open .ag-drawer-backdrop { display: block; position: fixed; inset: 0; z-index: 34; background: rgba(0,0,0,.3); }
   .ag-page.is-drawer-open .ag-drawer-close { display: inline-grid; position: sticky; top: 8px; z-index: 1; float: right; margin: 8px 8px 0 0; background: var(--ag-surface); }
   .ag-hide-narrow { display: none !important; }
+  /* Review: the panel takes the place of the chat; closing it brings the chat (and "send review") back. */
+  .ag-page.is-review .ag-center, .ag-page.is-review .ag-chat-strip, .ag-page.is-review .ag-drawer-toggle, .ag-page.is-review .ag-max-btn, .ag-page.is-review .ag-head .ag-kbd { display: none !important; }
+  .ag-page.is-review .ag-context { grid-area: chat; position: relative; inset: auto; z-index: auto; width: auto; transform: none; box-shadow: none; transition: none; }
+  .ag-review-bar { flex-wrap: wrap; height: auto; min-height: 52px; padding-block: 8px; row-gap: 6px; }
   .ag-ws-title { max-width: 140px; }
   .ag-switch-title { max-width: 160px; }
 }
@@ -468,6 +474,11 @@ button.ag-gate-chip { cursor: pointer; }
   .fi-panel-app .fi-layout { flex-direction: column; }
   .ag-rail { position: fixed; top: auto; bottom: 0; left: 0; right: 0; width: auto; height: 56px; flex-direction: row; justify-content: space-around; padding: 0 8px; border-right: 0; border-top: 1px solid var(--ag-border); }
   .ag-rail-logo, .ag-rail-spacer { display: none; }
+  .ag-review-flag-text, .ag-review-bar .ag-seg { display: none; }
+  .ag-review-flag { padding: 0 8px; }
+  .ag-page.is-review .ag-task-meta { display: none; }
+  .ag-review-body { flex-direction: column; }
+  .ag-review-body .ag-tree { width: auto; max-height: 30vh; border-right: 0; border-bottom: 1px solid var(--ag-border); }
   .fi-panel-app .fi-main-ctn { padding-bottom: 56px; }
   .ag-page { height: calc(100dvh - 56px); }
   .ag-head { padding: 0 12px; gap: 6px; }

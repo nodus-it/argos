@@ -400,6 +400,16 @@ body,
   .fi-main .fi-section.fi-aside > .fi-section-header {
     position: static;
   }
+  /* Stacked on phones: the header sits above the fields, so the side padding only narrows them. */
+  .fi-main .fi-section.fi-aside {
+    padding: 18px 0;
+  }
+  .fi-main .fi-section.fi-aside > .fi-section-content-ctn > .fi-section-content {
+    padding-inline: 0;
+  }
+  .fi-main .fi-sc-tabs-tab {
+    padding-inline: 0;
+  }
 }
 
 /* Tabs — underline style per the mockup (.tabs/.tab.on). Covers both the form
