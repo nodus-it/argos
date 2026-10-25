@@ -51,7 +51,7 @@
             </div>
         @endif
         <span class="ag-review-flag" x-show="review" x-cloak>
-            <x-ag.icon name="eye" :size="15" :stroke="2" /> {{ __('workspaces.focus.review_mode') }}
+            <x-ag.icon name="eye" :size="15" :stroke="2" /> <span class="ag-review-flag-text">{{ __('workspaces.focus.review_mode') }}</span>
         </span>
         <span class="ag-spacer"></span>
         <button type="button" class="ag-btn" x-show="review" x-cloak x-on:click="closeReview()">

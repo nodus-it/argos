@@ -10,6 +10,10 @@
         /** @var list<array<string, mixed>> $files */
         $seenCount = count($seen);
     @endphp
+    @if ($view === 'split')
+        {{-- Side by side does not fit a phone. --}}
+        <span hidden x-init="if (window.matchMedia('(max-width: 640px)').matches) $wire.setView('unified')"></span>
+    @endif
     <span class="hidden" wire:key="cc-{{ $commentCount }}" x-init="window.dispatchEvent(new CustomEvent('argos-review-count', { detail: {{ $commentCount }} }))"></span>
     <div class="ag-review-bar">
         <span class="ag-review-title">{{ __('workspaces.review.changes') }}</span>
