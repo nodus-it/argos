@@ -143,6 +143,7 @@ class WorkspaceSetupTest extends TestCase
         $workspace = $this->workspace->fresh();
         $this->assertSame(WorkspaceSetupStatus::Running, $workspace->setup_status);
         $this->assertSame('php-8.5', $workspace->workerStack?->name);
+        $this->assertSame([], $workspace->worker_services);
         $brief = TaskEvent::query()->where('task_id', $task->id)->where('type', TaskEventType::UserMessage)->firstOrFail();
         $this->assertStringContainsString('Write every message to the person in English', (string) $brief->payload['text']);
         $this->assertSame(__('workspaces.setup.brief_summary', ['project' => 'laravel', 'missing' => __('workspaces.setup.brief_nothing_missing')]), $brief->payload['brief']);
@@ -192,6 +193,15 @@ class WorkspaceSetupTest extends TestCase
         $brief = (string) TaskEvent::query()->where('task_id', $task->id)->where('type', TaskEventType::UserMessage)->firstOrFail()->payload['text'];
         $this->assertStringContainsString('in German', $brief);
         $this->assertStringContainsString('Backing services for task worktrees: none.', $brief);
+    }
+
+    public function test_the_database_and_redis_the_repo_expects_are_turned_on_at_creation(): void
+    {
+        $this->files = ['composer.json' => '{"require": {"laravel/horizon": "^5.0"}}', 'artisan' => '<?php', '.env.example' => "DB_CONNECTION=mysql\n"];
+
+        $this->service()->afterCreate($this->workspace, $this->admin);
+
+        $this->assertSame(['mysql', 'redis'], $this->workspace->fresh()->worker_services);
     }
 
     public function test_without_a_subscription_the_setup_waits(): void

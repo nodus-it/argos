@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Workspace;
 
+use App\Enums\BackingService;
 use App\Enums\TaskKind;
 use App\Models\Task;
 use App\Models\Workspace;
@@ -62,6 +63,19 @@ class EnvAuditTest extends TestCase
 
         $this->files = ['.env.example' => "DB_CONNECTION=sqlite\n", 'config/database.php' => "<?php return ['connections' => ['sqlite' => [], 'mariadb' => []]];"];
         $this->assertSame('mariadb', app(EnvAudit::class)->databaseDriver(Workspace::factory()->create()));
+    }
+
+    public function test_it_detects_the_database_and_redis_the_repository_expects(): void
+    {
+        $this->files = [
+            '.env.example' => "DB_CONNECTION=sqlite\nCACHE_STORE=database\n",
+            'config/database.php' => "<?php return ['default' => env('DB_CONNECTION', 'mariadb')];",
+            'composer.json' => '{"require": {"laravel/horizon": "^5.0"}}',
+        ];
+        $this->assertSame([BackingService::Mysql, BackingService::Redis], app(EnvAudit::class)->servicesNeeded(Workspace::factory()->create()));
+
+        $this->files = ['.env.example' => "DB_CONNECTION=sqlite\nCACHE_STORE=file\n", 'composer.json' => '{}'];
+        $this->assertSame([], app(EnvAudit::class)->servicesNeeded(Workspace::factory()->create()));
     }
 
     public function test_missing_required_keys_lock_previews_except_for_the_setup_task(): void

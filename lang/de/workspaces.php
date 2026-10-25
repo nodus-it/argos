@@ -818,6 +818,7 @@ return [
         'steps' => [
             'agent' => 'Claude-Abo verbunden',
             'stack' => 'Stack erkannt',
+            'services' => 'Datenbank und Redis eingeschaltet',
             'setup' => 'Einrichtung getestet',
             'demo' => 'Live-Demo eingeschaltet',
             'env' => 'Demo-ENVs vollständig',
@@ -827,6 +828,7 @@ return [
         'actions' => [
             'agent' => 'Verbinden',
             'stack' => 'Auswählen',
+            'services' => 'Einschalten',
             'setup' => 'Einrichten',
             'demo' => 'Einschalten',
             'env' => 'Werte setzen',

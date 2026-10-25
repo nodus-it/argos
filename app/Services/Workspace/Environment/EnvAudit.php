@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Workspace\Environment;
 
+use App\Enums\BackingService;
 use App\Models\Workspace;
 use App\Services\Demo\DemoConfigLocator;
 use App\Services\GitProvider\GitServiceFactory;
@@ -100,6 +101,26 @@ class EnvAudit
         $config = $this->cached($workspace, 'database', fn (): string => (string) $this->file($workspace, 'config/database.php'));
 
         return ! str_contains($config, "'mysql' =>") && str_contains($config, "'mariadb' =>") ? 'mariadb' : 'mysql';
+    }
+
+    /**
+     * The backing services the repository expects: MySQL when `.env.example` or
+     * `config/database.php` default to mysql/mariadb, Redis when a driver uses it or Horizon/Predis is required.
+     *
+     * @return list<BackingService>
+     */
+    public function servicesNeeded(Workspace $workspace): array
+    {
+        $example = $this->example($workspace);
+        $database = $this->cached($workspace, 'database', fn (): string => (string) $this->file($workspace, 'config/database.php'));
+        $composer = $this->cached($workspace, 'composer', fn (): string => (string) $this->file($workspace, 'composer.json'));
+
+        $mysql = in_array($example['DB_CONNECTION'] ?? '', ['mysql', 'mariadb'], true)
+            || preg_match("/'default'\\s*=>\\s*env\\(\\s*'DB_CONNECTION'\\s*,\\s*'(mysql|mariadb)'/", $database) === 1;
+        $drivers = array_intersect_key($example, array_flip(['CACHE_STORE', 'SESSION_DRIVER', 'QUEUE_CONNECTION']));
+        $redis = in_array('redis', $drivers, true) || preg_match('#"(laravel/horizon|predis/predis)"#', $composer) === 1;
+
+        return array_values(array_filter([$mysql ? BackingService::Mysql : null, $redis ? BackingService::Redis : null]));
     }
 
     public static function setByArgos(string $key): bool

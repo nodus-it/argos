@@ -120,6 +120,11 @@ setting up*.
 
 ### Setup checklist
 
+When a workspace is created, Argos also turns on the backing services the
+repository expects: MySQL when `.env.example` or `config/database.php` default
+to `mysql`/`mariadb`, Redis when a cache, session or queue driver uses it or
+the project requires Horizon or Predis.
+
 Workspace admins see a checklist on the workspace page while a required step
 is open — Claude subscription, stack, tested setup, and the demo environment
 when the live demo is on — and the full list, optional steps included, at the
