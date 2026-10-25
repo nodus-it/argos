@@ -98,7 +98,7 @@ return [
         'branch_label' => 'Standard-Branch',
         'branch_placeholder' => 'Branch wählen…',
         'name_label' => 'Workspace-Name',
-        'create_button' => 'Workspace anlegen',
+        'create_button' => 'Weiter zum Anlegen',
     ],
 
     'done' => [

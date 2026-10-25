@@ -98,7 +98,7 @@ return [
         'branch_label' => 'Default branch',
         'branch_placeholder' => 'Choose a branch…',
         'name_label' => 'Workspace name',
-        'create_button' => 'Create workspace',
+        'create_button' => 'Continue to create',
     ],
 
     'done' => [

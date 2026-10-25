@@ -38,6 +38,15 @@ class CreateWorkspace extends CreateRecord
     /** @var array{project?: string, stack?: string|null, services?: list<string>, gates?: list<string>|null, setup?: string, preview?: string, open?: list<string>, missing?: list<string>} */
     public array $detected = [];
 
+    public function mount(): void
+    {
+        parent::mount();
+        $draft = session()->pull(CreateWorkspaceExpert::DRAFT_KEY);
+        if (is_array($draft)) {
+            $this->form->fill($draft);
+        }
+    }
+
     public function getTitle(): string
     {
         return __('workspaces.create.title');

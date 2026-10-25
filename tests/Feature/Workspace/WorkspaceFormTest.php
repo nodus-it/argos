@@ -113,6 +113,15 @@ class WorkspaceFormTest extends TestCase
             ->assertSet('data.worker_stack_id', WorkerStack::query()->where('name', 'php-8.5')->value('id'));
     }
 
+    public function test_the_guided_page_starts_from_a_handed_over_draft(): void
+    {
+        session()->put(CreateWorkspaceExpert::DRAFT_KEY, ['name' => 'widget', 'platform' => 'github', 'repo_url' => 'https://github.com/acme/widget']);
+
+        Livewire::test(CreateWorkspace::class)
+            ->assertSchemaStateSet(['name' => 'widget', 'repo_url' => 'https://github.com/acme/widget']);
+        $this->assertNull(session(CreateWorkspaceExpert::DRAFT_KEY));
+    }
+
     public function test_the_expert_mode_takes_the_entries_along(): void
     {
         Livewire::test(CreateWorkspace::class)
