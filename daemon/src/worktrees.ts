@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -198,9 +198,19 @@ export function setupRunner(script: string, layout: Layout): SetupScript {
     return (dir, env, timeoutMs) =>
         new Promise((resolve) => {
             const childEnv = { ...strippedEnv(), ...cacheEnv(layout), ...env };
-            execFile(script, [], { cwd: dir, env: childEnv, timeout: timeoutMs, maxBuffer: 32 * 1024 * 1024, encoding: 'utf8' }, (error, stdout, stderr) => {
-                const code = error === null ? 0 : typeof error.code === 'number' ? error.code : 1;
-                resolve({ code, output: `${stdout}${stderr}` });
+            // stdout and stderr in the order they arrive: the log's tail must hold the failing step.
+            const chunks: string[] = [];
+            const child = spawn(script, [], { cwd: dir, env: childEnv });
+            child.stdout.setEncoding('utf8').on('data', (chunk: string) => chunks.push(chunk));
+            child.stderr.setEncoding('utf8').on('data', (chunk: string) => chunks.push(chunk));
+            const timer = setTimeout(() => child.kill('SIGKILL'), timeoutMs);
+            child.on('error', (error) => {
+                clearTimeout(timer);
+                resolve({ code: 1, output: `${chunks.join('')}${error.message}\n` });
+            });
+            child.on('close', (code) => {
+                clearTimeout(timer);
+                resolve({ code: code ?? 1, output: chunks.join('') });
             });
         });
 }

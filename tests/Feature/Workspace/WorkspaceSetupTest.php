@@ -181,6 +181,19 @@ class WorkspaceSetupTest extends TestCase
         $this->assertSame($task->id, $this->service()->start($this->workspace, $this->admin)->id);
     }
 
+    public function test_the_setup_speaks_the_owners_language_and_names_the_backing_services(): void
+    {
+        $this->admin->forceFill(['locale' => 'de'])->save();
+        $this->files = ['composer.json' => '{}', 'artisan' => '<?php'];
+
+        $task = $this->service()->afterCreate($this->workspace, $this->admin->fresh());
+
+        $this->assertSame(__('workspaces.setup.task_title', [], 'de'), $task->title);
+        $brief = (string) TaskEvent::query()->where('task_id', $task->id)->where('type', TaskEventType::UserMessage)->firstOrFail()->payload['text'];
+        $this->assertStringContainsString('in German', $brief);
+        $this->assertStringContainsString('Backing services for task worktrees: none.', $brief);
+    }
+
     public function test_without_a_subscription_the_setup_waits(): void
     {
         AgentCredential::query()->delete();

@@ -46,6 +46,8 @@ export function worktreeDir(layout: Layout, slug: string): string {
  */
 export function cacheEnv(layout: Layout): Record<string, string> {
     return {
+        COMPOSER_CACHE_DIR: join(layout.cacheDir, 'composer'),
+        npm_config_cache: join(layout.cacheDir, 'npm'),
         YARN_CACHE_FOLDER: join(layout.cacheDir, 'yarn'),
         PNPM_STORE_DIR: join(layout.cacheDir, 'pnpm'),
     };

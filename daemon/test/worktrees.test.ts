@@ -1,9 +1,9 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { cacheEnv, layoutFor, saveTaskEnv, taskEnv, taskEnvFile, worktreeDir } from '../src/layout.js';
-import { prepareWorktree, removeWorktree, writeEnv } from '../src/worktrees.js';
+import { prepareWorktree, removeWorktree, setupRunner, writeEnv } from '../src/worktrees.js';
 import { commitAll, git, workspaceFixture, type WorkspaceFixture } from './workspaceFixture.js';
 
 describe('task worktrees', () => {
@@ -163,7 +163,12 @@ describe('layout', () => {
     it('places caches on the volume', () => {
         const layout = layoutFor('/workspace');
         expect(layout).toMatchObject({ mainDir: '/workspace/repo', tasksDir: '/workspace/tasks', baselinesDir: '/workspace/.argos/baselines' });
-        expect(cacheEnv(layout)).toEqual({ YARN_CACHE_FOLDER: '/workspace/.cache/yarn', PNPM_STORE_DIR: '/workspace/.cache/pnpm' });
+        expect(cacheEnv(layout)).toEqual({
+            COMPOSER_CACHE_DIR: '/workspace/.cache/composer',
+            npm_config_cache: '/workspace/.cache/npm',
+            YARN_CACHE_FOLDER: '/workspace/.cache/yarn',
+            PNPM_STORE_DIR: '/workspace/.cache/pnpm',
+        });
     });
 
     it('keeps the task env in the worktree and tolerates a missing or broken file', () => {
@@ -195,6 +200,20 @@ describe('taskEnv reserved keys', () => {
         const dir = mkdtempSync(join(tmpdir(), 'argos-env-'));
         saveTaskEnv(dir, { DB_DATABASE: 'task_x', CLAUDE_CODE_OAUTH_TOKEN: 'x', PATH: '/evil', ARGOS_DAEMON_TOKEN: 'x', HOME: '/x' });
         expect(taskEnv(dir)).toEqual({ DB_DATABASE: 'task_x' });
+        rmSync(dir, { recursive: true, force: true });
+    });
+});
+
+describe('setup runner', () => {
+    it('keeps stdout and stderr in the order they arrive and reports the exit code', async () => {
+        const dir = mkdtempSync(join(tmpdir(), 'argos-setup-'));
+        const script = join(dir, 'setup.sh');
+        writeFileSync(script, '#!/usr/bin/env bash\necho one\nsleep 0.05\necho two >&2\nsleep 0.05\necho three\nexit 3\n');
+        chmodSync(script, 0o755);
+
+        const result = await setupRunner(script, layoutFor(dir))(dir, {}, 10_000);
+
+        expect(result).toEqual({ code: 3, output: 'one\ntwo\nthree\n' });
         rmSync(dir, { recursive: true, force: true });
     });
 });
