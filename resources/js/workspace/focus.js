@@ -187,6 +187,8 @@ export function argosReview(labelTemplate) {
         draft: null,
         change: null,
         changed: [],
+        // Phones: the file list is folded behind a toggle above the diff.
+        filesOpen: false,
 
         /** Claude edited a file: hint, don't swap the diff under the reader. */
         fileChanged(edit) {

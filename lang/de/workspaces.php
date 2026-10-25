@@ -357,6 +357,7 @@ return [
         'closed' => 'geschlossen',
     ],
     'review' => [
+        'files_toggle' => '{1} :count Datei|[0,*] :count Dateien',
         'strip_comments' => 'Chat mit deinen gesammelten Kommentaren einblenden',
         'message_card' => '{1} Review · 1 Kommentar|[0,*] Review · :count Kommentare',
         'show_code' => 'Code',

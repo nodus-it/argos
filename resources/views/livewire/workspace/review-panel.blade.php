@@ -58,13 +58,18 @@
     @elseif ($files === [])
         <div class="ag-review-empty ag-muted">{{ __('workspaces.review.no_changes', ['branch' => $baseBranch]) }}</div>
     @else
-        <div class="ag-review-body">
+        <div class="ag-review-body" :class="{ 'is-files-open': filesOpen }">
+            <button type="button" class="ag-files-toggle" x-on:click="filesOpen = ! filesOpen" :aria-expanded="filesOpen">
+                <span class="mono ag-files-current">{{ $current['path'] ?? '' }}</span>
+                <span class="ag-muted">{{ trans_choice('workspaces.review.files_toggle', count($files), ['count' => count($files)]) }}</span>
+                <x-ag.icon name="chevron-down" :size="14" :stroke="2" />
+            </button>
             <nav class="ag-tree" aria-label="{{ __('workspaces.focus.changed_files') }}">
                 @foreach ($tree as $dir => $dirFiles)
                     <div class="ag-tree-dir mono">{{ $dir === '' ? '/' : $dir }}</div>
                     @foreach ($dirFiles as $f)
                         <button type="button" @class(['ag-tree-file', 'is-current' => $current['path'] === $f['path']])
-                                wire:click="selectFile(@js($f['path']))" x-on:click="draft = null" @if ($current['path'] === $f['path']) aria-current="true" @endif title="{{ $f['path'] }}">
+                                wire:click="selectFile(@js($f['path']))" x-on:click="draft = null; filesOpen = false" @if ($current['path'] === $f['path']) aria-current="true" @endif title="{{ $f['path'] }}">
                             <span @class(['ag-file-status', 'mono', 'is-'.strtolower($f['status'])])>{{ $f['status'] }}</span>
                             <span class="ag-tree-name mono">{{ $f['name'] }}</span>
                             @if (($findingCounts[$f['path']] ?? 0) > 0)
@@ -196,7 +201,7 @@
                 @endif
 
                 <div class="ag-diff-foot">
-                    <span class="ag-muted">{{ __('workspaces.review.tip') }}</span>
+                    <span class="ag-muted ag-review-tip">{{ __('workspaces.review.tip') }}</span>
                     <span class="ag-spacer"></span>
                     <button type="button" class="ag-btn ag-btn-sm" @disabled($previous === null) @if ($previous) wire:click="selectFile(@js($previous))" @endif>
                         <x-ag.icon name="arrow-left" :size="14" :stroke="2" /> {{ __('workspaces.review.previous') }}
