@@ -15,6 +15,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Services\EntityService;
 use App\Services\Workspace\WorkspaceException;
+use App\Services\Workspace\WorkspaceOnboarding;
 use App\Services\Workspace\WorkspaceService;
 use App\Support\DocsLinkAction;
 use Filament\Actions\Action;
@@ -124,7 +125,8 @@ class EditWorkspaceSettings extends EditRecord
                 ->heading(__('workspaces.settings.sections.advanced').': '.__('workspace_form.sections.worker'))
                 ->aside(false)
                 ->collapsible()
-                ->collapsed(fn (): bool => $this->workspace()->worker_stack_id !== null || $this->workspace()->worker_source === WorkerSource::Byoi),
+                ->collapsed(fn (): bool => ($this->workspace()->worker_stack_id !== null || $this->workspace()->worker_source === WorkerSource::Byoi)
+                    && ! collect(app(WorkspaceOnboarding::class)->steps($this->workspace(), auth()->user()))->contains(fn (array $s): bool => $s['key'] === 'services' && ! $s['done'])),
         ]);
     }
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Workspace;
 
 use App\Enums\AgentName;
+use App\Enums\BackingService;
 use App\Enums\DemoStatus;
 use App\Enums\PermissionMode;
 use App\Enums\TaskEventType;
@@ -28,6 +29,7 @@ use App\Services\Git\WorkspaceDiffService;
 use App\Services\GitProvider\GitServiceFactory;
 use App\Services\Worker\WorkerSidecarManager;
 use App\Services\Workspace\Environment\BackingServiceResolver;
+use App\Services\Workspace\Environment\EnvAudit;
 use App\Workers\Compose\WorkerImageBuilder;
 use App\Workers\Compose\WorkerImageResolver;
 use Illuminate\Support\Facades\Cache;
@@ -156,6 +158,9 @@ class WorkspaceSetupService
         if ($found['stack'] !== null && $workspace->worker_stack_id === null && $workspace->worker_source !== WorkerSource::Byoi) {
             $workspace->worker_stack_id = WorkerStack::query()->where('name', $found['stack'])->value('id');
         }
+        // Database and Redis the repo expects: on before the container's first start, so tasks get them.
+        $needed = array_map(fn (BackingService $service): string => $service->value, app(EnvAudit::class)->servicesNeeded($workspace));
+        $workspace->worker_services = array_values(array_unique([...($workspace->worker_services ?? []), ...$needed]));
         // Complete is not tested: the setup task runs either way, only a passed check makes it Ready.
         $workspace->forceFill(['setup_status' => $found['missing'] === [] ? WorkspaceSetupStatus::Untested : $workspace->setup_status])->save();
 

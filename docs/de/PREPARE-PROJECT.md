@@ -126,6 +126,11 @@ Status geht zurück auf *Einrichtung nötig*.
 
 ### Einrichtungs-Checkliste
 
+Beim Anlegen eines Workspaces schaltet Argos außerdem die Backing Services ein,
+die das Repository erwartet: MySQL, wenn `.env.example` oder
+`config/database.php` auf `mysql`/`mariadb` stehen, Redis, wenn ein Cache-,
+Session- oder Queue-Treiber es nutzt oder das Projekt Horizon oder Predis braucht.
+
 Workspace-Admins sehen auf der Workspace-Seite eine Checkliste, solange ein
 Pflichtschritt offen ist — Claude-Abo, Stack, getestete Einrichtung und, bei
 eingeschalteter Live-Demo, die Demo-ENVs — und die ganze Liste samt optionaler

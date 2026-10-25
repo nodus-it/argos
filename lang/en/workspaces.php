@@ -818,6 +818,7 @@ return [
         'steps' => [
             'agent' => 'Claude subscription connected',
             'stack' => 'Stack detected',
+            'services' => 'Database and Redis on',
             'setup' => 'Setup tested',
             'demo' => 'Live demo enabled',
             'env' => 'Demo environment complete',
@@ -827,6 +828,7 @@ return [
         'actions' => [
             'agent' => 'Connect',
             'stack' => 'Choose',
+            'services' => 'Turn on',
             'setup' => 'Set up',
             'demo' => 'Enable',
             'env' => 'Set values',

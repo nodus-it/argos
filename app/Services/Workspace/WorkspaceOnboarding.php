@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Workspace;
 
+use App\Enums\BackingService;
 use App\Enums\WorkerSource;
 use App\Enums\WorkspaceSetupStatus;
 use App\Models\User;
@@ -30,10 +31,13 @@ class WorkspaceOnboarding
         $settings = fn (string $tab): string => route('filament.app.resources.workspaces.settings', ['record' => $workspace, 'tab' => $tab]);
         $setupTask = $this->setup->openTask($workspace);
         $missingEnv = $workspace->live_demo_enabled ? $this->env->audit($workspace)['missing'] : [];
+        $neededServices = $this->env->servicesNeeded($workspace);
+        $servicesOn = array_diff(array_map(fn (BackingService $s): string => $s->value, $neededServices), $workspace->worker_services ?? []) === [];
 
         $steps = [
             ['agent', $this->agents->usableAgentsFor($user)->isNotEmpty(), true, route('filament.app.account.resources.agents.create')],
             ['stack', $workspace->worker_stack_id !== null || $workspace->worker_source === WorkerSource::Byoi, true, $settings('environment')],
+            ...($neededServices !== [] ? [['services', $servicesOn, true, $settings('environment')]] : []),
             ['setup', $workspace->setup_status === WorkspaceSetupStatus::Ready, true, $setupTask !== null
                 ? route('filament.app.resources.workspaces.view', ['record' => $workspace, 'task' => $setupTask->slug])
                 : $settings('environment')],
