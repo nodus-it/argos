@@ -11,11 +11,9 @@
      x-on:argos-gates-updated.window="$wire.$refresh()"
      @if ($gateRun?->status === \App\Enums\GateRunStatus::Running) wire:poll.10s @elseif ($prLoading) wire:poll.2s @endif>
 
-    @if ($onboarding !== null)
-        <section class="ag-section" id="ctx-setup" x-data="{ ...argosFold('setup', @js(collect($onboarding)->contains(fn (array $s): bool => $s['required'] && ! $s['done']))) }" :class="{ 'is-folded': !open }">
-            <h2 class="ag-section-h"><button type="button" class="ag-section-title ag-fold-btn" x-on:click="toggleFold()" :aria-expanded="open"><x-ag.icon name="chevron-right" :size="12" :stroke="2.4" class="ag-fold-chev" />{{ __('workspaces.onboarding.section') }} · {{ collect($onboarding)->where('done', true)->count() }}/{{ count($onboarding) }}</button></h2>
-            @include('livewire.workspace.partials.onboarding', ['steps' => $onboarding])
-        </section>
+    @php $setupOpen = $onboarding !== null && collect($onboarding)->contains(fn (array $s): bool => $s['required'] && ! $s['done']); @endphp
+    @if ($setupOpen)
+        @include('livewire.workspace.partials.setup-section', ['steps' => $onboarding, 'open' => true])
     @endif
 
     <section class="ag-section" id="ctx-env" x-data="{ ...argosFold('env') }" :class="{ 'is-folded': !open }">
@@ -272,4 +270,7 @@
             @endif
         @endif
     </section>
+    @if ($onboarding !== null && ! $setupOpen)
+        @include('livewire.workspace.partials.setup-section', ['steps' => $onboarding, 'open' => false])
+    @endif
 </div>
