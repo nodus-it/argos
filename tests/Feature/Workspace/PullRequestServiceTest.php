@@ -105,6 +105,25 @@ class PullRequestServiceTest extends TestCase
             ->map(fn (TaskEvent $e): string => (string) ($e->payload['kind'] ?? ''))->all();
     }
 
+    public function test_refresh_tells_open_pages_when_the_pull_request_changed(): void
+    {
+        $this->git->shouldReceive('pullRequestDetails')->andReturn(
+            $this->details(['checks' => ['state' => 'pending', 'url' => 'https://ci/7', 'failed' => []]]),
+            $this->details(['checks' => ['state' => 'pending', 'url' => 'https://ci/7', 'failed' => []]]),
+            $this->details(['state' => 'merged']),
+        );
+        $updates = fn (): int => Event::dispatched(TaskStream::class, fn (TaskStream $e): bool => collect($e->events)->contains('type', 'pr.updated'))->count();
+
+        $this->service()->refresh($this->task);
+        $this->assertSame(1, $updates());
+
+        $this->service()->refresh($this->task->fresh());
+        $this->assertSame(1, $updates(), 'An unchanged pull request sends nothing.');
+
+        $this->service()->refresh($this->task->fresh());
+        $this->assertSame(2, $updates());
+    }
+
     public function test_refresh_stores_checks_reviews_and_conflicts(): void
     {
         $this->git->shouldReceive('pullRequestDetails')->once()->with('acme', 'widget', 7)->andReturn($this->details([
