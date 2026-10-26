@@ -198,11 +198,11 @@ export function argosTaskStream(config) {
             return config.labels.typing.replace('__NAME__', names.join(', '));
         },
 
-        /** Upload pasted or dropped images through Livewire. */
+        /** Upload pasted or dropped files through Livewire; images go to Claude as images, the rest into the task folder. */
         attach(fileList) {
-            const images = Array.from(fileList || []).filter((f) => f.type.startsWith('image/'));
-            if (images.length > 0) {
-                this.$wire.uploadMultiple('uploads', images, () => {}, () => {});
+            const files = Array.from(fileList || []);
+            if (files.length > 0) {
+                this.$wire.uploadMultiple('uploads', files, () => {}, () => {});
             }
         },
 

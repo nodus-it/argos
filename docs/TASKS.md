@@ -172,6 +172,11 @@ to do.
 - **Images:** paste, drop or attach screenshots (PNG, JPEG, GIF, WebP; up to 5
   per message, `ARGOS_WORKSPACE_UPLOAD_MAX_MB` each). Claude sees them with the
   message; others see them as thumbnails. They are stored privately.
+- **Other files** (spreadsheets, PDFs, CSV, archives): attach or drop them the
+  same way, with the same limits. Argos writes them into the task's folder under
+  `.argos/uploads/` — a folder git ignores, so they never land in a commit — and
+  the message tells Claude the path. In the chat they show as a link that
+  downloads the file.
 - **`@` mentions:** type `@` and part of a path to pick a file of the task's
   worktree (fuzzy search over tracked and untracked files; ignored ones are
   left out). The path is inserted as text.

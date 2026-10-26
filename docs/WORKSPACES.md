@@ -269,6 +269,6 @@ pushed are lost.
 | `ARGOS_WORKSPACE_IDLE_MINUTES` | `240` | Idle time before a workspace is stopped (`0` disables). |
 | `ARGOS_WORKSPACE_CPUS` / `ARGOS_WORKSPACE_MEMORY` | `2` / `4g` | Default limits per workspace container. |
 | `ARGOS_WORKSPACE_PR_SYNC_MINUTES` | `3` | How often open pull requests of tasks are re-read. |
-| `ARGOS_WORKSPACE_UPLOAD_MAX_MB` | `5` | Size limit per image attached to a message. |
+| `ARGOS_WORKSPACE_UPLOAD_MAX_MB` | `5` | Size limit per file attached to a message. |
 
 All settings are listed in [Configuration](CONFIGURATION.md#workspaces).

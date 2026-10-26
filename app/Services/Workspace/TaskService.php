@@ -165,8 +165,9 @@ class TaskService
      *
      * @param  list<array{media_type: string, data: string, path?: string}>  $images
      * @param  array<string, mixed>  $display  how the chat shows the message (e.g. `review`: the collected comments as a card); Claude gets `$text`
+     * @param  list<array{name: string, path: string}>  $files  stored attachments the daemon puts into the task folder
      */
-    public function send(Task $task, User $author, string $text, array $images = [], bool $automated = false, array $display = []): TaskEvent
+    public function send(Task $task, User $author, string $text, array $images = [], bool $automated = false, array $display = [], array $files = []): TaskEvent
     {
         Gate::forUser($author)->authorize('prompt', $task);
         if ($task->status->isFinished()) {
@@ -195,7 +196,7 @@ class TaskService
                 'text' => $text,
                 'author_name' => $author->name,
                 'images' => array_map(fn (array $image): array => ['media_type' => $image['media_type'], 'path' => $image['path'] ?? null], $images),
-            ] + ($automated ? ['auto' => true] : []) + ($queued ? ['pending' => true] : []) + $display,
+            ] + ($files !== [] ? ['files' => $files] : []) + ($automated ? ['auto' => true] : []) + ($queued ? ['pending' => true] : []) + $display,
         ]);
 
         if ($queued) {
@@ -204,7 +205,7 @@ class TaskService
             return $event;
         }
 
-        $payload = $this->messagePayload($task, $event, ['id' => $author->id, 'name' => $author->name], $text, array_map(fn (array $image): array => ['media_type' => $image['media_type'], 'data' => $image['data']], $images));
+        $payload = $this->messagePayload($task, $event, ['id' => $author->id, 'name' => $author->name], $text, array_map(fn (array $image): array => ['media_type' => $image['media_type'], 'data' => $image['data']], $images), app(TaskAttachmentService::class)->loadFiles($files));
 
         try {
             $this->deliver($task, $payload);
@@ -474,6 +475,7 @@ class TaskService
                 ['id' => $event->author_user_id, 'name' => (string) ($event->payload['author_name'] ?? '')],
                 (string) ($event->payload['text'] ?? ''),
                 app(TaskAttachmentService::class)->load(is_array($event->payload['images'] ?? null) ? $event->payload['images'] : []),
+                app(TaskAttachmentService::class)->loadFiles(is_array($event->payload['files'] ?? null) ? $event->payload['files'] : []),
             ));
         } catch (WorkspaceException $e) {
             $event->forceFill(['payload' => [...$payload, 'undelivered' => true]])->save();
@@ -532,15 +534,17 @@ class TaskService
      *
      * @param  array{id: int|null, name: string}  $author
      * @param  list<array{media_type: string, data: string}>  $images
+     * @param  list<array{name: string, data: string}>  $files
      * @return array<string, mixed>
      */
-    private function messagePayload(Task $task, TaskEvent $event, array $author, string $text, array $images): array
+    private function messagePayload(Task $task, TaskEvent $event, array $author, string $text, array $images, array $files = []): array
     {
         return [
             'client_msg_id' => (string) $event->id,
             'author' => $author,
             'text' => $task->restore_note !== null ? '['.$task->restore_note."]\n\n".$text : $text,
             ...($images !== [] ? ['images' => $images] : []),
+            ...($files !== [] ? ['files' => $files] : []),
         ];
     }
 
@@ -566,6 +570,7 @@ class TaskService
                 ['id' => $event->author_user_id, 'name' => (string) ($event->payload['author_name'] ?? '')],
                 (string) ($event->payload['text'] ?? ''),
                 app(TaskAttachmentService::class)->load(is_array($event->payload['images'] ?? null) ? $event->payload['images'] : []),
+                app(TaskAttachmentService::class)->loadFiles(is_array($event->payload['files'] ?? null) ? $event->payload['files'] : []),
             );
 
             try {

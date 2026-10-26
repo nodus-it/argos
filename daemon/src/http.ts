@@ -16,6 +16,7 @@ import { GATE_NAME_PATTERN, GateRunner, tail, type GateScript } from './gates.js
 import { CheckpointStore, parseRef, type Checkpoint } from './checkpoints.js';
 import { layoutFor, saveTaskEnv, SLUG_PATTERN, worktreeDir, type Layout } from './layout.js';
 import { prepareWorktree, removeWorktree, SETUP_TIMEOUT_MS, writeEnv, type SetupScript } from './worktrees.js';
+import { storeUploads, uploadNote } from './uploads.js';
 import { join } from 'node:path';
 
 /** The daemon's version, from package.json (one directory above src/ and dist/). */
@@ -73,6 +74,10 @@ const messageSchema = z.object({
     text: z.string().max(200_000),
     images: z
         .array(z.object({ media_type: z.enum(['image/png', 'image/jpeg', 'image/gif', 'image/webp']), data: z.string().min(1) }))
+        .max(5)
+        .optional(),
+    files: z
+        .array(z.object({ name: z.string().min(1).max(255), data: z.string().min(1) }))
         .max(5)
         .optional(),
 });
@@ -527,7 +532,9 @@ export function buildApp(deps: AppDependencies): { app: FastifyInstance; session
         if (session.currentState === 'closed') {
             throw new CodedError(409, 'task_closed', 'Task session is closed; start it again');
         }
-        const accepted = session.send({ clientMsgId: body.client_msg_id, author: body.author, text: body.text, images: body.images });
+        const files = body.files ?? [];
+        const text = files.length === 0 ? body.text : body.text + uploadNote(await storeUploads(session.cwd, files));
+        const accepted = session.send({ clientMsgId: body.client_msg_id, author: body.author, text, images: body.images });
 
         return reply.code(202).send({ queued: accepted });
     });

@@ -1150,3 +1150,6 @@ body,
     min-width: 0;
     flex: 1;
 }
+.ws-files{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
+.ws-file{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:var(--t-xs);color:inherit;text-decoration:none;max-width:100%;overflow-wrap:anywhere;}
+.ws-file:hover{background:var(--surface-2,var(--surface));}

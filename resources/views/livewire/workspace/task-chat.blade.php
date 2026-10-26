@@ -278,6 +278,13 @@
                                 @endforeach
                             </div>
                         @endif
+                        @if (! empty($p['files']))
+                            <div class="ws-files">
+                                @foreach ($p['files'] as $file)
+                                    <a class="ws-file mono" href="{{ route('tasks.attachments', ['task' => $task, 'file' => basename((string) $file['path'])]) }}" title="{{ __('workspaces.task.file_hint') }}" data-testid="message-file"><x-ag.icon name="file" :size="14" />{{ $file['name'] }}</a>
+                                @endforeach
+                            </div>
+                        @endif
                     </div>
                 @else
                     @php $firstId = $block['items'][0]['event']->id ?? ($block['items'][0]['rows'][0]['id'] ?? $loop->index); @endphp
@@ -501,7 +508,7 @@
                     </div>
                     <div class="ag-composer-bar">
                         <button type="button" class="ag-icon-btn ag-icon-btn-sm" x-on:click="$refs.file.click()" title="{{ __('workspaces.task.attach') }}" aria-label="{{ __('workspaces.task.attach') }}"><x-ag.icon name="paperclip" :size="17" /></button>
-                        <input type="file" class="sr-only" tabindex="-1" aria-hidden="true" x-ref="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple x-on:change="attach($event.target.files); $event.target.value = ''">
+                        <input type="file" class="sr-only" tabindex="-1" aria-hidden="true" x-ref="file" multiple x-on:change="attach($event.target.files); $event.target.value = ''">
                         <span x-data="argosDictation(@js('ag-composer-'.$task->id), @js(app()->getLocale() === 'de' ? 'de-DE' : 'en-US'))" x-show="supported" x-cloak class="ag-dictation">
                             <button type="button" class="ag-icon-btn ag-icon-btn-sm" x-on:click="toggle()" :class="{ 'is-listening': listening }" :aria-pressed="listening"
                                     :title="failed !== '' ? @js(__('workspaces.chat.dictation_failed')) + ' (' + failed + ')' : (listening ? @js(__('workspaces.chat.dictation_stop')) : @js(__('workspaces.chat.dictation')))"

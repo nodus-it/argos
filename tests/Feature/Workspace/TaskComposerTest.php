@@ -90,15 +90,37 @@ class TaskComposerTest extends TestCase
             ->assertOk();
     }
 
-    public function test_non_images_are_rejected(): void
+    public function test_other_files_go_to_the_daemon_and_download_under_their_name(): void
     {
-        $this->chat()->set('taskId', $this->task->id)
-            ->set('uploads', [UploadedFile::fake()->create('notes.pdf', 10, 'application/pdf')])
-            ->set('draft', 'look')
-            ->call('send')
-            ->assertHasErrors('uploads.0');
+        $daemon = new class extends FakeWorkspaceDaemon
+        {
+            /** @var list<array<string, mixed>> */
+            public static array $sent = [];
 
-        $this->assertCount(0, $this->userMessages());
+            public function sendMessage(string $taskId, array $payload): array
+            {
+                self::$sent[] = $payload;
+
+                return parent::sendMessage($taskId, $payload);
+            }
+        };
+        $this->app->singleton(WorkspaceDaemonClient::class, $daemon::class);
+
+        $this->chat()->set('taskId', $this->task->id)
+            ->set('uploads', [UploadedFile::fake()->createWithContent('Umsatz 2026.xlsx', 'sheet')])
+            ->set('draft', 'sum it up')
+            ->call('send')
+            ->assertHasNoErrors();
+
+        $file = $this->userMessages()->sole()->payload['files'][0];
+        $this->assertSame('Umsatz 2026.xlsx', $file['name']);
+        $this->assertSame([], $this->userMessages()->sole()->payload['images']);
+        $this->assertSame([['name' => 'Umsatz 2026.xlsx', 'data' => base64_encode('sheet')]], $daemon::$sent[0]['files']);
+
+        $this->actingAs($this->owner)
+            ->get(route('tasks.attachments', ['task' => $this->task, 'file' => basename($file['path'])]))
+            ->assertOk()
+            ->assertDownload('Umsatz 2026.xlsx');
     }
 
     public function test_attachments_are_only_served_to_members(): void

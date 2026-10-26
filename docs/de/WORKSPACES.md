@@ -294,6 +294,6 @@ Commits, die nie gepusht wurden, gehen verloren.
 | `ARGOS_WORKSPACE_IDLE_MINUTES` | `240` | Leerlaufzeit, bevor ein Workspace gestoppt wird (`0` deaktiviert). |
 | `ARGOS_WORKSPACE_CPUS` / `ARGOS_WORKSPACE_MEMORY` | `2` / `4g` | Standard-Grenzen pro Workspace-Container. |
 | `ARGOS_WORKSPACE_PR_SYNC_MINUTES` | `3` | Wie oft offene Pull Requests von Aufgaben neu gelesen werden. |
-| `ARGOS_WORKSPACE_UPLOAD_MAX_MB` | `5` | Größenlimit pro Bild, das an eine Nachricht angehängt wird. |
+| `ARGOS_WORKSPACE_UPLOAD_MAX_MB` | `5` | Größenlimit pro Datei, die an eine Nachricht angehängt wird. |
 
 Alle Einstellungen stehen unter [Konfiguration](CONFIGURATION.md#workspaces).

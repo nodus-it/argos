@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Services\Workspace;
 
+use App\Enums\TaskEventType;
 use App\Models\Task;
+use App\Models\TaskEvent;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Gate;
@@ -13,8 +15,9 @@ use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
- * Images attached to task messages: stored privately per workspace and
- * task, handed to Claude as base64 image blocks, served back to members.
+ * Files attached to task messages, stored privately per workspace and task.
+ * Images reach Claude as image blocks; other files are written into the
+ * task folder by the daemon. Members can open both again.
  */
 class TaskAttachmentService
 {
@@ -51,16 +54,44 @@ class TaskAttachmentService
         return $images;
     }
 
-    /** Stream an attachment to a member of the task's workspace. */
+    /**
+     * Keep the attachments that are no image; Claude reads them from the task folder.
+     *
+     * @param  list<UploadedFile>  $files
+     * @return list<array{name: string, path: string}>
+     */
+    public function storeFiles(Task $task, array $files): array
+    {
+        $stored = [];
+        foreach (array_slice($files, 0, self::MAX_FILES) as $file) {
+            if (in_array((string) $file->getMimeType(), self::MIME_TYPES, true)) {
+                continue;
+            }
+            $extension = strtolower((string) $file->getClientOriginalExtension());
+            $path = $this->directory($task).'/'.Str::ulid().(preg_match('/^[a-z0-9]{1,10}$/', $extension) === 1 ? '.'.$extension : '');
+            Storage::disk(self::DISK)->put($path, (string) file_get_contents($file->getRealPath()));
+            $stored[] = ['name' => $file->getClientOriginalName(), 'path' => $path];
+        }
+
+        return $stored;
+    }
+
+    /** Stream an attachment to a member of the task's workspace; anything but an image downloads. */
     public function response(Task $task, string $file, User $user): StreamedResponse
     {
         Gate::forUser($user)->authorize('view', $task);
-        abort_unless(preg_match('/^[0-9A-Za-z]{26}\.(png|jpg|gif|webp)$/', $file) === 1, 404);
+        abort_unless(preg_match('/^[0-9A-Za-z]{26}(\.[a-z0-9]{1,10})?$/', $file) === 1, 404);
 
         $path = $this->directory($task).'/'.$file;
         abort_unless(Storage::disk(self::DISK)->exists($path), 404);
 
-        return Storage::disk(self::DISK)->response($path, null, ['Cache-Control' => 'private, max-age=86400']);
+        $headers = ['Cache-Control' => 'private, max-age=86400', 'X-Content-Type-Options' => 'nosniff'];
+        if (preg_match('/\.(png|jpg|gif|webp)$/', $file) === 1) {
+            return Storage::disk(self::DISK)->response($path, null, $headers);
+        }
+        $name = $this->originalName($task, $file);
+
+        return Storage::disk(self::DISK)->download($path, $name, $headers);
     }
 
     /**
@@ -80,6 +111,39 @@ class TaskAttachmentService
         }
 
         return $loaded;
+    }
+
+    /**
+     * Read stored files back for the daemon.
+     *
+     * @param  list<array{name?: string, path?: string|null}>  $files
+     * @return list<array{name: string, data: string}>
+     */
+    public function loadFiles(array $files): array
+    {
+        $loaded = [];
+        foreach ($files as $file) {
+            $path = (string) ($file['path'] ?? '');
+            if ($path !== '' && str_starts_with($path, 'workspace-uploads/') && Storage::disk(self::DISK)->exists($path)) {
+                $loaded[] = ['name' => (string) ($file['name'] ?? basename($path)), 'data' => base64_encode((string) Storage::disk(self::DISK)->get($path))];
+            }
+        }
+
+        return $loaded;
+    }
+
+    /** The name the file was uploaded with, from the message that carries it. */
+    private function originalName(Task $task, string $file): string
+    {
+        $event = TaskEvent::query()->where('task_id', $task->id)->where('type', TaskEventType::UserMessage->value)
+            ->where('payload', 'like', '%'.$file.'%')->latest('id')->first();
+        foreach ((array) ($event?->payload['files'] ?? []) as $stored) {
+            if (is_array($stored) && basename((string) ($stored['path'] ?? '')) === $file) {
+                return (string) ($stored['name'] ?? $file);
+            }
+        }
+
+        return $file;
     }
 
     /** Remove every attachment of a workspace (on delete). */
