@@ -127,7 +127,8 @@ class IssueTriggerTest extends TestCase
         $git->shouldReceive('createPullRequest')->andReturn(['number' => 4, 'html_url' => 'https://x/4', 'state' => 'open']);
         $this->mock(GitServiceFactory::class)->shouldReceive('forWorkspace')->andReturn($git);
 
-        $this->assertTrue(app(PlanApprovalService::class)->check($link->fresh()));
+        // Through the scheduled command, so its query runs against the real schema.
+        $this->artisan('argos:check-plan-approvals')->expectsOutput('Approved 1 plan(s).')->assertSuccessful();
 
         $this->assertSame(AutoTaskState::Done, Task::query()->sole()->auto_state);
         $this->assertFalse(app(PlanApprovalService::class)->check($link->fresh()), 'nothing waits any more');

@@ -26,7 +26,7 @@ class CheckPlanApprovalsCommand extends Command
         ExternalIssueLink::query()
             ->with('binding')
             ->whereNotNull('plan_comment_id')
-            ->whereNotNull('workspace_id')
+            ->whereNotNull('task_id')
             ->each(function (ExternalIssueLink $link) use (&$approved): void {
                 if ($this->service->check($link)) {
                     $approved++;
