@@ -167,7 +167,7 @@ return [
         'max_active' => (int) $envOr('ARGOS_WORKSPACE_MAX_ACTIVE', 5),
         // Stop idle workspaces (container only; volumes stay) after this many
         // minutes without activity and without a busy task.
-        'idle_minutes' => (int) $envOr('ARGOS_WORKSPACE_IDLE_MINUTES', 60),
+        'idle_minutes' => (int) $envOr('ARGOS_WORKSPACE_IDLE_MINUTES', 240),
         'cpus' => (string) $envOr('ARGOS_WORKSPACE_CPUS', '2'),
         'memory' => (string) $envOr('ARGOS_WORKSPACE_MEMORY', '4g'),
         // Process limit per workspace container (fork bombs stay inside).

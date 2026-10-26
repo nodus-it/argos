@@ -521,6 +521,7 @@ return [
         'load_older' => 'Ältere Nachrichten laden',
         'cost' => 'Kosten',
         'resume' => 'Session fortsetzen',
+        'session_resting' => 'Die Session ruht. Schreib einfach weiter, sie wird automatisch fortgesetzt.',
         'session_ended' => 'Die Session wurde beendet.',
         'usage_limit' => 'Das Abo von :agent hat sein Nutzungslimit erreicht. Wieder verfügbar :time.',
         'usage_limit_unknown' => 'bald',

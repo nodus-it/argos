@@ -164,7 +164,7 @@ in den Workspace-Einstellungen fest (siehe
 |---|---|---|
 | `ARGOS_WORKSPACE_COLLABORATION` | `true` | Ob Workspaces außer der Person, die sie angelegt hat, weitere Mitglieder und Aufgaben weitere Mitwirkende haben dürfen. Steht hinter dem Gate `workspace-collaboration`. |
 | `ARGOS_WORKSPACE_MAX_ACTIVE` | `5` | Gleichzeitig laufende Workspace-Container. Ein Start darüber hinaus wird abgelehnt — laufende Workspaces werden nie verdrängt. `0` hebt das Limit auf. |
-| `ARGOS_WORKSPACE_IDLE_MINUTES` | `60` | Einen laufenden Workspace nach so vielen Minuten ohne Aktivität stoppen (nie, solange eine Aufgabe vorbereitet wird, in der Warteschlange steht, arbeitet, auf eine Entscheidung wartet oder automatisch läuft). `0` deaktiviert. |
+| `ARGOS_WORKSPACE_IDLE_MINUTES` | `240` | Einen laufenden Workspace nach so vielen Minuten ohne Aktivität stoppen (nie, solange eine Aufgabe vorbereitet wird, in der Warteschlange steht, arbeitet, auf eine Entscheidung wartet oder automatisch läuft). `0` deaktiviert. |
 | `ARGOS_WORKSPACE_CPUS` | `2` | Standard-CPU-Limit pro Workspace-Container (ein Workspace kann ein eigenes setzen). |
 | `ARGOS_WORKSPACE_MEMORY` | `4g` | Standard-Speicherlimit pro Workspace-Container (ein Workspace kann ein eigenes setzen). |
 | `ARGOS_INTERNAL_URL` | `http://nginx` | Basis-URL, über die der Workspace-Daemon den Manager im Netz `argos_ws` erreicht. |

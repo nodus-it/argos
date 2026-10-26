@@ -352,6 +352,7 @@ button.ag-gate-chip { cursor: pointer; }
 .ag-review-empty { padding: 32px 24px; font-size: 13px; }
 .ag-review-body { flex: 1; min-height: 0; display: flex; }
 .ag-files-toggle { display: none; }
+.ag-session-rest { margin: 0 max(24px, calc((100% - var(--ag-chat-w)) / 2)) 8px; font-size: 12.5px; }
 .ag-detected { margin: 0; display: grid; grid-template-columns: minmax(10rem, max-content) 1fr; border: 1px solid var(--ag-border); border-radius: 12px; background: var(--ag-surface); overflow: hidden; }
 .ag-detected-row { display: contents; }
 .ag-detected-row > dt, .ag-detected-row > dd { margin: 0; padding: 10px 16px; border-top: 1px solid var(--ag-border); font-size: 13.5px; }

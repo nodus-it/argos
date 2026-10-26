@@ -381,10 +381,8 @@
         </div>
 
         @if ($task->isResumable() && $canWrite)
-            <div class="ws-alert ws-alert-warn">
-                <span>{{ __('workspaces.task.session_ended') }}</span>
-                <button type="button" class="btn btn-secondary btn-sm" wire:click="resume">{{ __('workspaces.task.resume') }}</button>
-            </div>
+            {{-- Sending reopens the session on its own; this only says so. --}}
+            <p class="ag-session-rest ag-muted" data-testid="session-rest">{{ __('workspaces.task.session_resting') }}</p>
         @endif
 
         {{-- Reset to a checkpoint --}}
