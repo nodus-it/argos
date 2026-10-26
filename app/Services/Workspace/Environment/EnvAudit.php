@@ -98,29 +98,68 @@ class EnvAudit
             return $driver;
         }
         // An app that only configures a `mariadb` connection cannot use `mysql`.
-        $config = $this->cached($workspace, 'database', fn (): string => (string) $this->file($workspace, 'config/database.php'));
+        $config = $this->cachedFile($workspace, 'config/database.php');
 
         return ! str_contains($config, "'mysql' =>") && str_contains($config, "'mariadb' =>") ? 'mariadb' : 'mysql';
     }
 
+    /** Compose files a repository commonly keeps its local services in. */
+    private const COMPOSE_PATHS = [
+        'compose.yaml', 'compose.yml', 'docker-compose.yml', 'docker-compose.yaml',
+        '.tools/docker/compose.yml', '.tools/docker/docker-compose.yml', 'docker/compose.yml', 'docker/docker-compose.yml', '.docker/docker-compose.yml',
+    ];
+
     /**
-     * The backing services the repository expects: MySQL when `.env.example` or
-     * `config/database.php` default to mysql/mariadb, Redis when a driver uses it or Horizon/Predis is required.
+     * The backing services the repository expects.
      *
      * @return list<BackingService>
      */
     public function servicesNeeded(Workspace $workspace): array
     {
+        return array_values(array_filter(array_map(
+            fn (string $service): ?BackingService => BackingService::tryFrom($service),
+            array_keys($this->serviceSources($workspace)),
+        )));
+    }
+
+    /**
+     * Which file shows that the repository expects MySQL or Redis: `.env.example`,
+     * `config/database.php`, `composer.json` (Horizon, Predis) or one of its compose files.
+     *
+     * @return array<string, string> service => file
+     */
+    public function serviceSources(Workspace $workspace): array
+    {
         $example = $this->example($workspace);
-        $database = $this->cached($workspace, 'database', fn (): string => (string) $this->file($workspace, 'config/database.php'));
-        $composer = $this->cached($workspace, 'composer', fn (): string => (string) $this->file($workspace, 'composer.json'));
+        $sources = [];
 
-        $mysql = in_array($example['DB_CONNECTION'] ?? '', ['mysql', 'mariadb'], true)
-            || preg_match("/'default'\\s*=>\\s*env\\(\\s*'DB_CONNECTION'\\s*,\\s*'(mysql|mariadb)'/", $database) === 1;
-        $drivers = array_intersect_key($example, array_flip(['CACHE_STORE', 'SESSION_DRIVER', 'QUEUE_CONNECTION']));
-        $redis = in_array('redis', $drivers, true) || preg_match('#"(laravel/horizon|predis/predis)"#', $composer) === 1;
+        if (in_array($example['DB_CONNECTION'] ?? '', ['mysql', 'mariadb'], true)) {
+            $sources['mysql'] = '.env.example';
+        } elseif (preg_match("/'default'\\s*=>\\s*env\\(\\s*'DB_CONNECTION'\\s*,\\s*'(mysql|mariadb)'/", $this->cachedFile($workspace, 'config/database.php')) === 1) {
+            $sources['mysql'] = 'config/database.php';
+        }
+        if (in_array('redis', array_intersect_key($example, array_flip(['CACHE_STORE', 'SESSION_DRIVER', 'QUEUE_CONNECTION'])), true)) {
+            $sources['redis'] = '.env.example';
+        } elseif (preg_match('#"(laravel/horizon|predis/predis)"#', $this->cachedFile($workspace, 'composer.json')) === 1) {
+            $sources['redis'] = 'composer.json';
+        }
 
-        return array_values(array_filter([$mysql ? BackingService::Mysql : null, $redis ? BackingService::Redis : null]));
+        foreach (self::COMPOSE_PATHS as $path) {
+            $compose = $this->cachedFile($workspace, $path);
+            if (! isset($sources['mysql']) && preg_match('/image:\s*\S*(mysql|mariadb|percona)/i', $compose) === 1) {
+                $sources['mysql'] = $path;
+            }
+            if (! isset($sources['redis']) && preg_match('/image:\s*\S*(redis|valkey|keydb)/i', $compose) === 1) {
+                $sources['redis'] = $path;
+            }
+        }
+
+        return $sources;
+    }
+
+    private function cachedFile(Workspace $workspace, string $path): string
+    {
+        return $this->cached($workspace, 'file:'.$path, fn (): string => (string) $this->file($workspace, $path));
     }
 
     public static function setByArgos(string $key): bool
