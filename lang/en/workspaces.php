@@ -751,7 +751,7 @@ return [
             'memory_limit_mb' => 'Memory limit',
             'memory_limit_mb_helper' => 'For the workspace container. Empty: the installation default.',
             'cleanup_after_days' => 'Clean up finished tasks after (days)',
-            'cleanup_after_days_helper' => 'Preview, working copy and database of a finished task are removed after this many days. The conversation, the remote branch and the pull request stay.',
+            'cleanup_after_days_helper' => 'Preview, working copy and database of a finished task are removed after this many days and the task moves to the archive. The conversation, the remote branch and the pull request stay.',
             'default_value' => 'Default: :value',
         ],
         'integrations' => [

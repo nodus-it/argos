@@ -752,7 +752,7 @@ return [
             'memory_limit_mb' => 'Arbeitsspeicher-Grenze',
             'memory_limit_mb_helper' => 'Für den Workspace-Container. Leer: Standard der Installation.',
             'cleanup_after_days' => 'Erledigte Aufgaben aufräumen nach (Tagen)',
-            'cleanup_after_days_helper' => 'Preview, Arbeitskopie und Datenbank einer erledigten Aufgabe werden nach so vielen Tagen entfernt. Unterhaltung, Remote-Branch und Pull Request bleiben.',
+            'cleanup_after_days_helper' => 'Preview, Arbeitskopie und Datenbank einer erledigten Aufgabe werden nach so vielen Tagen entfernt, die Aufgabe wandert ins Archiv. Unterhaltung, Remote-Branch und Pull Request bleiben.',
             'default_value' => 'Standard: :value',
         ],
         'integrations' => [

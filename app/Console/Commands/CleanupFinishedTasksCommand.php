@@ -11,7 +11,8 @@ use Illuminate\Console\Command;
 /**
  * Cleans up finished tasks (done or cancelled) once their workspace's
  * `cleanup_after_days` have passed: preview, worktree and database go, the
- * conversation stays readable. Remote branches and pull requests are kept.
+ * task moves to the archive with its conversation readable. Remote branches
+ * and pull requests are kept.
  * Tasks of a stopped workspace wait for a pass while it runs.
  */
 class CleanupFinishedTasksCommand extends Command
@@ -26,6 +27,7 @@ class CleanupFinishedTasksCommand extends Command
 
         Task::query()
             ->with('workspace')
+            ->whereHas('workspace')
             ->whereNotNull('done_at')
             ->whereNull('cleaned_at')
             ->where('session_open', false)
@@ -40,6 +42,7 @@ class CleanupFinishedTasksCommand extends Command
                     return;
                 }
                 if ($cleanup->cleanup($task)) {
+                    $task->forceFill(['archived_at' => $task->archived_at ?? now()])->save();
                     $this->line('Cleaned up '.$task->workspace->slug.'/'.$task->slug);
                     $cleaned++;
                 }

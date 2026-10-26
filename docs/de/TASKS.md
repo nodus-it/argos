@@ -505,7 +505,8 @@ Folge-Aufgabe, um weiterzumachen.
 `cleanup_after_days` (Einstellungen → Ressourcen, Standard 14) nachdem eine
 Aufgabe fertig oder abgebrochen ist, entfernt Argos ihre Preview, ihren
 Worktree, ihren lokalen Branch und ihre Datenbank (täglich um 03:30,
-`argos:tasks:cleanup`). Unterhaltung, Remote-Branch und Pull Request bleiben.
+`argos:tasks:cleanup`) und verschiebt die Aufgabe ins Archiv des
+Aufgaben-Switchers. Unterhaltung, Remote-Branch und Pull Request bleiben.
 Aufgaben eines gestoppten Workspaces werden bei einem späteren Lauf
 aufgeräumt, sobald er läuft.
 

@@ -452,8 +452,9 @@ Finished tasks refuse new messages — start a follow-up task to continue.
 
 `cleanup_after_days` (Settings → Resources, default 14) after a task is done
 or cancelled, Argos removes its preview, worktree, local branch and database
-(daily at 03:30, `argos:tasks:cleanup`). The conversation, the remote branch
-and the pull request stay. Tasks of a stopped workspace are cleaned up on a
+(daily at 03:30, `argos:tasks:cleanup`) and moves the task to the archive of
+the task switcher. The conversation, the remote branch and the pull request
+stay. Tasks of a stopped workspace are cleaned up on a
 later run once it is running.
 
 ## Notifications
