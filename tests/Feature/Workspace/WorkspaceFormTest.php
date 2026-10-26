@@ -107,7 +107,8 @@ class WorkspaceFormTest extends TestCase
             ->fillForm(['name' => 'Nexus', 'repo_url' => 'https://github.com/org/repo', 'platform' => 'github', 'token' => 'pat-123', 'default_branch' => 'main'])
             ->goToNextWizardStep()
             ->assertHasNoFormErrors()
-            ->assertSee(__('workspaces.create.lines.stack', ['stack' => 'PHP 8.5']))
+            ->assertSee('PHP 8.5')
+            ->assertSee(__('workspaces.create.from', ['file' => '.env.example']))
             ->assertSee('STRIPE_SECRET')
             ->assertSet('data.worker_services', ['mysql', 'redis'])
             ->assertSet('data.worker_stack_id', WorkerStack::query()->where('name', 'php-8.5')->value('id'));

@@ -149,6 +149,14 @@ class TaskChatTest extends TestCase
         $this->assertStringContainsString('only when someone asks for one', app(TaskService::class)->systemPrompt($task));
     }
 
+    public function test_claude_answers_in_the_users_language_and_says_du_in_german(): void
+    {
+        $prompt = app(TaskService::class)->systemPrompt($this->createTask());
+
+        $this->assertStringContainsString('language the humans write in', $prompt);
+        $this->assertStringContainsString('informally with "du"', $prompt);
+    }
+
     public function test_approvals_are_decided_in_the_chat(): void
     {
         $task = $this->createTask();

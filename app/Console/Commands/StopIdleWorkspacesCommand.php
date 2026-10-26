@@ -25,7 +25,7 @@ class StopIdleWorkspacesCommand extends Command
 
     public function handle(WorkspaceService $workspaces): int
     {
-        $minutes = (int) config('argos.workspaces.idle_minutes', 60);
+        $minutes = (int) config('argos.workspaces.idle_minutes', 240);
         if ($minutes <= 0) {
             $this->info('Idle stop disabled.');
 

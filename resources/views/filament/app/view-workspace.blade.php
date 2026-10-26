@@ -7,6 +7,8 @@
      :class="{ 'is-review': review, 'is-max': review && maximized, 'is-drawer-open': drawer }">
     {{-- Lets notifications.js skip signals for the workspace in front of you. --}}
     <script>window.ArgosCurrentWorkspace = @js($workspace->id);</script>
+    {{-- An open, visible page counts as activity, so reading keeps the container up. --}}
+    <span hidden x-data x-init="setInterval(() => { if (document.visibilityState === 'visible') $wire.heartbeat() }, 300000)"></span>
 
     {{-- Container state changes come from queued jobs; poll only while one runs. --}}
     @if ($transitional)

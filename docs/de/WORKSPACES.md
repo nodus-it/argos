@@ -227,7 +227,11 @@ Jeder Workspace läuft in einem Container mit:
 - **Stopp bei Leerlauf:** Ein laufender Workspace ohne Aktivität für
   `ARGOS_WORKSPACE_IDLE_MINUTES` wird gestoppt — aber nie, solange eine
   Aufgabe vorbereitet wird, in der Session-Warteschlange wartet, arbeitet, auf
-  eine Entscheidung wartet oder automatisch läuft.
+  eine Entscheidung wartet oder automatisch läuft. Als Aktivität zählen
+  Nachrichten, Entscheidungen, Claudes Arbeit, Editor und Preview, ebenso eine
+  offene Workspace-Seite in einem sichtbaren Browser-Tab. Ein gestoppter
+  Workspace schließt seine Sessions; die nächste Nachricht setzt die Session
+  von selbst fort.
 - **Kapazität:** Höchstens `ARGOS_WORKSPACE_MAX_ACTIVE` Workspaces laufen
   gleichzeitig. Ein Start darüber hinaus wird abgelehnt; laufende Workspaces
   werden nie verdrängt.
@@ -287,7 +291,7 @@ Commits, die nie gepusht wurden, gehen verloren.
 |---|---|---|
 | `ARGOS_WORKSPACE_COLLABORATION` | `true` | Ob Workspaces außer der anlegenden Person weitere Mitglieder und Aufgaben Mitarbeitende haben dürfen. |
 | `ARGOS_WORKSPACE_MAX_ACTIVE` | `5` | Gleichzeitig laufende Workspaces. |
-| `ARGOS_WORKSPACE_IDLE_MINUTES` | `60` | Leerlaufzeit, bevor ein Workspace gestoppt wird (`0` deaktiviert). |
+| `ARGOS_WORKSPACE_IDLE_MINUTES` | `240` | Leerlaufzeit, bevor ein Workspace gestoppt wird (`0` deaktiviert). |
 | `ARGOS_WORKSPACE_CPUS` / `ARGOS_WORKSPACE_MEMORY` | `2` / `4g` | Standard-Grenzen pro Workspace-Container. |
 | `ARGOS_WORKSPACE_PR_SYNC_MINUTES` | `3` | Wie oft offene Pull Requests von Aufgaben neu gelesen werden. |
 | `ARGOS_WORKSPACE_UPLOAD_MAX_MB` | `5` | Größenlimit pro Bild, das an eine Nachricht angehängt wird. |

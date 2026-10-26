@@ -91,6 +91,9 @@ export function argosTaskStream(config) {
                         window.dispatchEvent(new CustomEvent('argos-turn-completed', { detail: { taskId: this.taskId } }));
                         persisted = true;
                         break;
+                    case 'pr.updated':
+                        window.dispatchEvent(new CustomEvent('argos-workspace-changed'));
+                        break;
                     case 'notice':
                         // A setup test changes the setup status the sidebar's checklist shows.
                         if (String(event.data?.kind ?? '').startsWith('setup_')) {

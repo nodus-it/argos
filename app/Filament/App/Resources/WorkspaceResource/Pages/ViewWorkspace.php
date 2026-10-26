@@ -230,6 +230,15 @@ class ViewWorkspace extends ViewRecord
         return $this->task() ?? throw WorkspaceException::translated('workspaces.ship.no_task');
     }
 
+    /** The open page keeps the workspace from being idle-stopped. */
+    public function heartbeat(): void
+    {
+        $workspace = $this->workspace();
+        if ($workspace->status === WorkspaceStatus::Running) {
+            app(WorkspaceService::class)->touch($workspace);
+        }
+    }
+
     /**
      * @return array<string, mixed>
      */

@@ -132,6 +132,34 @@ class TaskHousekeepingTest extends TestCase
         $this->assertSame($expected, $synced);
     }
 
+    public function test_sync_prs_skips_deleted_workspaces_and_survives_a_failing_task(): void
+    {
+        $gone = Workspace::factory()->create();
+        Task::factory()->create(['workspace_id' => $gone->id, 'pr_number' => 1, 'pr_state' => 'open', 'status' => TaskStatus::PrOpen]);
+        $gone->delete();
+        $failing = $this->task('failing', ['pr_number' => 2, 'pr_state' => 'open', 'status' => TaskStatus::PrOpen]);
+        $next = $this->task('next', ['pr_number' => 3, 'pr_state' => 'open', 'status' => TaskStatus::PrOpen]);
+
+        $synced = [];
+        $this->mock(PullRequestService::class, function (MockInterface $mock) use (&$synced, $failing): void {
+            $mock->shouldReceive('refresh')->andReturnUsing(function (Task $task) use (&$synced, $failing): null {
+                $synced[] = $task->id;
+                if ($task->is($failing)) {
+                    throw new \RuntimeException('provider down');
+                }
+
+                return null;
+            });
+        });
+
+        $this->artisan('argos:tasks:sync-prs')->assertSuccessful();
+
+        sort($synced);
+        $expected = [$failing->id, $next->id];
+        sort($expected);
+        $this->assertSame($expected, $synced);
+    }
+
     public function test_cleanup_says_where_unpushed_work_was_kept(): void
     {
         $task = $this->finished('unpushed', 20);

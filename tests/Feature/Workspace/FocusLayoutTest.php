@@ -107,6 +107,16 @@ class FocusLayoutTest extends TestCase
             ->assertSeeHtml("'de-DE')");
     }
 
+    public function test_an_open_page_keeps_the_workspace_active(): void
+    {
+        $this->workspace->forceFill(['last_activity_at' => now()->subHours(3)])->save();
+
+        Livewire::actingAs($this->owner)->test(ViewWorkspace::class, ['record' => $this->workspace->getKey()])
+            ->call('heartbeat');
+
+        $this->assertTrue($this->workspace->fresh()->last_activity_at->isAfter(now()->subMinute()));
+    }
+
     public function test_tasks_are_grouped_with_a_status_line(): void
     {
         $waiting = $this->task('Navbar', SessionStatus::WaitingInput);

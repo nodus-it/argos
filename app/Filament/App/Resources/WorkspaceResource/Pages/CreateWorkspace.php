@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Filament\App\Resources\WorkspaceResource\Pages;
 
-use App\Enums\BackingService;
 use App\Filament\App\Resources\WorkspaceResource;
 use App\Filament\Shared\WorkspaceForm;
 use App\Filament\Support\Pages\CreateRecord;
@@ -12,11 +11,13 @@ use App\Models\WorkerStack;
 use App\Services\Workspace\Environment\EnvAudit;
 use App\Services\Workspace\WorkspaceSetupService;
 use App\Support\DocsLinkAction;
+use App\Support\GateRows;
 use Filament\Actions\Action;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Pages\CreateRecord\Concerns\HasWizard;
 use Filament\Schemas\Components\Text;
 use Filament\Schemas\Components\Utilities\Set;
+use Filament\Schemas\Components\View;
 use Filament\Schemas\Components\Wizard\Step;
 use Illuminate\Validation\ValidationException;
 use Throwable;
@@ -35,7 +36,7 @@ class CreateWorkspace extends CreateRecord
 
     protected static bool $canCreateAnother = false;
 
-    /** @var array{project?: string, stack?: string|null, services?: list<string>, gates?: list<string>|null, setup?: string, preview?: string, open?: list<string>, missing?: list<string>} */
+    /** @var array{project?: string, stack?: string|null, services?: list<string>, service_sources?: array<string, string>, gates?: list<string>|null, setup?: string, preview?: string, open?: list<string>, missing?: list<string>} */
     public array $detected = [];
 
     public function mount(): void
@@ -68,10 +69,7 @@ class CreateWorkspace extends CreateRecord
             Step::make(__('workspaces.create.steps.detected'))
                 ->schema([
                     Text::make(__('workspaces.create.steps.detected_help'))->color('gray'),
-                    TextEntry::make('detected_state')
-                        ->hiddenLabel()
-                        ->state(fn (): array => $this->detectedLines())
-                        ->listWithLineBreaks(),
+                    View::make('filament.app.workspace.detected')->viewData(fn (): array => ['rows' => $this->detectedRows()]),
                     WorkspaceForm::workerSection(gated: false)
                         ->heading(__('workspaces.create.change_detected'))
                         ->aside(false)
@@ -100,10 +98,8 @@ class CreateWorkspace extends CreateRecord
             Step::make(__('workspaces.create.steps.go'))
                 ->schema([
                     Text::make(__('workspaces.create.steps.go_help'))->color('gray'),
-                    TextEntry::make('summary_state')
-                        ->hiddenLabel()
-                        ->state(fn (): array => [...$this->detectedLines(), (string) __('workspaces.create.go_next')])
-                        ->listWithLineBreaks(),
+                    View::make('filament.app.workspace.detected')->viewData(fn (): array => ['rows' => $this->detectedRows()]),
+                    Text::make(__('workspaces.create.go_next')),
                 ]),
         ];
     }
@@ -121,13 +117,15 @@ class CreateWorkspace extends CreateRecord
             throw ValidationException::withMessages(['data.repo_url' => __('workspaces.create.unreadable', ['error' => $e->getMessage()])]);
         }
 
-        $services = array_map(fn (BackingService $s): string => $s->value, $audit->servicesNeeded($draft));
+        $serviceSources = $audit->serviceSources($draft);
+        $services = array_keys($serviceSources);
         $sources = $setup->sources($draft);
         $env = $audit->audit($draft);
         $this->detected = [
             'project' => $found['project'],
             'stack' => $found['stack'],
             'services' => $services,
+            'service_sources' => $serviceSources,
             'gates' => $setup->availableGates($draft),
             'setup' => $sources['setup'],
             'preview' => $sources['preview'],
@@ -141,27 +139,34 @@ class CreateWorkspace extends CreateRecord
         $set('worker_services', array_values(array_unique([...($this->data['worker_services'] ?? []), ...$services])));
     }
 
-    /** @return list<string> */
-    public function detectedLines(): array
+    /** @return list<array{label: string, value: string, reason: string, found: bool}> */
+    public function detectedRows(): array
     {
         $d = $this->detected;
         if ($d === []) {
             return [];
         }
+        $row = fn (string $key, string $value, string $reason = '', bool $found = true): array => [
+            'label' => (string) __('workspaces.create.rows.'.$key), 'value' => $value, 'reason' => $reason, 'found' => $found,
+        ];
         $stack = $d['stack'] !== null ? (WorkerStack::query()->where('name', $d['stack'])->value('label') ?? $d['stack']) : null;
-        $services = array_map(fn (string $s): string => BackingService::tryFrom($s)?->label() ?? $s, $d['services'] ?? []);
+        $service = fn (string $key): array => isset($d['service_sources'][$key])
+            ? $row($key, (string) __('workspaces.create.on'), (string) __('workspaces.create.from', ['file' => $d['service_sources'][$key]]))
+            : $row($key, (string) __('workspaces.create.not_found'), (string) __('workspaces.create.service_hint'), false);
+        $gateLabels = array_map(fn (string $g): string => GateRows::ROWS[$g]['label'] ?? $g, $d['gates'] ?? []);
 
         return [
-            __('workspaces.create.lines.project', ['project' => $d['project']]),
-            $stack !== null ? __('workspaces.create.lines.stack', ['stack' => $stack]) : __('workspaces.create.lines.no_stack'),
-            $services !== [] ? __('workspaces.create.lines.services', ['services' => implode(', ', $services)]) : __('workspaces.create.lines.no_services'),
+            $row('project', (string) __('workspaces.create.projects.'.$d['project'])),
+            $stack !== null ? $row('stack', $stack, (string) __('workspaces.create.stack_reason')) : $row('stack', (string) __('workspaces.create.not_found'), (string) __('workspaces.create.no_stack'), false),
+            $service('mysql'),
+            $service('redis'),
             match (true) {
-                $d['gates'] === null => __('workspaces.create.lines.gates_unknown'),
-                $d['gates'] === [] => __('workspaces.create.lines.no_gates'),
-                default => __('workspaces.create.lines.gates', ['gates' => implode(', ', $d['gates'])]),
+                $d['gates'] === null => $row('gates', (string) __('workspaces.create.unknown'), (string) __('workspaces.create.gates_unknown'), false),
+                $d['gates'] === [] => $row('gates', (string) __('workspaces.create.not_found'), (string) __('workspaces.create.no_gates'), false),
+                default => $row('gates', implode(', ', $gateLabels), (string) __('workspaces.create.from', ['file' => 'composer.json'])),
             },
-            __('workspaces.create.lines.setup', ['source' => __('workspaces.setup.source.'.$d['setup'])]),
-            __('workspaces.create.lines.preview', ['source' => __('workspaces.setup.source.'.$d['preview'])]),
+            $row('setup', (string) __('workspaces.setup.source.'.$d['setup'])),
+            $row('preview', (string) __('workspaces.setup.source.'.$d['preview'])),
         ];
     }
 

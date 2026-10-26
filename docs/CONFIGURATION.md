@@ -159,7 +159,7 @@ sessions and previews, CPU, memory, cleanup) are set in the workspace settings
 |---|---|---|
 | `ARGOS_WORKSPACE_COLLABORATION` | `true` | Whether workspaces may have members besides their creator and tasks collaborators. Backs the `workspace-collaboration` gate. |
 | `ARGOS_WORKSPACE_MAX_ACTIVE` | `5` | Workspace containers running at the same time. Starting beyond it is refused — running workspaces are never evicted. `0` disables the cap. |
-| `ARGOS_WORKSPACE_IDLE_MINUTES` | `60` | Stop a running workspace after this many minutes without activity (never while a task is being prepared, queued, working, waiting for a decision or running automatically). `0` disables. |
+| `ARGOS_WORKSPACE_IDLE_MINUTES` | `240` | Stop a running workspace after this many minutes without activity (never while a task is being prepared, queued, working, waiting for a decision or running automatically). `0` disables. |
 | `ARGOS_WORKSPACE_CPUS` | `2` | Default CPU limit per workspace container (a workspace can set its own). |
 | `ARGOS_WORKSPACE_MEMORY` | `4g` | Default memory limit per workspace container (a workspace can set its own). |
 | `ARGOS_INTERNAL_URL` | `http://nginx` | Base URL the workspace daemon uses to reach the manager on `argos_ws`. |

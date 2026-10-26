@@ -38,6 +38,7 @@ class PullRequestService
         private readonly TaskService $tasks,
         private readonly TaskNoticeService $notices,
         private readonly WorkspaceNotifier $notifier,
+        private readonly TaskStreamPublisher $stream,
     ) {}
 
     /**
@@ -80,8 +81,13 @@ class PullRequestService
         } elseif (! $task->status->isFinished() && $task->status !== TaskStatus::Preparing) {
             $task->status = TaskStatus::PrOpen;
         }
+        $changed = $task->isDirty(['pr_state', 'pr_url', 'pr_checks', 'pr_review_state', 'pr_conflicts', 'auto_merge', 'status']);
         $task->save();
 
+        // Open pages re-render the sidebar; most changes come without a chat notice.
+        if ($changed) {
+            $this->stream->publish($task->workspace_id, $task->id, [['type' => 'pr.updated', 'data' => []]]);
+        }
         $this->announceChanges($task, $before, $details);
         if ($finished) {
             app(IssueRunReporter::class)->closed($task);

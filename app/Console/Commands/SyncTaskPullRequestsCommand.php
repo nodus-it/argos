@@ -8,6 +8,7 @@ use App\Models\Task;
 use App\Services\GitProvider\PullRequestDetails;
 use App\Services\Workspace\PullRequestService;
 use Illuminate\Console\Command;
+use Throwable;
 
 /**
  * Refreshes the state of tasks' open pull requests; a merged one finishes
@@ -23,9 +24,17 @@ class SyncTaskPullRequestsCommand extends Command
     {
         Task::query()
             ->with('workspace')
+            ->whereHas('workspace')
             ->whereNotNull('pr_number')
             ->whereIn('pr_state', PullRequestDetails::OPEN_STATES)
-            ->each(fn (Task $task) => $pullRequests->refresh($task));
+            ->each(function (Task $task) use ($pullRequests): void {
+                // One broken task must not keep the others from syncing.
+                try {
+                    $pullRequests->refresh($task);
+                } catch (Throwable $e) {
+                    report($e);
+                }
+            });
 
         return self::SUCCESS;
     }

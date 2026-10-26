@@ -78,6 +78,16 @@ class EnvAuditTest extends TestCase
         $this->assertSame([], app(EnvAudit::class)->servicesNeeded(Workspace::factory()->create()));
     }
 
+    public function test_compose_files_of_the_repository_count_as_well(): void
+    {
+        $this->files = ['.tools/docker/compose.yml' => "services:\n  database:\n    image: \${DB_IMAGE:-mariadb:latest}\n  redis:\n    image: \${REDIS_IMAGE:-redis:latest}\n"];
+
+        $this->assertSame(
+            ['mysql' => '.tools/docker/compose.yml', 'redis' => '.tools/docker/compose.yml'],
+            app(EnvAudit::class)->serviceSources(Workspace::factory()->create()),
+        );
+    }
+
     public function test_missing_required_keys_lock_previews_except_for_the_setup_task(): void
     {
         config(['argos.preview.enabled' => true]);

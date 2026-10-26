@@ -287,7 +287,7 @@
                             <span>{{ __('workspaces.events.claude') }}
                                 @if ($block['started_at'] !== null)<time title="{{ $block['started_at']->isoFormat('LLL') }}">· {{ $block['started_at']->format('H:i') }}</time>@endif
                                 @if ($block['running'])
-                                    · <span x-data="{ s: {{ \App\Support\TaskTimeline::elapsed($block['started_at']) }} }" x-init="setInterval(() => s++, 1000)" x-text="@js(__('workspaces.chat.working_for', ['seconds' => '__S__'])).replace('__S__', s)">{{ __('workspaces.chat.working_for', ['seconds' => \App\Support\TaskTimeline::elapsed($block['started_at'])]) }}</span>
+                                    · <span x-data="argosElapsed({{ $block['started_at']?->getTimestampMs() ?? 'null' }})" x-text="@js(__('workspaces.chat.working_for', ['seconds' => '__S__'])).replace('__S__', seconds)">{{ __('workspaces.chat.working_for', ['seconds' => \App\Support\TaskTimeline::elapsed($block['started_at'])]) }}</span>
                                 @elseif ($block['duration_ms'] !== null)
                                     · {{ $block['cost'] ? __('workspaces.chat.meta', ['duration' => number_format($block['duration_ms'] / 1000, 0, ',', '.'), 'cost' => \App\Support\CostFormatter::usd((float) $block['cost'])]) : __('workspaces.chat.meta_duration', ['duration' => number_format($block['duration_ms'] / 1000, 0, ',', '.')]) }}
                                 @endif
@@ -381,10 +381,8 @@
         </div>
 
         @if ($task->isResumable() && $canWrite)
-            <div class="ws-alert ws-alert-warn">
-                <span>{{ __('workspaces.task.session_ended') }}</span>
-                <button type="button" class="btn btn-secondary btn-sm" wire:click="resume">{{ __('workspaces.task.resume') }}</button>
-            </div>
+            {{-- Sending reopens the session on its own; this only says so. --}}
+            <p class="ag-session-rest ag-muted" data-testid="session-rest">{{ __('workspaces.task.session_resting') }}</p>
         @endif
 
         {{-- Reset to a checkpoint --}}
@@ -425,14 +423,12 @@
                     // What Claude does right now, always in sight above the composer.
                     $runningBlock = collect($timeline)->last(fn ($b) => $b['kind'] === 'claude' && $b['running']);
                     $lastStep = $runningBlock !== null ? collect($runningBlock['items'])->where('kind', 'steps')->flatMap(fn ($i) => $i['rows'])->last() : null;
-                    $runningFor = $runningBlock !== null ? \App\Support\TaskTimeline::elapsed($runningBlock['started_at']) : 0;
                 @endphp
                 <div class="ag-working-bar" role="status" x-show="status === 'running'" x-cloak
-                     x-data="{ s: {{ $runningFor }}, t: null }"
-                     x-effect="if (status === 'running') { t ??= setInterval(() => s++, 1000) } else { clearInterval(t); t = null; s = 0 }">
+                     x-data="argosElapsed({{ $runningBlock !== null ? ($runningBlock['started_at']?->getTimestampMs() ?? 'null') : 'null' }})">
                     <span class="ag-working-pulse" aria-hidden="true"></span>
                     <span class="ag-working-text">{{ __('workspaces.chat.claude_working') }}@if ($lastStep !== null) · <span class="ag-working-step">{{ $lastStep['verb'] }} <span class="mono">{{ \Illuminate\Support\Str::limit($lastStep['target'], 80) }}</span></span>@endif</span>
-                    <span class="ag-working-time mono" x-text="s >= 60 ? Math.floor(s / 60) + ' min ' + (s % 60) + ' s' : s + ' s'"></span>
+                    <span class="ag-working-time mono" x-text="seconds >= 60 ? Math.floor(seconds / 60) + ' min ' + (seconds % 60) + ' s' : seconds + ' s'"></span>
                 </div>
                 @if ($task !== null)
                     @livewire('workspace.change-tray', ['workspaceId' => $workspace->id, 'taskId' => $task->id], key('tray-'.$task->id))

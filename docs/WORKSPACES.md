@@ -211,7 +211,10 @@ Each workspace runs in one container with:
 - **Idle stop:** a running workspace without activity for
   `ARGOS_WORKSPACE_IDLE_MINUTES` is stopped — but never while a task is being
   prepared, waits in the session queue, works, waits for a decision, or runs
-  automatically.
+  automatically. Messages, decisions, Claude's work, the editor and the
+  preview count as activity, and so does an open workspace page in a visible
+  browser tab. A stopped workspace closes its sessions; the next message
+  resumes the session on its own.
 - **Capacity:** at most `ARGOS_WORKSPACE_MAX_ACTIVE` workspaces run at once.
   Starting beyond that is refused; running workspaces are never evicted.
 - **Limits per workspace** (Settings → Resources): *Parallel sessions*
@@ -263,7 +266,7 @@ pushed are lost.
 |---|---|---|
 | `ARGOS_WORKSPACE_COLLABORATION` | `true` | Whether workspaces may have members besides the creator, and tasks collaborators. |
 | `ARGOS_WORKSPACE_MAX_ACTIVE` | `5` | Workspaces running at the same time. |
-| `ARGOS_WORKSPACE_IDLE_MINUTES` | `60` | Idle time before a workspace is stopped (`0` disables). |
+| `ARGOS_WORKSPACE_IDLE_MINUTES` | `240` | Idle time before a workspace is stopped (`0` disables). |
 | `ARGOS_WORKSPACE_CPUS` / `ARGOS_WORKSPACE_MEMORY` | `2` / `4g` | Default limits per workspace container. |
 | `ARGOS_WORKSPACE_PR_SYNC_MINUTES` | `3` | How often open pull requests of tasks are re-read. |
 | `ARGOS_WORKSPACE_UPLOAD_MAX_MB` | `5` | Size limit per image attached to a message. |
