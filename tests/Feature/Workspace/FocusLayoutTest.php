@@ -14,6 +14,7 @@ use App\Enums\TaskKind;
 use App\Enums\TaskStatus;
 use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceSetupStatus;
+use App\Enums\WorkspaceStatus;
 use App\Filament\App\Resources\WorkspaceResource\Pages\ViewWorkspace;
 use App\Livewire\Workspace\ChangeTray;
 use App\Livewire\Workspace\ContextPanel;
@@ -115,6 +116,17 @@ class FocusLayoutTest extends TestCase
             ->call('heartbeat');
 
         $this->assertTrue($this->workspace->fresh()->last_activity_at->isAfter(now()->subMinute()));
+    }
+
+    public function test_a_finished_start_refreshes_the_sidebar(): void
+    {
+        $this->workspace->forceFill(['status' => WorkspaceStatus::Starting])->save();
+        $page = Livewire::actingAs($this->owner)->test(ViewWorkspace::class, ['record' => $this->workspace->getKey()]);
+
+        $page->call('refreshStatus')->assertNotDispatched('argos-workspace-changed');
+
+        $this->workspace->forceFill(['status' => WorkspaceStatus::Running])->save();
+        $page->call('refreshStatus')->assertDispatched('argos-workspace-changed');
     }
 
     public function test_tasks_are_grouped_with_a_status_line(): void

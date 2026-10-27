@@ -56,6 +56,7 @@ class ViewWorkspace extends ViewRecord
         } catch (WorkspaceException $e) {
             Notification::make()->title($e->getMessage())->warning()->send();
         }
+        $this->shownStatus = $this->workspace()->fresh()?->status->value;
     }
 
     #[On('task-changed')]
@@ -88,9 +89,18 @@ class ViewWorkspace extends ViewRecord
     }
 
     /** Re-read the record while the container changes state (polled). */
+    /** The container state the page last showed; the record itself is re-read on every request. */
+    public ?string $shownStatus = null;
+
     public function refreshStatus(): void
     {
         $this->record = $this->workspace()->fresh() ?? $this->record;
+        $status = $this->workspace()->status->value;
+        // The sidebar and the change tray are components of their own: a started container must reach them too.
+        if ($this->shownStatus !== null && $this->shownStatus !== $status) {
+            $this->dispatch('argos-workspace-changed');
+        }
+        $this->shownStatus = $status;
     }
 
     /** Rendered in the page's own header (see view-workspace.blade.php). */
