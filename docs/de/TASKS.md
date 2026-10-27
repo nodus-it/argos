@@ -192,6 +192,11 @@ markieren*). Sie erscheint nur, wenn es etwas zu tun gibt.
   WebP; bis zu 5 pro Nachricht, je `ARGOS_WORKSPACE_UPLOAD_MAX_MB`). Claude
   sieht sie mit der Nachricht; andere sehen sie als Vorschaubilder. Sie werden
   privat gespeichert.
+- **Andere Dateien** (Tabellen, PDFs, CSV, Archive): genauso anhängen oder
+  hineinziehen, mit denselben Grenzen. Argos legt sie im Ordner der Aufgabe unter
+  `.argos/uploads/` ab — git ignoriert den Ordner, sie landen also nie in einem
+  Commit — und die Nachricht nennt Claude den Pfad. Im Chat erscheinen sie als
+  Link, der die Datei herunterlädt.
 - **`@`-Erwähnungen:** Tippe `@` und einen Teil eines Pfads, um eine Datei aus
   dem Worktree der Aufgabe auszuwählen (unscharfe Suche über getrackte und
   ungetrackte Dateien; ignorierte bleiben außen vor). Der Pfad wird als Text
@@ -500,7 +505,8 @@ Folge-Aufgabe, um weiterzumachen.
 `cleanup_after_days` (Einstellungen → Ressourcen, Standard 14) nachdem eine
 Aufgabe fertig oder abgebrochen ist, entfernt Argos ihre Preview, ihren
 Worktree, ihren lokalen Branch und ihre Datenbank (täglich um 03:30,
-`argos:tasks:cleanup`). Unterhaltung, Remote-Branch und Pull Request bleiben.
+`argos:tasks:cleanup`) und verschiebt die Aufgabe ins Archiv des
+Aufgaben-Switchers. Unterhaltung, Remote-Branch und Pull Request bleiben.
 Aufgaben eines gestoppten Workspaces werden bei einem späteren Lauf
 aufgeräumt, sobald er läuft.
 

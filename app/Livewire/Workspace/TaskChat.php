@@ -323,12 +323,12 @@ class TaskChat extends Component
 
         $this->validate([
             'uploads' => ['array', 'max:'.TaskAttachmentService::MAX_FILES],
-            'uploads.*' => ['image', 'mimes:png,jpg,jpeg,gif,webp', 'max:'.((int) config('argos.workspaces.upload_max_mb', 5) * 1024)],
+            'uploads.*' => ['file', 'max:'.((int) config('argos.workspaces.upload_max_mb', 5) * 1024)],
         ]);
 
         $this->attempt(function () use ($task, $text): void {
-            $images = app(TaskAttachmentService::class)->store($task, $this->uploads);
-            app(TaskService::class)->send($task, $this->user(), $text, $images);
+            $attachments = app(TaskAttachmentService::class);
+            app(TaskService::class)->send($task, $this->user(), $text, $attachments->store($task, $this->uploads), files: $attachments->storeFiles($task, $this->uploads));
             $this->draft = '';
             $this->uploads = [];
         });

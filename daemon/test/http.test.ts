@@ -230,6 +230,25 @@ describe('daemon HTTP API', () => {
         outbox.stop();
     }, 20_000);
 
+    it('stores attached files in the task folder and names them in the message', async () => {
+        const texts: string[] = [];
+        const { app, outbox } = make(async function* (message) {
+            texts.push(textOfUserMessage(message));
+            yield assistantText('m', 'ok');
+        });
+        await prepare(app, 'fix-login', 't1');
+        await app.inject({ method: 'POST', url: '/tasks/t1/start', headers: auth, payload: startBody });
+        const files = [{ name: 'data.xlsx', data: Buffer.from('sheet').toString('base64') }];
+        expect((await app.inject({ method: 'POST', url: '/tasks/t1/messages', headers: auth, payload: { ...message('e1', 'look'), files } })).statusCode).toBe(202);
+
+        await waitFor(() => texts.length > 0);
+        expect(texts[0]).toContain('look');
+        expect(texts[0]).toContain('- .argos/uploads/data.xlsx');
+        expect(readFileSync(join(ws.layout.tasksDir, 'fix-login', '.argos/uploads/data.xlsx'), 'utf8')).toBe('sheet');
+        await app.inject({ method: 'POST', url: '/tasks/t1/stop', headers: auth });
+        outbox.stop();
+    }, 20_000);
+
     it('resolves approvals and 404s unknown ones', async () => {
         const { app, outbox } = make(async function* (_message, ctx) {
             const decision = await ctx.askPermission('Write', { file_path: 'x' });

@@ -90,8 +90,9 @@ class TaskHousekeepingTest extends TestCase
             $this->assertNull($spared->fresh()->cleaned_at, $spared->title);
         }
         $this->assertTrue($alreadyCleaned->fresh()->cleaned_at->lt(now()->subDays(9)));
-        // The conversation stays.
-        $this->assertNull($old->fresh()->archived_at);
+        // The conversation stays, in the archive.
+        $this->assertNotNull($old->fresh()->archived_at);
+        $this->assertNull($recent->fresh()->archived_at);
         $this->assertDatabaseHas('tasks', ['id' => $old->id]);
     }
 
@@ -106,6 +107,18 @@ class TaskHousekeepingTest extends TestCase
 
         $this->assertNull($old->fresh()->cleaned_at);
         $this->assertSame(DemoStatus::Live, $preview->fresh()->status);
+    }
+
+    public function test_cleanup_skips_tasks_of_deleted_workspaces(): void
+    {
+        $old = $this->finished('old-done', 20);
+        $gone = Workspace::factory()->create(['cleanup_after_days' => 14]);
+        Task::factory()->create(['workspace_id' => $gone->id, 'status' => TaskStatus::Done, 'done_at' => now()->subDays(30)]);
+        $gone->delete();
+
+        $this->artisan('argos:tasks:cleanup')->assertSuccessful();
+
+        $this->assertNotNull($old->fresh()->cleaned_at);
     }
 
     public function test_sync_prs_refreshes_open_and_draft_pull_requests_only(): void
